@@ -5456,6 +5456,156 @@ func TestDescribeNode(t *testing.T) {
 	}
 }
 
+func TestDescribeNodeWithSidecar(t *testing.T) {
+	holderIdentity := "holder"
+	nodeCapacity := mergeResourceLists(
+		getHugePageResourceList("2Mi", "4Gi"),
+		getResourceList("8", "24Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+	nodeAllocatable := mergeResourceLists(
+		getHugePageResourceList("2Mi", "2Gi"),
+		getResourceList("4", "12Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+
+	restartPolicy := corev1.ContainerRestartPolicyAlways
+	fake := fake.NewSimpleClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: true,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:    nodeCapacity,
+				Allocatable: nodeAllocatable,
+			},
+		},
+		&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: corev1.NamespaceNodeLease,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: &holderIdentity,
+				AcquireTime:    &metav1.MicroTime{Time: time.Now().Add(-time.Hour)},
+				RenewTime:      &metav1.MicroTime{Time: time.Now()},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-with-resources",
+				Namespace: "foo",
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{
+					// sidecar, should sum into the total resources
+					{
+						Name:          "init-container-1",
+						RestartPolicy: &restartPolicy,
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1", "1Gi"),
+						},
+					},
+					// non-sidecar
+					{
+						Name: "init-container-2",
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1", "1Gi"),
+						},
+					},
+				},
+				Containers: []corev1.Container{
+					{
+						Name:  "cpu-mem",
+						Image: "image:latest",
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1", "1Gi"),
+							Limits:   getResourceList("2", "2Gi"),
+						},
+					},
+					{
+						Name:  "hugepages",
+						Image: "image:latest",
+						Resources: corev1.ResourceRequirements{
+							Requests: getHugePageResourceList("2Mi", "512Mi"),
+							Limits:   getHugePageResourceList("2Mi", "512Mi"),
+						},
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		},
+		&corev1.EventList{
+			Items: []corev1.Event{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-1",
+						Namespace: "default",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "bar",
+						UID:  "bar",
+					},
+					Message:        "Node bar status is now: NodeHasNoDiskPressure",
+					FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          1,
+					Type:           corev1.EventTypeNormal,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-2",
+						Namespace: "default",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "bar",
+						UID:  "0ceac5fb-a393-49d7-b04f-9ea5f18de5e9",
+					},
+					Message:        "Node bar status is now: NodeReady",
+					FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          2,
+					Type:           corev1.EventTypeNormal,
+				},
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedOut := []string{"Unschedulable", "true", "holder",
+		`Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests     Limits
+  --------           --------     ------
+  cpu                2 (50%)      2 (50%)
+  memory             2Gi (16%)    2Gi (16%)
+  ephemeral-storage  0 (0%)       0 (0%)
+  hugepages-1Gi      0 (0%)       0 (0%)
+  hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
+		`Node bar status is now: NodeHasNoDiskPressure`,
+		`Node bar status is now: NodeReady`}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %s in output: %s", expected, out)
+		}
+	}
+}
 func TestDescribeStatefulSet(t *testing.T) {
 	var partition int32 = 2672
 	var replicas int32 = 1
