@@ -1701,7 +1701,7 @@ func TestPreempt(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, time.Duration(0))
+			cache := internalcache.New(ctx)
 			for _, pod := range test.pods {
 				cache.AddPod(logger, pod)
 			}

@@ -279,7 +279,7 @@ func TestFailureHandler(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(ctx, 30*time.Second)
+			schedulerCache := internalcache.New(ctx)
 
 			queue.Add(logger, testPod)
 			queue.Pop()
@@ -358,7 +358,7 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(ctx, 30*time.Second)
+			schedulerCache := internalcache.New(ctx)
 
 			for i := range tt.nodes {
 				node := tt.nodes[i]
@@ -404,7 +404,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 	podInformer.Informer().GetStore().Add(testPod)
 
 	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-	schedulerCache := internalcache.New(ctx, 30*time.Second)
+	schedulerCache := internalcache.New(ctx)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.
 	schedulerCache.AddNode(logger, &nodeFoo)
