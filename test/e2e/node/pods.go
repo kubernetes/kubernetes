@@ -48,6 +48,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
 )
@@ -82,7 +83,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err := podClient.List(ctx, options)
 			framework.ExpectNoError(err, "failed to query for pod")
-			framework.ExpectEqual(len(pods.Items), 0)
+			gomega.Expect(pods.Items).To(gomega.BeEmpty())
 
 			ginkgo.By("submitting the pod to kubernetes")
 			podClient.Create(ctx, pod)
@@ -92,7 +93,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(ctx, options)
 			framework.ExpectNoError(err, "failed to query for pod")
-			framework.ExpectEqual(len(pods.Items), 1)
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 
 			// We need to wait for the pod to be running, otherwise the deletion
 			// may be carried out immediately rather than gracefully.
@@ -106,7 +107,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			var statusCode int
 			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "30").Do(ctx).StatusCode(&statusCode).Into(&lastPod)
 			framework.ExpectNoError(err, "failed to use http client to send delete")
-			framework.ExpectEqual(statusCode, http.StatusOK, "failed to delete gracefully by client request")
+			gomega.Expect(statusCode).To(gomega.Equal(http.StatusOK), "failed to delete gracefully by client request")
 
 			ginkgo.By("verifying the kubelet observed the termination notice")
 
@@ -144,8 +145,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(ctx, options)
 			framework.ExpectNoError(err, "failed to query for pods")
-			framework.ExpectEqual(len(pods.Items), 0)
-
+			gomega.Expect(pods.Items).To(gomega.BeEmpty())
 		})
 	})
 
@@ -197,7 +197,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("verifying QOS class is set on the pod")
 			pod, err := podClient.Get(ctx, name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to query for pod")
-			framework.ExpectEqual(pod.Status.QOSClass, v1.PodQOSGuaranteed)
+			gomega.Expect(pod.Status.QOSClass).To(gomega.Equal(v1.PodQOSGuaranteed))
 		})
 	})
 
