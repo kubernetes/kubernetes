@@ -5991,6 +5991,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.PersistentVolumeStatus
   map:
     fields:
+    - name: lastPhaseTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: message
       type:
         scalar: string

@@ -5574,6 +5574,7 @@ func autoConvert_v1_PersistentVolumeStatus_To_core_PersistentVolumeStatus(in *v1
 	out.Phase = core.PersistentVolumePhase(in.Phase)
 	out.Message = in.Message
 	out.Reason = in.Reason
+	out.LastPhaseTransitionTime = (*metav1.Time)(unsafe.Pointer(in.LastPhaseTransitionTime))
 	return nil
 }
 
@@ -5586,6 +5587,7 @@ func autoConvert_core_PersistentVolumeStatus_To_v1_PersistentVolumeStatus(in *co
 	out.Phase = v1.PersistentVolumePhase(in.Phase)
 	out.Message = in.Message
 	out.Reason = in.Reason
+	out.LastPhaseTransitionTime = (*metav1.Time)(unsafe.Pointer(in.LastPhaseTransitionTime))
 	return nil
 }
 

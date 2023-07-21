@@ -626,6 +626,13 @@ const (
 	// Enables PDBUnhealthyPodEvictionPolicy for PodDisruptionBudgets
 	PDBUnhealthyPodEvictionPolicy featuregate.Feature = "PDBUnhealthyPodEvictionPolicy"
 
+	// owner: @RomanBednar
+	// kep: https://kep.k8s.io/3762
+	// alpha: v1.28
+	//
+	// Adds a new field to persistent volumes which holds a timestamp of when the volume last transitioned its phase.
+	PersistentVolumeLastPhaseTransitionTime featuregate.Feature = "PersistentVolumeLastPhaseTransitionTime"
+
 	// owner: @haircommander
 	// kep: https://kep.k8s.io/2364
 	// alpha: v1.23
@@ -1103,6 +1110,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	NodeSwap: {Default: false, PreRelease: featuregate.Beta},
 
 	PDBUnhealthyPodEvictionPolicy: {Default: true, PreRelease: featuregate.Beta},
+
+	PersistentVolumeLastPhaseTransitionTime: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodAndContainerStatsFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 

@@ -91,7 +91,7 @@ func TestDropDisabledFields(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeExpandSecret, tc.csiExpansionEnabled)()
 
-			DropDisabledFields(tc.newSpec, tc.oldSpec)
+			DropDisabledSpecFields(tc.newSpec, tc.oldSpec)
 			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {
 				t.Error(cmp.Diff(tc.newSpec, tc.expectNewSpec))
 			}
