@@ -34,13 +34,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const (
-	pingReadDeadline = 60 * time.Second
-	// should be less than pingReadDeadline
-	pingWriteDeadline = 10 * time.Second
-	PingPeriod        = 5 * time.Second
-)
-
 var (
 	_ Executor          = &wsStreamExecutor{}
 	_ streamCreator     = &wsStreamCreator{}
@@ -55,13 +48,23 @@ var (
 	}
 )
 
+// wsHeartbeatOptions stores the heartbeat related deadline options
+// including the enable/disable.
+type wsHeartbeatOptions struct {
+	enablePing        bool
+	pingReadDeadline  time.Duration
+	pingWriteDeadline time.Duration
+	pingPeriod        time.Duration
+}
+
 // wsStreamExecutor handles transporting standard shell streams over an httpstream connection.
 type wsStreamExecutor struct {
-	transport http.RoundTripper
-	upgrader  websocket.ConnectionHolder
-	method    string
-	url       string
-	protocols []string
+	transport        http.RoundTripper
+	upgrader         websocket.ConnectionHolder
+	method           string
+	url              string
+	protocols        []string
+	heartbeatOptions wsHeartbeatOptions
 }
 
 // NewWebSocketExecutor allows to execute commands via a WebSocket connection.
@@ -80,6 +83,12 @@ func NewWebSocketExecutor(config *restclient.Config, method, url string) (Execut
 		// servers on container runtimes which support V1-V4. These legacy
 		// websocket servers will not handle the new CLOSE signal.
 		protocols: []string{remotecommand.StreamProtocolV5Name},
+		heartbeatOptions: wsHeartbeatOptions{
+			enablePing:        true,
+			pingReadDeadline:  60 * time.Second,
+			pingWriteDeadline: 10 * time.Second,
+			pingPeriod:        5 * time.Second,
+		},
 	}, nil
 }
 
@@ -130,7 +139,7 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 				panicChan <- p
 			}
 		}()
-		creator := newWSStreamCreator(conn)
+		creator := newWSStreamCreator(conn, e.heartbeatOptions)
 		go creator.run(e.upgrader.DataBufferSize()) // connection read/stream write loop in its own goroutine.
 		errorChan <- streamer.stream(creator)
 	}()
@@ -146,19 +155,25 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 }
 
 type wsStreamCreator struct {
-	conn      *gwebsocket.Conn
-	connMu    sync.Mutex
-	streams   map[byte]*stream
-	streamsMu sync.Mutex
+	conn              *gwebsocket.Conn
+	connMu            sync.Mutex
+	streams           map[byte]*stream
+	streamsMu         sync.Mutex
+	pingReadDeadline  time.Duration
+	pingWriteDeadline time.Duration
 }
 
-func newWSStreamCreator(conn *gwebsocket.Conn) *wsStreamCreator {
+func newWSStreamCreator(conn *gwebsocket.Conn, options wsHeartbeatOptions) *wsStreamCreator {
 	ws := wsStreamCreator{
-		conn:    conn,
-		streams: map[byte]*stream{},
+		conn:              conn,
+		streams:           map[byte]*stream{},
+		pingReadDeadline:  options.pingReadDeadline,
+		pingWriteDeadline: options.pingWriteDeadline,
 	}
 
-	go ws.sendPings(PingPeriod) // start heartbeat
+	if options.enablePing {
+		go ws.sendPings(options.pingPeriod) // start heartbeat
+	}
 
 	return &ws
 }
@@ -188,12 +203,13 @@ func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, 
 	}
 	reader, writer := io.Pipe()
 	s := &stream{
-		headers:   headers,
-		readPipe:  reader,
-		writePipe: writer,
-		conn:      c.conn,
-		connMu:    &c.connMu,
-		id:        id,
+		headers:           headers,
+		readPipe:          reader,
+		writePipe:         writer,
+		conn:              c.conn,
+		connMu:            &c.connMu,
+		id:                id,
+		pingWriteDeadline: c.pingWriteDeadline,
 	}
 	c.setStream(id, s)
 	return s, nil
@@ -238,11 +254,11 @@ func (c *wsStreamCreator) run(bufferSize int) {
 	// difference can cause incomplete connection reads.
 	readBuffer := make([]byte, bufferSize)
 	// Set up handler for ping/pong heartbeat.
-	if err := c.conn.SetReadDeadline(time.Now().Add(pingReadDeadline)); err != nil {
+	if err := c.conn.SetReadDeadline(time.Now().Add(c.pingReadDeadline)); err != nil {
 		klog.V(7).Infof("Websocket setting read deadline failed %v", err)
 	}
 	c.conn.SetPongHandler(func(string) error {
-		err := c.conn.SetReadDeadline(time.Now().Add(pingReadDeadline))
+		err := c.conn.SetReadDeadline(time.Now().Add(c.pingReadDeadline))
 		if err != nil {
 			klog.V(7).Infof("Websocket setting read deadline failed %v", err)
 		}
@@ -317,8 +333,9 @@ type stream struct {
 	conn *gwebsocket.Conn
 	// connMu protects conn against concurrent write operations. There must be a single writer and a single reader only.
 	// The mutex is shared across all streams because the underlying connection is shared.
-	connMu *sync.Mutex
-	id     byte
+	connMu            *sync.Mutex
+	id                byte
+	pingWriteDeadline time.Duration
 }
 
 func (s *stream) Read(p []byte) (n int, err error) {
@@ -334,7 +351,7 @@ func (s *stream) Write(p []byte) (n int, err error) {
 	if s.conn == nil {
 		return 0, fmt.Errorf("write on closed stream %d", s.id)
 	}
-	err = s.conn.SetWriteDeadline(time.Now().Add(pingWriteDeadline))
+	err = s.conn.SetWriteDeadline(time.Now().Add(s.pingWriteDeadline))
 	if err != nil {
 		klog.V(7).Infof("Websocket setting write deadline failed %v", err)
 		return 0, err

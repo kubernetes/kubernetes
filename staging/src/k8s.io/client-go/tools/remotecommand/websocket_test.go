@@ -263,6 +263,134 @@ func TestWebSocketClient_ErrorStream(t *testing.T) {
 	}
 }
 
+// TestWebSocketClient_HeartbeatEnabled ensures that the heartbeat keeps the connection opened
+// in idle mode(there is no data transmission between client and server).
+func TestWebSocketClient_HeartbeatEnabled(t *testing.T) {
+	expectedExitCode := randomExitCode()
+	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
+		if err != nil {
+			t.Fatalf("error on webSocketServerStreams: %v", err)
+		}
+		defer conns.conn.Close()
+		// we should lock the connection greater than 100 milliseconds to test because write and read deadlines
+		// are set to 100 milliseconds and since heartbeat is enabled, this should **not** fail with timeout error.
+		time.Sleep(120 * time.Millisecond)
+		// Force an non-zero exit code error returned on the error stream.
+		conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+			Status: metav1.StatusFailure,
+			Reason: remotecommand.NonZeroExitCodeReason,
+			Details: &metav1.StatusDetails{
+				Causes: []metav1.StatusCause{
+					{
+						Type:    remotecommand.ExitCodeCauseType,
+						Message: fmt.Sprintf("%d", expectedExitCode),
+					},
+				},
+			},
+		}})
+	}))
+	defer websocketServer.Close()
+
+	// Now create the WebSocket client (executor), and point it to the "websocketServer".
+	websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stderr=true"
+	websocketLocation, err := url.Parse(websocketServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse WebSocket server URL: %s", websocketServer.URL)
+	}
+	exec, err := NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host}, "POST", websocketServer.URL)
+	if err != nil {
+		t.Errorf("unexpected error creating websocket executor: %v", err)
+	}
+
+	streamExec := exec.(*wsStreamExecutor)
+	streamExec.heartbeatOptions = wsHeartbeatOptions{
+		enablePing:        true,
+		pingPeriod:        50 * time.Millisecond,
+		pingWriteDeadline: 100 * time.Millisecond,
+		pingReadDeadline:  100 * time.Millisecond,
+	}
+	var stderr bytes.Buffer
+	options := &StreamOptions{
+		Stderr: &stderr,
+	}
+	errorChan := make(chan error)
+	go func() {
+		// Start the streaming on the WebSocket "exec" client.
+		errorChan <- streamExec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		if err == nil {
+			t.Errorf("expected error, but received none")
+		}
+		expectedError := fmt.Sprintf("command terminated with exit code %d", expectedExitCode)
+		// Compare expected error with exit code to actual error.
+		if expectedError != err.Error() {
+			t.Errorf("expected error (%s), got (%s)", expectedError, err)
+		}
+	}
+}
+
+// TestWebSocketClient_TimeoutsWithoutHeartbeat tests the timeout error when the heartbeat
+// is intentionally disabled.
+func TestWebSocketClient_TimeoutsWithoutHeartbeat(t *testing.T) {
+	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
+		if err != nil {
+			t.Fatalf("error on webSocketServerStreams: %v", err)
+		}
+		defer conns.conn.Close()
+		// we should lock the connection greater than 100 milliseconds to test because write and read deadlines
+		// are set to 100 milliseconds and since heartbeat is disabled, this should fail with timeout error.
+		time.Sleep(120 * time.Millisecond)
+	}))
+	defer websocketServer.Close()
+
+	// Now create the WebSocket client (executor), and point it to the "websocketServer".
+	websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stderr=true"
+	websocketLocation, err := url.Parse(websocketServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse WebSocket server URL: %s", websocketServer.URL)
+	}
+	exec, err := NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host}, "POST", websocketServer.URL)
+	if err != nil {
+		t.Errorf("unexpected error creating websocket executor: %v", err)
+	}
+
+	streamExec := exec.(*wsStreamExecutor)
+	streamExec.heartbeatOptions = wsHeartbeatOptions{
+		enablePing:        false,
+		pingPeriod:        50 * time.Millisecond,
+		pingWriteDeadline: 100 * time.Millisecond,
+		pingReadDeadline:  100 * time.Millisecond,
+	}
+	var stderr bytes.Buffer
+	options := &StreamOptions{
+		Stderr: &stderr,
+	}
+	errorChan := make(chan error)
+	go func() {
+		// Start the streaming on the WebSocket "exec" client.
+		errorChan <- streamExec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		if err == nil {
+			t.Errorf("timeout error expected")
+		}
+		if !strings.Contains(err.Error(), "i/o timeout") {
+			t.Errorf("unexpected error occurred %v", err)
+		}
+	}
+}
+
 // fakeTerminalSizeQueue implements the TerminalSizeQueue interface, hard-coded to
 // return the "size" only once.
 type fakeTerminalSizeQueue struct {
@@ -449,6 +577,93 @@ func TestWebSocketStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 	go func() {
 		// Start the streaming on the WebSocket "exec" client.
 		errorChan <- exec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		if err != nil {
+			t.Errorf("unexpected error")
+		}
+	}
+	data, err := ioutil.ReadAll(bytes.NewReader(stdout.Bytes()))
+	if err != nil {
+		t.Errorf("error reading the stream: %v", err)
+		return
+	}
+	// Check the data sent on STDIN was the same returned on STDOUT.
+	if !bytes.Equal(randomData, data) {
+		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
+	}
+
+}
+
+// TestWebSocketStreamTranslator_LoopbackStdinToStdoutWithHeartbeatDelay implements a "fuzz" test by sending random
+// data through the WebSocket client to the StreamTranslator proxy on the STDIN stream, returning
+// the data on the STDOUT stream. This test adds a delay in server greater than the default read and write timeout
+// values which should prove that heartbeat works in active data transmission.
+func TestWebSocketStreamTranslator_LoopbackStdinToStdoutWithHeartbeatDelay(t *testing.T) {
+	// Final upstream server is SPDY server. This server only copies the STDIN to the STDOUT, so
+	// the same data sent upstream on STDIN, will be returned on STDOUT.
+	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var stdin, stdout bytes.Buffer
+		ctx, err := createHTTPStreams(w, req, &StreamOptions{
+			Stdin:  &stdin,
+			Stdout: &stdout,
+		})
+		if err != nil {
+			t.Errorf("error on createHTTPStreams: %v", err)
+			return
+		}
+		defer ctx.conn.Close()
+
+		io.Copy(ctx.stdoutStream, ctx.stdinStream)
+		time.Sleep(150 * time.Millisecond)
+	}))
+	defer spdyServer.Close()
+
+	// Parse a URL to the SPDY server. Used as target of the StreamTranslator proxy.
+	spdyLocation, err := url.Parse(spdyServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse SPDY server URL: %s", spdyServer.URL)
+	}
+	spdyRoundTripper := spdy.NewRoundTripper(nil)
+	// Create the StreamTranslator proxy pointing upstream to the SPDY server, and have
+	// it handle requests of the "proxyServer". NOTE: nil ErrorResponder not needed.
+	proxy := proxy.NewStreamTranslatorHandler(spdyLocation, spdyRoundTripper, nil, proxy.Options{Stdin: true, Stdout: true})
+	proxyServer := httptest.NewServer(proxy)
+	proxyUri, err := url.Parse(proxyServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse proxy server URL: %s", proxyServer.URL)
+	}
+	// Now create the WebSocket client (executor), and point it to the "proxyServer".
+	exec, err := NewWebSocketExecutor(&rest.Config{Host: proxyUri.Host}, "POST", proxyServer.URL)
+	if err != nil {
+		t.Errorf("unexpected error creating websocket executor: %v", err)
+	}
+	streamExec := exec.(*wsStreamExecutor)
+	streamExec.heartbeatOptions = wsHeartbeatOptions{
+		enablePing:        true,
+		pingPeriod:        10 * time.Millisecond,
+		pingWriteDeadline: 100 * time.Millisecond,
+		pingReadDeadline:  120 * time.Millisecond,
+	}
+	// Generate random data, and set it up to stream on STDIN. The data will be
+	// returned on the STDOUT buffer.
+	randomData := make([]byte, 1024*1024)
+	if _, err := rand.Read(randomData); err != nil {
+		t.Errorf("unexpected error reading random data: %v", err)
+	}
+	var stdout bytes.Buffer
+	options := &StreamOptions{
+		Stdin:  bytes.NewReader(randomData),
+		Stdout: &stdout,
+	}
+	errorChan := make(chan error)
+	go func() {
+		// Start the streaming on the WebSocket "exec" client.
+		errorChan <- streamExec.StreamWithContext(context.Background(), *options)
 	}()
 
 	select {
