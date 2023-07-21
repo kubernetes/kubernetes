@@ -31,6 +31,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("ConfigMap", func() {
@@ -157,7 +158,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		configMapFromUpdate, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get ConfigMap")
 		ginkgo.By(fmt.Sprintf("Verifying update of ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
-		framework.ExpectEqual(configMapFromUpdate.Data, configMap.Data)
+		gomega.Expect(configMapFromUpdate.Data).To(gomega.Equal(configMap.Data))
 	})
 
 	/*
@@ -189,8 +190,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 		ginkgo.By("fetching the ConfigMap")
 		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(ctx, testConfigMapName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get ConfigMap")
-		framework.ExpectEqual(configMap.Data["valueName"], testConfigMap.Data["valueName"])
-		framework.ExpectEqual(configMap.Labels["test-configmap-static"], testConfigMap.Labels["test-configmap-static"])
+		gomega.Expect(configMap.Data["valueName"]).To(gomega.Equal(testConfigMap.Data["valueName"]))
+		gomega.Expect(configMap.Labels["test-configmap-static"]).To(gomega.Equal(testConfigMap.Labels["test-configmap-static"]))
 
 		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -239,7 +240,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 			LabelSelector: "test-configmap-static=true",
 		})
 		framework.ExpectNoError(err, "failed to list ConfigMap by LabelSelector")
-		framework.ExpectEqual(len(configMapList.Items), 0, "ConfigMap is still present after being deleted by collection")
+		gomega.Expect(configMapList.Items).To(gomega.BeEmpty(), "ConfigMap is still present after being deleted by collection")
 	})
 })
 

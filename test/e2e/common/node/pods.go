@@ -251,7 +251,7 @@ var _ = SIGDescribe("Pods", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(ctx, options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 0)
+		gomega.Expect(pods.Items).To(gomega.BeEmpty())
 
 		lw := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -281,7 +281,7 @@ var _ = SIGDescribe("Pods", func() {
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(ctx, options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 1)
+		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 
 		ginkgo.By("verifying pod creation was observed")
 		select {
@@ -334,7 +334,7 @@ var _ = SIGDescribe("Pods", func() {
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(ctx, options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 0)
+		gomega.Expect(pods.Items).To(gomega.BeEmpty())
 	})
 
 	/*
@@ -372,7 +372,7 @@ var _ = SIGDescribe("Pods", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(ctx, options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 1)
+		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 
 		ginkgo.By("updating the pod")
 		podClient.Update(ctx, name, func(pod *v1.Pod) {
@@ -387,7 +387,7 @@ var _ = SIGDescribe("Pods", func() {
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(ctx, options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 1)
+		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 		framework.Logf("Pod update OK")
 	})
 
@@ -426,7 +426,7 @@ var _ = SIGDescribe("Pods", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(ctx, options)
 		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 1)
+		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 
 		ginkgo.By("updating the pod")
 		podClient.Update(ctx, name, func(pod *v1.Pod) {
@@ -956,7 +956,7 @@ var _ = SIGDescribe("Pods", func() {
 		}
 		p, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(ctx, testPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get Pod %v in namespace %v", testPodName, testNamespaceName)
-		framework.ExpectEqual(p.Status.Phase, v1.PodRunning, "failed to see Pod %v in namespace %v running", p.ObjectMeta.Name, testNamespaceName)
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodRunning), "failed to see Pod %v in namespace %v running", p.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
 		prePatchResourceVersion := p.ResourceVersion
@@ -997,8 +997,8 @@ var _ = SIGDescribe("Pods", func() {
 		ginkgo.By("getting the Pod and ensuring that it's patched")
 		pod, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(ctx, testPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch Pod %s in namespace %s", testPodName, testNamespaceName)
-		framework.ExpectEqual(pod.ObjectMeta.Labels["test-pod"], "patched", "failed to patch Pod - missing label")
-		framework.ExpectEqual(pod.Spec.Containers[0].Image, testPodImage2, "failed to patch Pod - wrong image")
+		gomega.Expect(pod.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-pod", "patched"), "failed to patch Pod - missing label")
+		gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(testPodImage2), "failed to patch Pod - wrong image")
 
 		ginkgo.By("replacing the Pod's status Ready condition to False")
 		var podStatusUpdate *v1.Pod
@@ -1020,7 +1020,7 @@ var _ = SIGDescribe("Pods", func() {
 					podStatusFieldPatchCount++
 				}
 			}
-			framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to patch all relevant Pod conditions")
+			gomega.Expect(podStatusFieldPatchCount).To(gomega.Equal(podStatusFieldPatchCountTotal), "failed to patch all relevant Pod conditions")
 			podStatusUpdate, err = f.ClientSet.CoreV1().Pods(testNamespaceName).UpdateStatus(ctx, &podStatusUpdated, metav1.UpdateOptions{})
 			return err
 		})
@@ -1034,7 +1034,7 @@ var _ = SIGDescribe("Pods", func() {
 				podStatusFieldPatchCount++
 			}
 		}
-		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
+		gomega.Expect(podStatusFieldPatchCount).To(gomega.Equal(podStatusFieldPatchCountTotal), "failed to update PodStatus - field patch count doesn't match the total")
 
 		ginkgo.By("deleting the Pod via a Collection with a LabelSelector")
 		preDeleteResourceVersion := podStatusUpdate.ResourceVersion
@@ -1119,8 +1119,8 @@ var _ = SIGDescribe("Pods", func() {
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(pStatusJSON)+`}`),
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err, "failed to patch pod: %q", podName)
-		framework.ExpectEqual(pStatus.Status.Message, "Patched by e2e test", fmt.Sprintf("Status.Message for %q was %q but expected it to be \"Patched by e2e test\"", podName, pStatus.Status.Message))
-		framework.ExpectEqual(pStatus.Status.Reason, "E2E", fmt.Sprintf("Status.Reason for %q was %q but expected it to be \"E2E\"", podName, pStatus.Status.Reason))
+		gomega.Expect(pStatus.Status.Message).To(gomega.Equal("Patched by e2e test"), "Status.Message for %q was %q but expected it to be \"Patched by e2e test\"", podName, pStatus.Status.Message)
+		gomega.Expect(pStatus.Status.Reason).To(gomega.Equal("E2E"), "Status.Reason for %q was %q but expected it to be \"E2E\"", podName, pStatus.Status.Reason)
 		framework.Logf("Status Message: %q and Reason: %q", pStatus.Status.Message, pStatus.Status.Reason)
 	})
 })

@@ -105,9 +105,9 @@ var _ = SIGDescribe("NodeLease", func() {
 			for i := range leaseList.Items {
 				lease := &leaseList.Items[i]
 				ownerRefs := lease.ObjectMeta.OwnerReferences
-				framework.ExpectEqual(len(ownerRefs), 1)
-				framework.ExpectEqual(ownerRefs[0].Kind, v1.SchemeGroupVersion.WithKind("Node").Kind)
-				framework.ExpectEqual(ownerRefs[0].APIVersion, v1.SchemeGroupVersion.WithKind("Node").Version)
+				gomega.Expect(ownerRefs).To(gomega.HaveLen(1))
+				gomega.Expect(ownerRefs[0].Kind).To(gomega.Equal(v1.SchemeGroupVersion.WithKind("Node").Kind))
+				gomega.Expect(ownerRefs[0].APIVersion).To(gomega.Equal(v1.SchemeGroupVersion.WithKind("Node").Version))
 			}
 		})
 
@@ -181,7 +181,7 @@ var _ = SIGDescribe("NodeLease", func() {
 			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
-			framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
+			gomega.Expect(readyCondition.Status).To(gomega.Equal(v1.ConditionTrue))
 		})
 	})
 })
@@ -190,7 +190,7 @@ func getHeartbeatTimeAndStatus(ctx context.Context, clientSet clientset.Interfac
 	node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
-	framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
+	gomega.Expect(readyCondition.Status).To(gomega.Equal(v1.ConditionTrue))
 	heartbeatTime := readyCondition.LastHeartbeatTime.Time
 	readyCondition.LastHeartbeatTime = metav1.Time{}
 	return heartbeatTime, node.Status

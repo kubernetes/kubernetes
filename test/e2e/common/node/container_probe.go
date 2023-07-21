@@ -95,7 +95,7 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		restartCount := getRestartCount(p)
-		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
+		gomega.Expect(restartCount).To(gomega.Equal(0), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -123,7 +123,7 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		restartCount := getRestartCount(p)
-		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
+		gomega.Expect(restartCount).To(gomega.Equal(0), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -773,7 +773,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers][Feature:SidecarContain
 		}
 
 		restartCount := getRestartCount(p)
-		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
+		gomega.Expect(restartCount).To(gomega.Equal(0), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -802,7 +802,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers][Feature:SidecarContain
 		}
 
 		restartCount := getRestartCount(p)
-		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
+		gomega.Expect(restartCount).To(gomega.Equal(0), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
