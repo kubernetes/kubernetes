@@ -208,7 +208,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	selector := labels.NewSelector().Add(*requirement)
 	pods, err := d.f.ClientSet.CoreV1().Pods(d.f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "list proxy pods")
-	framework.ExpectEqual(numNodes, int32(len(pods.Items)), "number of proxy pods")
+	gomega.Expect(numNodes).To(gomega.Equal(int32(len(pods.Items))), "number of proxy pods")
 
 	// Run registar and plugin for each of the pods.
 	for _, pod := range pods.Items {
