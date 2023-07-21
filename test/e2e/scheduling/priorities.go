@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -256,7 +257,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		ginkgo.By("Pod should prefer scheduled to the node that pod can tolerate.")
 		tolePod, err := cs.CoreV1().Pods(ns).Get(ctx, tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(tolePod.Spec.NodeName, nodeName)
+		gomega.Expect(tolePod.Spec.NodeName).To(gomega.Equal(nodeName))
 	})
 
 	ginkgo.Context("PodTopologySpread Scoring", func() {
@@ -348,7 +349,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			}
 			testPod := runPausePod(ctx, f, podCfg)
 			ginkgo.By(fmt.Sprintf("Verifying if the test-pod lands on node %q", nodeNames[1]))
-			framework.ExpectEqual(nodeNames[1], testPod.Spec.NodeName)
+			gomega.Expect(testPod.Spec.NodeName).To(gomega.Equal(nodeNames[1]))
 		})
 	})
 })
