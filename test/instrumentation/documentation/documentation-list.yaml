@@ -12,84 +12,6 @@
     certificate is invalid or unused, the value will be +INF.
   type: Gauge
   stabilityLevel: ALPHA
-- name: changes
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlice changes
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - operation
-- name: desired_endpoint_slices
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlices that would exist with perfect endpoint allocation
-  type: Gauge
-  stabilityLevel: ALPHA
-- name: endpoints_added_per_sync
-  subsystem: endpoint_slice_controller
-  help: Number of endpoints added on each Service sync
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 2
-  - 4
-  - 8
-  - 16
-  - 32
-  - 64
-  - 128
-  - 256
-  - 512
-  - 1024
-  - 2048
-  - 4096
-  - 8192
-  - 16384
-  - 32768
-- name: endpoints_desired
-  subsystem: endpoint_slice_controller
-  help: Number of endpoints desired
-  type: Gauge
-  stabilityLevel: ALPHA
-- name: endpoints_removed_per_sync
-  subsystem: endpoint_slice_controller
-  help: Number of endpoints removed on each Service sync
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 2
-  - 4
-  - 8
-  - 16
-  - 32
-  - 64
-  - 128
-  - 256
-  - 512
-  - 1024
-  - 2048
-  - 4096
-  - 8192
-  - 16384
-  - 32768
-- name: endpointslices_changed_per_sync
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlices changed on each Service sync
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - topology
-- name: num_endpoint_slices
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlices
-  type: Gauge
-  stabilityLevel: ALPHA
-- name: syncs
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlice syncs
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - result
 - name: addresses_skipped_per_sync
   subsystem: endpoint_slice_mirroring_controller
   help: Number of addresses skipped on each Endpoints sync due to being invalid or
@@ -506,12 +428,18 @@
     GC Controller started.
   type: Counter
   stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - reason
 - name: force_delete_pods_total
   subsystem: pod_gc_collector
   help: Number of pods that are being forcefully deleted since the Pod GC Controller
     started.
   type: Counter
   stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - reason
 - name: sorting_deletion_age_ratio
   subsystem: replicaset_controller
   help: The ratio of chosen deleted pod's ages to the current youngest pod's age (at
@@ -538,26 +466,6 @@
   help: Number of ResourceClaims creation request failures
   type: Counter
   stabilityLevel: ALPHA
-- name: job_deletion_duration_seconds
-  subsystem: ttl_after_finished_controller
-  help: The time it took to delete the job since it became eligible for deletion
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 0.1
-  - 0.2
-  - 0.4
-  - 0.8
-  - 1.6
-  - 3.2
-  - 6.4
-  - 12.8
-  - 25.6
-  - 51.2
-  - 102.4
-  - 204.8
-  - 409.6
-  - 819.2
 - name: job_pods_finished_total
   subsystem: job_controller
   help: The number of finished Pods that are fully tracked
@@ -618,9 +526,12 @@
   labels:
   - zone
 - name: attachdetach_controller_forced_detaches
+  subsystem: attach_detach_controller
   help: Number of times the A/D Controller performed a forced detach
   type: Counter
   stabilityLevel: ALPHA
+  labels:
+  - reason
 - name: attachdetach_controller_total_volumes
   help: Number of volumes in A/D Controller
   type: Custom
@@ -747,6 +658,26 @@
   labels:
   - node
   - volume_plugin
+- name: job_deletion_duration_seconds
+  subsystem: ttl_after_finished_controller
+  help: The time it took to delete the job since it became eligible for deletion
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.8
+  - 1.6
+  - 3.2
+  - 6.4
+  - 12.8
+  - 25.6
+  - 51.2
+  - 102.4
+  - 204.8
+  - 409.6
+  - 819.2
 - name: volume_operation_total_errors
   help: Total volume operation errors
   type: Counter
@@ -772,6 +703,15 @@
   - namespace
 - name: container_start_time_seconds
   help: Start time of the container since unix epoch in seconds
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - container
+  - pod
+  - namespace
+- name: container_swap_usage_bytes
+  help: Current amount of the container swap usage in bytes. Reported only on non-windows
+    systems
   type: Custom
   stabilityLevel: ALPHA
   labels:
@@ -1420,13 +1360,10 @@
   help: Current working set of the node in bytes
   type: Custom
   stabilityLevel: ALPHA
-- name: plugin_manager_total_plugins
-  help: Number of plugins in Plugin Manager
+- name: node_swap_usage_bytes
+  help: Current swap usage of the node in bytes. Reported only on non-windows systems
   type: Custom
   stabilityLevel: ALPHA
-  labels:
-  - socket_path
-  - state
 - name: pod_cpu_usage_seconds_total
   help: Cumulative cpu time consumed by the pod in core-seconds
   type: Custom
@@ -1436,6 +1373,14 @@
   - namespace
 - name: pod_memory_working_set_bytes
   help: Current working set of the pod in bytes
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - pod
+  - namespace
+- name: pod_swap_usage_bytes
+  help: Current amount of the pod swap usage in bytes. Reported only on non-windows
+    systems
   type: Custom
   stabilityLevel: ALPHA
   labels:
@@ -1602,6 +1547,20 @@
   - 240
   - 270
   - 300
+- name: proxy_healthz_total
+  subsystem: kubeproxy
+  help: Cumulative proxy healthz HTTP status
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - code
+- name: proxy_livez_total
+  subsystem: kubeproxy
+  help: Cumulative proxy livez HTTP status
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - code
 - name: sync_full_proxy_rules_duration_seconds
   subsystem: kubeproxy
   help: SyncProxyRules latency in seconds for full resyncs
@@ -1675,6 +1634,13 @@
   help: Cumulative proxy rules Endpoint changes
   type: Counter
   stabilityLevel: ALPHA
+- name: sync_proxy_rules_iptables_last
+  subsystem: kubeproxy
+  help: Number of iptables rules written by kube-proxy in last sync
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - table
 - name: sync_proxy_rules_iptables_partial_restore_failures_total
   subsystem: kubeproxy
   help: Cumulative proxy iptables partial restore failures
@@ -1687,7 +1653,7 @@
   stabilityLevel: ALPHA
 - name: sync_proxy_rules_iptables_total
   subsystem: kubeproxy
-  help: Number of proxy iptables rules programmed
+  help: Total number of iptables rules owned by kube-proxy
   type: Gauge
   stabilityLevel: ALPHA
   labels:
@@ -1719,6 +1685,13 @@
   help: Cumulative proxy rules Service changes
   type: Counter
   stabilityLevel: ALPHA
+- name: plugin_manager_total_plugins
+  help: Number of plugins in Plugin Manager
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - socket_path
+  - state
 - name: probe_duration_seconds
   subsystem: prober
   help: Duration in seconds for a probe response.
@@ -1860,22 +1833,6 @@
   help: Gauge measuring the number of allocated NodePorts for Services
   type: Gauge
   stabilityLevel: ALPHA
-- name: allocation_errors_total
-  subsystem: nodeport_allocator
-  namespace: kube_apiserver
-  help: Number of errors trying to allocate NodePort
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - scope
-- name: allocation_total
-  subsystem: nodeport_allocator
-  namespace: kube_apiserver
-  help: Number of NodePort allocations
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - scope
 - name: available_ports
   subsystem: nodeport_allocator
   namespace: kube_apiserver
@@ -2302,6 +2259,24 @@
   - 0.0512
   - 0.1024
   - 0.2048
+- name: apiextensions_openapi_v2_regeneration_count
+  help: Counter of OpenAPI v2 spec regeneration count broken down by causing CRD name
+    and reason.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - crd
+  - reason
+- name: apiextensions_openapi_v3_regeneration_count
+  help: Counter of OpenAPI v3 spec regeneration count broken down by group, version,
+    causing CRD and reason.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - crd
+  - group
+  - reason
+  - version
 - name: conversion_webhook_duration_seconds
   namespace: apiserver
   help: Conversion webhook request latency
@@ -2360,34 +2335,53 @@
   - 4.096
   - 8.192
   - 16.384
-- name: apiextensions_openapi_v2_regeneration_count
-  help: Counter of OpenAPI v2 spec regeneration count broken down by causing CRD name
-    and reason.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - crd
-  - reason
-- name: apiextensions_openapi_v3_regeneration_count
-  help: Counter of OpenAPI v3 spec regeneration count broken down by group, version,
-    causing CRD and reason.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - crd
-  - group
-  - reason
-  - version
-- name: admission_match_condition_evaluation_errors_total
+- name: match_condition_evaluation_errors_total
   subsystem: admission
   namespace: apiserver
   help: Admission match condition evaluation errors count, identified by name of resource
-    containing the match condition and broken out for each admission type (validating
-    or mutating).
+    containing the match condition and broken out for each kind containing matchConditions
+    (webhook or policy), operation and admission type (validate or admit).
   type: Counter
   stabilityLevel: ALPHA
   labels:
+  - kind
   - name
+  - operation
+  - type
+- name: match_condition_evaluation_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission match condition evaluation time in seconds, identified by name and
+    broken out for each kind containing matchConditions (webhook or policy), operation
+    and type (validate or admit).
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - kind
+  - name
+  - operation
+  - type
+  buckets:
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.1
+  - 0.2
+  - 0.25
+- name: match_condition_exclusions_total
+  subsystem: admission
+  namespace: apiserver
+  help: Admission match condition evaluation exclusions count, identified by name
+    of resource containing the match condition and broken out for each kind containing
+    matchConditions (webhook or policy), operation and admission type (validate or
+    admit).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - kind
+  - name
+  - operation
   - type
 - name: step_admission_duration_seconds_summary
   subsystem: admission
@@ -2606,14 +2600,6 @@
   - 7.776e+06
   - 1.5552e+07
   - 3.1104e+07
-- name: current_inqueue_requests
-  subsystem: apiserver
-  help: Maximal number of queued requests in this apiserver per request kind in last
-    second.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - request_kind
 - name: apiserver_delegated_authn_request_duration_seconds
   help: Request latency in seconds. Broken down by status code.
   type: Histogram
@@ -2656,6 +2642,195 @@
   stabilityLevel: ALPHA
   labels:
   - code
+- name: authenticated_user_requests
+  help: Counter of authenticated requests broken out by username.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - username
+- name: authentication_attempts
+  help: Counter of authenticated attempts.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - result
+- name: authentication_duration_seconds
+  help: Authentication duration in seconds broken out by result.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: active_fetch_count
+  subsystem: token_cache
+  namespace: authentication
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - status
+- name: fetch_total
+  subsystem: token_cache
+  namespace: authentication
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - status
+- name: request_duration_seconds
+  subsystem: token_cache
+  namespace: authentication
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - status
+- name: request_total
+  subsystem: token_cache
+  namespace: authentication
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - status
+- name: authorization_attempts_total
+  help: Counter of authorization attempts broken down by result. It can be either
+    'allowed', 'denied', 'no-opinion' or 'error'.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - result
+- name: authorization_duration_seconds
+  help: Authorization duration in seconds broken out by result.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: cache_list_fetched_objects_total
+  namespace: apiserver
+  help: Number of objects read from watch cache in the course of serving a LIST request
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - index
+  - resource_prefix
+- name: cache_list_returned_objects_total
+  namespace: apiserver
+  help: Number of objects returned for a LIST request from watch cache
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource_prefix
+- name: cache_list_total
+  namespace: apiserver
+  help: Number of LIST requests served from watch cache
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - index
+  - resource_prefix
+- name: current_inqueue_requests
+  subsystem: apiserver
+  help: Maximal number of queued requests in this apiserver per request kind in last
+    second.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - request_kind
+- name: dial_duration_seconds
+  subsystem: egress_dialer
+  namespace: apiserver
+  help: Dial latency histogram in seconds, labeled by the protocol (http-connect or
+    grpc), transport (tcp or uds)
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - protocol
+  - transport
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 2.5
+  - 12.5
+- name: dial_failure_count
+  subsystem: egress_dialer
+  namespace: apiserver
+  help: Dial failure count, labeled by the protocol (http-connect or grpc), transport
+    (tcp or uds), and stage (connect or proxy). The stage indicates at which stage
+    the dial failed
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - protocol
+  - stage
+  - transport
+- name: dial_start_total
+  subsystem: egress_dialer
+  namespace: apiserver
+  help: Dial starts, labeled by the protocol (http-connect or grpc) and transport
+    (tcp or uds).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - protocol
+  - transport
+- name: automatic_reload_failures_total
+  subsystem: encryption_config_controller
+  namespace: apiserver
+  help: Total number of failed automatic reloads of encryption configuration.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: automatic_reload_last_timestamp_seconds
+  subsystem: encryption_config_controller
+  namespace: apiserver
+  help: Timestamp of the last successful or failed automatic reload of encryption
+    configuration.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - status
+- name: automatic_reload_success_total
+  subsystem: encryption_config_controller
+  namespace: apiserver
+  help: Total number of successful automatic reloads of encryption configuration.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: init_events_total
+  namespace: apiserver
+  help: Counter of init events processed in watch cache broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
 - name: request_aborts_total
   subsystem: apiserver
   help: Number of requests which apiserver aborted possibly due to a timeout, for
@@ -2856,11 +3031,94 @@
   - resource
   - subresource
   - verb
+- name: storage_db_total_size_in_bytes
+  subsystem: apiserver
+  help: Total size of the storage database file physically allocated in bytes.
+  type: Gauge
+  deprecatedVersion: 1.28.0
+  stabilityLevel: ALPHA
+  labels:
+  - endpoint
+- name: storage_decode_errors_total
+  namespace: apiserver
+  help: Number of stored object decode errors split by object type
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: storage_events_received_total
+  subsystem: apiserver
+  help: Number of etcd events received split by kind.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_list_evaluated_objects_total
+  help: Number of objects tested in the course of serving a LIST request from storage
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_list_fetched_objects_total
+  help: Number of objects read from storage in the course of serving a LIST request
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_list_returned_objects_total
+  help: Number of objects returned for a LIST request from storage
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_list_total
+  help: Number of LIST requests served from storage
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_size_bytes
+  help: Size of the storage database file physically allocated in bytes.
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - cluster
+- name: terminated_watchers_total
+  namespace: apiserver
+  help: Counter of watchers closed due to unresponsiveness broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
 - name: tls_handshake_errors_total
   subsystem: apiserver
   help: Number of requests dropped with 'TLS handshake error from' error
   type: Counter
   stabilityLevel: ALPHA
+- name: events_dispatched_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of events dispatched in watch cache broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: events_received_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of events received in watch cache broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: initializations_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of watch cache initializations broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
 - name: watch_events_sizes
   subsystem: apiserver
   help: Watch event size distribution in bytes
@@ -2888,97 +3146,69 @@
   - group
   - kind
   - version
-- name: authenticated_user_requests
-  help: Counter of authenticated requests broken out by username.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - username
-- name: authentication_attempts
-  help: Counter of authenticated attempts.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - result
-- name: authentication_duration_seconds
-  help: Authentication duration in seconds broken out by result.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - result
-  buckets:
-  - 0.001
-  - 0.002
-  - 0.004
-  - 0.008
-  - 0.016
-  - 0.032
-  - 0.064
-  - 0.128
-  - 0.256
-  - 0.512
-  - 1.024
-  - 2.048
-  - 4.096
-  - 8.192
-  - 16.384
-- name: active_fetch_count
-  subsystem: token_cache
-  namespace: authentication
+- name: etcd_bookmark_counts
+  help: Number of etcd bookmarks (progress notify events) split by kind.
   type: Gauge
   stabilityLevel: ALPHA
   labels:
-  - status
-- name: fetch_total
-  subsystem: token_cache
-  namespace: authentication
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - status
-- name: request_duration_seconds
-  subsystem: token_cache
-  namespace: authentication
+  - resource
+- name: etcd_lease_object_counts
+  help: Number of objects attached to a single etcd lease.
   type: Histogram
   stabilityLevel: ALPHA
-  labels:
-  - status
-- name: request_total
-  subsystem: token_cache
-  namespace: authentication
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - status
-- name: authorization_attempts_total
-  help: Counter of authorization attempts broken down by result. It can be either
-    'allowed', 'denied', 'no-opinion' or 'error'.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - result
-- name: authorization_duration_seconds
-  help: Authorization duration in seconds broken out by result.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - result
   buckets:
-  - 0.001
-  - 0.002
-  - 0.004
-  - 0.008
-  - 0.016
-  - 0.032
-  - 0.064
-  - 0.128
-  - 0.256
-  - 0.512
-  - 1.024
-  - 2.048
-  - 4.096
-  - 8.192
-  - 16.384
+  - 10
+  - 50
+  - 100
+  - 500
+  - 1000
+  - 2500
+  - 5000
+- name: etcd_request_duration_seconds
+  help: Etcd request latency in seconds for each operation and object type.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
+- name: etcd_request_errors_total
+  help: Etcd failed request counts for each operation and object type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - type
+- name: etcd_requests_total
+  help: Etcd request counts for each operation and object type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - type
 - name: field_validation_request_duration_seconds
   help: Response latency distribution in seconds for each field validation value
   type: Histogram
@@ -3007,6 +3237,27 @@
   - 30
   - 45
   - 60
+- name: capacity
+  subsystem: watch_cache
+  help: Total capacity of watch cache broken by resource type.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: capacity_decrease_total
+  subsystem: watch_cache
+  help: Total number of watch cache capacity decrease events broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: capacity_increase_total
+  subsystem: watch_cache
+  help: Total number of watch cache capacity increase events broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
 - name: current_inflight_requests
   subsystem: apiserver
   help: Maximal number of currently used inflight request limit of this apiserver
@@ -3118,68 +3369,12 @@
   - 1e+07
   - 1e+08
   - 1e+09
-- name: cache_list_fetched_objects_total
-  namespace: apiserver
-  help: Number of objects read from watch cache in the course of serving a LIST request
-  type: Counter
-  stabilityLevel: ALPHA
+- name: apiserver_storage_objects
+  help: Number of stored objects at the time of last check split by kind.
+  type: Gauge
+  stabilityLevel: STABLE
   labels:
-  - index
-  - resource_prefix
-- name: cache_list_returned_objects_total
-  namespace: apiserver
-  help: Number of objects returned for a LIST request from watch cache
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource_prefix
-- name: cache_list_total
-  namespace: apiserver
-  help: Number of LIST requests served from watch cache
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - index
-  - resource_prefix
-- name: dial_duration_seconds
-  subsystem: egress_dialer
-  namespace: apiserver
-  help: Dial latency histogram in seconds, labeled by the protocol (http-connect or
-    grpc), transport (tcp or uds)
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - protocol
-  - transport
-  buckets:
-  - 0.005
-  - 0.025
-  - 0.1
-  - 0.5
-  - 2.5
-  - 12.5
-- name: dial_failure_count
-  subsystem: egress_dialer
-  namespace: apiserver
-  help: Dial failure count, labeled by the protocol (http-connect or grpc), transport
-    (tcp or uds), and stage (connect or proxy). The stage indicates at which stage
-    the dial failed
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - protocol
-  - stage
-  - transport
-- name: dial_start_total
-  subsystem: egress_dialer
-  namespace: apiserver
-  help: Dial starts, labeled by the protocol (http-connect or grpc) and transport
-    (tcp or uds).
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - protocol
-  - transport
+  - resource
 - name: dek_cache_fill_percent
   subsystem: envelope_encryption
   namespace: apiserver
@@ -3275,26 +3470,6 @@
   - 13.1072
   - 26.2144
   - 52.4288
-- name: current_executing_requests
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Number of requests in initial (for a WATCH) or any (for a non-WATCH) execution
-    stage in the API Priority and Fairness subsystem
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - flow_schema
-  - priority_level
-- name: current_inqueue_requests
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Number of requests currently pending in queues of the API Priority and Fairness
-    subsystem
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - flow_schema
-  - priority_level
 - name: current_limit_seats
   subsystem: flowcontrol
   namespace: apiserver
@@ -3373,15 +3548,6 @@
   stabilityLevel: ALPHA
   labels:
   - priority_level
-- name: dispatched_requests_total
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Number of requests executed by API Priority and Fairness subsystem
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - flow_schema
-  - priority_level
 - name: epoch_advance_total
   subsystem: flowcontrol
   namespace: apiserver
@@ -3426,14 +3592,6 @@
   stabilityLevel: ALPHA
   labels:
   - bound
-  - priority_level
-- name: nominal_limit_seats
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Nominal number of execution seats configured for each priority level
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
   - priority_level
 - name: priority_level_request_utilization
   subsystem: flowcontrol
@@ -3508,16 +3666,6 @@
   - 0.95
   - 0.99
   - 1
-- name: rejected_requests_total
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Number of requests rejected by API Priority and Fairness subsystem
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - flow_schema
-  - priority_level
-  - reason
 - name: request_concurrency_in_use
   subsystem: flowcontrol
   namespace: apiserver
@@ -3525,6 +3673,7 @@
     stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness
     subsystem
   type: Gauge
+  deprecatedVersion: 1.31.0
   stabilityLevel: ALPHA
   labels:
   - flow_schema
@@ -3532,8 +3681,9 @@
 - name: request_concurrency_limit
   subsystem: flowcontrol
   namespace: apiserver
-  help: Shared concurrency limit in the API Priority and Fairness subsystem
+  help: Nominal number of execution seats configured for each priority level
   type: Gauge
+  deprecatedVersion: 1.30.0
   stabilityLevel: ALPHA
   labels:
   - priority_level
@@ -3570,6 +3720,7 @@
   - 2
   - 5
   - 10
+  - 15
   - 30
 - name: request_queue_length_after_enqueue
   subsystem: flowcontrol
@@ -3590,30 +3741,6 @@
   - 250
   - 500
   - 1000
-- name: request_wait_duration_seconds
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Length of time a request spent waiting in its queue
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - execute
-  - flow_schema
-  - priority_level
-  buckets:
-  - 0
-  - 0.005
-  - 0.02
-  - 0.05
-  - 0.1
-  - 0.2
-  - 0.5
-  - 1
-  - 2
-  - 5
-  - 10
-  - 15
-  - 30
 - name: seat_fair_frac
   subsystem: flowcontrol
   namespace: apiserver
@@ -3669,13 +3796,14 @@
   - 2
   - 4
   - 10
-- name: init_events_total
-  namespace: apiserver
-  help: Counter of init events processed in watch cache broken by resource type.
+- name: rerouted_request_total
+  subsystem: apiserver
+  help: Total number of requests that were proxied to a peer kube apiserver because
+    the local apiserver was not capable of serving it
   type: Counter
   stabilityLevel: ALPHA
   labels:
-  - resource
+  - code
 - name: data_key_generation_duration_seconds
   subsystem: storage
   namespace: apiserver
@@ -3703,64 +3831,12 @@
   help: Total number of failed data encryption key(DEK) generation operations.
   type: Counter
   stabilityLevel: ALPHA
-- name: storage_db_total_size_in_bytes
-  subsystem: apiserver
-  help: Total size of the storage database file physically allocated in bytes.
-  type: Gauge
-  deprecatedVersion: "1.28.0"
-  stabilityLevel: ALPHA
-  labels:
-  - endpoint
-- name: storage_decode_errors_total
-  namespace: apiserver
-  help: Number of stored object decode errors split by object type
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
 - name: envelope_transformation_cache_misses_total
   subsystem: storage
   namespace: apiserver
   help: Total number of cache misses while accessing key decryption key(KEK).
   type: Counter
   stabilityLevel: ALPHA
-- name: storage_events_received_total
-  subsystem: apiserver
-  help: Number of etcd events received split by kind.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_list_evaluated_objects_total
-  help: Number of objects tested in the course of serving a LIST request from storage
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_list_fetched_objects_total
-  help: Number of objects read from storage in the course of serving a LIST request
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_list_returned_objects_total
-  help: Number of objects returned for a LIST request from storage
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_list_total
-  help: Number of LIST requests served from storage
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_size_bytes
-  help: Size of the storage database file physically allocated in bytes.
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - cluster
 - name: transformation_duration_seconds
   subsystem: storage
   namespace: apiserver
@@ -3799,134 +3875,16 @@
 - name: transformation_operations_total
   subsystem: storage
   namespace: apiserver
-  help: Total number of transformations.
+  help: Total number of transformations. Successful transformation will have a status
+    'OK' and a varied status string when the transformation fails. This status and
+    transformation_type fields may be used for alerting on encryption/decryption failure
+    using transformation_type from_storage for decryption and to_storage for encryption
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - status
   - transformation_type
   - transformer_prefix
-- name: terminated_watchers_total
-  namespace: apiserver
-  help: Counter of watchers closed due to unresponsiveness broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: events_dispatched_total
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Counter of events dispatched in watch cache broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: events_received_total
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Counter of events received in watch cache broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: initializations_total
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Counter of watch cache initializations broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: etcd_bookmark_counts
-  help: Number of etcd bookmarks (progress notify events) split by kind.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: etcd_lease_object_counts
-  help: Number of objects attached to a single etcd lease.
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 10
-  - 50
-  - 100
-  - 500
-  - 1000
-  - 2500
-  - 5000
-- name: etcd_request_duration_seconds
-  help: Etcd request latency in seconds for each operation and object type.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - operation
-  - type
-  buckets:
-  - 0.005
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.2
-  - 0.4
-  - 0.6
-  - 0.8
-  - 1
-  - 1.25
-  - 1.5
-  - 2
-  - 3
-  - 4
-  - 5
-  - 6
-  - 8
-  - 10
-  - 15
-  - 20
-  - 30
-  - 45
-  - 60
-- name: etcd_request_errors_total
-  help: Etcd failed request counts for each operation and object type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - operation
-  - type
-- name: etcd_requests_total
-  help: Etcd request counts for each operation and object type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - operation
-  - type
-- name: capacity
-  subsystem: watch_cache
-  help: Total capacity of watch cache broken by resource type.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: capacity_decrease_total
-  subsystem: watch_cache
-  help: Total number of watch cache capacity decrease events broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: capacity_increase_total
-  subsystem: watch_cache
-  help: Total number of watch cache capacity increase events broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_objects
-  help: Number of stored objects at the time of last check split by kind.
-  type: Gauge
-  stabilityLevel: STABLE
-  labels:
-  - resource
 - name: x509_insecure_sha1_total
   subsystem: webhooks
   namespace: apiserver
@@ -3943,6 +3901,88 @@
     SAN extension missing (either/or, based on the runtime environment)
   type: Counter
   stabilityLevel: ALPHA
+- name: current_executing_requests
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests in initial (for a WATCH) or any (for a non-WATCH) execution
+    stage in the API Priority and Fairness subsystem
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: current_executing_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Concurrency (number of seats) occupied by the currently executing (initial
+    stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness
+    subsystem
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: current_inqueue_requests
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests currently pending in queues of the API Priority and Fairness
+    subsystem
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: dispatched_requests_total
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests executed by API Priority and Fairness subsystem
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: nominal_limit_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Nominal number of execution seats configured for each priority level
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - priority_level
+- name: rejected_requests_total
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests rejected by API Priority and Fairness subsystem
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+  - reason
+- name: request_wait_duration_seconds
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Length of time a request spent waiting in its queue
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - execute
+  - flow_schema
+  - priority_level
+  buckets:
+  - 0
+  - 0.005
+  - 0.02
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.5
+  - 1
+  - 2
+  - 5
+  - 10
+  - 15
+  - 30
 - name: request_duration_seconds
   subsystem: cloud_provider_webhook
   help: Request latency in seconds. Broken down by status code.
@@ -3968,6 +4008,32 @@
   labels:
   - code
   - webhook
+- name: cloud_provider_taint_removal_delay_seconds
+  subsystem: node_controller
+  help: Number of seconds after node creation when NodeController removed the cloud-provider
+    taint of a single node.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 1
+  - 4
+  - 16
+  - 64
+  - 256
+  - 1024
+- name: initial_node_sync_delay_seconds
+  subsystem: node_controller
+  help: Number of seconds after node creation when NodeController finished the initial
+    synchronization of a single node.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 1
+  - 4
+  - 16
+  - 64
+  - 256
+  - 1024
 - name: loadbalancer_sync_total
   subsystem: service_controller
   help: A metric counting the amount of times any load balancer has been configured,
@@ -4039,31 +4105,6 @@
   - major
   - minor
   - platform
-- name: feature_enabled
-  namespace: kubernetes
-  help: This metric records the data about the stage and enablement of a k8s feature.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - name
-  - stage
-- name: healthcheck
-  namespace: kubernetes
-  help: This metric records the result of a single healthcheck.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - name
-  - type
-- name: healthchecks_total
-  namespace: kubernetes
-  help: This metric records the results of all healthcheck.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - name
-  - status
-  - type
 - name: leader_election_master_status
   help: Gauge of if the reporting system is master of the relevant lease, 0 indicates
     backup, 1 indicates master. 'name' is the string used to identify the lease. Please
@@ -4072,6 +4113,24 @@
   stabilityLevel: ALPHA
   labels:
   - name
+- name: rest_client_dns_resolution_duration_seconds
+  help: DNS resolver latency in seconds. Broken down by host.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - host
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2
+  - 4
+  - 8
+  - 15
+  - 30
 - name: rest_client_exec_plugin_call_total
   help: Number of calls to an exec plugin, partitioned by the type of event encountered
     (no_error, plugin_execution_error, plugin_not_found_error, client_internal_error)
@@ -4293,6 +4352,141 @@
   - 0.1
   - 1
   - 10
+- name: disabled_metrics_total
+  help: The count of disabled metrics.
+  type: Counter
+  stabilityLevel: BETA
+- name: hidden_metrics_total
+  help: The count of hidden metrics.
+  type: Counter
+  stabilityLevel: BETA
+- name: feature_enabled
+  namespace: kubernetes
+  help: This metric records the data about the stage and enablement of a k8s feature.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+  - stage
+- name: healthcheck
+  namespace: kubernetes
+  help: This metric records the result of a single healthcheck.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+  - type
+- name: healthchecks_total
+  namespace: kubernetes
+  help: This metric records the results of all healthcheck.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+  - status
+  - type
+- name: registered_metrics_total
+  help: The count of registered metrics broken by stability level and deprecation
+    version.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - deprecated_version
+  - stability_level
+- name: x509_insecure_sha1_total
+  subsystem: kube_aggregator
+  namespace: apiserver
+  help: Counts the number of requests to servers with insecure SHA1 signatures in
+    their serving certificate OR the number of connection failures due to the insecure
+    SHA1 signatures (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: ALPHA
+- name: x509_missing_san_total
+  subsystem: kube_aggregator
+  namespace: apiserver
+  help: Counts the number of requests to servers missing SAN extension in their serving
+    certificate OR the number of connection failures due to the lack of x509 certificate
+    SAN extension missing (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: ALPHA
+- name: changes
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlice changes
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+- name: desired_endpoint_slices
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices that would exist with perfect endpoint allocation
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: endpoints_added_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints added on each Service sync
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+- name: endpoints_desired
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints desired
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: endpoints_removed_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints removed on each Service sync
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+- name: endpointslices_changed_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices changed on each Service sync
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - topology
+- name: num_endpoint_slices
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: syncs
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlice syncs
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - result
 - name: aggregator_openapi_v2_regeneration_count
   help: Counter of OpenAPI v2 spec regeneration count broken down by causing APIService
     name and reason.
@@ -4322,22 +4516,6 @@
   labels:
   - name
   - reason
-- name: x509_insecure_sha1_total
-  subsystem: kube_aggregator
-  namespace: apiserver
-  help: Counts the number of requests to servers with insecure SHA1 signatures in
-    their serving certificate OR the number of connection failures due to the insecure
-    SHA1 signatures (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
-- name: x509_missing_san_total
-  subsystem: kube_aggregator
-  namespace: apiserver
-  help: Counts the number of requests to servers missing SAN extension in their serving
-    certificate OR the number of connection failures due to the lack of x509 certificate
-    SAN extension missing (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
 - name: api_request_duration_seconds
   namespace: cloudprovider_azure
   help: Latency of an Azure API call
