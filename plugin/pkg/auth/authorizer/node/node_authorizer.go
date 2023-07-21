@@ -116,7 +116,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case nodeResource:
 
 			if attrs.GetVerb() == "list" {
-				return r.checkListRequest(attrs, nodeName)
+				return r.authorizeListRequestForNode(attrs, nodeName)
 			}
 
 			if attrs.GetVerb() == "get" {
@@ -133,7 +133,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case podResource:
 
 			if attrs.GetVerb() == "list" {
-				return r.checkListRequest(attrs, nodeName)
+				return r.authorizeListRequestForNode(attrs, nodeName)
 			}
 
 			if attrs.GetVerb() == "get" {
@@ -183,8 +183,8 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 	return authorizer.DecisionNoOpinion, "", nil
 }
 
-// checkListRequest authorizes list requests to objects of a specified types if they are related to the specified node
-func (r NodeAuthorizer) checkListRequest(attrs authorizer.Attributes, nodeName string) (authorizer.Decision, string, error) {
+// authorizeListRequestForNode authorizes list requests to objects of a specified types if they are related to the specified node
+func (r NodeAuthorizer) authorizeListRequestForNode(attrs authorizer.Attributes, nodeName string) (authorizer.Decision, string, error) {
 	m, _ := url.ParseQuery(attrs.GetQuery())
 
 	if len(m["fieldSelector"]) > 0 {
