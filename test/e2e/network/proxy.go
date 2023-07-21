@@ -485,7 +485,7 @@ func validateRedirectRequest(client *http.Client, redirectVerb string, urlString
 	defer resp.Body.Close()
 
 	framework.Logf("http.Client request:%s StatusCode:%d", redirectVerb, resp.StatusCode)
-	framework.ExpectEqual(resp.StatusCode, 301, "The resp.StatusCode returned: %d", resp.StatusCode)
+	gomega.Expect(resp.StatusCode).To(gomega.Equal(301), "The resp.StatusCode returned: %d", resp.StatusCode)
 }
 
 // validateProxyVerbRequest checks that a http request to a pod
@@ -587,7 +587,7 @@ func nodeProxyTest(ctx context.Context, f *framework.Framework, prefix, nodeDest
 			serviceUnavailableErrors++
 		} else {
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(status, http.StatusOK)
+			gomega.Expect(status).To(gomega.Equal(http.StatusOK))
 			gomega.Expect(d).To(gomega.BeNumerically("<", proxyHTTPCallTimeout))
 		}
 	}

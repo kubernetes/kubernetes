@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -178,7 +179,7 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
 
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(hostname, targetHostname)
+	gomega.Expect(hostname).To(gomega.Equal(targetHostname))
 }
 
 // createSecondNodePortService creates a service with the same selector as config.NodePortService and same HTTP Port
