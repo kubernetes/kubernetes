@@ -147,6 +147,7 @@ const (
 	// owner: @caesarxuchao
 	// alpha: v1.15
 	// beta: v1.16
+	// stable: 1.29
 	//
 	// Allow apiservers to show a count of remaining items in the response
 	// to a chunking list request.
@@ -256,7 +257,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	OpenAPIV3: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
-	RemainingItemCount: {Default: true, PreRelease: featuregate.Beta},
+	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	RemoveSelfLink: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
