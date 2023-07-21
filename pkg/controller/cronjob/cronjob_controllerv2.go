@@ -598,6 +598,7 @@ func (jm *ControllerV2) syncCronJob(
 		logger.Error(err, "Unable to make Job from template", "cronjob", klog.KObj(cronJob))
 		return cronJob, nil, updateStatus, err
 	}
+	jobNotExisted := true
 	jobResp, err := jm.jobControl.CreateJob(cronJob.Namespace, jobReq)
 	switch {
 	case errors.HasStatusCause(err, corev1.NamespaceTerminatingCause):
@@ -607,16 +608,31 @@ func (jm *ControllerV2) syncCronJob(
 	case errors.IsAlreadyExists(err):
 		// If the job is created by other actor, assume  it has updated the cronjob status accordingly
 		logger.Info("Job already exists", "cronjob", klog.KObj(cronJob), "job", klog.KObj(jobReq))
-		return cronJob, nil, updateStatus, err
+
+		// When the job created by other actor and the status of cronjob has not been
+		// updated normally, so here need get all jobs again.
+		jobResp, err = jm.jobControl.GetJob(cronJob.GetNamespace(), jobReq.GetName())
+		if err != nil {
+			logger.V(4).Info("Unable to get exist job", "job", klog.KObj(jobReq), "err", err)
+			return cronJob, nil, updateStatus, err
+		} else {
+			for _, owner := range jobResp.ObjectMeta.OwnerReferences {
+				if owner.Name == cronJob.Name {
+					jobNotExisted = false
+				}
+			}
+		}
 	case err != nil:
 		// default error handling
 		jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
 		return cronJob, nil, updateStatus, err
 	}
 
-	metrics.CronJobCreationSkew.Observe(jobResp.ObjectMeta.GetCreationTimestamp().Sub(*scheduledTime).Seconds())
-	logger.V(4).Info("Created Job", "job", klog.KObj(jobResp), "cronjob", klog.KObj(cronJob))
-	jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
+	if jobNotExisted {
+		metrics.CronJobCreationSkew.Observe(jobResp.ObjectMeta.GetCreationTimestamp().Sub(*scheduledTime).Seconds())
+		logger.V(4).Info("Created Job", "job", klog.KObj(jobResp), "cronjob", klog.KObj(cronJob))
+		jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
+	}
 
 	// ------------------------------------------------------------------ //
 
