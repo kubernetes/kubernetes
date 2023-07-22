@@ -1039,6 +1039,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 			svc.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
 			}
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		})
 		framework.ExpectNoError(err)
 
@@ -1171,6 +1172,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 			svc.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
 			}
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		})
 		framework.ExpectNoError(err)
 
