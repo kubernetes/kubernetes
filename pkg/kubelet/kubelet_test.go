@@ -449,6 +449,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	kubelet.statusManager = status.NewFakeManager()
 	fakeRuntime := testKubelet.fakeRuntime
 	pods := []*v1.Pod{
 		podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
