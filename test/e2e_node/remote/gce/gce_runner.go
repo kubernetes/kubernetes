@@ -74,6 +74,7 @@ var project = flag.String("project", "", "gce project the hosts live in (gce)")
 var zone = flag.String("zone", "", "gce zone that the hosts live in (gce)")
 var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2  (gce)")
 var imageProject = flag.String("image-project", "", "gce project the hosts live in  (gce)")
+var instanceType = flag.String("instance-type", "e2-medium", "GCP Machine type to use for test")
 var preemptibleInstances = flag.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible  (gce)")
 
 func init() {
@@ -82,7 +83,7 @@ func init() {
 
 const (
 	defaultGCEMachine             = "n1-standard-1"
-	acceleratorTypeResourceFormat = "https://www.googleapis.com/compute/beta/projects/%s/zones/%s/acceleratorTypes/%s"
+	acceleratorTypeResourceFormat = "https://www.googleapis.com/compute/v1/projects/%s/zones/%s/acceleratorTypes/%s"
 )
 
 type GCERunner struct {
@@ -764,7 +765,9 @@ func (g *GCERunner) updateKernelArguments(instance *compute.Instance, image stri
 }
 
 func (g *GCERunner) machineType(machine string) string {
-	if machine == "" {
+	if machine == "" && *instanceType != "" {
+		machine = *instanceType
+	} else {
 		machine = defaultGCEMachine
 	}
 	return fmt.Sprintf("zones/%s/machineTypes/%s", *zone, machine)
