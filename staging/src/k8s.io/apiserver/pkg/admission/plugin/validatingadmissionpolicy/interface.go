@@ -86,7 +86,7 @@ type Matcher interface {
 
 	// DefinitionMatches says whether this policy definition matches the provided admission
 	// resource request
-	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error)
+	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error)
 
 	// BindingMatches says whether this policy definition matches the provided admission
 	// resource request
@@ -109,5 +109,5 @@ type ValidateResult struct {
 type Validator interface {
 	// Validate is used to take cel evaluations and convert into decisions
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-	Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *corev1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult
+	Validate(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *corev1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult
 }

@@ -98,9 +98,10 @@ func TestMatcher(t *testing.T) {
 		criteria *v1beta1.MatchResources
 		attrs    admission.Attributes
 
-		expectMatches   bool
-		expectMatchKind schema.GroupVersionKind
-		expectErr       string
+		expectMatches       bool
+		expectMatchKind     schema.GroupVersionKind
+		expectMatchResource schema.GroupVersionResource
+		expectErr           string
 	}{
 		{
 			name:          "no rules (just write)",
@@ -204,9 +205,10 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: gvk("extensions", "v1beta1", "Deployment"),
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("extensions", "v1beta1", "deployments"),
+			expectMatchKind:     gvk("extensions", "v1beta1", "Deployment"),
 		},
 		{
 			name: "specific rules, equivalent match, prefer apps",
@@ -225,9 +227,10 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: gvk("apps", "v1beta1", "Deployment"),
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("apps", "v1beta1", "deployments"),
+			expectMatchKind:     gvk("apps", "v1beta1", "Deployment"),
 		},
 
 		{
@@ -311,9 +314,10 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: gvk("extensions", "v1beta1", "Scale"),
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("extensions", "v1beta1", "deployments"),
+			expectMatchKind:     gvk("extensions", "v1beta1", "Scale"),
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer apps",
@@ -332,9 +336,10 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: gvk("apps", "v1beta1", "Scale"),
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("apps", "v1beta1", "deployments"),
+			expectMatchKind:     gvk("apps", "v1beta1", "Scale"),
 		},
 		{
 			name: "specific rules, prefer exact match and name match",
@@ -380,9 +385,10 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("extensions", "v1beta1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches:   true,
-			expectMatchKind: gvk("autoscaling", "v1", "Scale"),
+			attrs:               admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("extensions", "v1beta1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:       true,
+			expectMatchResource: gvr("apps", "v1", "deployments"),
+			expectMatchKind:     gvk("autoscaling", "v1", "Scale"),
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions and name match miss",
@@ -536,7 +542,7 @@ func TestMatcher(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			matches, matchKind, err := a.Matches(testcase.attrs, interfaces, &fakeCriteria{matchResources: *testcase.criteria})
+			matches, matchResource, matchKind, err := a.Matches(testcase.attrs, interfaces, &fakeCriteria{matchResources: *testcase.criteria})
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)
@@ -557,6 +563,22 @@ func TestMatcher(t *testing.T) {
 
 			if matches != testcase.expectMatches {
 				t.Fatalf("expected matches = %v; got %v", testcase.expectMatches, matches)
+			}
+
+			expectResource := testcase.expectMatchResource
+			if !expectResource.Empty() && !matches {
+				t.Fatalf("expectResource is non-empty, but did not match")
+			} else if expectResource.Empty() {
+				// Test for exact match by default. Tests that expect an equivalent
+				// resource to match should explicitly state so by supplying
+				// expectMatchResource
+				expectResource = testcase.attrs.GetResource()
+			}
+
+			if matches {
+				if matchResource != expectResource {
+					t.Fatalf("expected matchResource %v, got %v", expectResource, matchResource)
+				}
 			}
 		})
 	}

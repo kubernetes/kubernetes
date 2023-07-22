@@ -318,10 +318,10 @@ var _ Validator = &fakeValidator{}
 
 type fakeValidator struct {
 	validationFilter, auditAnnotationFilter, messageFilter *fakeFilter
-	ValidateFunc                                           func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult
+	ValidateFunc                                           func(ctx context.Context, matchResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult
 }
 
-func (f *fakeValidator) RegisterDefinition(definition *v1beta1.ValidatingAdmissionPolicy, validateFunc func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult) {
+func (f *fakeValidator) RegisterDefinition(definition *v1beta1.ValidatingAdmissionPolicy, validateFunc func(ctx context.Context, matchResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult) {
 	//Key must be something that we can decipher from the inputs to Validate so using message which will be on the validationCondition object of evalResult
 	var key string
 	if len(definition.Spec.Validations) > 0 {
@@ -338,8 +338,8 @@ func (f *fakeValidator) RegisterDefinition(definition *v1beta1.ValidatingAdmissi
 	validatorMap[key] = f
 }
 
-func (f *fakeValidator) Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
-	return f.ValidateFunc(ctx, versionedAttr, versionedParams, namespace, runtimeCELCostBudget, authz)
+func (f *fakeValidator) Validate(ctx context.Context, matchResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	return f.ValidateFunc(ctx, matchResource, versionedAttr, versionedParams, namespace, runtimeCELCostBudget, authz)
 }
 
 var _ Matcher = &fakeMatcher{}
@@ -390,18 +390,18 @@ func (f *fakeMatcher) RegisterBinding(binding *v1beta1.ValidatingAdmissionPolicy
 
 // Matches says whether this policy definition matches the provided admission
 // resource request
-func (f *fakeMatcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
+func (f *fakeMatcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
 	namespace, name := definition.Namespace, definition.Name
 	key := namespacedName{
 		name:      name,
 		namespace: namespace,
 	}
 	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
-		return fun(definition, a), a.GetKind(), nil
+		return fun(definition, a), a.GetResource(), a.GetKind(), nil
 	}
 
 	// Default is match everything
-	return f.DefaultMatch, a.GetKind(), nil
+	return f.DefaultMatch, a.GetResource(), a.GetKind(), nil
 }
 
 // Matches says whether this policy definition matches the provided admission
@@ -834,7 +834,7 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -904,7 +904,7 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1019,7 +1019,7 @@ func TestReconfigureBinding(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1130,7 +1130,7 @@ func TestRemoveDefinition(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1199,7 +1199,7 @@ func TestRemoveBinding(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1309,7 +1309,7 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1370,7 +1370,7 @@ func TestEmptyParamRef(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		// Versioned params must be nil to pass the test
 		if versionedParams != nil {
 			return ValidateResult{
@@ -1447,7 +1447,7 @@ func TestEmptyParamSource(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1549,7 +1549,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 		}
 	})
 
-	validator1.RegisterDefinition(&policy1, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator1.RegisterDefinition(&policy1, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		evaluations1.Add(1)
 		return ValidateResult{
 			Decisions: []PolicyDecision{
@@ -1568,7 +1568,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 		}
 	})
 
-	validator2.RegisterDefinition(&policy2, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator2.RegisterDefinition(&policy2, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		evaluations2.Add(1)
 		return ValidateResult{
 			Decisions: []PolicyDecision{
@@ -1678,7 +1678,7 @@ func TestNativeTypeParam(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		evaluations.Add(1)
 		if _, ok := versionedParams.(*v1.ConfigMap); ok {
 			return ValidateResult{
@@ -1760,7 +1760,7 @@ func TestAuditValidationAction(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1831,7 +1831,7 @@ func TestWarnValidationAction(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1890,7 +1890,7 @@ func TestAllValidationActions(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
 				{
@@ -1977,7 +1977,7 @@ func TestNamespaceParamRefName(t *testing.T) {
 
 	lock := sync.Mutex{}
 	observedParamNamespaces := []string{}
-	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		lock.Lock()
 		defer lock.Unlock()
 
@@ -2264,7 +2264,7 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 		}
 	})
 
-	validator.RegisterDefinition(&policy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(&policy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		observeParam(versionedParams)
 		return ValidateResult{
 			Decisions: []PolicyDecision{
@@ -2505,7 +2505,7 @@ func TestNamespaceParamRefClusterScopedParamError(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		evaluations.Add(1)
 		if _, ok := versionedParams.(*v1beta1.ValidatingAdmissionPolicy); ok {
 			return ValidateResult{
@@ -2570,7 +2570,7 @@ func TestAuditAnnotations(t *testing.T) {
 		}
 	})
 
-	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 		o, err := meta.Accessor(versionedParams)
 		if err != nil {
 			t.Fatal(err)

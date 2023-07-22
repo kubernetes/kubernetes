@@ -244,7 +244,7 @@ func (c *celAdmissionController) Validate(
 		var versionedAttr *admission.VersionedAttributes
 
 		definition := definitionInfo.lastReconciledValue
-		matches, matchKind, err := c.policyController.matcher.DefinitionMatches(a, o, definition)
+		matches, matchResource, matchKind, err := c.policyController.matcher.DefinitionMatches(a, o, definition)
 		if err != nil {
 			// Configuration error.
 			addConfigError(err, definition, nil)
@@ -323,7 +323,7 @@ func (c *celAdmissionController) Validate(
 						nested: param,
 					}
 				}
-				validationResults = append(validationResults, bindingInfo.validator.Validate(ctx, versionedAttr, p, namespace, celconfig.RuntimeCELCostBudget, authz))
+				validationResults = append(validationResults, bindingInfo.validator.Validate(ctx, matchResource, versionedAttr, p, namespace, celconfig.RuntimeCELCostBudget, authz))
 			}
 
 			for _, validationResult := range validationResults {

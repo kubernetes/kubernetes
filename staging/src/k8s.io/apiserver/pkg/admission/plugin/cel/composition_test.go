@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -141,7 +142,7 @@ func TestCompositedPolicies(t *testing.T) {
 			if costBudget == 0 {
 				costBudget = celconfig.RuntimeCELCostBudget
 			}
-			result, _, err := f.ForInput(context.Background(), versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, nil, costBudget)
+			result, _, err := f.ForInput(context.Background(), versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes, v1.GroupVersionResource(tc.attributes.GetResource()), v1.GroupVersionKind(versionedAttr.VersionedKind)), optionalVars, nil, costBudget)
 			if !tc.expectErr && err != nil {
 				t.Fatalf("failed evaluation: %v", err)
 			}
