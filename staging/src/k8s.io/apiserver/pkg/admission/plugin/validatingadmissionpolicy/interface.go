@@ -21,7 +21,7 @@ import (
 
 	celgo "github.com/google/cel-go/cel"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -86,11 +86,11 @@ type Matcher interface {
 
 	// DefinitionMatches says whether this policy definition matches the provided admission
 	// resource request
-	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error)
+	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error)
 
 	// BindingMatches says whether this policy definition matches the provided admission
 	// resource request
-	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error)
+	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicyBinding) (bool, error)
 
 	// GetNamespace retrieves the Namespace resource by the given name. The name may be empty, in which case
 	// GetNamespace must return nil, nil

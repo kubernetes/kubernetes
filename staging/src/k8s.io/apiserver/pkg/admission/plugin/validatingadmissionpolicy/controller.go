@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -81,8 +81,8 @@ type policyData struct {
 // that determined the decision
 type policyDecisionWithMetadata struct {
 	PolicyDecision
-	Definition *v1alpha1.ValidatingAdmissionPolicy
-	Binding    *v1alpha1.ValidatingAdmissionPolicyBinding
+	Definition *v1beta1.ValidatingAdmissionPolicy
+	Binding    *v1beta1.ValidatingAdmissionPolicyBinding
 }
 
 // namespaceName is used as a key in definitionInfo and bindingInfos
@@ -98,7 +98,7 @@ type definitionInfo struct {
 
 	// Last value seen by this controller to be used in policy enforcement
 	// May not be nil
-	lastReconciledValue *v1alpha1.ValidatingAdmissionPolicy
+	lastReconciledValue *v1beta1.ValidatingAdmissionPolicy
 }
 
 type bindingInfo struct {
@@ -107,7 +107,7 @@ type bindingInfo struct {
 
 	// Last value seen by this controller to be used in policy enforcement
 	// May not be nil
-	lastReconciledValue *v1alpha1.ValidatingAdmissionPolicyBinding
+	lastReconciledValue *v1beta1.ValidatingAdmissionPolicyBinding
 }
 
 type paramInfo struct {
@@ -141,10 +141,10 @@ func NewAdmissionController(
 			informerFactory,
 			nil,
 			NewMatcher(matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)),
-			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](
-				informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer()),
-			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicyBinding](
-				informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicyBindings().Informer()),
+			generic.NewInformer[*v1beta1.ValidatingAdmissionPolicy](
+				informerFactory.Admissionregistration().V1beta1().ValidatingAdmissionPolicies().Informer()),
+			generic.NewInformer[*v1beta1.ValidatingAdmissionPolicyBinding](
+				informerFactory.Admissionregistration().V1beta1().ValidatingAdmissionPolicyBindings().Informer()),
 		),
 		authz: authz,
 	}
@@ -192,21 +192,21 @@ func (c *celAdmissionController) Validate(
 
 	var deniedDecisions []policyDecisionWithMetadata
 
-	addConfigError := func(err error, definition *v1alpha1.ValidatingAdmissionPolicy, binding *v1alpha1.ValidatingAdmissionPolicyBinding) {
+	addConfigError := func(err error, definition *v1beta1.ValidatingAdmissionPolicy, binding *v1beta1.ValidatingAdmissionPolicyBinding) {
 		// we always default the FailurePolicy if it is unset and validate it in API level
-		var policy v1alpha1.FailurePolicyType
+		var policy v1beta1.FailurePolicyType
 		if definition.Spec.FailurePolicy == nil {
-			policy = v1alpha1.Fail
+			policy = v1beta1.Fail
 		} else {
 			policy = *definition.Spec.FailurePolicy
 		}
 
 		// apply FailurePolicy specified in ValidatingAdmissionPolicy, the default would be Fail
 		switch policy {
-		case v1alpha1.Ignore:
+		case v1beta1.Ignore:
 			// TODO: add metrics for ignored error here
 			return
-		case v1alpha1.Fail:
+		case v1beta1.Fail:
 			var message string
 			if binding == nil {
 				message = fmt.Errorf("failed to configure policy: %w", err).Error()
@@ -336,17 +336,17 @@ func (c *celAdmissionController) Validate(
 					case ActionDeny:
 						for _, action := range binding.Spec.ValidationActions {
 							switch action {
-							case v1alpha1.Deny:
+							case v1beta1.Deny:
 								deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
 									Definition:     definition,
 									Binding:        binding,
 									PolicyDecision: decision,
 								})
 								celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
-							case v1alpha1.Audit:
+							case v1beta1.Audit:
 								c.publishValidationFailureAnnotation(binding, i, decision, versionedAttr)
 								celmetrics.Metrics.ObserveAudit(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
-							case v1alpha1.Warn:
+							case v1beta1.Warn:
 								warning.AddWarning(ctx, "", fmt.Sprintf("Validation failed for ValidatingAdmissionPolicy '%s' with binding '%s': %s", definition.Name, binding.Name, decision.Message))
 								celmetrics.Metrics.ObserveWarn(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
 							}
@@ -412,9 +412,9 @@ func (c *celAdmissionController) Validate(
 
 // Returns objects to use to evaluate the policy
 func (c *celAdmissionController) collectParams(
-	paramKind *v1alpha1.ParamKind,
+	paramKind *v1beta1.ParamKind,
 	info paramInfo,
-	paramRef *v1alpha1.ParamRef,
+	paramRef *v1beta1.ParamRef,
 	namespace string,
 ) ([]runtime.Object, error) {
 	// If definition has paramKind, paramRef is required in binding.
@@ -520,14 +520,14 @@ func (c *celAdmissionController) collectParams(
 	}
 
 	// Apply fail action for params not found case
-	if len(params) == 0 && paramRef.ParameterNotFoundAction != nil && *paramRef.ParameterNotFoundAction == v1alpha1.DenyAction {
+	if len(params) == 0 && paramRef.ParameterNotFoundAction != nil && *paramRef.ParameterNotFoundAction == v1beta1.DenyAction {
 		return nil, errors.New("no params found for policy binding with `Deny` parameterNotFoundAction")
 	}
 
 	return params, nil
 }
 
-func (c *celAdmissionController) publishValidationFailureAnnotation(binding *v1alpha1.ValidatingAdmissionPolicyBinding, expressionIndex int, decision PolicyDecision, attributes admission.Attributes) {
+func (c *celAdmissionController) publishValidationFailureAnnotation(binding *v1beta1.ValidatingAdmissionPolicyBinding, expressionIndex int, decision PolicyDecision, attributes admission.Attributes) {
 	key := "validation.policy.admission.k8s.io/validation_failure"
 	// Marshal to a list of failures since, in the future, we may need to support multiple failures
 	valueJson, err := utiljson.Marshal([]validationFailureValue{{
@@ -561,11 +561,11 @@ func (c *celAdmissionController) refreshPolicies() {
 // validationFailureValue defines the JSON format of a "validation.policy.admission.k8s.io/validation_failure" audit
 // annotation value.
 type validationFailureValue struct {
-	Message           string                      `json:"message"`
-	Policy            string                      `json:"policy"`
-	Binding           string                      `json:"binding"`
-	ExpressionIndex   int                         `json:"expressionIndex"`
-	ValidationActions []v1alpha1.ValidationAction `json:"validationActions"`
+	Message           string                     `json:"message"`
+	Policy            string                     `json:"policy"`
+	Binding           string                     `json:"binding"`
+	ExpressionIndex   int                        `json:"expressionIndex"`
+	ValidationActions []v1beta1.ValidationAction `json:"validationActions"`
 }
 
 type auditAnnotationCollector struct {
