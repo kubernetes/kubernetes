@@ -1944,8 +1944,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		if kl.podWorkers.CouldHaveRunningContainers(pod.UID) && !kubetypes.IsStaticPod(pod) {
 			pod = kl.handlePodResourcesResize(pod)
 		}
-	} else {
-		//todo(pbialon, InPlacePodVerticalScaling): check if we have any pending resize requests for this pod
+	} else if pod.Status.Phase != v1.PodRunning && kl.isPodResized(pod) {
 		pod = kl.podResizeInfeasible(pod)
 	}
 
