@@ -574,7 +574,7 @@ func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master strin
 	}
 
 	if len(config.HealthzBindAddress) > 0 {
-		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, s.Recorder, s.NodeRef)
+		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration)
 	}
 
 	err = s.platformSetup()
@@ -822,16 +822,17 @@ func (s *ProxyServer) Run() error {
 
 	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
 
-	var errCh chan error
+	var healthzErrCh, metricsErrCh chan error
 	if s.Config.BindAddressHardFail {
-		errCh = make(chan error)
+		healthzErrCh = make(chan error)
+		metricsErrCh = make(chan error)
 	}
 
 	// Start up a healthz server if requested
-	serveHealthz(s.HealthzServer, errCh)
+	serveHealthz(s.HealthzServer, healthzErrCh)
 
 	// Start up a metrics server if requested
-	serveMetrics(s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, errCh)
+	serveMetrics(s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, metricsErrCh)
 
 	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
 	if err != nil {
@@ -896,7 +897,13 @@ func (s *ProxyServer) Run() error {
 
 	go s.Proxier.SyncLoop()
 
-	return <-errCh
+	select {
+	case err = <-healthzErrCh:
+		s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeWarning, "FailedToStartProxierHealthcheck", "StartKubeProxy", err.Error())
+	case err = <-metricsErrCh:
+		s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeWarning, "FailedToStartMetricServer", "StartKubeProxy", err.Error())
+	}
+	return err
 }
 
 func (s *ProxyServer) birthCry() {
