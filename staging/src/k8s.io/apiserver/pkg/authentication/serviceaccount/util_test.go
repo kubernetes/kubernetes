@@ -145,7 +145,7 @@ func TestIsServiceAccountToken(t *testing.T) {
 		},
 	}
 
-	secretTypeMistmatch := &v1.Secret{
+	secretTypeMismatch := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "token-secret-2",
 			Namespace:       "default",
@@ -207,7 +207,7 @@ func TestIsServiceAccountToken(t *testing.T) {
 			expect: false,
 		},
 		"service account type not equal": {
-			secret: secretTypeMistmatch,
+			secret: secretTypeMismatch,
 			sa:     saIns,
 			expect: false,
 		},

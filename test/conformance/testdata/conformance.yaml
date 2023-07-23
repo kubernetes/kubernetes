@@ -312,7 +312,7 @@
     definitions MUST be published for custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
-- testname: Discovery, confirm the groupVerion and a resourcefrom each apiGroup
+- testname: Discovery, confirm the groupVersion and a resourcefrom each apiGroup
   codename: '[sig-api-machinery] Discovery should locate the groupVersion and a resource
     within each APIGroup [Conformance]'
   description: A resourceList MUST be found for each apiGroup that is retrieved. For

@@ -67,7 +67,7 @@ type testBufferedMarshalable struct {
 }
 
 func (d *testBufferedMarshalable) Marshal() ([]byte, error) {
-	return nil, fmt.Errorf("not invokable")
+	return nil, fmt.Errorf("not invocable")
 }
 
 func (d *testBufferedMarshalable) MarshalTo(data []byte) (int, error) {

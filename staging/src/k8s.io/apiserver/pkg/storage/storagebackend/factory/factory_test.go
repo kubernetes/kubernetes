@@ -138,7 +138,7 @@ func TestCreateHealthcheck(t *testing.T) {
 			got := healthcheck()
 
 			if !errors.Is(got, tc.want) {
-				t.Errorf("healthcheck() missmatch want %v got %v", tc.want, got)
+				t.Errorf("healthcheck() mismatch want %v got %v", tc.want, got)
 			}
 		})
 	}
@@ -239,7 +239,7 @@ func TestCreateReadycheck(t *testing.T) {
 			got := healthcheck()
 
 			if !errors.Is(got, tc.want) {
-				t.Errorf("healthcheck() missmatch want %v got %v", tc.want, got)
+				t.Errorf("healthcheck() mismatch want %v got %v", tc.want, got)
 			}
 		})
 	}

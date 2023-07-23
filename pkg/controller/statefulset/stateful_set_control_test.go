@@ -2729,7 +2729,7 @@ func assertMonotonicInvariants(set *apps.StatefulSet, om *fakeObjectManager) err
 
 		for _, claim := range getPersistentVolumeClaims(set, pods[idx]) {
 			claim, _ := om.claimsLister.PersistentVolumeClaims(set.Namespace).Get(claim.Name)
-			if err := checkClaimInvarients(set, pods[idx], claim); err != nil {
+			if err := checkClaimInvariants(set, pods[idx], claim); err != nil {
 				return err
 			}
 		}
@@ -2761,7 +2761,7 @@ func assertBurstInvariants(set *apps.StatefulSet, om *fakeObjectManager) error {
 			if err != nil {
 				return err
 			}
-			if err := checkClaimInvarients(set, pod, claim); err != nil {
+			if err := checkClaimInvariants(set, pod, claim); err != nil {
 				return err
 			}
 		}
@@ -2796,7 +2796,7 @@ func assertUpdateInvariants(set *apps.StatefulSet, om *fakeObjectManager) error 
 			if err != nil {
 				return err
 			}
-			if err := checkClaimInvarients(set, pod, claim); err != nil {
+			if err := checkClaimInvariants(set, pod, claim); err != nil {
 				return err
 			}
 		}
@@ -2823,7 +2823,7 @@ func assertUpdateInvariants(set *apps.StatefulSet, om *fakeObjectManager) error 
 	return nil
 }
 
-func checkClaimInvarients(set *apps.StatefulSet, pod *v1.Pod, claim *v1.PersistentVolumeClaim) error {
+func checkClaimInvariants(set *apps.StatefulSet, pod *v1.Pod, claim *v1.PersistentVolumeClaim) error {
 	policy := apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 		WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,

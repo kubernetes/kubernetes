@@ -123,7 +123,7 @@ func TestEnabledPluginNames(t *testing.T) {
 			}
 			for i := range actualPluginNames {
 				if scenario.expectedPluginNames[i] != actualPluginNames[i] {
-					t.Errorf("missmatch at index = %d, got = %s, expected = %s", i, actualPluginNames[i], scenario.expectedPluginNames[i])
+					t.Errorf("mismatch at index = %d, got = %s, expected = %s", i, actualPluginNames[i], scenario.expectedPluginNames[i])
 				}
 			}
 		})

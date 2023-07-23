@@ -289,7 +289,7 @@ func TestConfigBaseMarshal(t *testing.T) {
 		`, kubeadmapiv1.SchemeGroupVersion.String())))
 
 		if expected != got {
-			t.Fatalf("Missmatch between expected and got:\nExpected:\n%s\n---\nGot:\n%s", expected, got)
+			t.Fatalf("Mismatch between expected and got:\nExpected:\n%s\n---\nGot:\n%s", expected, got)
 		}
 	})
 }
@@ -318,7 +318,7 @@ func TestConfigBaseUnmarshal(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(got, expected) {
-			t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, got)
+			t.Fatalf("Mismatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, got)
 		}
 	})
 }
@@ -342,7 +342,7 @@ func TestGeneratedConfigFromCluster(t *testing.T) {
 				hash: testYAMLHash,
 			},
 			{
-				name:         "Missmatching hash means user supplied config",
+				name:         "Mismatching hash means user supplied config",
 				hash:         mismatchHash,
 				userSupplied: true,
 			},
