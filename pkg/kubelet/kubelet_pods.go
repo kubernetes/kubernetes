@@ -1522,10 +1522,8 @@ func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus
 		if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
 			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", pod.Name)
 		}
-	} else {
-		if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(pod.UID)); found {
-			return resizeStatus
-		}
+	} else if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(pod.UID)); found {
+		return resizeStatus
 	}
 
 	return ""
