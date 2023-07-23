@@ -1945,6 +1945,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			pod = kl.handlePodResourcesResize(pod)
 		}
 	} else {
+		//todo(pbialon, InPlacePodVerticalScaling): check if we have any pending resize requests for this pod
 		pod = kl.podResizeInfeasible(pod)
 	}
 
@@ -2800,11 +2801,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 	return true, podCopy, v1.PodResizeStatusInProgress
 }
 
-func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
-	if pod.Status.Phase != v1.PodRunning {
-		return pod
-	}
-	podResized := false
+func (kl *Kubelet) isPodResized(pod *v1.Pod) bool {
 	for _, container := range pod.Spec.Containers {
 		if len(container.Resources.Requests) == 0 {
 			continue
@@ -2812,18 +2809,24 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 		containerStatus, found := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
 		if !found {
 			klog.V(5).InfoS("ContainerStatus not found", "pod", pod.Name, "container", container.Name)
-			break
+			return false
 		}
 		if len(containerStatus.AllocatedResources) != len(container.Resources.Requests) {
 			klog.V(5).InfoS("ContainerStatus.AllocatedResources length mismatch", "pod", pod.Name, "container", container.Name)
-			break
+			return false
 		}
 		if !cmp.Equal(container.Resources.Requests, containerStatus.AllocatedResources) {
-			podResized = true
-			break
+			return true
 		}
 	}
-	if !podResized {
+	return false
+}
+
+func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
+	if pod.Status.Phase != v1.PodRunning {
+		return pod
+	}
+	if !kl.isPodResized(pod) {
 		return pod
 	}
 
