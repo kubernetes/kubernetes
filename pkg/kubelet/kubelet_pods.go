@@ -1541,10 +1541,8 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		s.Resize = kl.determinePodResizeStatus(pod, s)
-	} else {
-		if !kl.specStatusDiffers(pod, s) {
-			s.Resize = v1.PodResizeStatusInfeasible
-		}
+	} else if kl.specStatusDiffers(pod, s) {
+		s.Resize = v1.PodResizeStatusInfeasible
 	}
 
 	// calculate the next phase and preserve reason
