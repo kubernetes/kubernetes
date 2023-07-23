@@ -470,7 +470,7 @@ func TestHealthzServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
 	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
 
 	hsTest := &serverTest{
@@ -524,7 +524,7 @@ func TestLivezServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
 	server := hs.httpFactory.New(hs.addr, livezHandler{hs: hs})
 
 	hsTest := &serverTest{
