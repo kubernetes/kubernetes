@@ -448,6 +448,7 @@ func (req *request) wait() (bool, bool) {
 		qs.totRequestsCancelled++
 		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "cancelled")
 		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
+		metrics.AddSeatsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -req.MaxSeats())
 		req.NoteQueued(false)
 		qs.reqsGaugePair.RequestsWaiting.Add(-1)
 		qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
@@ -652,6 +653,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueToBoundLocked(queue *queue, f
 				disqueueSeats += req.MaxSeats()
 				req.NoteQueued(false)
 				metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
+				metrics.AddSeatsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -req.MaxSeats())
 			}
 			// we need to check if the next request has timed out.
 			return true
@@ -702,6 +704,7 @@ func (qs *queueSet) enqueueToBoundLocked(request *request) {
 	qs.totRequestsWaiting++
 	qs.totSeatsWaiting += request.MaxSeats()
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, 1)
+	metrics.AddSeatsInQueues(request.ctx, qs.qCfg.Name, request.fsName, request.MaxSeats())
 	request.NoteQueued(true)
 	qs.reqsGaugePair.RequestsWaiting.Add(1)
 	qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
@@ -760,6 +763,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	qs.totRequestsWaiting--
 	qs.totSeatsWaiting -= request.MaxSeats()
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
+	metrics.AddSeatsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -request.MaxSeats())
 	request.NoteQueued(false)
 	qs.reqsGaugePair.RequestsWaiting.Add(-1)
 	defer qs.boundNextDispatchLocked(queue)
