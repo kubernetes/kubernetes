@@ -455,51 +455,10 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q)", err)
 		}
 
-		// The Kind used for the /ephemeralcontainers subresource changed in 1.22. When presented with an unexpected
-		// Kind the api server will respond with a not-registered error. When this happens we can optimistically try
-		// using the old API.
-		if runtime.IsNotRegisteredError(err) {
-			klog.V(1).Infof("Falling back to legacy API because server returned error: %v", err)
-			return o.debugByEphemeralContainerLegacy(ctx, pod, debugContainer)
-		}
-
 		return nil, "", err
 	}
 
 	return result, debugContainer.Name, nil
-}
-
-// debugByEphemeralContainerLegacy adds debugContainer as an ephemeral container using the pre-1.22 /ephemeralcontainers API
-// This may be removed when we no longer wish to support releases prior to 1.22.
-func (o *DebugOptions) debugByEphemeralContainerLegacy(ctx context.Context, pod *corev1.Pod, debugContainer *corev1.EphemeralContainer) (*corev1.Pod, string, error) {
-	// We no longer have the v1.EphemeralContainers Kind since it was removed in 1.22, but
-	// we can present a JSON 6902 patch that the api server will apply.
-	patch, err := json.Marshal([]map[string]interface{}{{
-		"op":    "add",
-		"path":  "/ephemeralContainers/-",
-		"value": debugContainer,
-	}})
-	if err != nil {
-		return nil, "", fmt.Errorf("error creating JSON 6902 patch for old /ephemeralcontainers API: %s", err)
-	}
-
-	result := o.podClient.RESTClient().Patch(types.JSONPatchType).
-		Namespace(pod.Namespace).
-		Resource("pods").
-		Name(pod.Name).
-		SubResource("ephemeralcontainers").
-		Body(patch).
-		Do(ctx)
-	if err := result.Error(); err != nil {
-		return nil, "", err
-	}
-
-	newPod, err := o.podClient.Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, "", err
-	}
-
-	return newPod, debugContainer.Name, nil
 }
 
 // debugByCopy runs a copy of the target Pod with a debug container added or an original container modified
