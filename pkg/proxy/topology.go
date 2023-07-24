@@ -86,6 +86,7 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 			hasAnyEndpoints = true
 			if ep.GetIsLocal() {
 				hasLocalReadyEndpoints = true
+				break
 			}
 		} else if ep.IsServing() && ep.IsTerminating() {
 			hasAnyEndpoints = true
