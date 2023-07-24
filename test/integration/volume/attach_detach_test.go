@@ -31,10 +31,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	fakecloud "k8s.io/cloud-provider/fake"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
 	"k8s.io/kubernetes/pkg/volume"
@@ -189,23 +191,33 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	// mimic a non-graceful node shutdown
 	notReadyCOndition := v1.NodeCondition{
 		Type:   v1.NodeReady,
-		Status: v1.ConditionTrue,
+		Status: v1.ConditionFalse,
 	}
-	node.Status.Conditions = append(node.Status.Conditions, notReadyCOndition)
-	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{}); err != nil {
-		t.Fatalf("Failed to patch the node : %v", err)
-	}
-
+	// deep copy the node object.
+	deepCopyNode := node.DeepCopy()
+	deepCopyNode.Status.Conditions = append(deepCopyNode.Status.Conditions, notReadyCOndition)
 	taint := v1.Taint{
 		Key:    v1.TaintNodeOutOfService,
 		Effect: v1.TaintEffectNoExecute,
 	}
-	node.Spec.Taints = append(node.Spec.Taints, taint)
-	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{}); err != nil {
+	deepCopyNode.Spec.Taints = append(deepCopyNode.Spec.Taints, taint)
+	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), deepCopyNode, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to patch the node : %v", err)
 	}
-	// delete the pod
-	err := testClient.CoreV1().Pods(namespaceName).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+
+	// wait until the node update has propagated
+	gotNode, err := testClient.CoreV1().Nodes().Get(context.TODO(), "node-sandbox", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get the node : %v", err)
+	}
+	for i := 1; i <= 3; i++ {
+		if IsNodeNotReady(gotNode) && HasOutOfServiceTaint(node) {
+			break
+		}
+		time.Sleep(3 * time.Second)
+	}
+
+	err = testClient.CoreV1().Pods(namespaceName).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("error in deleting pod: %v", err)
 	}
@@ -222,6 +234,33 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 		}
 		break
 	}
+	actualForceDetachMericCounter, err := metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(metrics.ForceDetachReasonOutOfService))
+	if err != nil {
+		t.Errorf("Error getting actualForceDetachMericCounter")
+	}
+	if actualForceDetachMericCounter != float64(1) {
+		t.Fatalf("Expected desiredForceDetachMericCounter to be 1, got %v", actualForceDetachMericCounter)
+	}
+}
+
+func IsNodeNotReady(node *v1.Node) bool {
+	nodeConditions := node.Status.Conditions
+	for _, c := range nodeConditions {
+		if c.Type == v1.NodeReady && c.Status == v1.ConditionFalse {
+			return true
+		}
+	}
+	return false
+}
+
+func HasOutOfServiceTaint(node *v1.Node) bool {
+	taints := node.Spec.Taints
+	for _, taint := range taints {
+		if taint.Key == v1.TaintNodeOutOfService {
+			return true
+		}
+	}
+	return false
 }
 
 // Via integration test we can verify that if pod delete
