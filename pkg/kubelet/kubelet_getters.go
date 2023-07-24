@@ -40,6 +40,11 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csi"
 )
 
+const (
+	// Max amount of time to stat volume path
+	maxWaitForStatVolumePath = 10 * time.Second
+)
+
 // getRootDir returns the full path to the directory under which kubelet can
 // store data.  These functions are useful to pass interfaces to other modules
 // that may need to know where to write data without getting a whole kubelet
@@ -348,6 +353,16 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	return volumes, nil
 }
 
+func (kl *Kubelet) IsLikelyNotMountPoint(ctx context.Context, volumePath string)  (bool, error) {
+	select {
+	case <-ctx.Done():
+		klog.Errorf("filesystem %s may be corrupted", volumePath)
+		return false, fmt.Errorf("filesystem %s may be corrupted", volumePath)
+	default:
+		return kl.mounter.IsLikelyNotMountPoint(volumePath)
+	}
+}
+
 func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string, error) {
 	mountedVolumes := []string{}
 	volumePaths, err := kl.getPodVolumePathListFromDisk(podUID)
@@ -359,8 +374,11 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string,
 	// We plan to remove this mountpoint check as a condition before deleting pods since it is
 	// not reliable and the condition might be different for different types of volumes. But it requires
 	// a reliable way to clean up unused volume dir to avoid problems during pod deletion. See discussion in issue #74650
+	ctx, cancel := context.WithTimeout(ctx, maxWaitForStatVolumePath*time.Second)
+	defer cancel()
+	
 	for _, volumePath := range volumePaths {
-		isNotMount, err := kl.mounter.IsLikelyNotMountPoint(volumePath)
+		isNotMount, err := kl.IsLikelyNotMountPoint(volumePath)
 		if err != nil {
 			return mountedVolumes, fmt.Errorf("fail to check mount point %q: %v", volumePath, err)
 		}
