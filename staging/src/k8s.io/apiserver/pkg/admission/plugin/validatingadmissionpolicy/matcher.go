@@ -63,7 +63,7 @@ func (c *matcher) ValidateInitialization() error {
 }
 
 // DefinitionMatches returns whether this ValidatingAdmissionPolicy matches the provided admission resource request
-func (c *matcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
+func (c *matcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1beta1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
 	criteria := matchCriteria{constraints: definition.Spec.MatchConstraints}
 	return c.Matcher.Matches(a, o, &criteria)
 }
@@ -74,7 +74,7 @@ func (c *matcher) BindingMatches(a admission.Attributes, o admission.ObjectInter
 		return true, nil
 	}
 	criteria := matchCriteria{constraints: binding.Spec.MatchResources}
-	isMatch, _, err := c.Matcher.Matches(a, o, &criteria)
+	isMatch, _, _, err := c.Matcher.Matches(a, o, &criteria)
 	return isMatch, err
 }
 

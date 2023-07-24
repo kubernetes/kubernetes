@@ -248,7 +248,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
 
-	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
+	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Beta},
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 

@@ -26,6 +26,7 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 
 	v1 "k8s.io/api/admissionregistration/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
@@ -78,7 +79,7 @@ func NewMatcher(filter celplugin.Filter, failPolicy *v1.FailurePolicyType, match
 
 func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) MatchResult {
 	t := time.Now()
-	evalResults, _, err := m.filter.ForInput(ctx, versionedAttr, celplugin.CreateAdmissionRequest(versionedAttr.Attributes), celplugin.OptionalVariableBindings{
+	evalResults, _, err := m.filter.ForInput(ctx, versionedAttr, celplugin.CreateAdmissionRequest(versionedAttr.Attributes, metav1.GroupVersionResource(versionedAttr.GetResource()), metav1.GroupVersionKind(versionedAttr.VersionedKind)), celplugin.OptionalVariableBindings{
 		VersionedParams: versionedParams,
 		Authorizer:      authz,
 	}, nil, celconfig.RuntimeCELCostBudgetMatchConditions)
