@@ -111,6 +111,7 @@ type DebugOptions struct {
 	Args            []string
 	ArgsOnly        bool
 	Attach          bool
+	AttachFunc      func(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, cmdPath string, ns, podName, containerName string) error
 	Container       string
 	CopyTo          string
 	Replace         bool
@@ -212,6 +213,9 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
 		o.Attach = true
+		if o.AttachFunc == nil {
+			o.AttachFunc = o.handleAttachPod
+		}
 	}
 
 	// Environment
@@ -377,26 +381,8 @@ func (o *DebugOptions) Run(restClientGetter genericclioptions.RESTClientGetter, 
 			return visitErr
 		}
 
-		if o.Attach && len(containerName) > 0 {
-			opts := &attach.AttachOptions{
-				StreamOptions: exec.StreamOptions{
-					IOStreams: o.IOStreams,
-					Stdin:     o.Interactive,
-					TTY:       o.TTY,
-					Quiet:     o.Quiet,
-				},
-				CommandName: cmd.Parent().CommandPath() + " attach",
-
-				Attach: &attach.DefaultRemoteAttach{},
-			}
-			config, err := restClientGetter.ToRESTConfig()
-			if err != nil {
-				return err
-			}
-			opts.Config = config
-			opts.AttachFunc = attach.DefaultAttachFunc
-
-			if err := o.handleAttachPod(ctx, restClientGetter, debugPod.Namespace, debugPod.Name, containerName, opts); err != nil {
+		if o.Attach && len(containerName) > 0 && o.AttachFunc != nil {
+			if err := o.AttachFunc(ctx, restClientGetter, cmd.Parent().CommandPath(), debugPod.Namespace, debugPod.Name, containerName); err != nil {
 				return err
 			}
 		}
@@ -795,7 +781,25 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 	return result, err
 }
 
-func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, ns, podName, containerName string, opts *attach.AttachOptions) error {
+func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, cmdPath string, ns, podName, containerName string) error {
+	opts := &attach.AttachOptions{
+		StreamOptions: exec.StreamOptions{
+			IOStreams: o.IOStreams,
+			Stdin:     o.Interactive,
+			TTY:       o.TTY,
+			Quiet:     o.Quiet,
+		},
+		CommandName: cmdPath + " attach",
+
+		Attach: &attach.DefaultRemoteAttach{},
+	}
+	config, err := restClientGetter.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	opts.Config = config
+	opts.AttachFunc = attach.DefaultAttachFunc
+
 	pod, err := o.waitForContainer(ctx, ns, podName, containerName)
 	if err != nil {
 		return err
