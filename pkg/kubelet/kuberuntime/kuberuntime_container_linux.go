@@ -20,21 +20,26 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"errors"
 	"fmt"
-	cadvisorv1 "github.com/google/cadvisor/info/v1"
-	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
+	"github.com/containerd/cgroups"
+	cadvisorv1 "github.com/google/cadvisor/info/v1"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -305,6 +310,36 @@ var isCgroup2UnifiedMode = func() bool {
 	return libcontainercgroups.IsCgroup2UnifiedMode()
 }
 
+var (
+	swapControllerAvailability     bool
+	swapControllerAvailabilityOnce sync.Once
+)
+
+func swapControllerAvailable() bool {
+	// See https://github.com/containerd/containerd/pull/7838/
+	swapControllerAvailabilityOnce.Do(func() {
+		const warn = "Failed to detect the availability of the swap controller, assuming not available"
+		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
+		if libcontainercgroups.IsCgroup2UnifiedMode() {
+			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
+			_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
+			if err != nil {
+				klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
+				return
+			}
+			p = filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+		}
+		if _, err := os.Stat(p); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				klog.V(5).ErrorS(err, warn)
+			}
+			return
+		}
+		swapControllerAvailability = true
+	})
+	return swapControllerAvailability
+}
+
 type swapConfigurationHelper struct {
 	machineInfo cadvisorv1.MachineInfo
 }
@@ -337,10 +372,12 @@ func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxConta
 
 func (m swapConfigurationHelper) ConfigureNoSwap(lcr *runtimeapi.LinuxContainerResources) {
 	if !isCgroup2UnifiedMode() {
-		// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
-		// Some swapping is still possible.
-		// Note that if memory limit is 0, memory swap limit is ignored.
-		lcr.MemorySwapLimitInBytes = lcr.MemoryLimitInBytes
+		if swapControllerAvailable() {
+			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
+			// Some swapping is still possible.
+			// Note that if memory limit is 0, memory swap limit is ignored.
+			lcr.MemorySwapLimitInBytes = lcr.MemoryLimitInBytes
+		}
 		return
 	}
 
