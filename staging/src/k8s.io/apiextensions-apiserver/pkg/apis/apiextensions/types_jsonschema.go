@@ -22,19 +22,17 @@ type FieldValueErrorReason string
 
 const (
 	// FieldValueRequired is used to report required values that are not
-	// provided (e.g. empty strings, null values, or empty arrays).  See
-	// Required().
+	// provided (e.g. empty strings, null values, or empty arrays).
 	FieldValueRequired FieldValueErrorReason = "FieldValueRequired"
 	// FieldValueDuplicate is used to report collisions of values that must be
-	// unique (e.g. unique IDs).  See Duplicate().
+	// unique (e.g. unique IDs).
 	FieldValueDuplicate FieldValueErrorReason = "FieldValueDuplicate"
 	// FieldValueInvalid is used to report malformed values (e.g. failed regex
-	// match, too long, out of bounds).  See Invalid().
+	// match, too long, out of bounds).
 	FieldValueInvalid FieldValueErrorReason = "FieldValueInvalid"
 	// FieldValueForbidden is used to report valid (as per formatting rules)
 	// values which would be accepted under some conditions, but which are not
-	// permitted by the current conditions (such as security policy).  See
-	// Forbidden().
+	// permitted by the current conditions (such as security policy).
 	FieldValueForbidden FieldValueErrorReason = "FieldValueForbidden"
 )
 
@@ -234,7 +232,7 @@ type ValidationRule struct {
 	// The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule.
 	// The currently supported reasons are: "FieldValueInvalid", "FieldValueForbidden", "FieldValueRequired", "FieldValueDuplicate".
 	// If not set, default to use "FieldValueInvalid".
-	// All future added reasons must be accepted by clients when reading this value.
+	// All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.
 	// +optional
 	Reason *FieldValueErrorReason
 	// fieldPath represents the field path returned when the validation fails.

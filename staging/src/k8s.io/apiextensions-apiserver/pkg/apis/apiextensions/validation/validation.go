@@ -65,7 +65,7 @@ const (
 var supportedValidationReason = sets.NewString(
 	string(apiextensions.FieldValueRequired),
 	string(apiextensions.FieldValueForbidden),
-	string(apiextensions.FieldValueRequired),
+	string(apiextensions.FieldValueInvalid),
 	string(apiextensions.FieldValueDuplicate),
 )
 
