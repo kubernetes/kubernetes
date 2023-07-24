@@ -32,12 +32,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/features"
@@ -891,7 +890,7 @@ func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions)
 	if err != nil {
 		return nil, err
 	}
-	return s.watcher.Watch(s.watchContext(ctx), preparedKey, int64(rev), opts.Recursive, opts.ProgressNotify, s.transformer, opts.Predicate)
+	return s.watcher.Watch(s.watchContext(ctx), preparedKey, int64(rev), s.transformer, opts)
 }
 
 func (s *store) watchContext(ctx context.Context) context.Context {
