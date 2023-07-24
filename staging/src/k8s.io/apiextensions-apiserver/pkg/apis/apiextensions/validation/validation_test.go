@@ -4090,8 +4090,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							XValidations: apiextensions.ValidationRules{
 								{
 									Rule: "self.a > 0",
-									Reason: func() *field.ErrorType {
-										r := field.ErrorTypeInternal
+									Reason: func() *apiextensions.FieldValueErrorReason {
+										r := apiextensions.FieldValueErrorReason("InternalError")
 										return &r
 									}(),
 									FieldPath: ".a",
