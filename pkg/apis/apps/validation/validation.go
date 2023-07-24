@@ -26,6 +26,7 @@ import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -43,8 +44,42 @@ func ValidateStatefulSetName(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNSLabel(name, prefix)
 }
 
+func ValidatePersistentVolumeClaimTemplates(claims []api.PersistentVolumeClaim, volumes []api.Volume, fldPath *field.Path) (map[string]api.VolumeSource, field.ErrorList) {
+	allErrs := field.ErrorList{}
+
+	if len(claims) == 0 {
+		return nil, allErrs
+	}
+
+	allNames := sets.New[string]()
+	for _, volume := range volumes {
+		allNames.Insert(volume.Name)
+	}
+
+	allClaimNames := sets.New[string]()
+	vols := make(map[string]api.VolumeSource)
+	for i, claim := range claims {
+		idxPath := fldPath.Index(i)
+		if allNames.Has(claim.Name) || allClaimNames.Has(claim.Name) {
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("metadata", "name"), claim.Name))
+		} else {
+			allClaimNames.Insert(claim.Name)
+			vols[claim.Name] = api.VolumeSource{
+				PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+					ClaimName: claim.Name,
+				},
+			}
+		}
+		opts := apivalidation.ValidationOptionsForPersistentVolumeClaim(&claim, nil)
+		allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&claim.ObjectMeta, false, apivalidation.ValidatePersistentVolumeName, idxPath.Child("metadata"))...)
+		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeClaimSpec(&claim.Spec, idxPath.Child("spec"), opts)...)
+	}
+
+	return vols, allErrs
+}
+
 // ValidatePodTemplateSpecForStatefulSet validates the given template and ensures that it is in accordance with the desired selector.
-func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, selector labels.Selector, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, selector labels.Selector, volumes map[string]api.VolumeSource, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
@@ -59,7 +94,7 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 		// TODO: Add validation for PodSpec, currently this will check volumes, which we know will
 		// fail. We should really check that the union of the given volumes and volumeClaims match
 		// volume mounts in the containers.
-		// allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, volumes, fldPath, opts)...)
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
 		allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("annotations"))...)
 		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, &template.Spec, fldPath.Child("annotations"), opts)...)
@@ -126,6 +161,9 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 
 	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(spec.PersistentVolumeClaimRetentionPolicy, fldPath.Child("persistentVolumeClaimRetentionPolicy"))...)
 
+	vols, vErrs := ValidatePersistentVolumeClaimTemplates(spec.VolumeClaimTemplates, spec.Template.Spec.Volumes, fldPath.Child("volumeClaimTemplates"))
+	allErrs = append(allErrs, vErrs...)
+
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	if spec.Ordinals != nil {
@@ -147,7 +185,7 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
 	} else {
-		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(&spec.Template, selector, fldPath.Child("template"), opts)...)
+		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(&spec.Template, selector, vols, fldPath.Child("template"), opts)...)
 	}
 
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
@@ -358,7 +396,7 @@ func ValidateDaemonSetSpec(spec, oldSpec *apps.DaemonSetSpec, fldPath *field.Pat
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is invalid for daemonset"))
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, nil, fldPath.Child("template"), opts)...)
 	// get rid of apivalidation.ValidateReadOnlyPersistentDisks,stop passing oldSpec to this function
 	var oldVols []api.Volume
 	if oldSpec != nil {
@@ -757,7 +795,7 @@ func ValidatePodTemplateSpecForReplicaSet(template, oldTemplate *api.PodTemplate
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
 			}
 		}
-		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath, opts)...)
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, nil, fldPath, opts)...)
 		// Daemons run on more than one node, Cancel verification of read and write volumes.
 		// get rid of apivalidation.ValidateReadOnlyPersistentDisks,stop passing oldTemplate to this function
 		var oldVols []api.Volume

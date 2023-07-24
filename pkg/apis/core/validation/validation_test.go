@@ -2008,7 +2008,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 				}
 				opts := PodValidationOptions{}
-				_, errs = ValidateVolumes(volumes, nil, field.NewPath(""), opts)
+				_, errs = ValidateVolumes(volumes, nil, nil, field.NewPath(""), opts)
 			} else {
 				opts := ValidationOptionsForPersistentVolumeClaim(scenario.claim, nil)
 				errs = ValidatePersistentVolumeClaim(scenario.claim, opts)
@@ -5107,7 +5107,7 @@ func TestValidateVolumes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			names, errs := ValidateVolumes([]core.Volume{tc.vol}, nil, field.NewPath("field"), tc.opts)
+			names, errs := ValidateVolumes([]core.Volume{tc.vol}, nil, nil, field.NewPath("field"), tc.opts)
 			if len(errs) != len(tc.errs) {
 				t.Fatalf("unexpected error(s): got %d, want %d: %v", len(tc.errs), len(errs), errs)
 			}
@@ -5133,7 +5133,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "abc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 		{Name: "abc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 	}
-	_, errs := ValidateVolumes(dupsCase, nil, field.NewPath("field"), PodValidationOptions{})
+	_, errs := ValidateVolumes(dupsCase, nil, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(errs) == 0 {
 		t.Errorf("expected error")
 	} else if len(errs) != 1 {
@@ -6246,7 +6246,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 			},
 		}}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
+	vols, v1err := ValidateVolumes(volumes, nil, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -6308,7 +6308,7 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
+	vols, v1err := ValidateVolumes(volumes, nil, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -6381,7 +6381,7 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
+	vols, v1err := ValidateVolumes(volumes, nil, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -6520,7 +6520,7 @@ func TestValidateMountPropagation(t *testing.T) {
 	volumes := []core.Volume{
 		{Name: "foo", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols2, v2err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
+	vols2, v2err := ValidateVolumes(volumes, nil, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v2err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v2err)
 		return
@@ -6555,7 +6555,7 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 		}}}},
 	}
 
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
+	vols, v1err := ValidateVolumes(volumes, nil, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volumes - expected success %v", v1err)
 		return
@@ -9347,7 +9347,7 @@ func TestValidatePodSpec(t *testing.T) {
 			opts := PodValidationOptions{
 				ResourceIsPod: true,
 			}
-			if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), opts); len(errs) != 0 {
+			if errs := ValidatePodSpec(&v, nil, nil, field.NewPath("field"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -9582,7 +9582,7 @@ func TestValidatePodSpec(t *testing.T) {
 		opts := PodValidationOptions{
 			ResourceIsPod: true,
 		}
-		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), opts); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v, nil, nil, field.NewPath("field"), opts); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
@@ -22549,7 +22549,7 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		err := ValidatePodTemplateSpec(test.spec, rootFld, PodValidationOptions{})
+		err := ValidatePodTemplateSpec(test.spec, nil, rootFld, PodValidationOptions{})
 		assert.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
 	}
 }
@@ -23427,7 +23427,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidatePodSpec(&v, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+			if errs := ValidatePodSpec(&v, shortPodName, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -23562,7 +23562,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		}(),
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v, nil, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
@@ -23573,7 +23573,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			t.Run(claimName, func(t *testing.T) {
 				for _, podMeta := range []*metav1.ObjectMeta{shortPodName, brokenPodName} {
 					t.Run(podMeta.Name, func(t *testing.T) {
-						errs := ValidatePodSpec(spec, podMeta, field.NewPath("field"), PodValidationOptions{})
+						errs := ValidatePodSpec(spec, podMeta, nil, field.NewPath("field"), PodValidationOptions{})
 						// Only one out of the four combinations fails.
 						expectError := spec == &goodClaimTemplate && podMeta == brokenPodName
 						if expectError && len(errs) == 0 {

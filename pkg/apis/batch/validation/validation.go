@@ -250,7 +250,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 
 	allErrs = append(allErrs, validatePodReplacementPolicy(spec, fldPath.Child("podReplacementPolicy"))...)
 
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, nil, fldPath.Child("template"), opts)...)
 
 	// spec.Template.Spec.RestartPolicy can be defaulted as RestartPolicyAlways
 	// by SetDefaults_PodSpec function when the user does not explicitly specify a value for it,

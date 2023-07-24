@@ -205,7 +205,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 			},
 		},
 	}
@@ -229,6 +229,7 @@ func TestValidateStatefulSet(t *testing.T) {
 						ContainerPort: 12345,
 						Protocol:      api.ProtocolTCP,
 					}},
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
 				}},
 			},
 		},
@@ -240,6 +241,16 @@ func TestValidateStatefulSet(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
+				Containers: []api.Container{{
+					Name:            "abc",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					Ports: []api.ContainerPort{{
+						ContainerPort: 12345,
+						Protocol:      api.ProtocolTCP,
+					}},
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+				}},
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidLabels,
@@ -257,6 +268,16 @@ func TestValidateStatefulSet(t *testing.T) {
 				RestartPolicy:         api.RestartPolicyAlways,
 				DNSPolicy:             api.DNSClusterFirst,
 				ActiveDeadlineSeconds: &invalidTime,
+				Containers: []api.Container{{
+					Name:            "abc",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					Ports: []api.ContainerPort{{
+						ContainerPort: 12345,
+						Protocol:      api.ProtocolTCP,
+					}},
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+				}},
 			},
 		},
 	}
@@ -402,6 +423,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		name: "empty restart policy",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
 		errs: field.ErrorList{
+			field.Required(field.NewPath("spec", "template", "spec", "restartPolicy"), ""),
 			field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 		},
 	}, {
@@ -560,7 +582,7 @@ func generateStatefulSetSpec(minSeconds int32) *apps.StatefulSetSpec {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 			},
 		},
 	}
@@ -752,7 +774,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 			},
 		},
 	}
@@ -764,7 +786,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 			},
 		},
 	}
@@ -778,6 +800,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			StorageClassName: &storageClass,
+			AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
 					api.ResourceStorage: resource.MustParse("1Gi"),
@@ -797,6 +820,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			StorageClassName: &storageClass2,
+			AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
 					api.ResourceStorage: resource.MustParse("2Gi"),
@@ -807,7 +831,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 
 	addContainersValidTemplate := validPodTemplate.DeepCopy()
 	addContainersValidTemplate.Template.Spec.Containers = append(addContainersValidTemplate.Template.Spec.Containers,
-		api.Container{Name: "def", Image: "image2", ImagePullPolicy: "IfNotPresent"})
+		api.Container{Name: "def", Image: "image2", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile})
 	if len(addContainersValidTemplate.Template.Spec.Containers) != len(validPodTemplate.Template.Spec.Containers)+1 {
 		t.Errorf("failure during test setup: template %v should have more containers than template %v", addContainersValidTemplate, validPodTemplate)
 	}

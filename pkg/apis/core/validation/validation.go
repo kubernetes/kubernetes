@@ -384,7 +384,7 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *fiel
 	return allErrs
 }
 
-func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath *field.Path, opts PodValidationOptions) (map[string]core.VolumeSource, field.ErrorList) {
+func ValidateVolumes(volumes []core.Volume, extraVolumeSources map[string]core.VolumeSource, podMeta *metav1.ObjectMeta, fldPath *field.Path, opts PodValidationOptions) (map[string]core.VolumeSource, field.ErrorList) {
 	allErrs := field.ErrorList{}
 
 	allNames := sets.String{}
@@ -400,6 +400,9 @@ func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath 
 		}
 	}
 	vols := make(map[string]core.VolumeSource)
+	for k, v := range extraVolumeSources {
+		vols[k] = *v.DeepCopy()
+	}
 	for i, vol := range volumes {
 		idxPath := fldPath.Index(i)
 		namePath := idxPath.Child("name")
@@ -3861,7 +3864,7 @@ func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.
 
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, metaPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, metaPath.Child("annotations"), opts)...)
-	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, specPath, opts)...)
+	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, nil, specPath, opts)...)
 
 	// we do additional validation only pertinent for pods and not pod templates
 	// this was done to preserve backwards compatibility
@@ -3990,7 +3993,7 @@ func validateHostIPs(pod *core.Pod) field.ErrorList {
 // tricks.
 // The pod metadata is needed to validate generic ephemeral volumes. It is optional
 // and should be left empty unless the spec is from a real pod object.
-func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, extraVolumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	var gracePeriod int64
@@ -3999,7 +4002,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 		gracePeriod = *spec.TerminationGracePeriodSeconds
 	}
 
-	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"), opts)
+	vols, vErrs := ValidateVolumes(spec.Volumes, extraVolumes, podMeta, fldPath.Child("volumes"), opts)
 	allErrs = append(allErrs, vErrs...)
 	podClaimNames := gatherPodResourceClaimNames(spec.ResourceClaims)
 	allErrs = append(allErrs, validatePodResourceClaims(podMeta, spec.ResourceClaims, fldPath.Child("resourceClaims"))...)
@@ -5125,7 +5128,7 @@ func ValidatePodBinding(binding *core.Binding) field.ErrorList {
 // ValidatePodTemplate tests if required fields in the pod template are set.
 func ValidatePodTemplate(pod *core.PodTemplate, opts PodValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodTemplateSpec(&pod.Template, field.NewPath("template"), opts)...)
+	allErrs = append(allErrs, ValidatePodTemplateSpec(&pod.Template, nil, field.NewPath("template"), opts)...)
 	return allErrs
 }
 
@@ -5133,7 +5136,7 @@ func ValidatePodTemplate(pod *core.PodTemplate, opts PodValidationOptions) field
 // that cannot be changed.
 func ValidatePodTemplateUpdate(newPod, oldPod *core.PodTemplate, opts PodValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodTemplateSpec(&newPod.Template, field.NewPath("template"), opts)...)
+	allErrs = append(allErrs, ValidatePodTemplateSpec(&newPod.Template, nil, field.NewPath("template"), opts)...)
 	return allErrs
 }
 
@@ -5554,7 +5557,7 @@ func ValidatePodTemplateSpecForRC(template, oldTemplate *core.PodTemplateSpec, s
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
 			}
 		}
-		allErrs = append(allErrs, ValidatePodTemplateSpec(template, fldPath, opts)...)
+		allErrs = append(allErrs, ValidatePodTemplateSpec(template, nil, fldPath, opts)...)
 		// get rid of apivalidation.ValidateReadOnlyPersistentDisks,stop passing oldTemplate to this function
 		var oldVols []core.Volume
 		if oldTemplate != nil {
@@ -5590,12 +5593,12 @@ func ValidateReplicationControllerSpec(spec, oldSpec *core.ReplicationController
 }
 
 // ValidatePodTemplateSpec validates the spec of a pod template
-func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, extraVolumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"), opts)...)
-	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, nil, fldPath.Child("spec"), opts)...)
+	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, nil, extraVolumes, fldPath.Child("spec"), opts)...)
 	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(spec.ObjectMeta, &spec.Spec, fldPath.Child("spec"))...)
 
 	if len(spec.Spec.EphemeralContainers) > 0 {
