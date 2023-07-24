@@ -31,14 +31,18 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	fakecloud "k8s.io/cloud-provider/fake"
+	basemetric "k8s.io/component-base/metrics"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/controller/podgc"
+	podgcmetrics "k8s.io/kubernetes/pkg/controller/podgc/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -140,16 +144,15 @@ var defaultTimerConfig = attachdetach.TimerConfig{
 	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Second,
 }
 
-// TestPodTerminationWithNodeOOSDetach integration test verifies that if `out-of-service` taint is applied to the node,
-// which is shutdown non gracefully, then all the pods will immediately get terminated and scheduled to a different
-// healthy node without waiting for the default period of time.
-func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
+// TestNodeOOSDetach integration test verifies that if `out-of-service` taint is applied to the node,
+// which is shutdown non gracefully, then all the volumes of the pods on that node will get force detached.
+func TestNodeOOSDetach(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	namespaceName := "test-volume-detach"
-	testClient, plugin, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, gcCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
@@ -185,6 +188,8 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(ctx)
+	// Run gcCtrl to avoid leaking goroutines during its creation
+	go gcCtrl.Run(ctx)
 
 	waitToObservePods(t, podInformer, 1)
 
@@ -200,67 +205,120 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 		Key:    v1.TaintNodeOutOfService,
 		Effect: v1.TaintEffectNoExecute,
 	}
-	deepCopyNode.Spec.Taints = append(deepCopyNode.Spec.Taints, taint)
-	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), deepCopyNode, metav1.UpdateOptions{}); err != nil {
-		t.Fatalf("Failed to patch the node : %v", err)
+	gotNode, err := testClient.CoreV1().Nodes().UpdateStatus(context.TODO(), deepCopyNode, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to patch the node status : %v", err)
+	}
+	gotNode.Spec.Taints = append(gotNode.Spec.Taints, taint)
+	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), gotNode, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Failed to taint the node : %v", err)
 	}
 
-	// wait until the node update has propagated
+	waitForNodeToBeNotReady(t, testClient, "node-sandbox")
+	waitForNodeToBeTainted(t, testClient, "node-sandbox", v1.TaintNodeOutOfService)
+	graceTime := int64(300)
+	err = testClient.CoreV1().Pods(namespaceName).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
+		GracePeriodSeconds: &graceTime,
+	})
+	if err != nil {
+		t.Fatalf("error in deleting pod: %v", err)
+	}
+	waitForPodDeletionTimeStampToSet(t, testClient, pod.Name, namespaceName)
+	waitForMetric(t, metrics.ForceDetachMetricCounter.WithLabelValues(metrics.ForceDetachReasonOutOfService), 1, "detach-metrics")
+}
+
+// TestPodTerminationWithNodeOOSDetach integration test verifies that if `out-of-service` taint is applied to the node,
+// which is shutdown non gracefully, then all the pods will immediately get terminated and volume be immediately detached
+// without waiting for the default time out period.
+func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	namespaceName := "test-volume-detach"
+	testClient, ctrl, pvCtrl, gcCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
+
+	// create a node
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-sandbox",
+			Annotations: map[string]string{
+				util.ControllerManagedAttachAnnotation: "true",
+			},
+		},
+	}
+	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to created node : %v", err)
+	}
+
+	// create fake pods with volumes
+	pod := fakePodWithVol(namespaceName)
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+		t.Errorf("Failed to create pod : %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	podInformer := informers.Core().V1().Pods().Informer()
+	// start the informer
+	informers.Start(ctx.Done())
+	informers.WaitForCacheSync(ctx.Done())
+
+	// run the controllers
+	go ctrl.Run(ctx)
+	go pvCtrl.Run(ctx)
+	go gcCtrl.Run(ctx)
+
+	waitToObservePods(t, podInformer, 1)
 	gotNode, err := testClient.CoreV1().Nodes().Get(context.TODO(), "node-sandbox", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get the node : %v", err)
 	}
-	for i := 1; i <= 3; i++ {
-		if IsNodeNotReady(gotNode) && HasOutOfServiceTaint(node) {
-			break
-		}
-		time.Sleep(3 * time.Second)
-	}
 
-	err = testClient.CoreV1().Pods(namespaceName).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+	// mimic a non-graceful node shutdown by marking the node to be not ready
+	notReadyCOndition := v1.NodeCondition{
+		Type:   v1.NodeReady,
+		Status: v1.ConditionFalse,
+	}
+	// deep copy the node object.
+	deepCopyNode := node
+	deepCopyNode.Status.Conditions = append(deepCopyNode.Status.Conditions, notReadyCOndition)
+	deepCopyNode.Status.VolumesInUse = append(deepCopyNode.Status.VolumesInUse, "kubernetes.io/mock-provisioner/fake-mount")
+	gotNode, err = testClient.CoreV1().Nodes().UpdateStatus(context.TODO(), deepCopyNode, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to patch the node status : %v", err)
+	}
+	waitForNodeToBeNotReady(t, testClient, "node-sandbox")
+
+	// delete the pod with grace period time so that it is stuck in terminating state
+	gracePeriod := int64(300)
+	err = testClient.CoreV1().Pods(namespaceName).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
+		GracePeriodSeconds: &gracePeriod,
+	})
 	if err != nil {
 		t.Fatalf("error in deleting pod: %v", err)
 	}
+	waitForPodDeletionTimeStampToSet(t, testClient, pod.Name, namespaceName)
 
-	// verify the detach call count
-	for i := 1; i <= 3; i++ {
-		time.Sleep(3 * time.Second)
-		err = volumetest.VerifyDetachCallCount(1, plugin)
-		if err != nil {
-			if i <= 2 {
-				continue
-			}
-			t.Fatalf("incorrect detach call count: %v", err)
-		}
-		break
+	// taint the node with out-of-service taint
+	taint := v1.Taint{
+		Key:    v1.TaintNodeOutOfService,
+		Effect: v1.TaintEffectNoExecute,
 	}
-	actualForceDetachMericCounter, err := metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(metrics.ForceDetachReasonOutOfService))
-	if err != nil {
-		t.Errorf("Error getting actualForceDetachMericCounter")
+	gotNode.Spec.Taints = append(gotNode.Spec.Taints, taint)
+	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), gotNode, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Failed to patch the node : %v", err)
 	}
-	if actualForceDetachMericCounter != float64(1) {
-		t.Fatalf("Expected desiredForceDetachMericCounter to be 1, got %v", actualForceDetachMericCounter)
-	}
-}
+	waitForNodeToBeTainted(t, testClient, "node-sandbox", v1.TaintNodeOutOfService)
 
-func IsNodeNotReady(node *v1.Node) bool {
-	nodeConditions := node.Status.Conditions
-	for _, c := range nodeConditions {
-		if c.Type == v1.NodeReady && c.Status == v1.ConditionFalse {
-			return true
-		}
-	}
-	return false
-}
-
-func HasOutOfServiceTaint(node *v1.Node) bool {
-	taints := node.Spec.Taints
-	for _, taint := range taints {
-		if taint.Key == v1.TaintNodeOutOfService {
-			return true
-		}
-	}
-	return false
+	// verify is the pod was force deleted
+	waitForMetric(t, podgcmetrics.DeletingPodsTotal.WithLabelValues(namespaceName, podgcmetrics.PodGCReasonTerminatingOutOfService), 1, "terminating-pod-metric")
+	// verify the volume was force detached
+	// Note that metric is accumulating so expected count is `2` as the test
+	waitForMetric(t, metrics.ForceDetachMetricCounter.WithLabelValues(metrics.ForceDetachReasonOutOfService), 2, "detach-metric")
 }
 
 // Via integration test we can verify that if pod delete
@@ -281,7 +339,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		},
 	}
 
-	testClient, _, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, gcCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -311,6 +369,8 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	go ctrl.Run(ctx)
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(ctx)
+	// Run gcCtrl to avoid leaking goroutines started during its creation.
+	go gcCtrl.Run(ctx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -356,7 +416,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 		},
 	}
 
-	testClient, _, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, gcCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -389,7 +449,8 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	go ctrl.Run(ctx)
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(ctx)
-
+	// Run gcCtrl to avoid leaking goroutines started during its creation.
+	go gcCtrl.Run(ctx)
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
 	if err != nil {
@@ -429,7 +490,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 		},
 	}
 
-	testClient, _, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, gcCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -462,6 +523,8 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	go ctrl.Run(ctx)
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(ctx)
+	// Run gcCtrl to avoid leaking goroutines started during its creation.
+	go gcCtrl.Run(ctx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -484,6 +547,69 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	}
 
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 20*time.Second, "expected non-zero pods in dsw if KeepTerminatedPodVolumesAnnotation is set", 1)
+}
+
+func waitForMetric(t *testing.T, m basemetric.CounterMetric, expectedCount float64, identifier string) {
+	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+		gotCount, err := metricstestutil.GetCounterMetricValue(m)
+		fmt.Println(gotCount)
+		if err != nil {
+			t.Fatal(err, identifier)
+		}
+		if gotCount >= expectedCount {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatal(err, identifier)
+	}
+}
+
+func waitForNodeToBeTainted(t *testing.T, testingClient *clientset.Clientset, nodeName, taintKey string) {
+	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+		node, err := testingClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, taint := range node.Spec.Taints {
+			if taint.Key == taintKey {
+				return true, nil
+			}
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func waitForNodeToBeNotReady(t *testing.T, testingClient *clientset.Clientset, nodeName string) {
+	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+		node, err := testingClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !nodeutil.IsNodeReady(node) {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func waitForPodDeletionTimeStampToSet(t *testing.T, testingClient *clientset.Clientset, podName, podNamespace string) {
+	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+		pod, err := testingClient.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pod.DeletionTimestamp != nil {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // wait for the podInformer to observe the pods. Call this function before
@@ -527,7 +653,7 @@ func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, ch
 	}
 }
 
-func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, *volumetest.FakeVolumePlugin, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, clientgoinformers.SharedInformerFactory) {
+func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, *podgc.PodGCController, clientgoinformers.SharedInformerFactory) {
 	config := restclient.CopyConfig(server.ClientConfig)
 	config.QPS = 1000000
 	config.Burst = 1000000
@@ -588,11 +714,20 @@ func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, sync
 		NodeInformer:              informers.Core().V1().Nodes(),
 		EnableDynamicProvisioning: false,
 	}
+	var podgcCtrl *podgc.PodGCController
+	podgcCtrl = podgc.NewPodGCInternal(ctx,
+		testClient,
+		informers.Core().V1().Pods(),
+		informers.Core().V1().Nodes(),
+		0,
+		500*time.Millisecond,
+		time.Second)
+
 	pvCtrl, err := persistentvolume.NewController(ctx, params)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	return testClient, plugin, ctrl, pvCtrl, informers
+	return testClient, ctrl, pvCtrl, podgcCtrl, informers
 }
 
 // Via integration test we can verify that if pod add
@@ -612,7 +747,7 @@ func TestPodAddedByDswp(t *testing.T) {
 			},
 		},
 	}
-	testClient, _, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, gcCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -645,6 +780,8 @@ func TestPodAddedByDswp(t *testing.T) {
 	go ctrl.Run(ctx)
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(ctx)
+	// Run gcCtrl to avoid leaking goroutines started during its creation.
+	go gcCtrl.Run(ctx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -682,7 +819,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	defer server.TearDownFn()
 	namespaceName := "test-pod-deletion"
 
-	testClient, _, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, attachdetach.TimerConfig{
+	testClient, ctrl, pvCtrl, gcCtrl, informers := createAdClients(t, server, defaultSyncPeriod, attachdetach.TimerConfig{
 		ReconcilerLoopPeriod:                        100 * time.Millisecond,
 		ReconcilerMaxWaitForUnmountDuration:         6 * time.Second,
 		DesiredStateOfWorldPopulatorLoopSleepPeriod: 24 * time.Hour,
@@ -733,6 +870,8 @@ func TestPVCBoundWithADC(t *testing.T) {
 	initCSIObjects(ctx.Done(), informers)
 	go ctrl.Run(ctx)
 	go pvCtrl.Run(ctx)
+	// Run gcCtrl to avoid leaking goroutines started during its creation.
+	go gcCtrl.Run(ctx)
 
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4)
 	// Give attachdetach controller enough time to populate pods into DSWP.
