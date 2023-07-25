@@ -282,7 +282,7 @@ func testZonalFailover(ctx context.Context, c clientset.Interface, ns string) {
 	}
 
 	ginkgo.By("verifying the same PVC is used by the new pod")
-	framework.ExpectEqual(getPVC(ctx, c, ns, regionalPDLabels).Name, pvc.Name, "The same PVC should be used after failover.")
+	gomega.Expect(getPVC(ctx, c, ns, regionalPDLabels).Name).To(gomega.Equal(pvc.Name), "The same PVC should be used after failover.")
 
 	ginkgo.By("verifying the container output has 2 lines, indicating the pod has been created twice using the same regional PD.")
 	logs, err := e2epod.GetPodLogs(ctx, c, ns, pod.Name, "")
@@ -290,7 +290,7 @@ func testZonalFailover(ctx context.Context, c clientset.Interface, ns string) {
 		"Error getting logs from pod %s in namespace %s", pod.Name, ns)
 	lineCount := len(strings.Split(strings.TrimSpace(logs), "\n"))
 	expectedLineCount := 2
-	framework.ExpectEqual(lineCount, expectedLineCount, "Line count of the written file should be %d.", expectedLineCount)
+	gomega.Expect(lineCount).To(gomega.Equal(expectedLineCount), "Line count of the written file should be %d.", expectedLineCount)
 
 }
 
@@ -449,7 +449,7 @@ func getPVC(ctx context.Context, c clientset.Interface, ns string, pvcLabels map
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(len(pvcList.Items), 1, "There should be exactly 1 PVC matched.")
+	gomega.Expect(pvcList.Items).To(gomega.HaveLen(1), "There should be exactly 1 PVC matched.")
 
 	return &pvcList.Items[0]
 }
@@ -459,7 +459,7 @@ func getPod(ctx context.Context, c clientset.Interface, ns string, podLabels map
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := c.CoreV1().Pods(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(len(podList.Items), 1, "There should be exactly 1 pod matched.")
+	gomega.Expect(podList.Items).To(gomega.HaveLen(1), "There should be exactly 1 pod matched.")
 
 	return &podList.Items[0]
 }

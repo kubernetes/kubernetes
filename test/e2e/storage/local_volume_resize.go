@@ -127,7 +127,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := testVol.pvc.Status.Conditions
-			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 		})
 
 	})
