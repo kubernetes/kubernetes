@@ -574,7 +574,7 @@ var _ = SIGDescribe("kubelet", func() {
 				queryCommand := "\"/api/v1/nodes/" + nodeName + "/proxy/logs/?query=kubelet&tailLines=3\""
 				cmd := tk.KubectlCmd("get", "--raw", queryCommand)
 				result := runKubectlCommand(cmd)
-				logs := journalctlCommand("-u", "kubelet", "-n 3 --utc")
+				logs := journalctlCommandOnNode(nodeName, "-u kubelet -n 3 --utc")
 				if result != logs {
 					framework.Failf("Failed to receive the correct kubelet logs or the correct amount of lines of logs")
 				}
@@ -593,7 +593,7 @@ var _ = SIGDescribe("kubelet", func() {
 				queryCommand := "\"/api/v1/nodes/" + nodeName + "/proxy/logs/?query=kubelet&tailLines=3&boot=0&pattern=kubelet\""
 				cmd := tk.KubectlCmd("get", "--raw", queryCommand)
 				result := runKubectlCommand(cmd)
-				logs := journalctlCommand("-u", "kubelet", "-n 3 --utc")
+				logs := journalctlCommandOnNode(nodeName, "-u kubelet -n 3 --utc")
 				if result != logs {
 					framework.Failf("Failed to receive the correct kubelet logs")
 				}
@@ -613,7 +613,7 @@ var _ = SIGDescribe("kubelet", func() {
 				queryCommand := "\"/api/v1/nodes/" + nodeName + "/proxy/logs/?query=kubelet&tailLines=3&sinceTime=" + start.Format(time.RFC3339) + "\""
 				cmd := tk.KubectlCmd("get", "--raw", queryCommand)
 				result := runKubectlCommand(cmd)
-				logs := journalctlCommand("-u", "kubelet", "-n 3 --utc")
+				logs := journalctlCommandOnNode(nodeName, "-u kubelet -n 3 --utc")
 				if result != logs {
 					framework.Failf("Failed to receive the correct kubelet logs or the correct amount of lines of logs")
 				}
@@ -634,7 +634,7 @@ var _ = SIGDescribe("kubelet", func() {
 				queryCommand := "\"/api/v1/nodes/" + nodeName + "/proxy/logs/?query=kubelet&tailLines=3&sinceTime=" + start.Format(time.RFC3339) + "\""
 				cmd := tk.KubectlCmd("get", "--raw", queryCommand)
 				result := runKubectlCommand(cmd)
-				logs := journalctlCommand("-u", "kubelet", "--utc")
+				logs := journalctlCommandOnNode(nodeName, "-u kubelet --utc")
 				assertContains(result, logs)
 			}
 		})
@@ -672,13 +672,9 @@ func assertContains(expectedString string, result string) {
 	return
 }
 
-func journalctlCommand(arg ...string) string {
-	command := exec.Command("journalctl", arg...)
-	out, err := command.Output()
-	if err != nil {
-		framework.Logf("Command: %v\nError: %v", command, err)
-		framework.Failf("Error at running journalctl command")
-	}
-	framework.Logf("Journalctl output: %s", out)
-	return string(out)
+func journalctlCommandOnNode(nodeName string, args string) string {
+	result, err := e2essh.NodeExec(context.Background(), nodeName, "journalctl "+args, framework.TestContext.Provider)
+	framework.ExpectNoError(err)
+	e2essh.LogResult(result)
+	return result.Stdout
 }
