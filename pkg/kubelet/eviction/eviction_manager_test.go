@@ -109,10 +109,11 @@ func makePodWithMemoryStats(name string, priority int32, requests v1.ResourceLis
 	return pod, podStats
 }
 
-func makePodWithDiskStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*v1.Pod, statsapi.PodStats) {
+func makePodWithDiskStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string, volumes []v1.Volume) (*v1.Pod, statsapi.PodStats) {
 	pod := newPod(name, priority, []v1.Container{
 		newContainer(name, requests, limits),
-	}, nil)
+	}, volumes)
+
 	podStats := newPodDiskStats(pod, parseQuantity(rootFsUsed), parseQuantity(logsUsed), parseQuantity(perLocalVolumeUsed))
 	return pod, podStats
 }
@@ -294,7 +295,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 			wantPodStatus: v1.PodStatus{
 				Phase:   v1.PodFailed,
 				Reason:  "Evicted",
-				Message: "The node was low on resource: ephemeral-storage. Threshold quantity: 2Gi, available: 1536Mi. ",
+				Message: "The node was low on resource: ephemeral-storage. Threshold quantity: 2Gi, available: 1536Mi. Container above-requests was using 700Mi, request is 100Mi, has larger consumption of ephemeral-storage. ",
 			},
 		},
 	}
@@ -312,7 +313,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 				pods := []*v1.Pod{}
 				podStats := map[*v1.Pod]statsapi.PodStats{}
 				for _, podToMake := range podsToMake {
-					pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
+					pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed, nil)
 					pods = append(pods, pod)
 					podStats[pod] = podStat
 				}
@@ -371,7 +372,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 						Type:    "DisruptionTarget",
 						Status:  "True",
 						Reason:  "TerminationByKubelet",
-						Message: "The node was low on resource: ephemeral-storage. Threshold quantity: 2Gi, available: 1536Mi. ",
+						Message: "The node was low on resource: ephemeral-storage. Threshold quantity: 2Gi, available: 1536Mi. Container above-requests was using 700Mi, request is 100Mi, has larger consumption of ephemeral-storage. ",
 					})
 				}
 
@@ -534,8 +535,8 @@ func TestMemoryPressure(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
-	if observedGracePeriod != int64(0) {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	if observedGracePeriod != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
 
 	// the best-effort pod should not admit, burstable should
@@ -662,7 +663,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed, nil)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
@@ -713,7 +714,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	}
 
 	// create a best effort pod to test admission
-	podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi", "0Gi", "0Gi")
+	podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi", "0Gi", "0Gi", nil)
 
 	// synchronize
 	manager.synchronize(diskInfoProvider, activePodsFunc)
@@ -793,8 +794,8 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
-	if observedGracePeriod != int64(0) {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	if observedGracePeriod != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
 
 	// try to admit our pod (should fail)
@@ -927,8 +928,8 @@ func TestMinReclaim(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
 	observedGracePeriod := *podKiller.gracePeriodOverride
-	if observedGracePeriod != int64(0) {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	if observedGracePeriod != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
 
 	// reduce memory pressure, but not below the min-reclaim amount
@@ -947,8 +948,8 @@ func TestMinReclaim(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
-	if observedGracePeriod != int64(0) {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	if observedGracePeriod != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
 
 	// reduce memory pressure and ensure the min-reclaim amount
@@ -997,7 +998,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed, nil)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
@@ -1153,8 +1154,8 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
 	observedGracePeriod := *podKiller.gracePeriodOverride
-	if observedGracePeriod != int64(0) {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	if observedGracePeriod != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
 
 	// reduce disk pressure
@@ -1372,8 +1373,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
-	if observedGracePeriod != int64(0) {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	if observedGracePeriod != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
 
 	// try to admit our pod (should fail)
@@ -1554,6 +1555,177 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	}
 }
 
+func TestRootFsAboveLimitPodsAreEvicted(t *testing.T) {
+	podMaker := makePodWithDiskStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "rootfs-above-limits", priority: scheduling.DefaultPriorityWhenNoDefaultClassExists, requests: newResourceList("100m", "1Gi", "1Gi"), limits: newResourceList("100m", "1Gi", "1Gi"), rootFsUsed: "2Gi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed, nil)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+
+	podToEvict := pods[0]
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{
+		Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: "",
+	}
+
+	config := Config{}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
+	manager := &managerImpl{
+		clock:                         fakeClock,
+		killPodFunc:                   podKiller.killPodNow,
+		imageGC:                       diskGC,
+		containerGC:                   diskGC,
+		config:                        config,
+		recorder:                      &record.FakeRecorder{},
+		summaryProvider:               summaryProvider,
+		nodeRef:                       nodeRef,
+		nodeConditionsLastObservedAt:  nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:     thresholdsObservedAt{},
+		localStorageCapacityIsolation: true,
+	}
+
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// verify the right pod was killed with the right grace period.
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager should have killed pod: %v, but instead killed: %v", podToEvict.Name, podKiller.pod.Name)
+	}
+	if *podKiller.gracePeriodOverride != 1 {
+		t.Errorf("Manager should have evicted with gracePeriodOverride of 1, but used: %v", *podKiller.gracePeriodOverride)
+	}
+}
+
+func TestLogsFsAboveLimitPodsAreEvicted(t *testing.T) {
+	podMaker := makePodWithDiskStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "logsfs-above-limits", priority: scheduling.HighestUserDefinablePriority, requests: newResourceList("100m", "1Gi", "1Gi"), limits: newResourceList("100m", "1Gi", "1Gi"), logsFsUsed: "2Gi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed, nil)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+
+	podToEvict := pods[0]
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{
+		Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: "",
+	}
+
+	config := Config{}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
+	manager := &managerImpl{
+		clock:                         fakeClock,
+		killPodFunc:                   podKiller.killPodNow,
+		imageGC:                       diskGC,
+		containerGC:                   diskGC,
+		config:                        config,
+		recorder:                      &record.FakeRecorder{},
+		summaryProvider:               summaryProvider,
+		nodeRef:                       nodeRef,
+		nodeConditionsLastObservedAt:  nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:     thresholdsObservedAt{},
+		localStorageCapacityIsolation: true,
+	}
+
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// verify the right pod was killed with the right grace period.
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager should have killed pod: %v, but instead killed: %v", podToEvict.Name, podKiller.pod.Name)
+	}
+	if *podKiller.gracePeriodOverride != 1 {
+		t.Errorf("Manager should have evicted with gracePeriodOverride of 1, but used: %v", *podKiller.gracePeriodOverride)
+	}
+}
+
+func TestLocalVolumeAboveLimitPodsAreEvicted(t *testing.T) {
+	podMaker := makePodWithDiskStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "perlocalvolume-above-limits", priority: scheduling.HighestUserDefinablePriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), perLocalVolumeUsed: "2Gi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		volumeSizeLimit := resource.MustParse("1Gi")
+		volumes := []v1.Volume{{
+			Name: "emptyDirVolume",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					SizeLimit: &volumeSizeLimit,
+				},
+			},
+		}}
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed, volumes)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+
+	podToEvict := pods[0]
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{
+		Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: "",
+	}
+
+	config := Config{}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
+	manager := &managerImpl{
+		clock:                         fakeClock,
+		killPodFunc:                   podKiller.killPodNow,
+		imageGC:                       diskGC,
+		containerGC:                   diskGC,
+		config:                        config,
+		recorder:                      &record.FakeRecorder{},
+		summaryProvider:               summaryProvider,
+		nodeRef:                       nodeRef,
+		nodeConditionsLastObservedAt:  nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:     thresholdsObservedAt{},
+		localStorageCapacityIsolation: true,
+	}
+
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// verify the right pod was killed with the right grace period.
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager should have killed pod: %v, but instead killed: %v", podToEvict.Name, podKiller.pod.Name)
+	}
+	if *podKiller.gracePeriodOverride != 1 {
+		t.Errorf("Manager should have evicted with gracePeriodOverride of 1, but used: %v", *podKiller.gracePeriodOverride)
+	}
+}
+
 // TestAllocatableMemoryPressure
 func TestAllocatableMemoryPressure(t *testing.T) {
 	podMaker := makePodWithMemoryStats
@@ -1647,8 +1819,8 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
 	observedGracePeriod := *podKiller.gracePeriodOverride
-	if observedGracePeriod != int64(0) {
-		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	if observedGracePeriod != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
 	// reset state
 	podKiller.pod = nil
