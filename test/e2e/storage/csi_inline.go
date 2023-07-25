@@ -117,12 +117,12 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		ginkgo.By("getting")
 		retrievedPod, err := client.Get(ctx, podName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(retrievedPod.UID, createdPod.UID)
+		gomega.Expect(retrievedPod.UID).To(gomega.BeIdenticalTo(createdPod.UID))
 
 		ginkgo.By("listing in namespace")
 		podList, err := client.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(podList.Items), 1, "list should have 1 items, got: %s", podList)
+		gomega.Expect(len(podList.Items)).To(gomega.BeIdenticalTo(1), "list should have 1 items, got: %s", podList)
 
 		ginkgo.By("patching")
 		patchedPod, err := client.Patch(ctx, createdPod.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
