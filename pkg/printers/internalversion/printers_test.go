@@ -4657,7 +4657,7 @@ func TestPrintStatefulSet(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Ready, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "Unknown", "0s"}}},
 		},
 		// Generate options "Wide"; includes containers and images.
 		{
@@ -4690,7 +4690,189 @@ func TestPrintStatefulSet(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Ready, Age, Containers, Images
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "Unknown", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2"}}},
+		},
+		// The stateful set is ready.
+		{
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					Generation:        1,
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					Replicas:           5,
+					ReadyReplicas:      5,
+					UpdatedReplicas:    5,
+					CurrentReplicas:    5,
+					CurrentRevision:    "1",
+					UpdateRevision:     "1",
+					ObservedGeneration: utilpointer.Int64(1),
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Ready, Status, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "5/5", "Ready", "0s"}}},
+		},
+		// The stateful set is scaling.
+		{
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					Generation:        1,
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					Replicas:      3,
+					ReadyReplicas: 2,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Ready, Status, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "Scaling", "0s"}}},
+		},
+		// The stateful set is updating.
+		{
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					Generation:        1,
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					Replicas:        3,
+					ReadyReplicas:   2,
+					CurrentRevision: "1",
+					UpdateRevision:  "2",
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Ready, Status, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "Updating", "0s"}}},
+		},
+		// The stateful set is updating.
+		{
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					Generation:        1,
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					Replicas:        3,
+					ReadyReplicas:   2,
+					CurrentRevision: "1",
+					UpdateRevision:  "2",
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Ready, Status, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "Updating", "0s"}}},
+		},
+		// The stateful set is terminating.
+		{
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					Generation:        1,
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					DeletionTimestamp: &metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					Replicas:        3,
+					ReadyReplicas:   2,
+					CurrentRevision: "1",
+					UpdateRevision:  "2",
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Ready, Status, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "Terminating", "0s"}}},
 		},
 	}
 
