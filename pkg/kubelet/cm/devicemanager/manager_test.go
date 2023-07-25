@@ -1184,6 +1184,66 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 
 }
 
+func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
+	podToAllocate := "podToAllocate"
+	containerToAllocate := "containerToAllocate"
+	podToRemove := "podToRemove"
+	containerToRemove := "containerToRemove"
+	deviceID := "deviceID"
+	resourceName := "domain1.com/resource"
+
+	socket := filepath.Join(os.TempDir(), esocketName())
+	devs := []*pluginapi.Device{
+		{ID: deviceID, Health: pluginapi.Healthy},
+	}
+	p, e := esetup(t, devs, socket, resourceName, func(n string, d []pluginapi.Device) {})
+
+	waitUpdateAllocatedDevicesChan := make(chan struct{})
+	waitSetGetPreferredAllocChan := make(chan struct{})
+
+	p.SetGetPreferredAllocFunc(func(r *pluginapi.PreferredAllocationRequest, devs map[string]pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
+		waitSetGetPreferredAllocChan <- struct{}{}
+		<-waitUpdateAllocatedDevicesChan
+		return &pluginapi.PreferredAllocationResponse{
+			ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
+				{
+					DeviceIDs: []string{deviceID},
+				},
+			},
+		}, nil
+	})
+
+	testManager := &ManagerImpl{
+		endpoints:             make(map[string]endpointInfo),
+		healthyDevices:        make(map[string]sets.Set[string]),
+		unhealthyDevices:      make(map[string]sets.Set[string]),
+		allocatedDevices:      make(map[string]sets.Set[string]),
+		podDevices:            newPodDevices(),
+		activePods:            func() []*v1.Pod { return []*v1.Pod{} },
+		sourcesReady:          &sourcesReadyStub{},
+		topologyAffinityStore: topologymanager.NewFakeManager(),
+	}
+
+	testManager.endpoints[resourceName] = endpointInfo{
+		e: e,
+		opts: &pluginapi.DevicePluginOptions{
+			GetPreferredAllocationAvailable: true,
+		},
+	}
+	testManager.healthyDevices[resourceName] = sets.New[string](deviceID)
+	testManager.podDevices.insert(podToRemove, containerToRemove, resourceName, nil, nil)
+
+	go func() {
+		<-waitSetGetPreferredAllocChan
+		testManager.UpdateAllocatedDevices()
+		waitUpdateAllocatedDevicesChan <- struct{}{}
+	}()
+
+	set, err := testManager.devicesToAllocate(podToAllocate, containerToAllocate, resourceName, 1, sets.New[string]())
+	assert.NoError(t, err)
+	assert.Equal(t, set, sets.New[string](deviceID))
+}
+
 func TestGetDeviceRunContainerOptions(t *testing.T) {
 	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",
