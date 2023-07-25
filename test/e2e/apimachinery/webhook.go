@@ -708,7 +708,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 
 	/*
 		Release: v1.28
-		Testname: Admission webhook, create and update validating webhook configuration with match conditions
+		Testname: Validating Admission webhook, create and update validating webhook configuration with matchConditions
 		Description: Register a validating webhook configuration. Verify that the match conditions field are
 		properly stored in the api-server.  Update the validating webhook configuration and retrieve it; the
 		retrieved object must contain the newly update matchConditions fields.
@@ -759,7 +759,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 
 	/*
 		Release: v1.28
-		Testname: Admission webhook, create and update mutating webhook configuration with match conditions
+		Testname: Mutating Admission webhook, create and update mutating webhook configuration with matchConditions
 		Description: Register a mutating webhook configuration. Verify that the match conditions field are
 		properly stored in the api-server.  Update the mutating webhook configuration and retrieve it; the
 		retrieved object must contain the newly update matchConditions fields.
@@ -810,7 +810,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 
 	/*
 		Release: v1.28
-		Testname: Admission webhook, reject validating webhook configurations with invalid matchconditions
+		Testname: Validing Admission webhook, reject validating webhook configurations with invalid matchConditions
 		Description: Creates a validating webhook configuration with an invalid CEL expression in it's
 		matchConditions field. The api-server server should reject the create request with a "compilation
 		failed" error message.
@@ -834,7 +834,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 
 	/*
 		Release: v1.28
-		Testname: Admission webhook, reject mutating webhook configurations with invalid matchconditions
+		Testname: Mutating Admission webhook, reject mutating webhook configurations with invalid matchConditions
 		Description: Creates a mutating webhook configuration with an invalid CEL expression in it's
 		matchConditions field. The api-server server should reject the create request with a "compilation
 		failed" error message.
@@ -858,7 +858,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 
 	/*
 		Release: v1.28
-		Testname: Admission webhook, validating webhook exclude leases using match conditions field.
+		Testname: Validating Admission webhook, validating webhook exclude leases using match conditions field.
 		Description: Create a validating webhook configuration with matchConditions field that
 		will reject all resources except the coordination.k8s.io/lease ones. Try to create pods
 		until the webhook is ready and rejecting the pods with "denied" error message. Create
@@ -910,7 +910,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 
 	/*
 		Release: v1.28
-		Testname: Admission webhook, mutating webhook excluding object with specific name
+		Testname: Mutating Admission webhook, mutating webhook excluding object with specific name
 		Description: Create a mutating webhook configuration with matchConditions field that
 		will reject all resources except ones with a specific name 'skip-me'. Create
 		a configMap with the name 'skip-me' and verify that it's mutated. Create a
