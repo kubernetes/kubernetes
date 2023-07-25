@@ -16,8 +16,24 @@ limitations under the License.
 
 package v1beta1
 
-import (
-	"k8s.io/apimachinery/pkg/util/validation/field"
+// FieldValueErrorReason is a machine-readable value providing more detail about why a field failed the validation.
+// +enum
+type FieldValueErrorReason string
+
+const (
+	// FieldValueRequired is used to report required values that are not
+	// provided (e.g. empty strings, null values, or empty arrays).
+	FieldValueRequired FieldValueErrorReason = "FieldValueRequired"
+	// FieldValueDuplicate is used to report collisions of values that must be
+	// unique (e.g. unique IDs).
+	FieldValueDuplicate FieldValueErrorReason = "FieldValueDuplicate"
+	// FieldValueInvalid is used to report malformed values (e.g. failed regex
+	// match, too long, out of bounds).
+	FieldValueInvalid FieldValueErrorReason = "FieldValueInvalid"
+	// FieldValueForbidden is used to report valid (as per formatting rules)
+	// values which would be accepted under some conditions, but which are not
+	// permitted by the current conditions (such as security policy).
+	FieldValueForbidden FieldValueErrorReason = "FieldValueForbidden"
 )
 
 // JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).
@@ -255,9 +271,9 @@ type ValidationRule struct {
 	// The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule.
 	// The currently supported reasons are: "FieldValueInvalid", "FieldValueForbidden", "FieldValueRequired", "FieldValueDuplicate".
 	// If not set, default to use "FieldValueInvalid".
-	// All future added reasons must be accepted by clients when reading this value.
+	// All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.
 	// +optional
-	Reason *field.ErrorType `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	Reason *FieldValueErrorReason `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 	// fieldPath represents the field path returned when the validation fails.
 	// It must be a relative JSON path (i.e. with array notation) scoped to the location of this x-kubernetes-validations extension in the schema and refer to an existing field.
 	// e.g. when validation checks if a specific attribute `foo` under a map `testMap`, the fieldPath could be set to `.testMap.foo`

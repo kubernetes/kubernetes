@@ -47653,9 +47653,10 @@ func schema_pkg_apis_apiextensions_v1_ValidationRule(ref common.ReferenceCallbac
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule. The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule. The currently supported reasons are: \"FieldValueInvalid\", \"FieldValueForbidden\", \"FieldValueRequired\", \"FieldValueDuplicate\". If not set, default to use \"FieldValueInvalid\". All future added reasons must be accepted by clients when reading this value.",
+							Description: "reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule. The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule. The currently supported reasons are: \"FieldValueInvalid\", \"FieldValueForbidden\", \"FieldValueRequired\", \"FieldValueDuplicate\". If not set, default to use \"FieldValueInvalid\". All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.\n\nPossible enum values:\n - `\"FieldValueDuplicate\"` is used to report collisions of values that must be unique (e.g. unique IDs).\n - `\"FieldValueForbidden\"` is used to report valid (as per formatting rules) values which would be accepted under some conditions, but which are not permitted by the current conditions (such as security policy).\n - `\"FieldValueInvalid\"` is used to report malformed values (e.g. failed regex match, too long, out of bounds).\n - `\"FieldValueRequired\"` is used to report required values that are not provided (e.g. empty strings, null values, or empty arrays).",
 							Type:        []string{"string"},
 							Format:      "",
+							Enum:        []interface{}{"FieldValueDuplicate", "FieldValueForbidden", "FieldValueInvalid", "FieldValueRequired"},
 						},
 					},
 					"fieldPath": {
@@ -49065,9 +49066,10 @@ func schema_pkg_apis_apiextensions_v1beta1_ValidationRule(ref common.ReferenceCa
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule. The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule. The currently supported reasons are: \"FieldValueInvalid\", \"FieldValueForbidden\", \"FieldValueRequired\", \"FieldValueDuplicate\". If not set, default to use \"FieldValueInvalid\". All future added reasons must be accepted by clients when reading this value.",
+							Description: "reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule. The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule. The currently supported reasons are: \"FieldValueInvalid\", \"FieldValueForbidden\", \"FieldValueRequired\", \"FieldValueDuplicate\". If not set, default to use \"FieldValueInvalid\". All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.\n\nPossible enum values:\n - `\"FieldValueDuplicate\"` is used to report collisions of values that must be unique (e.g. unique IDs).\n - `\"FieldValueForbidden\"` is used to report valid (as per formatting rules) values which would be accepted under some conditions, but which are not permitted by the current conditions (such as security policy).\n - `\"FieldValueInvalid\"` is used to report malformed values (e.g. failed regex match, too long, out of bounds).\n - `\"FieldValueRequired\"` is used to report required values that are not provided (e.g. empty strings, null values, or empty arrays).",
 							Type:        []string{"string"},
 							Format:      "",
+							Enum:        []interface{}{"FieldValueDuplicate", "FieldValueForbidden", "FieldValueInvalid", "FieldValueRequired"},
 						},
 					},
 					"fieldPath": {

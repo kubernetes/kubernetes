@@ -63,10 +63,10 @@ const (
 )
 
 var supportedValidationReason = sets.NewString(
-	string(field.ErrorTypeInvalid),
-	string(field.ErrorTypeForbidden),
-	string(field.ErrorTypeRequired),
-	string(field.ErrorTypeDuplicate),
+	string(apiextensions.FieldValueRequired),
+	string(apiextensions.FieldValueForbidden),
+	string(apiextensions.FieldValueInvalid),
+	string(apiextensions.FieldValueDuplicate),
 )
 
 // ValidateCustomResourceDefinition statically validates

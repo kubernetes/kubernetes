@@ -4090,8 +4090,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							XValidations: apiextensions.ValidationRules{
 								{
 									Rule: "self.a > 0",
-									Reason: func() *field.ErrorType {
-										r := field.ErrorTypeInternal
+									Reason: func() *apiextensions.FieldValueErrorReason {
+										r := apiextensions.FieldValueErrorReason("InternalError")
 										return &r
 									}(),
 									FieldPath: ".a",
@@ -4100,6 +4100,36 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"a": {
 									Type: "number",
+									XValidations: apiextensions.ValidationRules{
+										{
+											Rule: "true",
+											Reason: func() *apiextensions.FieldValueErrorReason {
+												r := apiextensions.FieldValueRequired
+												return &r
+											}(),
+										},
+										{
+											Rule: "true",
+											Reason: func() *apiextensions.FieldValueErrorReason {
+												r := apiextensions.FieldValueInvalid
+												return &r
+											}(),
+										},
+										{
+											Rule: "true",
+											Reason: func() *apiextensions.FieldValueErrorReason {
+												r := apiextensions.FieldValueDuplicate
+												return &r
+											}(),
+										},
+										{
+											Rule: "true",
+											Reason: func() *apiextensions.FieldValueErrorReason {
+												r := apiextensions.FieldValueForbidden
+												return &r
+											}(),
+										},
+									},
 								},
 							},
 						},
