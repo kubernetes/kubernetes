@@ -28,7 +28,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -49,6 +48,7 @@ import (
 	kmsapi "k8s.io/kms/apis/v1beta1"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 const (
@@ -133,7 +133,7 @@ resources:
 `
 	providerName := "kms-provider"
 	pluginMock := mock.NewBase64Plugin(t, "@kms-provider.sock")
-	test, err := newTransformTest(t, encryptionConfig, false, "")
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -295,6 +295,7 @@ resources:
 // 10. confirm that cluster wide secret read still works
 // 11. confirm that api server can restart with last applied encryption config
 func TestEncryptionConfigHotReload(t *testing.T) {
+	storageConfig := framework.SharedEtcd()
 	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -309,7 +310,7 @@ resources:
 `
 	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 	var restarted bool
-	test, err := newTransformTest(t, encryptionConfig, true, "")
+	test, err := newTransformTest(t, encryptionConfig, true, "", storageConfig)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -365,7 +366,7 @@ resources:
 	// start new KMS Plugin
 	_ = mock.NewBase64Plugin(t, "@new-kms-provider.sock")
 	// update encryption config
-	if err := os.WriteFile(path.Join(test.configDir, encryptionConfigFileName), []byte(encryptionConfigWithNewProvider), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(test.configDir, encryptionConfigFileName), []byte(encryptionConfigWithNewProvider), 0644); err != nil {
 		t.Fatalf("failed to update encryption config, err: %v", err)
 	}
 
@@ -377,8 +378,9 @@ resources:
 
 	// run storage migration
 	// get secrets
+	ctx := testContext(t)
 	secretsList, err := test.restClient.CoreV1().Secrets("").List(
-		context.TODO(),
+		ctx,
 		metav1.ListOptions{},
 	)
 	if err != nil {
@@ -388,7 +390,7 @@ resources:
 	for _, secret := range secretsList.Items {
 		// update secret
 		_, err = test.restClient.CoreV1().Secrets(secret.Namespace).Update(
-			context.TODO(),
+			ctx,
 			&secret,
 			metav1.UpdateOptions{},
 		)
@@ -399,7 +401,7 @@ resources:
 
 	// get configmaps
 	configmapsList, err := test.restClient.CoreV1().ConfigMaps("").List(
-		context.TODO(),
+		ctx,
 		metav1.ListOptions{},
 	)
 	if err != nil {
@@ -409,7 +411,7 @@ resources:
 	for _, configmap := range configmapsList.Items {
 		// update configmap
 		_, err = test.restClient.CoreV1().ConfigMaps(configmap.Namespace).Update(
-			context.TODO(),
+			ctx,
 			&configmap,
 			metav1.UpdateOptions{},
 		)
@@ -463,7 +465,7 @@ resources:
 `
 
 	// update encryption config and wait for hot reload
-	if err := os.WriteFile(path.Join(test.configDir, encryptionConfigFileName), []byte(encryptionConfigWithoutOldProvider), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(test.configDir, encryptionConfigFileName), []byte(encryptionConfigWithoutOldProvider), 0644); err != nil {
 		t.Fatalf("failed to update encryption config, err: %v", err)
 	}
 
@@ -472,7 +474,7 @@ resources:
 
 	// confirm that reading secrets still works
 	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
-		context.TODO(),
+		ctx,
 		testSecret,
 		metav1.GetOptions{},
 	)
@@ -481,13 +483,13 @@ resources:
 	}
 
 	// make sure cluster wide secrets read still works
-	_, err = test.restClient.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{})
+	_, err = test.restClient.CoreV1().Secrets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("failed to list secrets, err: %v", err)
 	}
 
 	// make sure cluster wide configmaps read still works
-	_, err = test.restClient.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{})
+	_, err = test.restClient.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("failed to list configmaps, err: %v", err)
 	}
@@ -496,19 +498,28 @@ resources:
 	previousConfigDir := test.configDir
 	test.shutdownAPIServer()
 	restarted = true
-	test, err = newTransformTest(t, "", true, previousConfigDir)
+	test, err = newTransformTest(t, test.transformerConfig, true, previousConfigDir, storageConfig)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
 	defer test.cleanUp()
 
+	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
+		ctx,
+		testSecret,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatalf("failed to read secret, err: %v", err)
+	}
+
 	// confirm that reading cluster wide secrets still works after restart
-	if _, err = test.restClient.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{}); err != nil {
+	if _, err = test.restClient.CoreV1().Secrets("").List(ctx, metav1.ListOptions{}); err != nil {
 		t.Fatalf("failed to list secrets, err: %v", err)
 	}
 
 	// make sure cluster wide configmaps read still works
-	if _, err = test.restClient.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{}); err != nil {
+	if _, err = test.restClient.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{}); err != nil {
 		t.Fatalf("failed to list configmaps, err: %v", err)
 	}
 }
@@ -531,7 +542,7 @@ resources:
 		_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
 		defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)()
 		defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)()
-		test, err := newTransformTest(t, encryptionConfig, false, "")
+		test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 		if err != nil {
 			t.Fatalf("failed to start KUBE API Server with encryptionConfig")
 		}
@@ -643,7 +654,7 @@ resources:
 	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 	_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "")
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -785,9 +796,8 @@ resources:
 `
 			_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 
-			test, err := newTransformTest(t, encryptionConfig, true, "")
+			test, err := newTransformTest(t, encryptionConfig, true, "", nil)
 			if err != nil {
-				test.cleanUp()
 				t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 			}
 			defer test.cleanUp()
@@ -950,7 +960,7 @@ resources:
 	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
 	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "")
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
 		t.Fatalf("failed to start kube-apiserver, error: %v", err)
 	}
@@ -1006,7 +1016,7 @@ resources:
 	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
 	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, true, "")
+	test, err := newTransformTest(t, encryptionConfig, true, "", nil)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver, error: %v", err)
 	}
