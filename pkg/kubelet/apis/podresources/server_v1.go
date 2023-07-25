@@ -21,10 +21,11 @@ import (
 	"fmt"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
-	"k8s.io/kubelet/pkg/apis/podresources/v1"
+	v1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
 // v1PodResourcesServer implements PodResourcesListerServer
@@ -66,11 +67,14 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 
 		for j, container := range pod.Spec.Containers {
 			pRes.Containers[j] = &v1.ContainerResources{
-				Name:    container.Name,
-				Devices: p.devicesProvider.GetDevices(string(pod.UID), container.Name),
-				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
-				Memory:  p.memoryProvider.GetMemory(string(pod.UID), container.Name),
+				Name: container.Name,
 			}
+			if podutil.IsPodTerminal(pod) {
+				continue
+			}
+			pRes.Containers[j].Devices = p.devicesProvider.GetDevices(string(pod.UID), container.Name)
+			pRes.Containers[j].CpuIds = p.cpusProvider.GetCPUs(string(pod.UID), container.Name)
+			pRes.Containers[j].Memory = p.memoryProvider.GetMemory(string(pod.UID), container.Name)
 			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesDynamicResources) {
 				pRes.Containers[j].DynamicResources = p.dynamicResourcesProvider.GetDynamicResources(pod, &container)
 			}

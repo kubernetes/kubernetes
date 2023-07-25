@@ -19,9 +19,10 @@ package podresources
 import (
 	"context"
 
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
-	"k8s.io/kubelet/pkg/apis/podresources/v1"
+	v1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
@@ -69,9 +70,12 @@ func (p *v1alpha1PodResourcesServer) List(ctx context.Context, req *v1alpha1.Lis
 
 		for j, container := range pod.Spec.Containers {
 			pRes.Containers[j] = &v1alpha1.ContainerResources{
-				Name:    container.Name,
-				Devices: v1DevicesToAlphaV1(p.devicesProvider.GetDevices(string(pod.UID), container.Name)),
+				Name: container.Name,
 			}
+			if podutil.IsPodTerminal(pod) {
+				continue
+			}
+			pRes.Containers[j].Devices = v1DevicesToAlphaV1(p.devicesProvider.GetDevices(string(pod.UID), container.Name))
 		}
 		podResources[i] = &pRes
 	}
