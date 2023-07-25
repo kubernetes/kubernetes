@@ -230,6 +230,10 @@ aliases:
   # emeretus:
   # - dashpole
   # - vishh
+  sig-node-cri-approvers:
+    - saschagrunert
+    - haircommander
+    - mikebrow
   sig-node-reviewers:
     - Random-Liu
     - dchen1107

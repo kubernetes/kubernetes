@@ -6,6 +6,7 @@ approvers:
   - sig-node-approvers
   - sig-node-api-approvers
   - api-approvers
+  - sig-node-cri-approvers
 reviewers:
   - sig-node-reviewers
   - dims
