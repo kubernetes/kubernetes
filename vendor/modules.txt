@@ -185,10 +185,9 @@ github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v1.0.0
 ## explicit; go 1.14
 github.com/daviddengcn/go-colortext
-# github.com/docker/distribution v2.8.2+incompatible
-## explicit
-github.com/docker/distribution/digestset
-github.com/docker/distribution/reference
+# github.com/distribution/distribution/v3 v3.0.0-20230722181636-7b502560cad4
+## explicit; go 1.18
+github.com/distribution/distribution/v3/reference
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units

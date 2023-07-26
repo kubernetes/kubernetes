@@ -32,7 +32,7 @@ func FamiliarString(ref Reference) string {
 }
 
 // FamiliarMatch reports whether ref matches the specified pattern.
-// See https://godoc.org/path#Match for supported patterns.
+// See [path.Match] for supported patterns.
 func FamiliarMatch(pattern string, ref Reference) (bool, error) {
 	matched, err := path.Match(pattern, FamiliarString(ref))
 	if namedRef, isNamed := ref.(Named); isNamed && !matched {
