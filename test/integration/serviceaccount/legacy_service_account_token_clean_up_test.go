@@ -51,17 +51,11 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.LegacyServiceAccountTokenCleanUp, true)()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	fakeClock := testingclock.NewFakeClock(time.Now().UTC())
-
 	c, config, stopFunc, informers, err := startServiceAccountTestServerAndWaitForCaches(ctx, t)
 	defer stopFunc()
 	if err != nil {
 		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
 	}
-
-	// start legacy service account token cleaner
-	startLegacyServiceAccountTokenCleaner(ctx, c, fakeClock, informers)
 
 	// wait configmap to label with tracking date
 	if err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
@@ -78,21 +72,11 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 		t.Fatalf("failed to wait configmap starts to track: %v", err)
 	}
 
-	// create service account
-	myns := "clean-ns"
-	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}}, metav1.CreateOptions{})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		t.Fatalf("could not create namespace: %v", err)
-	}
-	mysa, err := c.CoreV1().ServiceAccounts(myns).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readOnlyServiceAccountName}}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Service Account not created: %v", err)
-	}
-
 	tests := []struct {
 		name            string
 		secretName      string
 		secretTokenData string
+		namespace       string
 		expectCleanedUp bool
 		lastUsedLabel   bool
 		isPodMounted    bool
@@ -101,6 +85,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 		{
 			name:            "auto created legacy token without pod binding",
 			secretName:      "auto-token-without-pod-mounting-a",
+			namespace:       "clean-ns-1",
 			lastUsedLabel:   true,
 			isManual:        false,
 			isPodMounted:    false,
@@ -109,6 +94,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 		{
 			name:            "manually created legacy token",
 			secretName:      "manual-token",
+			namespace:       "clean-ns-2",
 			lastUsedLabel:   true,
 			isManual:        true,
 			isPodMounted:    false,
@@ -117,6 +103,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 		{
 			name:            "auto created legacy token with pod binding",
 			secretName:      "auto-token-with-pod-mounting",
+			namespace:       "clean-ns-3",
 			lastUsedLabel:   true,
 			isManual:        false,
 			isPodMounted:    true,
@@ -125,6 +112,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 		{
 			name:            "auto created legacy token without pod binding, secret has not been used after tracking",
 			secretName:      "auto-token-without-pod-mounting-b",
+			namespace:       "clean-ns-4",
 			lastUsedLabel:   false,
 			isManual:        false,
 			isPodMounted:    false,
@@ -133,19 +121,38 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+
+			fakeClock := testingclock.NewFakeClock(time.Now().UTC())
+
+			// start legacy service account token cleaner
+			ctxForCleaner, cancelFunc := context.WithCancel(context.Background())
+			startLegacyServiceAccountTokenCleaner(ctxForCleaner, c, fakeClock, informers)
+			informers.Start(ctx.Done())
+			defer cancelFunc()
+
+			// create service account
+			_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: test.namespace}}, metav1.CreateOptions{})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				t.Fatalf("could not create namespace: %v", err)
+			}
+			mysa, err := c.CoreV1().ServiceAccounts(test.namespace).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readOnlyServiceAccountName}}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Service Account not created: %v", err)
+			}
+
 			// create secret
-			secret, err := createServiceAccountToken(c, mysa, myns, test.secretName)
+			secret, err := createServiceAccountToken(c, mysa, test.namespace, test.secretName)
 			if err != nil {
 				t.Fatalf("Secret not created: %v", err)
 			}
 			if !test.isManual {
-				if err := addReferencedServiceAccountToken(c, myns, readOnlyServiceAccountName, secret); err != nil {
+				if err := addReferencedServiceAccountToken(c, test.namespace, readOnlyServiceAccountName, secret); err != nil {
 					t.Fatal(err)
 				}
 			}
 			podLister := informers.Core().V1().Pods().Lister()
 			if test.isPodMounted {
-				_, err = createAutotokenMountedPod(c, myns, test.secretName, podLister)
+				_, err = createAutotokenMountedPod(c, test.namespace, test.secretName, podLister)
 				if err != nil {
 					t.Fatalf("Pod not created: %v", err)
 				}
@@ -158,7 +165,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 			roClient := clientset.NewForConfigOrDie(&myConfig)
 
 			// the secret should not be labeled with LastUsedLabelKey.
-			liveSecret, err := c.CoreV1().Secrets(myns).Get(context.TODO(), test.secretName, metav1.GetOptions{})
+			liveSecret, err := c.CoreV1().Secrets(test.namespace).Get(context.TODO(), test.secretName, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Could not get secret: %v", err)
 			}
@@ -169,9 +176,9 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 
 			// authenticate legacy tokens
 			if test.lastUsedLabel {
-				doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
+				doServiceAccountAPIRequests(t, roClient, test.namespace, true, true, false)
 				// all service account tokens should be labeled with LastUsedLabelKey.
-				liveSecret, err = c.CoreV1().Secrets(myns).Get(context.TODO(), test.secretName, metav1.GetOptions{})
+				liveSecret, err = c.CoreV1().Secrets(test.namespace).Get(context.TODO(), test.secretName, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Could not get secret: %v", err)
 				}
@@ -185,7 +192,7 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 
 			fakeClock.Step(cleanUpPeriod + 24*time.Hour)
 			time.Sleep(2 * syncInterval)
-			liveSecret, err = c.CoreV1().Secrets(myns).Get(context.TODO(), test.secretName, metav1.GetOptions{})
+			liveSecret, err = c.CoreV1().Secrets(test.namespace).Get(context.TODO(), test.secretName, metav1.GetOptions{})
 			if test.expectCleanedUp {
 				if err == nil {
 					t.Fatalf("The secret %s should be cleaned up. time: %v; creationTime: %v", test.secretName, fakeClock.Now().UTC(), liveSecret.CreationTimestamp)
@@ -215,7 +222,6 @@ func startLegacyServiceAccountTokenCleaner(ctx context.Context, client clientset
 			CleanUpPeriod: cleanUpPeriod,
 		})
 	go legacySATokenCleaner.Run(ctx)
-	informers.Start(ctx.Done())
 }
 
 func createAutotokenMountedPod(c clientset.Interface, ns, secretName string, podLister listersv1.PodLister) (*v1.Pod, error) {
