@@ -257,6 +257,8 @@ define TEST_E2E_NODE_HELP_INFO
 #  SSH_USER: For REMOTE=true only  SSH username to use.
 #  SSH_KEY: For REMOTE=true only. Path to SSH key to use.
 #  SSH_OPTIONS: For REMOTE=true only. SSH options to use.
+#  INSTANCE_TYPE: For REMOTE=true only. Machine type to use.
+#  NODE_ENV: For REMOTE=true only. Additional metadata keys to add the instance.
 #  RUNTIME_CONFIG: The runtime configuration for the API server on the node e2e tests.
 #
 # Example:
