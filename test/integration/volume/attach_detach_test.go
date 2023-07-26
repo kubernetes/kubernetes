@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -143,89 +142,6 @@ var defaultTimerConfig = attachdetach.TimerConfig{
 	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Second,
 }
 
-// TestNodeOOSDetach integration test verifies that if `out-of-service` taint is applied to the node,
-// which is shutdown non gracefully, then all the volumes of the pods on that node will get force detached.
-func TestNodeOOSDetach(t *testing.T) {
-	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
-	defer server.TearDownFn()
-
-	namespaceName := "test-volume-detach"
-	testClient, ctrl, pvCtrl, gcCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
-	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
-	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
-
-	// create a node
-	node := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-sandbox",
-			Annotations: map[string]string{
-				util.ControllerManagedAttachAnnotation: "true",
-			},
-		},
-	}
-	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to created node : %v", err)
-	}
-
-	// create fake pods with volumes
-	pod := fakePodWithVol(namespaceName)
-	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
-		t.Errorf("Failed to create pod : %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	podInformer := informers.Core().V1().Pods().Informer()
-	// start the informer
-	informers.Start(ctx.Done())
-	informers.WaitForCacheSync(ctx.Done())
-
-	// run the controllers
-	go ctrl.Run(ctx)
-
-	// Run pvCtrl to avoid leaking goroutines started during its creation.
-	go pvCtrl.Run(ctx)
-	// Run gcCtrl to avoid leaking goroutines during its creation
-	go gcCtrl.Run(ctx)
-
-	waitToObservePods(t, podInformer, 1)
-
-	// mimic a non-graceful node shutdown
-	notReadyCOndition := v1.NodeCondition{
-		Type:   v1.NodeReady,
-		Status: v1.ConditionFalse,
-	}
-	// deep copy the node object.
-	deepCopyNode := node.DeepCopy()
-	deepCopyNode.Status.Conditions = append(deepCopyNode.Status.Conditions, notReadyCOndition)
-	taint := v1.Taint{
-		Key:    v1.TaintNodeOutOfService,
-		Effect: v1.TaintEffectNoExecute,
-	}
-	gotNode, err := testClient.CoreV1().Nodes().UpdateStatus(context.TODO(), deepCopyNode, metav1.UpdateOptions{})
-	if err != nil {
-		t.Fatalf("Failed to patch the node status : %v", err)
-	}
-	gotNode.Spec.Taints = append(gotNode.Spec.Taints, taint)
-	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), gotNode, metav1.UpdateOptions{}); err != nil {
-		t.Fatalf("Failed to taint the node : %v", err)
-	}
-
-	waitForNodeToBeNotReady(t, testClient, "node-sandbox")
-	waitForNodeToBeTainted(t, testClient, "node-sandbox", v1.TaintNodeOutOfService)
-	graceTime := int64(300)
-	err = testClient.CoreV1().Pods(namespaceName).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
-		GracePeriodSeconds: &graceTime,
-	})
-	if err != nil {
-		t.Fatalf("error in deleting pod: %v", err)
-	}
-	waitForPodDeletionTimeStampToSet(t, testClient, pod.Name, namespaceName)
-	waitForMetric(t, metrics.ForceDetachMetricCounter.WithLabelValues(metrics.ForceDetachReasonOutOfService), 1, "detach-metrics")
-}
-
 // TestPodTerminationWithNodeOOSDetach integration test verifies that if `out-of-service` taint is applied to the node,
 // which is shutdown non gracefully, then all the pods will immediately get terminated and volume be immediately detached
 // without waiting for the default time out period.
@@ -233,8 +149,8 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
-
-	namespaceName := "test-volume-detach"
+	namespaceName := "test-volume-terminating-detach"
+	nodeName := "node-sandbox"
 	testClient, ctrl, pvCtrl, gcCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -242,13 +158,14 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	// create a node
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-sandbox",
+			Name: nodeName,
 			Annotations: map[string]string{
 				util.ControllerManagedAttachAnnotation: "true",
 			},
 		},
 	}
-	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
+	node, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	if err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
@@ -260,7 +177,7 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
+	go informers.Core().V1().Nodes().Informer().Run(ctx.Done())
 	podInformer := informers.Core().V1().Pods().Informer()
 	// start the informer
 	informers.Start(ctx.Done())
@@ -272,27 +189,33 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	go gcCtrl.Run(ctx)
 
 	waitToObservePods(t, podInformer, 1)
-	gotNode, err := testClient.CoreV1().Nodes().Get(context.TODO(), "node-sandbox", metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Failed to get the node : %v", err)
-	}
 
-	// mimic a non-graceful node shutdown by marking the node to be not ready
-	notReadyCOndition := v1.NodeCondition{
-		Type:   v1.NodeReady,
-		Status: v1.ConditionFalse,
+	// wait for volume to be attached
+	for i := 0; i < 10; i++ {
+		node, err = testClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get the node : %v", err)
+		}
+		if len(node.Status.VolumesAttached) > 1 {
+			break
+		}
+		time.Sleep(1 * time.Second)
 	}
-	// deep copy the node object.
-	deepCopyNode := gotNode
-	deepCopyNode.Status.Conditions = append(deepCopyNode.Status.Conditions, notReadyCOndition)
-	deepCopyNode.Status.VolumesInUse = append(deepCopyNode.Status.VolumesInUse, "kubernetes.io/mock-provisioner/fake-mount")
-	gotNode, err = testClient.CoreV1().Nodes().UpdateStatus(context.TODO(), deepCopyNode, metav1.UpdateOptions{})
+	if len(node.Status.VolumesAttached) < 1 {
+		t.Logf("failed to attach volume for pod %s on node %s", pod.Name, node.Name)
+	}
+	// Patch the node to mark the volume in use as attach-detach controller verifies if safe to detach the volume
+	// based on that.
+	node.Status.VolumesInUse = append(node.Status.VolumesInUse, "kubernetes.io/mock-provisioner/fake-mount")
+	node, err = testClient.CoreV1().Nodes().UpdateStatus(context.TODO(), node, metav1.UpdateOptions{})
 	if err != nil {
-		t.Fatalf("Failed to patch the node status : %v", err)
+		t.Fatalf("error in updating node status: %v", err)
 	}
-	waitForNodeToBeNotReady(t, testClient, "node-sandbox")
+	// We need to mimic a non-graceful node shutdown by marking the node to be not ready but the created node
+	// does not have any condition so it will be `Not Ready` and hence a patch of Node to make it `Not Ready`
+	// is not required.
 
-	// delete the pod with grace period time so that it is stuck in terminating state
+	// Delete the pod with grace period time so that it is stuck in terminating state
 	gracePeriod := int64(300)
 	err = testClient.CoreV1().Pods(namespaceName).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriod,
@@ -302,22 +225,22 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	}
 	waitForPodDeletionTimeStampToSet(t, testClient, pod.Name, namespaceName)
 
-	// taint the node with out-of-service taint
+	// taint the node `out-of-service`
 	taint := v1.Taint{
 		Key:    v1.TaintNodeOutOfService,
 		Effect: v1.TaintEffectNoExecute,
 	}
-	gotNode.Spec.Taints = append(gotNode.Spec.Taints, taint)
-	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), gotNode, metav1.UpdateOptions{}); err != nil {
+	node.Spec.Taints = append(node.Spec.Taints, taint)
+	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to patch the node : %v", err)
 	}
-	waitForNodeToBeTainted(t, testClient, "node-sandbox", v1.TaintNodeOutOfService)
+	waitForNodeToBeTainted(t, testClient, nodeName, v1.TaintNodeOutOfService)
 
 	// verify is the pod was force deleted
 	waitForMetric(t, podgcmetrics.DeletingPodsTotal.WithLabelValues(namespaceName, podgcmetrics.PodGCReasonTerminatingOutOfService), 1, "terminating-pod-metric")
 	// verify the volume was force detached
-	// Note that metric is accumulating so expected count is `2` as the test
-	waitForMetric(t, metrics.ForceDetachMetricCounter.WithLabelValues(metrics.ForceDetachReasonOutOfService), 2, "detach-metric")
+	// Note: Metrics are accumulating
+	waitForMetric(t, metrics.ForceDetachMetricCounter.WithLabelValues(metrics.ForceDetachReasonOutOfService), 1, "detach-metric")
 }
 
 // Via integration test we can verify that if pod delete
@@ -555,6 +478,7 @@ func waitForMetric(t *testing.T, m basemetric.CounterMetric, expectedCount float
 			t.Fatal(err, identifier)
 		}
 		t.Logf("expected metric count %g but got %g for %s", expectedCount, gotCount, identifier)
+		// As metrics are global, this condition ( >= ) is applied, just to check the minimum expectation.
 		if gotCount >= expectedCount {
 			return true, nil
 		}
@@ -574,21 +498,6 @@ func waitForNodeToBeTainted(t *testing.T, testingClient *clientset.Clientset, no
 			if taint.Key == taintKey {
 				return true, nil
 			}
-		}
-		return false, nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func waitForNodeToBeNotReady(t *testing.T, testingClient *clientset.Clientset, nodeName string) {
-	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
-		node, err := testingClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !nodeutil.IsNodeReady(node) {
-			return true, nil
 		}
 		return false, nil
 	}); err != nil {
