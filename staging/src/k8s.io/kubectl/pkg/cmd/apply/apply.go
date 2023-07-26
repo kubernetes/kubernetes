@@ -711,6 +711,9 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 		annotationMap := metadata.GetAnnotations()
 		if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
 			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, info.ObjectName(), corev1.LastAppliedConfigAnnotation, o.cmdBaseName)
+			if err := util.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
+				return err
+			}
 		}
 
 		patcher, err := newPatcher(o, info, helper)
