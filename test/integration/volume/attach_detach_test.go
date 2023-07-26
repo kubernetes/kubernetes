@@ -19,9 +19,6 @@ package volume
 import (
 	"context"
 	"fmt"
-	"testing"
-	"time"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +44,8 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
+	"testing"
+	"time"
 )
 
 func fakePodWithVol(namespace string) *v1.Pod {
@@ -284,7 +283,7 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 		Status: v1.ConditionFalse,
 	}
 	// deep copy the node object.
-	deepCopyNode := node
+	deepCopyNode := gotNode
 	deepCopyNode.Status.Conditions = append(deepCopyNode.Status.Conditions, notReadyCOndition)
 	deepCopyNode.Status.VolumesInUse = append(deepCopyNode.Status.VolumesInUse, "kubernetes.io/mock-provisioner/fake-mount")
 	gotNode, err = testClient.CoreV1().Nodes().UpdateStatus(context.TODO(), deepCopyNode, metav1.UpdateOptions{})
@@ -552,10 +551,10 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 func waitForMetric(t *testing.T, m basemetric.CounterMetric, expectedCount float64, identifier string) {
 	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
 		gotCount, err := metricstestutil.GetCounterMetricValue(m)
-		fmt.Println(gotCount)
 		if err != nil {
 			t.Fatal(err, identifier)
 		}
+		t.Logf("expected metric count %g but got %g for %s", expectedCount, gotCount, identifier)
 		if gotCount >= expectedCount {
 			return true, nil
 		}
