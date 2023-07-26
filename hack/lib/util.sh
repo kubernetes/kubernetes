@@ -144,11 +144,14 @@ kube::util::host_os() {
     Darwin)
       host_os=darwin
       ;;
+    FreeBSD)
+      host_os=freebsd
+      ;;
     Linux)
       host_os=linux
       ;;
     *)
-      kube::log::error "Unsupported host OS.  Must be Linux or Mac OS X."
+      kube::log::error "Unsupported host OS.  Must be Linux, Mac OS X or FreeBSD."
       exit 1
       ;;
   esac
