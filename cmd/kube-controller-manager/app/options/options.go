@@ -47,6 +47,8 @@ import (
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	netutils "k8s.io/utils/net"
 
+	"k8s.io/klog/v2"
+
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 )
@@ -440,8 +442,10 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	kubeconfig.DisableCompression = true
 	kubeconfig.ContentConfig.AcceptContentTypes = s.Generic.ClientConnection.AcceptContentTypes
 	kubeconfig.ContentConfig.ContentType = s.Generic.ClientConnection.ContentType
-	kubeconfig.QPS = s.Generic.ClientConnection.QPS
-	kubeconfig.Burst = int(s.Generic.ClientConnection.Burst)
+	klog.Errorf("BBB controller-manager QPS=500")
+	kubeconfig.QPS = 500 //s.Generic.ClientConnection.QPS
+	klog.Errorf("BBB controller-manager Burst=500")
+	kubeconfig.Burst = 500 //int(s.Generic.ClientConnection.Burst)
 
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, KubeControllerManagerUserAgent))
 	if err != nil {
