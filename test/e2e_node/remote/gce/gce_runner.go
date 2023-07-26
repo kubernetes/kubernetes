@@ -58,6 +58,9 @@ func (e *envs) String() string {
 
 // Set function of flag.Value
 func (e *envs) Set(value string) error {
+	if value == "" {
+		return nil
+	}
 	kv := strings.SplitN(value, "=", 2)
 	if len(kv) != 2 {
 		return fmt.Errorf("invalid env string %s", value)
