@@ -18,8 +18,12 @@ package scheduling
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"regexp"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
@@ -97,22 +103,54 @@ func logOSImages(ctx context.Context, f *framework.Framework) {
 	}
 }
 
-func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, f *framework.Framework) bool {
-	framework.Logf("Getting list of Nodes from API server")
+func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, f *framework.Framework, dpPods *v1.PodList) bool {
+	framework.Logf("Getting list of Nodes from API server (gpuResourceName=%s)", gpuResourceName)
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
-	for _, node := range nodeList.Items {
+
+	schedulableNodes := []*v1.Node{}
+
+	for idx := range nodeList.Items {
+		node := &nodeList.Items[idx]
 		if node.Spec.Unschedulable {
 			continue
 		}
-		framework.Logf("gpuResourceName %s", gpuResourceName)
+		schedulableNodes = append(schedulableNodes, node)
+	}
+
+	if len(schedulableNodes) == 0 {
+		framework.Logf("no schedulable nodes")
+		return false
+	}
+
+	framework.Logf("Schedulable nodes %d over %d total", len(schedulableNodes), len(nodeList.Items))
+
+	for _, node := range schedulableNodes {
 		if val, ok := node.Status.Capacity[gpuResourceName]; !ok || val.Value() == 0 {
-			framework.Logf("Nvidia GPUs not available on Node: %q", node.Name)
+			framework.Logf("Nvidia GPUs not available on Node: %q (resource dump: %s)", node.Name, resourceListToString(node.Status.Capacity))
+			if dpPod := findDevicePluginPodForNode(dpPods, node.Name); dpPod != nil {
+				printPodStatus(dpPod)
+			}
 			return false
 		}
 	}
 	framework.Logf("Nvidia GPUs exist on all schedulable nodes")
 	return true
+}
+
+func resourceListToString(res v1.ResourceList) string {
+	resNames := []string{}
+	for resName := range res {
+		resNames = append(resNames, string(resName))
+	}
+	sort.Strings(resNames)
+
+	items := []string{}
+	for _, resName := range resNames {
+		resQty := res[v1.ResourceName(resName)]
+		items = append(items, fmt.Sprintf("%s=%s", resName, resQty.String()))
+	}
+	return strings.Join(items, ", ")
 }
 
 func getGPUsAvailable(ctx context.Context, f *framework.Framework) int64 {
@@ -163,20 +201,65 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework, setupResour
 	}
 
 	var rsgather *e2edebug.ContainerResourceGatherer
-	if setupResourceGatherer {
-		framework.Logf("Starting ResourceUsageGather for the created DaemonSet pods.")
-		rsgather, err = e2edebug.NewResourceUsageGatherer(ctx, f.ClientSet, e2edebug.ResourceGathererOptions{InKubemark: false, Nodes: e2edebug.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
-		framework.ExpectNoError(err, "creating ResourceUsageGather for the daemonset pods")
-		go rsgather.StartGatheringData(ctx)
-	}
+	//	if setupResourceGatherer {
+	//		framework.Logf("Starting ResourceUsageGather for the created DaemonSet pods.")
+	//		rsgather, err = e2edebug.NewResourceUsageGatherer(ctx, f.ClientSet, e2edebug.ResourceGathererOptions{InKubemark: false, Nodes: e2edebug.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
+	//		framework.ExpectNoError(err, "creating ResourceUsageGather for the daemonset pods")
+	//		go rsgather.StartGatheringData(ctx)
+	//	}
 
 	// Wait for Nvidia GPUs to be available on nodes
 	framework.Logf("Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
-	gomega.Eventually(ctx, func(ctx context.Context) bool {
-		return areGPUsAvailableOnAllSchedulableNodes(ctx, f)
-	}, driverInstallTimeout, time.Second).Should(gomega.BeTrue())
+
+	err = wait.PollImmediate(10*time.Second, driverInstallTimeout, func() (bool, error) {
+		ok := areGPUsAvailableOnAllSchedulableNodes(ctx, f, devicepluginPods)
+		return ok, nil
+	})
+	if err != nil {
+		for _, pod := range devicepluginPods.Items {
+			dpLogs, dpErr := getLogsForPod(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
+			if dpErr != nil {
+				framework.Logf("cannot get logs for pod %s/%s: %v", pod.Namespace, pod.Name, err)
+				continue
+			}
+			framework.Logf("pod %s/%s BEGIN:\n%s\nEND", pod.Namespace, pod.Name, dpLogs)
+		}
+	}
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	return rsgather
+}
+
+func findDevicePluginPodForNode(pods *v1.PodList, nodeName string) *v1.Pod {
+	for idx := range pods.Items {
+		pod := &pods.Items[idx]
+		if pod.Spec.NodeName == nodeName {
+			return pod
+		}
+	}
+	framework.Logf("Missing Device Plugin pod for node %s", nodeName)
+	return nil
+}
+
+func printPodStatus(p *v1.Pod) {
+	framework.Logf("%v from %v started at %v (%d container statuses recorded)", p.Name, p.Namespace, p.Status.StartTime, len(p.Status.ContainerStatuses))
+	for _, c := range p.Status.ContainerStatuses {
+		framework.Logf("\tContainer %v ready: %v, restart count %v",
+			c.Name, c.Ready, c.RestartCount)
+	}
+}
+
+func getLogsForPod(k8sCli kubernetes.Interface, podNamespace, podName, containerName string) (string, error) {
+	previous := false
+	request := k8sCli.CoreV1().RESTClient().Get().Resource("pods").Namespace(podNamespace).Name(podName).SubResource("log").Param("container", containerName).Param("previous", strconv.FormatBool(previous))
+	logs, err := request.Do(context.TODO()).Raw()
+	if err != nil {
+		return "", err
+	}
+	if strings.Contains(string(logs), "Internal Error") {
+		return "", fmt.Errorf("Fetched log contains \"Internal Error\": %q", string(logs))
+	}
+	return string(logs), err
 }
 
 func getGPUsPerPod() int64 {
