@@ -14,10 +14,21 @@
 
 # Dockerfile used for the kubectl image.
 
-ARG BASEIMAGE
 ARG BINARY
 
 
-FROM "${BASEIMAGE}"
+FROM registry.k8s.io/build-image/debian-base:bookworm-v1.0.0
 COPY ${BINARY} /bin/
+
+# Install additional utilities
+RUN apt update \
+    && apt install -y bash \
+                       grep \
+                       sed \
+                       gawk \
+                       coreutils \
+                       jq \
+                       diffutils \
+    && rm -rf /var/lib/apt/lists/*
+
 ENTRYPOINT ["/bin/kubectl"]
