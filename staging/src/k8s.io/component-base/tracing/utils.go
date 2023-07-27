@@ -19,6 +19,7 @@ package tracing
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -63,6 +64,7 @@ func NewProvider(ctx context.Context,
 		opts = append(opts, otlptracegrpc.WithEndpoint(*tracingConfig.Endpoint))
 	}
 	opts = append(opts, otlptracegrpc.WithInsecure())
+	opts = append(opts, otlptracegrpc.WithReconnectionPeriod(time.Second*10))
 	exporter, err := otlptracegrpc.New(ctx, opts...)
 	if err != nil {
 		return nil, err
