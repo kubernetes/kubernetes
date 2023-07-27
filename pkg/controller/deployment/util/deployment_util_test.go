@@ -188,6 +188,46 @@ func TestEqualIgnoreHash(t *testing.T) {
 			generatePodTemplateSpec("foo", "foo-node-2", map[string]string{}, map[string]string{"nothing": "else"}),
 			false,
 		},
+		{
+			Name:     "Same spec, same labels",
+			former:   generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{apps.DeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			latter:   generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{apps.DeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			expected: true,
+		},
+		{
+			Name:     "Same spec, only pod-template-hash label value is different",
+			former:   generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{apps.DeploymentUniqueLabelKey: "value-1", "something": "else"}),
+			latter:   generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{apps.DeploymentUniqueLabelKey: "value-2", "something": "else"}),
+			expected: true,
+		},
+		{
+			Name: "Same spec, only pod-template-hash labels values are different",
+			former: generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{
+				apps.DeploymentUniqueLabelKey:        "value-1",
+				apps.DefaultDeploymentUniqueLabelKey: "value-1",
+				"something":                          "else",
+			}),
+			latter: generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{
+				apps.DeploymentUniqueLabelKey:        "value-2",
+				"something":                          "else",
+				apps.DefaultDeploymentUniqueLabelKey: "value-2",
+			}),
+			expected: true,
+		},
+		{
+			Name: "Same spec, same hash labels",
+			former: generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{
+				apps.DeploymentUniqueLabelKey:        "value-1",
+				"something":                          "else",
+				apps.DefaultDeploymentUniqueLabelKey: "value-1",
+			}),
+			latter: generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{
+				apps.DeploymentUniqueLabelKey:        "value-1",
+				"something":                          "else",
+				apps.DefaultDeploymentUniqueLabelKey: "value-1",
+			}),
+			expected: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -222,10 +262,12 @@ func TestFindNewReplicaSet(t *testing.T) {
 	deployment := generateDeployment("nginx")
 	newRS := generateRS(deployment)
 	newRS.Labels[apps.DefaultDeploymentUniqueLabelKey] = "hash"
+	newRS.Labels[apps.DeploymentUniqueLabelKey] = "hash"
 	newRS.CreationTimestamp = later
 
 	newRSDup := generateRS(deployment)
 	newRSDup.Labels[apps.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRSDup.Labels[apps.DeploymentUniqueLabelKey] = "different-hash"
 	newRSDup.CreationTimestamp = now
 
 	oldDeployment := generateDeployment("nginx")
@@ -277,10 +319,12 @@ func TestFindOldReplicaSets(t *testing.T) {
 	newRS := generateRS(deployment)
 	*(newRS.Spec.Replicas) = 1
 	newRS.Labels[apps.DefaultDeploymentUniqueLabelKey] = "hash"
+	newRS.Labels[apps.DeploymentUniqueLabelKey] = "hash"
 	newRS.CreationTimestamp = later
 
 	newRSDup := generateRS(deployment)
 	newRSDup.Labels[apps.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRSDup.Labels[apps.DeploymentUniqueLabelKey] = "different-hash"
 	newRSDup.CreationTimestamp = now
 
 	oldDeployment := generateDeployment("nginx")

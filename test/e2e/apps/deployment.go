@@ -619,6 +619,10 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to locate deployment %v in namespace %v", testDeployment.ObjectMeta.Name, ns)
 		framework.Logf("Deployment %s has a patched status", dName)
 	})
+
+	ginkgo.It("test pod-template-hash label is backwards compatible", func(ctx context.Context) {
+		testPodTemplateHashCompatible(ctx, f)
+	})
 })
 
 func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
@@ -1700,4 +1704,213 @@ func testDeploymentSubresources(ctx context.Context, f *framework.Framework) {
 	deployment, err = c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Failed to get deployment resource: %v", err)
 	gomega.Expect(*(deployment.Spec.Replicas)).To(gomega.Equal(int32(4)), "deployment should have 4 replicas")
+}
+
+func testPodTemplateHashCompatible(ctx context.Context, f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	container := v1.Container{
+		Name:  "my-container",
+		Image: imageutils.GetPauseImageName(),
+	}
+
+	labelSelector := metav1.FormatLabelSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{"test-name": "pod-template-hash-compatible"},
+	})
+
+	checkPodTemplateHash := func(ctx context.Context, podNum int, hasOldLabel, hasNewLabel bool) error {
+		pods, err := c.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		if err != nil {
+			return err
+		}
+		if len(pods.Items) != podNum {
+			return fmt.Errorf("wrong number of pod: expected %d, got %d", podNum, len(pods.Items))
+		}
+		for _, pod := range pods.Items {
+			oldLabel, hasOld := pod.Labels[appsv1.DefaultDeploymentUniqueLabelKey]
+			newLabel, hasNew := pod.Labels[appsv1.DeploymentUniqueLabelKey]
+			if hasNew != hasNewLabel {
+				return fmt.Errorf("expect pod to have %s label, got: %v, want: %v", appsv1.DeploymentUniqueLabelKey, hasNew, hasNewLabel)
+			}
+			if hasOld != hasOldLabel {
+				return fmt.Errorf("expect pod to have %s label, got: %v, want: %v", appsv1.DefaultDaemonSetUniqueLabelKey, hasOld, hasOldLabel)
+			}
+			if (hasNew && hasOld) && (oldLabel != newLabel) {
+				return fmt.Errorf("pod has inconsistent hash label")
+			}
+		}
+		return nil
+	}
+
+	checkRsPodTemplateHash := func(ctx context.Context, rsName string, hasOldLabel, hasNewLabel, hasOldSelector, hasNewSelector bool) error {
+		rs, err := c.AppsV1().ReplicaSets(ns).Get(ctx, rsName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if _, ok := rs.Spec.Selector.MatchLabels[appsv1.DefaultDeploymentUniqueLabelKey]; ok != hasOldSelector {
+			return fmt.Errorf("expect rs to have %s label in selector, got: %v, want: %v", appsv1.DefaultDeploymentUniqueLabelKey, ok, hasOldSelector)
+		}
+		if _, ok := rs.Spec.Selector.MatchLabels[appsv1.DeploymentUniqueLabelKey]; ok != hasNewSelector {
+			return fmt.Errorf("expect rs to have %s label in selector, got: %v, want: %v", appsv1.DeploymentUniqueLabelKey, ok, hasNewSelector)
+		}
+		oldLabel, hasOld := rs.Labels[appsv1.DefaultDeploymentUniqueLabelKey]
+		newLabel, hasNew := rs.Labels[appsv1.DeploymentUniqueLabelKey]
+		if hasNew != hasNewLabel {
+			return fmt.Errorf("expect rs to have %s label, got: %v, want: %v", appsv1.DeploymentUniqueLabelKey, hasNew, hasNewLabel)
+		}
+		if hasOld != hasOldLabel {
+			return fmt.Errorf("expect rs to have %s label, got: %v, want: %v", appsv1.DefaultDaemonSetUniqueLabelKey, hasOld, hasOldLabel)
+		}
+		if (hasNew && hasOld) && (oldLabel != newLabel) {
+			return fmt.Errorf("rs has inconsistent hash label")
+		}
+		return nil
+	}
+
+	// create rs with old label
+	size := int32(1)
+	zero := int64(0)
+
+	rs := &appsv1.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-replicaset",
+			Namespace: ns,
+			Labels: map[string]string{
+				"test-name":                            "pod-template-hash-compatible",
+				appsv1.DefaultDeploymentUniqueLabelKey: "hash",
+			},
+		},
+		Spec: appsv1.ReplicaSetSpec{
+			Replicas: &size,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"test-name":                            "pod-template-hash-compatible",
+					appsv1.DefaultDeploymentUniqueLabelKey: "hash",
+				},
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"test-name":                            "pod-template-hash-compatible",
+						appsv1.DefaultDeploymentUniqueLabelKey: "hash",
+					},
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
+					Containers:                    []v1.Container{container},
+				},
+			},
+		},
+	}
+
+	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Creating replica set %q in namespace %q", rs.Name, ns)
+	err = e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rs.Name)
+	framework.ExpectNoError(err)
+
+	// create the deployment to control the replicaset
+	d := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-deployment",
+			Namespace: ns,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &size,
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"test-name": "pod-template-hash-compatible"}},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"test-name": "pod-template-hash-compatible"},
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
+					Containers:                    []v1.Container{container},
+				},
+			},
+		},
+	}
+
+	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Creating deployment %q in namespace %q", d.Name, ns)
+	err = waitForDeploymentCompleteAndCheckRolling(c, deployment)
+	framework.ExpectNoError(err)
+
+	if err := checkRsPodTemplateHash(ctx, rs.Name, true, false, true, false); err != nil {
+		framework.Failf("failed checking labels in rs after create the deployment, %v", err)
+	}
+	if err := checkPodTemplateHash(ctx, 1, true, false); err != nil {
+		framework.Failf("failed checking labels in pod after create the deployment, %v", err)
+	}
+
+	// scale should be ok with old label
+	scale, err := c.AppsV1().Deployments(ns).GetScale(ctx, d.Name, metav1.GetOptions{})
+	if err != nil {
+		framework.Failf("Failed to get scale subresource: %v", err)
+	}
+	scale.ResourceVersion = "" // indicate the scale update should be unconditional
+	scale.Spec.Replicas = 2
+	scaleResult, err := c.AppsV1().Deployments(ns).UpdateScale(ctx, d.Name, scale, metav1.UpdateOptions{})
+	if err != nil {
+		framework.Failf("Failed to put scale subresource: %v", err)
+	}
+	err = waitForDeploymentCompleteAndCheckRolling(c, deployment)
+	framework.ExpectNoError(err)
+	gomega.Expect(scaleResult.Spec.Replicas).To(gomega.Equal(int32(2)))
+	rs, err = testutil.GetNewReplicaSet(deployment, c)
+	framework.ExpectNoError(err, "getting rs from deployment")
+
+	if err := checkRsPodTemplateHash(ctx, rs.Name, true, false, true, false); err != nil {
+		framework.Failf("failed checking labels in rs after scale up the deployment, %v", err)
+	}
+	if err := checkPodTemplateHash(ctx, 2, true, false); err != nil {
+		framework.Failf("failed checking labels in pod after scale up the deployment, %v", err)
+	}
+
+	// update the deployment to create new labels
+	deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *appsv1.Deployment) {
+		update.Spec.Replicas = &size
+		update.Spec.Template.Spec.Containers[0].Env = d.Spec.Template.Spec.Containers[0].Env
+		update.Spec.Template.Spec.Containers[0].Env = append(update.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+			Name:  "foo",
+			Value: "bar",
+		})
+	})
+	framework.ExpectNoError(err, "Updating deployment %q in namespace %q", d.Name, ns)
+	err = waitForDeploymentCompleteAndCheckRolling(c, deployment)
+	framework.ExpectNoError(err)
+	rs, err = testutil.GetNewReplicaSet(deployment, c)
+	framework.ExpectNoError(err, "getting rs from deployment")
+
+	if err := checkRsPodTemplateHash(ctx, rs.Name, true, true, false, true); err != nil {
+		framework.Failf("failed checking labels in rs after update the deployment, %v", err)
+	}
+	if err := checkPodTemplateHash(ctx, 1, true, true); err != nil {
+		framework.Failf("failed checking labels in pod after update the deployment, %v", err)
+	}
+
+	// roll back to use the old label
+	deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *appsv1.Deployment) {
+		if update.Annotations == nil {
+			update.Annotations = make(map[string]string)
+		}
+		update.Annotations[appsv1.DeprecatedRollbackTo] = "1"
+	})
+
+	framework.ExpectNoError(err, "rollback deployment %q in namespace %q", d.Name, ns)
+	err = waitForDeploymentCompleteAndCheckRolling(c, deployment)
+	framework.ExpectNoError(err)
+
+	deployment, err = c.AppsV1().Deployments(ns).Get(ctx, d.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "getting deployment %q in namespace %q", d.Name, ns)
+	rs, err = testutil.GetNewReplicaSet(deployment, c)
+	framework.ExpectNoError(err, "getting rs from deployment")
+
+	if err := checkRsPodTemplateHash(ctx, rs.Name, true, false, true, false); err != nil {
+		framework.Failf("failed checking labels in rs(%s)(%v) after rollback the deployment, %v", rs.Name, rs.Spec.Selector.MatchLabels, err)
+	}
+	if err := checkPodTemplateHash(ctx, 1, true, false); err != nil {
+		framework.Failf("failed checking labels in pod after rollback the deployment, %v", err)
+	}
 }

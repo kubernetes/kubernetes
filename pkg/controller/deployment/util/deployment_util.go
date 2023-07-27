@@ -603,9 +603,12 @@ func ListPods(deployment *apps.Deployment, rsList []*apps.ReplicaSet, getPodList
 func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) bool {
 	t1Copy := template1.DeepCopy()
 	t2Copy := template2.DeepCopy()
-	// Remove hash labels from template.Labels before comparing
+	// Remove hash labels and deprecated hash labels from template.Labels before comparing
 	delete(t1Copy.Labels, apps.DefaultDeploymentUniqueLabelKey)
 	delete(t2Copy.Labels, apps.DefaultDeploymentUniqueLabelKey)
+
+	delete(t1Copy.Labels, apps.DeploymentUniqueLabelKey)
+	delete(t2Copy.Labels, apps.DeploymentUniqueLabelKey)
 	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 }
 
@@ -651,6 +654,7 @@ func SetFromReplicaSetTemplate(deployment *apps.Deployment, template v1.PodTempl
 	deployment.Spec.Template.ObjectMeta.Labels = labelsutil.CloneAndRemoveLabel(
 		deployment.Spec.Template.ObjectMeta.Labels,
 		apps.DefaultDeploymentUniqueLabelKey)
+	delete(deployment.Spec.Template.ObjectMeta.Labels, apps.DeploymentUniqueLabelKey)
 	return deployment
 }
 

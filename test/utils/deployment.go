@@ -128,8 +128,8 @@ func checkRollingUpdateStatus(c clientset.Interface, deployment *apps.Deployment
 	allRSs := append(oldRSs, newRS)
 	// The old/new ReplicaSets need to contain the pod-template-hash label
 	for i := range allRSs {
-		if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, apps.DefaultDeploymentUniqueLabelKey) {
-			reason = "all replica sets need to contain the pod-template-hash label"
+		if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, apps.DeploymentUniqueLabelKey) {
+			reason = "all replica sets need to contain the kubernetes.io/pod-template-hash label"
 			return reason, nil
 		}
 	}
@@ -268,8 +268,8 @@ func checkRevisionAndImage(deployment *apps.Deployment, newRS *apps.ReplicaSet, 
 	if newRS == nil {
 		return fmt.Errorf("new replicaset for deployment %q is yet to be created", deployment.Name)
 	}
-	if !labelsutil.SelectorHasLabel(newRS.Spec.Selector, apps.DefaultDeploymentUniqueLabelKey) {
-		return fmt.Errorf("new replica set %q doesn't have %q label selector", newRS.Name, apps.DefaultDeploymentUniqueLabelKey)
+	if !labelsutil.SelectorHasLabel(newRS.Spec.Selector, apps.DeploymentUniqueLabelKey) {
+		return fmt.Errorf("new replica set %q doesn't have %q label selector", newRS.Name, apps.DeploymentUniqueLabelKey)
 	}
 	// Check revision of this deployment, and of the new replica set of this deployment
 	if deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != revision {

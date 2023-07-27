@@ -134,7 +134,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 
 	// remove hash label before patching back into the deployment
 	delete(rsForRevision.Spec.Template.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
-
+	delete(rsForRevision.Spec.Template.Labels, appsv1.DeploymentUniqueLabelKey)
 	// compute deployment annotations
 	annotations := map[string]string{}
 	for k := range annotationsToSkip {
@@ -176,6 +176,9 @@ func equalIgnoreHash(template1, template2 *corev1.PodTemplateSpec) bool {
 	// Remove hash labels from template.Labels before comparing
 	delete(t1Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
 	delete(t2Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
+
+	delete(t1Copy.Labels, appsv1.DeploymentUniqueLabelKey)
+	delete(t2Copy.Labels, appsv1.DeploymentUniqueLabelKey)
 	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 }
 

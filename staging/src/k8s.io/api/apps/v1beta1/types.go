@@ -485,9 +485,14 @@ type RollbackConfig struct {
 }
 
 const (
-	// DefaultDeploymentUniqueLabelKey is the default key of the selector that is added
+	// Unprefixed labels are reserved for end-users
+	// so we will add a kubernetes.io to designate these labels as official Kubernetes labels.
+	k8sLabelPrefix = "kubernetes.io/"
+	// DeploymentUniqueLabelKey is the default key of the selector that is added
 	// to existing ReplicaSets (and label key that is added to its pods) to prevent the existing ReplicaSets
 	// to select new pods (and old pods being select by new ReplicaSet).
+	DeploymentUniqueLabelKey = k8sLabelPrefix + "pod-template-hash"
+	// Deprecated: DefaultDeploymentUniqueLabelKey is a legacy label that was set using unprefixed labels. Use DeploymentUniqueLabelKey instead.
 	DefaultDeploymentUniqueLabelKey string = "pod-template-hash"
 )
 

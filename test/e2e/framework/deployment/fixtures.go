@@ -115,9 +115,12 @@ func GetPodsForDeployment(ctx context.Context, client clientset.Interface, deplo
 	podTemplatesEqualsIgnoringHash := func(template1, template2 *v1.PodTemplateSpec) bool {
 		t1Copy := template1.DeepCopy()
 		t2Copy := template2.DeepCopy()
-		// Remove hash labels from template.Labels before comparing
+		// Remove hash labels and deprecated hash labels from template.Labels before comparing
 		delete(t1Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
 		delete(t2Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
+
+		delete(t1Copy.Labels, appsv1.DeploymentUniqueLabelKey)
+		delete(t2Copy.Labels, appsv1.DeploymentUniqueLabelKey)
 		return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 	}
 
