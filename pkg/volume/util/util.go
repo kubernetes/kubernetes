@@ -550,10 +550,14 @@ func UnmapBlockVolume(
 	}
 
 	// unmap devicePath from global node path
-	unmapDeviceErr = blkUtil.UnmapDevice(globalUnmapPath, string(podUID), true /* bindMount */)
-	if unmapDeviceErr != nil {
-		return fmt.Errorf("blkUtil.DetachFileDevice failed. globalUnmapPath:%s, podUID: %s, bindMount: %v: %v",
-			globalUnmapPath, string(podUID), true, unmapDeviceErr)
+	if globalUnmapPath != "" {
+		unmapDeviceErr = blkUtil.UnmapDevice(globalUnmapPath, string(podUID), true /* bindMount */)
+		if unmapDeviceErr != nil {
+			return fmt.Errorf("blkUtil.DetachFileDevice failed. globalUnmapPath:%s, podUID: %s, bindMount: %v: %v",
+				globalUnmapPath, string(podUID), true, unmapDeviceErr)
+		}
+	} else {
+		klog.Warningf("skip UnmapDevice for %s as globalUnmapPath is empty", string(podUID))
 	}
 	return nil
 }
