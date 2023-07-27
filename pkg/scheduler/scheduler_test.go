@@ -302,16 +302,7 @@ func TestFailureHandler(t *testing.T) {
 			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
 			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable), nil, time.Now())
 
-			var got *v1.Pod
-			if tt.podUpdatedDuringScheduling {
-				head, e := queue.Pop()
-				if e != nil {
-					t.Fatalf("Cannot pop pod from the activeQ: %v", e)
-				}
-				got = head.Pod
-			} else {
-				got = getPodFromPriorityQueue(queue, testPod)
-			}
+			got := getPodFromPriorityQueue(queue, testPod)
 
 			if diff := cmp.Diff(tt.expect, got); diff != "" {
 				t.Errorf("Unexpected pod (-want, +got): %s", diff)

@@ -919,6 +919,14 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) error
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	if p.isSchedulingQueueHintEnabled {
+		// the inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
+		if _, ok := p.inFlightPods[newPod.UID]; ok {
+			logger.V(6).Info("The pod is currently being processed, skip update", "pod", klog.KObj(newPod))
+			return nil
+		}
+	}
+
 	if oldPod != nil {
 		oldPodInfo := newQueuedPodInfoForLookup(oldPod)
 		// If the pod is already in the active queue, just update it there.
@@ -963,6 +971,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) error
 
 		return nil
 	}
+
 	// If pod is not in any of the queues, we put it in the active queue.
 	pInfo := p.newQueuedPodInfo(newPod)
 	if added, err := p.addToActiveQ(logger, pInfo); !added {
