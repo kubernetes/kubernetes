@@ -354,10 +354,10 @@ func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, 
 	kubeConfig.DisableCompression = true
 	kubeConfig.AcceptContentTypes = config.AcceptContentTypes
 	kubeConfig.ContentType = config.ContentType
-	klog.Errorf("BBB scheduler QPS=100")
-	kubeConfig.QPS = 100 //config.QPS
-	klog.Errorf("BBB scheduler Burst=100")
-	kubeConfig.Burst = 100 //int(config.Burst)
+	klog.Errorf("BBB scheduler QPS=300")
+	kubeConfig.QPS = 300 //config.QPS
+	klog.Errorf("BBB scheduler Burst=300")
+	kubeConfig.Burst = 300 //int(config.Burst)
 
 	return kubeConfig, nil
 }
