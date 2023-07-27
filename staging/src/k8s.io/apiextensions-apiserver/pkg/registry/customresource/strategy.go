@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/features"
@@ -188,8 +189,32 @@ func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (customResourceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+func (a customResourceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return generateWarningsFromObj(obj, nil)
+}
+
+func generateWarningsFromObj(obj, old runtime.Object) []string {
+	var allWarnings []string
+	fldPath := field.NewPath("metadata", "finalizers")
+	newObjAccessor, err := meta.Accessor(obj)
+	if err != nil {
+		return allWarnings
+	}
+
+	newAdded := sets.NewString(newObjAccessor.GetFinalizers()...)
+	if old != nil {
+		oldObjAccessor, err := meta.Accessor(old)
+		if err != nil {
+			return allWarnings
+		}
+		newAdded = newAdded.Difference(sets.NewString(oldObjAccessor.GetFinalizers()...))
+	}
+
+	for _, finalizer := range newAdded.List() {
+		allWarnings = append(allWarnings, validateKubeFinalizerName(finalizer, fldPath)...)
+	}
+
+	return allWarnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -244,8 +269,8 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 }
 
 // WarningsOnUpdate returns warnings for the given update.
-func (customResourceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+func (a customResourceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return generateWarningsFromObj(obj, old)
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
