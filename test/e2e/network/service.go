@@ -287,7 +287,12 @@ func StartServeHostnameService(ctx context.Context, c clientset.Interface, svc *
 		CreatedPods:          &createdPods,
 		MaxContainerFailures: &maxContainerFailures,
 	}
-	err = e2erc.RunRC(ctx, config)
+
+	dpConfig := testutils.DeploymentConfig{
+		RCConfig: config,
+	}
+
+	err = testutils.RunDeployment(ctx, dpConfig)
 	if err != nil {
 		return podNames, "", err
 	}
