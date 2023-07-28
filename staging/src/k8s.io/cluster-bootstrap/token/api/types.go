@@ -96,7 +96,7 @@ const (
 	BootstrapGroupPattern = `\Asystem:bootstrappers:[a-z0-9:-]{0,255}[a-z0-9]\z`
 
 	// BootstrapTokenPattern defines the {id}.{secret} regular expression pattern
-	BootstrapTokenPattern = `\A([a-z0-9]{6})\.([a-z0-9]{16})\z`
+	BootstrapTokenPattern = `\A([a-z0-9]{6})\.([a-z0-9]{24})\z`
 
 	// BootstrapTokenIDPattern defines token's id regular expression pattern
 	BootstrapTokenIDPattern = `\A([a-z0-9]{6})\z`
@@ -105,7 +105,7 @@ const (
 	BootstrapTokenIDBytes = 6
 
 	// BootstrapTokenSecretBytes defines the number of bytes used the Bootstrap Token's Secret field
-	BootstrapTokenSecretBytes = 16
+	BootstrapTokenSecretBytes = 24
 )
 
 // KnownTokenUsages specifies the known functions a token will get.
