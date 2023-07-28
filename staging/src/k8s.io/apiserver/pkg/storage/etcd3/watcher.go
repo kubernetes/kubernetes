@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -47,6 +48,9 @@ const (
 	incomingBufSize = 100
 	outgoingBufSize = 100
 )
+
+// defaultWatcherMaxLimit is used to facilitate construction tests
+var defaultWatcherMaxLimit int64 = maxLimit
 
 // fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error
 var fatalOnDecodeError = false
@@ -211,17 +215,58 @@ func (wc *watchChan) RequestWatchProgress() error {
 func (wc *watchChan) sync() error {
 	opts := []clientv3.OpOption{}
 	if wc.recursive {
-		opts = append(opts, clientv3.WithPrefix())
+		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
+		rangeEnd := clientv3.GetPrefixRangeEnd(wc.key)
+		opts = append(opts, clientv3.WithRange(rangeEnd))
 	}
-	getResp, err := wc.watcher.client.Get(wc.ctx, wc.key, opts...)
-	if err != nil {
-		return err
+
+	var err error
+	var lastKey []byte
+	var withRev int64
+	var getResp *clientv3.GetResponse
+
+	metricsOp := "get"
+	if wc.recursive {
+		metricsOp = "list"
 	}
-	wc.initialRev = getResp.Header.Revision
-	for _, kv := range getResp.Kvs {
-		wc.sendEvent(parseKV(kv))
+
+	preparedKey := wc.key
+
+	for {
+		startTime := time.Now()
+		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
+		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource.String(), err, startTime)
+		if err != nil {
+			return interpretListError(err, true, preparedKey, wc.key)
+		}
+
+		if len(getResp.Kvs) == 0 && getResp.More {
+			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+		}
+
+		// send items from the response until no more results
+		for i, kv := range getResp.Kvs {
+			lastKey = kv.Key
+			wc.sendEvent(parseKV(kv))
+			// free kv early. Long lists can take O(seconds) to decode.
+			getResp.Kvs[i] = nil
+		}
+
+		if withRev == 0 {
+			wc.initialRev = getResp.Header.Revision
+		}
+
+		// no more results remain
+		if !getResp.More {
+			return nil
+		}
+
+		preparedKey = string(lastKey) + "\x00"
+		if withRev == 0 {
+			withRev = getResp.Header.Revision
+			opts = append(opts, clientv3.WithRev(withRev))
+		}
 	}
-	return nil
 }
 
 func logWatchChannelErr(err error) {
