@@ -25,6 +25,7 @@ import (
 	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 )
 
@@ -97,6 +98,7 @@ func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authent
 		// https://tools.ietf.org/html/rfc6455#section-11.3.4 indicates the Sec-WebSocket-Protocol header may appear multiple times
 		// in a request, and is logically the same as a single Sec-WebSocket-Protocol header field that contains all values
 		req.Header.Set(protocolHeader, strings.Join(filteredProtocols, ","))
+		audit.AddAuditAnnotation(req.Context(), authenticator.AuthenticatorAnnotationKey, authenticator.WebsocketAuthenticator)
 	}
 
 	// If the token authenticator didn't error, provide a default error

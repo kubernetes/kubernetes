@@ -27,6 +27,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/component-base/metrics"
@@ -168,6 +169,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 		}
 
 		if ok {
+			audit.AddAuditAnnotation(req.Context(), authenticator.AuthenticatorAnnotationKey, authenticator.X509Authenticator)
 			return user, ok, err
 		}
 	}

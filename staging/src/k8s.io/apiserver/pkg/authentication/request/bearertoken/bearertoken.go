@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strings"
 
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/warning"
 )
@@ -72,5 +73,6 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 		err = invalidToken
 	}
 
+	audit.AddAuditAnnotation(req.Context(), authenticator.AuthenticatorAnnotationKey, authenticator.BearerTokenAuthenticator)
 	return resp, ok, err
 }

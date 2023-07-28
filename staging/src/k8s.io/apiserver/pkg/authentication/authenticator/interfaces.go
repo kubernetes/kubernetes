@@ -23,6 +23,20 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
+const (
+	// AuthenticatorAnnotationKey is the key used to indicate which authenticator
+	// was used to authenticate a request.
+	AuthenticatorAnnotationKey = "authentication.k8s.io/authenticator"
+	// the following are the names of the authenticators that are supported
+	// by the apiserver.  These are the values that should be used in the
+	// AuthenticatorAnnotationKey.
+	AnonymousAuthenticator     = "anonymous"
+	BearerTokenAuthenticator   = "bearerToken"
+	RequestHeaderAuthenticator = "requestHeader"
+	WebsocketAuthenticator     = "websocket"
+	X509Authenticator          = "x509"
+)
+
 // Token checks a string value against a backing authentication store and
 // returns a Response or an error if the token could not be checked.
 type Token interface {

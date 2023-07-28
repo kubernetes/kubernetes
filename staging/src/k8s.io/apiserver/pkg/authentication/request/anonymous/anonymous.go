@@ -19,6 +19,7 @@ package anonymous
 import (
 	"net/http"
 
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
@@ -32,6 +33,7 @@ const (
 func NewAuthenticator() authenticator.Request {
 	return authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 		auds, _ := authenticator.AudiencesFrom(req.Context())
+		audit.AddAuditAnnotation(req.Context(), authenticator.AuthenticatorAnnotationKey, authenticator.AnonymousAuthenticator)
 		return &authenticator.Response{
 			User: &user.DefaultInfo{
 				Name:   anonymousUser,

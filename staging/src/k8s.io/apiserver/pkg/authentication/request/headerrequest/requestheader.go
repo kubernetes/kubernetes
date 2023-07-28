@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"strings"
 
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -165,6 +166,7 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 	// clear headers used for authentication
 	ClearAuthenticationHeaders(req.Header, a.nameHeaders, a.groupHeaders, a.extraHeaderPrefixes)
 
+	audit.AddAuditAnnotation(req.Context(), authenticator.AuthenticatorAnnotationKey, authenticator.RequestHeaderAuthenticator)
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   name,
