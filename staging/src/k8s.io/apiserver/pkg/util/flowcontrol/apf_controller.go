@@ -58,6 +58,11 @@ import (
 
 const timeFmt = "2006-01-02T15:04:05.999"
 
+const (
+	// priorityLevelMaxSeatsPercent is the percentage of the nominalCL used as max seats allocatable from work estimator
+	priorityLevelMaxSeatsPercent = float64(0.15)
+)
+
 // This file contains a simple local (to the apiserver) controller
 // that digests API Priority and Fairness config objects (FlowSchema
 // and PriorityLevelConfiguration) into the data structure that the
@@ -150,6 +155,12 @@ type configController struct {
 
 	// watchTracker implements the necessary WatchTracker interface.
 	WatchTracker
+
+	// MaxSeatsTracker tracks the maximum seats that should be allocatable from the
+	// work estimator for a given priority level. This controller does not enforce
+	// any limits on max seats stored in this tracker, it is up to the work estimator
+	// to set lower/upper limits on max seats (currently min=1, max=10).
+	MaxSeatsTracker
 
 	// the most recent update attempts, ordered by increasing age.
 	// Consumer trims to keep only the last minute's worth of entries.
@@ -275,6 +286,7 @@ func newTestableController(config TestableConfig) *configController {
 		flowcontrolClient:      config.FlowcontrolClient,
 		priorityLevelStates:    make(map[string]*priorityLevelState),
 		WatchTracker:           NewWatchTracker(),
+		MaxSeatsTracker:        NewMaxSeatsTracker(),
 	}
 	klog.V(2).Infof("NewTestableController %q with serverConcurrencyLimit=%d, requestWaitLimit=%s, name=%s, asFieldManager=%q", cfgCtlr.name, cfgCtlr.serverConcurrencyLimit, cfgCtlr.requestWaitLimit, cfgCtlr.name, cfgCtlr.asFieldManager)
 	// Start with longish delay because conflicts will be between
@@ -774,6 +786,7 @@ func (meal *cfgMeal) processOldPLsLocked() {
 				// draining and no use is coming from another
 				// goroutine
 				klog.V(3).Infof("Removing undesired priority level %q (nilQueues=%v), Type=%v", plName, plState.queues == nil, plState.pl.Spec.Type)
+				meal.cfgCtlr.MaxSeatsTracker.ForgetPriorityLevel(plName)
 				continue
 			}
 			if !plState.quiescing {
@@ -835,9 +848,21 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 		plState.minCL = concurrencyLimit - lendableCL
 		plState.maxCL = concurrencyLimit + borrowingCL
 		meal.maxExecutingRequests += concurrencyLimit
+
 		var waitLimit int
 		if qCfg := limited.LimitResponse.Queuing; qCfg != nil {
 			waitLimit = int(qCfg.Queues * qCfg.QueueLengthLimit)
+
+			// Max seats allocatable from work estimator is calculated as MAX(1, MIN(0.15 * nominalCL, nominalCL/handSize)).
+			// This is to keep max seats relative to total available concurrency with a minimum value of 1.
+			// 15% of nominal concurrency was chosen since it preserved the previous max seats of 10 for default priority levels
+			// when using apiserver's default total server concurrency of 600 (--max-requests-inflight=400, --max-mutating-requests-inflight=200).
+			// This ensures that clusters with relatively high inflight requests will continue to use a max seats of 10
+			// while clusters with lower inflight requests will use max seats no greater than nominalCL/handSize.
+			// Calculated max seats can return arbitrarily high values but work estimator currently limits max seats at 10.
+			handSize := plState.pl.Spec.Limited.LimitResponse.Queuing.HandSize
+			maxSeats := uint64(math.Max(1, math.Min(math.Ceil(float64(concurrencyLimit)*priorityLevelMaxSeatsPercent), float64(int32(concurrencyLimit)/handSize))))
+			meal.cfgCtlr.MaxSeatsTracker.SetMaxSeats(plName, maxSeats)
 		}
 		meal.maxWaitingRequests += waitLimit
 
