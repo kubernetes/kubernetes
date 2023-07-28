@@ -768,12 +768,15 @@ func (g *GCERunner) updateKernelArguments(instance *compute.Instance, image stri
 }
 
 func (g *GCERunner) machineType(machine string) string {
+	var ret string
 	if machine == "" && *instanceType != "" {
-		machine = *instanceType
+		ret = *instanceType
+	} else if machine != "" {
+		ret = machine
 	} else {
-		machine = defaultGCEMachine
+		ret = defaultGCEMachine
 	}
-	return fmt.Sprintf("zones/%s/machineTypes/%s", *zone, machine)
+	return fmt.Sprintf("zones/%s/machineTypes/%s", *zone, ret)
 }
 func (g *GCERunner) rebootInstance(instance *compute.Instance) error {
 	// wait until the instance will not response to SSH
