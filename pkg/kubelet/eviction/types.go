@@ -67,6 +67,9 @@ type Manager interface {
 
 	// IsUnderPIDPressure returns true if the node is under PID pressure.
 	IsUnderPIDPressure() bool
+
+	// HasSynced returns true if eviction manager has executed synchronize method.
+	HasSynced() bool
 }
 
 // DiskInfoProvider is responsible for informing the manager how disk is configured.

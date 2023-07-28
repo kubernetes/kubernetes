@@ -559,6 +559,7 @@ func ReadyCondition(
 // MemoryPressureCondition returns a Setter that updates the v1.NodeMemoryPressure condition on the node.
 func MemoryPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderMemoryPressure
+	hasSynced func() bool, // typically Kubelet.evictionManager.HasSynced
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
@@ -594,25 +595,28 @@ func MemoryPressureCondition(nowFunc func() time.Time, // typically Kubelet.cloc
 		// condition.Status != v1.ConditionTrue or
 		// condition.Status != v1.ConditionFalse in the conditions below depending on whether
 		// the kubelet is under memory pressure or not.
-		if pressureFunc() {
-			if condition.Status != v1.ConditionTrue {
-				condition.Status = v1.ConditionTrue
-				condition.Reason = "KubeletHasInsufficientMemory"
-				condition.Message = "kubelet has insufficient memory available"
+		if hasSynced() || newCondition {
+			if pressureFunc() {
+				if condition.Status != v1.ConditionTrue {
+					condition.Status = v1.ConditionTrue
+					condition.Reason = "KubeletHasInsufficientMemory"
+					condition.Message = "kubelet has insufficient memory available"
+					condition.LastTransitionTime = currentTime
+					recordEventFunc(v1.EventTypeNormal, "NodeHasInsufficientMemory")
+				}
+			} else if condition.Status != v1.ConditionFalse {
+				condition.Status = v1.ConditionFalse
+				condition.Reason = "KubeletHasSufficientMemory"
+				condition.Message = "kubelet has sufficient memory available"
 				condition.LastTransitionTime = currentTime
-				recordEventFunc(v1.EventTypeNormal, "NodeHasInsufficientMemory")
+				recordEventFunc(v1.EventTypeNormal, "NodeHasSufficientMemory")
 			}
-		} else if condition.Status != v1.ConditionFalse {
-			condition.Status = v1.ConditionFalse
-			condition.Reason = "KubeletHasSufficientMemory"
-			condition.Message = "kubelet has sufficient memory available"
-			condition.LastTransitionTime = currentTime
-			recordEventFunc(v1.EventTypeNormal, "NodeHasSufficientMemory")
+
+			if newCondition {
+				node.Status.Conditions = append(node.Status.Conditions, *condition)
+			}
 		}
 
-		if newCondition {
-			node.Status.Conditions = append(node.Status.Conditions, *condition)
-		}
 		return nil
 	}
 }
@@ -620,6 +624,7 @@ func MemoryPressureCondition(nowFunc func() time.Time, // typically Kubelet.cloc
 // PIDPressureCondition returns a Setter that updates the v1.NodePIDPressure condition on the node.
 func PIDPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderPIDPressure
+	hasSynced func() bool, // typically Kubelet.evictionManager.HasSynced
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
@@ -655,25 +660,28 @@ func PIDPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.N
 		// condition.Status != v1.ConditionTrue or
 		// condition.Status != v1.ConditionFalse in the conditions below depending on whether
 		// the kubelet is under PID pressure or not.
-		if pressureFunc() {
-			if condition.Status != v1.ConditionTrue {
-				condition.Status = v1.ConditionTrue
-				condition.Reason = "KubeletHasInsufficientPID"
-				condition.Message = "kubelet has insufficient PID available"
+		if hasSynced() || newCondition {
+			if pressureFunc() {
+				if condition.Status != v1.ConditionTrue {
+					condition.Status = v1.ConditionTrue
+					condition.Reason = "KubeletHasInsufficientPID"
+					condition.Message = "kubelet has insufficient PID available"
+					condition.LastTransitionTime = currentTime
+					recordEventFunc(v1.EventTypeNormal, "NodeHasInsufficientPID")
+				}
+			} else if condition.Status != v1.ConditionFalse {
+				condition.Status = v1.ConditionFalse
+				condition.Reason = "KubeletHasSufficientPID"
+				condition.Message = "kubelet has sufficient PID available"
 				condition.LastTransitionTime = currentTime
-				recordEventFunc(v1.EventTypeNormal, "NodeHasInsufficientPID")
+				recordEventFunc(v1.EventTypeNormal, "NodeHasSufficientPID")
 			}
-		} else if condition.Status != v1.ConditionFalse {
-			condition.Status = v1.ConditionFalse
-			condition.Reason = "KubeletHasSufficientPID"
-			condition.Message = "kubelet has sufficient PID available"
-			condition.LastTransitionTime = currentTime
-			recordEventFunc(v1.EventTypeNormal, "NodeHasSufficientPID")
+
+			if newCondition {
+				node.Status.Conditions = append(node.Status.Conditions, *condition)
+			}
 		}
 
-		if newCondition {
-			node.Status.Conditions = append(node.Status.Conditions, *condition)
-		}
 		return nil
 	}
 }
@@ -681,6 +689,7 @@ func PIDPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.N
 // DiskPressureCondition returns a Setter that updates the v1.NodeDiskPressure condition on the node.
 func DiskPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderDiskPressure
+	hasSynced func() bool, // typically Kubelet.evictionManager.HasSynced
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
@@ -716,25 +725,28 @@ func DiskPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.
 		// condition.Status != v1.ConditionTrue or
 		// condition.Status != v1.ConditionFalse in the conditions below depending on whether
 		// the kubelet is under disk pressure or not.
-		if pressureFunc() {
-			if condition.Status != v1.ConditionTrue {
-				condition.Status = v1.ConditionTrue
-				condition.Reason = "KubeletHasDiskPressure"
-				condition.Message = "kubelet has disk pressure"
+		if hasSynced() || newCondition {
+			if pressureFunc() {
+				if condition.Status != v1.ConditionTrue {
+					condition.Status = v1.ConditionTrue
+					condition.Reason = "KubeletHasDiskPressure"
+					condition.Message = "kubelet has disk pressure"
+					condition.LastTransitionTime = currentTime
+					recordEventFunc(v1.EventTypeNormal, "NodeHasDiskPressure")
+				}
+			} else if condition.Status != v1.ConditionFalse {
+				condition.Status = v1.ConditionFalse
+				condition.Reason = "KubeletHasNoDiskPressure"
+				condition.Message = "kubelet has no disk pressure"
 				condition.LastTransitionTime = currentTime
-				recordEventFunc(v1.EventTypeNormal, "NodeHasDiskPressure")
+				recordEventFunc(v1.EventTypeNormal, "NodeHasNoDiskPressure")
 			}
-		} else if condition.Status != v1.ConditionFalse {
-			condition.Status = v1.ConditionFalse
-			condition.Reason = "KubeletHasNoDiskPressure"
-			condition.Message = "kubelet has no disk pressure"
-			condition.LastTransitionTime = currentTime
-			recordEventFunc(v1.EventTypeNormal, "NodeHasNoDiskPressure")
+
+			if newCondition {
+				node.Status.Conditions = append(node.Status.Conditions, *condition)
+			}
 		}
 
-		if newCondition {
-			node.Status.Conditions = append(node.Status.Conditions, *condition)
-		}
 		return nil
 	}
 }

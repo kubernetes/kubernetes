@@ -100,6 +100,8 @@ type managerImpl struct {
 	thresholdsLastUpdated time.Time
 	// whether can support local storage capacity isolation
 	localStorageCapacityIsolation bool
+	// synchronized is true if eviction manager has executed synchronize and updated node conditions once
+	synchronized bool
 }
 
 // ensure it implements the required interface
@@ -177,6 +179,11 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 
 // Start starts the control loop to observe and response to low compute resources.
 func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
+	// synchronize fast to update node conditions
+	// it may fail because of "failed to get summary stats" error, and it
+	// will not evict pod because podManager hasn't contained any pod yet
+	m.synchronize(diskInfoProvider, podFunc)
+
 	thresholdHandler := func(message string) {
 		klog.InfoS(message)
 		m.synchronize(diskInfoProvider, podFunc)
@@ -309,6 +316,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// update internal state
 	m.Lock()
 	m.nodeConditions = nodeConditions
+	m.synchronized = true
 	m.thresholdsFirstObservedAt = thresholdsFirstObservedAt
 	m.nodeConditionsLastObservedAt = nodeConditionsLastObservedAt
 	m.thresholdsMet = thresholds
@@ -402,6 +410,12 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 	klog.InfoS("Eviction manager: unable to evict any pods from the node")
 	return nil
+}
+
+func (m *managerImpl) HasSynced() bool {
+	m.RLock()
+	defer m.RUnlock()
+	return m.synchronized
 }
 
 func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods []*v1.Pod) {

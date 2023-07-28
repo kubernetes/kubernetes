@@ -1697,8 +1697,11 @@ func TestMemoryPressureCondition(t *testing.T) {
 			pressureFunc := func() bool {
 				return tc.pressure
 			}
+			hasSynced := func() bool {
+				return true
+			}
 			// construct setter
-			setter := MemoryPressureCondition(nowFunc, pressureFunc, recordEventFunc)
+			setter := MemoryPressureCondition(nowFunc, pressureFunc, hasSynced, recordEventFunc)
 			// call setter on node
 			if err := setter(ctx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -1819,8 +1822,11 @@ func TestPIDPressureCondition(t *testing.T) {
 			pressureFunc := func() bool {
 				return tc.pressure
 			}
+			hasSynced := func() bool {
+				return true
+			}
 			// construct setter
-			setter := PIDPressureCondition(nowFunc, pressureFunc, recordEventFunc)
+			setter := PIDPressureCondition(nowFunc, pressureFunc, hasSynced, recordEventFunc)
 			// call setter on node
 			if err := setter(ctx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -1941,8 +1947,11 @@ func TestDiskPressureCondition(t *testing.T) {
 			pressureFunc := func() bool {
 				return tc.pressure
 			}
+			hasSynced := func() bool {
+				return true
+			}
 			// construct setter
-			setter := DiskPressureCondition(nowFunc, pressureFunc, recordEventFunc)
+			setter := DiskPressureCondition(nowFunc, pressureFunc, hasSynced, recordEventFunc)
 			// call setter on node
 			if err := setter(ctx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)

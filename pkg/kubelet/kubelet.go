@@ -1498,6 +1498,10 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// trigger on-demand stats collection once so that we have capacity information for ephemeral storage.
 	// ignore any errors, since if stats collection is not successful, the container manager will fail to start below.
 	kl.StatsProvider.GetCgroupStats("/", true)
+
+	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
+	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.PodIsFinished, evictionMonitoringPeriod)
+
 	// Start container manager.
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
@@ -1511,8 +1515,6 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		klog.ErrorS(err, "Failed to start ContainerManager")
 		os.Exit(1)
 	}
-	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.PodIsFinished, evictionMonitoringPeriod)
 
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
@@ -1592,7 +1594,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start volume manager
 	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
-
+	kl.updateRuntimeUp()
 	if kl.kubeClient != nil {
 		// Start two go-routines to update the status.
 		//
