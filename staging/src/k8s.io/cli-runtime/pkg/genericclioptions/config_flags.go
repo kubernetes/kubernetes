@@ -286,6 +286,11 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 		cacheDir = *f.CacheDir
 	}
 
+	err = createCacheDirFile(cacheDir)
+	if err != nil {
+		return nil, err
+	}
+
 	httpCacheDir := filepath.Join(cacheDir, "http")
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, "discovery"), config.Host)
 
@@ -301,6 +306,22 @@ func getDefaultCacheDir() string {
 	}
 
 	return filepath.Join(homedir.HomeDir(), ".kube", "cache")
+}
+
+func createCacheDirFile(path string) error {
+	signature := `Signature: 8a477f597d28d172789f06886806bc55
+# This file is a cache directory tag created by kubernetes.
+# For information about cache directory tags, see:
+#  https://bford.info/cachedir/
+`
+	filename := filepath.Join(path, "CACHEDIR.TAG")
+	if err := os.MkdirAll(path, 0750); err != nil {
+		return err
+	}
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return os.WriteFile(filename, []byte(signature), 0644)
+	}
+	return nil
 }
 
 // ToRESTMapper returns a mapper.
