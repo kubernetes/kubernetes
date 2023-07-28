@@ -64,6 +64,10 @@ func newPod() runtime.Object {
 	return &example.Pod{}
 }
 
+func newPodList() runtime.Object {
+	return &example.PodList{}
+}
+
 func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
 	return func(ctx context.Context, t *testing.T, key string) {
 		getResp, err := etcdClient.KV.Get(ctx, key)
@@ -468,14 +472,16 @@ func (r *clientRecorder) GetReadsAndReset() uint64 {
 }
 
 type setupOptions struct {
-	client        func(testing.TB) *clientv3.Client
-	codec         runtime.Codec
-	newFunc       func() runtime.Object
-	prefix        string
-	groupResource schema.GroupResource
-	transformer   value.Transformer
-	pagingEnabled bool
-	leaseConfig   LeaseManagerConfig
+	client         func(testing.TB) *clientv3.Client
+	codec          runtime.Codec
+	newFunc        func() runtime.Object
+	newListFunc    func() runtime.Object
+	prefix         string
+	resourcePrefix string
+	groupResource  schema.GroupResource
+	transformer    value.Transformer
+	pagingEnabled  bool
+	leaseConfig    LeaseManagerConfig
 
 	recorderEnabled bool
 }
@@ -520,7 +526,9 @@ func withDefaults(options *setupOptions) {
 	}
 	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	options.newFunc = newPod
+	options.newListFunc = newPodList
 	options.prefix = ""
+	options.resourcePrefix = "/pods"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
 	options.transformer = newTestTransformer()
 	options.pagingEnabled = true
@@ -543,7 +551,9 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *cli
 		client,
 		setupOpts.codec,
 		setupOpts.newFunc,
+		setupOpts.newListFunc,
 		setupOpts.prefix,
+		setupOpts.resourcePrefix,
 		setupOpts.groupResource,
 		setupOpts.transformer,
 		setupOpts.pagingEnabled,
