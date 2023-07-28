@@ -61,15 +61,19 @@ type objectCountGetterFunc func(string) (int64, error)
 // number of watchers potentially interested in a given request.
 type watchCountGetterFunc func(*apirequest.RequestInfo) int
 
+// MaxSeatsFunc represents a function that returns the maximum seats
+// allowed for the work estimator for a given priority level.
+type maxSeatsFunc func(priorityLevelName string) uint64
+
 // NewWorkEstimator estimates the work that will be done by a given request,
 // if no WorkEstimatorFunc matches the given request then the default
 // work estimate of 1 seat is allocated to the request.
-func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc, config *WorkEstimatorConfig) WorkEstimatorFunc {
+func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
 	estimator := &workEstimator{
 		minimumSeats:          config.MinimumSeats,
-		maximumSeats:          config.MaximumSeats,
-		listWorkEstimator:     newListWorkEstimator(objectCountFn, config),
-		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn, config),
+		maximumSeatsLimit:     config.MaximumSeatsLimit,
+		listWorkEstimator:     newListWorkEstimator(objectCountFn, config, maxSeatsFn),
+		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn, config, maxSeatsFn),
 	}
 	return estimator.estimate
 }
@@ -86,8 +90,8 @@ func (e WorkEstimatorFunc) EstimateWork(r *http.Request, flowSchemaName, priorit
 type workEstimator struct {
 	// the minimum number of seats a request must occupy
 	minimumSeats uint64
-	// the maximum number of seats a request can occupy
-	maximumSeats uint64
+	// the default maximum number of seats a request can occupy
+	maximumSeatsLimit uint64
 	// listWorkEstimator estimates work for list request(s)
 	listWorkEstimator WorkEstimatorFunc
 	// mutatingWorkEstimator calculates the width of mutating request(s)
@@ -99,7 +103,7 @@ func (e *workEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelN
 	if !ok {
 		klog.ErrorS(fmt.Errorf("no RequestInfo found in context"), "Failed to estimate work for the request", "URI", r.RequestURI)
 		// no RequestInfo should never happen, but to be on the safe side let's return maximumSeats
-		return WorkEstimate{InitialSeats: e.maximumSeats}
+		return WorkEstimate{InitialSeats: e.maximumSeatsLimit}
 	}
 
 	switch requestInfo.Verb {
