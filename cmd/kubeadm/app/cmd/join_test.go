@@ -43,7 +43,7 @@ var testJoinConfig = fmt.Sprintf(`apiVersion: %s
 kind: JoinConfiguration
 discovery:
   bootstrapToken:
-    token: abcdef.0123456789abcdef
+    token: abcdef.0123456789abcdefghijklmn
     apiServerEndpoint: 1.2.3.4:6443
     unsafeSkipCAVerification: true
 controlPlane:
@@ -98,7 +98,7 @@ func TestNewJoinData(t *testing.T) {
 			args: []string{"1.2.3.4:6443"},
 			flags: map[string]string{
 				options.FileDiscovery:            "https://foo",
-				options.TokenDiscovery:           "abcdef.0123456789abcdef",
+				options.TokenDiscovery:           "abcdef.0123456789abcdefghijklmn",
 				options.TokenDiscoverySkipCAHash: "true",
 			},
 			expectError: true,
@@ -119,14 +119,14 @@ func TestNewJoinData(t *testing.T) {
 			name: "pass if bootstrap discovery is set",
 			args: []string{"1.2.3.4:6443", "5.6.7.8:6443"},
 			flags: map[string]string{
-				options.TokenDiscovery:           "abcdef.0123456789abcdef",
+				options.TokenDiscovery:           "abcdef.0123456789abcdefghijklmn",
 				options.TokenDiscoverySkipCAHash: "true",
 			},
 			validate: func(t *testing.T, data *joinData) {
 				// validate that bootstrap discovery settings are set into join data
 				if data.cfg.Discovery.BootstrapToken == nil ||
 					data.cfg.Discovery.BootstrapToken.APIServerEndpoint != "1.2.3.4:6443" || //only first arg should be kept as APIServerEndpoint
-					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" ||
+					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdefghijklmn" ||
 					data.cfg.Discovery.BootstrapToken.UnsafeSkipCAVerification != true {
 					t.Error("Invalid data.cfg.Discovery.BootstrapToken")
 				}
@@ -136,14 +136,14 @@ func TestNewJoinData(t *testing.T) {
 			name: "--token sets TLSBootstrapToken and BootstrapToken.Token if unset",
 			args: []string{"1.2.3.4:6443"},
 			flags: map[string]string{
-				options.TokenStr:                 "abcdef.0123456789abcdef",
+				options.TokenStr:                 "abcdef.0123456789abcdefghijklmn",
 				options.TokenDiscoverySkipCAHash: "true",
 			},
 			validate: func(t *testing.T, data *joinData) {
 				// validate that token sets both TLSBootstrapToken and BootstrapToken.Token into join data
-				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
+				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdefghijklmn" ||
 					data.cfg.Discovery.BootstrapToken == nil ||
-					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" {
+					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdefghijklmn" {
 					t.Error("Invalid TLSBootstrapToken or BootstrapToken.Token")
 				}
 			},
@@ -153,15 +153,15 @@ func TestNewJoinData(t *testing.T) {
 			args: []string{"1.2.3.4:6443"},
 			flags: map[string]string{
 				options.TokenStr:                 "aaaaaa.0123456789aaaaaa",
-				options.TLSBootstrapToken:        "abcdef.0123456789abcdef",
-				options.TokenDiscovery:           "defghi.0123456789defghi",
+				options.TLSBootstrapToken:        "abcdef.0123456789abcdefghijklmn",
+				options.TokenDiscovery:           "defghi.0123456789defghi12345678",
 				options.TokenDiscoverySkipCAHash: "true",
 			},
 			validate: func(t *testing.T, data *joinData) {
 				// validate that TLSBootstrapToken and BootstrapToken.Token values are preserved into join data
-				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
+				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdefghijklmn" ||
 					data.cfg.Discovery.BootstrapToken == nil ||
-					data.cfg.Discovery.BootstrapToken.Token != "defghi.0123456789defghi" {
+					data.cfg.Discovery.BootstrapToken.Token != "defghi.0123456789defghi12345678" {
 					t.Error("Invalid TLSBootstrapToken or BootstrapToken.Token")
 				}
 			},
@@ -227,11 +227,11 @@ func TestNewJoinData(t *testing.T) {
 						CACertPath: kubeadmapiv1.DefaultCACertPath,
 						Discovery: kubeadmapi.Discovery{
 							BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-								Token:                    "abcdef.0123456789abcdef",
+								Token:                    "abcdef.0123456789abcdefghijklmn",
 								APIServerEndpoint:        "1.2.3.4:6443",
 								UnsafeSkipCAVerification: true,
 							},
-							TLSBootstrapToken: "abcdef.0123456789abcdef",
+							TLSBootstrapToken: "abcdef.0123456789abcdefghijklmn",
 							Timeout:           &metav1.Duration{Duration: kubeadmapiv1.DefaultDiscoveryTimeout},
 						},
 						ControlPlane: &kubeadmapi.JoinControlPlane{

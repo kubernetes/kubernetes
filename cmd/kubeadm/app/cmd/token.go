@@ -70,7 +70,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			What is a bootstrap token more exactly?
 			 - It is a Secret in the kube-system namespace of type "bootstrap.kubernetes.io/token".
-			 - A bootstrap token must be of the form "[a-z0-9]{6}.[a-z0-9]{16}". The former part is the public token ID,
+			 - A bootstrap token must be of the form "[a-z0-9]{6}.[a-z0-9]{24}". The former part is the public token ID,
 			   while the latter is the Token Secret and it must be kept private at all circumstances!
 			 - The name of the Secret must be named "bootstrap-token-(token-id)".
 

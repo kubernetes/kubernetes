@@ -67,8 +67,8 @@ func TestUnmarshalJSON(t *testing.T) {
 		{`abcdef.abcdef0123456789`, &BootstrapTokenString{}, true},
 		{`"abcdef.abcdef0123456789`, &BootstrapTokenString{}, true},
 		{`"abcdef.ABCDEF0123456789"`, &BootstrapTokenString{}, true},
-		{`"abcdef.abcdef0123456789"`, &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"}, false},
-		{`"123456.aabbccddeeffgghh"`, &BootstrapTokenString{ID: "123456", Secret: "aabbccddeeffgghh"}, false},
+		{`"abcdef.abcdef0123456789ghijklmn"`, &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"}, false},
+		{`"123456.aabbccddeeffgghhiijjkkll"`, &BootstrapTokenString{ID: "123456", Secret: "aabbccddeeffgghhiijjkkll"}, false},
 	}
 	for _, rt := range tests {
 		t.Run(rt.input, func(t *testing.T) {
@@ -92,8 +92,8 @@ func TestJSONRoundtrip(t *testing.T) {
 		input string
 		bts   *BootstrapTokenString
 	}{
-		{`"abcdef.abcdef0123456789"`, nil},
-		{"", &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"}},
+		{`"abcdef.abcdef0123456789ghijklmn"`, nil},
+		{"", &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"}},
 	}
 	for _, rt := range tests {
 		t.Run(rt.input, func(t *testing.T) {
@@ -182,10 +182,10 @@ func TestNewBootstrapTokenString(t *testing.T) {
 		{token: "123456.AABBCCDDEEFFGGHH", expectedError: true, bts: nil},  // invalid token secret
 		{token: "123456.AABBCCD-EEFFGGHH", expectedError: true, bts: nil},  // invalid character
 		{token: "abc*ef.1234567890123456", expectedError: true, bts: nil},  // invalid character
-		{token: "abcdef.1234567890123456", expectedError: false, bts: &BootstrapTokenString{ID: "abcdef", Secret: "1234567890123456"}},
-		{token: "123456.aabbccddeeffgghh", expectedError: false, bts: &BootstrapTokenString{ID: "123456", Secret: "aabbccddeeffgghh"}},
-		{token: "abcdef.abcdef0123456789", expectedError: false, bts: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"}},
-		{token: "123456.1234560123456789", expectedError: false, bts: &BootstrapTokenString{ID: "123456", Secret: "1234560123456789"}},
+		{token: "abcdef.1234567890123456ghijklmn", expectedError: false, bts: &BootstrapTokenString{ID: "abcdef", Secret: "1234567890123456ghijklmn"}},
+		{token: "123456.aabbccddeeffgghhiijjkkll", expectedError: false, bts: &BootstrapTokenString{ID: "123456", Secret: "aabbccddeeffgghhiijjkkll"}},
+		{token: "abcdef.abcdef0123456789ghijklmn", expectedError: false, bts: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"}},
+		{token: "123456.1234560123456789ghijklmn", expectedError: false, bts: &BootstrapTokenString{ID: "123456", Secret: "1234560123456789ghijklmn"}},
 	}
 	for _, rt := range tests {
 		t.Run(rt.token, func(t *testing.T) {
@@ -224,10 +224,10 @@ func TestNewBootstrapTokenStringFromIDAndSecret(t *testing.T) {
 		{id: "123456", secret: "AABBCCDDEEFFGGHH", expectedError: true, bts: nil}, // invalid token secret
 		{id: "123456", secret: "AABBCCD-EEFFGGHH", expectedError: true, bts: nil}, // invalid character
 		{id: "abc*ef", secret: "1234567890123456", expectedError: true, bts: nil}, // invalid character
-		{id: "abcdef", secret: "1234567890123456", expectedError: false, bts: &BootstrapTokenString{ID: "abcdef", Secret: "1234567890123456"}},
-		{id: "123456", secret: "aabbccddeeffgghh", expectedError: false, bts: &BootstrapTokenString{ID: "123456", Secret: "aabbccddeeffgghh"}},
-		{id: "abcdef", secret: "abcdef0123456789", expectedError: false, bts: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"}},
-		{id: "123456", secret: "1234560123456789", expectedError: false, bts: &BootstrapTokenString{ID: "123456", Secret: "1234560123456789"}},
+		{id: "abcdef", secret: "1234567890123456ghijklmn", expectedError: false, bts: &BootstrapTokenString{ID: "abcdef", Secret: "1234567890123456ghijklmn"}},
+		{id: "123456", secret: "aabbccddeeffgghh12345678", expectedError: false, bts: &BootstrapTokenString{ID: "123456", Secret: "aabbccddeeffgghh12345678"}},
+		{id: "abcdef", secret: "abcdef0123456789ghijklmn", expectedError: false, bts: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"}},
+		{id: "123456", secret: "1234560123456789ghijklmn", expectedError: false, bts: &BootstrapTokenString{ID: "123456", Secret: "1234560123456789ghijklmn"}},
 	}
 	for _, rt := range tests {
 		t.Run(rt.id, func(t *testing.T) {
@@ -309,7 +309,7 @@ func TestBootstrapTokenToSecretRoundtrip(t *testing.T) {
 	}{
 		{
 			&BootstrapToken{
-				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"},
 				Description: "foo",
 				Expires: &metav1.Time{
 					Time: refTime,
@@ -494,10 +494,10 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 			"bootstrap-token-abcdef",
 			map[string][]byte{
 				"token-id":     []byte("abcdef"),
-				"token-secret": []byte("abcdef0123456789"),
+				"token-secret": []byte("abcdef0123456789ghijklmn"),
 			},
 			&BootstrapToken{
-				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"},
 			},
 			false,
 		},
@@ -536,11 +536,11 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 			"bootstrap-token-abcdef",
 			map[string][]byte{
 				"token-id":     []byte("abcdef"),
-				"token-secret": []byte("abcdef0123456789"),
+				"token-secret": []byte("abcdef0123456789ghijklmn"),
 				"description":  []byte("foo"),
 			},
 			&BootstrapToken{
-				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"},
 				Description: "foo",
 			},
 			false,
@@ -550,11 +550,11 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 			"bootstrap-token-abcdef",
 			map[string][]byte{
 				"token-id":     []byte("abcdef"),
-				"token-secret": []byte("abcdef0123456789"),
+				"token-secret": []byte("abcdef0123456789ghijklmn"),
 				"expiration":   []byte(refTime.Format(time.RFC3339)),
 			},
 			&BootstrapToken{
-				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"},
 				Expires: &metav1.Time{
 					Time: refTime,
 				},
@@ -577,12 +577,12 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 			"bootstrap-token-abcdef",
 			map[string][]byte{
 				"token-id":                       []byte("abcdef"),
-				"token-secret":                   []byte("abcdef0123456789"),
+				"token-secret":                   []byte("abcdef0123456789ghijklmn"),
 				"usage-bootstrap-signing":        []byte("true"),
 				"usage-bootstrap-authentication": []byte("true"),
 			},
 			&BootstrapToken{
-				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"},
 				Usages: []string{"authentication", "signing"},
 			},
 			false,
@@ -592,14 +592,14 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 			"bootstrap-token-abcdef",
 			map[string][]byte{
 				"token-id":                       []byte("abcdef"),
-				"token-secret":                   []byte("abcdef0123456789"),
+				"token-secret":                   []byte("abcdef0123456789ghijklmn"),
 				"usage-bootstrap-signing":        []byte("true"),
 				"usage-bootstrap-authentication": []byte("true"),
 				"usage-bootstrap-foo":            []byte("false"),
 				"usage-bootstrap-bar":            []byte(""),
 			},
 			&BootstrapToken{
-				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"},
 				Usages: []string{"authentication", "signing"},
 			},
 			false,
@@ -609,11 +609,11 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 			"bootstrap-token-abcdef",
 			map[string][]byte{
 				"token-id":          []byte("abcdef"),
-				"token-secret":      []byte("abcdef0123456789"),
+				"token-secret":      []byte("abcdef0123456789ghijklmn"),
 				"auth-extra-groups": []byte("system:bootstrappers,system:bootstrappers:foo"),
 			},
 			&BootstrapToken{
-				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"},
 				Groups: []string{"system:bootstrappers", "system:bootstrappers:foo"},
 			},
 			false,
@@ -623,7 +623,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 			"bootstrap-token-abcdef",
 			map[string][]byte{
 				"token-id":                       []byte("abcdef"),
-				"token-secret":                   []byte("abcdef0123456789"),
+				"token-secret":                   []byte("abcdef0123456789ghijklmn"),
 				"description":                    []byte("foo"),
 				"expiration":                     []byte(refTime.Format(time.RFC3339)),
 				"usage-bootstrap-signing":        []byte("true"),
@@ -631,7 +631,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 				"auth-extra-groups":              []byte("system:bootstrappers,system:bootstrappers:foo"),
 			},
 			&BootstrapToken{
-				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"},
 				Description: "foo",
 				Expires: &metav1.Time{
 					Time: refTime,

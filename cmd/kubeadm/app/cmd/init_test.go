@@ -40,7 +40,7 @@ kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: "1.2.3.4"
 bootstrapTokens:
-- token: "abcdef.0123456789abcdef"
+- token: "abcdef.0123456789abcdef12345678"
 nodeRegistration:
   criSocket: %s
   name: someName
@@ -123,7 +123,7 @@ func TestNewInitData(t *testing.T) {
 						},
 						BootstrapTokens: []bootstraptokenv1.BootstrapToken{
 							{
-								Token:  &bootstraptokenv1.BootstrapTokenString{ID: "abcdef", Secret: "0123456789abcdef"},
+								Token:  &bootstraptokenv1.BootstrapTokenString{ID: "abcdef", Secret: "0123456789abcdef12345678"},
 								Usages: []string{"signing", "authentication"},
 								TTL: &metav1.Duration{
 									Duration: bootstraptokenv1.DefaultTokenDuration,

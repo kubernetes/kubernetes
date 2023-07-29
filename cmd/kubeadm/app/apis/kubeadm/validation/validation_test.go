@@ -36,7 +36,7 @@ func TestValidateToken(t *testing.T) {
 		token    string
 		expected bool
 	}{
-		{"772ef5.6b6baab1d4a0a171", true},
+		{"772ef5.6b6baab1d4a0a171abcdefgh", true},
 		{".6b6baab1d4a0a171", false},
 		{"772ef5.", false},
 		{"abcdef.1234567890123456@foobar", false},
@@ -605,11 +605,11 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			CACertPath: "/some/cert.crt",
 			Discovery: kubeadmapi.Discovery{
 				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-					Token:             "abcdef.1234567890123456",
+					Token:             "abcdef.1234567890123456ghijklmn",
 					APIServerEndpoint: "1.2.3.4:6443",
 					CACertHashes:      []string{"aaaa"},
 				},
-				TLSBootstrapToken: "abcdef.1234567890123456",
+				TLSBootstrapToken: "abcdef.1234567890123456ghijklmn",
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
@@ -620,11 +620,11 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			CACertPath: "/some/cert.crt",
 			Discovery: kubeadmapi.Discovery{
 				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-					Token:             "abcdef.1234567890123456",
+					Token:             "abcdef.1234567890123456ghijklmn",
 					APIServerEndpoint: "1.2.3.4:6443",
 					CACertHashes:      []string{"aaaa"},
 				},
-				TLSBootstrapToken: "abcdef.1234567890123456",
+				TLSBootstrapToken: "abcdef.1234567890123456ghijklmn",
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
@@ -913,7 +913,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 		{
 			"valid: using token-based discovery with .BootstrapToken.CACertHashes",
 			&kubeadmapi.BootstrapTokenDiscovery{
-				Token:                    "abcdef.1234567890123456",
+				Token:                    "abcdef.1234567890123456ghijklmn",
 				APIServerEndpoint:        "192.168.122.100:6443",
 				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
 				UnsafeSkipCAVerification: false,
@@ -923,7 +923,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 		{
 			"valid: using token-based discovery with .BootstrapToken.CACertHashe but skip ca verification",
 			&kubeadmapi.BootstrapTokenDiscovery{
-				Token:                    "abcdef.1234567890123456",
+				Token:                    "abcdef.1234567890123456ghijklmn",
 				APIServerEndpoint:        "192.168.122.100:6443",
 				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
 				UnsafeSkipCAVerification: true,

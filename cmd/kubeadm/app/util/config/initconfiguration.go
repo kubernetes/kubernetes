@@ -51,7 +51,7 @@ var (
 	PlaceholderToken = bootstraptokenv1.BootstrapToken{
 		Token: &bootstraptokenv1.BootstrapTokenString{
 			ID:     "abcdef",
-			Secret: "0123456789abcdef",
+			Secret: "0123456789abcdefghijklmn",
 		},
 	}
 )

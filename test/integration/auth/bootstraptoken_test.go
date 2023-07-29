@@ -53,7 +53,7 @@ func (b bootstrapSecrets) Get(name string) (*corev1.Secret, error) {
 // TestBootstrapTokenAuth tests the bootstrap token auth provider
 func TestBootstrapTokenAuth(t *testing.T) {
 	validTokenID := "token1"
-	validSecret := "validtokensecret"
+	validSecret := "validtokensecret12345678"
 	var bootstrapSecretValid = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,

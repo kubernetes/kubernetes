@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	TokenExpectedRegex = "^\\S{6}\\.\\S{16}\n$"
+	TokenExpectedRegex = "^\\S{6}\\.\\S{24}\n$"
 )
 
 func TestCmdTokenGenerate(t *testing.T) {

@@ -64,7 +64,7 @@ func TestCmdInitToken(t *testing.T) {
 		},
 		{
 			name:     "valid token is accepted",
-			args:     "--token=abcdef.0123456789abcdef",
+			args:     "--token=abcdef.0123456789abcdef12345678",
 			expected: true,
 		},
 	}

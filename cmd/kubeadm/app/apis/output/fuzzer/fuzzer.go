@@ -39,7 +39,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 func fuzzBootstrapToken(obj *output.BootstrapToken, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
-	obj.Token = &bootstraptokenv1.BootstrapTokenString{ID: "uvxdac", Secret: "fq35fuyue3kd4gda"}
+	obj.Token = &bootstraptokenv1.BootstrapTokenString{ID: "uvxdac", Secret: "fq35fuyue3kd4gda12ls3il6"}
 	obj.Description = ""
 	obj.TTL = &metav1.Duration{Duration: time.Hour * 24}
 	obj.Usages = []string{"authentication", "signing"}

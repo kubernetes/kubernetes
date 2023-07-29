@@ -61,10 +61,10 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 				discovery:
 				  bootstrapToken:
 				    apiServerEndpoint: kube-apiserver:6443
-				    token: abcdef.0123456789abcdef
+				    token: abcdef.0123456789abcdef12345678
 				    unsafeSkipCAVerification: true
 				  timeout: 5m0s
-				  tlsBootstrapToken: abcdef.0123456789abcdef
+				  tlsBootstrapToken: abcdef.0123456789abcdef12345678
 			`),
 		},
 	}

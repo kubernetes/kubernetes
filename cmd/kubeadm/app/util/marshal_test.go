@@ -123,7 +123,7 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 		},
 		BootstrapTokens: []bootstraptokenv1.BootstrapToken{
 			{
-				Token: &bootstraptokenv1.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &bootstraptokenv1.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789ghijklmn"},
 			},
 		},
 		// NOTE: Using MarshalToYamlForCodecs and UnmarshalFromYamlForCodecs for ClusterConfiguration fields here won't work

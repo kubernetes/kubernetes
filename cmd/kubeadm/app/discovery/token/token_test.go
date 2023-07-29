@@ -87,10 +87,10 @@ users: null
 			// This is the default behavior. The JWS signature is patched after the cluster-info ConfigMap is created
 			name:        "valid: retrieve a valid kubeconfig with CA verification and delayed JWS signature",
 			tokenID:     "123456",
-			tokenSecret: "abcdef1234567890",
+			tokenSecret: "abcdef1234567890ghijklmn",
 			cfg: &kubeadmapi.Discovery{
 				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-					Token:        "123456.abcdef1234567890",
+					Token:        "123456.abcdef1234567890ghijklmn",
 					CACertHashes: []string{caCertHash},
 				},
 			},
@@ -104,10 +104,10 @@ users: null
 			// Same as above expect this test creates the ConfigMap with the JWS signature
 			name:        "valid: retrieve a valid kubeconfig with CA verification",
 			tokenID:     "123456",
-			tokenSecret: "abcdef1234567890",
+			tokenSecret: "abcdef1234567890ghijklmn",
 			cfg: &kubeadmapi.Discovery{
 				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-					Token:        "123456.abcdef1234567890",
+					Token:        "123456.abcdef1234567890ghijklmn",
 					CACertHashes: []string{caCertHash},
 				},
 			},
@@ -120,10 +120,10 @@ users: null
 			// Skipping CA verification is also supported
 			name:        "valid: retrieve a valid kubeconfig without CA verification",
 			tokenID:     "123456",
-			tokenSecret: "abcdef1234567890",
+			tokenSecret: "abcdef1234567890ghijklmn",
 			cfg: &kubeadmapi.Discovery{
 				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-					Token: "123456.abcdef1234567890",
+					Token: "123456.abcdef1234567890ghijklmn",
 				},
 			},
 			configMap: &fakeConfigMap{

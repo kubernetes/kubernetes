@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	tokenExpectedRegex = "^\\S{6}\\.\\S{16}\n$"
+	tokenExpectedRegex = "^\\S{6}\\.\\S{24}\n$"
 	testConfigToken    = `apiVersion: v1
 clusters:
 - cluster:
@@ -108,42 +108,42 @@ func TestRunCreateToken(t *testing.T) {
 		},
 		{
 			name:          "valid: non-empty token",
-			token:         "abcdef.1234567890123456",
+			token:         "abcdef.1234567890123456ghijklmn",
 			usages:        []string{"signing", "authentication"},
 			extraGroups:   []string{"system:bootstrappers:foo"},
 			expectedError: false,
 		},
 		{
 			name:          "valid: no extraGroups",
-			token:         "abcdef.1234567890123456",
+			token:         "abcdef.1234567890123456ghijklmn",
 			usages:        []string{"signing", "authentication"},
 			extraGroups:   []string{},
 			expectedError: false,
 		},
 		{
 			name:          "invalid: incorrect extraGroups",
-			token:         "abcdef.1234567890123456",
+			token:         "abcdef.1234567890123456ghijklmn",
 			usages:        []string{"signing", "authentication"},
 			extraGroups:   []string{"foo"},
 			expectedError: true,
 		},
 		{
 			name:          "invalid: specifying --groups when --usages doesn't include authentication",
-			token:         "abcdef.1234567890123456",
+			token:         "abcdef.1234567890123456ghijklmn",
 			usages:        []string{"signing"},
 			extraGroups:   []string{"foo"},
 			expectedError: true,
 		},
 		{
 			name:          "invalid: partially incorrect usages",
-			token:         "abcdef.1234567890123456",
+			token:         "abcdef.1234567890123456ghijklmn",
 			usages:        []string{"foo", "authentication"},
 			extraGroups:   []string{"system:bootstrappers:foo"},
 			expectedError: true,
 		},
 		{
 			name:          "invalid: all incorrect usages",
-			token:         "abcdef.1234567890123456",
+			token:         "abcdef.1234567890123456ghijklmn",
 			usages:        []string{"foo", "bar"},
 			extraGroups:   []string{"system:bootstrappers:foo"},
 			expectedError: true,
@@ -232,13 +232,13 @@ func TestNewCmdToken(t *testing.T) {
 		},
 		{
 			name:          "valid: delete from --kubeconfig",
-			args:          []string{"delete", "abcdef.1234567890123456", "--dry-run", "--kubeconfig=" + fullPath},
+			args:          []string{"delete", "abcdef.1234567890123456ghijklmn", "--dry-run", "--kubeconfig=" + fullPath},
 			configToWrite: testConfigToken,
 			expectedError: false,
 		},
 		{
 			name:          "valid: delete from " + clientcmd.RecommendedConfigPathEnvVar,
-			args:          []string{"delete", "abcdef.1234567890123456", "--dry-run"},
+			args:          []string{"delete", "abcdef.1234567890123456ghijklmn", "--dry-run"},
 			configToWrite: testConfigToken,
 			kubeConfigEnv: fullPath,
 			expectedError: false,
@@ -328,7 +328,7 @@ func TestRunDeleteTokens(t *testing.T) {
 
 	// test valid; should not fail
 	// for some reason Secrets().Delete() does not fail even for this dummy config
-	if err = RunDeleteTokens(&buf, client, []string{"abcdef.1234567890123456", "abcdef.2345678901234567"}); err != nil {
+	if err = RunDeleteTokens(&buf, client, []string{"abcdef.123456789012345678901234", "abcdef.234567890123456789012345"}); err != nil {
 		t.Errorf("RunDeleteToken() failed for a valid token: %v", err)
 	}
 

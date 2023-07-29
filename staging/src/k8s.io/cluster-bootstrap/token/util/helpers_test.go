@@ -90,11 +90,11 @@ func TestIsValidBootstrapToken(t *testing.T) {
 		{token: "123456.AABBCCDDEEFFGGHH", expected: false},  // invalid token secret
 		{token: "123456.AABBCCD-EEFFGGHH", expected: false},  // invalid character
 		{token: "abc*ef.1234567890123456", expected: false},  // invalid character
-		{token: "abcdef.1234567890123456", expected: true},
-		{token: "123456.aabbccddeeffgghh", expected: true},
+		{token: "abcdef.1234567890123456ghijklmn", expected: true},
+		{token: "123456.aabbccddeeffgghhiijjkkll", expected: true},
 		{token: "ABCDEF.abcdef0123456789", expected: false},
-		{token: "abcdef.abcdef0123456789", expected: true},
-		{token: "123456.1234560123456789", expected: true},
+		{token: "abcdef.abcdef0123456789ghijklmn", expected: true},
+		{token: "123456.1234560123456789ghijklmn", expected: true},
 	}
 	for _, rt := range tests {
 		actual := IsValidBootstrapToken(rt.token)

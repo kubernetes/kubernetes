@@ -37,8 +37,8 @@ const (
 	// string that matches the regexp `^([a-z0-9]{6})$`. Required.
 	BootstrapTokenIDKey = "token-id"
 
-	// BootstrapTokenSecretKey is the actual secret. It must be a random 16 character
-	// string that matches the regexp `^([a-z0-9]{16})$`. Required.
+	// BootstrapTokenSecretKey is the actual secret. It must be a random 24 character
+	// string that matches the regexp `^([a-z0-9]{24})$`. Required.
 	BootstrapTokenSecretKey = "token-secret"
 
 	// BootstrapTokenExpirationKey is when this token should be expired and no

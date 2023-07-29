@@ -66,7 +66,7 @@ localAPIEndpoint:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
 bootstrapTokens:
-- token: ce3aa5.5ec8455bb76b379f
+- token: ce3aa5.5ec8455bb76b379fabcdefgh
   ttl: 24h
 ---
 apiVersion: %[1]s

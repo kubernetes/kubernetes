@@ -283,7 +283,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
+			    token: abcdef.0123456789abcdef12345678
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
 			`, gv)),
@@ -317,7 +317,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
+			    token: abcdef.0123456789abcdef12345678
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
 			`, gv)),
@@ -338,7 +338,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
+			    token: abcdef.0123456789abcdef12345678
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
 			`, gv)),
@@ -362,7 +362,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
+			    token: abcdef.0123456789abcdef12345678
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
 			`, gv)),
@@ -386,7 +386,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
+			    token: abcdef.0123456789abcdef12345678
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
 			---
