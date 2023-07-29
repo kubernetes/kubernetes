@@ -32,6 +32,15 @@ func isSupportedQoSComputeResource(name v1.ResourceName) bool {
 	return supportedQoSComputeResources.Has(string(name))
 }
 
+// PodQOSClass returns the QoS class of a pod persisted in the PodStatus.
+// If QOSClass is empty, it returns value of GetPodQOS() which computes pod's QoS class.
+func PodQOSClass(pod *v1.Pod) v1.PodQOSClass {
+	if pod.Status.QOSClass != "" {
+		return pod.Status.QOSClass
+	}
+	return GetPodQOS(pod)
+}
+
 // GetPodQOS returns the QoS class of a pod.
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.

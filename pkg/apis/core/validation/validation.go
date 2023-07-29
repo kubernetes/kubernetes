@@ -4785,19 +4785,8 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		return allErrs
 	}
 
-	//TODO(vinaykul,InPlacePodVerticalScaling): With KEP 2527, we can rely on persistence of PodStatus.QOSClass
-	// We can use PodStatus.QOSClass instead of GetPodQOS here, in kubelet, and elsewhere, as PodStatus.QOSClass
-	// does not change once it is bootstrapped in podCreate. This needs to be addressed before beta as a
-	// separate PR covering all uses of GetPodQOS. With that change, we can drop the below block.
-	// Ref: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r1093790446
-	// Ref: https://github.com/kubernetes/kubernetes/pull/102884/#discussion_r663280487
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// reject attempts to change pod qos
-		oldQoS := qos.GetPodQOS(oldPod)
-		newQoS := qos.GetPodQOS(newPod)
-		if newQoS != oldQoS {
-			allErrs = append(allErrs, field.Invalid(fldPath, newQoS, "Pod QoS is immutable"))
-		}
+	if qos.PodQOSClass(oldPod) != qos.GetPodQOS(newPod) {
+		allErrs = append(allErrs, field.Invalid(fldPath, newPod.Status.QOSClass, "Pod QoS is immutable"))
 	}
 
 	// handle updateable fields by munging those fields prior to deep equal comparison.
