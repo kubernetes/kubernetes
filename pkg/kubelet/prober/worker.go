@@ -265,6 +265,16 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		return false
 	}
 
+	if w.container.StartupProbe != nil && w.probeType != startup {
+		result, ok := w.probeManager.startupManager.Get(w.containerID)
+		if !ok || result != results.Success {
+			// Either the container has not been created yet, or it was deleted.
+			klog.V(3).InfoS("Startup probe target container not found or not successful",
+				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
+			return true // Wait for more information.
+		}
+	}
+
 	// Probe disabled for InitialDelaySeconds.
 	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
 		return true

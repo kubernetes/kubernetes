@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -491,4 +492,30 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
+}
+
+func TestStartupProbeDefinedProbeDelays(t *testing.T) {
+	ctx := context.Background()
+	m := newTestManager()
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
+
+	w.container = v1.Container{
+		Name: testContainerName,
+		StartupProbe: &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				Exec: &v1.ExecAction{
+					Command: []string{"echo", "hello"},
+				},
+			},
+		},
+	}
+
+	reflect.DeepEqual(w.doProbe(ctx), true)
+
+	m.startupManager.Set(testContainerID, results.Failure, w.pod)
+	reflect.DeepEqual(w.doProbe(ctx), true)
+
+	m.startupManager.Set(testContainerID, results.Success, w.pod)
+	reflect.DeepEqual(w.doProbe(ctx), false)
 }
