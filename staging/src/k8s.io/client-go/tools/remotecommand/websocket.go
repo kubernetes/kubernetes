@@ -55,10 +55,6 @@ var (
 		v1.StreamTypeError:  remotecommand.StreamErr,
 		v1.StreamTypeResize: remotecommand.StreamResize,
 	}
-	streamType3streamID = map[string]byte{
-		v1.StreamTypeData:  0,
-		v1.StreamTypeError: 1,
-	}
 )
 
 const (
@@ -154,7 +150,7 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 				panicChan <- p
 			}
 		}()
-		creator := NewWSStreamCreator(conn)
+		creator := NewWSStreamCreator(conn, streamType2streamID)
 		go creator.ReadDemuxLoop(
 			e.upgrader.DataBufferSize(),
 			e.heartbeatPeriod,
@@ -184,16 +180,18 @@ func IsUpgradeFailure(err error) bool {
 }
 
 type WSStreamCreator struct {
-	conn      *gwebsocket.Conn
-	connMu    sync.Mutex
-	streams   map[byte]*stream
-	streamsMu sync.Mutex
+	conn        *gwebsocket.Conn
+	connMu      sync.Mutex
+	streams     map[byte]*stream
+	streamsMu   sync.Mutex
+	streamIDMap map[string]byte
 }
 
-func NewWSStreamCreator(conn *gwebsocket.Conn) *WSStreamCreator {
+func NewWSStreamCreator(conn *gwebsocket.Conn, streamIDMap map[string]byte) *WSStreamCreator {
 	return &WSStreamCreator{
-		conn:    conn,
-		streams: map[byte]*stream{},
+		conn:        conn,
+		streams:     map[byte]*stream{},
+		streamIDMap: streamIDMap,
 	}
 }
 
@@ -213,7 +211,7 @@ func (c *WSStreamCreator) setStream(id byte, s *stream) {
 // Returns a Stream structure or nil and an error if one occurred.
 func (c *WSStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, error) {
 	streamType := headers.Get(v1.StreamType)
-	id, ok := streamType3streamID[streamType]
+	id, ok := c.streamIDMap[streamType]
 	if !ok {
 		return nil, fmt.Errorf("unknown stream type: %s", streamType)
 	}
@@ -305,6 +303,12 @@ func (c *WSStreamCreator) ReadDemuxLoop(bufferSize int, period time.Duration, de
 			}
 		}
 	}
+}
+
+func (c *WSStreamCreator) Close() {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	c.conn.Close()
 }
 
 // closeAllStreamReaders closes readers in all streams.

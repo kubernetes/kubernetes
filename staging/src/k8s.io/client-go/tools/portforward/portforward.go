@@ -591,7 +591,13 @@ func (pf *PortForwarderWS) handleConnection(conn net.Conn, port ForwardedPort) {
 		runtime.HandleError(err)
 		return
 	}
+	defer func() {
+		ws.Close()
+	}()
+
+	readyCh := make(chan struct{})
 	go func() {
+		<-readyCh
 		ws.ReadDemuxLoop(32*1024, 3*time.Second, 15*time.Second)
 	}()
 
@@ -660,6 +666,7 @@ func (pf *PortForwarderWS) handleConnection(conn net.Conn, port ForwardedPort) {
 		}
 	}()
 
+	close(readyCh)
 	// wait for either a local->remote error or for copying from remote->local to finish
 	select {
 	case <-remoteDone:
@@ -668,6 +675,9 @@ func (pf *PortForwarderWS) handleConnection(conn net.Conn, port ForwardedPort) {
 
 	// always expect something on errorChan (it may be nil)
 	err = <-errorChan
+	if err == nil {
+		return
+	}
 	if err != nil {
 		runtime.HandleError(err)
 	}

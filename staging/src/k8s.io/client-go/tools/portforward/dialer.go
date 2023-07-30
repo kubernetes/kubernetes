@@ -7,11 +7,20 @@ import (
 	"net/url"
 	"strconv"
 
+	v1 "k8s.io/api/core/v1"
+
 	"k8s.io/client-go/tools/remotecommand"
 
 	"k8s.io/client-go/transport/websocket"
 
 	restclient "k8s.io/client-go/rest"
+)
+
+var (
+	streamType3streamID = map[string]byte{
+		v1.StreamTypeData:  0,
+		v1.StreamTypeError: 1,
+	}
 )
 
 type PortForwardWSDialer struct {
@@ -52,5 +61,5 @@ func (d *PortForwardWSDialer) Dial(port uint16, protocols ...string) (*remotecom
 		panic(fmt.Errorf("websocket connection is nil"))
 	}
 
-	return remotecommand.NewWSStreamCreator(conn), conn.Subprotocol(), nil
+	return remotecommand.NewWSStreamCreator(conn, streamType3streamID), conn.Subprotocol(), nil
 }
