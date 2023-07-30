@@ -61,6 +61,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.SecretList{}, func(obj interface{}) { SetObjectDefaults_SecretList(obj.(*v1.SecretList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Service{}, func(obj interface{}) { SetObjectDefaults_Service(obj.(*v1.Service)) })
 	scheme.AddTypeDefaultingFunc(&v1.ServiceList{}, func(obj interface{}) { SetObjectDefaults_ServiceList(obj.(*v1.ServiceList)) })
+	scheme.AddTypeDefaultingFunc(&v1.ServiceStatus{}, func(obj interface{}) { SetObjectDefaults_ServiceStatus(obj.(*v1.ServiceStatus)) })
 	return nil
 }
 
@@ -1089,4 +1090,8 @@ func SetObjectDefaults_ServiceList(in *v1.ServiceList) {
 		a := &in.Items[i]
 		SetObjectDefaults_Service(a)
 	}
+}
+
+func SetObjectDefaults_ServiceStatus(in *v1.ServiceStatus) {
+	SetDefaults_ServiceStatus(in)
 }

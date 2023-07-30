@@ -156,6 +156,19 @@ func SetDefaults_Service(obj *v1.Service) {
 	}
 
 }
+
+func SetDefaults_ServiceStatus(status *v1.ServiceStatus) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
+		ipMode := v1.LoadBalancerIPModeVIP
+
+		for i, ing := range status.LoadBalancer.Ingress {
+			if ing.IP != "" && ing.IPMode == nil {
+				status.LoadBalancer.Ingress[i].IPMode = &ipMode
+			}
+		}
+	}
+}
+
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
