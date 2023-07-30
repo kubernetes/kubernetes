@@ -151,7 +151,7 @@ func getOOMTargetContainerMultiProcess(name string) v1.Container {
 			"sh",
 			"-c",
 			// use the dd tool to attempt to allocate 20M in a block which exceeds the limit
-			"dd if=/dev/zero of=/dev/null bs=20M & sleep 86400",
+			"sleep 5 && dd if=/dev/zero of=/dev/null bs=20M & sleep 86400",
 		},
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
