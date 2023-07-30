@@ -137,12 +137,13 @@ kube::golang::verify_go_version
 export GO111MODULE=on
 
 # Install golangci-lint
-echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
+echo "installing golangci-lint and logcheck/extractcheck plugins from hack/tools into ${GOBIN}"
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
   go install github.com/golangci/golangci-lint/cmd/golangci-lint
   if [ "${golangci_config}" ]; then
     # This cannot be used without a config.
     go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+    go build -o "${GOBIN}/extractcheck.so" -buildmode=plugin ./extractcheck
   fi
 popd >/dev/null
 

@@ -29,6 +29,7 @@ issues:
 linters:
   disable-all: false # in contrast to golangci.yaml, the default set of linters remains enabled
   enable: # please keep this alphabetized and in sync with golangci.yaml
+    - extractcheck
     - ginkgolinter
     - gocritic
     - govet
@@ -45,6 +46,10 @@ linters-settings: # please keep this alphabetized
       path: ../_output/local/bin/logcheck.so
       description: structured logging checker
       original-url: k8s.io/logtools/logcheck
+    extractcheck:
+      # Installed there by hack/verify-golangci-lint.sh.
+      path: ../_output/local/bin/extractcheck.so
+      description: SSA extract checker
   gocritic:
   staticcheck:
     checks:
