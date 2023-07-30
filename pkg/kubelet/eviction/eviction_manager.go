@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -57,6 +59,8 @@ const (
 	// signalEmptyDirFsLimit is amount of storage available on filesystem requested by an emptyDir
 	signalEmptyDirFsLimit string = "emptydirfs.limit"
 )
+
+const instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/eviction"
 
 // managerImpl implements Manager
 type managerImpl struct {
@@ -102,6 +106,8 @@ type managerImpl struct {
 	thresholdsLastUpdated time.Time
 	// whether can support local storage capacity isolation
 	localStorageCapacityIsolation bool
+	// OpenTelemetry Tracer
+	tracer trace.Tracer
 }
 
 // ensure it implements the required interface
@@ -118,7 +124,9 @@ func NewManager(
 	nodeRef *v1.ObjectReference,
 	clock clock.WithTicker,
 	localStorageCapacityIsolation bool,
+	tracerProvider trace.TracerProvider,
 ) (Manager, lifecycle.PodAdmitHandler) {
+	tracer := tracerProvider.Tracer(instrumentationScope)
 	manager := &managerImpl{
 		clock:                         clock,
 		killPodFunc:                   killPodFunc,
@@ -134,6 +142,7 @@ func NewManager(
 		splitContainerImageFs:         nil,
 		thresholdNotifiers:            []ThresholdNotifier{},
 		localStorageCapacityIsolation: localStorageCapacityIsolation,
+		tracer:                        tracer,
 	}
 	return manager, manager
 }
@@ -602,6 +611,13 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
+	_, otelSpan := m.tracer.Start(nil, "Eviction/EvictPod", trace.WithAttributes(
+		attribute.String("k8s.pod.uid", string(pod.UID)),
+		attribute.String("k8s.pod", klog.KObj(pod).String()),
+		attribute.String("k8s.pod.name", pod.Name),
+		attribute.String("k8s.namespace.name", pod.Namespace),
+	))
+	defer otelSpan.End()
 	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
 		status.Phase = v1.PodFailed
 		status.Reason = Reason
