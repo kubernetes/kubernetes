@@ -67,20 +67,20 @@ run_clusterroles_tests() {
   output_message=$(! kubectl get clusterrolebinding super-admin 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'clusterrolebindings.rbac.authorization.k8s.io "super-admin" not found'
   # Dry-run test `kubectl create clusterrolebinding`
-  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --dry-run=client --clusterrole=admin --user=super-admin
-  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --dry-run=server --clusterrole=admin --user=super-admin
+  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --dry-run=client --clusterrole=admin --user-to-bind=super-admin
+  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --dry-run=server --clusterrole=admin --user-to-bind=super-admin
   output_message=$(! kubectl get clusterrolebinding super-admin 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'clusterrolebindings.rbac.authorization.k8s.io "super-admin" not found'
   # test `kubectl create clusterrolebinding`
   # test `kubectl set subject clusterrolebinding`
-  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --clusterrole=admin --user=super-admin
+  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --clusterrole=admin --user-to-bind=super-admin
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
-  kubectl set subject --dry-run=client "${kube_flags[@]}" clusterrolebinding super-admin --user=foo
-  kubectl set subject --dry-run=server "${kube_flags[@]}" clusterrolebinding super-admin --user=foo
+  kubectl set subject --dry-run=client "${kube_flags[@]}" clusterrolebinding super-admin --user-to-bind=foo
+  kubectl set subject --dry-run=server "${kube_flags[@]}" clusterrolebinding super-admin --user-to-bind=foo
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
-  kubectl set subject "${kube_flags[@]}" clusterrolebinding super-admin --user=foo
+  kubectl set subject "${kube_flags[@]}" clusterrolebinding super-admin --user-to-bind=foo
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:foo:'
-  kubectl create "${kube_flags[@]}" clusterrolebinding multi-users --clusterrole=admin --user=user-1 --user=user-2
+  kubectl create "${kube_flags[@]}" clusterrolebinding multi-users --clusterrole=admin --user-to-bind=user-1 --user-to-bind=user-2
   kube::test::get_object_assert clusterrolebinding/multi-users "{{range.subjects}}{{.name}}:{{end}}" 'user-1:user-2:'
 
   kubectl create "${kube_flags[@]}" clusterrolebinding super-group --clusterrole=admin --group=the-group
@@ -98,21 +98,21 @@ run_clusterroles_tests() {
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
 
   # test `kubectl set subject clusterrolebinding --all`
-  kubectl set subject "${kube_flags[@]}" clusterrolebinding --all --user=test-all-user
+  kubectl set subject "${kube_flags[@]}" clusterrolebinding --all --user-to-bind=test-all-user
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:foo:test-all-user:'
   kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'
 
   # test `kubectl create rolebinding`
   # test `kubectl set subject rolebinding`
-  kubectl create "${kube_flags[@]}" rolebinding admin --dry-run=client --clusterrole=admin --user=default-admin
-  kubectl create "${kube_flags[@]}" rolebinding admin --dry-run=server --clusterrole=admin --user=default-admin
+  kubectl create "${kube_flags[@]}" rolebinding admin --dry-run=client --clusterrole=admin --user-to-bind=default-admin
+  kubectl create "${kube_flags[@]}" rolebinding admin --dry-run=server --clusterrole=admin --user-to-bind=default-admin
   output_message=$(! kubectl get rolebinding/admin 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" ' not found'
-  kubectl create "${kube_flags[@]}" rolebinding admin --clusterrole=admin --user=default-admin
+  kubectl create "${kube_flags[@]}" rolebinding admin --clusterrole=admin --user-to-bind=default-admin
   kube::test::get_object_assert rolebinding/admin "{{.roleRef.kind}}" 'ClusterRole'
   kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:'
-  kubectl set subject "${kube_flags[@]}" rolebinding admin --user=foo
+  kubectl set subject "${kube_flags[@]}" rolebinding admin --user-to-bind=foo
   kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:foo:'
 
   kubectl create "${kube_flags[@]}" rolebinding localrole --role=localrole --group=the-group
@@ -129,7 +129,7 @@ run_clusterroles_tests() {
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
 
   # test `kubectl set subject rolebinding --all`
-  kubectl set subject "${kube_flags[@]}" rolebinding --all --user=test-all-user
+  kubectl set subject "${kube_flags[@]}" rolebinding --all --user-to-bind=test-all-user
   kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:foo:test-all-user:'
   kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'

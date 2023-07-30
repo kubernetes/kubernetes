@@ -46,10 +46,10 @@ var (
 	kubectl set subject clusterrolebinding admin --serviceaccount=namespace:serviceaccount1
 
 	# Update a role binding for user1, user2, and group1
-	kubectl set subject rolebinding admin --user=user1 --user=user2 --group=group1
+	kubectl set subject rolebinding admin --user-to-bind=user1 --user-to-bind=user2 --group=group1
 
 	# Print the result (in YAML format) of updating rolebinding subjects from a local, without hitting the server
-	kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run=client | kubectl set subject --local -f - --user=foo -o yaml`)
+	kubectl create rolebinding admin --role=admin --user-to-bind=admin -o yaml --dry-run=client | kubectl set subject --local -f - --user-to-bind=foo -o yaml`)
 )
 
 type updateSubjects func(existings []rbacv1.Subject, targets []rbacv1.Subject) (bool, []rbacv1.Subject)
@@ -94,7 +94,7 @@ func NewSubjectOptions(streams genericiooptions.IOStreams) *SubjectOptions {
 func NewCmdSubject(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewSubjectOptions(streams)
 	cmd := &cobra.Command{
-		Use:                   "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
+		Use:                   "subject (-f FILENAME | TYPE NAME) [--user-to-bind=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Update the user, group, or service account in a role binding or cluster role binding"),
 		Long:                  subjectLong,
@@ -114,6 +114,8 @@ func NewCmdSubject(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set subject will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the role")
+	cmd.Flags().MarkDeprecated("user", "due to the conflict with global options. Will be deleted in 1.31. Use --user-to-bind.")
+	cmd.Flags().StringArrayVar(&o.Users, "user-to-bind", o.Users, "Usernames to bind to the role")
 	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the role")
 	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the role")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-set")

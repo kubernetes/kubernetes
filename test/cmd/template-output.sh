@@ -170,7 +170,7 @@ EOF
   kube::test::if_has_string "${output_message}" 'valid-pod:'
 
   # check that "set subject" command supports --template output
-  output_message=$(kubectl "${kube_flags[@]:?}" set subject clusterrolebinding/foo --user=foo --dry-run=client --template="{{ .metadata.name }}:")
+  output_message=$(kubectl "${kube_flags[@]:?}" set subject clusterrolebinding/foo --user-to-bind=foo --dry-run=client --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'foo:'
 
   # check that "create secret docker-registry" command supports --template output

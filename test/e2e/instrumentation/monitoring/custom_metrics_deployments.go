@@ -248,7 +248,7 @@ func createClusterAdminBinding() error {
 	}
 	serviceAccount := strings.TrimSpace(stdout)
 	framework.Logf("current service account: %q", serviceAccount)
-	stat, err := e2ekubectl.RunKubectl("", "create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
+	stat, err := e2ekubectl.RunKubectl("", "create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user-to-bind="+serviceAccount)
 	framework.Logf(stat)
 	return err
 }

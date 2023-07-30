@@ -42,7 +42,7 @@ var (
 
 	roleBindingExample = templates.Examples(i18n.T(`
 		# Create a role binding for user1, user2, and group1 using the admin cluster role
-		kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1
+		kubectl create rolebinding admin --clusterrole=admin --user-to-bind=user1 --user-to-bind=user2 --group=group1
 
 		# Create a role binding for serviceaccount monitoring:sa-dev using the admin role
 		kubectl create rolebinding admin-binding --role=admin --serviceaccount=monitoring:sa-dev`))
@@ -87,7 +87,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericiooptions.IOStr
 	o := NewRoleBindingOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
+		Use:                   "rolebinding NAME --clusterrole=NAME|--role=NAME [--user-to-bind=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a role binding for a particular role or cluster role"),
 		Long:                  roleBindingLong,
@@ -107,6 +107,8 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericiooptions.IOStr
 	cmd.Flags().StringVar(&o.ClusterRole, "clusterrole", "", i18n.T("ClusterRole this RoleBinding should reference"))
 	cmd.Flags().StringVar(&o.Role, "role", "", i18n.T("Role this RoleBinding should reference"))
 	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the role. The flag can be repeated to add multiple users.")
+	cmd.Flags().MarkDeprecated("user", "due to the conflict with global options. Will be deleted in 1.31. Use --user-to-bind.")
+	cmd.Flags().StringArrayVar(&o.Users, "user-to-bind", o.Users, "Usernames to bind to the role. The flag can be repeated to add multiple users.")
 	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the role. The flag can be repeated to add multiple groups.")
 	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the role, in the format <namespace>:<name>. The flag can be repeated to add multiple service accounts.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
