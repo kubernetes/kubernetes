@@ -297,7 +297,7 @@ function install-node-problem-detector {
   fi
 
   echo "Downloading ${npd_tar}."
-  local -r npd_release_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-https://dl.k8s.io}"
+  local -r npd_release_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-https://storage.googleapis.com/kubernetes-release}"
   download-or-bust "${npd_hash}" "${npd_release_path}/node-problem-detector/${npd_tar}"
   local -r npd_dir="${KUBE_HOME}/node-problem-detector"
   mkdir -p "${npd_dir}"
