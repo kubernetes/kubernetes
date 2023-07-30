@@ -19,7 +19,6 @@ package portforward
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -37,7 +36,6 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/util"
@@ -132,11 +130,15 @@ type defaultPortForwarder struct {
 }
 
 func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
-	transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
+	/*transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
 	if err != nil {
 		return err
 	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)*/
+	dialer, err := portforward.NewDialer(opts.Config, url, method)
+	if err != nil {
+		return err
+	}
 	fw, err := portforward.NewOnAddresses(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
 	if err != nil {
 		return err

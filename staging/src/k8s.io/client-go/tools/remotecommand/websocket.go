@@ -45,7 +45,7 @@ const writeDeadline = 2 * time.Second
 
 var (
 	_ Executor          = &wsStreamExecutor{}
-	_ streamCreator     = &wsStreamCreator{}
+	_ streamCreator     = &WSStreamCreator{}
 	_ httpstream.Stream = &stream{}
 
 	streamType2streamID = map[string]byte{
@@ -54,6 +54,10 @@ var (
 		v1.StreamTypeStderr: remotecommand.StreamStdErr,
 		v1.StreamTypeError:  remotecommand.StreamErr,
 		v1.StreamTypeResize: remotecommand.StreamResize,
+	}
+	streamType3streamID = map[string]byte{
+		v1.StreamTypeData:  0,
+		v1.StreamTypeError: 1,
 	}
 )
 
@@ -150,8 +154,8 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 				panicChan <- p
 			}
 		}()
-		creator := newWSStreamCreator(conn)
-		go creator.readDemuxLoop(
+		creator := NewWSStreamCreator(conn)
+		go creator.ReadDemuxLoop(
 			e.upgrader.DataBufferSize(),
 			e.heartbeatPeriod,
 			e.heartbeatDeadline,
@@ -179,27 +183,27 @@ func IsUpgradeFailure(err error) bool {
 	return errors.As(err, &upgradeErr)
 }
 
-type wsStreamCreator struct {
+type WSStreamCreator struct {
 	conn      *gwebsocket.Conn
 	connMu    sync.Mutex
 	streams   map[byte]*stream
 	streamsMu sync.Mutex
 }
 
-func newWSStreamCreator(conn *gwebsocket.Conn) *wsStreamCreator {
-	return &wsStreamCreator{
+func NewWSStreamCreator(conn *gwebsocket.Conn) *WSStreamCreator {
+	return &WSStreamCreator{
 		conn:    conn,
 		streams: map[byte]*stream{},
 	}
 }
 
-func (c *wsStreamCreator) getStream(id byte) *stream {
+func (c *WSStreamCreator) getStream(id byte) *stream {
 	c.streamsMu.Lock()
 	defer c.streamsMu.Unlock()
 	return c.streams[id]
 }
 
-func (c *wsStreamCreator) setStream(id byte, s *stream) {
+func (c *WSStreamCreator) setStream(id byte, s *stream) {
 	c.streamsMu.Lock()
 	defer c.streamsMu.Unlock()
 	c.streams[id] = s
@@ -207,9 +211,9 @@ func (c *wsStreamCreator) setStream(id byte, s *stream) {
 
 // CreateStream uses id from passed headers to create a stream over "c.conn" connection.
 // Returns a Stream structure or nil and an error if one occurred.
-func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, error) {
+func (c *WSStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, error) {
 	streamType := headers.Get(v1.StreamType)
-	id, ok := streamType2streamID[streamType]
+	id, ok := streamType3streamID[streamType]
 	if !ok {
 		return nil, fmt.Errorf("unknown stream type: %s", streamType)
 	}
@@ -229,12 +233,12 @@ func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, 
 	return s, nil
 }
 
-// readDemuxLoop is the reading processor for this endpoint of the websocket
+// ReadDemuxLoop is the reading processor for this endpoint of the websocket
 // connection. This loop reads the connection, and demultiplexes the data
 // into one of the individual stream pipes (by checking the stream id). This
 // loop can *not* be run concurrently, because there can only be one websocket
 // connection reader at a time (a read mutex would provide no benefit).
-func (c *wsStreamCreator) readDemuxLoop(bufferSize int, period time.Duration, deadline time.Duration) {
+func (c *WSStreamCreator) ReadDemuxLoop(bufferSize int, period time.Duration, deadline time.Duration) {
 	// Initialize and start the ping/pong heartbeat.
 	h := newHeartbeat(c.conn, &c.connMu, period, deadline)
 	go h.start()
@@ -305,7 +309,7 @@ func (c *wsStreamCreator) readDemuxLoop(bufferSize int, period time.Duration, de
 
 // closeAllStreamReaders closes readers in all streams.
 // This unblocks all stream.Read() calls.
-func (c *wsStreamCreator) closeAllStreamReaders(err error) {
+func (c *WSStreamCreator) closeAllStreamReaders(err error) {
 	c.streamsMu.Lock()
 	defer c.streamsMu.Unlock()
 	for _, s := range c.streams {
