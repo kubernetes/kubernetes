@@ -903,7 +903,7 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 		}
 		secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
 		if err != nil {
-			klog.InfoS("Unable to retrieve pull secret, the image pull may not succeed.", "pod", klog.KObj(pod), "secret", klog.KObj(secret), "err", err)
+			klog.InfoS("Unable to retrieve pull secret, the image pull may not succeed.", "pod", klog.KObj(pod), "secret", fmt.Sprintf("%s/%s", pod.Namespace, secretRef.Name), "err", err)
 			failedPullSecrets = append(failedPullSecrets, secretRef.Name)
 			continue
 		}
