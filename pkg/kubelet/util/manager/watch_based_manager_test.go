@@ -500,6 +500,69 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	assert.True(t, apiequality.Semantic.DeepEqual(secret, obj))
 }
 
+func TestReflectorNotStoppedOnDelayedGet(t *testing.T) {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "name",
+			Namespace:       "ns",
+			ResourceVersion: "200",
+		},
+	}
+
+	fakeClient := &fake.Clientset{}
+	listReactor := func(a core.Action) (bool, runtime.Object, error) {
+		result := &v1.SecretList{
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: "200",
+			},
+			Items: []v1.Secret{*secret},
+		}
+
+		return true, result, nil
+	}
+
+	fakeClient.AddReactor("list", "secrets", listReactor)
+	fakeWatch := watch.NewFake()
+	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+
+	key := objectKey{namespace: "ns", name: "name"}
+	itemExists := func() (bool, error) {
+		store.lock.Lock()
+		defer store.lock.Unlock()
+		_, ok := store.items[key]
+		return ok, nil
+	}
+
+	reflectorRunning := func() bool {
+		store.lock.Lock()
+		defer store.lock.Unlock()
+		item := store.items[key]
+
+		item.lock.Lock()
+		defer item.lock.Unlock()
+		return !item.stopped
+	}
+
+	// AddReference should start reflector.
+	store.AddReference("ns", "name", "pod")
+	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
+		t.Errorf("item wasn't added to cache")
+	}
+
+	assert.True(t, reflectorRunning())
+
+	fakeClock.Step(30 * time.Second)
+	store.startRecycleIdleWatch()
+
+	// Reflector should already be running because starTime does not exceed maxIdleTime
+	assert.True(t, reflectorRunning())
+
+	obj, _ := store.Get("ns", "name")
+	assert.True(t, apiequality.Semantic.DeepEqual(secret, obj))
+}
+
 func TestRefMapHandlesReferencesCorrectly(t *testing.T) {
 	secret1 := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
