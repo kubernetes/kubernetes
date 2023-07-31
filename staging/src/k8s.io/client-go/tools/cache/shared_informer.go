@@ -646,36 +646,23 @@ func (s *sharedIndexInformer) OnAdd(obj interface{}, isInInitialList bool) {
 	// Invocation of this function is locked under s.blockDeltas, so it is
 	// save to distribute the notification
 	s.cacheMutationDetector.AddObject(obj)
-	s.processor.distribute(addNotification{newObj: obj, isInInitialList: isInInitialList}, false)
+	s.processor.distribute(addNotification{newObj: obj, isInInitialList: isInInitialList})
 }
 
 // Conforms to ResourceEventHandler
 func (s *sharedIndexInformer) OnUpdate(old, new interface{}) {
-	isSync := false
-
-	// If is a Sync event, isSync should be true
-	// If is a Replaced event, isSync is true if resource version is unchanged.
-	// If RV is unchanged: this is a Sync/Replaced event, so isSync is true
-
-	if accessor, err := meta.Accessor(new); err == nil {
-		if oldAccessor, err := meta.Accessor(old); err == nil {
-			// Events that didn't change resourceVersion are treated as resync events
-			// and only propagated to listeners that requested resync
-			isSync = accessor.GetResourceVersion() == oldAccessor.GetResourceVersion()
-		}
-	}
 
 	// Invocation of this function is locked under s.blockDeltas, so it is
 	// save to distribute the notification
 	s.cacheMutationDetector.AddObject(new)
-	s.processor.distribute(updateNotification{oldObj: old, newObj: new}, isSync)
+	s.processor.distribute(updateNotification{oldObj: old, newObj: new})
 }
 
 // Conforms to ResourceEventHandler
 func (s *sharedIndexInformer) OnDelete(old interface{}) {
 	// Invocation of this function is locked under s.blockDeltas, so it is
 	// save to distribute the notification
-	s.processor.distribute(deleteNotification{oldObj: old}, false)
+	s.processor.distribute(deleteNotification{oldObj: old})
 }
 
 // IsStopped reports whether the informer has already been stopped
@@ -772,20 +759,15 @@ func (p *sharedProcessor) removeListener(handle ResourceEventHandlerRegistration
 	return nil
 }
 
-func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
+func (p *sharedProcessor) distribute(obj interface{}) {
 	p.listenersLock.RLock()
 	defer p.listenersLock.RUnlock()
 
-	for listener, isSyncing := range p.listeners {
-		switch {
-		case !sync:
-			// non-sync messages are delivered to every listener
+	for listener, _ := range p.listeners {
+		
+			// sync messages & non-sync messages are delivered to every listener
 			listener.add(obj)
-		case isSyncing:
-			// sync messages are delivered to every syncing listener
-			listener.add(obj)
-		default:
-			// skipping a sync obj for a non-syncing listener
+		
 		}
 	}
 }
