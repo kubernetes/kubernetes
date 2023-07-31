@@ -281,7 +281,7 @@ name | architectures
   
   Users who were relying on Kubernetes' ability to migrate to an out-of-tree storage driver should complete
   that migration before the support for it is removed. ([#118303](https://github.com/kubernetes/kubernetes/pull/118303), [@carlory](https://github.com/carlory)) [SIG Storage]
-- KMSv1 is deprecated and will only receive security updates going forward. Use KMSv2 instead.  Set --feature-gates=KMSv1=true to use the deprecated KMSv1 feature. ([#119007](https://github.com/kubernetes/kubernetes/pull/119007), [@aramase](https://github.com/aramase)) [SIG API Machinery and Auth]
+- KMSv1 is deprecated and will only receive security updates going forward. Use KMSv2 instead. In the future, set --feature-gates=KMSv1=true to use the deprecated KMSv1 feature. ([#119007](https://github.com/kubernetes/kubernetes/pull/119007), [@aramase](https://github.com/aramase)) [SIG API Machinery and Auth]
 - The deprecated flag `--lock-object-namespace` and `--lock-object-name` have been removed from kube-scheduler. Please use `--leader-elect-resource-namespace` and `--leader-elect-resource-name` or ComponentConfig instead to configure those parameters. ([#119130](https://github.com/kubernetes/kubernetes/pull/119130), [@SataQiu](https://github.com/SataQiu)) [SIG Scheduling]
 
 ### API Change
