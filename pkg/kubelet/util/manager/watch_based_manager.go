@@ -58,6 +58,7 @@ type objectCacheItem struct {
 	// and protecting from closing stopCh multiple times.
 	lock           sync.Mutex
 	lastAccessTime time.Time
+	lastStartTime  time.Time
 	stopped        bool
 	immutable      bool
 	stopCh         chan struct{}
@@ -100,13 +101,13 @@ func (i *objectCacheItem) stopIfIdle(now time.Time, maxIdleTime time.Duration) b
 	// In case of overloaded kube-apiserver, if the list request is
 	// already being processed, all the work would lost and would have
 	// to be retried.
-	if !i.stopped && i.store.hasSynced() && now.After(i.lastAccessTime.Add(maxIdleTime)) {
+	if !i.stopped && i.store.hasSynced() && now.After(i.lastAccessTime.Add(maxIdleTime)) && now.After(i.lastStartTime.Add(maxIdleTime)) {
 		return i.stopThreadUnsafe()
 	}
 	return false
 }
 
-func (i *objectCacheItem) restartReflectorIfNeeded() {
+func (i *objectCacheItem) restartReflectorIfNeeded(startTiem time.Time) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 	if i.immutable || !i.stopped {
@@ -114,13 +115,14 @@ func (i *objectCacheItem) restartReflectorIfNeeded() {
 	}
 	i.stopCh = make(chan struct{})
 	i.stopped = false
-	go i.startReflector()
+	go i.startReflector(startTiem)
 }
 
-func (i *objectCacheItem) startReflector() {
+func (i *objectCacheItem) startReflector(startTiem time.Time) {
 	i.waitGroup.Wait()
 	i.waitGroup.Add(1)
 	defer i.waitGroup.Done()
+	i.lastStartTime = startTiem
 	i.reflector.Run(i.stopCh)
 }
 
@@ -241,7 +243,7 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 
 	// Don't start reflector if Kubelet is already shutting down.
 	if !c.stopped {
-		go item.startReflector()
+		go item.startReflector(c.clock.Now())
 	}
 	return item
 }
@@ -313,7 +315,7 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 
 	// Don't restart reflector if Kubelet is already shutting down.
 	if !c.isStopped() {
-		item.restartReflectorIfNeeded()
+		item.restartReflectorIfNeeded(c.clock.Now())
 	}
 	if err := wait.PollImmediate(10*time.Millisecond, time.Second, item.hasSynced); err != nil {
 		return nil, fmt.Errorf("failed to sync %s cache: %v", c.groupResource.String(), err)
