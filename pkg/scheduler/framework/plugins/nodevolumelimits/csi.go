@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -110,11 +109,13 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 
 	node := nodeInfo.Node()
 
-	// If CSINode doesn't exist, the predicate may read the limits from Node object
 	csiNode, err := pl.csiNodeLister.Get(node.Name)
 	if err != nil {
-		// TODO: return the error once CSINode is created by default (2 releases)
+		// This plugin is also used by the cluster-autoscaler, which doesn't support simulating CSINode
+		// objects now. If returning an error here, the cluster-autoscaler will fail to scale up the
+		// cluster. So we just log the error and return success in order to make autoscaling succeed.
 		klog.V(5).InfoS("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
+		return nil
 	}
 
 	newVolumes := make(map[string]string)
@@ -128,7 +129,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	}
 
 	// If the node doesn't have volume limits, the predicate will always be true
-	nodeVolumeLimits := getVolumeLimits(nodeInfo, csiNode)
+	nodeVolumeLimits := getVolumeLimits(csiNode)
 	if len(nodeVolumeLimits) == 0 {
 		return nil
 	}
@@ -230,7 +231,7 @@ func (pl *CSILimits) filterAttachableVolumes(
 		}
 
 		volumeUniqueName := fmt.Sprintf("%s/%s", driverName, volumeHandle)
-		volumeLimitKey := volumeutil.GetCSIAttachLimitKey(driverName)
+		volumeLimitKey := driverName
 		result[volumeUniqueName] = volumeLimitKey
 	}
 	return nil
@@ -272,7 +273,7 @@ func (pl *CSILimits) checkAttachableInlineVolume(vol *v1.Volume, csiNode *storag
 		return nil
 	}
 	volumeUniqueName := fmt.Sprintf("%s/%s", driverName, translatedPV.Spec.PersistentVolumeSource.CSI.VolumeHandle)
-	volumeLimitKey := volumeutil.GetCSIAttachLimitKey(driverName)
+	volumeLimitKey := driverName
 	result[volumeUniqueName] = volumeLimitKey
 	return nil
 }
@@ -393,17 +394,16 @@ func NewCSI(_ runtime.Object, handle framework.Handle, fts feature.Features) (fr
 	}, nil
 }
 
-func getVolumeLimits(nodeInfo *framework.NodeInfo, csiNode *storagev1.CSINode) map[v1.ResourceName]int64 {
-	// TODO: stop getting values from Node object in v1.18
-	nodeVolumeLimits := volumeLimits(nodeInfo)
-	if csiNode != nil {
-		for i := range csiNode.Spec.Drivers {
-			d := csiNode.Spec.Drivers[i]
-			if d.Allocatable != nil && d.Allocatable.Count != nil {
-				// TODO: drop GetCSIAttachLimitKey once we don't get values from Node object (v1.18)
-				k := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(d.Name))
-				nodeVolumeLimits[k] = int64(*d.Allocatable.Count)
-			}
+func getVolumeLimits(csiNode *storagev1.CSINode) map[v1.ResourceName]int64 {
+	nodeVolumeLimits := map[v1.ResourceName]int64{}
+	if csiNode == nil {
+		return nodeVolumeLimits
+	}
+	for i := range csiNode.Spec.Drivers {
+		d := csiNode.Spec.Drivers[i]
+		if d.Allocatable != nil && d.Allocatable.Count != nil {
+			k := v1.ResourceName(d.Name)
+			nodeVolumeLimits[k] = int64(*d.Allocatable.Count)
 		}
 	}
 	return nodeVolumeLimits
