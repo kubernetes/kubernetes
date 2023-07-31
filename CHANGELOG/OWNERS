@@ -15,11 +15,11 @@ approvers:
 reviewers:
   - release-managers
   - AnaMMedina21 # 1.28 Release Notes Shadow
-  - sanchita-07 # 1.28 Release Notes Lead
   - fsmunoz # 1.28 Release Notes Shadow
   - michaelfromyeg # 1.28 Release Notes Shadow
   - muddapu # 1.28 Release Notes Shadow
   - rashansmith # 1.28 Release Notes Shadow
+  - sanchita-07 # 1.28 Release Notes Lead
 labels:
   - sig/release
   - area/release-eng
