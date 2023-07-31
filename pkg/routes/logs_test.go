@@ -18,10 +18,62 @@ package routes
 
 import (
 	"fmt"
+	"github.com/emicklei/go-restful/v3"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestLogFileHandler(t *testing.T) {
+	oversizeFileName := fmt.Sprintf("%032768s", "a")
+	tests := []struct {
+		logpath      string
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			logpath:      oversizeFileName,
+			expectedCode: http.StatusNotFound,
+			expectedBody: "file not found\n",
+		},
+		{
+			logpath:      "..",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "unsupported logpath\n",
+		},
+		{
+			logpath:      "../logger/a",
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "unsupported logpath\n",
+		},
+	}
+
+	container := restful.NewContainer()
+	logs := Logs{}
+	logs.Install(container)
+
+	for _, tc := range tests {
+		request := httptest.NewRequest("GET", "/logs/"+tc.logpath, nil)
+		response := httptest.NewRecorder()
+		container.Dispatch(response, request)
+		if response.Code != tc.expectedCode {
+			t.Errorf("LogFileHandle failed expected status code %d actual %d", tc.expectedCode, response.Code)
+		}
+		if response.Body.String() != tc.expectedBody {
+			t.Errorf("LogFileHandle failed expected response body %q actualt %q", tc.expectedBody, response.Body.String())
+		}
+	}
+
+	emptyPath := "a/.."
+	request := httptest.NewRequest("GET", "/logs/"+emptyPath, nil)
+	response := httptest.NewRecorder()
+	container.Dispatch(response, request)
+	if response.Body.String() == "unsupported logpath\n" {
+		t.Errorf("emptyPath should be allowed")
+	}
+}
 
 func TestPreCheckLogFileNameLength(t *testing.T) {
 	// In windows, with long file name support enabled, file names can have up to 32,767 characters.
