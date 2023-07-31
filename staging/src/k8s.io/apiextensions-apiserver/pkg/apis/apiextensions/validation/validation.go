@@ -30,8 +30,13 @@ import (
 	celgo "github.com/google/cel-go/cel"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,12 +46,6 @@ import (
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/util/webhook"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
 var (
@@ -219,7 +218,7 @@ func ValidateCustomResourceDefinitionStoredVersions(storedVersions []string, ver
 	for _, v := range versions {
 		_, ok := storedVersionsMap[v.Name]
 		if v.Storage && !ok {
-			allErrs = append(allErrs, field.Invalid(fldPath, v, "must have the storage version "+v.Name))
+			allErrs = append(allErrs, field.Invalid(fldPath, storedVersions, "must have the storage version "+v.Name))
 		}
 		if ok {
 			delete(storedVersionsMap, v.Name)

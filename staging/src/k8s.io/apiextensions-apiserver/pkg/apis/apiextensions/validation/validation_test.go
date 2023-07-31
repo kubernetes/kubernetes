@@ -26,8 +26,6 @@ import (
 
 	"github.com/google/cel-go/cel"
 
-	"k8s.io/utils/pointer"
-
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -42,12 +40,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
+	"k8s.io/utils/pointer"
 )
 
 type validationMatch struct {
-	path      *field.Path
-	errorType field.ErrorType
-	contains  string
+	path           *field.Path
+	errorType      field.ErrorType
+	containsString string
 }
 
 func required(path ...string) validationMatch {
@@ -73,7 +72,12 @@ func forbidden(path ...string) validationMatch {
 }
 
 func (v validationMatch) matches(err *field.Error) bool {
-	return err.Type == v.errorType && err.Field == v.path.String() && strings.Contains(err.Error(), v.contains)
+	return err.Type == v.errorType && err.Field == v.path.String() && strings.Contains(err.Error(), v.containsString)
+}
+
+func (v validationMatch) contains(s string) validationMatch {
+	v.containsString = s
+	return v
 }
 
 func strPtr(s string) *string { return &s }
@@ -9433,6 +9437,100 @@ func TestSchemaHasDefaults(t *testing.T) {
 		if got := schemaHasDefaults(schema); got != expected {
 			t.Errorf("expected %v, got %v for: %s", expected, got, string(bs))
 		}
+	}
+}
+
+func TestValidateCustomResourceDefinitionStoredVersions(t *testing.T) {
+	tests := []struct {
+		name           string
+		versions       []string
+		storageVersion string
+		storedVersions []string
+		errors         []validationMatch
+	}{
+		{
+			name:           "one version",
+			versions:       []string{"v1"},
+			storageVersion: "v1",
+			storedVersions: []string{"v1"},
+		},
+		{
+			name:           "no stored version",
+			versions:       []string{"v1"},
+			storageVersion: "v1",
+			storedVersions: []string{},
+			errors: []validationMatch{
+				invalid("status", "storedVersions").contains("Invalid value: []string{}: must have at least one stored version"),
+			},
+		},
+		{
+			name:           "many versions",
+			versions:       []string{"v1alpha", "v1beta1", "v1"},
+			storageVersion: "v1",
+			storedVersions: []string{"v1alpha", "v1"},
+		},
+		{
+			name:           "missing stored versions",
+			versions:       []string{"v1beta1", "v1"},
+			storageVersion: "v1",
+			storedVersions: []string{"v1alpha", "v1beta1", "v1"},
+			errors: []validationMatch{
+				invalidIndex(0, "status", "storedVersions").contains("Invalid value: \"v1alpha\": must appear in spec.versions"),
+			},
+		},
+		{
+			name:           "missing storage versions",
+			versions:       []string{"v1alpha", "v1beta1", "v1"},
+			storageVersion: "v1",
+			storedVersions: []string{"v1alpha", "v1beta1"},
+			errors: []validationMatch{
+				invalid("status", "storedVersions").contains("Invalid value: []string{\"v1alpha\", \"v1beta1\"}: must have the storage version v1"),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		crd := &apiextensions.CustomResourceDefinition{
+			ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+			Spec: apiextensions.CustomResourceDefinitionSpec{
+				Group: "group.com",
+				Scope: "Cluster",
+				Names: apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+			},
+			Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: tc.storedVersions},
+		}
+		for _, version := range tc.versions {
+			v := apiextensions.CustomResourceDefinitionVersion{Name: version}
+			if tc.storageVersion == version {
+				v.Storage = true
+			}
+			crd.Spec.Versions = append(crd.Spec.Versions, v)
+		}
+
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateCustomResourceDefinitionStoredVersions(crd.Status.StoredVersions, crd.Spec.Versions, field.NewPath("status", "storedVersions"))
+			seenErrs := make([]bool, len(errs))
+
+			for _, expectedError := range tc.errors {
+				found := false
+				for i, err := range errs {
+					if expectedError.matches(err) && !seenErrs[i] {
+						found = true
+						seenErrs[i] = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("expected %v at %v, got %v", expectedError.errorType, expectedError.path.String(), errs)
+				}
+			}
+			for i, seen := range seenErrs {
+				if !seen {
+					t.Errorf("unexpected error: %v", errs[i])
+				}
+			}
+		})
 	}
 }
 
