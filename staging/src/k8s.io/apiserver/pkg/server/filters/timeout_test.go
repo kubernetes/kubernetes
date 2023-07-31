@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -415,8 +416,8 @@ func TestClientSideCancel(t *testing.T) {
 		time.Sleep(time.Second)
 		cancel()
 	}()
-	if _, err := client.Do(req); err == nil {
-		t.Fatalf("expected context canceled error")
+	if _, err := client.Do(req); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context canceled  error; got %v", err)
 	}
 
 	select {
