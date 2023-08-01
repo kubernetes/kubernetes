@@ -195,6 +195,9 @@ type TestContextType struct {
 	// KubeTestRepoConfigFile is a yaml file used for overriding registries for test images.
 	KubeTestRepoList string
 
+	// KubeTestImageRepository is the image repository where the test images are hosted, like "quay.io/openshift/community-e2e-images"
+	KubeTestImageRepository string
+
 	// SnapshotControllerPodName is the name used for identifying the snapshot controller pod.
 	SnapshotControllerPodName string
 
@@ -364,6 +367,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.E2EDockerConfigFile, "e2e-docker-config-file", "", "A docker credentials configuration file used which contains authorization token that can be used to pull images from certain private registries provided by the users. For more details refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub")
 	flags.StringVar(&TestContext.KubeTestRepoList, "kube-test-repo-list", "", "A yaml file used for overriding registries for test images. Alternatively, the KUBE_TEST_REPO_LIST env variable can be set.")
+	flags.StringVar(&TestContext.KubeTestImageRepository, "kube-test-repo", "", "The image repository where the test images are hosted, like \"quay.io/openshift/community-e2e-images\". Alternatively, the KUBE_TEST_REPO env variable can be set.")
 
 	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
 	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
@@ -467,8 +471,8 @@ func AfterReadingAllFlags(t *TestContextType) {
 
 	// These flags are not exposed via the normal command line flag set,
 	// therefore we have to use our own private one here.
-	if t.KubeTestRepoList != "" {
-		image.Init(t.KubeTestRepoList)
+	if len(t.KubeTestRepoList) > 0 || len(t.KubeTestImageRepository) > 0 {
+		image.Init(t.KubeTestRepoList, t.KubeTestImageRepository)
 	}
 	var fs flag.FlagSet
 	klog.InitFlags(&fs)
