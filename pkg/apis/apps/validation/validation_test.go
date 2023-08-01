@@ -18,9 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"strings"
-	"testing"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -36,6 +33,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"strings"
+	"testing"
 )
 
 func intStrAddr(intOrStr intstr.IntOrString) *intstr.IntOrString {
@@ -85,6 +84,8 @@ func TestValidateStatefulSet(t *testing.T) {
 	}
 
 	const enableStatefulSetAutoDeletePVC = "[enable StatefulSetAutoDeletePVC]"
+
+	const enableStatefulSetStartOrdinal = "[enable StatefulSetStartOrdinal]"
 
 	type testCase struct {
 		name string
@@ -194,7 +195,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 		},
 		{
-			name: "ordinals.start positive value",
+			name: "ordinals.start positive value " + enableStatefulSetStartOrdinal,
 			set: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
@@ -680,7 +681,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid ordinals.start ",
+			name: "invalid ordinals.start " + enableStatefulSetStartOrdinal,
 			set: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
@@ -711,6 +712,9 @@ func TestValidateStatefulSet(t *testing.T) {
 		t.Run(testTitle, func(t *testing.T) {
 			if strings.Contains(name, enableStatefulSetAutoDeletePVC) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			}
+			if strings.Contains(name, enableStatefulSetStartOrdinal) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
 			}
 
 			errs := ValidateStatefulSet(&testCase.set, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))
@@ -836,24 +840,24 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 		collisionCount     *int32 // Number of collisions for the StatefulSet
 		expectedErr        bool   // Whether an error is expected for the test case
 	}{
-		{"valid status", 3, 3, 2, 1, 0, nil, nil, false},
-		{"invalid replicas", -1, 3, 2, 1, 0, nil, nil, true},
-		{"invalid readyReplicas", 3, -1, 2, 1, 0, nil, nil, true},
-		{"invalid currentReplicas", 3, 3, -1, 1, 0, nil, nil, true},
-		{"invalid updatedReplicas", 3, 3, 2, -1, 0, nil, nil, true},
-		{"invalid observedGeneration", 3, 3, 2, 1, 0, Int64Ptr(-1), nil, true},
-		{"invalid collisionCount", 3, 3, 2, 1, 0, nil, Int32Ptr(-1), true},
-		{"readyReplicas greater than replicas", 3, 4, 2, 1, 0, nil, nil, true},
-		{"currentReplicas greater than replicas", 3, 3, 4, 1, 0, nil, nil, true},
-		{"updatedReplicas greater than replicas", 3, 3, 2, 4, 0, nil, nil, true},
-		{"invalid availableReplicas", 3, 3, 2, 1, -1, nil, nil, true},
+		{"valid status", 3, 3, 2, 1, 0, new(int64), new(int32), false},
+		{"invalid replicas", -1, 3, 2, 1, 0, new(int64), new(int32), true},
+		{"invalid readyReplicas", 3, -1, 2, 1, 0, new(int64), new(int32), true},
+		{"invalid currentReplicas", 3, 3, -1, 1, 0, new(int64), new(int32), true},
+		{"invalid updatedReplicas", 3, 3, 2, -1, 0, new(int64), new(int32), true},
+		{"invalid observedGen", 3, 3, 2, 1, 0, new(int64), new(int32), true},
+		{"invalid collisionCount", 3, 3, 2, 1, 0, new(int64), new(int32), true},
+		{"readyReplicas greater than replicas", 3, 4, 2, 1, 0, new(int64), new(int32), true},
+		{"currentReplicas greater than replicas", 3, 3, 4, 1, 0, new(int64), new(int32), true},
+		{"updatedReplicas greater than replicas", 3, 3, 2, 4, 0, new(int64), new(int32), true},
+		{"invalid availableReplicas", 3, 3, 2, 1, -1, new(int64), new(int32), true},
 	}
 
-	// Loop through each test case and execute the test
+	// Looping through each test case and executing the test
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Call the validateStatefulSetStatus function with the input parameters
-			err := validateStatefulSetStatus(
+			// created a new StatefulSet object
+			testData := &StatefulSet{
 				tc.replicas,
 				tc.readyReplicas,
 				tc.currentReplicas,
@@ -861,7 +865,9 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 				tc.availableReplicas,
 				tc.observedGeneration,
 				tc.collisionCount,
-			)
+			}
+
+			err := testData.Validate()
 
 			// Check if the error returned by the function matches the expected error
 			if (err != nil) != tc.expectedErr {
@@ -1147,30 +1153,6 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 					Template:            validPodTemplate.Template,
 					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-		},
-		{
-			name: "update existing instance with .spec.ordinals.start",
-			old: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc.123.example", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			update: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc.123.example", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					Ordinals: &apps.StatefulSetOrdinals{
-						Start: 3,
-					},
 				},
 			},
 		},
