@@ -7,6 +7,7 @@
 package seccomp
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -245,8 +246,8 @@ const (
 )
 
 // ErrSyscallDoesNotExist represents an error condition where
-// libseccomp is unable to resolve the syscall
-var ErrSyscallDoesNotExist = fmt.Errorf("could not resolve syscall name")
+// libseccomp is unable to resolve the syscall.
+var ErrSyscallDoesNotExist = errors.New("could not resolve syscall name")
 
 const (
 	// Userspace notification response flags
@@ -556,7 +557,7 @@ func MakeCondition(arg uint, comparison ScmpCompareOp, values ...uint64) (ScmpCo
 	} else if len(values) > 2 {
 		return condStruct, fmt.Errorf("conditions can have at most 2 arguments (%d given)", len(values))
 	} else if len(values) == 0 {
-		return condStruct, fmt.Errorf("must provide at least one value to compare against")
+		return condStruct, errors.New("must provide at least one value to compare against")
 	}
 
 	condStruct.Argument = arg
@@ -611,7 +612,7 @@ func NewFilter(defaultAction ScmpAction) (*ScmpFilter, error) {
 
 	fPtr := C.seccomp_init(defaultAction.toNative())
 	if fPtr == nil {
-		return nil, fmt.Errorf("could not create filter")
+		return nil, errors.New("could not create filter")
 	}
 
 	filter := new(ScmpFilter)
@@ -623,7 +624,7 @@ func NewFilter(defaultAction ScmpAction) (*ScmpFilter, error) {
 	// If the kernel does not support TSYNC, allow us to continue without error.
 	if err := filter.setFilterAttr(filterAttrTsync, 0x1); err != nil && err != syscall.ENOTSUP {
 		filter.Release()
-		return nil, fmt.Errorf("could not create filter - error setting tsync bit: %v", err)
+		return nil, fmt.Errorf("could not create filter: error setting tsync bit: %w", err)
 	}
 
 	return filter, nil
@@ -695,14 +696,14 @@ func (f *ScmpFilter) Merge(src *ScmpFilter) error {
 	defer src.lock.Unlock()
 
 	if !src.valid || !f.valid {
-		return fmt.Errorf("one or more of the filter contexts is invalid or uninitialized")
+		return errors.New("one or more of the filter contexts is invalid or uninitialized")
 	}
 
 	// Merge the filters
 	if retCode := C.seccomp_merge(f.filterCtx, src.filterCtx); retCode != 0 {
 		e := errRc(retCode)
 		if e == syscall.EINVAL {
-			return fmt.Errorf("filters could not be merged due to a mismatch in attributes or invalid filter")
+			return fmt.Errorf("filters could not be merged due to a mismatch in attributes or invalid filter: %w", e)
 		}
 		return e
 	}

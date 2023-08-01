@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	schedulingv1client "k8s.io/client-go/kubernetes/typed/scheduling/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -67,11 +68,11 @@ type PriorityClassOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewPriorityClassOptions returns an initialized PriorityClassOptions instance
-func NewPriorityClassOptions(ioStreams genericclioptions.IOStreams) *PriorityClassOptions {
+func NewPriorityClassOptions(ioStreams genericiooptions.IOStreams) *PriorityClassOptions {
 	return &PriorityClassOptions{
 		Value:            0,
 		PreemptionPolicy: "PreemptLowerPriority",
@@ -81,7 +82,7 @@ func NewPriorityClassOptions(ioStreams genericclioptions.IOStreams) *PriorityCla
 }
 
 // NewCmdCreatePriorityClass is a macro command to create a new priorityClass.
-func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewPriorityClassOptions(ioStreams)
 
 	cmd := &cobra.Command{

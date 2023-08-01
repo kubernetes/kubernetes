@@ -54,12 +54,6 @@ func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccess
 	return allErrs
 }
 
-// ValidateSelfSubjectRulesReview validates a SelfSubjectRulesReview and returns an
-// ErrorList with any errors.
-func ValidateSelfSubjectRulesReview(review *authorizationapi.SelfSubjectRulesReview) field.ErrorList {
-	return field.ErrorList{}
-}
-
 // ValidateSubjectAccessReview validates a SubjectAccessReview and returns an
 // ErrorList with any errors.
 func ValidateSubjectAccessReview(sar *authorizationapi.SubjectAccessReview) field.ErrorList {

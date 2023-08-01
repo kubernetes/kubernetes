@@ -17,9 +17,10 @@ limitations under the License.
 package service
 
 import (
+	"sync"
+
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"sync"
 )
 
 const (
@@ -32,12 +33,26 @@ var register sync.Once
 // registerMetrics registers service-controller metrics.
 func registerMetrics() {
 	register.Do(func() {
+		legacyregistry.MustRegister(loadBalancerSyncCount)
 		legacyregistry.MustRegister(nodeSyncLatency)
+		legacyregistry.MustRegister(nodeSyncErrorCount)
 		legacyregistry.MustRegister(updateLoadBalancerHostLatency)
 	})
 }
 
 var (
+	loadBalancerSyncCount = metrics.NewCounter(&metrics.CounterOpts{
+		Name:           "loadbalancer_sync_total",
+		Subsystem:      subSystemName,
+		Help:           "A metric counting the amount of times any load balancer has been configured, as an effect of service/node changes on the cluster",
+		StabilityLevel: metrics.ALPHA,
+	})
+	nodeSyncErrorCount = metrics.NewCounter(&metrics.CounterOpts{
+		Name:           "nodesync_error_total",
+		Subsystem:      subSystemName,
+		Help:           "A metric counting the amount of times any load balancer has been configured and errored, as an effect of node changes on the cluster",
+		StabilityLevel: metrics.ALPHA,
+	})
 	nodeSyncLatency = metrics.NewHistogram(&metrics.HistogramOpts{
 		Name:      "nodesync_latency_seconds",
 		Subsystem: subSystemName,
@@ -46,7 +61,6 @@ var (
 		Buckets:        metrics.ExponentialBuckets(1, 2, 15),
 		StabilityLevel: metrics.ALPHA,
 	})
-
 	updateLoadBalancerHostLatency = metrics.NewHistogram(&metrics.HistogramOpts{
 		Name:      "update_loadbalancer_host_latency_seconds",
 		Subsystem: subSystemName,

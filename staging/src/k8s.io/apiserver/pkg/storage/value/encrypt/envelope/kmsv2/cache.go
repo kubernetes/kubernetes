@@ -29,6 +29,10 @@ import (
 	"k8s.io/utils/clock"
 )
 
+// simpleCache stores the decryption subset of value.Transformer (value.Read).
+// this statically enforces that transformers placed in the cache are not used for encryption.
+// this is relevant in the context of nonce collision since transformers that are created
+// from encrypted DEKs retrieved from etcd cannot maintain their nonce counter state.
 type simpleCache struct {
 	cache *utilcache.Expiring
 	ttl   time.Duration
@@ -38,8 +42,10 @@ type simpleCache struct {
 }
 
 func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
+	cache := utilcache.NewExpiringWithClock(clock)
+	cache.AllowExpiredGet = true // for a given key, the value (the decryptTransformer) is always the same
 	return &simpleCache{
-		cache: utilcache.NewExpiringWithClock(clock),
+		cache: cache,
 		ttl:   ttl,
 		hashPool: &sync.Pool{
 			New: func() interface{} {
@@ -50,16 +56,16 @@ func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
 }
 
 // given a key, return the transformer, or nil if it does not exist in the cache
-func (c *simpleCache) get(key []byte) value.Transformer {
+func (c *simpleCache) get(key []byte) value.Read {
 	record, ok := c.cache.Get(c.keyFunc(key))
 	if !ok {
 		return nil
 	}
-	return record.(value.Transformer)
+	return record.(value.Read)
 }
 
 // set caches the record for the key
-func (c *simpleCache) set(key []byte, transformer value.Transformer) {
+func (c *simpleCache) set(key []byte, transformer value.Read) {
 	if len(key) == 0 {
 		panic("key must not be empty")
 	}
@@ -86,5 +92,11 @@ func (c *simpleCache) keyFunc(s []byte) string {
 
 // toString performs unholy acts to avoid allocations
 func toString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
+	// unsafe.SliceData relies on cap whereas we want to rely on len
+	if len(b) == 0 {
+		return ""
+	}
+	// Copied from go 1.20.1 strings.Builder.String
+	// https://github.com/golang/go/blob/202a1a57064127c3f19d96df57b9f9586145e21c/src/strings/builder.go#L48
+	return unsafe.String(unsafe.SliceData(b), len(b))
 }

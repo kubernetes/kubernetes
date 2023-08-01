@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,7 +61,7 @@ type azureFileDeleter struct {
 	azureProvider                         azureCloudProvider
 }
 
-func (plugin *azureFilePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *azureFilePlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	azure, resourceGroup, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		klog.V(4).Infof("failed to get azure provider")
@@ -102,7 +101,7 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 	}
 }
 
-func (plugin *azureFilePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *azureFilePlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	azure, resourceGroup, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		klog.V(4).Infof("failed to get azure provider")

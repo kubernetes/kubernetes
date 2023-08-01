@@ -132,11 +132,12 @@ func (s *Struct) ToStringDict(d starlark.StringDict) {
 
 func (s *Struct) String() string {
 	buf := new(strings.Builder)
-	if s.constructor == Default {
+	switch constructor := s.constructor.(type) {
+	case starlark.String:
 		// NB: The Java implementation always prints struct
 		// even for Bazel provider instances.
-		buf.WriteString("struct") // avoid String()'s quotation
-	} else {
+		buf.WriteString(constructor.GoString()) // avoid String()'s quotation
+	default:
 		buf.WriteString(s.constructor.String())
 	}
 	buf.WriteByte('(')

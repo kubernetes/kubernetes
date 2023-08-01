@@ -18,7 +18,6 @@ package benchmark
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -119,7 +118,7 @@ func BenchmarkEncoding(b *testing.B) {
 				test(b, "json", prints)
 			})
 
-			b.Log(fmt.Sprintf("%s: file sizes: %v\n", path, fileSizes))
+			b.Logf("%s: file sizes: %v\n", path, fileSizes)
 		})
 		return nil
 	}); err != nil {
@@ -287,11 +286,11 @@ func generateOutput(b *testing.B, config loadGeneratorConfig, files ...*os.File)
 	b.Logf("Wrote %d log entries in %s -> %.1f/s", total, duration, float64(total)/duration.Seconds())
 	for i, file := range files {
 		if file != nil {
-			pos, err := file.Seek(0, os.SEEK_END)
+			pos, err := file.Seek(0, io.SeekEnd)
 			if err != nil {
 				b.Fatal(err)
 			}
-			if _, err := file.Seek(0, os.SEEK_SET); err != nil {
+			if _, err := file.Seek(0, io.SeekStart); err != nil {
 				b.Fatal(err)
 			}
 			max := 50

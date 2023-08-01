@@ -393,6 +393,33 @@ func TestSharedInformerErrorHandling(t *testing.T) {
 	close(stop)
 }
 
+// TestSharedInformerStartRace is a regression test to ensure there is no race between
+// Run and SetWatchErrorHandler, and Run and SetTransform.
+func TestSharedInformerStartRace(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	stop := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			// Set dummy functions, just to test for race
+			informer.SetTransform(func(i interface{}) (interface{}, error) {
+				return i, nil
+			})
+			informer.SetWatchErrorHandler(func(r *Reflector, err error) {
+			})
+		}
+	}()
+
+	go informer.Run(stop)
+
+	close(stop)
+}
+
 func TestSharedInformerTransformer(t *testing.T) {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
@@ -406,9 +433,8 @@ func TestSharedInformerTransformer(t *testing.T) {
 			name := pod.GetName()
 
 			if upper := strings.ToUpper(name); upper != name {
-				copied := pod.DeepCopyObject().(*v1.Pod)
-				copied.SetName(upper)
-				return copied, nil
+				pod.SetName(upper)
+				return pod, nil
 			}
 		}
 		return obj, nil

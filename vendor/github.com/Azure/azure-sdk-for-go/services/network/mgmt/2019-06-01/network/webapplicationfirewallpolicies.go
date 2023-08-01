@@ -146,7 +146,7 @@ func (client WebApplicationFirewallPoliciesClient) Delete(ctx context.Context, r
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.WebApplicationFirewallPoliciesClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.WebApplicationFirewallPoliciesClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -178,6 +178,7 @@ func (client WebApplicationFirewallPoliciesClient) DeletePreparer(ctx context.Co
 // http.Response Body if it receives an error.
 func (client WebApplicationFirewallPoliciesClient) DeleteSender(req *http.Request) (future WebApplicationFirewallPoliciesDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

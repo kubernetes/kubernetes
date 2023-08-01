@@ -43,7 +43,6 @@ type expansionStatus int
 
 const (
 	expansionSuccess = iota
-	expansionFailed
 	expansionFailedOnController
 	expansionFailedOnNode
 	expansionFailedMissingStagingPath
@@ -64,13 +63,13 @@ type recoveryTest struct {
 	pvcRequestSize          string
 	allocatedResource       string
 	simulatedCSIDriverError expansionStatus
-	expectedResizeStatus    v1.PersistentVolumeClaimResizeStatus
+	expectedResizeStatus    v1.ClaimResourceStatus
 	recoverySize            resource.Quantity
 }
 
 var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-expansion")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSI Volume expansion", func() {
@@ -201,7 +200,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 			})
 		}
 	})
-	ginkgo.Context("CSI online volume expansion with secret[Feature:CSINodeExpandSecret]", func() {
+	ginkgo.Context("CSI online volume expansion with secret", func() {
 		var stringSecret = map[string]string{
 			"username": "admin",
 			"password": "t0p-Secret",
@@ -274,12 +273,20 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
+				pvc, err = m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
+				if err != nil {
+					framework.Failf("failed to get pvc %s, %v", pvc.Name, err)
+				}
+				gomega.Expect(pvc.Spec.VolumeName).ShouldNot(gomega.BeEquivalentTo(""), "while provisioning a volume for resizing")
 				pv, err := m.cs.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
 				if err != nil {
 					framework.Failf("failed to get pv %s, %v", pvc.Spec.VolumeName, err)
 				}
 				if pv.Spec.CSI == nil || pv.Spec.CSI.NodeExpandSecretRef == nil {
 					framework.Fail("creating pv without 'NodeExpandSecretRef'")
+				}
+				if pv.Spec.CSI.NodeExpandSecretRef.Namespace != f.Namespace.Name || pv.Spec.CSI.NodeExpandSecretRef.Name != secretName {
+					framework.Failf("failed to set node expand secret ref, namespace: %s name: %s", pv.Spec.CSI.NodeExpandSecretRef.Namespace, pv.Spec.CSI.NodeExpandSecretRef.Name)
 				}
 
 				ginkgo.By("Expanding current pvc")
@@ -298,9 +305,14 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
 				framework.ExpectNoError(err, "While waiting for PV resize to finish")
 
+				ginkgo.By("Waiting for PVC resize to finish")
+				pvc, err = testsuites.WaitForFSResize(ctx, pvc, m.cs)
+				framework.ExpectNoError(err, "while waiting for PVC to finish")
+
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.Poll(time.Second, csiResizeWaitPeriod, func() (done bool, err error) {
-					_, index, err := compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
+					var index int
+					_, index, err = compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					if err != nil {
 						return true, err
 					}
@@ -315,10 +327,6 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					return false, nil
 				})
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
-
-				ginkgo.By("Waiting for PVC resize to finish")
-				pvc, err = testsuites.WaitForFSResize(ctx, pvc, m.cs)
-				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				pvcConditions := pvc.Status.Conditions
 				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
@@ -395,14 +403,14 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				pvcRequestSize:          "4Gi",
 				allocatedResource:       "4Gi",
 				simulatedCSIDriverError: expansionSuccess,
-				expectedResizeStatus:    v1.PersistentVolumeClaimNoExpansionInProgress,
+				expectedResizeStatus:    "",
 			},
 			{
 				name:                    "should allow recovery if controller expansion fails with final error",
 				pvcRequestSize:          "11Gi", // expansion to 11Gi will cause expansion to fail on controller
 				allocatedResource:       "11Gi",
 				simulatedCSIDriverError: expansionFailedOnController,
-				expectedResizeStatus:    v1.PersistentVolumeClaimControllerExpansionFailed,
+				expectedResizeStatus:    v1.PersistentVolumeClaimControllerResizeFailed,
 				recoverySize:            resource.MustParse("4Gi"),
 			},
 			{
@@ -410,7 +418,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				pvcRequestSize:          "9Gi", // expansion to 9Gi will cause expansion to fail on node
 				allocatedResource:       "9Gi",
 				simulatedCSIDriverError: expansionFailedOnNode,
-				expectedResizeStatus:    v1.PersistentVolumeClaimNodeExpansionFailed,
+				expectedResizeStatus:    v1.PersistentVolumeClaimNodeResizeFailed,
 				recoverySize:            resource.MustParse("5Gi"),
 			},
 		}
@@ -491,7 +499,7 @@ func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClai
 	// if expansion succeeded on controller but failed on the node
 	if test.simulatedCSIDriverError == expansionFailedOnNode {
 		ginkgo.By("Wait for expansion to fail on node again")
-		err = waitForResizeStatus(pvc, m.cs, v1.PersistentVolumeClaimNodeExpansionFailed)
+		err = waitForResizeStatus(pvc, m.cs, v1.PersistentVolumeClaimNodeResizeFailed)
 		framework.ExpectNoError(err, "While waiting for resize status to be set to expansion-failed-on-node")
 
 		ginkgo.By("verify allocated resources after recovery")
@@ -528,13 +536,13 @@ func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim
 		framework.Failf("expected allocated Resources to be %s got %s", expectedAllocatedResource.String(), allocatedResource.String())
 	}
 
-	resizeStatus := pvc.Status.ResizeStatus
-	gomega.Expect(resizeStatus).NotTo(gomega.BeNil(), "resize status should not be nil")
-	framework.ExpectEqual(*resizeStatus, v1.PersistentVolumeClaimNoExpansionInProgress, "resize status should be empty")
+	resizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
+	framework.ExpectEqual(resizeStatus, "", "resize status should be empty")
 }
 
-func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, expectedStates ...v1.PersistentVolumeClaimResizeStatus) error {
-	var actualResizeStatus *v1.PersistentVolumeClaimResizeStatus
+func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, expectedState v1.ClaimResourceStatus) error {
+	var actualResizeStatus *v1.ClaimResourceStatus
+
 	waitErr := wait.PollImmediate(resizePollInterval, csiResizeWaitPeriod, func() (bool, error) {
 		var err error
 		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
@@ -543,18 +551,11 @@ func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, e
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
 		}
 
-		actualResizeStatus = updatedPVC.Status.ResizeStatus
-		if actualResizeStatus != nil {
-			for _, s := range expectedStates {
-				if s == *actualResizeStatus {
-					return true, nil
-				}
-			}
-		}
-		return false, nil
+		actualResizeStatus := updatedPVC.Status.AllocatedResourceStatuses[v1.ResourceStorage]
+		return (actualResizeStatus == expectedState), nil
 	})
 	if waitErr != nil {
-		return fmt.Errorf("error while waiting for resize status to sync to %+v, actualStatus %s: %v", expectedStates, *actualResizeStatus, waitErr)
+		return fmt.Errorf("error while waiting for resize status to sync to %v, actualStatus %s: %v", expectedState, *actualResizeStatus, waitErr)
 	}
 	return nil
 }

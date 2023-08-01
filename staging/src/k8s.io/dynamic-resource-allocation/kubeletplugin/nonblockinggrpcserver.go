@@ -54,7 +54,7 @@ type endpoint struct {
 
 // startGRPCServer sets up the GRPC server on a Unix domain socket and spawns a goroutine
 // which handles requests for arbitrary services.
-func startGRPCServer(logger klog.Logger, grpcVerbosity int, interceptor grpc.UnaryServerInterceptor, endpoint endpoint, services ...registerService) (*grpcServer, error) {
+func startGRPCServer(logger klog.Logger, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, endpoint endpoint, services ...registerService) (*grpcServer, error) {
 	s := &grpcServer{
 		logger:        logger,
 		endpoint:      endpoint,
@@ -79,15 +79,13 @@ func startGRPCServer(logger klog.Logger, grpcVerbosity int, interceptor grpc.Una
 	// Run a gRPC server. It will close the listening socket when
 	// shutting down, so we don't need to do that.
 	var opts []grpc.ServerOption
-	var interceptors []grpc.UnaryServerInterceptor
+	var finalInterceptors []grpc.UnaryServerInterceptor
 	if grpcVerbosity >= 0 {
-		interceptors = append(interceptors, s.interceptor)
+		finalInterceptors = append(finalInterceptors, s.interceptor)
 	}
-	if interceptor != nil {
-		interceptors = append(interceptors, interceptor)
-	}
-	if len(interceptors) >= 0 {
-		opts = append(opts, grpc.ChainUnaryInterceptor(interceptors...))
+	finalInterceptors = append(finalInterceptors, interceptors...)
+	if len(finalInterceptors) >= 0 {
+		opts = append(opts, grpc.ChainUnaryInterceptor(finalInterceptors...))
 	}
 	s.server = grpc.NewServer(opts...)
 	for _, service := range services {

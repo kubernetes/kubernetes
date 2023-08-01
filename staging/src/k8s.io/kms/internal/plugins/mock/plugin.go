@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/kms/internal"
-	"k8s.io/kms/pkg/hierarchy"
 	"k8s.io/kms/pkg/service"
 	"k8s.io/kms/pkg/util"
 )
@@ -55,14 +54,20 @@ func main() {
 	grpcService := service.NewGRPCService(
 		addr,
 		*timeout,
-		hierarchy.NewLocalKEKService(ctx, remoteKMSService),
+		remoteKMSService,
 	)
 
 	klog.InfoS("starting server", "listenAddr", *listenAddr)
-	if err := grpcService.ListenAndServe(); err != nil {
-		klog.ErrorS(err, "failed to serve")
-		os.Exit(1)
-	}
+	go func() {
+		if err := grpcService.ListenAndServe(); err != nil {
+			klog.ErrorS(err, "failed to serve")
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	klog.InfoS("shutting down server")
+	grpcService.Shutdown()
 }
 
 // withShutdownSignal returns a copy of the parent context that will close if

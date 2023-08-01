@@ -413,6 +413,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableSystemLogQuery != nil {
+		in, out := &in.EnableSystemLogQuery, &out.EnableSystemLogQuery
+		*out = new(bool)
+		**out = **in
+	}
 	out.ShutdownGracePeriod = in.ShutdownGracePeriod
 	out.ShutdownGracePeriodCriticalPods = in.ShutdownGracePeriodCriticalPods
 	if in.ShutdownGracePeriodByPodPriority != nil {

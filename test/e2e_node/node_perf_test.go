@@ -82,7 +82,7 @@ func setKubeletConfig(ctx context.Context, f *framework.Framework, cfg *kubeletc
 // Slow by design.
 var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 	f := framework.NewDefaultFramework("node-performance-testing")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		wl     workloads.NodePerfWorkload
 		oldCfg *kubeletconfig.KubeletConfiguration

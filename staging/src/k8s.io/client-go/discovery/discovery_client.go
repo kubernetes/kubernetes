@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"sort"
@@ -29,7 +30,7 @@ import (
 
 	//nolint:staticcheck // SA1019 Keep using module since it's still being maintained and the api of google.golang.org/protobuf/proto differs
 	"github.com/golang/protobuf/proto"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -58,8 +59,9 @@ const (
 	defaultBurst = 300
 
 	AcceptV1 = runtime.ContentTypeJSON
-	// Aggregated discovery content-type (currently v2beta1). NOTE: Currently, we are assuming the order
-	// for "g", "v", and "as" from the server. We can only compare this string if we can make that assumption.
+	// Aggregated discovery content-type (v2beta1). NOTE: content-type parameters
+	// MUST be ordered (g, v, as) for server in "Accept" header (BUT we are resilient
+	// to ordering when comparing returned values in "Content-Type" header).
 	AcceptV2Beta1 = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
 	// Prioritize aggregated discovery by placing first in the order of discovery accept types.
 	acceptDiscoveryFormats = AcceptV2Beta1 + "," + AcceptV1
@@ -259,8 +261,16 @@ func (d *DiscoveryClient) downloadLegacy() (
 
 	var resourcesByGV map[schema.GroupVersion]*metav1.APIResourceList
 	// Switch on content-type server responded with: aggregated or unaggregated.
-	switch responseContentType {
-	case AcceptV1:
+	switch {
+	case isV2Beta1ContentType(responseContentType):
+		var aggregatedDiscovery apidiscovery.APIGroupDiscoveryList
+		err = json.Unmarshal(body, &aggregatedDiscovery)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
+	default:
+		// Default is unaggregated discovery v1.
 		var v metav1.APIVersions
 		err = json.Unmarshal(body, &v)
 		if err != nil {
@@ -271,15 +281,6 @@ func (d *DiscoveryClient) downloadLegacy() (
 			apiGroup = apiVersionsToAPIGroup(&v)
 		}
 		apiGroupList.Groups = []metav1.APIGroup{apiGroup}
-	case AcceptV2Beta1:
-		var aggregatedDiscovery apidiscovery.APIGroupDiscoveryList
-		err = json.Unmarshal(body, &aggregatedDiscovery)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
-	default:
-		return nil, nil, nil, fmt.Errorf("Unknown discovery response content-type: %s", responseContentType)
 	}
 
 	return apiGroupList, resourcesByGV, failedGVs, nil
@@ -313,13 +314,8 @@ func (d *DiscoveryClient) downloadAPIs() (
 	failedGVs := map[schema.GroupVersion]error{}
 	var resourcesByGV map[schema.GroupVersion]*metav1.APIResourceList
 	// Switch on content-type server responded with: aggregated or unaggregated.
-	switch responseContentType {
-	case AcceptV1:
-		err = json.Unmarshal(body, apiGroupList)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	case AcceptV2Beta1:
+	switch {
+	case isV2Beta1ContentType(responseContentType):
 		var aggregatedDiscovery apidiscovery.APIGroupDiscoveryList
 		err = json.Unmarshal(body, &aggregatedDiscovery)
 		if err != nil {
@@ -327,10 +323,36 @@ func (d *DiscoveryClient) downloadAPIs() (
 		}
 		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
 	default:
-		return nil, nil, nil, fmt.Errorf("Unknown discovery response content-type: %s", responseContentType)
+		// Default is unaggregated discovery v1.
+		err = json.Unmarshal(body, apiGroupList)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	return apiGroupList, resourcesByGV, failedGVs, nil
+}
+
+// isV2Beta1ContentType checks of the content-type string is both
+// "application/json" and contains the v2beta1 content-type params.
+// NOTE: This function is resilient to the ordering of the
+// content-type parameters, as well as parameters added by
+// intermediaries such as proxies or gateways. Examples:
+//
+//	"application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList" = true
+//	"application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io" = true
+//	"application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io;charset=utf-8" = true
+//	"application/json" = false
+//	"application/json; charset=UTF-8" = false
+func isV2Beta1ContentType(contentType string) bool {
+	base, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	return runtime.ContentTypeJSON == base &&
+		params["g"] == "apidiscovery.k8s.io" &&
+		params["v"] == "v2beta1" &&
+		params["as"] == "APIGroupDiscoveryList"
 }
 
 // ServerGroups returns the supported groups, with information like supported versions and the

@@ -1,5 +1,11 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+# Enable CDI as described in
+# https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
+- |-
+  [plugins."io.containerd.grpc.v1.cri"]
+    enable_cdi = true
 nodes:
 - role: control-plane
   kubeadmConfigPatches:
@@ -13,7 +19,7 @@ nodes:
           v: "5"
     apiServer:
         extraArgs:
-          runtime-config: "resource.k8s.io/v1alpha1=true"
+          runtime-config: "resource.k8s.io/v1alpha2=true"
   - |
     kind: InitConfiguration
     nodeRegistration:

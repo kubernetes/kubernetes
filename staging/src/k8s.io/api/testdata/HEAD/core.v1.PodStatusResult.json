@@ -59,6 +59,11 @@
     "reason": "reasonValue",
     "nominatedNodeName": "nominatedNodeNameValue",
     "hostIP": "hostIPValue",
+    "hostIPs": [
+      {
+        "ip": "ipValue"
+      }
+    ],
     "podIP": "podIPValue",
     "podIPs": [
       {
@@ -111,8 +116,8 @@
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
         "started": true,
-        "resourcesAllocated": {
-          "resourcesAllocatedKey": "0"
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
         },
         "resources": {
           "limits": {
@@ -174,8 +179,8 @@
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
         "started": true,
-        "resourcesAllocated": {
-          "resourcesAllocatedKey": "0"
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
         },
         "resources": {
           "limits": {
@@ -238,8 +243,8 @@
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
         "started": true,
-        "resourcesAllocated": {
-          "resourcesAllocatedKey": "0"
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
         },
         "resources": {
           "limits": {
@@ -256,6 +261,12 @@
         }
       }
     ],
-    "resize": "resizeValue"
+    "resize": "resizeValue",
+    "resourceClaimStatuses": [
+      {
+        "name": "nameValue",
+        "resourceClaimName": "resourceClaimNameValue"
+      }
+    ]
   }
 }

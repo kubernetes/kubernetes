@@ -9,9 +9,9 @@ reviewers:
   - dchen1107
   - hwdef
   - justaugustus
-  - lavalamp
   - liggitt
   - mikedanese
+  - pohly
   - SataQiu
   - smarterclayton
   - spiffxp
@@ -25,9 +25,9 @@ approvers:
   - deads2k
   - dims # for local-up-cluster related files
   - enj # for sig-auth related stuff like cert testdata
-  - lavalamp
   - liggitt
   - mikedanese
+  - pohly # for logging and linting
   - pwittrock
   - SataQiu
   - smarterclayton
@@ -41,5 +41,6 @@ emeritus_approvers:
   - fejta
   - ixdy
   - jbeda
+  - lavalamp
   - zmerlynn
   - vishh

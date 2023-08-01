@@ -54,7 +54,7 @@ func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
 
 var _ = SIGDescribe("Lease", func() {
 	f := framework.NewDefaultFramework("lease-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.17

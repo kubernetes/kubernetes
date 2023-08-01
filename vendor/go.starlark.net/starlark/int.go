@@ -190,20 +190,38 @@ func (i Int) Hash() (uint32, error) {
 	}
 	return 12582917 * uint32(lo+3), nil
 }
-func (x Int) CompareSameType(op syntax.Token, v Value, depth int) (bool, error) {
+
+// Required by the TotallyOrdered interface
+func (x Int) Cmp(v Value, depth int) (int, error) {
 	y := v.(Int)
 	xSmall, xBig := x.get()
 	ySmall, yBig := y.get()
 	if xBig != nil || yBig != nil {
+<<<<<<< HEAD
 		return threeway(op, x.bigInt().Cmp(y.bigInt())), nil
 	}
 	return threeway(op, signum64(xSmall-ySmall)), nil
+=======
+		return x.bigInt().Cmp(y.bigInt()), nil
+	}
+	return signum64(xSmall - ySmall), nil // safe: int32 operands
+>>>>>>> origin/GarbageErrors
 }
 
 // Float returns the float value nearest i.
 func (i Int) Float() Float {
 	iSmall, iBig := i.get()
 	if iBig != nil {
+<<<<<<< HEAD
+=======
+		// Fast path for hardware int-to-float conversions.
+		if iBig.IsUint64() {
+			return Float(iBig.Uint64())
+		} else if iBig.IsInt64() {
+			return Float(iBig.Int64())
+		}
+
+>>>>>>> origin/GarbageErrors
 		f, _ := new(big.Float).SetInt(iBig).Float64()
 		return Float(f)
 	}

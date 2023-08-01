@@ -25,11 +25,8 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/authentication"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/authentication/selfsubjectreview"
 	"k8s.io/kubernetes/pkg/registry/authentication/tokenreview"
 )
@@ -72,6 +69,10 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		tokenReviewStorage := tokenreview.NewREST(p.Authenticator, p.APIAudiences)
 		storage[resource] = tokenReviewStorage
 	}
+	if resource := "selfsubjectreviews"; apiResourceConfigSource.ResourceEnabled(authenticationv1.SchemeGroupVersion.WithResource(resource)) {
+		selfSRStorage := selfsubjectreview.NewREST()
+		storage[resource] = selfSRStorage
+	}
 
 	return storage
 }
@@ -81,12 +82,8 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 
 	// selfsubjectreviews
 	if resource := "selfsubjectreviews"; apiResourceConfigSource.ResourceEnabled(authenticationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.APISelfSubjectReview) {
-			selfSRStorage := selfsubjectreview.NewREST()
-			storage[resource] = selfSRStorage
-		} else {
-			klog.Warningln("SelfSubjectReview API is disabled because corresponding feature gate APISelfSubjectReview is not enabled.")
-		}
+		selfSRStorage := selfsubjectreview.NewREST()
+		storage[resource] = selfSRStorage
 	}
 	return storage
 }
@@ -96,12 +93,8 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 
 	// selfsubjectreviews
 	if resource := "selfsubjectreviews"; apiResourceConfigSource.ResourceEnabled(authenticationv1beta1.SchemeGroupVersion.WithResource(resource)) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.APISelfSubjectReview) {
-			selfSRStorage := selfsubjectreview.NewREST()
-			storage[resource] = selfSRStorage
-		} else {
-			klog.Warningln("SelfSubjectReview API is disabled because corresponding feature gate APISelfSubjectReview is not enabled.")
-		}
+		selfSRStorage := selfsubjectreview.NewREST()
+		storage[resource] = selfSRStorage
 	}
 	return storage
 }

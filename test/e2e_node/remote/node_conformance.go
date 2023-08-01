@@ -35,9 +35,8 @@ import (
 // ConformanceRemote contains the specific functions in the node conformance test suite.
 type ConformanceRemote struct{}
 
-// InitConformanceRemote initializes the node conformance test suite.
-func InitConformanceRemote() TestSuite {
-	return &ConformanceRemote{}
+func init() {
+	RegisterTestSuite("conformance", &ConformanceRemote{})
 }
 
 // getConformanceDirectory gets node conformance test build directory.
@@ -108,7 +107,7 @@ func (c *ConformanceRemote) SetupTestPackage(tardir, systemSpecName string) erro
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := utils.GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir(builder.IsDockerizedBuild(), builder.GetTargetBuildArch())
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes build output directory %v", err)
 	}

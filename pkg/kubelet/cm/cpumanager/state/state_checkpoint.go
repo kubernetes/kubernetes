@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
 var _ State = &stateCheckpoint{}
@@ -121,7 +121,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	var tmpContainerCPUSet cpuset.CPUSet
 	tmpAssignments := ContainerCPUAssignments{}
 	for pod := range checkpointV2.Entries {
-		tmpAssignments[pod] = make(map[string]cpuset.CPUSet)
+		tmpAssignments[pod] = make(map[string]cpuset.CPUSet, len(checkpointV2.Entries[pod]))
 		for container, cpuString := range checkpointV2.Entries[pod] {
 			if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
 				return fmt.Errorf("could not parse cpuset %q for container %q in pod %q: %v", cpuString, container, pod, err)
@@ -147,7 +147,7 @@ func (sc *stateCheckpoint) storeState() error {
 
 	assignments := sc.cache.GetCPUAssignments()
 	for pod := range assignments {
-		checkpoint.Entries[pod] = make(map[string]string)
+		checkpoint.Entries[pod] = make(map[string]string, len(assignments[pod]))
 		for container, cset := range assignments[pod] {
 			checkpoint.Entries[pod][container] = cset.String()
 		}

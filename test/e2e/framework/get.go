@@ -100,7 +100,10 @@ func ShouldRetry(err error) (retry bool, retryAfter time.Duration) {
 	}
 
 	// these errors indicate a transient error that should be retried.
-	if apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) || errors.As(err, &transientError{}) {
+	if apierrors.IsTimeout(err) ||
+		apierrors.IsTooManyRequests(err) ||
+		apierrors.IsServiceUnavailable(err) ||
+		errors.As(err, &transientError{}) {
 		return true, 0
 	}
 

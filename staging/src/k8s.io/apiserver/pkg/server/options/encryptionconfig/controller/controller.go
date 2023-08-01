@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 )
@@ -163,16 +164,19 @@ func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem(serverCtx contex
 	ctx, closeTransformers := context.WithCancel(serverCtx)
 
 	defer func() {
-		// TODO: increment success metric when updatedEffectiveConfig=true
-
 		// TODO can work queue metrics help here?
 
 		if !updatedEffectiveConfig {
 			// avoid leaking if we're not using the newly constructed transformers (due to an error or them not being changed)
 			closeTransformers()
 		}
+
+		if updatedEffectiveConfig && err == nil {
+			metrics.RecordEncryptionConfigAutomaticReloadSuccess()
+		}
+
 		if err != nil {
-			// TODO: increment failure metric
+			metrics.RecordEncryptionConfigAutomaticReloadFailure()
 			utilruntime.HandleError(fmt.Errorf("error processing encryption config file %s: %v", d.filePath, err))
 			// add dummy item back to the queue to trigger file content processing.
 			d.queue.AddRateLimited(key)

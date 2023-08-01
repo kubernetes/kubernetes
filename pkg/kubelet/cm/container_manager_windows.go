@@ -23,6 +23,7 @@ limitations under the License.
 package cm
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -86,8 +87,11 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		}
 	}
 
+	ctx := context.Background()
+	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
+
 	// Starts device manager.
-	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady); err != nil {
+	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap, containerRunningSet); err != nil {
 		return err
 	}
 
@@ -250,6 +254,10 @@ func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.Contai
 }
 
 func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
+	return nil
+}
+
+func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
 	return nil
 }
 

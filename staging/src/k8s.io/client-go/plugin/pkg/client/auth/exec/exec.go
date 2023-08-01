@@ -32,12 +32,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/term"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/dump"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/install"
@@ -81,8 +81,6 @@ func newCache() *cache {
 	return &cache{m: make(map[string]*Authenticator)}
 }
 
-var spewConfig = &spew.ConfigState{DisableMethods: true, Indent: " "}
-
 func cacheKey(conf *api.ExecConfig, cluster *clientauthentication.Cluster) string {
 	key := struct {
 		conf    *api.ExecConfig
@@ -91,7 +89,7 @@ func cacheKey(conf *api.ExecConfig, cluster *clientauthentication.Cluster) strin
 		conf:    conf,
 		cluster: cluster,
 	}
-	return spewConfig.Sprint(key)
+	return dump.Pretty(key)
 }
 
 type cache struct {

@@ -296,7 +296,7 @@ func (c *claimsTest) run(t *testing.T) {
 		t.Fatalf("serialize token: %v", err)
 	}
 
-	got, ok, err := a.AuthenticateToken(context.Background(), token)
+	got, ok, err := a.AuthenticateToken(testContext(t), token)
 
 	expectErr := len(c.wantErr) > 0
 
@@ -1580,4 +1580,10 @@ type errTransport string
 
 func (e errTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 	return nil, fmt.Errorf("%s", e)
+}
+
+func testContext(t *testing.T) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	return ctx
 }

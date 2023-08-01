@@ -61,7 +61,7 @@ apiVersion: %s
 kind: InitConfiguration
 nodeRegistration:
   name: foo
-  criSocket: ""
+  criSocket: %s
 localAPIEndpoint:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
@@ -86,7 +86,7 @@ networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-`, kubeadmapiv1.SchemeGroupVersion.String())
+`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket)
 
 // fakeWaiter is a fake apiclient.Waiter that returns errors it was initialized with
 type fakeWaiter struct {

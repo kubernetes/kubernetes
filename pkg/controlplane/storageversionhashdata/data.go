@@ -26,6 +26,7 @@ import (
 var NoStorageVersionHash = sets.NewString(
 	"v1/bindings",
 	"v1/componentstatuses",
+	"authentication.k8s.io/v1/selfsubjectreviews",
 	"authentication.k8s.io/v1/tokenreviews",
 	"authorization.k8s.io/v1/localsubjectaccessreviews",
 	"authorization.k8s.io/v1/selfsubjectaccessreviews",
@@ -73,7 +74,6 @@ var GVRToStorageVersionHash = map[string]string{
 	"storage.k8s.io/v1/storageclasses":                                 "K+m6uJwbjGY=",
 	"storage.k8s.io/v1/csistoragecapacities":                           "xeVl+2Ly1kE=",
 	"storage.k8s.io/v1/volumeattachments":                              "tJx/ezt6UDU=",
-	"storage.k8s.io/v1beta1/csistoragecapacities":                      "xeVl+2Ly1kE=",
 	"apps/v1/controllerrevisions":                                      "85nkx63pcBU=",
 	"apps/v1/daemonsets":                                               "dd7pWHUlMKQ=",
 	"apps/v1/deployments":                                              "8aSe+NMegvE=",

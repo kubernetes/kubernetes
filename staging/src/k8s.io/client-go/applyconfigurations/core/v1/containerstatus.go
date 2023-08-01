@@ -34,7 +34,7 @@ type ContainerStatusApplyConfiguration struct {
 	ImageID              *string                                 `json:"imageID,omitempty"`
 	ContainerID          *string                                 `json:"containerID,omitempty"`
 	Started              *bool                                   `json:"started,omitempty"`
-	ResourcesAllocated   *corev1.ResourceList                    `json:"resourcesAllocated,omitempty"`
+	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
 	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 }
 
@@ -116,11 +116,11 @@ func (b *ContainerStatusApplyConfiguration) WithStarted(value bool) *ContainerSt
 	return b
 }
 
-// WithResourcesAllocated sets the ResourcesAllocated field in the declarative configuration to the given value
+// WithAllocatedResources sets the AllocatedResources field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ResourcesAllocated field is set to the value of the last call.
-func (b *ContainerStatusApplyConfiguration) WithResourcesAllocated(value corev1.ResourceList) *ContainerStatusApplyConfiguration {
-	b.ResourcesAllocated = &value
+// If called multiple times, the AllocatedResources field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithAllocatedResources(value corev1.ResourceList) *ContainerStatusApplyConfiguration {
+	b.AllocatedResources = &value
 	return b
 }
 

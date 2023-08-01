@@ -300,7 +300,9 @@ func unpackOneArg(v Value, ptr interface{}) error {
 			// Attempt to call Value.Type method.
 			func() {
 				defer func() { recover() }()
-				paramType = paramVar.MethodByName("Type").Call(nil)[0].String()
+				if typer, _ := paramVar.Interface().(interface{ Type() string }); typer != nil {
+					paramType = typer.Type()
+				}
 			}()
 			return fmt.Errorf("got %s, want %s", v.Type(), paramType)
 		}

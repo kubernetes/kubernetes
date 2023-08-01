@@ -19,7 +19,6 @@ package csi
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -1065,7 +1064,7 @@ func TestUnmounterTeardown(t *testing.T) {
 }
 
 func TestIsCorruptedDir(t *testing.T) {
-	existingMountPath, err := ioutil.TempDir(os.TempDir(), "blobfuse-csi-mount-test")
+	existingMountPath, err := os.MkdirTemp(os.TempDir(), "blobfuse-csi-mount-test")
 	if err != nil {
 		t.Fatalf("failed to create tmp dir: %v", err)
 	}

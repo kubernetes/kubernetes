@@ -18,7 +18,6 @@ package net
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -700,7 +699,7 @@ func TestGetIPFromHostInterfaces(t *testing.T) {
 }
 
 func makeRouteFile(content string, t *testing.T) (*os.File, error) {
-	routeFile, err := ioutil.TempFile("", "route")
+	routeFile, err := os.CreateTemp("", "route")
 	if err != nil {
 		return nil, err
 	}

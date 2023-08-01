@@ -41,7 +41,7 @@ import (
 
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
-	f.NamespacePodSecurityEnforceLevel = api.LevelPrivileged
+	f.NamespacePodSecurityLevel = api.LevelPrivileged
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())

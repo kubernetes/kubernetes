@@ -746,7 +746,7 @@ func (r *resolver) expr(e syntax.Expr) {
 				}
 				x := binop.X.(*syntax.Ident)
 				if seenName[x.Name] {
-					r.errorf(x.NamePos, "keyword argument %s repeated", x.Name)
+					r.errorf(x.NamePos, "keyword argument %q is repeated", x.Name)
 				} else {
 					if seenName == nil {
 						seenName = make(map[string]bool)

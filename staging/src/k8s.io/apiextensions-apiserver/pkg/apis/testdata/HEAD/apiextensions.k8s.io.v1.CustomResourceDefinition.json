@@ -139,7 +139,10 @@
             "x-kubernetes-validations": [
               {
                 "rule": "ruleValue",
-                "message": "messageValue"
+                "message": "messageValue",
+                "messageExpression": "messageExpressionValue",
+                "reason": "reasonValue",
+                "fieldPath": "fieldPathValue"
               }
             ]
           }

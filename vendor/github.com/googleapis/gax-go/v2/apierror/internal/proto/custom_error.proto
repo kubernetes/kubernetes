@@ -1,0 +1,50 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package error;
+
+option go_package = "github.com/googleapis/gax-go/v2/apierror/internal/proto;jsonerror";
+
+
+// CustomError is an example of a custom error message  which may be included
+// in an rpc status. It is not meant to reflect a standard error.
+message CustomError {
+
+  // Error code for `CustomError`.
+  enum CustomErrorCode {
+    // Default error.
+    CUSTOM_ERROR_CODE_UNSPECIFIED = 0;
+
+    // Too many foo.
+    TOO_MANY_FOO = 1;
+
+    // Not enough foo.
+    NOT_ENOUGH_FOO = 2;
+
+    // Catastrophic error.
+    UNIVERSE_WAS_DESTROYED = 3;
+
+  }
+
+  // Error code specific to the custom API being invoked.
+  CustomErrorCode code = 1;
+
+  // Name of the failed entity.
+  string entity = 2;
+
+  // Message that describes the error.
+  string error_message = 3;
+}

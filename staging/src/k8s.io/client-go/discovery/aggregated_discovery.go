@@ -92,12 +92,18 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 		resourceList := &metav1.APIResourceList{}
 		resourceList.GroupVersion = gv.String()
 		for _, r := range v.Resources {
-			resource := convertAPIResource(r)
-			resourceList.APIResources = append(resourceList.APIResources, resource)
+			resource, err := convertAPIResource(r)
+			if err == nil {
+				resourceList.APIResources = append(resourceList.APIResources, resource)
+			}
 			// Subresources field in new format get transformed into full APIResources.
+			// It is possible a partial result with an error was returned to be used
+			// as the parent resource for the subresource.
 			for _, subresource := range r.Subresources {
-				sr := convertAPISubresource(resource, subresource)
-				resourceList.APIResources = append(resourceList.APIResources, sr)
+				sr, err := convertAPISubresource(resource, subresource)
+				if err == nil {
+					resourceList.APIResources = append(resourceList.APIResources, sr)
+				}
 			}
 		}
 		gvResources[gv] = resourceList
@@ -105,30 +111,44 @@ func convertAPIGroup(g apidiscovery.APIGroupDiscovery) (
 	return group, gvResources, failedGVs
 }
 
-// convertAPIResource tranforms a APIResourceDiscovery to an APIResource.
-func convertAPIResource(in apidiscovery.APIResourceDiscovery) metav1.APIResource {
-	return metav1.APIResource{
+// convertAPIResource tranforms a APIResourceDiscovery to an APIResource. We are
+// resilient to missing GVK, since this resource might be the parent resource
+// for a subresource. If the parent is missing a GVK, it is not returned in
+// discovery, and the subresource MUST have the GVK.
+func convertAPIResource(in apidiscovery.APIResourceDiscovery) (metav1.APIResource, error) {
+	result := metav1.APIResource{
 		Name:         in.Resource,
 		SingularName: in.SingularResource,
 		Namespaced:   in.Scope == apidiscovery.ScopeNamespace,
-		Group:        in.ResponseKind.Group,
-		Version:      in.ResponseKind.Version,
-		Kind:         in.ResponseKind.Kind,
 		Verbs:        in.Verbs,
 		ShortNames:   in.ShortNames,
 		Categories:   in.Categories,
 	}
+	var err error
+	if in.ResponseKind != nil {
+		result.Group = in.ResponseKind.Group
+		result.Version = in.ResponseKind.Version
+		result.Kind = in.ResponseKind.Kind
+	} else {
+		err = fmt.Errorf("discovery resource %s missing GVK", in.Resource)
+	}
+	// Can return partial result with error, which can be the parent for a
+	// subresource. Do not add this result to the returned discovery resources.
+	return result, err
 }
 
 // convertAPISubresource tranforms a APISubresourceDiscovery to an APIResource.
-func convertAPISubresource(parent metav1.APIResource, in apidiscovery.APISubresourceDiscovery) metav1.APIResource {
-	return metav1.APIResource{
-		Name:         fmt.Sprintf("%s/%s", parent.Name, in.Subresource),
-		SingularName: parent.SingularName,
-		Namespaced:   parent.Namespaced,
-		Group:        in.ResponseKind.Group,
-		Version:      in.ResponseKind.Version,
-		Kind:         in.ResponseKind.Kind,
-		Verbs:        in.Verbs,
+func convertAPISubresource(parent metav1.APIResource, in apidiscovery.APISubresourceDiscovery) (metav1.APIResource, error) {
+	result := metav1.APIResource{}
+	if in.ResponseKind == nil {
+		return result, fmt.Errorf("subresource %s/%s missing GVK", parent.Name, in.Subresource)
 	}
+	result.Name = fmt.Sprintf("%s/%s", parent.Name, in.Subresource)
+	result.SingularName = parent.SingularName
+	result.Namespaced = parent.Namespaced
+	result.Group = in.ResponseKind.Group
+	result.Version = in.ResponseKind.Version
+	result.Kind = in.ResponseKind.Kind
+	result.Verbs = in.Verbs
+	return result, nil
 }

@@ -51,8 +51,18 @@ type Thread struct {
 	// The default behavior is to call thread.Cancel("too many steps").
 	OnMaxSteps func(thread *Thread)
 
+<<<<<<< HEAD
 	// steps counts abstract computation steps executed by this thread.
 	steps, maxSteps uint64
+=======
+	// Steps a count of abstract computation steps executed
+	// by this thread. It is incremented by the interpreter. It may be used
+	// as a measure of the approximate cost of Starlark execution, by
+	// computing the difference in its value before and after a computation.
+	//
+	// The precise meaning of "step" is not specified and may change.
+	Steps, maxSteps uint64
+>>>>>>> origin/GarbageErrors
 
 	// cancelReason records the reason from the first call to Cancel.
 	cancelReason *string
@@ -65,6 +75,7 @@ type Thread struct {
 	proftime time.Duration
 }
 
+<<<<<<< HEAD
 // ExecutionSteps returns a count of abstract computation steps executed
 // by this thread. It is incremented by the interpreter. It may be used
 // as a measure of the approximate cost of Starlark execution, by
@@ -73,6 +84,11 @@ type Thread struct {
 // The precise meaning of "step" is not specified and may change.
 func (thread *Thread) ExecutionSteps() uint64 {
 	return thread.steps
+=======
+// ExecutionSteps returns the current value of Steps.
+func (thread *Thread) ExecutionSteps() uint64 {
+	return thread.Steps
+>>>>>>> origin/GarbageErrors
 }
 
 // SetMaxExecutionSteps sets a limit on the number of Starlark
@@ -84,12 +100,27 @@ func (thread *Thread) SetMaxExecutionSteps(max uint64) {
 	thread.maxSteps = max
 }
 
+<<<<<<< HEAD
+=======
+// Uncancel resets the cancellation state.
+//
+// Unlike most methods of Thread, it is safe to call Uncancel from any
+// goroutine, even if the thread is actively executing.
+func (thread *Thread) Uncancel() {
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&thread.cancelReason)), nil)
+}
+
+>>>>>>> origin/GarbageErrors
 // Cancel causes execution of Starlark code in the specified thread to
 // promptly fail with an EvalError that includes the specified reason.
 // There may be a delay before the interpreter observes the cancellation
 // if the thread is currently in a call to a built-in function.
 //
+<<<<<<< HEAD
 // Cancellation cannot be undone.
+=======
+// Call [Uncancel] to reset the cancellation state.
+>>>>>>> origin/GarbageErrors
 //
 // Unlike most methods of Thread, it is safe to call Cancel from any
 // goroutine, even if the thread is actively executing.
@@ -1036,6 +1067,12 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 			if y, ok := y.(Int); ok {
 				return x.Or(y), nil
 			}
+
+		case *Dict: // union
+			if y, ok := y.(*Dict); ok {
+				return x.Union(y), nil
+			}
+
 		case *Set: // union
 			if y, ok := y.(*Set); ok {
 				iter := Iterate(y)
@@ -1056,10 +1093,10 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 				if x.Len() > y.Len() {
 					x, y = y, x // opt: range over smaller set
 				}
-				for _, xelem := range x.elems() {
+				for xe := x.ht.head; xe != nil; xe = xe.next {
 					// Has, Insert cannot fail here.
-					if found, _ := y.Has(xelem); found {
-						set.Insert(xelem)
+					if found, _ := y.Has(xe.key); found {
+						set.Insert(xe.key)
 					}
 				}
 				return set, nil
@@ -1075,14 +1112,14 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 		case *Set: // symmetric difference
 			if y, ok := y.(*Set); ok {
 				set := new(Set)
-				for _, xelem := range x.elems() {
-					if found, _ := y.Has(xelem); !found {
-						set.Insert(xelem)
+				for xe := x.ht.head; xe != nil; xe = xe.next {
+					if found, _ := y.Has(xe.key); !found {
+						set.Insert(xe.key)
 					}
 				}
-				for _, yelem := range y.elems() {
-					if found, _ := x.Has(yelem); !found {
-						set.Insert(yelem)
+				for ye := y.ht.head; ye != nil; ye = ye.next {
+					if found, _ := x.Has(ye.key); !found {
+						set.Insert(ye.key)
 					}
 				}
 				return set, nil
@@ -1219,8 +1256,22 @@ func Call(thread *Thread, fn Value, args Tuple, kwargs []Tuple) (Value, error) {
 	fr.callable = c
 
 	thread.beginProfSpan()
+
+	// Use defer to ensure that panics from built-ins
+	// pass through the interpreter without leaving
+	// it in a bad state.
+	defer func() {
+		thread.endProfSpan()
+
+		// clear out any references
+		// TODO(adonovan): opt: zero fr.Locals and
+		// reuse it if it is large enough.
+		*fr = frame{}
+
+		thread.stack = thread.stack[:len(thread.stack)-1] // pop
+	}()
+
 	result, err := c.CallInternal(thread, args, kwargs)
-	thread.endProfSpan()
 
 	// Sanity check: nil is not a valid Starlark value.
 	if result == nil && err == nil {
@@ -1233,9 +1284,6 @@ func Call(thread *Thread, fn Value, args Tuple, kwargs []Tuple) (Value, error) {
 			err = thread.evalError(err)
 		}
 	}
-
-	*fr = frame{}                                     // clear out any references
-	thread.stack = thread.stack[:len(thread.stack)-1] // pop
 
 	return result, err
 }

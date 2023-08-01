@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
@@ -169,7 +170,7 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 // validate against both decoding and validation to make sure we use the hardest rule between the both to reset
 // with decoding being as strict as it gets, only using it should be enough in admission
 func validateManagedFieldsAndDecode(managedFields []metav1.ManagedFieldsEntry) error {
-	if err := fieldmanager.ValidateManagedFields(managedFields); err != nil {
+	if err := managedfields.ValidateManagedFields(managedFields); err != nil {
 		return err
 
 	}

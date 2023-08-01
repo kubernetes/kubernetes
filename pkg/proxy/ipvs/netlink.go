@@ -40,4 +40,9 @@ type NetLinkHandle interface {
 	// Only the addresses of the current family are returned.
 	// IPv6 link-local and loopback addresses are excluded.
 	GetLocalAddresses(dev string) (sets.Set[string], error)
+	// GetAllLocalAddressesExcept return all local addresses on the node, except from the passed dev.
+	// This is not the same as to take the diff between GetAllLocalAddresses and GetLocalAddresses
+	// since an address can be assigned to many interfaces. This problem raised
+	// https://github.com/kubernetes/kubernetes/issues/114815
+	GetAllLocalAddressesExcept(dev string) (sets.Set[string], error)
 }

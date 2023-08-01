@@ -51,7 +51,7 @@ func TestResourceVersioner(t *testing.T) {
 
 func TestCodec(t *testing.T) {
 	claim := internal.ResourceClaim{}
-	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: "resource.k8s.io", Version: "v1alpha1"}), &claim)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: "resource.k8s.io", Version: "v1alpha2"}), &claim)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != "resource.k8s.io/v1alpha1" || other.Kind != "ResourceClaim" {
+	if other.APIVersion != "resource.k8s.io/v1alpha2" || other.Kind != "ResourceClaim" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }

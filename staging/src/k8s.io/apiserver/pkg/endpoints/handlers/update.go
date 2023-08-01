@@ -156,15 +156,13 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		// allows skipping managedFields update if the resulting object is too big
 		shouldUpdateManagedFields := true
-		if scope.FieldManager != nil {
-			admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
-			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
-				if shouldUpdateManagedFields {
-					return scope.FieldManager.UpdateNoErrors(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent())), nil
-				}
-				return newObj, nil
-			})
-		}
+		admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
+		transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
+			if shouldUpdateManagedFields {
+				return scope.FieldManager.UpdateNoErrors(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent())), nil
+			}
+			return newObj, nil
+		})
 
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
@@ -187,15 +185,6 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 				dedupOwnerReferencesAndAddWarning(newObj, req.Context(), true)
 				return newObj, nil
 			})
-		}
-
-		// Ignore changes that only affect managed fields
-		// timestamps. FieldManager can't know about changes
-		// like normalized fields, defaulted fields and other
-		// mutations.
-		// Only makes sense when SSA field manager is being used
-		if scope.FieldManager != nil {
-			transformers = append(transformers, fieldmanager.IgnoreManagedFieldsTimestampsTransformer)
 		}
 
 		createAuthorizerAttributes := authorizer.AttributesRecord{
@@ -237,7 +226,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			result, err := requestFunc()
 			// If the object wasn't committed to storage because it's serialized size was too large,
 			// it is safe to remove managedFields (which can be large) and try again.
-			if isTooLargeError(err) && scope.FieldManager != nil {
+			if isTooLargeError(err) {
 				if accessor, accessorErr := meta.Accessor(obj); accessorErr == nil {
 					accessor.SetManagedFields(nil)
 					shouldUpdateManagedFields = false

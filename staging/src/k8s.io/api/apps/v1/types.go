@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -29,6 +29,7 @@ const (
 	DeprecatedRollbackTo           = "deprecated.deployment.rollback.to"
 	DeprecatedTemplateGeneration   = "deprecated.daemonset.template.generation"
 	StatefulSetPodNameLabel        = "statefulset.kubernetes.io/pod-name"
+	PodIndexLabel                  = "apps.kubernetes.io/pod-index"
 )
 
 // +genclient
@@ -260,7 +261,7 @@ type StatefulSetSpec struct {
 	// default ordinals behavior assigns a "0" index to the first replica and
 	// increments the index by one for each additional replica requested. Using
 	// the ordinals field requires the StatefulSetStartOrdinal feature gate to be
-	// enabled, which is alpha.
+	// enabled, which is beta.
 	// +optional
 	Ordinals *StatefulSetOrdinals `json:"ordinals,omitempty" protobuf:"bytes,11,opt,name=ordinals"`
 }

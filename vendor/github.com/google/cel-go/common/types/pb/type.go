@@ -38,22 +38,23 @@ type description interface {
 	Zero() proto.Message
 }
 
-// NewTypeDescription produces a TypeDescription value for the fully-qualified proto type name
+// newTypeDescription produces a TypeDescription value for the fully-qualified proto type name
 // with a given descriptor.
-func NewTypeDescription(typeName string, desc protoreflect.MessageDescriptor) *TypeDescription {
+func newTypeDescription(typeName string, desc protoreflect.MessageDescriptor, extensions extensionMap) *TypeDescription {
 	msgType := dynamicpb.NewMessageType(desc)
 	msgZero := dynamicpb.NewMessage(desc)
 	fieldMap := map[string]*FieldDescription{}
 	fields := desc.Fields()
 	for i := 0; i < fields.Len(); i++ {
 		f := fields.Get(i)
-		fieldMap[string(f.Name())] = NewFieldDescription(f)
+		fieldMap[string(f.Name())] = newFieldDescription(f)
 	}
 	return &TypeDescription{
 		typeName:    typeName,
 		desc:        desc,
 		msgType:     msgType,
 		fieldMap:    fieldMap,
+		extensions:  extensions,
 		reflectType: reflectTypeOf(msgZero),
 		zeroMsg:     zeroValueOf(msgZero),
 	}
@@ -66,8 +67,22 @@ type TypeDescription struct {
 	desc        protoreflect.MessageDescriptor
 	msgType     protoreflect.MessageType
 	fieldMap    map[string]*FieldDescription
+	extensions  extensionMap
 	reflectType reflect.Type
 	zeroMsg     proto.Message
+}
+
+// Copy copies the type description with updated references to the Db.
+func (td *TypeDescription) Copy(pbdb *Db) *TypeDescription {
+	return &TypeDescription{
+		typeName:    td.typeName,
+		desc:        td.desc,
+		msgType:     td.msgType,
+		fieldMap:    td.fieldMap,
+		extensions:  pbdb.extensions,
+		reflectType: td.reflectType,
+		zeroMsg:     td.zeroMsg,
+	}
 }
 
 // FieldMap returns a string field name to FieldDescription map.
@@ -78,16 +93,21 @@ func (td *TypeDescription) FieldMap() map[string]*FieldDescription {
 // FieldByName returns (FieldDescription, true) if the field name is declared within the type.
 func (td *TypeDescription) FieldByName(name string) (*FieldDescription, bool) {
 	fd, found := td.fieldMap[name]
+	if found {
+		return fd, true
+	}
+	extFieldMap, found := td.extensions[td.typeName]
 	if !found {
 		return nil, false
 	}
-	return fd, true
+	fd, found = extFieldMap[name]
+	return fd, found
 }
 
 // MaybeUnwrap accepts a proto message as input and unwraps it to a primitive CEL type if possible.
 //
 // This method returns the unwrapped value and 'true', else the original value and 'false'.
-func (td *TypeDescription) MaybeUnwrap(msg proto.Message) (interface{}, bool, error) {
+func (td *TypeDescription) MaybeUnwrap(msg proto.Message) (any, bool, error) {
 	return unwrap(td, msg)
 }
 
@@ -111,8 +131,8 @@ func (td *TypeDescription) Zero() proto.Message {
 	return td.zeroMsg
 }
 
-// NewFieldDescription creates a new field description from a protoreflect.FieldDescriptor.
-func NewFieldDescription(fieldDesc protoreflect.FieldDescriptor) *FieldDescription {
+// newFieldDescription creates a new field description from a protoreflect.FieldDescriptor.
+func newFieldDescription(fieldDesc protoreflect.FieldDescriptor) *FieldDescription {
 	var reflectType reflect.Type
 	var zeroMsg proto.Message
 	switch fieldDesc.Kind() {
@@ -124,9 +144,17 @@ func NewFieldDescription(fieldDesc protoreflect.FieldDescriptor) *FieldDescripti
 	default:
 		reflectType = reflectTypeOf(fieldDesc.Default().Interface())
 		if fieldDesc.IsList() {
-			parentMsg := dynamicpb.NewMessage(fieldDesc.ContainingMessage())
-			listField := parentMsg.NewField(fieldDesc).List()
-			elem := listField.NewElement().Interface()
+			var elemValue protoreflect.Value
+			if fieldDesc.IsExtension() {
+				et := dynamicpb.NewExtensionType(fieldDesc)
+				elemValue = et.New().List().NewElement()
+			} else {
+				parentMsgType := fieldDesc.ContainingMessage()
+				parentMsg := dynamicpb.NewMessage(parentMsgType)
+				listField := parentMsg.NewField(fieldDesc).List()
+				elemValue = listField.NewElement()
+			}
+			elem := elemValue.Interface()
 			switch elemType := elem.(type) {
 			case protoreflect.Message:
 				elem = elemType.Interface()
@@ -140,8 +168,8 @@ func NewFieldDescription(fieldDesc protoreflect.FieldDescriptor) *FieldDescripti
 	}
 	var keyType, valType *FieldDescription
 	if fieldDesc.IsMap() {
-		keyType = NewFieldDescription(fieldDesc.MapKey())
-		valType = NewFieldDescription(fieldDesc.MapValue())
+		keyType = newFieldDescription(fieldDesc.MapKey())
+		valType = newFieldDescription(fieldDesc.MapValue())
 	}
 	return &FieldDescription{
 		desc:        fieldDesc,
@@ -195,7 +223,7 @@ func (fd *FieldDescription) Descriptor() protoreflect.FieldDescriptor {
 //
 // This function implements the FieldType.IsSet function contract which can be used to operate on
 // more than just protobuf field accesses; however, the target here must be a protobuf.Message.
-func (fd *FieldDescription) IsSet(target interface{}) bool {
+func (fd *FieldDescription) IsSet(target any) bool {
 	switch v := target.(type) {
 	case proto.Message:
 		pbRef := v.ProtoReflect()
@@ -219,14 +247,14 @@ func (fd *FieldDescription) IsSet(target interface{}) bool {
 //
 // This function implements the FieldType.GetFrom function contract which can be used to operate
 // on more than just protobuf field accesses; however, the target here must be a protobuf.Message.
-func (fd *FieldDescription) GetFrom(target interface{}) (interface{}, error) {
+func (fd *FieldDescription) GetFrom(target any) (any, error) {
 	v, ok := target.(proto.Message)
 	if !ok {
 		return nil, fmt.Errorf("unsupported field selection target: (%T)%v", target, target)
 	}
 	pbRef := v.ProtoReflect()
 	pbDesc := pbRef.Descriptor()
-	var fieldVal interface{}
+	var fieldVal any
 	if pbDesc == fd.desc.ContainingMessage() {
 		// When the target protobuf shares the same message descriptor instance as the field
 		// descriptor, use the cached field descriptor value.
@@ -289,7 +317,7 @@ func (fd *FieldDescription) IsList() bool {
 //
 // This function returns the unwrapped value and 'true' on success, or the original value
 // and 'false' otherwise.
-func (fd *FieldDescription) MaybeUnwrapDynamic(msg protoreflect.Message) (interface{}, bool, error) {
+func (fd *FieldDescription) MaybeUnwrapDynamic(msg protoreflect.Message) (any, bool, error) {
 	return unwrapDynamic(fd, msg)
 }
 
@@ -362,7 +390,7 @@ func checkedWrap(t *exprpb.Type) *exprpb.Type {
 // input message is a *dynamicpb.Message which obscures the typing information from Go.
 //
 // Returns the unwrapped value and 'true' if unwrapped, otherwise the input value and 'false'.
-func unwrap(desc description, msg proto.Message) (interface{}, bool, error) {
+func unwrap(desc description, msg proto.Message) (any, bool, error) {
 	switch v := msg.(type) {
 	case *anypb.Any:
 		dynMsg, err := v.UnmarshalNew()
@@ -418,7 +446,7 @@ func unwrap(desc description, msg proto.Message) (interface{}, bool, error) {
 // unwrapDynamic unwraps a reflected protobuf Message value.
 //
 // Returns the unwrapped value and 'true' if unwrapped, otherwise the input value and 'false'.
-func unwrapDynamic(desc description, refMsg protoreflect.Message) (interface{}, bool, error) {
+func unwrapDynamic(desc description, refMsg protoreflect.Message) (any, bool, error) {
 	msg := refMsg.Interface()
 	if !refMsg.IsValid() {
 		msg = desc.Zero()
@@ -508,7 +536,7 @@ func unwrapDynamic(desc description, refMsg protoreflect.Message) (interface{}, 
 
 // reflectTypeOf intercepts the reflect.Type call to ensure that dynamicpb.Message types preserve
 // well-known protobuf reflected types expected by the CEL type system.
-func reflectTypeOf(val interface{}) reflect.Type {
+func reflectTypeOf(val any) reflect.Type {
 	switch v := val.(type) {
 	case proto.Message:
 		return reflect.TypeOf(zeroValueOf(v))

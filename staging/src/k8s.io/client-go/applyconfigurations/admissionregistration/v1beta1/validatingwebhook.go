@@ -37,6 +37,7 @@ type ValidatingWebhookApplyConfiguration struct {
 	SideEffects             *admissionregistrationv1beta1.SideEffectClass   `json:"sideEffects,omitempty"`
 	TimeoutSeconds          *int32                                          `json:"timeoutSeconds,omitempty"`
 	AdmissionReviewVersions []string                                        `json:"admissionReviewVersions,omitempty"`
+	MatchConditions         []MatchConditionApplyConfiguration              `json:"matchConditions,omitempty"`
 }
 
 // ValidatingWebhookApplyConfiguration constructs an declarative configuration of the ValidatingWebhook type for use with
@@ -128,6 +129,19 @@ func (b *ValidatingWebhookApplyConfiguration) WithTimeoutSeconds(value int32) *V
 func (b *ValidatingWebhookApplyConfiguration) WithAdmissionReviewVersions(values ...string) *ValidatingWebhookApplyConfiguration {
 	for i := range values {
 		b.AdmissionReviewVersions = append(b.AdmissionReviewVersions, values[i])
+	}
+	return b
+}
+
+// WithMatchConditions adds the given value to the MatchConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the MatchConditions field.
+func (b *ValidatingWebhookApplyConfiguration) WithMatchConditions(values ...*MatchConditionApplyConfiguration) *ValidatingWebhookApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithMatchConditions")
+		}
+		b.MatchConditions = append(b.MatchConditions, *values[i])
 	}
 	return b
 }

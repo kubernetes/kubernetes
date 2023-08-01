@@ -19,6 +19,7 @@ syntax = "proto3";
 
 package v1beta1;
 option go_package = "k8s.io/kms/apis/v1beta1";
+option deprecated = true;
 
 // This service defines the public APIs for remote KMS provider.
 service KeyManagementService {
@@ -31,11 +32,13 @@ service KeyManagementService {
     rpc Encrypt(EncryptRequest) returns (EncryptResponse) {}
 }
 
+// Deprecated: KMSv1 is deprecated in v1.28 and will only receive security updates going forward. Use KMSv2 instead.
 message VersionRequest {
     // Version of the KMS plugin API.
     string version = 1;
 }
 
+// Deprecated: KMSv1 is deprecated in v1.28 and will only receive security updates going forward. Use KMSv2 instead.
 message VersionResponse {
     // Version of the KMS plugin API.
     string version = 1;
@@ -45,6 +48,7 @@ message VersionResponse {
     string runtime_version = 3;
 }
 
+// Deprecated: KMSv1 is deprecated in v1.28 and will only receive security updates going forward. Use KMSv2 instead.
 message DecryptRequest {
     // Version of the KMS plugin API.
     string version = 1;
@@ -52,11 +56,13 @@ message DecryptRequest {
     bytes cipher = 2;
 }
 
+// Deprecated: KMSv1 is deprecated in v1.28 and will only receive security updates going forward. Use KMSv2 instead.
 message DecryptResponse {
     // The decrypted data.
     bytes plain = 1;
 }
 
+// Deprecated: KMSv1 is deprecated in v1.28 and will only receive security updates going forward. Use KMSv2 instead.
 message EncryptRequest {
     // Version of the KMS plugin API.
     string version = 1;
@@ -64,8 +70,8 @@ message EncryptRequest {
     bytes plain = 2;
 }
 
+// Deprecated: KMSv1 is deprecated in v1.28 and will only receive security updates going forward. Use KMSv2 instead.
 message EncryptResponse {
     // The encrypted data.
     bytes cipher = 1;
 }
-

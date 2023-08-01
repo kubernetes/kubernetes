@@ -45,11 +45,12 @@ import (
 const (
 	// systemdSuffix is the cgroup name suffix for systemd
 	systemdSuffix string = ".slice"
-	// MemoryMin is memory.min for cgroup v2
-	MemoryMin string = "memory.min"
-	// MemoryHigh is memory.high for cgroup v2
-	MemoryHigh         string = "memory.high"
-	Cgroup2MaxCpuLimit string = "max"
+	// Cgroup2MemoryMin is memory.min for cgroup v2
+	Cgroup2MemoryMin string = "memory.min"
+	// Cgroup2MemoryHigh is memory.high for cgroup v2
+	Cgroup2MemoryHigh      string = "memory.high"
+	Cgroup2MaxCpuLimit     string = "max"
+	Cgroup2MaxSwapFilename string = "memory.swap.max"
 )
 
 var RootCgroupName = CgroupName([]string{})

@@ -103,19 +103,6 @@ type QuotaMonitor struct {
 	updateFilter UpdateFilter
 }
 
-// NewMonitor creates a new instance of a QuotaMonitor
-func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
-	return &QuotaMonitor{
-		informersStarted:  informersStarted,
-		informerFactory:   informerFactory,
-		ignoredResources:  ignoredResources,
-		resourceChanges:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
-		resyncPeriod:      resyncPeriod,
-		replenishmentFunc: replenishmentFunc,
-		registry:          registry,
-	}
-}
-
 // monitor runs a Controller with a local stop channel.
 type monitor struct {
 	controller cache.Controller

@@ -26,9 +26,10 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
 
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apiserver/pkg/cel"
-	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 // UnstructuredToVal converts a Kubernetes unstructured data element to a CEL Val.
@@ -425,7 +426,22 @@ var _ = traits.Lister(&unstructuredList{})
 func (t *unstructuredList) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	switch typeDesc.Kind() {
 	case reflect.Slice:
-		return t.elements, nil
+		switch t.itemsSchema.Type() {
+		// Workaround for https://github.com/kubernetes/kubernetes/issues/117590 until we
+		// resolve the desired behavior in cel-go via https://github.com/google/cel-go/issues/688
+		case "string":
+			var result []string
+			for _, e := range t.elements {
+				s, ok := e.(string)
+				if !ok {
+					return nil, fmt.Errorf("expected all elements to be of type string, but got %T", e)
+				}
+				result = append(result, s)
+			}
+			return result, nil
+		default:
+			return t.elements, nil
+		}
 	}
 	return nil, fmt.Errorf("type conversion error from '%s' to '%s'", t.Type(), typeDesc)
 }

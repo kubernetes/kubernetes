@@ -150,7 +150,7 @@ func (c *Controller) Start(logger klog.Logger, nodeInformer informers.NodeInform
 		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			return c.onUpdate(logger, newNode)
 		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
 			return c.onDelete(logger, node)
 		}),
 	})

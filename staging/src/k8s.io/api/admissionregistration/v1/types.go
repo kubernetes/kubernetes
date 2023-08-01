@@ -307,6 +307,28 @@ type ValidatingWebhook struct {
 	// include any versions known to the API Server, calls to the webhook will fail
 	// and be subject to the failure policy.
 	AdmissionReviewVersions []string `json:"admissionReviewVersions" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
+
+	// MatchConditions is a list of conditions that must be met for a request to be sent to this
+	// webhook. Match conditions filter requests that have already been matched by the rules,
+	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
+	// There are a maximum of 64 match conditions allowed.
+	//
+	// The exact matching logic is (in order):
+	//   1. If ANY matchCondition evaluates to FALSE, the webhook is skipped.
+	//   2. If ALL matchConditions evaluate to TRUE, the webhook is called.
+	//   3. If any matchCondition evaluates to an error (but none are FALSE):
+	//      - If failurePolicy=Fail, reject the request
+	//      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
+	//
+	// This is a beta feature and managed by the AdmissionWebhookMatchConditions feature gate.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=AdmissionWebhookMatchConditions
+	// +optional
+	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,11,opt,name=matchConditions"`
 }
 
 // MutatingWebhook describes an admission webhook and the resources and operations it applies to.
@@ -454,6 +476,28 @@ type MutatingWebhook struct {
 	// Defaults to "Never".
 	// +optional
 	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,10,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
+
+	// MatchConditions is a list of conditions that must be met for a request to be sent to this
+	// webhook. Match conditions filter requests that have already been matched by the rules,
+	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
+	// There are a maximum of 64 match conditions allowed.
+	//
+	// The exact matching logic is (in order):
+	//   1. If ANY matchCondition evaluates to FALSE, the webhook is skipped.
+	//   2. If ALL matchConditions evaluate to TRUE, the webhook is called.
+	//   3. If any matchCondition evaluates to an error (but none are FALSE):
+	//      - If failurePolicy=Fail, reject the request
+	//      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
+	//
+	// This is a beta feature and managed by the AdmissionWebhookMatchConditions feature gate.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=AdmissionWebhookMatchConditions
+	// +optional
+	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,12,opt,name=matchConditions"`
 }
 
 // ReinvocationPolicyType specifies what type of policy the admission hook uses.
@@ -562,4 +606,33 @@ type ServiceReference struct {
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
 	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
+}
+
+// MatchCondition represents a condition which must by fulfilled for a request to be sent to a webhook.
+type MatchCondition struct {
+	// Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+	// as well as providing an identifier for logging purposes. A good name should be descriptive of
+	// the associated expression.
+	// Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
+	// must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or
+	// '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an
+	// optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')
+	//
+	// Required.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+	// CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
+	//
+	// 'object' - The object from the incoming request. The value is null for DELETE requests.
+	// 'oldObject' - The existing object. The value is null for CREATE requests.
+	// 'request' - Attributes of the admission request(/pkg/apis/admission/types.go#AdmissionRequest).
+	// 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
+	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
+	// 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
+	//   request resource.
+	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
+	//
+	// Required.
+	Expression string `json:"expression" protobuf:"bytes,2,opt,name=expression"`
 }

@@ -47,7 +47,11 @@ var Disassemble = false
 const debug = false // make code generation verbose, for debugging the compiler
 
 // Increment this to force recompilation of saved bytecode files.
+<<<<<<< HEAD
 const Version = 12
+=======
+const Version = 13
+>>>>>>> origin/GarbageErrors
 
 type Opcode uint8
 
@@ -100,6 +104,7 @@ const (
 	FALSE     // - FALSE False
 	MANDATORY // - MANDATORY Mandatory	     [sentinel value for required kwonly args]
 
+<<<<<<< HEAD
 	ITERPUSH    //       iterable ITERPUSH    -  [pushes the iterator stack]
 	ITERPOP     //              - ITERPOP     -    [pops the iterator stack]
 	NOT         //          value NOT         bool
@@ -112,6 +117,21 @@ const (
 	SLICE       //   x lo hi step SLICE       slice
 	INPLACE_ADD //            x y INPLACE_ADD z      where z is x+y or x.extend(y)
 	MAKEDICT    //              - MAKEDICT    dict
+=======
+	ITERPUSH     //       iterable ITERPUSH     -  [pushes the iterator stack]
+	ITERPOP      //              - ITERPOP      -    [pops the iterator stack]
+	NOT          //          value NOT          bool
+	RETURN       //          value RETURN       -
+	SETINDEX     //        a i new SETINDEX     -
+	INDEX        //            a i INDEX        elem
+	SETDICT      // dict key value SETDICT      -
+	SETDICTUNIQ  // dict key value SETDICTUNIQ  -
+	APPEND       //      list elem APPEND       -
+	SLICE        //   x lo hi step SLICE        slice
+	INPLACE_ADD  //            x y INPLACE_ADD  z      where z is x+y or x.extend(y)
+	INPLACE_PIPE //            x y INPLACE_PIPE z      where z is x|y
+	MAKEDICT     //              - MAKEDICT     dict
+>>>>>>> origin/GarbageErrors
 
 	// --- opcodes with an argument must go below this line ---
 
@@ -177,6 +197,10 @@ var opcodeNames = [...]string{
 	IN:           "in",
 	INDEX:        "index",
 	INPLACE_ADD:  "inplace_add",
+<<<<<<< HEAD
+=======
+	INPLACE_PIPE: "inplace_pipe",
+>>>>>>> origin/GarbageErrors
 	ITERJMP:      "iterjmp",
 	ITERPOP:      "iterpop",
 	ITERPUSH:     "iterpush",
@@ -250,6 +274,10 @@ var stackEffect = [...]int8{
 	IN:           -1,
 	INDEX:        -1,
 	INPLACE_ADD:  -1,
+<<<<<<< HEAD
+=======
+	INPLACE_PIPE: -1,
+>>>>>>> origin/GarbageErrors
 	ITERJMP:      variableStackEffect,
 	ITERPOP:      0,
 	ITERPUSH:     -1,
@@ -1145,11 +1173,16 @@ func (fcomp *fcomp) stmt(stmt syntax.Stmt) {
 
 			fcomp.expr(stmt.RHS)
 
-			if stmt.Op == syntax.PLUS_EQ {
-				// Allow the runtime to optimize list += iterable.
+			// In-place x+=y and x|=y have special semantics:
+			// the resulting x aliases the original x.
+			switch stmt.Op {
+			case syntax.PLUS_EQ:
 				fcomp.setPos(stmt.OpPos)
 				fcomp.emit(INPLACE_ADD)
-			} else {
+			case syntax.PIPE_EQ:
+				fcomp.setPos(stmt.OpPos)
+				fcomp.emit(INPLACE_PIPE)
+			default:
 				fcomp.binop(stmt.OpPos, stmt.Op-syntax.PLUS_EQ+syntax.PLUS)
 			}
 			set()

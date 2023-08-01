@@ -45,6 +45,9 @@ func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, er
 			AdvertiseAddress: "1.2.3.4",
 			BindPort:         1234,
 		},
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+			CRISocket: kubeadmconstants.UnknownCRISocket,
+		},
 	}
 	clusterCfg := kubeadmapiv1.ClusterConfiguration{
 		TypeMeta: metav1.TypeMeta{

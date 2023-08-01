@@ -1,0 +1,47 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "admissionregistration.k8s.io/v1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "categories": [
+        "api-extensions"
+      ],
+      "kind": "MutatingWebhookConfiguration",
+      "name": "mutatingwebhookconfigurations",
+      "namespaced": false,
+      "singularName": "mutatingwebhookconfiguration",
+      "storageVersionHash": "Sqi0GUgDaX0=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "categories": [
+        "api-extensions"
+      ],
+      "kind": "ValidatingWebhookConfiguration",
+      "name": "validatingwebhookconfigurations",
+      "namespaced": false,
+      "singularName": "validatingwebhookconfiguration",
+      "storageVersionHash": "B0wHjQmsGNk=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    }
+  ]
+}

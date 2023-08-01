@@ -43,7 +43,7 @@ type PrivilegedPodTestConfig struct {
 
 var _ = SIGDescribe("PrivilegedPod [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("e2e-privileged-pod")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	config := &PrivilegedPodTestConfig{
 		f:                      f,
 		privilegedPod:          "privileged-pod",

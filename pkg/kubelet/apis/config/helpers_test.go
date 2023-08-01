@@ -190,6 +190,7 @@ var (
 		"EnableControllerAttachDetach",
 		"EnableDebugFlagsHandler",
 		"EnableDebuggingHandlers",
+		"EnableSystemLogQuery",
 		"EnableProfilingHandler",
 		"EnableServer",
 		"EnableSystemLogHandler",

@@ -74,8 +74,13 @@ func TestZapLoggerInfo(t *testing.T) {
 		},
 		{
 			msg:        "test for NamespacedName argument",
-			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for NamespacedName argument\",\"v\":0,\"obj\":{\"Name\":\"kube-proxy\",\"Namespace\":\"kube-system\"}}\n",
+			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for NamespacedName argument\",\"v\":0,\"obj\":{\"name\":\"kube-proxy\",\"namespace\":\"kube-system\"}}\n",
 			keysValues: []interface{}{"obj", types.NamespacedName{Name: "kube-proxy", Namespace: "kube-system"}},
+		},
+		{
+			msg:        "test for NamespacedName argument with no namespace",
+			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for NamespacedName argument with no namespace\",\"v\":0,\"obj\":{\"name\":\"kube-proxy\"}}\n",
+			keysValues: []interface{}{"obj", types.NamespacedName{Name: "kube-proxy"}},
 		},
 	}
 

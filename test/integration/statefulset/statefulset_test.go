@@ -36,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
@@ -123,7 +124,8 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 }
 
 func TestSpecReplicasChange(t *testing.T) {
-	closeFn, rm, informers, c := scSetup(t)
+	_, ctx := ktesting.NewTestContext(t)
+	closeFn, rm, informers, c := scSetup(ctx, t)
 	defer closeFn()
 	ns := framework.CreateNamespaceOrDie(c, "test-spec-replicas-change", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
@@ -166,7 +168,8 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestDeletingAndFailedPods(t *testing.T) {
-	closeFn, rm, informers, c := scSetup(t)
+	_, ctx := ktesting.NewTestContext(t)
+	closeFn, rm, informers, c := scSetup(ctx, t)
 	defer closeFn()
 	ns := framework.CreateNamespaceOrDie(c, "test-deleting-and-failed-pods", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
@@ -257,7 +260,8 @@ func TestStatefulSetAvailable(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			closeFn, rm, informers, c := scSetup(t)
+			_, ctx := ktesting.NewTestContext(t)
+			closeFn, rm, informers, c := scSetup(ctx, t)
 			defer closeFn()
 			ns := framework.CreateNamespaceOrDie(c, "test-available-pods", t)
 			defer framework.DeleteNamespaceOrDie(c, ns, t)
@@ -347,8 +351,12 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 
 // add for issue: https://github.com/kubernetes/kubernetes/issues/108837
 func TestStatefulSetStatusWithPodFail(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	limitedPodNumber := 2
-	c, config, closeFn := framework.StartTestServer(t, framework.TestServerSetup{
+	c, config, closeFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			config.GenericConfig.AdmissionControl = &fakePodFailAdmission{
 				limitedPodNumber: limitedPodNumber,
@@ -359,8 +367,8 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
-
 	ssc := statefulset.NewStatefulSetController(
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Apps().V1().StatefulSets(),
 		informers.Core().V1().PersistentVolumeClaims(),
@@ -371,21 +379,19 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(c, "test-pod-fail", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	informers.Start(ctx.Done())
 	go ssc.Run(ctx, 5)
 
 	sts := newSTS("sts", ns.Name, 4)
-	_, err := c.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
+	_, err := c.AppsV1().StatefulSets(sts.Namespace).Create(ctx, sts, metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("Could not create statefuleSet %s: %v", sts.Name, err)
+		t.Fatalf("Could not create statefulSet %s: %v", sts.Name, err)
 	}
 
 	wantReplicas := limitedPodNumber
 	var gotReplicas int32
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newSTS, err := c.AppsV1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+		newSTS, err := c.AppsV1().StatefulSets(sts.Namespace).Get(ctx, sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -443,7 +449,8 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
-			closeFn, rm, informers, c := scSetup(t)
+			_, ctx := ktesting.NewTestContext(t)
+			closeFn, rm, informers, c := scSetup(ctx, t)
 			defer closeFn()
 			ns := framework.CreateNamespaceOrDie(c, "test-autodelete-ownerrefs", t)
 			defer framework.DeleteNamespaceOrDie(c, ns, t)
@@ -524,7 +531,8 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 	}
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
-	closeFn, rm, informers, c := scSetup(t)
+	_, ctx := ktesting.NewTestContext(t)
+	closeFn, rm, informers, c := scSetup(ctx, t)
 	defer closeFn()
 	cancel := runControllerAndInformers(rm, informers)
 	defer cancel()

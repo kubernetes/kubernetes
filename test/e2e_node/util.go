@@ -25,17 +25,22 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/util/procfs"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -55,8 +60,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
+	"github.com/coreos/go-systemd/v22/dbus"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
@@ -82,14 +87,19 @@ const (
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
 )
 
-var kubeletHealthCheckURL = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
+var (
+	kubeletHealthCheckURL    = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
+	containerRuntimeUnitName = ""
+	// KubeletConfig is the kubelet configuration the test is running against.
+	kubeletCfg *kubeletconfig.KubeletConfiguration
+)
 
 func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
 	kubeletConfig, err := getCurrentKubeletConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current kubelet config")
 	}
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/stats/summary", net.JoinHostPort(kubeletConfig.Address, strconv.Itoa(int(kubeletConfig.ReadOnlyPort)))), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://%s/stats/summary", net.JoinHostPort(kubeletConfig.Address, strconv.Itoa(int(kubeletConfig.ReadOnlyPort)))), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build http request: %w", err)
 	}
@@ -157,7 +167,22 @@ func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResour
 // Returns the current KubeletConfiguration
 func getCurrentKubeletConfig(ctx context.Context) (*kubeletconfig.KubeletConfiguration, error) {
 	// namespace only relevant if useProxy==true, so we don't bother
-	return e2ekubelet.GetCurrentKubeletConfig(ctx, framework.TestContext.NodeName, "", false)
+	return e2enodekubelet.GetCurrentKubeletConfig(ctx, framework.TestContext.NodeName, "", false, framework.TestContext.StandaloneMode)
+}
+
+func cleanupPods(f *framework.Framework) {
+	ginkgo.AfterEach(func(ctx context.Context) {
+		ginkgo.By("Deleting any Pods created by the test in namespace: " + f.Namespace.Name)
+		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, p := range l.Items {
+			if p.Namespace != f.Namespace.Name {
+				continue
+			}
+			framework.Logf("Deleting pod: %s", p.Name)
+			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, 2*time.Minute)
+		}
+	})
 }
 
 // Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
@@ -279,7 +304,7 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", framework.TestContext.NodeName, ports.KubeletReadOnlyPort), "/metrics")
+	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(), ports.KubeletReadOnlyPort), "/metrics")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
@@ -338,6 +363,71 @@ func findKubeletServiceName(running bool) string {
 	kubeletServiceName := matches[0]
 	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
 	return kubeletServiceName
+}
+
+func findContainerRuntimeServiceName() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := dbus.NewWithContext(ctx)
+	framework.ExpectNoError(err, "Failed to setup dbus connection")
+	defer conn.Close()
+
+	runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+	framework.ExpectNoError(err, "failed to get list of container runtime pids")
+	framework.ExpectEqual(len(runtimePids), 1, "Unexpected number of container runtime pids. Expected 1 but got %v", len(runtimePids))
+
+	containerRuntimePid := runtimePids[0]
+
+	unitName, err := conn.GetUnitNameByPID(ctx, uint32(containerRuntimePid))
+	framework.ExpectNoError(err, "Failed to get container runtime unit name")
+
+	return unitName, nil
+}
+
+type containerRuntimeUnitOp int
+
+const (
+	startContainerRuntimeUnitOp containerRuntimeUnitOp = iota
+	stopContainerRuntimeUnitOp
+)
+
+func performContainerRuntimeUnitOp(op containerRuntimeUnitOp) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := dbus.NewWithContext(ctx)
+	framework.ExpectNoError(err, "Failed to setup dbus connection")
+	defer conn.Close()
+
+	if containerRuntimeUnitName == "" {
+		containerRuntimeUnitName, err = findContainerRuntimeServiceName()
+		framework.ExpectNoError(err, "Failed to find container runtime name")
+	}
+
+	reschan := make(chan string)
+
+	switch op {
+	case startContainerRuntimeUnitOp:
+		conn.StartUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
+	case stopContainerRuntimeUnitOp:
+		conn.StopUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
+	default:
+		framework.Failf("Unexpected container runtime op: %v", op)
+	}
+
+	job := <-reschan
+	framework.ExpectEqual(job, "done", "Expected job to complete with done")
+
+	return nil
+}
+
+func stopContainerRuntime() error {
+	return performContainerRuntimeUnitOp(stopContainerRuntimeUnitOp)
+}
+
+func startContainerRuntime() error {
+	return performContainerRuntimeUnitOp(startContainerRuntimeUnitOp)
 }
 
 // restartKubelet restarts the current kubelet service.
@@ -410,7 +500,7 @@ func kubeletHealthCheck(url string) bool {
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {
-	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+	if kubeletCfg.CgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
 	}
 	return cgroupName.ToCgroupfs()
@@ -464,4 +554,91 @@ func waitForAllContainerRemoval(ctx context.Context, podName, podNS string) {
 		}
 		return nil
 	}, 2*time.Minute, 1*time.Second).Should(gomega.Succeed())
+}
+
+func getPidsForProcess(name, pidFile string) ([]int, error) {
+	if len(pidFile) > 0 {
+		pid, err := getPidFromPidFile(pidFile)
+		if err == nil {
+			return []int{pid}, nil
+		}
+		// log the error and fall back to pidof
+		runtime.HandleError(err)
+	}
+	return procfs.PidOf(name)
+}
+
+func getPidFromPidFile(pidFile string) (int, error) {
+	file, err := os.Open(pidFile)
+	if err != nil {
+		return 0, fmt.Errorf("error opening pid file %s: %v", pidFile, err)
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return 0, fmt.Errorf("error reading pid file %s: %v", pidFile, err)
+	}
+
+	pid, err := strconv.Atoi(string(data))
+	if err != nil {
+		return 0, fmt.Errorf("error parsing %s as a number: %v", string(data), err)
+	}
+
+	return pid, nil
+}
+
+// WaitForPodInitContainerRestartCount waits for the given Pod init container
+// to achieve at least a given restartCount
+// TODO: eventually look at moving to test/e2e/framework/pod
+func WaitForPodInitContainerRestartCount(ctx context.Context, c clientset.Interface, namespace, podName string, initContainerIndex int, desiredRestartCount int32, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("init container %d started", initContainerIndex)
+	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		if initContainerIndex > len(pod.Status.InitContainerStatuses)-1 {
+			return false, nil
+		}
+		containerStatus := pod.Status.InitContainerStatuses[initContainerIndex]
+		return containerStatus.RestartCount >= desiredRestartCount, nil
+	})
+}
+
+// WaitForPodContainerRestartCount waits for the given Pod container to achieve at least a given restartCount
+// TODO: eventually look at moving to test/e2e/framework/pod
+func WaitForPodContainerRestartCount(ctx context.Context, c clientset.Interface, namespace, podName string, containerIndex int, desiredRestartCount int32, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %d started", containerIndex)
+	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		if containerIndex > len(pod.Status.ContainerStatuses)-1 {
+			return false, nil
+		}
+		containerStatus := pod.Status.ContainerStatuses[containerIndex]
+		return containerStatus.RestartCount >= desiredRestartCount, nil
+	})
+}
+
+// WaitForPodInitContainerToFail waits for the given Pod init container to fail with the given reason, specifically due to
+// invalid container configuration. In this case, the container will remain in a waiting state with a specific
+// reason set, which should match the given reason.
+// TODO: eventually look at moving to test/e2e/framework/pod
+func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, namespace, podName string, containerIndex int, reason string, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %d failed with reason %s", containerIndex, reason)
+	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		switch pod.Status.Phase {
+		case v1.PodPending:
+			if len(pod.Status.InitContainerStatuses) == 0 {
+				return false, nil
+			}
+			containerStatus := pod.Status.InitContainerStatuses[containerIndex]
+			if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == reason {
+				return true, nil
+			}
+			return false, nil
+		case v1.PodFailed, v1.PodRunning, v1.PodSucceeded:
+			return false, fmt.Errorf("pod was expected to be pending, but it is in the state: %s", pod.Status.Phase)
+		}
+		return false, nil
+	})
+}
+
+func nodeNameOrIP() string {
+	return "localhost"
 }

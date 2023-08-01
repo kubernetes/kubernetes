@@ -68,7 +68,7 @@ func (client FirewallPolicyRuleGroupsClient) CreateOrUpdate(ctx context.Context,
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.FirewallPolicyRuleGroupsClient", "CreateOrUpdate", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.FirewallPolicyRuleGroupsClient", "CreateOrUpdate", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -105,6 +105,7 @@ func (client FirewallPolicyRuleGroupsClient) CreateOrUpdatePreparer(ctx context.
 // http.Response Body if it receives an error.
 func (client FirewallPolicyRuleGroupsClient) CreateOrUpdateSender(req *http.Request) (future FirewallPolicyRuleGroupsCreateOrUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -152,7 +153,7 @@ func (client FirewallPolicyRuleGroupsClient) Delete(ctx context.Context, resourc
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.FirewallPolicyRuleGroupsClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.FirewallPolicyRuleGroupsClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -185,6 +186,7 @@ func (client FirewallPolicyRuleGroupsClient) DeletePreparer(ctx context.Context,
 // http.Response Body if it receives an error.
 func (client FirewallPolicyRuleGroupsClient) DeleteSender(req *http.Request) (future FirewallPolicyRuleGroupsDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

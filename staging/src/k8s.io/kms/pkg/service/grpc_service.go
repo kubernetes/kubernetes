@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 
 	"k8s.io/klog/v2"
-	kmsapi "k8s.io/kms/apis/v2alpha1"
+	kmsapi "k8s.io/kms/apis/v2"
 )
 
 // GRPCService is a grpc server that runs the kms v2 alpha1 API.

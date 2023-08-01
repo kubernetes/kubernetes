@@ -202,9 +202,9 @@ func (p *perfCounterNodeStatsClient) getNodeInfo() nodeInfo {
 	return p.nodeInfo
 }
 
-func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter *perfCounter, networkAdapterCounter *networkCounter) {
+func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter perfCounter, networkAdapterCounter *networkCounter) {
 	cpuValue, err := cpuCounter.getData()
-	cpuCores := runtime.NumCPU()
+	cpuCores := ProcessorCount()
 	if err != nil {
 		klog.ErrorS(err, "Unable to get cpu perf counter data")
 		return

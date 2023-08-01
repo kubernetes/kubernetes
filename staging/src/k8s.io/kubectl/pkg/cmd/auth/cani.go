@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	discovery "k8s.io/client-go/discovery"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -62,7 +62,7 @@ type CanIOptions struct {
 	ResourceName   string
 	List           bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
 }
 
@@ -110,7 +110,7 @@ var (
 )
 
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command
-func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCanI(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &CanIOptions{
 		IOStreams: streams,
 	}

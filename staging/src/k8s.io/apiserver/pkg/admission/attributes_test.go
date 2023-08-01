@@ -39,7 +39,7 @@ func TestAddAnnotation(t *testing.T) {
 	assert.Equal(t, annotations["foo.admission.k8s.io/key1"], "value1", "admission annotations should not be overwritten")
 
 	// test invalid plugin names
-	var testCases map[string]string = map[string]string{
+	var testCases = map[string]string{
 		"invalid dns subdomain": "INVALID-DNS-Subdomain/policy",
 		"no plugin name":        "policy",
 		"no key name":           "foo.admission.k8s.io",

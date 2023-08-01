@@ -81,7 +81,6 @@ var _ initializer.WantsRESTMapper = &celAdmissionPlugin{}
 var _ initializer.WantsDynamicClient = &celAdmissionPlugin{}
 var _ initializer.WantsDrainedNotification = &celAdmissionPlugin{}
 var _ initializer.WantsAuthorizer = &celAdmissionPlugin{}
-
 var _ admission.InitializationValidator = &celAdmissionPlugin{}
 var _ admission.ValidationInterface = &celAdmissionPlugin{}
 
@@ -114,7 +113,6 @@ func (c *celAdmissionPlugin) SetDrainedNotification(stopCh <-chan struct{}) {
 func (c *celAdmissionPlugin) SetAuthorizer(authorizer authorizer.Authorizer) {
 	c.authorizer = authorizer
 }
-
 func (c *celAdmissionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	if featureGates.Enabled(features.ValidatingAdmissionPolicy) {
 		c.enabled = true

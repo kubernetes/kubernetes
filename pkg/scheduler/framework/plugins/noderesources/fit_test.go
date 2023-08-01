@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -473,6 +474,17 @@ func TestEnoughRequests(t *testing.T) {
 			name:                      "skip checking extended resource request with quantity zero via resource groups",
 			wantInsufficientResources: []InsufficientResource{},
 		},
+		{
+			pod: newResourcePod(
+				framework.Resource{
+					ScalarResources: map[v1.ResourceName]int64{
+						extendedResourceA: 1,
+					}}),
+			nodeInfo: framework.NewNodeInfo(newResourcePod(framework.Resource{
+				MilliCPU: 20, Memory: 30, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}})),
+			name:                      "skip checking resource request with quantity zero",
+			wantInsufficientResources: []InsufficientResource{},
+		},
 	}
 
 	for _, test := range enoughPodsTests {
@@ -639,6 +651,85 @@ func TestStorageRequests(t *testing.T) {
 
 }
 
+func TestRestartableInitContainers(t *testing.T) {
+	newPod := func() *v1.Pod {
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+			},
+		}
+	}
+	newPodWithRestartableInitContainers := func() *v1.Pod {
+		restartPolicyAlways := v1.ContainerRestartPolicyAlways
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+				InitContainers: []v1.Container{
+					{
+						Name:          "restartable-init",
+						RestartPolicy: &restartPolicyAlways,
+					},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name                    string
+		pod                     *v1.Pod
+		enableSidecarContainers bool
+		wantStatus              *framework.Status
+	}{
+		{
+			name: "allow pod without restartable init containers if sidecar containers is disabled",
+			pod:  newPod(),
+		},
+		{
+			name:       "not allow pod with restartable init containers if sidecar containers is disabled",
+			pod:        newPodWithRestartableInitContainers(),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled"),
+		},
+		{
+			name:                    "allow pod without restartable init containers if sidecar containers is enabled",
+			enableSidecarContainers: true,
+			pod:                     newPod(),
+		},
+		{
+			name:                    "allow pod with restartable init containers if sidecar containers is enabled",
+			enableSidecarContainers: true,
+			pod:                     newPodWithRestartableInitContainers(),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(0, 0, 1, 0, 0, 0)}}
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(&node)
+
+			p, err := NewFit(&config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{EnableSidecarContainers: test.enableSidecarContainers})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cycleState := framework.NewCycleState()
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("prefilter failed with status: %v", preFilterStatus)
+			}
+
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, nodeInfo)
+			if diff := cmp.Diff(gotStatus, test.wantStatus); diff != "" {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			}
+		})
+	}
+
+}
+
 func TestFitScore(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -647,6 +738,7 @@ func TestFitScore(t *testing.T) {
 		existingPods         []*v1.Pod
 		expectedPriorities   framework.NodeScoreList
 		nodeResourcesFitArgs config.NodeResourcesFitArgs
+		runPreScore          bool
 	}{
 		{
 			name: "test case for ScoringStrategy RequestedToCapacityRatio case1",
@@ -674,6 +766,7 @@ func TestFitScore(t *testing.T) {
 					},
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy RequestedToCapacityRatio case2",
@@ -701,6 +794,7 @@ func TestFitScore(t *testing.T) {
 					},
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy MostAllocated",
@@ -722,6 +816,7 @@ func TestFitScore(t *testing.T) {
 					Resources: defaultResources,
 				},
 			},
+			runPreScore: true,
 		},
 		{
 			name: "test case for ScoringStrategy LeastAllocated",
@@ -743,17 +838,91 @@ func TestFitScore(t *testing.T) {
 					Resources: defaultResources,
 				},
 			},
+			runPreScore: true,
+		},
+		{
+			name: "test case for ScoringStrategy RequestedToCapacityRatio case1 if PreScore is not called",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "5000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 10}, {Name: "node2", Score: 32}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.RequestedToCapacityRatio,
+					Resources: defaultResources,
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: []config.UtilizationShapePoint{
+							{Utilization: 0, Score: 10},
+							{Utilization: 100, Score: 0},
+						},
+					},
+				},
+			},
+			runPreScore: false,
+		},
+		{
+			name: "test case for ScoringStrategy MostAllocated if PreScore is not called",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 67}, {Name: "node2", Score: 36}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.MostAllocated,
+					Resources: defaultResources,
+				},
+			},
+			runPreScore: false,
+		},
+		{
+			name: "test case for ScoringStrategy LeastAllocated if PreScore is not called",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 32}, {Name: "node2", Score: 63}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.LeastAllocated,
+					Resources: defaultResources,
+				},
+			},
+			runPreScore: false,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
-			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			args := test.nodeResourcesFitArgs
 			p, err := NewFit(&args, fh, plfeature.Features{})
 			if err != nil {
@@ -762,9 +931,15 @@ func TestFitScore(t *testing.T) {
 
 			var gotPriorities framework.NodeScoreList
 			for _, n := range test.nodes {
+				if test.runPreScore {
+					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
+					if !status.IsSuccess() {
+						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
+					}
+				}
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
 				if !status.IsSuccess() {
-					t.Errorf("unexpected error: %v", status)
+					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
 				gotPriorities = append(gotPriorities, framework.NodeScore{Name: n.Name, Score: score})
 			}
@@ -864,6 +1039,9 @@ func BenchmarkTestFitScore(b *testing.B) {
 
 	for _, test := range tests {
 		b.Run(test.name, func(b *testing.B) {
+			_, ctx := ktesting.NewTestContext(b)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			existingPods := []*v1.Pod{
 				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
 			}
@@ -872,14 +1050,14 @@ func BenchmarkTestFitScore(b *testing.B) {
 			}
 			state := framework.NewCycleState()
 			var nodeResourcesFunc = runtime.FactoryAdapter(plfeature.Features{}, NewFit)
-			pl := plugintesting.SetupPlugin(b, nodeResourcesFunc, &test.nodeResourcesFitArgs, cache.NewSnapshot(existingPods, nodes))
+			pl := plugintesting.SetupPlugin(ctx, b, nodeResourcesFunc, &test.nodeResourcesFitArgs, cache.NewSnapshot(existingPods, nodes))
 			p := pl.(*Fit)
 
 			b.ResetTimer()
 
 			requestedPod := st.MakePod().Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj()
 			for i := 0; i < b.N; i++ {
-				_, status := p.Score(context.Background(), state, requestedPod, nodes[0].Name)
+				_, status := p.Score(ctx, state, requestedPod, nodes[0].Name)
 				if !status.IsSuccess() {
 					b.Errorf("unexpected status: %v", status)
 				}
@@ -892,22 +1070,22 @@ func TestEventsToRegister(t *testing.T) {
 	tests := []struct {
 		name                             string
 		inPlacePodVerticalScalingEnabled bool
-		expectedClusterEvents            []framework.ClusterEvent
+		expectedClusterEvents            []framework.ClusterEventWithHint
 	}{
 		{
 			"Register events with InPlacePodVerticalScaling feature enabled",
 			true,
-			[]framework.ClusterEvent{
-				{Resource: "Pod", ActionType: framework.Update | framework.Delete},
-				{Resource: "Node", ActionType: framework.Add | framework.Update},
+			[]framework.ClusterEventWithHint{
+				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.Update | framework.Delete}},
+				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.Update}},
 			},
 		},
 		{
 			"Register events with InPlacePodVerticalScaling feature disabled",
 			false,
-			[]framework.ClusterEvent{
-				{Resource: "Pod", ActionType: framework.Delete},
-				{Resource: "Node", ActionType: framework.Add | framework.Update},
+			[]framework.ClusterEventWithHint{
+				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.Delete}},
+				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.Update}},
 			},
 		},
 	}

@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/client-go/informers"
@@ -224,10 +223,10 @@ func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.
 	}
 
 	if !reflect.DeepEqual(expectedVolumes, pod.Spec.Volumes) {
-		t.Errorf("unexpected volumes: %s", diff.ObjectReflectDiff(expectedVolumes, pod.Spec.Volumes))
+		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumes, pod.Spec.Volumes))
 	}
 	if !reflect.DeepEqual(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts) {
-		t.Errorf("unexpected volumes: %s", diff.ObjectReflectDiff(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts))
+		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts))
 	}
 
 	// ensure result converted to v1 matches defaulted object
@@ -544,6 +543,34 @@ func TestAllowsReferencedSecret(t *testing.T) {
 	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+
+	pod2 = &api.Pod{
+		Spec: api.PodSpec{
+			ServiceAccountName: DefaultServiceAccountName,
+			EphemeralContainers: []api.EphemeralContainer{
+				{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name: "container-2",
+						Env: []api.EnvVar{
+							{
+								Name: "env-1",
+								ValueFrom: &api.EnvVarSource{
+									SecretKeyRef: &api.SecretKeySelector{
+										LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	// validate enforces restrictions on secret mounts when operation==create and subresource=='' or operation==update and subresource==ephemeralcontainers"
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "ephemeralcontainers", admission.Update, &metav1.UpdateOptions{}, false, nil)
+	if err := admit.Validate(context.TODO(), attrs, nil); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 }
 
 func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
@@ -620,6 +647,66 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
 	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
 		t.Errorf("Unexpected error: %v", err)
+	}
+
+	pod2 = &api.Pod{
+		Spec: api.PodSpec{
+			ServiceAccountName: DefaultServiceAccountName,
+			InitContainers: []api.Container{
+				{
+					Name: "container-1",
+					Env: []api.EnvVar{
+						{
+							Name: "env-1",
+							ValueFrom: &api.EnvVarSource{
+								SecretKeyRef: &api.SecretKeySelector{
+									LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err != nil {
+		t.Errorf("admit only enforces restrictions on secret mounts when operation==create. Unexpected error: %v", err)
+	}
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+		t.Errorf("validate only enforces restrictions on secret mounts when operation==create and subresource==''. Unexpected error: %v", err)
+	}
+
+	pod2 = &api.Pod{
+		Spec: api.PodSpec{
+			ServiceAccountName: DefaultServiceAccountName,
+			EphemeralContainers: []api.EphemeralContainer{
+				{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name: "container-2",
+						Env: []api.EnvVar{
+							{
+								Name: "env-1",
+								ValueFrom: &api.EnvVarSource{
+									SecretKeyRef: &api.SecretKeySelector{
+										LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil)
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err != nil {
+		t.Errorf("admit only enforces restrictions on secret mounts when operation==create and subresource==''. Unexpected error: %v", err)
+	}
+	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "ephemeralcontainers", admission.Update, &metav1.UpdateOptions{}, false, nil)
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+		t.Errorf("validate enforces restrictions on secret mounts when operation==update and subresource==ephemeralcontainers. Unexpected error: %v", err)
 	}
 }
 

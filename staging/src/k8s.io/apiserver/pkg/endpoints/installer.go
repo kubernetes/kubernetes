@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/deprecation"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	utilwarning "k8s.io/apiserver/pkg/endpoints/warning"
@@ -600,6 +600,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if a.group.ConvertabilityChecker != nil {
 			decodableVersions = a.group.ConvertabilityChecker.VersionsForGroupKind(fqKindToRegister.GroupKind())
 		}
+
 		resourceInfo = &storageversion.ResourceInfo{
 			GroupResource: schema.GroupResource{
 				Group:    a.group.GroupVersion.Group,
@@ -612,6 +613,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			EquivalentResourceMapper: a.group.EquivalentResourceRegistry,
 
 			DirectlyDecodableVersions: decodableVersions,
+
+			ServedVersions: a.group.AllServedVersionsByResource[path],
 		}
 	}
 
@@ -674,28 +677,23 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
 
-	// Use TypeConverter's nil-ness as a proxy for whether SSA/OpenAPI is enabled
-	// This should be removed in the future and made unconditional
-	// https://github.com/kubernetes/kubernetes/pull/114998
-	if a.group.TypeConverter != nil {
-		var resetFields map[fieldpath.APIVersion]*fieldpath.Set
-		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
-			resetFields = resetFieldsStrategy.GetResetFields()
-		}
+	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
+	if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
+		resetFields = resetFieldsStrategy.GetResetFields()
+	}
 
-		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
-			a.group.TypeConverter,
-			a.group.UnsafeConvertor,
-			a.group.Defaulter,
-			a.group.Creater,
-			fqKindToRegister,
-			reqScope.HubGroupVersion,
-			subresource,
-			resetFields,
-		)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
-		}
+	reqScope.FieldManager, err = managedfields.NewDefaultFieldManager(
+		a.group.TypeConverter,
+		a.group.UnsafeConvertor,
+		a.group.Defaulter,
+		a.group.Creater,
+		fqKindToRegister,
+		reqScope.HubGroupVersion,
+		subresource,
+		resetFields,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
 	}
 
 	for _, action := range actions {
@@ -716,7 +714,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			requestScope = "resource"
 			operationSuffix = operationSuffix + "WithPath"
 		}
-		if strings.Index(action.Path, "/{name}") != -1 || action.Verb == "POST" {
+		if strings.Contains(action.Path, "/{name}") || action.Verb == "POST" {
 			requestScope = "resource"
 		}
 		if action.AllNamespaces {

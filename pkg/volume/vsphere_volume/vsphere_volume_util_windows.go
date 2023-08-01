@@ -40,6 +40,10 @@ func verifyDevicePath(path string) (string, error) {
 		klog.V(4).Infof("Found vSphere disk attached with disk number %v", path)
 		return path, nil
 	}
+	// NOTE: If a powershell command that would return an array (e.g.: Get-Disk) would return an array of
+	// one element, powershell will in fact return that object directly, and **not an array containing
+	// that elemenent, which means piping it to ConvertTo-Json would not result in array as expected below.
+	// The following syntax forces it to always be an array.
 	cmd := exec.Command("powershell", "/c", "Get-Disk | Select Number, SerialNumber | ConvertTo-JSON")
 	output, err := cmd.Output()
 	if err != nil {

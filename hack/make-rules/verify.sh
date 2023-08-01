@@ -35,6 +35,7 @@ EXCLUDED_PATTERNS=(
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   "verify-golangci-lint-pr.sh"   # Don't run this as part of the block pull-kubernetes-verify yet. TODO(pohly): try this in a non-blocking job and then reconsider this.
   "verify-licenses.sh"           # runs in a separate job to monitor availability of the dependencies periodically
+  "verify-openapi-docs-urls.sh"  # Spams docs URLs, don't run in CI.
   )
 
 # Exclude typecheck in certain cases, if they're running in a separate job.
@@ -126,10 +127,10 @@ function run-cmd {
   local tr
 
   if ${SILENT}; then
-    juLog -output="${output}" -class="verify" -name="${testname}" "$@" &> /dev/null
+    juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@" &> /dev/null
     tr=$?
   else
-    juLog -output="${output}" -class="verify" -name="${testname}" "$@"
+    juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@"
     tr=$?
   fi
   return ${tr}

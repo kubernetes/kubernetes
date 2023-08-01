@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/discovery"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -40,18 +41,18 @@ var (
 type APIVersionsOptions struct {
 	discoveryClient discovery.CachedDiscoveryInterface
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewAPIVersionsOptions creates the options for APIVersions
-func NewAPIVersionsOptions(ioStreams genericclioptions.IOStreams) *APIVersionsOptions {
+func NewAPIVersionsOptions(ioStreams genericiooptions.IOStreams) *APIVersionsOptions {
 	return &APIVersionsOptions{
 		IOStreams: ioStreams,
 	}
 }
 
 // NewCmdAPIVersions creates the `api-versions` command
-func NewCmdAPIVersions(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAPIVersions(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewAPIVersionsOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "api-versions",

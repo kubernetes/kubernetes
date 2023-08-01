@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+
+	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
@@ -230,71 +232,17 @@ func (m *ManagerImpl) getNUMANodeIds(topology *pluginapi.TopologyInfo) []int {
 }
 
 func (m *ManagerImpl) getPodDeviceRequest(pod *v1.Pod) map[string]int {
-	podResources := sets.NewString()
-
-	// Find the max request of a given resource across all init containers
-	initContainerRequests := make(map[string]int)
-	for _, container := range pod.Spec.InitContainers {
-		for resourceObj, requestedObj := range container.Resources.Limits {
-			resource := string(resourceObj)
-			requested := int(requestedObj.Value())
-
-			if !m.isDevicePluginResource(resource) {
-				continue
-			}
-
-			podResources.Insert(resource)
-
-			if _, exists := initContainerRequests[resource]; !exists {
-				initContainerRequests[resource] = requested
-				continue
-			}
-			if requested > initContainerRequests[resource] {
-				initContainerRequests[resource] = requested
-
-			}
-		}
-	}
-
-	// Compute the sum of requests across all app containers for a given resource
-	appContainerRequests := make(map[string]int)
-	for _, container := range pod.Spec.Containers {
-		for resourceObj, requestedObj := range container.Resources.Limits {
-			resource := string(resourceObj)
-			requested := int(requestedObj.Value())
-
-			if !m.isDevicePluginResource(resource) {
-				continue
-			}
-			podResources.Insert(resource)
-			appContainerRequests[resource] += requested
-		}
-	}
-
-	// Calculate podRequests as the max of init and app container requests for a given resource
+	// for these device plugin resources, requests == limits
+	limits := resource.PodLimits(pod, resource.PodResourcesOptions{
+		ExcludeOverhead: true,
+	})
 	podRequests := make(map[string]int)
-	for resource := range podResources {
-		_, initExists := initContainerRequests[resource]
-		_, appExists := appContainerRequests[resource]
-
-		if initExists && !appExists {
-			podRequests[resource] = initContainerRequests[resource]
+	for resourceName, quantity := range limits {
+		if !m.isDevicePluginResource(string(resourceName)) {
 			continue
 		}
-
-		if !initExists && appExists {
-			podRequests[resource] = appContainerRequests[resource]
-			continue
-		}
-
-		if initContainerRequests[resource] > appContainerRequests[resource] {
-			podRequests[resource] = initContainerRequests[resource]
-			continue
-		}
-
-		podRequests[resource] = appContainerRequests[resource]
+		podRequests[string(resourceName)] = int(quantity.Value())
 	}
-
 	return podRequests
 }
 

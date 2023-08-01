@@ -45,7 +45,7 @@ func TestExplainErrors(t *testing.T) {
 		Version:  "v1",
 		Resource: "doesntmatter",
 	}, false, "unknown-format")
-	require.ErrorContains(t, err, "could not locate schema")
+	require.ErrorContains(t, err, "couldn't find resource for \"test0.example.com/v1, Resource=doesntmatter\"")
 
 	// Validate error when openapi client returns error.
 	fakeClient.ForcedErr = fmt.Errorf("Always fails")
@@ -74,7 +74,7 @@ func TestExplainErrors(t *testing.T) {
 	require.ErrorContains(t, err, "failed to parse openapi schema")
 
 	// Validate error when render template is not recognized.
-	client := openapitest.NewFileClient(t)
+	client := openapitest.NewEmbeddedFileClient()
 	err = PrintModelDescription(nil, &buf, client, apiGroupsGVR, false, "unknown-format")
 	require.ErrorContains(t, err, "unrecognized format: unknown-format")
 }
@@ -84,7 +84,7 @@ func TestExplainErrors(t *testing.T) {
 func TestExplainOpenAPIClient(t *testing.T) {
 	var buf bytes.Buffer
 
-	fileClient := openapitest.NewFileClient(t)
+	fileClient := openapitest.NewEmbeddedFileClient()
 	paths, err := fileClient.Paths()
 	require.NoError(t, err)
 	gv, found := paths[apiGroupsPath]

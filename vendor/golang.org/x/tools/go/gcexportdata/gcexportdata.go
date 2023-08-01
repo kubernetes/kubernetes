@@ -27,7 +27,6 @@ import (
 	"go/token"
 	"go/types"
 	"io"
-	"io/ioutil"
 	"os/exec"
 
 	"golang.org/x/tools/internal/gcimporter"
@@ -85,6 +84,19 @@ func NewReader(r io.Reader) (io.Reader, error) {
 	}
 }
 
+// readAll works the same way as io.ReadAll, but avoids allocations and copies
+// by preallocating a byte slice of the necessary size if the size is known up
+// front. This is always possible when the input is an archive. In that case,
+// NewReader will return the known size using an io.LimitedReader.
+func readAll(r io.Reader) ([]byte, error) {
+	if lr, ok := r.(*io.LimitedReader); ok {
+		data := make([]byte, lr.N)
+		_, err := io.ReadFull(lr, data)
+		return data, err
+	}
+	return io.ReadAll(r)
+}
+
 // Read reads export data from in, decodes it, and returns type
 // information for the package.
 //
@@ -102,19 +114,13 @@ func NewReader(r io.Reader) (io.Reader, error) {
 //
 // On return, the state of the reader is undefined.
 func Read(in io.Reader, fset *token.FileSet, imports map[string]*types.Package, path string) (*types.Package, error) {
-	data, err := ioutil.ReadAll(in)
+	data, err := readAll(in)
 	if err != nil {
 		return nil, fmt.Errorf("reading export data for %q: %v", path, err)
 	}
 
 	if bytes.HasPrefix(data, []byte("!<arch>")) {
 		return nil, fmt.Errorf("can't read export data for %q directly from an archive file (call gcexportdata.NewReader first to extract export data)", path)
-	}
-
-	// The App Engine Go runtime v1.6 uses the old export data format.
-	// TODO(adonovan): delete once v1.7 has been around for a while.
-	if bytes.HasPrefix(data, []byte("package ")) {
-		return gcimporter.ImportData(imports, path, path, bytes.NewReader(data))
 	}
 
 	// The indexed export format starts with an 'i'; the older
@@ -165,7 +171,7 @@ func Write(out io.Writer, fset *token.FileSet, pkg *types.Package) error {
 //
 // Experimental: This API is experimental and may change in the future.
 func ReadBundle(in io.Reader, fset *token.FileSet, imports map[string]*types.Package) ([]*types.Package, error) {
-	data, err := ioutil.ReadAll(in)
+	data, err := readAll(in)
 	if err != nil {
 		return nil, fmt.Errorf("reading export bundle: %v", err)
 	}

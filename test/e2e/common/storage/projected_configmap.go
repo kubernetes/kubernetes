@@ -37,7 +37,7 @@ import (
 
 var _ = SIGDescribe("Projected configMap", func() {
 	f := framework.NewDefaultFramework("projected")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 	   Release: v1.9

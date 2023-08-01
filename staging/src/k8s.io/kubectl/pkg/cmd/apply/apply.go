@@ -35,6 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -75,7 +76,7 @@ type ApplyFlags struct {
 	PruneWhitelist []string // TODO: Remove this in kubectl 1.28 or later
 	PruneAllowlist []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // ApplyOptions defines flags and other configuration parameters for the `apply` command
@@ -109,7 +110,7 @@ type ApplyOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	// Objects (and some denormalized data) which are to be
 	// applied. The standard way to fill in this structure
@@ -159,7 +160,7 @@ var (
 		# Apply the JSON passed into stdin to a pod
 		cat pod.json | kubectl apply -f -
 
-		# Apply the configuration from all files that end with '.json' - i.e. expand wildcard characters in file names
+		# Apply the configuration from all files that end with '.json'
 		kubectl apply -f '*.json'
 
 		# Note: --prune is still in Alpha
@@ -179,7 +180,7 @@ var (
 var ApplySetToolVersion = version.Get().GitVersion
 
 // NewApplyFlags returns a default ApplyFlags
-func NewApplyFlags(streams genericclioptions.IOStreams) *ApplyFlags {
+func NewApplyFlags(streams genericiooptions.IOStreams) *ApplyFlags {
 	return &ApplyFlags{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to apply."),
@@ -193,7 +194,7 @@ func NewApplyFlags(streams genericclioptions.IOStreams) *ApplyFlags {
 }
 
 // NewCmdApply creates the `apply` command
-func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewApplyFlags(ioStreams)
 
 	cmd := &cobra.Command{
@@ -313,11 +314,13 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		if enforceNamespace && parent.IsNamespaced() {
 			parent.Namespace = namespace
 		}
-		// TODO: is version.Get() the right thing? Does it work for non-kubectl package consumers?
-		tooling := ApplySetTooling{name: baseName, version: ApplySetToolVersion}
-		restClient, err := f.ClientForMapping(parent.RESTMapping)
-		if err != nil || restClient == nil {
+		tooling := ApplySetTooling{Name: baseName, Version: ApplySetToolVersion}
+		restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping)
+		if err != nil {
 			return nil, fmt.Errorf("failed to initialize RESTClient for ApplySet: %w", err)
+		}
+		if restClient == nil {
+			return nil, fmt.Errorf("could not build RESTClient for ApplySet")
 		}
 		applySet = NewApplySet(parent, tooling, mapper, restClient)
 	}
@@ -401,7 +404,7 @@ func (o *ApplyOptions) Validate() error {
 		if !o.Prune {
 			return fmt.Errorf("--applyset requires --prune")
 		}
-		if err := o.ApplySet.Validate(); err != nil {
+		if err := o.ApplySet.Validate(context.TODO(), o.DynamicClient); err != nil {
 			return err
 		}
 	}
@@ -419,8 +422,6 @@ func (o *ApplyOptions) Validate() error {
 				return fmt.Errorf("--selector is incompatible with --applyset")
 			} else if len(o.PruneResources) > 0 {
 				return fmt.Errorf("--prune-allowlist is incompatible with --applyset")
-			} else {
-				klog.Warning("WARNING: --prune --applyset is not fully implemented and does not yet prune any resources.")
 			}
 		} else {
 			if !o.All && o.Selector == "" {
@@ -467,7 +468,7 @@ func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 		o.objects, err = r.Infos()
 
 		if o.ApplySet != nil {
-			if err := o.ApplySet.addLabels(o.objects); err != nil {
+			if err := o.ApplySet.AddLabels(o.objects...); err != nil {
 				return nil, err
 			}
 		}
@@ -510,22 +511,11 @@ func (o *ApplyOptions) Run() error {
 	}
 
 	if o.ApplySet != nil {
-		if err := o.ApplySet.FetchParent(); err != nil {
-			return err
-		}
-		// Update the live parent object to the superset of the current and previous resources.
-		// Doing this before the actual apply and prune operations improves behavior by ensuring
-		// the live object contains the superset on failure. This may cause the next pruning
-		// operation to make a larger number of GET requests than strictly necessary, but it prevents
-		// object leakage from the set. The superset will automatically be reduced to the correct
-		// set by the next successful operation.
-		for _, info := range infos {
-			o.ApplySet.AddResource(info.ResourceMapping(), info.Namespace)
-		}
-		if err := o.ApplySet.UpdateParent(UpdateToSuperset, o.DryRunStrategy, o.ValidationDirective); err != nil {
+		if err := o.ApplySet.BeforeApply(infos, o.DryRunStrategy, o.ValidationDirective); err != nil {
 			return err
 		}
 	}
+
 	// Iterate through all objects, applying each one.
 	for _, info := range infos {
 		if err := o.applyOneObject(info); err != nil {
@@ -1011,6 +1001,7 @@ func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 		return err
 	}
 	o.VisitedUids.Insert(metadata.GetUID())
+
 	return nil
 }
 
@@ -1029,15 +1020,11 @@ func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 
 		if o.Prune {
 			if cmdutil.ApplySet.IsEnabled() && o.ApplySet != nil {
-				pruner := newApplySetPruner(o)
-				if err := pruner.pruneAll(ctx, o.ApplySet); err != nil {
+				if err := o.ApplySet.Prune(ctx, o); err != nil {
 					// Do not update the ApplySet. If pruning failed, we want to keep the superset
 					// of the previous and current resources in the ApplySet, so that the pruning
 					// step of the next apply will be able to clean up the set correctly.
 					return err
-				}
-				if err := o.ApplySet.UpdateParent(UpdateToLatestSet, o.DryRunStrategy, o.ValidationDirective); err != nil {
-					return fmt.Errorf("apply and prune succeeded, but ApplySet update failed: %w", err)
 				}
 			} else {
 				p := newPruner(o)

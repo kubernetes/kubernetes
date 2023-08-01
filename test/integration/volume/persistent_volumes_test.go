@@ -19,9 +19,6 @@ package volume
 import (
 	"context"
 	"fmt"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"math/rand"
 	"os"
 	"strconv"
@@ -47,6 +44,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // Several tests in this file are configurable by environment variables:
@@ -1044,7 +1042,6 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 // assignment and binding of PVCs with storage class name set to nil or "" with
 // and without presence of a default SC.
 func TestRetroactiveStorageClassAssignment(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, true)()
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=DefaultStorageClass"}, framework.SharedEtcd())
 	defer s.TearDownFn()
 	namespaceName := "retro-pvc-sc"
@@ -1357,7 +1354,9 @@ func createClients(namespaceName string, t *testing.T, s *kubeapiservertesting.T
 	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fakecloud.Cloud{}
 	informers := informers.NewSharedInformerFactory(testClient, getSyncPeriod(syncPeriod))
+	_, ctx := ktesting.NewTestContext(t)
 	ctrl, err := persistentvolumecontroller.NewController(
+		ctx,
 		persistentvolumecontroller.ControllerParameters{
 			KubeClient:                binderClient,
 			SyncPeriod:                getSyncPeriod(syncPeriod),

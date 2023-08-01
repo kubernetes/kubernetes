@@ -149,8 +149,9 @@ In [It] at: wait_test.go:54 <time>
 						Type: "failed",
 						Description: `[FAILED] Timed out after <after>.
 The function passed to Eventually returned the following error:
-pods "no-such-pod" not found
-    <framework.transientError>: {
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
         error: <*errors.StatusError>{
             ErrStatus: {
                 TypeMeta: {Kind: "", APIVersion: ""},
@@ -179,8 +180,9 @@ INFO: Failed inside E2E framework:
     	wait_test.go:58
 [FAILED] Timed out after <after>.
 The function passed to Eventually returned the following error:
-pods "no-such-pod" not found
-    <framework.transientError>: {
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
         error: <*errors.StatusError>{
             ErrStatus: {
                 TypeMeta: {Kind: "", APIVersion: ""},
@@ -209,8 +211,9 @@ In [It] at: wait_test.go:58 <time>
 						Type: "failed",
 						Description: `[FAILED] Timed out after <after>.
 The function passed to Eventually returned the following error:
-pods "no-such-pod" not found
-    <framework.transientError>: {
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
         error: <*errors.StatusError>{
             ErrStatus: {
                 TypeMeta: {Kind: "", APIVersion: ""},
@@ -234,8 +237,9 @@ In [It] at: wait_test.go:62 <time>
 					SystemErr: `> Enter [It] not found, retry with wrappers - wait_test.go:61 <time>
 [FAILED] Timed out after <after>.
 The function passed to Eventually returned the following error:
-pods "no-such-pod" not found
-    <framework.transientError>: {
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
         error: <*errors.StatusError>{
             ErrStatus: {
                 TypeMeta: {Kind: "", APIVersion: ""},
@@ -264,8 +268,9 @@ In [It] at: wait_test.go:62 <time>
 						Type: "failed",
 						Description: `[FAILED] Timed out after <after>.
 The function passed to Eventually returned the following error:
-pods "no-such-pod" not found
-    <framework.transientError>: {
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
         error: <*errors.StatusError>{
             ErrStatus: {
                 TypeMeta: {Kind: "", APIVersion: ""},
@@ -289,8 +294,9 @@ In [It] at: wait_test.go:66 <time>
 					SystemErr: `> Enter [It] not found, retry with inverted wrappers - wait_test.go:65 <time>
 [FAILED] Timed out after <after>.
 The function passed to Eventually returned the following error:
-pods "no-such-pod" not found
-    <framework.transientError>: {
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
         error: <*errors.StatusError>{
             ErrStatus: {
                 TypeMeta: {Kind: "", APIVersion: ""},
@@ -383,8 +389,9 @@ In [It] at: wait_test.go:75 <time>
 					Failure: &reporters.JUnitFailure{
 						Description: `[FAILED] Timed out after <after>.
 The function passed to Eventually returned the following error:
-fake API error
-    <*errors.StatusError>: {
+    <*errors.StatusError>: 
+    fake API error
+    {
         ErrStatus: 
             code: 429
             details:
@@ -416,8 +423,9 @@ STEP: returning pod - wait_test.go:90 <time>
 STEP: returning fake API error - wait_test.go:82 <time>
 [FAILED] Timed out after <after>.
 The function passed to Eventually returned the following error:
-fake API error
-    <*errors.StatusError>: {
+    <*errors.StatusError>: 
+    fake API error
+    {
         ErrStatus: 
             code: 429
             details:

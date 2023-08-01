@@ -56,3 +56,52 @@ func TestLegacyLogSymLink(t *testing.T) {
 	expectedPath := filepath.Join(legacyContainerLogsDir, fmt.Sprintf("%s_%s_%s-%s", podName, podNamespace, containerName, containerID)[:251]+".log")
 	as.Equal(expectedPath, legacyLogSymlink(containerID, containerName, podName, podNamespace))
 }
+
+func TestGetContainerIDFromLegacyLogSymLink(t *testing.T) {
+	containerID := randStringBytes(80)
+	containerName := randStringBytes(70)
+	podName := randStringBytes(128)
+	podNamespace := randStringBytes(10)
+
+	for _, test := range []struct {
+		name        string
+		logSymLink  string
+		expected    string
+		shouldError bool
+	}{
+		{
+			name:        "unable to find separator",
+			logSymLink:  "dummy.log",
+			expected:    "",
+			shouldError: true,
+		},
+		{
+			name:        "invalid suffix",
+			logSymLink:  filepath.Join(legacyContainerLogsDir, fmt.Sprintf("%s_%s_%s-%s", podName, podNamespace, containerName, containerID)[:251]+".invalidsuffix"),
+			expected:    "",
+			shouldError: true,
+		},
+		{
+			name:        "container ID too short",
+			logSymLink:  filepath.Join(legacyContainerLogsDir, fmt.Sprintf("%s_%s_%s-%s", podName, podNamespace, containerName, containerID[:5])+".log"),
+			expected:    "",
+			shouldError: true,
+		},
+		{
+			name:        "valid path",
+			logSymLink:  filepath.Join(legacyContainerLogsDir, fmt.Sprintf("%s_%s_%s-%s", podName, podNamespace, containerName, containerID)[:251]+".log"),
+			expected:    containerID[:40],
+			shouldError: false,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			containerID, err := getContainerIDFromLegacyLogSymlink(test.logSymLink)
+			if test.shouldError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, test.expected, containerID)
+		})
+	}
+}

@@ -42,27 +42,16 @@ func (oa OpenAPI) InstallV2(c *restful.Container, mux *mux.PathRecorderMux) (*ha
 		klog.Fatalf("Failed to build open api spec for root: %v", err)
 	}
 	spec.Definitions = handler.PruneDefaults(spec.Definitions)
-	openAPIVersionedService, err := handler.NewOpenAPIService(spec)
-	if err != nil {
-		klog.Fatalf("Failed to create OpenAPIService: %v", err)
-	}
-
-	err = openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", mux)
-	if err != nil {
-		klog.Fatalf("Failed to register versioned open api spec for root: %v", err)
-	}
+	openAPIVersionedService := handler.NewOpenAPIService(spec)
+	openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", mux)
 
 	return openAPIVersionedService, spec
 }
 
 // InstallV3 adds the static group/versions defined in the RegisteredWebServices to the OpenAPI v3 spec
 func (oa OpenAPI) InstallV3(c *restful.Container, mux *mux.PathRecorderMux) *handler3.OpenAPIService {
-	openAPIVersionedService, err := handler3.NewOpenAPIService(nil)
-	if err != nil {
-		klog.Fatalf("Failed to create OpenAPIService: %v", err)
-	}
-
-	err = openAPIVersionedService.RegisterOpenAPIV3VersionedService("/openapi/v3", mux)
+	openAPIVersionedService := handler3.NewOpenAPIService()
+	err := openAPIVersionedService.RegisterOpenAPIV3VersionedService("/openapi/v3", mux)
 	if err != nil {
 		klog.Fatalf("Failed to register versioned open api spec for root: %v", err)
 	}

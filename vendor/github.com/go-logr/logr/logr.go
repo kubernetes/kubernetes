@@ -21,7 +21,7 @@ limitations under the License.
 // to back that API.  Packages in the Go ecosystem can depend on this package,
 // while callers can implement logging with whatever backend is appropriate.
 //
-// Usage
+// # Usage
 //
 // Logging is done using a Logger instance.  Logger is a concrete type with
 // methods, which defers the actual logging to a LogSink interface.  The main
@@ -30,16 +30,20 @@ limitations under the License.
 // "structured logging".
 //
 // With Go's standard log package, we might write:
-//   log.Printf("setting target value %s", targetValue)
+//
+//	log.Printf("setting target value %s", targetValue)
 //
 // With logr's structured logging, we'd write:
-//   logger.Info("setting target", "value", targetValue)
+//
+//	logger.Info("setting target", "value", targetValue)
 //
 // Errors are much the same.  Instead of:
-//   log.Printf("failed to open the pod bay door for user %s: %v", user, err)
+//
+//	log.Printf("failed to open the pod bay door for user %s: %v", user, err)
 //
 // We'd write:
-//   logger.Error(err, "failed to open the pod bay door", "user", user)
+//
+//	logger.Error(err, "failed to open the pod bay door", "user", user)
 //
 // Info() and Error() are very similar, but they are separate methods so that
 // LogSink implementations can choose to do things like attach additional
@@ -47,7 +51,7 @@ limitations under the License.
 // always logged, regardless of the current verbosity.  If there is no error
 // instance available, passing nil is valid.
 //
-// Verbosity
+// # Verbosity
 //
 // Often we want to log information only when the application in "verbose
 // mode".  To write log lines that are more verbose, Logger has a V() method.
@@ -58,20 +62,22 @@ limitations under the License.
 // Error messages do not have a verbosity level and are always logged.
 //
 // Where we might have written:
-//   if flVerbose >= 2 {
-//       log.Printf("an unusual thing happened")
-//   }
+//
+//	if flVerbose >= 2 {
+//	    log.Printf("an unusual thing happened")
+//	}
 //
 // We can write:
-//   logger.V(2).Info("an unusual thing happened")
 //
-// Logger Names
+//	logger.V(2).Info("an unusual thing happened")
+//
+// # Logger Names
 //
 // Logger instances can have name strings so that all messages logged through
 // that instance have additional context.  For example, you might want to add
 // a subsystem name:
 //
-//   logger.WithName("compactor").Info("started", "time", time.Now())
+//	logger.WithName("compactor").Info("started", "time", time.Now())
 //
 // The WithName() method returns a new Logger, which can be passed to
 // constructors or other functions for further use.  Repeated use of WithName()
@@ -82,25 +88,27 @@ limitations under the License.
 // joining operation (e.g. whitespace, commas, periods, slashes, brackets,
 // quotes, etc).
 //
-// Saved Values
+// # Saved Values
 //
 // Logger instances can store any number of key/value pairs, which will be
 // logged alongside all messages logged through that instance.  For example,
 // you might want to create a Logger instance per managed object:
 //
 // With the standard log package, we might write:
-//   log.Printf("decided to set field foo to value %q for object %s/%s",
-//       targetValue, object.Namespace, object.Name)
+//
+//	log.Printf("decided to set field foo to value %q for object %s/%s",
+//	    targetValue, object.Namespace, object.Name)
 //
 // With logr we'd write:
-//   // Elsewhere: set up the logger to log the object name.
-//   obj.logger = mainLogger.WithValues(
-//       "name", obj.name, "namespace", obj.namespace)
 //
-//   // later on...
-//   obj.logger.Info("setting foo", "value", targetValue)
+//	// Elsewhere: set up the logger to log the object name.
+//	obj.logger = mainLogger.WithValues(
+//	    "name", obj.name, "namespace", obj.namespace)
 //
-// Best Practices
+//	// later on...
+//	obj.logger.Info("setting foo", "value", targetValue)
+//
+// # Best Practices
 //
 // Logger has very few hard rules, with the goal that LogSink implementations
 // might have a lot of freedom to differentiate.  There are, however, some
@@ -124,15 +132,15 @@ limitations under the License.
 // around. For cases where passing a logger is optional, a pointer to Logger
 // should be used.
 //
-// Key Naming Conventions
+// # Key Naming Conventions
 //
 // Keys are not strictly required to conform to any specification or regex, but
 // it is recommended that they:
-//   * be human-readable and meaningful (not auto-generated or simple ordinals)
-//   * be constant (not dependent on input data)
-//   * contain only printable characters
-//   * not contain whitespace or punctuation
-//   * use lower case for simple keys and lowerCamelCase for more complex ones
+//   - be human-readable and meaningful (not auto-generated or simple ordinals)
+//   - be constant (not dependent on input data)
+//   - contain only printable characters
+//   - not contain whitespace or punctuation
+//   - use lower case for simple keys and lowerCamelCase for more complex ones
 //
 // These guidelines help ensure that log data is processed properly regardless
 // of the log implementation.  For example, log implementations will try to
@@ -141,51 +149,54 @@ limitations under the License.
 // While users are generally free to use key names of their choice, it's
 // generally best to avoid using the following keys, as they're frequently used
 // by implementations:
-//   * "caller": the calling information (file/line) of a particular log line
-//   * "error": the underlying error value in the `Error` method
-//   * "level": the log level
-//   * "logger": the name of the associated logger
-//   * "msg": the log message
-//   * "stacktrace": the stack trace associated with a particular log line or
-//                   error (often from the `Error` message)
-//   * "ts": the timestamp for a log line
+//   - "caller": the calling information (file/line) of a particular log line
+//   - "error": the underlying error value in the `Error` method
+//   - "level": the log level
+//   - "logger": the name of the associated logger
+//   - "msg": the log message
+//   - "stacktrace": the stack trace associated with a particular log line or
+//     error (often from the `Error` message)
+//   - "ts": the timestamp for a log line
 //
 // Implementations are encouraged to make use of these keys to represent the
 // above concepts, when necessary (for example, in a pure-JSON output form, it
 // would be necessary to represent at least message and timestamp as ordinary
 // named values).
 //
-// Break Glass
+// # Break Glass
 //
 // Implementations may choose to give callers access to the underlying
 // logging implementation.  The recommended pattern for this is:
-//   // Underlier exposes access to the underlying logging implementation.
-//   // Since callers only have a logr.Logger, they have to know which
-//   // implementation is in use, so this interface is less of an abstraction
-//   // and more of way to test type conversion.
-//   type Underlier interface {
-//       GetUnderlying() <underlying-type>
-//   }
+//
+//	// Underlier exposes access to the underlying logging implementation.
+//	// Since callers only have a logr.Logger, they have to know which
+//	// implementation is in use, so this interface is less of an abstraction
+//	// and more of way to test type conversion.
+//	type Underlier interface {
+//	    GetUnderlying() <underlying-type>
+//	}
 //
 // Logger grants access to the sink to enable type assertions like this:
-//   func DoSomethingWithImpl(log logr.Logger) {
-//       if underlier, ok := log.GetSink()(impl.Underlier) {
-//          implLogger := underlier.GetUnderlying()
-//          ...
-//       }
-//   }
+//
+//	func DoSomethingWithImpl(log logr.Logger) {
+//	    if underlier, ok := log.GetSink().(impl.Underlier); ok {
+//	       implLogger := underlier.GetUnderlying()
+//	       ...
+//	    }
+//	}
 //
 // Custom `With*` functions can be implemented by copying the complete
 // Logger struct and replacing the sink in the copy:
-//   // WithFooBar changes the foobar parameter in the log sink and returns a
-//   // new logger with that modified sink.  It does nothing for loggers where
-//   // the sink doesn't support that parameter.
-//   func WithFoobar(log logr.Logger, foobar int) logr.Logger {
-//      if foobarLogSink, ok := log.GetSink()(FoobarSink); ok {
-//         log = log.WithSink(foobarLogSink.WithFooBar(foobar))
-//      }
-//      return log
-//   }
+//
+//	// WithFooBar changes the foobar parameter in the log sink and returns a
+//	// new logger with that modified sink.  It does nothing for loggers where
+//	// the sink doesn't support that parameter.
+//	func WithFoobar(log logr.Logger, foobar int) logr.Logger {
+//	   if foobarLogSink, ok := log.GetSink().(FoobarSink); ok {
+//	      log = log.WithSink(foobarLogSink.WithFooBar(foobar))
+//	   }
+//	   return log
+//	}
 //
 // Don't use New to construct a new Logger with a LogSink retrieved from an
 // existing Logger. Source code attribution might not work correctly and
@@ -201,11 +212,14 @@ import (
 )
 
 // New returns a new Logger instance.  This is primarily used by libraries
-// implementing LogSink, rather than end users.
+// implementing LogSink, rather than end users.  Passing a nil sink will create
+// a Logger which discards all log lines.
 func New(sink LogSink) Logger {
 	logger := Logger{}
 	logger.setSink(sink)
-	sink.Init(runtimeInfo)
+	if sink != nil {
+		sink.Init(runtimeInfo)
+	}
 	return logger
 }
 
@@ -244,7 +258,7 @@ type Logger struct {
 // Enabled tests whether this Logger is enabled.  For example, commandline
 // flags might be used to set the logging verbosity and disable some info logs.
 func (l Logger) Enabled() bool {
-	return l.sink.Enabled(l.level)
+	return l.sink != nil && l.sink.Enabled(l.level)
 }
 
 // Info logs a non-error message with the given key/value pairs as context.
@@ -254,6 +268,9 @@ func (l Logger) Enabled() bool {
 // information.  The key/value pairs must alternate string keys and arbitrary
 // values.
 func (l Logger) Info(msg string, keysAndValues ...interface{}) {
+	if l.sink == nil {
+		return
+	}
 	if l.Enabled() {
 		if withHelper, ok := l.sink.(CallStackHelperLogSink); ok {
 			withHelper.GetCallStackHelper()()
@@ -273,6 +290,9 @@ func (l Logger) Info(msg string, keysAndValues ...interface{}) {
 // triggered this log line, if present. The err parameter is optional
 // and nil may be passed instead of an error instance.
 func (l Logger) Error(err error, msg string, keysAndValues ...interface{}) {
+	if l.sink == nil {
+		return
+	}
 	if withHelper, ok := l.sink.(CallStackHelperLogSink); ok {
 		withHelper.GetCallStackHelper()()
 	}
@@ -284,6 +304,9 @@ func (l Logger) Error(err error, msg string, keysAndValues ...interface{}) {
 // level means a log message is less important.  Negative V-levels are treated
 // as 0.
 func (l Logger) V(level int) Logger {
+	if l.sink == nil {
+		return l
+	}
 	if level < 0 {
 		level = 0
 	}
@@ -294,6 +317,9 @@ func (l Logger) V(level int) Logger {
 // WithValues returns a new Logger instance with additional key/value pairs.
 // See Info for documentation on how key/value pairs work.
 func (l Logger) WithValues(keysAndValues ...interface{}) Logger {
+	if l.sink == nil {
+		return l
+	}
 	l.setSink(l.sink.WithValues(keysAndValues...))
 	return l
 }
@@ -304,6 +330,9 @@ func (l Logger) WithValues(keysAndValues ...interface{}) Logger {
 // contain only letters, digits, and hyphens (see the package documentation for
 // more information).
 func (l Logger) WithName(name string) Logger {
+	if l.sink == nil {
+		return l
+	}
 	l.setSink(l.sink.WithName(name))
 	return l
 }
@@ -324,6 +353,9 @@ func (l Logger) WithName(name string) Logger {
 // WithCallDepth(1) because it works with implementions that support the
 // CallDepthLogSink and/or CallStackHelperLogSink interfaces.
 func (l Logger) WithCallDepth(depth int) Logger {
+	if l.sink == nil {
+		return l
+	}
 	if withCallDepth, ok := l.sink.(CallDepthLogSink); ok {
 		l.setSink(withCallDepth.WithCallDepth(depth))
 	}
@@ -345,6 +377,9 @@ func (l Logger) WithCallDepth(depth int) Logger {
 // implementation does not support either of these, the original Logger will be
 // returned.
 func (l Logger) WithCallStackHelper() (func(), Logger) {
+	if l.sink == nil {
+		return func() {}, l
+	}
 	var helper func()
 	if withCallDepth, ok := l.sink.(CallDepthLogSink); ok {
 		l.setSink(withCallDepth.WithCallDepth(1))
@@ -355,6 +390,11 @@ func (l Logger) WithCallStackHelper() (func(), Logger) {
 		helper = func() {}
 	}
 	return helper, l
+}
+
+// IsZero returns true if this logger is an uninitialized zero value
+func (l Logger) IsZero() bool {
+	return l.sink == nil
 }
 
 // contextKey is how we find Loggers in a context.Context.
@@ -442,7 +482,7 @@ type LogSink interface {
 	WithName(name string) LogSink
 }
 
-// CallDepthLogSink represents a Logger that knows how to climb the call stack
+// CallDepthLogSink represents a LogSink that knows how to climb the call stack
 // to identify the original call site and can offset the depth by a specified
 // number of frames.  This is useful for users who have helper functions
 // between the "real" call site and the actual calls to Logger methods.
@@ -467,7 +507,7 @@ type CallDepthLogSink interface {
 	WithCallDepth(depth int) LogSink
 }
 
-// CallStackHelperLogSink represents a Logger that knows how to climb
+// CallStackHelperLogSink represents a LogSink that knows how to climb
 // the call stack to identify the original call site and can skip
 // intermediate helper functions if they mark themselves as
 // helper. Go's testing package uses that approach.

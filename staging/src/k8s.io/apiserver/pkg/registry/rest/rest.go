@@ -209,6 +209,13 @@ type NamedCreater interface {
 	Create(ctx context.Context, name string, obj runtime.Object, createValidation ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error)
 }
 
+// SubresourceObjectMetaPreserver adds configuration options to a Creater for subresources.
+type SubresourceObjectMetaPreserver interface {
+	// PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate indicates that a
+	// handler should preserve fields of ObjectMeta that are managed by the system.
+	PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() bool
+}
+
 // UpdatedObjectInfo provides information about an updated object to an Updater.
 // It requires access to the old object in order to return the newly updated object.
 type UpdatedObjectInfo interface {

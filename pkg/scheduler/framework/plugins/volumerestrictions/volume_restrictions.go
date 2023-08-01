@@ -154,10 +154,26 @@ func haveOverlap(a1, a2 []string) bool {
 	return false
 }
 
+// return true if there are conflict checking targets.
+func needsRestrictionsCheck(v v1.Volume) bool {
+	return v.GCEPersistentDisk != nil || v.AWSElasticBlockStore != nil || v.RBD != nil || v.ISCSI != nil
+}
+
 // PreFilter computes and stores cycleState containing details for enforcing ReadWriteOncePod.
 func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	needsCheck := false
+	for i := range pod.Spec.Volumes {
+		if needsRestrictionsCheck(pod.Spec.Volumes[i]) {
+			needsCheck = true
+			break
+		}
+	}
+
 	if !pl.enableReadWriteOncePod {
-		return nil, nil
+		if needsCheck {
+			return nil, nil
+		}
+		return nil, framework.NewStatus(framework.Skip)
 	}
 
 	pvcs, err := pl.readWriteOncePodPVCsForPod(ctx, pod)
@@ -171,6 +187,10 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 	s, err := pl.calPreFilterState(ctx, pod, pvcs)
 	if err != nil {
 		return nil, framework.AsStatus(err)
+	}
+
+	if !needsCheck && s.conflictingPVCRefCount == 0 {
+		return nil, framework.NewStatus(framework.Skip)
 	}
 	cycleState.Write(preFilterStateKey, s)
 	return nil, nil
@@ -257,14 +277,12 @@ func (pl *VolumeRestrictions) readWriteOncePodPVCsForPod(ctx context.Context, po
 // existing volumes.
 func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 	for i := range pod.Spec.Volumes {
-		v := &pod.Spec.Volumes[i]
-		// fast path if there is no conflict checking targets.
-		if v.GCEPersistentDisk == nil && v.AWSElasticBlockStore == nil && v.RBD == nil && v.ISCSI == nil {
+		v := pod.Spec.Volumes[i]
+		if !needsRestrictionsCheck(v) {
 			continue
 		}
-
 		for _, ev := range nodeInfo.Pods {
-			if isVolumeConflict(v, ev.Pod) {
+			if isVolumeConflict(&v, ev.Pod) {
 				return false
 			}
 		}
@@ -315,17 +333,17 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
+func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
 		// Due to immutable fields `spec.volumes`, pod update events are ignored.
-		{Resource: framework.Pod, ActionType: framework.Delete},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
 		// A new Node may make a pod schedulable.
-		{Resource: framework.Node, ActionType: framework.Add},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
 		// This PVC is required to exist to check its access modes.
-		{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
 	}
 }
 

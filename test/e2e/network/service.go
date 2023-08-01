@@ -757,7 +757,7 @@ func getEndpointNodesWithInternalIP(ctx context.Context, jig *e2eservice.TestJig
 
 var _ = common.SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 
@@ -1020,7 +1020,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		jig.ExternalIPs = true
+		jig.ExternalIPs = false
 		servicePort := 8080
 		tcpService, err := jig.CreateTCPServiceWithPort(ctx, nil, int32(servicePort))
 		framework.ExpectNoError(err)
@@ -1090,7 +1090,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		jig.ExternalIPs = true
+		jig.ExternalIPs = false
 		servicePort := 8080
 		svc, err := jig.CreateTCPServiceWithPort(ctx, nil, int32(servicePort))
 		framework.ExpectNoError(err)
@@ -1312,7 +1312,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		jig.ExternalIPs = true
+		jig.ExternalIPs = false
 
 		ginkgo.By("creating service " + serviceName + " with type=clusterIP in namespace " + ns)
 		clusterIPService, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
@@ -1344,7 +1344,7 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "nodeport-update-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		jig.ExternalIPs = true
+		jig.ExternalIPs = false
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
 		tcpService, err := jig.CreateTCPService(ctx, nil)
@@ -1765,7 +1765,7 @@ var _ = common.SIGDescribe("Services", func() {
 		t.Name = "slow-terminating-unready-pod"
 		t.Image = imageutils.GetE2EImage(imageutils.Agnhost)
 		port := 80
-		terminateSeconds := int64(600)
+		terminateSeconds := int64(100)
 
 		service := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1987,7 +1987,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		// webserver should continue to serve traffic through the Service after delete since:
-		//  - it has a 600s termination grace period
+		//  - it has a 100s termination grace period
 		//  - it is unready but PublishNotReadyAddresses is true
 		err = cs.CoreV1().Pods(ns).Delete(ctx, webserverPod0.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
@@ -2106,7 +2106,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		// webserver should stop to serve traffic through the Service after delete since:
-		//  - it has a 600s termination grace period
+		//  - it has a 100s termination grace period
 		//  - it is unready but PublishNotReadyAddresses is false
 		err = cs.CoreV1().Pods(ns).Delete(ctx, webserverPod0.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
@@ -2465,7 +2465,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod to Pod [Feature:ServiceInternalTrafficPolicy]", func(ctx context.Context) {
+	ginkgo.It("should respect internalTrafficPolicy=Local Pod to Pod", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -2533,7 +2533,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod [Feature:ServiceInternalTrafficPolicy]", func(ctx context.Context) {
+	ginkgo.It("should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -2603,7 +2603,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod and Node, to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]", func(ctx context.Context) {
+	ginkgo.It("should respect internalTrafficPolicy=Local Pod and Node, to Pod (hostNetwork: true)", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -2705,7 +2705,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fail health check node port if there are only terminating endpoints [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fail health check node port if there are only terminating endpoints", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -2733,9 +2733,9 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "600")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(600)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2754,14 +2754,16 @@ var _ = common.SIGDescribe("Services", func() {
 		healthCheckNodePortAddr := net.JoinHostPort(nodeIPs[0], strconv.Itoa(int(svc.Spec.HealthCheckNodePort)))
 		// validate that the health check node port from kube-proxy returns 200 when there are ready endpoints
 		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --connect-timeout 5 http://%s/healthz`, healthCheckNodePortAddr)
+			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
-				return false, err
+				framework.Logf("unexpected error trying to connect to nodeport %d : %v", healthCheckNodePortAddr, err)
+				return false, nil
 			}
 
 			expectedOut := "200"
 			if out != expectedOut {
+				framework.Logf("expected output: %s , got %s", expectedOut, out)
 				return false, nil
 			}
 			return true, nil
@@ -2775,14 +2777,16 @@ var _ = common.SIGDescribe("Services", func() {
 
 		// validate that the health check node port from kube-proxy returns 503 when there are no ready endpoints
 		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --connect-timeout 5 http://%s/healthz`, healthCheckNodePortAddr)
+			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
-				return false, err
+				framework.Logf("unexpected error trying to connect to nodeport %d : %v", healthCheckNodePortAddr, err)
+				return false, nil
 			}
 
 			expectedOut := "503"
 			if out != expectedOut {
+				framework.Logf("expected output: %s , got %s", expectedOut, out)
 				return false, nil
 			}
 			return true, nil
@@ -2794,7 +2798,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execHostnameTest(*pausePod0, nodePortAddress, webserverPod0.Name)
 	})
 
-	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -2821,9 +2825,9 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "600")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(600)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2847,7 +2851,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pausePod1.Name, f.Namespace.Name, framework.PodStartTimeout))
 
 		// webserver should continue to serve traffic through the Service after delete since:
-		//  - it has a 600s termination grace period
+		//  - it has a 100s termination grace period
 		//  - it is the only ready endpoint
 		err = cs.CoreV1().Pods(ns).Delete(ctx, webserverPod0.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
@@ -2867,7 +2871,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -2896,9 +2900,9 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "600")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(600)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2922,7 +2926,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pausePod1.Name, f.Namespace.Name, framework.PodStartTimeout))
 
 		// webserver should continue to serve traffic through the Service after delete since:
-		//  - it has a 600s termination grace period
+		//  - it has a 100s termination grace period
 		//  - it is the only ready endpoint
 		err = cs.CoreV1().Pods(ns).Delete(ctx, webserverPod0.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
@@ -2945,7 +2949,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -2973,9 +2977,9 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "600")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(600)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2999,7 +3003,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pausePod1.Name, f.Namespace.Name, framework.PodStartTimeout))
 
 		// webserver should continue to serve traffic through the Service after delete since:
-		//  - it has a 600s termination grace period
+		//  - it has a 100s termination grace period
 		//  - it is the only ready endpoint
 		err = cs.CoreV1().Pods(ns).Delete(ctx, webserverPod0.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
@@ -3020,7 +3024,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
+	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -3049,9 +3053,9 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "600")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(600)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -3075,7 +3079,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pausePod1.Name, f.Namespace.Name, framework.PodStartTimeout))
 
 		// webserver should continue to serve traffic through the Service after delete since:
-		//  - it has a 600s termination grace period
+		//  - it has a 100s termination grace period
 		//  - it is the only ready endpoint
 		err = cs.CoreV1().Pods(ns).Delete(ctx, webserverPod0.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)

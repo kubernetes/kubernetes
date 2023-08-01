@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -111,12 +112,25 @@ func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOption
 // GenerateContainerSecurityContext generates the corresponding container security context with the given inputs
 // If the Node OS is windows, currently we will ignore the inputs and return nil.
 // TODO: Will modify it after windows has its own security context
-func GenerateContainerSecurityContext(privileged bool) *v1.SecurityContext {
+func GenerateContainerSecurityContext(level psaapi.Level) *v1.SecurityContext {
 	if NodeOSDistroIs("windows") {
 		return nil
 	}
-	return &v1.SecurityContext{
-		Privileged: &privileged,
+
+	switch level {
+	case psaapi.LevelBaseline:
+		return &v1.SecurityContext{
+			Privileged: pointer.Bool(false),
+		}
+	case psaapi.LevelPrivileged:
+		return &v1.SecurityContext{
+			Privileged: pointer.Bool(true),
+		}
+	case psaapi.LevelRestricted:
+		return GetRestrictedContainerSecurityContext()
+	default:
+		ginkgo.Fail(fmt.Sprintf("unknown k8s.io/pod-security-admission/policy.Level %q", level))
+		panic("not reached")
 	}
 }
 

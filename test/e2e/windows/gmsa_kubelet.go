@@ -41,7 +41,7 @@ import (
 
 var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
 	f := framework.NewDefaultFramework("gmsa-kubelet-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("kubelet GMSA support", func() {
 		ginkgo.Context("when creating a pod with correct GMSA credential specs", func() {

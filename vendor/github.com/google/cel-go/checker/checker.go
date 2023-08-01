@@ -23,6 +23,7 @@ import (
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/containers"
+	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/types/ref"
 
 	"google.golang.org/protobuf/proto"
@@ -173,8 +174,8 @@ func (c *checker) checkSelect(e *exprpb.Expr) {
 
 			// Rewrite the node to be a variable reference to the resolved fully-qualified
 			// variable name.
-			c.setType(e, ident.GetIdent().Type)
-			c.setReference(e, newIdentReference(ident.GetName(), ident.GetIdent().Value))
+			c.setType(e, ident.GetIdent().GetType())
+			c.setReference(e, newIdentReference(ident.GetName(), ident.GetIdent().GetValue()))
 			identName := ident.GetName()
 			e.ExprKind = &exprpb.Expr_IdentExpr{
 				IdentExpr: &exprpb.Expr_Ident{
@@ -185,9 +186,37 @@ func (c *checker) checkSelect(e *exprpb.Expr) {
 		}
 	}
 
+	resultType := c.checkSelectField(e, sel.GetOperand(), sel.GetField(), false)
+	if sel.TestOnly {
+		resultType = decls.Bool
+	}
+	c.setType(e, substitute(c.mappings, resultType, false))
+}
+
+func (c *checker) checkOptSelect(e *exprpb.Expr) {
+	// Collect metadata related to the opt select call packaged by the parser.
+	call := e.GetCallExpr()
+	operand := call.GetArgs()[0]
+	field := call.GetArgs()[1]
+	fieldName, isString := maybeUnwrapString(field)
+	if !isString {
+		c.errors.ReportError(c.location(field), "unsupported optional field selection: %v", field)
+		return
+	}
+
+	// Perform type-checking using the field selection logic.
+	resultType := c.checkSelectField(e, operand, fieldName, true)
+	c.setType(e, substitute(c.mappings, resultType, false))
+}
+
+func (c *checker) checkSelectField(e, operand *exprpb.Expr, field string, optional bool) *exprpb.Type {
 	// Interpret as field selection, first traversing down the operand.
-	c.check(sel.GetOperand())
-	targetType := substitute(c.mappings, c.getType(sel.GetOperand()), false)
+	c.check(operand)
+	operandType := substitute(c.mappings, c.getType(operand), false)
+
+	// If the target type is 'optional', unwrap it for the sake of this check.
+	targetType, isOpt := maybeUnwrapOptional(operandType)
+
 	// Assume error type by default as most types do not support field selection.
 	resultType := decls.Error
 	switch kindOf(targetType) {
@@ -199,7 +228,7 @@ func (c *checker) checkSelect(e *exprpb.Expr) {
 		// Objects yield their field type declaration as the selection result type, but only if
 		// the field is defined.
 		messageType := targetType
-		if fieldType, found := c.lookupFieldType(c.location(e), messageType.GetMessageType(), sel.GetField()); found {
+		if fieldType, found := c.lookupFieldType(c.location(e), messageType.GetMessageType(), field); found {
 			resultType = fieldType.Type
 		}
 	case kindTypeParam:
@@ -212,16 +241,17 @@ func (c *checker) checkSelect(e *exprpb.Expr) {
 	default:
 		// Dynamic / error values are treated as DYN type. Errors are handled this way as well
 		// in order to allow forward progress on the check.
-		if isDynOrError(targetType) {
-			resultType = decls.Dyn
-		} else {
+		if !isDynOrError(targetType) {
 			c.errors.typeDoesNotSupportFieldSelection(c.location(e), targetType)
 		}
+		resultType = decls.Dyn
 	}
-	if sel.TestOnly {
-		resultType = decls.Bool
+
+	// If the target type was optional coming in, then the result must be optional going out.
+	if isOpt || optional {
+		return decls.NewOptionalType(resultType)
 	}
-	c.setType(e, substitute(c.mappings, resultType, false))
+	return resultType
 }
 
 func (c *checker) checkCall(e *exprpb.Expr) {
@@ -229,15 +259,19 @@ func (c *checker) checkCall(e *exprpb.Expr) {
 	// please consider the impact on planner.go and consolidate implementations or mirror code
 	// as appropriate.
 	call := e.GetCallExpr()
-	target := call.GetTarget()
-	args := call.GetArgs()
 	fnName := call.GetFunction()
+	if fnName == operators.OptSelect {
+		c.checkOptSelect(e)
+		return
+	}
 
+	args := call.GetArgs()
 	// Traverse arguments.
 	for _, arg := range args {
 		c.check(arg)
 	}
 
+	target := call.GetTarget()
 	// Regular static call with simple name.
 	if target == nil {
 		// Check for the existence of the function.
@@ -359,6 +393,9 @@ func (c *checker) resolveOverload(
 	}
 
 	if resultType == nil {
+		for i, arg := range argTypes {
+			argTypes[i] = substitute(c.mappings, arg, true)
+		}
 		c.errors.noMatchingOverload(loc, fn.GetName(), argTypes, target != nil)
 		resultType = decls.Error
 		return nil
@@ -369,16 +406,29 @@ func (c *checker) resolveOverload(
 
 func (c *checker) checkCreateList(e *exprpb.Expr) {
 	create := e.GetListExpr()
-	var elemType *exprpb.Type
-	for _, e := range create.GetElements() {
+	var elemsType *exprpb.Type
+	optionalIndices := create.GetOptionalIndices()
+	optionals := make(map[int32]bool, len(optionalIndices))
+	for _, optInd := range optionalIndices {
+		optionals[optInd] = true
+	}
+	for i, e := range create.GetElements() {
 		c.check(e)
-		elemType = c.joinTypes(c.location(e), elemType, c.getType(e))
+		elemType := c.getType(e)
+		if optionals[int32(i)] {
+			var isOptional bool
+			elemType, isOptional = maybeUnwrapOptional(elemType)
+			if !isOptional && !isDyn(elemType) {
+				c.errors.typeMismatch(c.location(e), decls.NewOptionalType(elemType), elemType)
+			}
+		}
+		elemsType = c.joinTypes(c.location(e), elemsType, elemType)
 	}
-	if elemType == nil {
+	if elemsType == nil {
 		// If the list is empty, assign free type var to elem type.
-		elemType = c.newTypeVar()
+		elemsType = c.newTypeVar()
 	}
-	c.setType(e, decls.NewListType(elemType))
+	c.setType(e, decls.NewListType(elemsType))
 }
 
 func (c *checker) checkCreateStruct(e *exprpb.Expr) {
@@ -392,22 +442,31 @@ func (c *checker) checkCreateStruct(e *exprpb.Expr) {
 
 func (c *checker) checkCreateMap(e *exprpb.Expr) {
 	mapVal := e.GetStructExpr()
-	var keyType *exprpb.Type
-	var valueType *exprpb.Type
+	var mapKeyType *exprpb.Type
+	var mapValueType *exprpb.Type
 	for _, ent := range mapVal.GetEntries() {
 		key := ent.GetMapKey()
 		c.check(key)
-		keyType = c.joinTypes(c.location(key), keyType, c.getType(key))
+		mapKeyType = c.joinTypes(c.location(key), mapKeyType, c.getType(key))
 
-		c.check(ent.Value)
-		valueType = c.joinTypes(c.location(ent.Value), valueType, c.getType(ent.Value))
+		val := ent.GetValue()
+		c.check(val)
+		valType := c.getType(val)
+		if ent.GetOptionalEntry() {
+			var isOptional bool
+			valType, isOptional = maybeUnwrapOptional(valType)
+			if !isOptional && !isDyn(valType) {
+				c.errors.typeMismatch(c.location(val), decls.NewOptionalType(valType), valType)
+			}
+		}
+		mapValueType = c.joinTypes(c.location(val), mapValueType, valType)
 	}
-	if keyType == nil {
+	if mapKeyType == nil {
 		// If the map is empty, assign free type variables to typeKey and value type.
-		keyType = c.newTypeVar()
-		valueType = c.newTypeVar()
+		mapKeyType = c.newTypeVar()
+		mapValueType = c.newTypeVar()
 	}
-	c.setType(e, decls.NewMapType(keyType, valueType))
+	c.setType(e, decls.NewMapType(mapKeyType, mapValueType))
 }
 
 func (c *checker) checkCreateMessage(e *exprpb.Expr) {
@@ -449,15 +508,21 @@ func (c *checker) checkCreateMessage(e *exprpb.Expr) {
 		c.check(value)
 
 		fieldType := decls.Error
-		if t, found := c.lookupFieldType(
-			c.locationByID(ent.GetId()),
-			messageType.GetMessageType(),
-			field); found {
-			fieldType = t.Type
+		ft, found := c.lookupFieldType(c.locationByID(ent.GetId()), messageType.GetMessageType(), field)
+		if found {
+			fieldType = ft.Type
 		}
-		if !c.isAssignable(fieldType, c.getType(value)) {
-			c.errors.fieldTypeMismatch(
-				c.locationByID(ent.Id), field, fieldType, c.getType(value))
+
+		valType := c.getType(value)
+		if ent.GetOptionalEntry() {
+			var isOptional bool
+			valType, isOptional = maybeUnwrapOptional(valType)
+			if !isOptional && !isDyn(valType) {
+				c.errors.typeMismatch(c.location(value), decls.NewOptionalType(valType), valType)
+			}
+		}
+		if !c.isAssignable(fieldType, valType) {
+			c.errors.fieldTypeMismatch(c.locationByID(ent.Id), field, fieldType, valType)
 		}
 	}
 }

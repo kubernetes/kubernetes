@@ -216,6 +216,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                          &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                     &IngressClassDescriber{c},
 		{Group: networkingv1alpha1.GroupName, Kind: "ClusterCIDR"}:                &ClusterCIDRDescriber{c},
+		{Group: networkingv1alpha1.GroupName, Kind: "IPAddress"}:                  &IPAddressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: batchv1beta1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
@@ -380,14 +381,35 @@ var DefaultObjectDescriber ObjectDescriber
 func init() {
 	d := &Describers{}
 	err := d.Add(
-		describeLimitRange,
-		describeQuota,
-		describePod,
-		describeService,
-		describeReplicationController,
+		describeCertificateSigningRequest,
+		describeCronJob,
+		describeCSINode,
 		describeDaemonSet,
-		describeNode,
+		describeDeployment,
+		describeEndpoints,
+		describeEndpointSliceV1,
+		describeEndpointSliceV1beta1,
+		describeHorizontalPodAutoscalerV1,
+		describeHorizontalPodAutoscalerV2,
+		describeJob,
+		describeLimitRange,
 		describeNamespace,
+		describeNetworkPolicy,
+		describeNode,
+		describePersistentVolume,
+		describePersistentVolumeClaim,
+		describePod,
+		describePodDisruptionBudgetV1,
+		describePodDisruptionBudgetV1beta1,
+		describePriorityClass,
+		describeQuota,
+		describeReplicaSet,
+		describeReplicationController,
+		describeSecret,
+		describeService,
+		describeServiceAccount,
+		describeStatefulSet,
+		describeStorageClass,
 	)
 	if err != nil {
 		klog.Fatalf("Cannot register describers: %v", err)
@@ -2853,6 +2875,46 @@ func (c *ClusterCIDRDescriber) describeClusterCIDRV1alpha1(cc *networkingv1alpha
 	})
 }
 
+// IPAddressDescriber generates information about an IPAddress.
+type IPAddressDescriber struct {
+	client clientset.Interface
+}
+
+func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	var events *corev1.EventList
+
+	ipV1alpha1, err := c.client.NetworkingV1alpha1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil {
+		if describerSettings.ShowEvents {
+			events, _ = searchEvents(c.client.CoreV1(), ipV1alpha1, describerSettings.ChunkSize)
+		}
+		return c.describeIPAddressV1alpha1(ipV1alpha1, events)
+	}
+	return "", err
+}
+
+func (c *IPAddressDescriber) describeIPAddressV1alpha1(ip *networkingv1alpha1.IPAddress, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%v\n", ip.Name)
+		printLabelsMultiline(w, "Labels", ip.Labels)
+		printAnnotationsMultiline(w, "Annotations", ip.Annotations)
+
+		if ip.Spec.ParentRef != nil {
+			w.Write(LEVEL_0, "Parent Reference:\n")
+			w.Write(LEVEL_1, "Group:\t%v\n", ip.Spec.ParentRef.Group)
+			w.Write(LEVEL_1, "Resource:\t%v\n", ip.Spec.ParentRef.Resource)
+			w.Write(LEVEL_1, "Namespace:\t%v\n", ip.Spec.ParentRef.Namespace)
+			w.Write(LEVEL_1, "Name:\t%v\n", ip.Spec.ParentRef.Name)
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
 // ServiceDescriber generates information about a service.
 type ServiceDescriber struct {
 	clientset.Interface
@@ -4968,8 +5030,12 @@ func (fn typeFunc) Matches(types []reflect.Type) bool {
 // Describe invokes the nested function with the exact number of arguments.
 func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, error) {
 	values := []reflect.Value{reflect.ValueOf(exact)}
-	for _, obj := range extra {
-		values = append(values, reflect.ValueOf(obj))
+	for i, obj := range extra {
+		if obj != nil {
+			values = append(values, reflect.ValueOf(obj))
+		} else {
+			values = append(values, reflect.New(fn.Extra[i]).Elem())
+		}
 	}
 	out := fn.Fn.Call(values)
 	s := out[0].Interface().(string)
@@ -5143,8 +5209,7 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	}
 
 	out.Flush()
-	str := string(buf.String())
-	return str, nil
+	return buf.String(), nil
 }
 
 type SortableResourceNames []corev1.ResourceName

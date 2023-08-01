@@ -14,8 +14,7 @@ The design of Bolt is based on Howard Chu's LMDB database project.
 
 Bolt currently works on Windows, Mac OS X, and Linux.
 
-
-Basics
+# Basics
 
 There are only a few types in Bolt: DB, Bucket, Tx, and Cursor. The DB is
 a collection of buckets and is represented by a single file on disk. A bucket is
@@ -27,8 +26,7 @@ iterate over the dataset sequentially. Read-write transactions can create and
 delete buckets and can insert and remove keys. Only one read-write transaction
 is allowed at a time.
 
-
-Caveats
+# Caveats
 
 The database uses a read-only, memory-mapped data file to ensure that
 applications cannot corrupt the database, however, this means that keys and
@@ -38,7 +36,5 @@ will cause Go to panic.
 Keys and values retrieved from the database are only valid for the life of
 the transaction. When used outside the transaction, these byte slices can
 point to different data or can point to invalid memory which will cause a panic.
-
-
 */
 package bbolt

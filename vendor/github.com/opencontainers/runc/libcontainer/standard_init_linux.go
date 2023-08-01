@@ -198,11 +198,12 @@ func (l *linuxStandardInit) Init() error {
 	if err != nil {
 		return err
 	}
-	// exec.LookPath might return no error for an executable residing on a
-	// file system mounted with noexec flag, so perform this extra check
-	// now while we can still return a proper error.
-	if err := system.Eaccess(name); err != nil {
-		return &os.PathError{Op: "exec", Path: name, Err: err}
+	// exec.LookPath in Go < 1.20 might return no error for an executable
+	// residing on a file system mounted with noexec flag, so perform this
+	// extra check now while we can still return a proper error.
+	// TODO: remove this once go < 1.20 is not supported.
+	if err := eaccess(name); err != nil {
+		return &os.PathError{Op: "eaccess", Path: name, Err: err}
 	}
 
 	// Set seccomp as close to execve as possible, so as few syscalls take

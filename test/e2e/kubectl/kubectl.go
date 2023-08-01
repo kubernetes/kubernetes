@@ -37,7 +37,8 @@ import (
 	"strings"
 	"time"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	"github.com/google/go-cmp/cmp"
 
 	"sigs.k8s.io/yaml"
 
@@ -45,9 +46,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
@@ -254,7 +257,7 @@ func runKubectlRetryOrDie(ns string, args ...string) string {
 var _ = SIGDescribe("Kubectl client", func() {
 	defer ginkgo.GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// Reusable cluster state function.  This won't be adversely affected by lazy initialization of framework.
 	clusterState := func() *framework.ClusterVerification {
@@ -430,7 +433,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				veryLongData[i] = 'a'
 			}
 			execOutput = e2ekubectl.RunKubectlOrDie(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", string(veryLongData))
-			framework.ExpectEqual(string(veryLongData), strings.TrimSpace(execOutput), "Unexpected kubectl exec output")
+			gomega.Expect(string(veryLongData)).To(gomega.Equal(strings.TrimSpace(execOutput)), "Unexpected kubectl exec output")
 
 			ginkgo.By("executing a command in the container with noninteractive stdin")
 			execOutput = e2ekubectl.NewKubectlCommand(ns, "exec", "-i", podRunningTimeoutArg, simplePodName, "--", "cat").
@@ -484,7 +487,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				proxyLogs.Reset()
 				ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
 				output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
-					WithEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
+					AppendEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
 					ExecOrDie(ns)
 
 				// Verify we got the normal output captured by the exec server
@@ -541,7 +544,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				if !ok {
 					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
 				}
-				framework.ExpectEqual(ee.ExitStatus(), 42)
+				gomega.Expect(ee.ExitStatus()).To(gomega.Equal(42))
 			})
 
 			ginkgo.It("should support port-forward", func(ctx context.Context) {
@@ -668,7 +671,7 @@ metadata:
 				ginkgo.By("trying to use kubectl with invalid token")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
 				framework.Logf("got err %v", err)
-				framework.ExpectError(err)
+				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Response Status: 401 Unauthorized"))
@@ -676,7 +679,7 @@ metadata:
 				ginkgo.By("trying to use kubectl with invalid server")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
 				framework.Logf("got err %v", err)
-				framework.ExpectError(err)
+				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err).To(gomega.ContainSubstring("Unable to connect to the server"))
 				gomega.Expect(err).To(gomega.ContainSubstring("GET http://invalid/api"))
 
@@ -707,7 +710,7 @@ metadata:
 				if !ok {
 					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
 				}
-				framework.ExpectEqual(ee.ExitStatus(), 42)
+				gomega.Expect(ee.ExitStatus()).To(gomega.Equal(42))
 			})
 
 			ginkgo.It("[Slow] running a failing command without --restart=Never", func(ctx context.Context) {
@@ -842,6 +845,65 @@ metadata:
 			for _, component := range components {
 				ginkgo.By("getting status of " + component)
 				e2ekubectl.RunKubectlOrDie(ns, "get", "componentstatuses", component)
+			}
+		})
+	})
+
+	ginkgo.Describe("Kubectl prune with applyset", func() {
+		ginkgo.It("should apply and prune objects", func(ctx context.Context) {
+			framework.Logf("applying manifest1")
+			manifest1 := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+  namespace: {{ns}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm2
+  namespace: {{ns}}
+`
+
+			manifest1 = strings.ReplaceAll(manifest1, "{{ns}}", ns)
+			args := []string{"apply", "--prune", "--applyset=applyset1", "-f", "-"}
+			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest1).ExecOrDie(ns)
+
+			framework.Logf("checking which objects exist")
+			objects := mustListObjectsInNamespace(ctx, c, ns)
+			names := mustGetNames(objects)
+			if diff := cmp.Diff(names, []string{"cm1", "cm2"}); diff != "" {
+				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
+			}
+
+			framework.Logf("applying manifest2")
+			manifest2 := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+  namespace: {{ns}}
+`
+			manifest2 = strings.ReplaceAll(manifest2, "{{ns}}", ns)
+
+			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
+
+			framework.Logf("checking which objects exist")
+			objects = mustListObjectsInNamespace(ctx, c, ns)
+			names = mustGetNames(objects)
+			if diff := cmp.Diff(names, []string{"cm1"}); diff != "" {
+				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
+			}
+
+			framework.Logf("applying manifest2 (again)")
+			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
+
+			framework.Logf("checking which objects exist")
+			objects = mustListObjectsInNamespace(ctx, c, ns)
+			names = mustGetNames(objects)
+			if diff := cmp.Diff(names, []string{"cm1"}); diff != "" {
+				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
 			}
 		})
 	})
@@ -1102,7 +1164,7 @@ metadata:
 			time.Sleep(10 * time.Second)
 
 			schema := schemaForGVK(schema.GroupVersionKind{Group: crd.Crd.Spec.Group, Version: crd.Crd.Spec.Versions[0].Name, Kind: crd.Crd.Spec.Names.Kind})
-			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
+			gomega.Expect(schema).ToNot(gomega.BeNil(), "retrieving a schema for the crd")
 
 			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 
@@ -1110,7 +1172,8 @@ metadata:
 			// are still considered invalid
 			invalidArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
 			err = createApplyCustomResource(invalidArbitraryCR, f.Namespace.Name, "test-cr", crd)
-			framework.ExpectError(err, "creating custom resource")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "creating custom resource")
+
 			if !strings.Contains(err.Error(), `unknown field "spec.extraProperty"`) {
 				framework.Failf("incorrect error from createApplyCustomResource: %v", err)
 			}
@@ -1153,7 +1216,7 @@ metadata:
 			ginkgo.By("attempting to create a CR with unknown metadata fields at the root level")
 			gvk := schema.GroupVersionKind{Group: testCRD.Crd.Spec.Group, Version: testCRD.Crd.Spec.Versions[0].Name, Kind: testCRD.Crd.Spec.Names.Kind}
 			schema := schemaForGVK(gvk)
-			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
+			gomega.Expect(schema).ToNot(gomega.BeNil(), "retrieving a schema for the crd")
 			embeddedCRPattern := `
 
 {%s,
@@ -1613,7 +1676,12 @@ metadata:
 			// we expect following values for: Major -> digit, Minor -> numeric followed by an optional '+',  GitCommit -> alphanumeric
 			requiredItems := []string{"Client Version: ", "Server Version: "}
 			for _, item := range requiredItems {
-				if matched, _ := regexp.MatchString(item+`version.Info\{Major:"\d", Minor:"\d+\+?", GitVersion:"v\d\.\d+\.[\d\w\-\.\+]+", GitCommit:"[0-9a-f]+"`, versionString); !matched {
+				// prior to 1.28 we printed long version information
+				oldMatched, _ := regexp.MatchString(item+`version.Info\{Major:"\d", Minor:"\d+\+?", GitVersion:"v\d\.\d+\.[\d\w\-\.\+]+", GitCommit:"[0-9a-f]+"`, versionString)
+				// 1.28+ prints short information
+				newMatched, _ := regexp.MatchString(item+`v\d\.\d+\.[\d\w\-\.\+]+`, versionString)
+				// due to backwards compatibility we need to match both until 1.30 most likely
+				if !oldMatched && !newMatched {
 					framework.Failf("Item %s value is not valid in %s\n", item, versionString)
 				}
 			}
@@ -1970,6 +2038,35 @@ metadata:
 			ginkgo.By("calling kubectl wait --for=delete")
 			e2ekubectl.RunKubectlOrDie(ns, "wait", "--for=delete", "pod/doesnotexist")
 			e2ekubectl.RunKubectlOrDie(ns, "wait", "--for=delete", "pod", "--selector=app.kubernetes.io/name=noexist")
+		})
+	})
+
+	ginkgo.Describe("kubectl subresource flag", func() {
+		ginkgo.It("should not be used in a bulk GET", func() {
+			ginkgo.By("calling kubectl get nodes --subresource=status")
+			out, err := e2ekubectl.RunKubectl("", "get", "nodes", "--subresource=status")
+			gomega.Expect(err).To(gomega.HaveOccurred(), fmt.Sprintf("Expected kubectl to fail, but it succeeded: %s", out))
+			gomega.Expect(err).To(gomega.ContainSubstring("subresource cannot be used when bulk resources are specified"))
+		})
+		ginkgo.It("GET on status subresource of built-in type (node) returns identical info as GET on the built-in type", func(ctx context.Context) {
+			ginkgo.By("first listing nodes in the cluster, and using first node of the list")
+			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
+			node := nodes.Items[0]
+			// Avoid comparing values of fields that might end up
+			// changing between the two invocations of kubectl. We
+			// compare the name and version fields.
+			ginkgo.By(fmt.Sprintf("calling kubectl get nodes %s", node.Name))
+			outBuiltIn := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name,
+				"--output=jsonpath='{.metadata.name}{.status.nodeInfo.kubeletVersion}'",
+			)
+			ginkgo.By(fmt.Sprintf("calling kubectl get nodes %s --subresource=status", node.Name))
+			outStatusSubresource := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name,
+				"--output=jsonpath='{.metadata.name}{.status.nodeInfo.kubeletVersion}'",
+				"--subresource=status",
+			)
+			gomega.Expect(outBuiltIn).To(gomega.Equal(outStatusSubresource))
 		})
 	})
 })
@@ -2348,4 +2445,39 @@ waitLoop:
 	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
 	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
+}
+
+// mustListObjectsInNamespace queries all the objects we use for testing in the given namespace.
+// Currently this is just ConfigMaps.
+// We filter our "system" configmaps, like "kube-root-ca.crt".
+func mustListObjectsInNamespace(ctx context.Context, c clientset.Interface, ns string) []runtime.Object {
+	var objects []runtime.Object
+	configMaps, err := c.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		framework.Failf("error listing configmaps: %v", err)
+	}
+	for i := range configMaps.Items {
+		cm := &configMaps.Items[i]
+		if cm.Name == "kube-root-ca.crt" {
+			// Ignore system objects
+			continue
+		}
+		objects = append(objects, cm)
+	}
+	return objects
+}
+
+// mustGetNames returns a slice containing the metadata.name for each object.
+func mustGetNames(objects []runtime.Object) []string {
+	var names []string
+	for _, obj := range objects {
+		metaAccessor, err := meta.Accessor(obj)
+		if err != nil {
+			framework.Failf("error getting accessor for %T: %v", obj, err)
+		}
+		name := metaAccessor.GetName()
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }

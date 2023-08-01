@@ -43,7 +43,7 @@ const (
 
 var _ = SIGDescribe("PodTemplates", func() {
 	f := framework.NewDefaultFramework("podtemplate")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	/*
 	   Release: v1.19
 	   Testname: PodTemplate lifecycle

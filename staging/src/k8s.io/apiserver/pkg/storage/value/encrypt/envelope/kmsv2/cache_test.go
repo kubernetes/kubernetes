@@ -18,6 +18,7 @@ limitations under the License.
 package kmsv2
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"sync"
@@ -40,7 +41,7 @@ func TestSimpleCacheSetError(t *testing.T) {
 		{
 			name:        "empty key",
 			key:         []byte{},
-			transformer: nil,
+			transformer: &envelopeTransformer{},
 		},
 		{
 			name:        "nil transformer",
@@ -66,7 +67,7 @@ func TestKeyFunc(t *testing.T) {
 	cache := newSimpleCache(fakeClock, time.Second)
 
 	t.Run("AllocsPerRun test", func(t *testing.T) {
-		key, err := generateKey(encryptedDEKMaxSize) // simulate worst case EDEK
+		key, err := generateKey(encryptedDEKSourceMaxSize) // simulate worst case EDEK
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +100,7 @@ func TestKeyFunc(t *testing.T) {
 func TestSimpleCache(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	cache := newSimpleCache(fakeClock, 5*time.Second)
-	envelopeTransformer := &envelopeTransformer{}
+	transformer := &envelopeTransformer{}
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
@@ -107,7 +108,7 @@ func TestSimpleCache(t *testing.T) {
 		wg.Add(1)
 		go func(key string) {
 			defer wg.Done()
-			cache.set([]byte(key), envelopeTransformer)
+			cache.set([]byte(key), transformer)
 		}(k)
 	}
 	wg.Wait()
@@ -118,17 +119,37 @@ func TestSimpleCache(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		k := fmt.Sprintf("key-%d", i)
-		if cache.get([]byte(k)) != envelopeTransformer {
+		if cache.get([]byte(k)) != transformer {
 			t.Fatalf("Expected to get the transformer for key %v", k)
 		}
 	}
 
 	// Wait for the cache to expire
 	fakeClock.Step(6 * time.Second)
+
+	// expired reads still work until GC runs on write
+	for i := 0; i < 10; i++ {
+		k := fmt.Sprintf("key-%d", i)
+		if cache.get([]byte(k)) != transformer {
+			t.Fatalf("Expected to get the transformer for key %v", k)
+		}
+	}
+
+	// run GC by performing a write
+	cache.set([]byte("some-other-unrelated-key"), transformer)
+
 	for i := 0; i < 10; i++ {
 		k := fmt.Sprintf("key-%d", i)
 		if cache.get([]byte(k)) != nil {
 			t.Fatalf("Expected to get nil for key %v", k)
 		}
 	}
+}
+
+func generateKey(length int) (key []byte, err error) {
+	key = make([]byte, length)
+	if _, err = rand.Read(key); err != nil {
+		return nil, err
+	}
+	return key, nil
 }

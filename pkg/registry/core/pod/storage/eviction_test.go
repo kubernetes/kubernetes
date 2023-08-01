@@ -709,6 +709,109 @@ func TestEvictionPDBStatus(t *testing.T) {
 	}
 }
 
+func TestAddConditionAndDelete(t *testing.T) {
+	cases := []struct {
+		name              string
+		initialPod        bool
+		makeDeleteOptions func(*api.Pod) *metav1.DeleteOptions
+		expectErr         string
+	}{
+		{
+			name:              "simple",
+			initialPod:        true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions { return &metav1.DeleteOptions{} },
+		},
+		{
+			name:              "missing",
+			initialPod:        false,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions { return &metav1.DeleteOptions{} },
+			expectErr:         "not found",
+		},
+		{
+			name:       "valid uid",
+			initialPod: true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions {
+				return &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &pod.UID}}
+			},
+		},
+		{
+			name:       "invalid uid",
+			initialPod: true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions {
+				badUID := pod.UID + "1"
+				return &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &badUID}}
+			},
+			expectErr: "The object might have been deleted and then recreated",
+		},
+		{
+			name:       "valid resourceVersion",
+			initialPod: true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions {
+				return &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &pod.ResourceVersion}}
+			},
+		},
+		{
+			name:       "invalid resourceVersion",
+			initialPod: true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions {
+				badRV := pod.ResourceVersion + "1"
+				return &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &badRV}}
+			},
+			expectErr: "The object might have been modified",
+		},
+	}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+
+	storage, _, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	client := fake.NewSimpleClientset()
+	evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
+
+	for _, tc := range cases {
+		for _, conditionsEnabled := range []bool{true, false} {
+			name := fmt.Sprintf("%s_conditions=%v", tc.name, conditionsEnabled)
+			t.Run(name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, conditionsEnabled)()
+				var deleteOptions *metav1.DeleteOptions
+				if tc.initialPod {
+					newPod := validNewPod()
+					createdObj, err := storage.Create(testContext, newPod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					t.Cleanup(func() {
+						zero := int64(0)
+						storage.Delete(testContext, newPod.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{GracePeriodSeconds: &zero})
+					})
+					deleteOptions = tc.makeDeleteOptions(createdObj.(*api.Pod))
+				} else {
+					deleteOptions = tc.makeDeleteOptions(nil)
+				}
+				if deleteOptions == nil {
+					deleteOptions = &metav1.DeleteOptions{}
+				}
+
+				err := addConditionAndDeletePod(evictionRest, testContext, "foo", rest.ValidateAllObjectFunc, deleteOptions)
+				if err == nil {
+					if tc.expectErr != "" {
+						t.Fatalf("expected err containing %q, got none", tc.expectErr)
+					}
+					return
+				}
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected err containing %q, got %v", tc.expectErr, err)
+				}
+			})
+		}
+	}
+}
+
 func resource(resource string) schema.GroupResource {
 	return schema.GroupResource{Group: "", Resource: resource}
 }
@@ -765,7 +868,7 @@ func (ms *mockStore) Watch(ctx context.Context, options *metainternalversion.Lis
 }
 
 func (ms *mockStore) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	return nil, false, nil
+	return ms.pod, false, nil
 }
 
 func (ms *mockStore) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {

@@ -30,12 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	k8sfeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -55,8 +52,6 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("extensions", "v1beta1", "ingresses"):                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                     `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
-	gvr("extensions", "v1beta1", "networkpolicies"):                 `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
-	gvr("networking.k8s.io", "v1", "networkpolicies"):               `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 25}}`,
 	gvr("autoscaling", "v2", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 25}}`,
 	gvr("batch", "v1", "cronjobs"):                                  `{"status": {"lastScheduleTime":  "2020-01-01T00:00:00Z"}}`,
@@ -64,9 +59,12 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("storage.k8s.io", "v1", "volumeattachments"):                `{"status": {"attached": false}}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                     `{"status": {"currentHealthy": 25}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                `{"status": {"currentHealthy": 25}}`,
-	gvr("resource.k8s.io", "v1alpha1", "podschedulings"):            `{"status": {"resourceClaims": [{"name": "my-claim", "unsuitableNodes": ["node2"]}]}}`, // Not really a conflict with status_test.go: Apply just stores both nodes. Conflict testing therefore gets disabled for podschedulings.
-	gvr("resource.k8s.io", "v1alpha1", "resourceclaims"):            `{"status": {"driverName": "other.example.com"}}`,
+	gvr("resource.k8s.io", "v1alpha2", "podschedulingcontexts"):     `{"status": {"resourceClaims": [{"name": "my-claim", "unsuitableNodes": ["node2"]}]}}`, // Not really a conflict with status_test.go: Apply just stores both nodes. Conflict testing therefore gets disabled for podschedulingcontexts.
+	gvr("resource.k8s.io", "v1alpha2", "resourceclaims"):            `{"status": {"driverName": "other.example.com"}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
+	// standard for []metav1.Condition
+	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 }
 
 // resetFieldsStatusDefault conflicts with statusDefault
@@ -86,10 +84,10 @@ var noConflicts = map[string]struct{}{
 	// namespaces only have a spec.finalizers field which is also skipped,
 	// thus it will never have a conflict.
 	"namespaces": {},
-	// podschedulings.status only has a list which contains items with a list,
+	// podschedulingcontexts.status only has a list which contains items with a list,
 	// therefore apply works because it simply merges either the outer or
 	// the inner list.
-	"podschedulings": {},
+	"podschedulingcontexts": {},
 }
 
 var image2 = image.GetE2EImage(image.Etcd)
@@ -134,8 +132,6 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("extensions", "v1beta1", "ingresses"):                                      `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                               `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                                    `{"spec": {"defaultBackend": {"service": {"name": "service2"}}}}`,
-	gvr("extensions", "v1beta1", "networkpolicies"):                                `{"spec":{"podSelector":{"matchLabels":{"app":"web"}},"ingress":[]}}`,
-	gvr("networking.k8s.io", "v1", "networkpolicies"):                              `{"spec":{"podSelector":{"matchLabels":{"app":"web"}},"ingress":[]}}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                                    `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                               `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("storage.k8s.io", "v1alpha1", "volumeattachments"):                         `{"metadata": {"name": "vaName2"}, "spec": {"nodeName": "localhost2"}}`,
@@ -146,11 +142,13 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("awesome.bears.com", "v3", "pandas"):                                       `{"spec": {"replicas": 302}}`,
 	gvr("apiregistration.k8s.io", "v1beta1", "apiservices"):                        `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
 	gvr("apiregistration.k8s.io", "v1", "apiservices"):                             `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
-	gvr("resource.k8s.io", "v1alpha1", "podschedulings"):                           `{"spec": {"selectedNode": "node2name"}}`,
-	gvr("resource.k8s.io", "v1alpha1", "resourceclasses"):                          `{"driverName": "other.example.com"}`,
-	gvr("resource.k8s.io", "v1alpha1", "resourceclaims"):                           `{"spec": {"resourceClassName": "class2name"}}`, // ResourceClassName is immutable, but that doesn't matter for the test.
-	gvr("resource.k8s.io", "v1alpha1", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
+	gvr("resource.k8s.io", "v1alpha2", "podschedulingcontexts"):                    `{"spec": {"selectedNode": "node2name"}}`,
+	gvr("resource.k8s.io", "v1alpha2", "resourceclasses"):                          `{"driverName": "other.example.com"}`,
+	gvr("resource.k8s.io", "v1alpha2", "resourceclaims"):                           `{"spec": {"resourceClassName": "class2name"}}`, // ResourceClassName is immutable, but that doesn't matter for the test.
+	gvr("resource.k8s.io", "v1alpha2", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):                `{}`,
+	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
+	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
 }
 
 // TestResetFields makes sure that fieldManager does not own fields reset by the storage strategy.
@@ -159,8 +157,6 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 // confirms that the fieldmanager1 is wiped of the status and fieldmanager2 is wiped of the spec.
 // We then attempt to apply obj2 to the spec endpoint which fails with an expected conflict.
 func TestApplyResetFields(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, k8sfeatures.NetworkPolicyStatus, true)()
-
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)

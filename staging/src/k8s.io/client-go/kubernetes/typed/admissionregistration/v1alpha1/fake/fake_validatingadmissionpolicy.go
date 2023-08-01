@@ -98,6 +98,17 @@ func (c *FakeValidatingAdmissionPolicies) Update(ctx context.Context, validating
 	return obj.(*v1alpha1.ValidatingAdmissionPolicy), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeValidatingAdmissionPolicies) UpdateStatus(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (*v1alpha1.ValidatingAdmissionPolicy, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateSubresourceAction(validatingadmissionpoliciesResource, "status", validatingAdmissionPolicy), &v1alpha1.ValidatingAdmissionPolicy{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ValidatingAdmissionPolicy), err
+}
+
 // Delete takes name of the validatingAdmissionPolicy and deletes it. Returns an error if one occurs.
 func (c *FakeValidatingAdmissionPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
@@ -138,6 +149,28 @@ func (c *FakeValidatingAdmissionPolicies) Apply(ctx context.Context, validatingA
 	}
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpoliciesResource, *name, types.ApplyPatchType, data), &v1alpha1.ValidatingAdmissionPolicy{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ValidatingAdmissionPolicy), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeValidatingAdmissionPolicies) ApplyStatus(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
+	if validatingAdmissionPolicy == nil {
+		return nil, fmt.Errorf("validatingAdmissionPolicy provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(validatingAdmissionPolicy)
+	if err != nil {
+		return nil, err
+	}
+	name := validatingAdmissionPolicy.Name
+	if name == nil {
+		return nil, fmt.Errorf("validatingAdmissionPolicy.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpoliciesResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.ValidatingAdmissionPolicy{})
 	if obj == nil {
 		return nil, err
 	}

@@ -110,7 +110,7 @@ func (t Token) String() string {
 	case SelfClosingTagToken:
 		return "<" + t.tagString() + "/>"
 	case CommentToken:
-		return "<!--" + EscapeString(t.Data) + "-->"
+		return "<!--" + escapeCommentString(t.Data) + "-->"
 	case DoctypeToken:
 		return "<!DOCTYPE " + EscapeString(t.Data) + ">"
 	}
@@ -598,10 +598,10 @@ scriptDataDoubleEscapeEnd:
 // readComment reads the next comment token starting with "<!--". The opening
 // "<!--" has already been consumed.
 func (z *Tokenizer) readComment() {
-	// When modifying this function, consider manually increasing the suffixLen
-	// constant in func TestComments, from 6 to e.g. 9 or more. That increase
-	// should only be temporary, not committed, as it exponentially affects the
-	// test running time.
+	// When modifying this function, consider manually increasing the
+	// maxSuffixLen constant in func TestComments, from 6 to e.g. 9 or more.
+	// That increase should only be temporary, not committed, as it
+	// exponentially affects the test running time.
 
 	z.data.start = z.raw.end
 	defer func() {
@@ -913,7 +913,14 @@ func (z *Tokenizer) readTagAttrKey() {
 		case ' ', '\n', '\r', '\t', '\f', '/':
 			z.pendingAttr[0].end = z.raw.end - 1
 			return
-		case '=', '>':
+		case '=':
+			if z.pendingAttr[0].start+1 == z.raw.end {
+				// WHATWG 13.2.5.32, if we see an equals sign before the attribute name
+				// begins, we treat it as a character in the attribute name and continue.
+				continue
+			}
+			fallthrough
+		case '>':
 			z.raw.end--
 			z.pendingAttr[0].end = z.raw.end
 			return

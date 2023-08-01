@@ -23,11 +23,6 @@ import (
 	"time"
 )
 
-var (
-	// TODO(yifan): Maybe set the them as parameters for NewCache().
-	defaultCachePeriod = time.Second * 2
-)
-
 // RuntimeCache is in interface for obtaining cached Pods.
 type RuntimeCache interface {
 	GetPods(context.Context) ([]*Pod, error)
@@ -39,9 +34,10 @@ type podsGetter interface {
 }
 
 // NewRuntimeCache creates a container runtime cache.
-func NewRuntimeCache(getter podsGetter) (RuntimeCache, error) {
+func NewRuntimeCache(getter podsGetter, cachePeriod time.Duration) (RuntimeCache, error) {
 	return &runtimeCache{
-		getter: getter,
+		getter:      getter,
+		cachePeriod: cachePeriod,
 	}, nil
 }
 
@@ -53,6 +49,8 @@ type runtimeCache struct {
 	sync.Mutex
 	// The underlying container runtime used to update the cache.
 	getter podsGetter
+	// The interval after which the cache should be refreshed.
+	cachePeriod time.Duration
 	// Last time when cache was updated.
 	cacheTime time.Time
 	// The content of the cache.
@@ -64,7 +62,7 @@ type runtimeCache struct {
 func (r *runtimeCache) GetPods(ctx context.Context) ([]*Pod, error) {
 	r.Lock()
 	defer r.Unlock()
-	if time.Since(r.cacheTime) > defaultCachePeriod {
+	if time.Since(r.cacheTime) > r.cachePeriod {
 		if err := r.updateCache(ctx); err != nil {
 			return nil, err
 		}

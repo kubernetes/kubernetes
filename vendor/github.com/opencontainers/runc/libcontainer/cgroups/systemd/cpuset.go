@@ -51,5 +51,10 @@ func RangeToBits(str string) ([]byte, error) {
 		// do not allow empty values
 		return nil, errors.New("empty value")
 	}
+
+	// fit cpuset parsing order in systemd
+	for l, r := 0, len(ret)-1; l < r; l, r = l+1, r-1 {
+		ret[l], ret[r] = ret[r], ret[l]
+	}
 	return ret, nil
 }

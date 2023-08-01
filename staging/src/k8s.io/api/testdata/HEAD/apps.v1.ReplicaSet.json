@@ -556,9 +556,10 @@
             "resizePolicy": [
               {
                 "resourceName": "resourceNameValue",
-                "policy": "policyValue"
+                "restartPolicy": "restartPolicyValue"
               }
             ],
+            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -839,9 +840,10 @@
             "resizePolicy": [
               {
                 "resourceName": "resourceNameValue",
-                "policy": "policyValue"
+                "restartPolicy": "restartPolicyValue"
               }
             ],
+            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -1122,9 +1124,10 @@
             "resizePolicy": [
               {
                 "resourceName": "resourceNameValue",
-                "policy": "policyValue"
+                "restartPolicy": "restartPolicyValue"
               }
             ],
+            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",

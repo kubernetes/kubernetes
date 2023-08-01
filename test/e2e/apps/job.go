@@ -69,7 +69,7 @@ type watchEventConfig struct {
 
 var _ = SIGDescribe("Job", func() {
 	f := framework.NewDefaultFramework("job")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	parallelism := int32(2)
 	completions := int32(4)
 

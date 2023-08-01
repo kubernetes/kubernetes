@@ -42,6 +42,7 @@ spec.securityContext.sysctls[*].name
 'net.ipv4.tcp_syncookies'
 'net.ipv4.ping_group_range'
 'net.ipv4.ip_unprivileged_port_start'
+'net.ipv4.ip_local_reserved_ports'
 
 */
 
@@ -60,6 +61,10 @@ func CheckSysctls() Check {
 				MinimumVersion: api.MajorMinorVersion(1, 0),
 				CheckPod:       sysctls_1_0,
 			},
+			{
+				MinimumVersion: api.MajorMinorVersion(1, 27),
+				CheckPod:       sysctls_1_27,
+			},
 		},
 	}
 }
@@ -72,14 +77,30 @@ var (
 		"net.ipv4.ping_group_range",
 		"net.ipv4.ip_unprivileged_port_start",
 	)
+	sysctls_allowed_1_27 = sets.NewString(
+		"kernel.shm_rmid_forced",
+		"net.ipv4.ip_local_port_range",
+		"net.ipv4.tcp_syncookies",
+		"net.ipv4.ping_group_range",
+		"net.ipv4.ip_unprivileged_port_start",
+		"net.ipv4.ip_local_reserved_ports",
+	)
 )
 
 func sysctls_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	return sysctls(podMetadata, podSpec, sysctls_allowed_1_0)
+}
+
+func sysctls_1_27(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	return sysctls(podMetadata, podSpec, sysctls_allowed_1_27)
+}
+
+func sysctls(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, sysctls_allowed_set sets.String) CheckResult {
 	var forbiddenSysctls []string
 
 	if podSpec.SecurityContext != nil {
 		for _, sysctl := range podSpec.SecurityContext.Sysctls {
-			if !sysctls_allowed_1_0.Has(sysctl.Name) {
+			if !sysctls_allowed_set.Has(sysctl.Name) {
 				forbiddenSysctls = append(forbiddenSysctls, sysctl.Name)
 			}
 		}

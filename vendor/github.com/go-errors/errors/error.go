@@ -91,6 +91,10 @@ func New(e interface{}) *Error {
 // fmt.Errorf("%v"). The skip parameter indicates how far up the stack
 // to start the stacktrace. 0 is from the current call, 1 from its caller, etc.
 func Wrap(e interface{}, skip int) *Error {
+	if e == nil {
+		return nil
+	}
+
 	var err error
 
 	switch e := e.(type) {
@@ -117,6 +121,9 @@ func Wrap(e interface{}, skip int) *Error {
 // up the stack to start the stacktrace. 0 is from the current call,
 // 1 from its caller, etc.
 func WrapPrefix(e interface{}, prefix string, skip int) *Error {
+	if e == nil {
+		return nil
+	}
 
 	err := Wrap(e, 1+skip)
 
@@ -130,26 +137,6 @@ func WrapPrefix(e interface{}, prefix string, skip int) *Error {
 		prefix: prefix,
 	}
 
-}
-
-// Is detects whether the error is equal to a given error. Errors
-// are considered equal by this function if they are the same object,
-// or if they both contain the same error inside an errors.Error.
-func Is(e error, original error) bool {
-
-	if e == original {
-		return true
-	}
-
-	if e, ok := e.(*Error); ok {
-		return Is(e.Err, original)
-	}
-
-	if original, ok := original.(*Error); ok {
-		return Is(e, original.Err)
-	}
-
-	return false
 }
 
 // Errorf creates a new error with the given message. You can use it
@@ -214,4 +201,9 @@ func (err *Error) TypeName() string {
 		return "panic"
 	}
 	return reflect.TypeOf(err.Err).String()
+}
+
+// Return the wrapped error (implements api for As function).
+func (err *Error) Unwrap() error {
+	return err.Err
 }

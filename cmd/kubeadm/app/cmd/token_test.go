@@ -36,6 +36,7 @@ import (
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -172,6 +173,9 @@ func TestRunCreateToken(t *testing.T) {
 						Groups: tc.extraGroups,
 					},
 				},
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+					CRISocket: constants.UnknownCRISocket,
+				},
 			}
 
 			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "", "")
@@ -249,18 +253,14 @@ func TestNewCmdToken(t *testing.T) {
 			if _, err = f.WriteString(tc.configToWrite); err != nil {
 				t.Errorf("Unable to write test file %q: %v", fullPath, err)
 			}
-			// store the current value of the environment variable.
-			storedEnv := os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
 			if tc.kubeConfigEnv != "" {
-				os.Setenv(clientcmd.RecommendedConfigPathEnvVar, tc.kubeConfigEnv)
+				t.Setenv(clientcmd.RecommendedConfigPathEnvVar, tc.kubeConfigEnv)
 			}
 			cmd.SetArgs(tc.args)
 			err := cmd.Execute()
 			if (err != nil) != tc.expectedError {
 				t.Errorf("Test case %q: newCmdToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
 			}
-			// restore the environment variable.
-			os.Setenv(clientcmd.RecommendedConfigPathEnvVar, storedEnv)
 		})
 	}
 }

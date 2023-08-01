@@ -27,10 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/utils/cpuset"
 )
 
 const (
@@ -424,12 +424,12 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
 	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// ResourcesAllocated holds the value of Container.Resources.Requests when the pod was admitted.
+	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
 	// We should return this value because this is what kubelet agreed to allocate for the container
 	// and the value configured with runtime.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-			cpuQuantity = cs.ResourcesAllocated[v1.ResourceCPU]
+			cpuQuantity = cs.AllocatedResources[v1.ResourceCPU]
 		}
 	}
 	if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
@@ -584,7 +584,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 	}
 }
 
-// generateCPUtopologyHints generates a set of TopologyHints given the set of
+// generateCPUTopologyHints generates a set of TopologyHints given the set of
 // available CPUs and the number of CPUs being requested.
 //
 // It follows the convention of marking all hints that have the same number of

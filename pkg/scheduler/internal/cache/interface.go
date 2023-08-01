@@ -19,6 +19,7 @@ package cache
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -68,23 +69,23 @@ type Cache interface {
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
 	// After expiration, its information would be subtracted.
-	AssumePod(pod *v1.Pod) error
+	AssumePod(logger klog.Logger, pod *v1.Pod) error
 
 	// FinishBinding signals that cache for assumed pod can be expired
-	FinishBinding(pod *v1.Pod) error
+	FinishBinding(logger klog.Logger, pod *v1.Pod) error
 
 	// ForgetPod removes an assumed pod from cache.
-	ForgetPod(pod *v1.Pod) error
+	ForgetPod(logger klog.Logger, pod *v1.Pod) error
 
 	// AddPod either confirms a pod if it's assumed, or adds it back if it's expired.
 	// If added back, the pod's information would be added again.
-	AddPod(pod *v1.Pod) error
+	AddPod(logger klog.Logger, pod *v1.Pod) error
 
 	// UpdatePod removes oldPod's information and adds newPod's information.
-	UpdatePod(oldPod, newPod *v1.Pod) error
+	UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error
 
 	// RemovePod removes a pod. The pod's information would be subtracted from assigned node.
-	RemovePod(pod *v1.Pod) error
+	RemovePod(logger klog.Logger, pod *v1.Pod) error
 
 	// GetPod returns the pod from the cache with the same namespace and the
 	// same name of the specified pod.
@@ -95,21 +96,21 @@ type Cache interface {
 
 	// AddNode adds overall information about node.
 	// It returns a clone of added NodeInfo object.
-	AddNode(node *v1.Node) *framework.NodeInfo
+	AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo
 
 	// UpdateNode updates overall information about node.
 	// It returns a clone of updated NodeInfo object.
-	UpdateNode(oldNode, newNode *v1.Node) *framework.NodeInfo
+	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo
 
 	// RemoveNode removes overall information about node.
-	RemoveNode(node *v1.Node) error
+	RemoveNode(logger klog.Logger, node *v1.Node) error
 
 	// UpdateSnapshot updates the passed infoSnapshot to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.
 	// The snapshot only includes Nodes that are not deleted at the time this function is called.
 	// nodeinfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
-	UpdateSnapshot(nodeSnapshot *Snapshot) error
+	UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapshot) error
 
 	// Dump produces a dump of the current cache.
 	Dump() *Dump
@@ -117,6 +118,6 @@ type Cache interface {
 
 // Dump is a dump of the cache state.
 type Dump struct {
-	AssumedPods sets.String
+	AssumedPods sets.Set[string]
 	Nodes       map[string]*framework.NodeInfo
 }

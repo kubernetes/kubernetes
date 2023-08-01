@@ -441,8 +441,10 @@ func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, st
 		t.Errorf("Unexpected failure during deletion: %v", err)
 	}
 
-	if calls != 2 {
-		t.Errorf("validate function should have been called twice, called %d", calls)
+	// Implementations of the storage interface are allowed to ignore the suggestion,
+	// in which case just one validation call is possible.
+	if calls > 2 {
+		t.Errorf("validate function should have been called at most twice, called %d", calls)
 	}
 
 	if err := store.Get(ctx, key, storage.GetOptions{}, &example.Pod{}); !storage.IsNotFound(err) {
@@ -476,7 +478,7 @@ func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T
 	}
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ignoreWatchCacheTests bool) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 
 	initialRV, preset, err := seedMultiLevelData(ctx, store)
@@ -504,6 +506,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 		pod := obj.(*example.Pod)
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
+	// Use compact to increase etcd global revision without changes to any resources.
+	// The increase in resources version comes from Kubernetes compaction updating hidden key.
+	// Used to test consistent List to confirm it returns latest etcd revision.
+	compaction(ctx, t, initialRV)
+	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
 		name                       string
@@ -704,7 +711,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
-			expectRV:                   list.ResourceVersion,
+			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
 		},
 		{
 			name:   "test List with limit at resource version 0",
@@ -1017,6 +1024,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{},
 		},
+		{
+			name:        "test consistent List",
+			prefix:      "/pods/empty",
+			pred:        storage.Everything,
+			rv:          "",
+			expectRV:    currentRV,
+			expectedOut: []example.Pod{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1304,13 +1319,13 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		name:                 "existing key, resourceVersion=0",
 		key:                  key,
 		pred:                 storage.Everything,
-		expectedAlternatives: [][]example.Pod{{}, {*storedObj}},
+		expectedAlternatives: [][]example.Pod{{}, {*prevStoredObj}, {*storedObj}},
 		rv:                   "0",
 	}, {
 		name:                 "existing key, resourceVersion=0, resourceVersionMatch=notOlderThan",
 		key:                  key,
 		pred:                 storage.Everything,
-		expectedAlternatives: [][]example.Pod{{}, {*storedObj}},
+		expectedAlternatives: [][]example.Pod{{}, {*prevStoredObj}, {*storedObj}},
 		rv:                   "0",
 		rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
 	}, {

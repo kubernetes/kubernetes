@@ -43,11 +43,14 @@ import (
 )
 
 func TestIPAMMultiCIDRRangeAllocatorCIDRAllocate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// set the feature gate to enable MultiCIDRRangeAllocator
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -60,9 +63,6 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRAllocate(t *testing.T) {
 	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
@@ -130,10 +130,14 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRAllocate(t *testing.T) {
 }
 
 func TestIPAMMultiCIDRRangeAllocatorCIDRRelease(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// set the feature gate to enable MultiCIDRRangeAllocator
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -146,9 +150,6 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRRelease(t *testing.T) {
 	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
@@ -207,10 +208,14 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRRelease(t *testing.T) {
 }
 
 func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// set the feature gate to enable MultiCIDRRangeAllocator.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -223,9 +228,6 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
 	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
@@ -303,10 +305,14 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
 }
 
 func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTerminate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// set the feature gate to enable MultiCIDRRangeAllocator.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -319,9 +325,6 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTerminate(t *testing.T) {
 	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
@@ -388,10 +391,14 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTerminate(t *testing.T) {
 }
 
 func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTieBreak(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// set the feature gate to enable MultiCIDRRangeAllocator
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -404,9 +411,6 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTieBreak(t *testing.T) {
 	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())

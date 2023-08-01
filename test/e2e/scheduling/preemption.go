@@ -69,7 +69,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	var nodeList *v1.NodeList
 	var ns string
 	f := framework.NewDefaultFramework("sched-preemption")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	lowPriority, mediumPriority, highPriority := int32(1), int32(100), int32(1000)
 	lowPriorityClassName := f.BaseName + "-low-priority"
@@ -514,7 +514,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			runPausePod(ctx, f, mediumPodCfg)
 
 			ginkgo.By("Verify there are 3 Pods left in this namespace")
-			wantPods := sets.NewString("high", "medium", "low")
+			wantPods := sets.New("high", "medium", "low")
 
 			// Wait until the number of pods stabilizes. Note that `medium` pod can get scheduled once the
 			// second low priority pod is marked as terminating.
@@ -542,7 +542,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		var node *v1.Node
 		var ns, nodeHostNameLabel string
 		f := framework.NewDefaultFramework("sched-preemption-path")
-		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+		f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 		priorityPairs := make([]priorityPair, 0)
 
@@ -762,7 +762,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	ginkgo.Context("PriorityClass endpoints", func() {
 		var cs clientset.Interface
 		f := framework.NewDefaultFramework("sched-preemption-path")
-		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 		testUUID := uuid.New().String()
 		var pcs []*schedulingv1.PriorityClass
 

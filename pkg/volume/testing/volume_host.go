@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -75,7 +74,6 @@ type fakeVolumeHost struct {
 	informerFactory        informers.SharedInformerFactory
 	kubeletErr             error
 	mux                    sync.Mutex
-	filteredDialOptions    *proxyutil.FilteredDialOptions
 }
 
 var _ VolumeHost = &fakeVolumeHost{}
@@ -123,10 +121,6 @@ func (f *fakeVolumeHost) GetPodsDir() string {
 	return filepath.Join(f.rootDir, "pods")
 }
 
-func (f *fakeVolumeHost) GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error) {
-	return containerUID, containerGID, nil
-}
-
 func (f *fakeVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
 	return filepath.Join(f.rootDir, "pods", string(podUID), "volumes", pluginName, volumeName)
 }
@@ -153,10 +147,6 @@ func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
 
 func (f *fakeVolumeHost) GetSubpather() subpath.Interface {
 	return f.subpather
-}
-
-func (f *fakeVolumeHost) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
-	return f.filteredDialOptions
 }
 
 func (f *fakeVolumeHost) GetPluginMgr() *VolumePluginMgr {

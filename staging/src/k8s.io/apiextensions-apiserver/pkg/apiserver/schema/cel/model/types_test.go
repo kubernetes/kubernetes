@@ -29,12 +29,7 @@ import (
 
 func TestTypes_RuleTypesFieldMapping(t *testing.T) {
 	stdEnv, _ := cel.NewEnv()
-	reg := apiservercel.NewRegistry(stdEnv)
-	rt, err := apiservercel.NewRuleTypes("CustomObject", SchemaDeclType(testSchema(), true), reg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rt.TypeProvider = stdEnv.TypeProvider()
+	rt := apiservercel.NewDeclTypeProvider(SchemaDeclType(testSchema(), true).MaybeAssignTypeName("CustomObject"))
 	nestedFieldType, found := rt.FindFieldType("CustomObject", "nested")
 	if !found {
 		t.Fatal("got field not found for 'CustomObject.nested', wanted found")

@@ -36,7 +36,7 @@ import (
 
 var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 	f := framework.NewDefaultFramework("endpointslicemirroring")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 

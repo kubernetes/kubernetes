@@ -41,6 +41,7 @@ import (
 func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 	tests := map[string]struct {
 		enablePodDisruptionConditions bool
+		enableJobPodReplacementPolicy bool
 		phase                         v1.PodPhase
 		wantPhase                     v1.PodPhase
 		wantDisruptionTarget          *v1.PodCondition
@@ -55,6 +56,24 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 				Reason:  "DeletionByPodGC",
 				Message: "PodGC: node no longer exists",
 			},
+		},
+		"PodDisruptionConditions and PodReplacementPolicy enabled": {
+			enablePodDisruptionConditions: true,
+			enableJobPodReplacementPolicy: true,
+			phase:                         v1.PodPending,
+			wantPhase:                     v1.PodFailed,
+			wantDisruptionTarget: &v1.PodCondition{
+				Type:    v1.DisruptionTarget,
+				Status:  v1.ConditionTrue,
+				Reason:  "DeletionByPodGC",
+				Message: "PodGC: node no longer exists",
+			},
+		},
+		"Only PodReplacementPolicy enabled; no PodDisruptionCondition": {
+			enablePodDisruptionConditions: false,
+			enableJobPodReplacementPolicy: true,
+			phase:                         v1.PodPending,
+			wantPhase:                     v1.PodFailed,
 		},
 		"PodDisruptionConditions disabled": {
 			enablePodDisruptionConditions: false,
@@ -76,8 +95,8 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)()
 			testCtx := setup(t, "podgc-orphaned")
-			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 
 			node := &v1.Node{
@@ -117,7 +136,7 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error %v, while creating pod: %v", err, klog.KObj(pod))
 			}
-			defer testutils.RemovePodFinalizers(testCtx.ClientSet, t, []*v1.Pod{pod})
+			defer testutils.RemovePodFinalizers(testCtx.Ctx, testCtx.ClientSet, t, *pod)
 
 			pod.Status.Phase = test.phase
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{}); err != nil {
@@ -152,6 +171,7 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 	tests := map[string]struct {
 		enablePodDisruptionConditions bool
+		enableJobPodReplacementPolicy bool
 		withFinalizer                 bool
 		wantPhase                     v1.PodPhase
 	}{
@@ -160,8 +180,8 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			withFinalizer:                 true,
 			wantPhase:                     v1.PodFailed,
 		},
-		"pod has phase when PodDisruptionConditions disabled": {
-			enablePodDisruptionConditions: true,
+		"pod has phase unchanged when PodDisruptionConditions disabled": {
+			enablePodDisruptionConditions: false,
 			withFinalizer:                 true,
 			wantPhase:                     v1.PodPending,
 		},
@@ -173,14 +193,20 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			enablePodDisruptionConditions: false,
 			withFinalizer:                 false,
 		},
+		"pod has phase changed when PodDisruptionConditions disabled, but JobPodReplacementPolicy enabled": {
+			enablePodDisruptionConditions: false,
+			enableJobPodReplacementPolicy: true,
+			withFinalizer:                 true,
+			wantPhase:                     v1.PodFailed,
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeOutOfServiceVolumeDetach, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)()
 			testCtx := setup(t, "podgc-out-of-service")
-			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 
 			node := &v1.Node{
@@ -226,7 +252,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 				t.Fatalf("Error %v, while creating pod: %v", err, klog.KObj(pod))
 			}
 			if test.withFinalizer {
-				defer testutils.RemovePodFinalizers(testCtx.ClientSet, t, []*v1.Pod{pod})
+				defer testutils.RemovePodFinalizers(testCtx.Ctx, testCtx.ClientSet, t, *pod)
 			}
 
 			// trigger termination of the pod, but with long grace period so that it is not removed immediately
@@ -246,7 +272,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			}
 			if test.withFinalizer {
 				// wait until the pod phase is set as expected
-				err = wait.PollImmediate(time.Second, time.Second*15, func() (bool, error) {
+				err = wait.Poll(time.Second, time.Second*15, func() (bool, error) {
 					var e error
 					pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
 					if e != nil {

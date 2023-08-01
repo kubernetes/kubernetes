@@ -7,6 +7,7 @@
 // Starlark values are represented by the Value interface.
 // The following built-in Value types are known to the evaluator:
 //
+<<<<<<< HEAD
 //      NoneType        -- NoneType
 //      Bool            -- bool
 //      Bytes           -- bytes
@@ -19,23 +20,37 @@
 //      *Set            -- set
 //      *Function       -- function (implemented in Starlark)
 //      *Builtin        -- builtin_function_or_method (function or method implemented in Go)
+=======
+//	NoneType        -- NoneType
+//	Bool            -- bool
+//	Bytes           -- bytes
+//	Int             -- int
+//	Float           -- float
+//	String          -- string
+//	*List           -- list
+//	Tuple           -- tuple
+//	*Dict           -- dict
+//	*Set            -- set
+//	*Function       -- function (implemented in Starlark)
+//	*Builtin        -- builtin_function_or_method (function or method implemented in Go)
+>>>>>>> origin/GarbageErrors
 //
 // Client applications may define new data types that satisfy at least
 // the Value interface.  Such types may provide additional operations by
 // implementing any of these optional interfaces:
 //
-//      Callable        -- value is callable like a function
-//      Comparable      -- value defines its own comparison operations
-//      Iterable        -- value is iterable using 'for' loops
-//      Sequence        -- value is iterable sequence of known length
-//      Indexable       -- value is sequence with efficient random access
-//      Mapping         -- value maps from keys to values, like a dictionary
-//      HasBinary       -- value defines binary operations such as * and +
-//      HasAttrs        -- value has readable fields or methods x.f
-//      HasSetField     -- value has settable fields x.f
-//      HasSetIndex     -- value supports element update using x[i]=y
-//      HasSetKey       -- value supports map update using x[k]=v
-//      HasUnary        -- value defines unary operations such as + and -
+//	Callable        -- value is callable like a function
+//	Comparable      -- value defines its own comparison operations
+//	Iterable        -- value is iterable using 'for' loops
+//	Sequence        -- value is iterable sequence of known length
+//	Indexable       -- value is sequence with efficient random access
+//	Mapping         -- value maps from keys to values, like a dictionary
+//	HasBinary       -- value defines binary operations such as * and +
+//	HasAttrs        -- value has readable fields or methods x.f
+//	HasSetField     -- value has settable fields x.f
+//	HasSetIndex     -- value supports element update using x[i]=y
+//	HasSetKey       -- value supports map update using x[k]=v
+//	HasUnary        -- value defines unary operations such as + and -
 //
 // Client applications may also define domain-specific functions in Go
 // and make them available to Starlark programs.  Use NewBuiltin to
@@ -63,7 +78,6 @@
 // through Starlark code and into callbacks.  When evaluation fails it
 // returns an EvalError from which the application may obtain a
 // backtrace of active Starlark calls.
-//
 package starlark // import "go.starlark.net/starlark"
 
 // This file defines the data types of Starlark and their basic operations.
@@ -132,7 +146,34 @@ type Comparable interface {
 	CompareSameType(op syntax.Token, y Value, depth int) (bool, error)
 }
 
+// A TotallyOrdered is a type whose values form a total order:
+// if x and y are of the same TotallyOrdered type, then x must be less than y,
+// greater than y, or equal to y.
+//
+// It is simpler than Comparable and should be preferred in new code,
+// but if a type implements both interfaces, Comparable takes precedence.
+type TotallyOrdered interface {
+	Value
+	// Cmp compares two values x and y of the same totally ordered type.
+	// It returns negative if x < y, positive if x > y, and zero if the values are equal.
+	//
+	// Implementations that recursively compare subcomponents of
+	// the value should use the CompareDepth function, not Cmp, to
+	// avoid infinite recursion on cyclic structures.
+	//
+	// The depth parameter is used to bound comparisons of cyclic
+	// data structures.  Implementations should decrement depth
+	// before calling CompareDepth and should return an error if depth
+	// < 1.
+	//
+	// Client code should not call this method.  Instead, use the
+	// standalone Compare or Equals functions, which are defined for
+	// all pairs of operands.
+	Cmp(y Value, depth int) (int, error)
+}
+
 var (
+<<<<<<< HEAD
 	_ Comparable = Int{}
 	_ Comparable = False
 	_ Comparable = Float(0)
@@ -141,6 +182,16 @@ var (
 	_ Comparable = (*List)(nil)
 	_ Comparable = Tuple(nil)
 	_ Comparable = (*Set)(nil)
+=======
+	_ TotallyOrdered = Int{}
+	_ TotallyOrdered = Float(0)
+	_ Comparable     = False
+	_ Comparable     = String("")
+	_ Comparable     = (*Dict)(nil)
+	_ Comparable     = (*List)(nil)
+	_ Comparable     = Tuple(nil)
+	_ Comparable     = (*Set)(nil)
+>>>>>>> origin/GarbageErrors
 )
 
 // A Callable value f may be the operand of a function call, f(x).
@@ -229,13 +280,12 @@ var (
 //
 // Example usage:
 //
-// 	iter := iterable.Iterator()
+//	iter := iterable.Iterator()
 //	defer iter.Done()
 //	var x Value
 //	for iter.Next(&x) {
 //		...
 //	}
-//
 type Iterator interface {
 	// If the iterator is exhausted, Next returns false.
 	// Otherwise it sets *p to the current element of the sequence,
@@ -276,7 +326,7 @@ type HasSetKey interface {
 var _ HasSetKey = (*Dict)(nil)
 
 // A HasBinary value may be used as either operand of these binary operators:
-//     +   -   *   /   //   %   in   not in   |   &   ^   <<   >>
+// +   -   *   /   //   %   in   not in   |   &   ^   <<   >>
 //
 // The Side argument indicates whether the receiver is the left or right operand.
 //
@@ -296,7 +346,7 @@ const (
 )
 
 // A HasUnary value may be used as the operand of these unary operators:
-//     +   -   ~
+// +   -   ~
 //
 // An implementation may decline to handle an operation by returning (nil, nil).
 // For this reason, clients should always call the standalone Unary(op, x)
@@ -441,9 +491,13 @@ func isFinite(f float64) bool {
 	return math.Abs(f) <= math.MaxFloat64
 }
 
-func (x Float) CompareSameType(op syntax.Token, y_ Value, depth int) (bool, error) {
+func (x Float) Cmp(y_ Value, depth int) (int, error) {
 	y := y_.(Float)
+<<<<<<< HEAD
 	return threeway(op, floatCmp(x, y)), nil
+=======
+	return floatCmp(x, y), nil
+>>>>>>> origin/GarbageErrors
 }
 
 // floatCmp performs a three-valued comparison on floats,
@@ -711,6 +765,34 @@ func (fn *Function) Param(i int) (string, syntax.Position) {
 	id := fn.funcode.Locals[i]
 	return id.Name, id.Pos
 }
+
+// ParamDefault returns the default value of the specified parameter
+// (0 <= i < NumParams()), or nil if the parameter is not optional.
+func (fn *Function) ParamDefault(i int) Value {
+	if i < 0 || i >= fn.NumParams() {
+		panic(i)
+	}
+
+	// fn.defaults omits all required params up to the first optional param. It
+	// also does not include *args or **kwargs at the end.
+	firstOptIdx := fn.NumParams() - len(fn.defaults)
+	if fn.HasVarargs() {
+		firstOptIdx--
+	}
+	if fn.HasKwargs() {
+		firstOptIdx--
+	}
+	if i < firstOptIdx || i >= firstOptIdx+len(fn.defaults) {
+		return nil
+	}
+
+	dflt := fn.defaults[i-firstOptIdx]
+	if _, ok := dflt.(mandatory); ok {
+		return nil
+	}
+	return dflt
+}
+
 func (fn *Function) HasVarargs() bool { return fn.funcode.HasVarargs }
 func (fn *Function) HasKwargs() bool  { return fn.funcode.HasKwargs }
 
@@ -754,13 +836,12 @@ func NewBuiltin(name string, fn func(thread *Thread, fn *Builtin, args Tuple, kw
 // In the example below, the value of f is the string.index
 // built-in method bound to the receiver value "abc":
 //
-//     f = "abc".index; f("a"); f("b")
+//	f = "abc".index; f("a"); f("b")
 //
 // In the common case, the receiver is bound only during the call,
 // but this still results in the creation of a temporary method closure:
 //
-//     "abc".index("a")
-//
+//	"abc".index("a")
 func (b *Builtin) BindReceiver(recv Value) *Builtin {
 	return &Builtin{name: b.name, fn: b.fn, recv: recv}
 }
@@ -794,6 +875,14 @@ func (d *Dict) Type() string                                    { return "dict" 
 func (d *Dict) Freeze()                                         { d.ht.freeze() }
 func (d *Dict) Truth() Bool                                     { return d.Len() > 0 }
 func (d *Dict) Hash() (uint32, error)                           { return 0, fmt.Errorf("unhashable type: dict") }
+
+func (x *Dict) Union(y *Dict) *Dict {
+	z := new(Dict)
+	z.ht.init(x.Len()) // a lower bound
+	z.ht.addAll(&x.ht) // can't fail
+	z.ht.addAll(&y.ht) // can't fail
+	return z
+}
 
 func (d *Dict) Attr(name string) (Value, error) { return builtinAttr(d, name, dictMethods) }
 func (d *Dict) AttrNames() []string             { return builtinAttrNames(dictMethods) }
@@ -1057,7 +1146,6 @@ func (s *Set) Len() int                               { return int(s.ht.len) }
 func (s *Set) Iterate() Iterator                      { return s.ht.iterate() }
 func (s *Set) String() string                         { return toString(s) }
 func (s *Set) Type() string                           { return "set" }
-func (s *Set) elems() []Value                         { return s.ht.keys() }
 func (s *Set) Freeze()                                { s.ht.freeze() }
 func (s *Set) Hash() (uint32, error)                  { return 0, fmt.Errorf("unhashable type: set") }
 func (s *Set) Truth() Bool                            { return s.Len() > 0 }
@@ -1083,8 +1171,8 @@ func setsEqual(x, y *Set, depth int) (bool, error) {
 	if x.Len() != y.Len() {
 		return false, nil
 	}
-	for _, elem := range x.elems() {
-		if found, _ := y.Has(elem); !found {
+	for e := x.ht.head; e != nil; e = e.next {
+		if found, _ := y.Has(e.key); !found {
 			return false, nil
 		}
 	}
@@ -1093,8 +1181,8 @@ func setsEqual(x, y *Set, depth int) (bool, error) {
 
 func (s *Set) Union(iter Iterator) (Value, error) {
 	set := new(Set)
-	for _, elem := range s.elems() {
-		set.Insert(elem) // can't fail
+	for e := s.ht.head; e != nil; e = e.next {
+		set.Insert(e.key) // can't fail
 	}
 	var x Value
 	for iter.Next(&x) {
@@ -1198,11 +1286,11 @@ func writeValue(out *strings.Builder, x Value, path []Value) {
 
 	case *Set:
 		out.WriteString("set([")
-		for i, elem := range x.elems() {
-			if i > 0 {
+		for e := x.ht.head; e != nil; e = e.next {
+			if e != x.ht.head {
 				out.WriteString(", ")
 			}
-			writeValue(out, elem, path)
+			writeValue(out, e.key, path)
 		}
 		out.WriteString("])")
 
@@ -1265,6 +1353,14 @@ func CompareDepth(op syntax.Token, x, y Value, depth int) (bool, error) {
 	if sameType(x, y) {
 		if xcomp, ok := x.(Comparable); ok {
 			return xcomp.CompareSameType(op, y, depth)
+		}
+
+		if xcomp, ok := x.(TotallyOrdered); ok {
+			t, err := xcomp.Cmp(y, depth)
+			if err != nil {
+				return false, err
+			}
+			return threeway(op, t), nil
 		}
 
 		// use identity comparison

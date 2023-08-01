@@ -18,14 +18,14 @@ limitations under the License.
  * This test checks that various VolumeSources are working.
  *
  * There are two ways, how to test the volumes:
- * 1) With containerized server (NFS, Ceph, Gluster, iSCSI, ...)
+ * 1) With containerized server (NFS, Ceph, iSCSI, ...)
  * The test creates a server pod, exporting simple 'index.html' file.
  * Then it uses appropriate VolumeSource to import this file into a client pod
  * and checks that the pod can see the file. It does so by importing the file
- * into web server root and loadind the index.html from it.
+ * into web server root and loading the index.html from it.
  *
  * These tests work only when privileged containers are allowed, exporting
- * various filesystems (NFS, GlusterFS, ...) usually needs some mounting or
+ * various filesystems (ex: NFS) usually needs some mounting or
  * other privileged magic in the server pod.
  *
  * Note that the server containers are for testing purposes only and should not
@@ -59,6 +59,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	uexec "k8s.io/utils/exec"
 
 	"github.com/onsi/ginkgo/v2"
@@ -87,7 +88,7 @@ const (
 	VolumeServerPodStartupTimeout = 3 * time.Minute
 
 	// PodCleanupTimeout is a waiting period for pod to be cleaned up and unmount its volumes so we
-	// don't tear down containers with NFS/Ceph/Gluster server too early.
+	// don't tear down containers with NFS/Ceph server too early.
 	PodCleanupTimeout = 20 * time.Second
 )
 
@@ -149,6 +150,10 @@ type Test struct {
 
 // NewNFSServer is a NFS-specific wrapper for CreateStorageServer.
 func NewNFSServer(ctx context.Context, cs clientset.Interface, namespace string, args []string) (config TestConfig, pod *v1.Pod, host string) {
+	return NewNFSServerWithNodeName(ctx, cs, namespace, args, "")
+}
+
+func NewNFSServerWithNodeName(ctx context.Context, cs clientset.Interface, namespace string, args []string, nodeName string) (config TestConfig, pod *v1.Pod, host string) {
 	config = TestConfig{
 		Namespace:          namespace,
 		Prefix:             "nfs",
@@ -157,6 +162,10 @@ func NewNFSServer(ctx context.Context, cs clientset.Interface, namespace string,
 		ServerVolumes:      map[string]string{"": "/exports"},
 		ServerReadyMessage: "NFS started",
 	}
+	if nodeName != "" {
+		config.ClientNodeSelection = e2epod.NodeSelection{Name: nodeName}
+	}
+
 	if len(args) > 0 {
 		config.ServerArgs = args
 	}
@@ -329,6 +338,10 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 		},
 	}
 
+	if config.ClientNodeSelection.Name != "" {
+		serverPod.Spec.NodeName = config.ClientNodeSelection.Name
+	}
+
 	var pod *v1.Pod
 	serverPod, err := podClient.Create(ctx, serverPod, metav1.CreateOptions{})
 	// ok if the server pod already exists. TODO: make this controllable by callers
@@ -355,7 +368,7 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 		}
 	}
 	if config.ServerReadyMessage != "" {
-		_, err := e2epodoutput.LookForStringInLog(pod.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
+		_, err := e2epodoutput.LookForStringInLogWithoutKubectl(ctx, client, pod.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
 		framework.ExpectNoError(err, "Failed to find %q in pod logs: %s", config.ServerReadyMessage, err)
 	}
 	return pod
@@ -386,8 +399,9 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 	When SELinux is enabled on the host, client-pod can not read the content, with permission denied.
 	Invoking client-pod as privileged, so that it can access the volume content, even when SELinux is enabled on the host.
 	*/
-	if config.Prefix == "hostpathsymlink" || config.Prefix == "hostpath" {
-		privileged = true
+	securityLevel := admissionapi.LevelBaseline // TODO (#118184): also support LevelRestricted
+	if privileged || config.Prefix == "hostpathsymlink" || config.Prefix == "hostpath" {
+		securityLevel = admissionapi.LevelPrivileged
 	}
 	command = "while true ; do sleep 2; done "
 	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
@@ -431,9 +445,9 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 		// a privileged container, so we don't go privileged for block volumes.
 		// https://github.com/moby/moby/issues/35991
 		if privileged && test.Mode == v1.PersistentVolumeBlock {
-			privileged = false
+			securityLevel = admissionapi.LevelBaseline
 		}
-		clientPod.Spec.Containers[0].SecurityContext = e2epod.GenerateContainerSecurityContext(privileged)
+		clientPod.Spec.Containers[0].SecurityContext = e2epod.GenerateContainerSecurityContext(securityLevel)
 
 		if test.Mode == v1.PersistentVolumeBlock {
 			clientPod.Spec.Containers[0].VolumeDevices = append(clientPod.Spec.Containers[0].VolumeDevices, v1.VolumeDevice{
@@ -608,7 +622,7 @@ func generateWriteCmd(content, path string) []string {
 	return commands
 }
 
-// generateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
+// GenerateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
 func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 	var commands []string
 	commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}

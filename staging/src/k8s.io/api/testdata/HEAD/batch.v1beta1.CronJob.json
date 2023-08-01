@@ -117,6 +117,8 @@
           ]
         },
         "backoffLimit": 7,
+        "backoffLimitPerIndex": 12,
+        "maxFailedIndexes": 13,
         "selector": {
           "matchLabels": {
             "matchLabelsKey": "matchLabelsValue"
@@ -628,9 +630,10 @@
                 "resizePolicy": [
                   {
                     "resourceName": "resourceNameValue",
-                    "policy": "policyValue"
+                    "restartPolicy": "restartPolicyValue"
                   }
                 ],
+                "restartPolicy": "restartPolicyValue",
                 "volumeMounts": [
                   {
                     "name": "nameValue",
@@ -911,9 +914,10 @@
                 "resizePolicy": [
                   {
                     "resourceName": "resourceNameValue",
-                    "policy": "policyValue"
+                    "restartPolicy": "restartPolicyValue"
                   }
                 ],
+                "restartPolicy": "restartPolicyValue",
                 "volumeMounts": [
                   {
                     "name": "nameValue",
@@ -1194,9 +1198,10 @@
                 "resizePolicy": [
                   {
                     "resourceName": "resourceNameValue",
-                    "policy": "policyValue"
+                    "restartPolicy": "restartPolicyValue"
                   }
                 ],
+                "restartPolicy": "restartPolicyValue",
                 "volumeMounts": [
                   {
                     "name": "nameValue",
@@ -1758,7 +1763,8 @@
         },
         "ttlSecondsAfterFinished": 8,
         "completionMode": "completionModeValue",
-        "suspend": true
+        "suspend": true,
+        "podReplacementPolicy": "podReplacementPolicyValue"
       }
     },
     "successfulJobsHistoryLimit": 6,

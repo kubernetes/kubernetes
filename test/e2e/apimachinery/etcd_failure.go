@@ -39,7 +39,7 @@ import (
 var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("etcd-failure")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		// This test requires:

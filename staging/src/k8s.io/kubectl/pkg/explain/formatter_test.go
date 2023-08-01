@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestFormatterWrite(t *testing.T) {
@@ -113,7 +113,7 @@ fringilla velit.
 `
 
 	if buf.String() != want {
-		t.Errorf("Diff:\n%s", diff.StringDiff(buf.String(), want))
+		t.Errorf("Diff:\n%s", cmp.Diff(buf.String(), want))
 	}
 }
 

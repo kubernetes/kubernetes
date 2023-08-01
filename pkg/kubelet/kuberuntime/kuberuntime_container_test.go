@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -234,6 +235,10 @@ func TestToKubeContainerStatus(t *testing.T) {
 // TestToKubeContainerStatusWithResources tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
 func TestToKubeContainerStatusWithResources(t *testing.T) {
+	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
+	if goruntime.GOOS == "windows" {
+		t.Skip("Updating Pod Container Resources is not supported on Windows.")
+	}
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
@@ -336,7 +341,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 	}
 }
 
-func TestLifeCycleHook(t *testing.T) {
+func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Container) {
 
 	// Setup
 	fakeRuntime, _, m, _ := createTestRuntimeManager()
@@ -347,23 +352,6 @@ func TestLifeCycleHook(t *testing.T) {
 		ID:   "foo",
 	}
 
-	testPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "default",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         []string{"testCommand"},
-					WorkingDir:      "testWorkingDir",
-				},
-			},
-		},
-	}
 	cmdPostStart := &v1.Lifecycle{
 		PostStart: &v1.LifecycleHandler{
 			Exec: &v1.ExecAction{
@@ -413,7 +401,7 @@ func TestLifeCycleHook(t *testing.T) {
 	// Configured and works as expected
 	t.Run("PreStop-CMDExec", func(t *testing.T) {
 		ctx := context.Background()
-		testPod.Spec.Containers[0].Lifecycle = cmdLifeCycle
+		testContainer.Lifecycle = cmdLifeCycle
 		m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
 		if fakeRunner.Cmd[0] != cmdLifeCycle.PreStop.Exec.Command[0] {
 			t.Errorf("CMD Prestop hook was not invoked")
@@ -427,7 +415,7 @@ func TestLifeCycleHook(t *testing.T) {
 			defer func() { fakeHTTP.req = nil }()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
 			httpLifeCycle.PreStop.HTTPGet.Port = intstr.IntOrString{}
-			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
+			testContainer.Lifecycle = httpLifeCycle
 			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
 
 			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
@@ -437,8 +425,8 @@ func TestLifeCycleHook(t *testing.T) {
 		t.Run("consistent", func(t *testing.T) {
 			ctx := context.Background()
 			defer func() { fakeHTTP.req = nil }()
-			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt(80)
-			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
+			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt32(80)
+			testContainer.Lifecycle = httpLifeCycle
 			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
 
 			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
@@ -468,8 +456,7 @@ func TestLifeCycleHook(t *testing.T) {
 		// Fake all the things you need before trying to create a container
 		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
 		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(testPod, 0)
-		testPod.Spec.Containers[0].Lifecycle = cmdPostStart
-		testContainer := &testPod.Spec.Containers[0]
+		testContainer.Lifecycle = cmdPostStart
 		fakePodStatus := &kubecontainer.PodStatus{
 			ContainerStatuses: []*kubecontainer.Status{
 				{
@@ -493,6 +480,51 @@ func TestLifeCycleHook(t *testing.T) {
 			t.Errorf("CMD PostStart hook was not invoked")
 		}
 	})
+}
+
+func TestLifeCycleHook(t *testing.T) {
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         []string{"testCommand"},
+					WorkingDir:      "testWorkingDir",
+				},
+			},
+		},
+	}
+
+	testLifeCycleHook(t, testPod, &testPod.Spec.Containers[0])
+}
+
+func TestLifeCycleHookForRestartableInitContainer(t *testing.T) {
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         []string{"testCommand"},
+					WorkingDir:      "testWorkingDir",
+					RestartPolicy:   &containerRestartPolicyAlways,
+				},
+			},
+		},
+	}
+
+	testLifeCycleHook(t, testPod, &testPod.Spec.InitContainers[0])
 }
 
 func TestStartSpec(t *testing.T) {
@@ -805,6 +837,10 @@ func TestKillContainerGracePeriod(t *testing.T) {
 
 // TestUpdateContainerResources tests updating a container in a Pod.
 func TestUpdateContainerResources(t *testing.T) {
+	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
+	if goruntime.GOOS == "windows" {
+		t.Skip("Updating Pod Container Resources is not supported on Windows.")
+	}
 	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
 	require.NoError(t, errCreate)
 	pod := &v1.Pod{

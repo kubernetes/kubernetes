@@ -114,7 +114,7 @@ type ObjectMeta struct {
 	// automatically. Name is primarily intended for creation idempotence and configuration
 	// definition.
 	// Cannot be updated.
-	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 
@@ -140,7 +140,7 @@ type ObjectMeta struct {
 	//
 	// Must be a DNS_LABEL.
 	// Cannot be updated.
-	// More info: http://kubernetes.io/docs/user-guide/namespaces
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 
@@ -154,7 +154,7 @@ type ObjectMeta struct {
 	//
 	// Populated by the system.
 	// Read-only.
-	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
 	// +optional
 	UID types.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID"`
 
@@ -218,14 +218,14 @@ type ObjectMeta struct {
 	// Map of string keys and values that can be used to organize and categorize
 	// (scope and select) objects. May match selectors of replication controllers
 	// and services.
-	// More info: http://kubernetes.io/docs/user-guide/labels
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
 	// +optional
 	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,11,rep,name=labels"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
 	// set by external tools to store and retrieve arbitrary metadata. They are not
 	// queryable and should be preserved when modifying objects.
-	// More info: http://kubernetes.io/docs/user-guide/annotations
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,12,rep,name=annotations"`
 
@@ -295,10 +295,10 @@ type OwnerReference struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// Name of the referent.
-	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// UID of the referent.
-	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
 	UID types.UID `json:"uid" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// If true, this reference points to the managing controller.
 	// +optional
@@ -778,7 +778,7 @@ type StatusDetails struct {
 	Kind string `json:"kind,omitempty" protobuf:"bytes,3,opt,name=kind"`
 	// UID of the resource.
 	// (when there is a single resource which can be described).
-	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
 	// +optional
 	UID types.UID `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// The Causes array includes more details associated with the StatusReason
@@ -995,6 +995,24 @@ const (
 	// CauseTypeFieldValueNotSupported is used to report valid (as per formatting rules)
 	// values that can not be handled (e.g. an enumerated string).
 	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
+	// CauseTypeForbidden is used to report valid (as per formatting rules)
+	// values which would be accepted under some conditions, but which are not
+	// permitted by the current conditions (such as security policy).  See
+	// Forbidden().
+	CauseTypeForbidden CauseType = "FieldValueForbidden"
+	// CauseTypeTooLong is used to report that the given value is too long.
+	// This is similar to ErrorTypeInvalid, but the error will not include the
+	// too-long value.  See TooLong().
+	CauseTypeTooLong CauseType = "FieldValueTooLong"
+	// CauseTypeTooMany is used to report "too many". This is used to
+	// report that a given list has too many items. This is similar to FieldValueTooLong,
+	// but the error indicates quantity instead of length.
+	CauseTypeTooMany CauseType = "FieldValueTooMany"
+	// CauseTypeInternal is used to report other errors that are not related
+	// to user input.  See InternalError().
+	CauseTypeInternal CauseType = "InternalError"
+	// CauseTypeTypeInvalid is for the value did not match the schema type for that field
+	CauseTypeTypeInvalid CauseType = "FieldValueTypeInvalid"
 	// CauseTypeUnexpectedServerResponse is used to report when the server responded to the client
 	// without the expected return type. The presence of this cause indicates the error may be
 	// due to an intervening proxy or the server software malfunctioning.
@@ -1207,9 +1225,7 @@ type LabelSelector struct {
 // relates the key and values.
 type LabelSelectorRequirement struct {
 	// key is the label key that the selector applies to.
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// operator represents a key's relationship to a set of values.
 	// Valid operators are In, NotIn, Exists and DoesNotExist.
 	Operator LabelSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=LabelSelectorOperator"`

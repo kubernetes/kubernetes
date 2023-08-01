@@ -25,8 +25,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/emicklei/go-restful/v3"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/common"
@@ -72,10 +77,27 @@ func (s *specProxier) GetAPIServiceNames() []string {
 }
 
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
-func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.DelegationTarget, pathHandler common.PathHandlerByGroupVersion) (SpecProxier, error) {
+func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.DelegationTarget, aggregatorService *restful.Container, openAPIConfig *common.Config, pathHandler common.PathHandlerByGroupVersion) (SpecProxier, error) {
 	s := &specProxier{
 		apiServiceInfo: map[string]*openAPIV3APIServiceInfo{},
 		downloader:     downloader,
+	}
+
+	if aggregatorService != nil && openAPIConfig != nil {
+		// Make native types exposed by aggregator available to the aggregated
+		// OpenAPI (normal handle is disabled by skipOpenAPIInstallation option)
+		aggregatorLocalServiceName := "k8s_internal_local_kube_aggregator_types"
+		v3Mux := mux.NewPathRecorderMux(aggregatorLocalServiceName)
+		_ = routes.OpenAPI{
+			Config: openAPIConfig,
+		}.InstallV3(aggregatorService, v3Mux)
+
+		s.AddUpdateAPIService(v3Mux, &v1.APIService{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: aggregatorLocalServiceName,
+			},
+		})
+		s.UpdateAPIServiceSpec(aggregatorLocalServiceName)
 	}
 
 	i := 1
@@ -93,10 +115,7 @@ func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.D
 		i++
 	}
 
-	handler, err := handler3.NewOpenAPIService(nil)
-	if err != nil {
-		return s, err
-	}
+	handler := handler3.NewOpenAPIService()
 	s.openAPIV2ConverterHandler = handler
 	openAPIV2ConverterMux := mux.NewPathRecorderMux(openAPIV2Converter)
 	s.openAPIV2ConverterHandler.RegisterOpenAPIV3VersionedService("/openapi/v3", openAPIV2ConverterMux)
@@ -116,6 +135,7 @@ func (s *specProxier) AddUpdateAPIService(handler http.Handler, apiservice *v1.A
 	if apiServiceInfo, ok := s.apiServiceInfo[apiservice.Name]; ok {
 		apiServiceInfo.apiService = *apiservice
 		apiServiceInfo.handler = handler
+		return
 	}
 	s.apiServiceInfo[apiservice.Name] = &openAPIV3APIServiceInfo{
 		apiService: *apiservice,
@@ -271,6 +291,24 @@ func (s *specProxier) handleGroupVersion(w http.ResponseWriter, r *http.Request)
 
 // Register registers the OpenAPI V3 Discovery and GroupVersion handlers
 func (s *specProxier) register(handler common.PathHandlerByGroupVersion) {
-	handler.Handle("/openapi/v3", http.HandlerFunc(s.handleDiscovery))
-	handler.HandlePrefix("/openapi/v3/", http.HandlerFunc(s.handleGroupVersion))
+	handler.Handle("/openapi/v3", metrics.InstrumentHandlerFunc("GET",
+		/* group = */ "",
+		/* version = */ "",
+		/* resource = */ "",
+		/* subresource = */ "openapi/v3",
+		/* scope = */ "",
+		/* component = */ "",
+		/* deprecated */ false,
+		/* removedRelease */ "",
+		http.HandlerFunc(s.handleDiscovery)))
+	handler.HandlePrefix("/openapi/v3/", metrics.InstrumentHandlerFunc("GET",
+		/* group = */ "",
+		/* version = */ "",
+		/* resource = */ "",
+		/* subresource = */ "openapi/v3/",
+		/* scope = */ "",
+		/* component = */ "",
+		/* deprecated */ false,
+		/* removedRelease */ "",
+		http.HandlerFunc(s.handleGroupVersion)))
 }

@@ -53,7 +53,7 @@ var (
 
 var _ = SIGDescribe("API priority and fairness", func() {
 	f := framework.NewDefaultFramework("apf")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should ensure that requests can be classified by adding FlowSchema and PriorityLevelConfiguration", func(ctx context.Context) {
 		testingFlowSchemaName := "e2e-testing-flowschema"

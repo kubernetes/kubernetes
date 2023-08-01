@@ -150,6 +150,7 @@ type KubeletConfiguration struct {
 	// +optional
 	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile,omitempty"`
 	// tlsCipherSuites is the list of allowed cipher suites for the server.
+	// Note that TLS 1.3 ciphersuites are not configurable.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	// Default: nil
 	// +optional
@@ -547,22 +548,20 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	ProtectKernelDefaults bool `json:"protectKernelDefaults,omitempty"`
-	// makeIPTablesUtilChains, if true, causes the Kubelet ensures a set of iptables rules
-	// are present on host.
-	// These rules will serve as utility rules for various components, e.g. kube-proxy.
-	// The rules will be created based on iptablesMasqueradeBit and iptablesDropBit.
+	// makeIPTablesUtilChains, if true, causes the Kubelet to create the
+	// KUBE-IPTABLES-HINT chain in iptables as a hint to other components about the
+	// configuration of iptables on the system.
 	// Default: true
 	// +optional
 	MakeIPTablesUtilChains *bool `json:"makeIPTablesUtilChains,omitempty"`
-	// iptablesMasqueradeBit is the bit of the iptables fwmark space to mark for SNAT.
-	// Values must be within the range [0, 31]. Must be different from other mark bits.
-	// Warning: Please match the value of the corresponding parameter in kube-proxy.
-	// TODO: clean up IPTablesMasqueradeBit in kube-proxy.
+	// iptablesMasqueradeBit formerly controlled the creation of the KUBE-MARK-MASQ
+	// chain.
+	// Deprecated: no longer has any effect.
 	// Default: 14
 	// +optional
 	IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit,omitempty"`
-	// iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets.
-	// Values must be within the range [0, 31]. Must be different from other mark bits.
+	// iptablesDropBit formerly controlled the creation of the KUBE-MARK-DROP chain.
+	// Deprecated: no longer has any effect.
 	// Default: 15
 	// +optional
 	IPTablesDropBit *int32 `json:"iptablesDropBit,omitempty"`
@@ -692,6 +691,12 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
+	// enableSystemLogQuery enables the node log query feature on the /logs endpoint.
+	// EnableSystemLogHandler has to be enabled in addition for this feature to work.
+	// Default: false
+	// +featureGate=NodeLogQuery
+	// +optional
+	EnableSystemLogQuery *bool `json:"enableSystemLogQuery,omitempty"`
 	// shutdownGracePeriod specifies the total duration that the node should delay the
 	// shutdown and total grace period for pod termination during a node shutdown.
 	// Default: "0s"
@@ -792,6 +797,7 @@ type KubeletConfiguration struct {
 	RegisterNode *bool `json:"registerNode,omitempty"`
 	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
 	// See https://kep.k8s.io/2832 for more details.
+	// Default: nil
 	// +featureGate=KubeletTracing
 	// +optional
 	Tracing *tracingapi.TracingConfiguration `json:"tracing,omitempty"`

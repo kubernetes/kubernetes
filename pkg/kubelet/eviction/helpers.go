@@ -1024,7 +1024,7 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
 					(resourceToReclaim == v1.ResourceMemory || resourceToReclaim == v1.ResourceCPU) {
 					if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-						requests = cs.ResourcesAllocated[resourceToReclaim]
+						requests = cs.AllocatedResources[resourceToReclaim]
 					}
 				}
 				var usage *resource.Quantity

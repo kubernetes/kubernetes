@@ -496,9 +496,10 @@
         "resizePolicy": [
           {
             "resourceName": "resourceNameValue",
-            "policy": "policyValue"
+            "restartPolicy": "restartPolicyValue"
           }
         ],
+        "restartPolicy": "restartPolicyValue",
         "volumeMounts": [
           {
             "name": "nameValue",
@@ -779,9 +780,10 @@
         "resizePolicy": [
           {
             "resourceName": "resourceNameValue",
-            "policy": "policyValue"
+            "restartPolicy": "restartPolicyValue"
           }
         ],
+        "restartPolicy": "restartPolicyValue",
         "volumeMounts": [
           {
             "name": "nameValue",
@@ -1062,9 +1064,10 @@
         "resizePolicy": [
           {
             "resourceName": "resourceNameValue",
-            "policy": "policyValue"
+            "restartPolicy": "restartPolicyValue"
           }
         ],
+        "restartPolicy": "restartPolicyValue",
         "volumeMounts": [
           {
             "name": "nameValue",
@@ -1639,6 +1642,11 @@
     "reason": "reasonValue",
     "nominatedNodeName": "nominatedNodeNameValue",
     "hostIP": "hostIPValue",
+    "hostIPs": [
+      {
+        "ip": "ipValue"
+      }
+    ],
     "podIP": "podIPValue",
     "podIPs": [
       {
@@ -1691,8 +1699,8 @@
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
         "started": true,
-        "resourcesAllocated": {
-          "resourcesAllocatedKey": "0"
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
         },
         "resources": {
           "limits": {
@@ -1754,8 +1762,8 @@
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
         "started": true,
-        "resourcesAllocated": {
-          "resourcesAllocatedKey": "0"
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
         },
         "resources": {
           "limits": {
@@ -1818,8 +1826,8 @@
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
         "started": true,
-        "resourcesAllocated": {
-          "resourcesAllocatedKey": "0"
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
         },
         "resources": {
           "limits": {
@@ -1836,6 +1844,12 @@
         }
       }
     ],
-    "resize": "resizeValue"
+    "resize": "resizeValue",
+    "resourceClaimStatuses": [
+      {
+        "name": "nameValue",
+        "resourceClaimName": "resourceClaimNameValue"
+      }
+    ]
   }
 }

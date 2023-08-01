@@ -160,43 +160,6 @@ profiles:
 		t.Fatal(err)
 	}
 
-	// plugin config
-	pluginConfigFilev1beta2 := filepath.Join(tmpDir, "pluginv1beta2.yaml")
-	if err := os.WriteFile(pluginConfigFilev1beta2, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1beta2
-kind: KubeSchedulerConfiguration
-clientConnection:
-  kubeconfig: '%s'
-profiles:
-- plugins:
-    preFilter:
-      enabled:
-      - name: NodeResourcesFit
-      - name: NodePorts
-      disabled:
-      - name: "*"
-    filter:
-      enabled:
-      - name: NodeResourcesFit
-      - name: NodePorts
-      disabled:
-      - name: "*"
-    preScore:
-      enabled:
-      - name: InterPodAffinity
-      - name: TaintToleration
-      disabled:
-      - name: "*"
-    score:
-      enabled:
-      - name: InterPodAffinity
-      - name: TaintToleration
-      disabled:
-      - name: "*"
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-
 	// out-of-tree plugin config v1
 	outOfTreePluginConfigFilev1 := filepath.Join(tmpDir, "outOfTreePluginv1.yaml")
 	if err := os.WriteFile(outOfTreePluginConfigFilev1, []byte(fmt.Sprintf(`
@@ -220,25 +183,6 @@ profiles:
 	outOfTreePluginConfigFilev1beta3 := filepath.Join(tmpDir, "outOfTreePluginv1beta3.yaml")
 	if err := os.WriteFile(outOfTreePluginConfigFilev1beta3, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta3
-kind: KubeSchedulerConfiguration
-clientConnection:
-  kubeconfig: '%s'
-profiles:
-- plugins:
-    preFilter:
-      enabled:
-      - name: Foo
-    filter:
-      enabled:
-      - name: Foo
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-
-	// out-of-tree plugin config v1beta2
-	outOfTreePluginConfigFilev1beta2 := filepath.Join(tmpDir, "outOfTreePluginv1beta2.yaml")
-	if err := os.WriteFile(outOfTreePluginConfigFilev1beta2, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: '%s'
@@ -309,12 +253,13 @@ leaderElection:
 	}
 
 	testcases := []struct {
-		name               string
-		flags              []string
-		registryOptions    []Option
-		restoreFeatures    map[featuregate.Feature]bool
-		wantPlugins        map[string]*config.Plugins
-		wantLeaderElection *componentbaseconfig.LeaderElectionConfiguration
+		name                 string
+		flags                []string
+		registryOptions      []Option
+		restoreFeatures      map[featuregate.Feature]bool
+		wantPlugins          map[string]*config.Plugins
+		wantLeaderElection   *componentbaseconfig.LeaderElectionConfiguration
+		wantClientConnection *componentbaseconfig.ClientConnectionConfiguration
 	}{
 		{
 			name: "default config with an alpha feature enabled",
@@ -356,35 +301,6 @@ leaderElection:
 			},
 		},
 		{
-			name: "component configuration v1beta2",
-			flags: []string{
-				"--config", pluginConfigFilev1beta2,
-				"--kubeconfig", configKubeconfig,
-			},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": func() *config.Plugins {
-					plugins := defaults.PluginsV1beta2.DeepCopy()
-					plugins.Filter.Enabled = []config.Plugin{
-						{Name: "NodeResourcesFit"},
-						{Name: "NodePorts"},
-					}
-					plugins.PreFilter.Enabled = []config.Plugin{
-						{Name: "NodeResourcesFit"},
-						{Name: "NodePorts"},
-					}
-					plugins.PreScore.Enabled = []config.Plugin{
-						{Name: "InterPodAffinity"},
-						{Name: "TaintToleration"},
-					}
-					plugins.Score.Enabled = []config.Plugin{
-						{Name: "InterPodAffinity", Weight: 1},
-						{Name: "TaintToleration", Weight: 1},
-					}
-					return plugins
-				}(),
-			},
-		},
-		{
 			name: "component configuration v1beta3",
 			flags: []string{
 				"--config", pluginConfigFilev1beta3,
@@ -402,6 +318,7 @@ leaderElection:
 						{Name: "NodePorts"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
 						{Name: "InterPodAffinity"},
 						{Name: "TaintToleration"},
 					}
@@ -431,6 +348,7 @@ leaderElection:
 						{Name: "NodePorts"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
 						{Name: "InterPodAffinity"},
 						{Name: "TaintToleration"},
 					}
@@ -438,22 +356,6 @@ leaderElection:
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "TaintToleration", Weight: 1},
 					}
-					return plugins
-				}(),
-			},
-		},
-		{
-			name: "out-of-tree component configuration v1beta2",
-			flags: []string{
-				"--config", outOfTreePluginConfigFilev1beta2,
-				"--kubeconfig", configKubeconfig,
-			},
-			registryOptions: []Option{WithPlugin("Foo", newFoo)},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": func() *config.Plugins {
-					plugins := defaults.PluginsV1beta2.DeepCopy()
-					plugins.PreFilter.Enabled = append(plugins.PreFilter.Enabled, config.Plugin{Name: "Foo"})
-					plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: "Foo"})
 					return plugins
 				}(),
 			},
@@ -495,7 +397,7 @@ leaderElection:
 			flags: []string{
 				"--leader-elect=false",
 				"--leader-elect-lease-duration=2h", // CLI args are favored over the fields in ComponentConfig
-				"--lock-object-namespace=default",  // deprecated CLI arg will be ignored if --config is specified
+				"--kubeconfig=foo",                 // deprecated CLI arg will be ignored if --config is specified
 				"--config", emptyLeaderElectionConfig,
 			},
 			wantLeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
@@ -507,14 +409,20 @@ leaderElection:
 				ResourceName:      v1beta3.SchedulerDefaultLockObjectName,
 				ResourceNamespace: v1beta3.SchedulerDefaultLockObjectNamespace,
 			},
+			wantClientConnection: &componentbaseconfig.ClientConnectionConfiguration{
+				Kubeconfig:  configKubeconfig,
+				ContentType: "application/vnd.kubernetes.protobuf",
+				QPS:         50,
+				Burst:       100,
+			},
 		},
 		{
 			name: "leader election CLI args, without --config arg",
 			flags: []string{
 				"--leader-elect=false",
 				"--leader-elect-lease-duration=2h",
-				"--lock-object-namespace=default", // deprecated CLI arg is honored if --config is not specified
-				"--kubeconfig", configKubeconfig,
+				"--leader-elect-resource-namespace=default",
+				"--kubeconfig", configKubeconfig, // deprecated CLI arg is honored if --config is not specified
 			},
 			wantLeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
 				LeaderElect:       false,                                    // from CLI args
@@ -523,7 +431,13 @@ leaderElection:
 				RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
 				ResourceLock:      "leases",
 				ResourceName:      v1beta3.SchedulerDefaultLockObjectName,
-				ResourceNamespace: "default", // from deprecated CLI args
+				ResourceNamespace: "default", // from CLI args
+			},
+			wantClientConnection: &componentbaseconfig.ClientConnectionConfiguration{
+				Kubeconfig:  configKubeconfig, // from deprecated CLI args
+				ContentType: "application/vnd.kubernetes.protobuf",
+				QPS:         50,
+				Burst:       100,
 			},
 		},
 		{
@@ -617,6 +531,13 @@ leaderElection:
 				gotLeaderElection := opts.ComponentConfig.LeaderElection
 				if diff := cmp.Diff(*tc.wantLeaderElection, gotLeaderElection); diff != "" {
 					t.Errorf("Unexpected leaderElection diff (-want, +got): %s", diff)
+				}
+			}
+
+			if tc.wantClientConnection != nil {
+				gotClientConnection := opts.ComponentConfig.ClientConnection
+				if diff := cmp.Diff(*tc.wantClientConnection, gotClientConnection); diff != "" {
+					t.Errorf("Unexpected clientConnection diff (-want, +got): %s", diff)
 				}
 			}
 		})

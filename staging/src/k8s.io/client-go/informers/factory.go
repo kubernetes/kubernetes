@@ -184,7 +184,7 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
 	return res
 }
 
-// InternalInformerFor returns the SharedIndexInformer for obj using an internal
+// InformerFor returns the SharedIndexInformer for obj using an internal
 // client.
 func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer {
 	f.lock.Lock()
@@ -257,7 +257,7 @@ type SharedInformerFactory interface {
 	// ForResource gives generic access to a shared informer of the matching type.
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 
-	// InternalInformerFor returns the SharedIndexInformer for obj using an internal
+	// InformerFor returns the SharedIndexInformer for obj using an internal
 	// client.
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
 

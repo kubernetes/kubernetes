@@ -30,9 +30,9 @@ import (
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/utils/cpuset"
 )
 
 var (
@@ -260,6 +260,14 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 
 	if kc.ContainerRuntimeEndpoint == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: the containerRuntimeEndpoint was not specified or empty"))
+	}
+
+	if kc.EnableSystemLogQuery && !localFeatureGate.Enabled(features.NodeLogQuery) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler"))
+	}
+	if kc.EnableSystemLogQuery && !kc.EnableSystemLogHandler {
+		allErrors = append(allErrors,
+			fmt.Errorf("invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery"))
 	}
 
 	return utilerrors.NewAggregate(allErrors)

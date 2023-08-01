@@ -35,6 +35,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
@@ -48,12 +49,12 @@ discovery:
 controlPlane:
   certificateKey: c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd
 nodeRegistration:
-  criSocket: unix:///var/run/containerd/containerd.sock
+  criSocket: %s
   name: someName
   ignorePreflightErrors:
     - c
     - d
-`, kubeadmapiv1.SchemeGroupVersion.String())
+`, kubeadmapiv1.SchemeGroupVersion.String(), expectedCRISocket)
 
 func TestNewJoinData(t *testing.T) {
 	// create temp directory
@@ -218,7 +219,7 @@ func TestNewJoinData(t *testing.T) {
 						TypeMeta: metav1.TypeMeta{Kind: "", APIVersion: ""},
 						NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 							Name:                  "somename",
-							CRISocket:             "unix:///var/run/containerd/containerd.sock",
+							CRISocket:             expectedCRISocket,
 							IgnorePreflightErrors: []string{"c", "d"},
 							ImagePullPolicy:       "IfNotPresent",
 							Taints:                []v1.Taint{{Key: "node-role.kubernetes.io/control-plane", Effect: "NoSchedule"}},
@@ -319,6 +320,15 @@ func TestNewJoinData(t *testing.T) {
 			klog.LogToStderr(false)
 			defer klog.LogToStderr(true)
 
+			// set the cri socket here, otherwise the testcase might fail if is run on the node with multiple
+			// cri endpoints configured, the failure caused by this is normally not an expected failure.
+			if tc.flags == nil {
+				tc.flags = make(map[string]string)
+			}
+			// set `cri-socket` only if `CfgPath` is not set
+			if _, okay := tc.flags[options.CfgPath]; !okay {
+				tc.flags[options.NodeCRISocket] = constants.UnknownCRISocket
+			}
 			// sets cmd flags (that will be reflected on the join options)
 			for f, v := range tc.flags {
 				cmd.Flags().Set(f, v)

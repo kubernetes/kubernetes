@@ -165,7 +165,13 @@ func TestGetRequestForResource(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			realQuantity := GetRequestForResource(test.resource, &test.requests, test.nonZero)
-			assert.EqualValuesf(t, test.expectedQuantity, realQuantity, "Failed to test: %s", test.name)
+			var realQuantityI64 int64
+			if test.resource == v1.ResourceCPU {
+				realQuantityI64 = realQuantity.MilliValue()
+			} else {
+				realQuantityI64 = realQuantity.Value()
+			}
+			assert.EqualValuesf(t, test.expectedQuantity, realQuantityI64, "Failed to test: %s", test.name)
 		})
 	}
 }
