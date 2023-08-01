@@ -235,7 +235,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			if err != nil {
 				framework.ExpectNoError(err, "getting pod resources assignment after pod restart")
 			}
-			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
+			err, _ = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
 			framework.ExpectNoError(err, "inconsistent device assignment after pod restart")
 
 			ginkgo.By("Creating another pod")
@@ -254,9 +254,9 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			if err != nil {
 				framework.ExpectNoError(err, "getting pod resources assignment after pod restart")
 			}
-			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
+			err, _ = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
 			framework.ExpectNoError(err, "inconsistent device assignment after extra container restart - pod1")
-			err = checkPodResourcesAssignment(v1PodResources, pod2.Namespace, pod2.Name, pod2.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID2})
+			err, _ = checkPodResourcesAssignment(v1PodResources, pod2.Namespace, pod2.Name, pod2.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID2})
 			framework.ExpectNoError(err, "inconsistent device assignment after extra container restart - pod2")
 		})
 
@@ -274,7 +274,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			pod1, err = f.PodClient().Get(context.TODO(), pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.Logf("testing pod: UID=%s namespace=%s name=%s ready=%v", pod1.UID, pod1.Namespace, pod1.Name, podutils.IsPodReady(pod1))
+			framework.Logf("testing pod: pre-restart  UID=%s namespace=%s name=%s ready=%v", pod1.UID, pod1.Namespace, pod1.Name, podutils.IsPodReady(pod1))
 
 			ginkgo.By("Restarting Kubelet")
 			restartKubelet(true)
@@ -300,9 +300,9 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}).WithTimeout(time.Minute).ShouldNot(gomega.HaveOccurred(),
 				"the same pod instance not running across kubelet restarts, workload should not be perturbed by kubelet restarts")
 
-			pod1, err = f.PodClient().Get(context.TODO(), pod1.Name, metav1.GetOptions{})
+			pod2, err := f.PodClient().Get(context.TODO(), pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.Logf("testing pod: UID=%s namespace=%s name=%s ready=%v", pod1.UID, pod1.Namespace, pod1.Name, podutils.IsPodReady(pod1))
+			framework.Logf("testing pod: post-restart UID=%s namespace=%s name=%s ready=%v", pod2.UID, pod2.Namespace, pod2.Name, podutils.IsPodReady(pod2))
 
 			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
 			// note we don't check again the logs of the container: the check is done at startup, the container
@@ -314,7 +314,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
-			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
+			err, _ = checkPodResourcesAssignment(v1PodResources, pod2.Namespace, pod2.Name, pod2.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
 			framework.ExpectNoError(err, "inconsistent device assignment after pod restart")
 		})
 
@@ -376,7 +376,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
-			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
+			err, _ = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
 			framework.ExpectNoError(err, "inconsistent device assignment after pod restart")
 		})
 
@@ -430,7 +430,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
-			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
+			err, _ = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
 			framework.ExpectNoError(err, "inconsistent device assignment after pod restart")
 
 			ginkgo.By("Creating another pod")
@@ -486,7 +486,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
-			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
+			err, _ = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
 			framework.ExpectNoError(err, "inconsistent device assignment after pod restart")
 
 			ginkgo.By("Re-Register resources by deleting the plugin pod")
@@ -517,6 +517,62 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				return checkIsTheSamePodStillRunning(testpod, pod1.UID)
 			}).WithTimeout(time.Minute).ShouldNot(gomega.HaveOccurred(),
 				"the same pod instance not running across kubelet restarts, workload should not be perturbed by device plugins restarts")
+		})
+
+		ginkgo.It("[OrphanedPods] Ensures pods consuming devices deleted while kubelet is down are cleaned up correctly", func() {
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalWithRestart)
+			pod := f.PodClient().CreateSync(makeBusyboxPod(SampleDeviceResourceName, podRECMD))
+
+			deviceIDRE := "stub devices: (Dev-[0-9]+)"
+			devID, err := parseLog(f, pod.Name, pod.Name, deviceIDRE)
+			framework.ExpectNoError(err, "getting logs for pod %q", pod.Name)
+			gomega.Expect(devID).To(gomega.Not(gomega.BeEmpty()), "pod1 requested a device but started successfully without")
+
+			pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("stopping the kubelet")
+			startKubelet := stopKubelet()
+
+			// wait until the kubelet health check will fail
+			gomega.Eventually(func() bool {
+				ok := kubeletHealthCheck(kubeletHealthCheckURL)
+				framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
+				return ok
+			}, f.Timeouts.PodStart, 1*time.Second).Should(gomega.BeFalse())
+
+			framework.Logf("Delete the pod while the kubelet is not running")
+			// Delete pod sync by name will force delete the pod, removing it from kubelet's config
+			deletePodSyncByName(f, pod.Name)
+
+			framework.Logf("Starting the kubelet")
+			startKubelet()
+
+			// wait until the kubelet health check will succeed
+			gomega.Eventually(func() bool {
+				ok := kubeletHealthCheck(kubeletHealthCheckURL)
+				framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
+				return ok
+			}, f.Timeouts.PodStart, 1*time.Second).Should(gomega.BeTrue())
+
+			framework.Logf("wait for the pod %v to disappear", pod.Name)
+			gomega.Eventually(func() error {
+				err := checkMirrorPodDisappear(f.ClientSet, pod.Name, pod.Namespace)
+				framework.Logf("pod %s/%s disappear check err=%v", pod.Namespace, pod.Name, err)
+				return err
+			}, f.Timeouts.PodDelete, 1*time.Second).Should(gomega.BeNil())
+
+			waitForAllContainerRemoval(pod.Name, pod.Namespace)
+
+			ginkgo.By("Verifying the device assignment after device plugin restart using podresources API")
+			gomega.Eventually(func() error {
+				v1PodResources, err = getV1NodeDevices()
+				return err
+			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
+			err, allocated := checkPodResourcesAssignment(v1PodResources, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
+			if err == nil || allocated {
+				framework.Fail(fmt.Sprintf("stale device assignment after pod deletion while kubelet was down allocated=%v error=%v", allocated, err))
+			}
 		})
 	})
 }
@@ -715,7 +771,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
-			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
+			err, _ = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
 			framework.ExpectNoError(err, "inconsistent device assignment after node reboot")
 
 		})
@@ -783,7 +839,7 @@ func parseLog(f *framework.Framework, podName string, contName string, re string
 	return matches[1], nil
 }
 
-func checkPodResourcesAssignment(v1PodRes *kubeletpodresourcesv1.ListPodResourcesResponse, podNamespace, podName, containerName, resourceName string, devs []string) error {
+func checkPodResourcesAssignment(v1PodRes *kubeletpodresourcesv1.ListPodResourcesResponse, podNamespace, podName, containerName, resourceName string, devs []string) (error, bool) {
 	for _, podRes := range v1PodRes.PodResources {
 		if podRes.Namespace != podNamespace || podRes.Name != podName {
 			continue
@@ -795,10 +851,12 @@ func checkPodResourcesAssignment(v1PodRes *kubeletpodresourcesv1.ListPodResource
 			return matchContainerDevices(podNamespace+"/"+podName+"/"+containerName, contRes.Devices, resourceName, devs)
 		}
 	}
-	return fmt.Errorf("no resources found for %s/%s/%s", podNamespace, podName, containerName)
+	err := fmt.Errorf("no resources found for %s/%s/%s", podNamespace, podName, containerName)
+	framework.Logf("%v", err)
+	return err, false
 }
 
-func matchContainerDevices(ident string, contDevs []*kubeletpodresourcesv1.ContainerDevices, resourceName string, devs []string) error {
+func matchContainerDevices(ident string, contDevs []*kubeletpodresourcesv1.ContainerDevices, resourceName string, devs []string) (error, bool) {
 	expected := sets.NewString(devs...)
 	assigned := sets.NewString()
 	for _, contDev := range contDevs {
@@ -811,9 +869,9 @@ func matchContainerDevices(ident string, contDevs []*kubeletpodresourcesv1.Conta
 	assignedStr := strings.Join(assigned.UnsortedList(), ",")
 	framework.Logf("%s: devices expected %q assigned %q", ident, expectedStr, assignedStr)
 	if !assigned.Equal(expected) {
-		return fmt.Errorf("device allocation mismatch for %s expected %s assigned %s", ident, expectedStr, assignedStr)
+		return fmt.Errorf("device allocation mismatch for %s expected %s assigned %s", ident, expectedStr, assignedStr), true
 	}
-	return nil
+	return nil, true
 }
 
 // getSampleDevicePluginPod returns the Sample Device Plugin pod to be used e2e tests.
