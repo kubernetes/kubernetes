@@ -224,6 +224,9 @@ aliases:
   # - dashpole
   # - vishh
   sig-node-cri-approvers:
+    - msau42
+    - smarterclayton
+    - thockin
     - saschagrunert
     - haircommander
     - mikebrow
@@ -361,10 +364,6 @@ aliases:
     - andrewsykim
     - caseydavenport
     - danwinship
-    - thockin
-  sig-node-api-approvers:
-    - msau42
-    - smarterclayton
     - thockin
   sig-scheduling-api-approvers:
     - msau42

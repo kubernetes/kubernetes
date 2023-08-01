@@ -4,7 +4,6 @@ approvers:
   - dims
   - feiskyer
   - sig-node-approvers
-  - sig-node-api-approvers
   - api-approvers
   - sig-node-cri-approvers
 reviewers:
