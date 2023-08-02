@@ -106,7 +106,7 @@ type QueuedPodInfo struct {
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
-	InitialAttemptTimestamp time.Time
+	InitialAttemptTimestamp *time.Time
 	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
 	UnschedulablePlugins sets.String
 	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.

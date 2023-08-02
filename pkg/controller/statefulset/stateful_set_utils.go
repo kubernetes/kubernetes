@@ -615,6 +615,23 @@ func (ao ascendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(ao[i]) < getOrdinal(ao[j])
 }
 
+// descendingOrdinal is a sort.Interface that Sorts a list of Pods based on the ordinals extracted
+// from the Pod. Pod's that have not been constructed by StatefulSet's have an ordinal of -1, and are therefore pushed
+// to the end of the list.
+type descendingOrdinal []*v1.Pod
+
+func (do descendingOrdinal) Len() int {
+	return len(do)
+}
+
+func (do descendingOrdinal) Swap(i, j int) {
+	do[i], do[j] = do[j], do[i]
+}
+
+func (do descendingOrdinal) Less(i, j int) bool {
+	return getOrdinal(do[i]) > getOrdinal(do[j])
+}
+
 // getStatefulSetMaxUnavailable calculates the real maxUnavailable number according to the replica count
 // and maxUnavailable from rollingUpdateStrategy. The number defaults to 1 if the maxUnavailable field is
 // not set, and it will be round down to at least 1 if the maxUnavailable value is a percentage.

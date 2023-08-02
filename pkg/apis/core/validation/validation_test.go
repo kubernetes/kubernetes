@@ -13790,6 +13790,117 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			err:  "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Invalid value:",
 			test: "empty NodeSelectorTerm (selects nothing) cannot become populated (selects something)",
+		}, {
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity:        nil,
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{{
+									MatchExpressions: []core.NodeSelectorRequirement{{
+										Key:      "expr",
+										Operator: core.NodeSelectorOpIn,
+										Values:   []string{"foo"},
+									}},
+								}},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			test: "nil affinity can be mutated for gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity:        nil,
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{{
+									MatchExpressions: []core.NodeSelectorRequirement{{
+										Key:      "expr",
+										Operator: core.NodeSelectorOpIn,
+										Values:   []string{"foo"},
+									}},
+								}},
+							},
+						},
+						PodAffinity: &core.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+								{
+									TopologyKey: "foo",
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"foo": "bar"},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "pod updates may not change fields other than",
+			test: "the podAffinity cannot be updated on gated pods",
+		},
+		{
+			old: core.Pod{
+				Spec: core.PodSpec{
+					Affinity:        nil,
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			new: core.Pod{
+				Spec: core.PodSpec{
+					Affinity: &core.Affinity{
+						NodeAffinity: &core.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+								NodeSelectorTerms: []core.NodeSelectorTerm{{
+									MatchExpressions: []core.NodeSelectorRequirement{{
+										Key:      "expr",
+										Operator: core.NodeSelectorOpIn,
+										Values:   []string{"foo"},
+									}},
+								}},
+							},
+						},
+						PodAntiAffinity: &core.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+								{
+									TopologyKey: "foo",
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"foo": "bar"},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowMutableNodeSelectorAndNodeAffinity: true,
+			},
+			err:  "pod updates may not change fields other than",
+			test: "the podAntiAffinity cannot be updated on gated pods",
 		},
 	}
 	for _, test := range tests {

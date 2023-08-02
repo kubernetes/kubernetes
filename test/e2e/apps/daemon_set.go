@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -73,6 +74,16 @@ const (
 // NamespaceNodeSelectors the annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
 // node selectors labels to namespaces
 var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
+
+var nonTerminalPhaseSelector = func() labels.Selector {
+	var reqs []labels.Requirement
+	for _, phase := range []v1.PodPhase{v1.PodFailed, v1.PodSucceeded} {
+		req, _ := labels.NewRequirement("status.phase", selection.NotEquals, []string{string(phase)})
+		reqs = append(reqs, *req)
+	}
+	selector := labels.NewSelector()
+	return selector.Add(reqs...)
+}()
 
 type updateDSFunc func(*appsv1.DaemonSet)
 
@@ -1025,7 +1036,10 @@ func newDaemonSetWithLabel(dsName, image string, label map[string]string) *appsv
 
 func listDaemonPods(ctx context.Context, c clientset.Interface, ns string, label map[string]string) *v1.PodList {
 	selector := labels.Set(label).AsSelector()
-	options := metav1.ListOptions{LabelSelector: selector.String()}
+	options := metav1.ListOptions{
+		LabelSelector: selector.String(),
+		FieldSelector: nonTerminalPhaseSelector.String(),
+	}
 	podList, err := c.CoreV1().Pods(ns).List(ctx, options)
 	framework.ExpectNoError(err)
 	gomega.Expect(podList.Items).ToNot(gomega.BeEmpty())

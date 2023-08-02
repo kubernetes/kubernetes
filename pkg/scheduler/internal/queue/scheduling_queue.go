@@ -386,6 +386,10 @@ func (p *PriorityQueue) addToActiveQ(pInfo *framework.QueuedPodInfo) (bool, erro
 		p.unschedulablePods.addOrUpdate(pInfo)
 		return false, nil
 	}
+	if pInfo.InitialAttemptTimestamp == nil {
+		now := p.clock.Now()
+		pInfo.InitialAttemptTimestamp = &now
+	}
 	if err := p.activeQ.Add(pInfo); err != nil {
 		klog.ErrorS(err, "Error adding pod to the active queue", "pod", klog.KObj(pInfo.Pod))
 		return false, err
@@ -900,7 +904,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 	return &framework.QueuedPodInfo{
 		PodInfo:                 podInfo,
 		Timestamp:               now,
-		InitialAttemptTimestamp: now,
+		InitialAttemptTimestamp: nil,
 		UnschedulablePlugins:    sets.NewString(plugins...),
 	}
 }
