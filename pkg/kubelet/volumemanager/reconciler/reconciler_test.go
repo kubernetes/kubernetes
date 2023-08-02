@@ -2342,9 +2342,9 @@ func TestSyncStates(t *testing.T) {
 		{
 			name: "when reconstruction fails for a volume, volumes should be cleaned up",
 			volumePaths: []string{
-				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
+				filepath.Join("pod1", "volumes", "fake-plugin", volumetesting.FailNewMounter),
 			},
-			createMountPoint: false,
+			createMountPoint: true,
 			podInfos:         []podInfo{},
 			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
 				return retryWithExponentialBackOff(reconcilerSyncWaitDuration, func() (bool, error) {
@@ -2354,6 +2354,65 @@ func TestSyncStates(t *testing.T) {
 					}
 					return true, nil
 				})
+			},
+		},
+		{
+			name: "when mount point does not exist, reconstruction should not fail, volumes should be added in asw",
+			volumePaths: []string{
+				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
+			},
+			createMountPoint: false,
+			podInfos:         []podInfo{},
+			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
+				mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
+				if len(mountedPods) != 1 {
+					return fmt.Errorf("expected 1 pods to in asw got %d", len(mountedPods))
+				}
+				return nil
+			},
+		},
+		{
+			name: "when mount point does not exist, reconstruction should not fail, if volume exists in dsw, volume should be recorded in skipped during reconstruction",
+			volumePaths: []string{
+				filepath.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
+			},
+			createMountPoint: false,
+			podInfos:         []podInfo{defaultPodInfo},
+			postSyncStatCallback: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
+				skippedVolumes := rcInstance.skippedDuringReconstruction
+				if len(skippedVolumes) != 1 {
+					return fmt.Errorf("expected 1 pods to in skippedDuringReconstruction got %d", len(skippedVolumes))
+				}
+				rcInstance.processReconstructedVolumes()
+				return nil
+			},
+			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
+				mountedPods := rcInstance.actualStateOfWorld.GetAllMountedVolumes()
+				if len(mountedPods) != 1 {
+					return fmt.Errorf("expected 1 pods to in mounted volume list got %d", len(mountedPods))
+				}
+				mountedPodVolume := mountedPods[0]
+				addedViaReconstruction := rcInstance.actualStateOfWorld.IsVolumeReconstructed(mountedPodVolume.VolumeName, mountedPodVolume.PodName)
+				if !addedViaReconstruction {
+					return fmt.Errorf("expected volume %s to be marked as added via reconstruction", mountedPodVolume.VolumeName)
+				}
+
+				// check device mount state
+				attachedVolumes := rcInstance.actualStateOfWorld.GetAttachedVolumes()
+				if len(attachedVolumes) != 1 {
+					return fmt.Errorf("expected 1 volume to be unmounted, got %d", len(attachedVolumes))
+				}
+				firstAttachedVolume := attachedVolumes[0]
+				if !firstAttachedVolume.DeviceMayBeMounted() {
+					return fmt.Errorf("expected %s volume to be mounted in uncertain state", firstAttachedVolume.VolumeName)
+				}
+
+				// also skippedVolumes map should be empty
+				skippedVolumes := rcInstance.skippedDuringReconstruction
+				if len(skippedVolumes) > 0 {
+					return fmt.Errorf("expected 0 pods in skipped volumes found %d", len(skippedVolumes))
+				}
+				return nil
 			},
 		},
 		{

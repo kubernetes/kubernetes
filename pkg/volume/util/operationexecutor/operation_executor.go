@@ -28,7 +28,6 @@ import (
 	"github.com/go-logr/logr"
 
 	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 // OperationExecutor defines a set of operations for attaching, detaching,
@@ -151,8 +149,6 @@ type OperationExecutor interface {
 	ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
 	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, volumePath string, pluginName string) (volume.ReconstructedVolume, error)
-	// CheckVolumeExistenceOperation checks volume existence
-	CheckVolumeExistenceOperation(volumeSpec *volume.Spec, mountPath, volumeName string, mounter mount.Interface, uniqueVolumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, podUID types.UID, attachable volume.AttachableVolumePlugin) (bool, error)
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -1091,62 +1087,4 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 	return volume.ReconstructedVolume{
 		Spec: volumeSpec,
 	}, nil
-}
-
-// CheckVolumeExistenceOperation checks mount path directory if volume still exists
-func (oe *operationExecutor) CheckVolumeExistenceOperation(
-	volumeSpec *volume.Spec,
-	mountPath, volumeName string,
-	mounter mount.Interface,
-	uniqueVolumeName v1.UniqueVolumeName,
-	podName volumetypes.UniquePodName,
-	podUID types.UID,
-	attachable volume.AttachableVolumePlugin) (bool, error) {
-	fsVolume, err := util.CheckVolumeModeFilesystem(volumeSpec)
-	if err != nil {
-		return false, err
-	}
-
-	// Filesystem Volume case
-	// For attachable volume case, check mount path directory if volume is still existing and mounted.
-	// Return true if volume is mounted.
-	if fsVolume {
-		if attachable != nil {
-			var isNotMount bool
-			var mountCheckErr error
-			if mounter == nil {
-				return false, fmt.Errorf("mounter was not set for a filesystem volume")
-			}
-			if isNotMount, mountCheckErr = mount.IsNotMountPoint(mounter, mountPath); mountCheckErr != nil {
-				return false, fmt.Errorf("could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
-					uniqueVolumeName,
-					volumeName,
-					podName,
-					podUID,
-					mountCheckErr)
-			}
-			return !isNotMount, nil
-		}
-		// For non-attachable volume case, skip check and return true without mount point check
-		// since plugins may not have volume mount point.
-		return true, nil
-	}
-
-	// Block Volume case
-	// Check mount path directory if volume still exists, then return true if volume
-	// is there. Either plugin is attachable or non-attachable, the plugin should
-	// have symbolic link associated to raw block device under pod device map
-	// if volume exists.
-	blkutil := volumepathhandler.NewBlockVolumePathHandler()
-	var islinkExist bool
-	var checkErr error
-	if islinkExist, checkErr = blkutil.IsSymlinkExist(mountPath); checkErr != nil {
-		return false, fmt.Errorf("could not check whether the block volume %q (spec.Name: %q) pod %q (UID: %q) is mapped to: %v",
-			uniqueVolumeName,
-			volumeName,
-			podName,
-			podUID,
-			checkErr)
-	}
-	return islinkExist, nil
 }
