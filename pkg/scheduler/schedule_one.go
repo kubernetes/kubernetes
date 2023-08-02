@@ -121,6 +121,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		status := sched.bindingCycle(bindingCycleCtx, state, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
 		if !status.IsSuccess() {
 			sched.handleBindingCycleError(bindingCycleCtx, state, fwk, assumedPodInfo, start, scheduleResult, status)
+			return
 		}
 		// Usually, DonePod is called inside the scheduling queue,
 		// but in this case, we need to call it here because this Pod won't go back to the scheduling queue.
