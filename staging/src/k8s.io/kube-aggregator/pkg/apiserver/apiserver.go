@@ -477,6 +477,8 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		openAPIV3Aggregator, err := openapiv3aggregator.BuildAndRegisterAggregator(
 			specDownloaderV3,
 			s.GenericAPIServer.NextDelegate(),
+			s.GenericAPIServer.Handler.GoRestfulContainer,
+			s.openAPIConfig,
 			s.GenericAPIServer.Handler.NonGoRestfulMux)
 		if err != nil {
 			return preparedAPIAggregator{}, err
