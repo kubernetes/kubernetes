@@ -198,6 +198,10 @@ type ExtraConfig struct {
 
 	// The range of ports to be assigned to services with type=NodePort or greater
 	ServiceNodePortRange utilnet.PortRange
+
+	// EnableServiceHealthCheckPort enables health check port allocation for LoadBalancer services
+	EnableServiceHealthCheckPort bool
+
 	// If non-zero, the "kubernetes" services uses this port as NodePort.
 	KubernetesServiceNodePort int
 
@@ -439,10 +443,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			KubeletClientConfig: c.ExtraConfig.KubeletClientConfig,
 		},
 		Services: corerest.ServicesConfig{
-			ClusterIPRange:          c.ExtraConfig.ServiceIPRange,
-			SecondaryClusterIPRange: c.ExtraConfig.SecondaryServiceIPRange,
-			NodePortRange:           c.ExtraConfig.ServiceNodePortRange,
-			IPRepairInterval:        c.ExtraConfig.RepairServicesInterval,
+			ClusterIPRange:               c.ExtraConfig.ServiceIPRange,
+			SecondaryClusterIPRange:      c.ExtraConfig.SecondaryServiceIPRange,
+			NodePortRange:                c.ExtraConfig.ServiceNodePortRange,
+			IPRepairInterval:             c.ExtraConfig.RepairServicesInterval,
+			EnableServiceHealthCheckPort: c.ExtraConfig.EnableServiceHealthCheckPort,
 		},
 	})
 	if err != nil {

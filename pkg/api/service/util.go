@@ -78,9 +78,13 @@ func RequestsOnlyLocalTraffic(service *api.Service) bool {
 }
 
 // NeedsHealthCheck checks if service needs health check.
-func NeedsHealthCheck(service *api.Service) bool {
+var NeedsHealthCheck = func(service *api.Service) bool {
 	if service.Spec.Type != api.ServiceTypeLoadBalancer {
 		return false
 	}
 	return RequestsOnlyLocalTraffic(service)
+}
+
+func DisableHealthCheckPortAllocation() {
+	NeedsHealthCheck = func(service *api.Service) bool { return false }
 }

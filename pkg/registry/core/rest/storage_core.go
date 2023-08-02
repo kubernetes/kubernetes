@@ -37,6 +37,7 @@ import (
 	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
@@ -78,9 +79,10 @@ type ProxyConfig struct {
 
 type ServicesConfig struct {
 	// Service IP ranges
-	ClusterIPRange          net.IPNet
-	SecondaryClusterIPRange net.IPNet
-	NodePortRange           utilnet.PortRange
+	ClusterIPRange               net.IPNet
+	SecondaryClusterIPRange      net.IPNet
+	NodePortRange                utilnet.PortRange
+	EnableServiceHealthCheckPort bool
 
 	IPRepairInterval time.Duration
 }
@@ -221,6 +223,10 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		if err != nil {
 			return genericapiserver.APIGroupInfo{}, err
 		}
+	}
+
+	if !c.Services.EnableServiceHealthCheckPort {
+		apiservice.DisableHealthCheckPortAllocation()
 	}
 
 	if resource := "pods"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {

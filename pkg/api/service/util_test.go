@@ -214,3 +214,25 @@ func TestNeedsHealthCheck(t *testing.T) {
 		},
 	})
 }
+
+func TestDisableHealthCheckPortAllocation(t *testing.T) {
+	// backup the check function for the disabling test
+	needsHealthCheckFnBackup := NeedsHealthCheck
+	neededService := &api.Service{
+		Spec: api.ServiceSpec{
+			Type:                  api.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyLocal,
+		},
+	}
+	if res := NeedsHealthCheck(neededService); res != true {
+		t.Errorf("Expected needs health check = %v, got %v",
+			true, res)
+	}
+	DisableHealthCheckPortAllocation()
+	if res := NeedsHealthCheck(neededService); res != false {
+		t.Errorf("Expected needs health check = %v, got %v",
+			false, res)
+	}
+	// restore the check function
+	NeedsHealthCheck = needsHealthCheckFnBackup
+}

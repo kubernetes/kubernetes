@@ -245,8 +245,9 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 
 			APIServerServicePort: 443,
 
-			ServiceNodePortRange:      opts.ServiceNodePortRange,
-			KubernetesServiceNodePort: opts.KubernetesServiceNodePort,
+			ServiceNodePortRange:         opts.ServiceNodePortRange,
+			KubernetesServiceNodePort:    opts.KubernetesServiceNodePort,
+			EnableServiceHealthCheckPort: opts.EnableServiceHealthCheckPort,
 
 			EndpointReconcilerType: reconcilers.Type(opts.EndpointReconcilerType),
 			MasterCount:            opts.MasterCount,

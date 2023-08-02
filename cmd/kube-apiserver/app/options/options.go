@@ -56,6 +56,8 @@ type Extra struct {
 	APIServerServiceIP net.IP
 
 	ServiceNodePortRange utilnet.PortRange
+	// EnableServiceHealthCheckPort enables health check port allocation for LoadBalancer services
+	EnableServiceHealthCheckPort bool
 
 	EndpointReconcilerType string
 
@@ -124,6 +126,9 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", ""+
 		"A port range to reserve for services with NodePort visibility.  This must not overlap with the ephemeral port range on nodes.  "+
 		"Example: '30000-32767'. Inclusive at both ends of the range.")
+
+	fs.BoolVar(&s.EnableServiceHealthCheckPort, "enable-service-health-check-port", true,
+		"If true, allocate health check ports for LoadBalancer services.")
 
 	// Kubelet related flags:
 	fs.StringSliceVar(&s.KubeletConfig.PreferredAddressTypes, "kubelet-preferred-address-types", s.KubeletConfig.PreferredAddressTypes,
