@@ -36,6 +36,7 @@ import (
 	"k8s.io/kube-openapi/pkg/spec3"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	samplev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -138,11 +139,11 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 		aggrclient, err := aggregatorclient.NewForConfig(config)
 		framework.ExpectNoError(err)
 		names := generateSampleAPIServerObjectNames(f.Namespace.Name)
-		SetUpSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), names)
-		defer cleanupSampleAPIServer(ctx, f.ClientSet, aggrclient, names)
+		SetUpSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), names, samplev1beta1.GroupName, "v1beta1")
+		defer cleanupSampleAPIServer(ctx, f.ClientSet, aggrclient, names, "v1beta1.wardle.example.com")
 
 		c := openapi3.NewRoot(f.ClientSet.Discovery().OpenAPIV3())
-		gv := schema.GroupVersion{Group: "wardle.example.com", Version: "v1alpha1"}
+		gv := schema.GroupVersion{Group: samplev1beta1.GroupName, Version: "v1beta1"}
 		var openAPISpec *spec3.OpenAPI
 		// Poll for the OpenAPI to be updated with the new aggregated apiserver.
 		wait.Poll(time.Second*1, wait.ForeverTestTimeout, func() (bool, error) {
