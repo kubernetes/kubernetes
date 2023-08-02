@@ -85,9 +85,13 @@ func InternalPolicyLocal(service *v1.Service) bool {
 }
 
 // NeedsHealthCheck checks if service needs health check.
-func NeedsHealthCheck(service *v1.Service) bool {
+var NeedsHealthCheck = func(service *v1.Service) bool {
 	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
 		return false
 	}
 	return ExternalPolicyLocal(service)
+}
+
+func DisableHealthCheckPortAllocation() {
+	NeedsHealthCheck = func(service *v1.Service) bool { return false }
 }

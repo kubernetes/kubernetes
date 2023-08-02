@@ -32,6 +32,7 @@ import (
 	"github.com/google/cadvisor/machine"
 	"github.com/google/cadvisor/utils/sysfs"
 	"k8s.io/apimachinery/pkg/watch"
+	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -128,6 +129,11 @@ func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, du
 func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStack bool) (proxy.Provider, error) {
 	var proxier proxy.Provider
 	var err error
+
+	if !config.EnableServiceHealthCheckPort {
+		klog.InfoS("Disabling health check port serving", "EnableServiceHealthCheckPort", config.EnableServiceHealthCheckPort)
+		apiservice.DisableHealthCheckPortAllocation()
+	}
 
 	primaryProtocol := utiliptables.ProtocolIPv4
 	if s.PrimaryIPFamily == v1.IPv6Protocol {
