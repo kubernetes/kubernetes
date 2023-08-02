@@ -591,7 +591,7 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 		acc.iterateCombinations(numas, k, func(combo []int) LoopControl {
 			// If we've already found a combo with a balance of 0 in a
 			// different iteration, then don't bother checking any others.
-			if bestBalance == 0 && bestBalanceInOneSocket {
+			if bestBalance == 0 && (!alignBySocket || bestBalanceInOneSocket) {
 				return Break
 			}
 
@@ -614,14 +614,24 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 			//  Calculate an even distribution of CPUs in groups of size
 			// 'cpuGroupSize'.
 			distribution := (numCPUs / len(combo) / cpuGroupSize) * cpuGroupSize
-			for _, numa := range combo {
-				// distribution should not be more than available CPUs in each NUMA node in combo.
-				availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize * cpuGroupSize
-				if distribution > availableCPUsInNUMA {
-					distribution = availableCPUsInNUMA
+			if alignBySocket {
+				for _, numa := range combo {
+					// distribution should not be more than available CPUs
+					// in each NUMA node in combo if alignBySocket is set.
+					availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize * cpuGroupSize
+					if distribution > availableCPUsInNUMA {
+						distribution = availableCPUsInNUMA
+					}
 				}
 			}
-
+			// Check that each NUMA node in this combination can allocate
+			// an even distribution of CPUs in groups of size 'cpuGroupSize'.
+			for _, numa := range combo {
+				cpus := acc.details.CPUsInNUMANodes(numa)
+				if cpus.Size() < distribution {
+					return Continue
+				}
+			}
 			// Calculate how many CPUs will be available on each NUMA node in
 			// the system after allocating an even distribution of CPU groups
 			// of size 'cpuGroupSize' from each NUMA node in 'combo'. This will
