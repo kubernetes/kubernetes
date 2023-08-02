@@ -750,7 +750,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	active := int32(len(activePods))
 	newSucceededPods, newFailedPods := getNewFinishedPods(&job, pods, uncounted, expectedRmFinalizers)
 	succeeded := job.Status.Succeeded + int32(len(newSucceededPods)) + int32(len(uncounted.succeeded))
-	failed := job.Status.Failed + int32(len(newFailedPods)) + int32(len(uncounted.failed))
+	failed := job.Status.Failed + int32(nonIgnoredFailedPodsCount(&job, newFailedPods)) + int32(len(uncounted.failed))
 	var ready *int32
 	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
 		ready = pointer.Int32(countReadyPods(activePods))
@@ -762,7 +762,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		job.Status.StartTime = &now
 	}
 
-	newBackoffInfo := jm.backoffRecordStore.newBackoffRecord(jm.clock, key, newSucceededPods, newFailedPods)
+	newBackoffInfo := jm.backoffRecordStore.newBackoffRecord(key, newSucceededPods, newFailedPods)
 
 	var manageJobErr error
 	var finishedCondition *batch.JobCondition
@@ -909,6 +909,19 @@ func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods
 	}
 	wg.Wait()
 	return successfulDeletes, errorFromChannel(errCh)
+}
+
+func nonIgnoredFailedPodsCount(job *batch.Job, failedPods []*v1.Pod) int {
+	result := len(failedPods)
+	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+		for _, p := range failedPods {
+			_, countFailed, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
+			if !countFailed {
+				result--
+			}
+		}
+	}
+	return result
 }
 
 // deleteJobPods deletes the pods, returns the number of successful removals
@@ -1340,15 +1353,7 @@ func getNewFinishedPods(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerm
 		return p.Status.Phase == v1.PodSucceeded
 	})
 	failedPods = getValidPodsWithFilter(job, pods, uncounted.Failed(), expectedRmFinalizers, func(p *v1.Pod) bool {
-		if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
-			if !isPodFailed(p, job) {
-				return false
-			}
-			_, countFailed, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
-			return countFailed
-		} else {
-			return isPodFailed(p, job)
-		}
+		return isPodFailed(p, job)
 	})
 	return succeededPods, failedPods
 }

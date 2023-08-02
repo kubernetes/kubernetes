@@ -2909,6 +2909,53 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusFailed:    0,
 			wantStatusSucceeded: 0,
 		},
+		"ignore pod failure based on OnPodConditions, ignored failures delays pod recreation": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(0),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.DisruptionTarget,
+										Status: v1.ConditionTrue,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						DeletionTimestamp: &now,
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodFailed,
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.DisruptionTarget,
+								Status: v1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    0,
+			wantStatusFailed:    0,
+			wantStatusSucceeded: 0,
+		},
 		"fail job based on OnPodConditions": {
 			enableJobPodFailurePolicy: true,
 			job: batch.Job{
