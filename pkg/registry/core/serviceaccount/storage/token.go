@@ -29,7 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/warning"
@@ -76,6 +78,11 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	namespace, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok {
 		return nil, errors.NewBadRequest("namespace is required")
+	}
+
+	requesterUserInfo, ok := genericapirequest.UserFrom(ctx)
+	if !ok {
+		return nil, errors.NewBadRequest("no user present on request")
 	}
 
 	// require name/namespace in the body to match URL if specified
@@ -163,7 +170,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 
 	if r.maxExpirationSeconds > 0 && req.Spec.ExpirationSeconds > r.maxExpirationSeconds {
-		//only positive value is valid
+		// only positive value is valid
 		warning.AddWarning(ctx, "", fmt.Sprintf("requested expiration of %d seconds shortened to %d seconds", req.Spec.ExpirationSeconds, r.maxExpirationSeconds))
 		req.Spec.ExpirationSeconds = r.maxExpirationSeconds
 	}
@@ -179,7 +186,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		exp = token.ExpirationExtensionSeconds
 	}
 
-	sc, pc := token.Claims(*svcacct, pod, secret, exp, warnAfter, req.Spec.Audiences)
+	sc, pc := token.Claims(*svcacct, pod, secret, requesterUserInfo, exp, warnAfter, req.Spec.Audiences)
 	tokdata, err := r.issuer.GenerateToken(sc, pc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token: %v", err)
@@ -191,6 +198,9 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		Token:               tokdata,
 		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
 	}
+
+	audit.AddAuditAnnotation(ctx, serviceaccount.JTIKey, sc.ID)
+
 	return out, nil
 }
 

@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"gopkg.in/square/go-jose.v2/jwt"
-	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/klog/v2"
 
+	"k8s.io/apiserver/pkg/audit"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -51,6 +53,8 @@ type kubernetes struct {
 	Pod       *ref             `json:"pod,omitempty"`
 	Secret    *ref             `json:"secret,omitempty"`
 	WarnAfter *jwt.NumericDate `json:"warnafter,omitempty"`
+
+	RequesterUserInfo userInfo `json:"requesterUserInfo,omitempty"`
 }
 
 type ref struct {
@@ -58,7 +62,16 @@ type ref struct {
 	UID  string `json:"uid,omitempty"`
 }
 
-func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirationSeconds, warnafter int64, audience []string) (*jwt.Claims, interface{}) {
+type userInfo struct {
+	// The name that uniquely identifies this user among all active users.
+	Username string `json:"username,omitempty"`
+	// A unique value that identifies this user across time. If this user is
+	// deleted and another user by the same name is added, they will have
+	// different UIDs.
+	UID string `json:"uid,omitempty"`
+}
+
+func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, requesterUserInfo user.Info, expirationSeconds, warnafter int64, audience []string) (*jwt.Claims, interface{}) {
 	now := now()
 	sc := &jwt.Claims{
 		Subject:   apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name),
@@ -66,6 +79,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 		IssuedAt:  jwt.NewNumericDate(now),
 		NotBefore: jwt.NewNumericDate(now),
 		Expiry:    jwt.NewNumericDate(now.Add(time.Duration(expirationSeconds) * time.Second)),
+		ID:        uuid.New().String(),
 	}
 	pc := &privateClaims{
 		Kubernetes: kubernetes{
@@ -73,6 +87,10 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 			Svcacct: ref{
 				Name: sa.Name,
 				UID:  string(sa.UID),
+			},
+			RequesterUserInfo: userInfo{
+				Username: requesterUserInfo.GetName(),
+				UID:      requesterUserInfo.GetUID(),
 			},
 		},
 	}
@@ -218,6 +236,10 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		UID:       private.Kubernetes.Svcacct.UID,
 		PodName:   podName,
 		PodUID:    podUID,
+
+		JTI:               public.ID,
+		RequesterUsername: private.Kubernetes.RequesterUserInfo.Username,
+		RequesterUID:      private.Kubernetes.RequesterUserInfo.UID,
 	}, nil
 }
 

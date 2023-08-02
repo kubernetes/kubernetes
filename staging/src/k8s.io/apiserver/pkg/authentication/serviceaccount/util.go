@@ -42,6 +42,13 @@ const (
 	// PodUIDKey is the key used in a user's "extra" to specify the pod UID of
 	// the authenticating request.
 	PodUIDKey = "authentication.kubernetes.io/pod-uid"
+	// JTIKey is the key used in a user's "extra" (to specify the JTI of the authenticating request)
+	// and audit event annotations (to specify the JTI of the newly created SA token).
+	JTIKey = "authentication.kubernetes.io/jti"
+	// RequesterUsernameKey is the key used in a user's "extra" to specify the username that requested this SA token.
+	RequesterUsernameKey = "authentication.kubernetes.io/requester-username"
+	// RequesterUIDKey is the key used in a user's "extra" to specify the UID that requested this SA token.
+	RequesterUIDKey = "authentication.kubernetes.io/requester-uid"
 )
 
 // MakeUsername generates a username from the given namespace and ServiceAccount name.
@@ -119,6 +126,9 @@ func UserInfo(namespace, name, uid string) user.Info {
 type ServiceAccountInfo struct {
 	Name, Namespace, UID string
 	PodName, PodUID      string
+	JTI                  string
+	RequesterUsername    string
+	RequesterUID         string
 }
 
 func (sa *ServiceAccountInfo) UserInfo() user.Info {
@@ -126,12 +136,20 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 		Name:   MakeUsername(sa.Namespace, sa.Name),
 		UID:    sa.UID,
 		Groups: MakeGroupNames(sa.Namespace),
+		Extra:  map[string][]string{},
 	}
 	if sa.PodName != "" && sa.PodUID != "" {
-		info.Extra = map[string][]string{
-			PodNameKey: {sa.PodName},
-			PodUIDKey:  {sa.PodUID},
-		}
+		info.Extra[PodNameKey] = []string{sa.PodName}
+		info.Extra[PodUIDKey] = []string{sa.PodUID}
+	}
+	if len(sa.JTI) > 0 {
+		info.Extra[JTIKey] = []string{sa.JTI}
+	}
+	if len(sa.RequesterUsername) > 0 {
+		info.Extra[RequesterUsernameKey] = []string{sa.RequesterUsername}
+	}
+	if len(sa.RequesterUID) > 0 {
+		info.Extra[RequesterUIDKey] = []string{sa.RequesterUID}
 	}
 	return info
 }
