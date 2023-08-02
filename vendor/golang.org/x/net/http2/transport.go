@@ -518,11 +518,14 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 func authorityAddr(scheme string, authority string) (addr string) {
 	host, port, err := net.SplitHostPort(authority)
 	if err != nil { // authority didn't have a port
+		host = authority
+		port = ""
+	}
+	if port == "" { // authority's port was empty
 		port = "443"
 		if scheme == "http" {
 			port = "80"
 		}
-		host = authority
 	}
 	if a, err := idna.ToASCII(host); err == nil {
 		host = a
