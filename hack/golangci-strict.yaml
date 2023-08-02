@@ -25,10 +25,16 @@ issues:
     - linters:
        - ginkgolinter
       text: use a function call in (Eventually|Consistently)
+    # SSA Extract calls are allowed in tests.
+    - linters:
+       - forbidigo
+      text: should not be used because managedFields was removed
+      path: _test.go$
 
 linters:
   disable-all: false # in contrast to golangci.yaml, the default set of linters remains enabled
   enable: # please keep this alphabetized and in sync with golangci.yaml
+    - forbidigo
     - ginkgolinter
     - gocritic
     - govet
@@ -45,6 +51,15 @@ linters-settings: # please keep this alphabetized
       path: ../_output/local/bin/logcheck.so
       description: structured logging checker
       original-url: k8s.io/logtools/logcheck
+  forbidigo:
+    analyze-types: true
+    forbid:
+    - p: ^managedfields\.ExtractInto$
+      pkg: ^k8s\.io/apimachinery/pkg/util/managedfields$
+      msg: should not be used because managedFields was removed
+    - p: \.Extract
+      pkg: ^k8s\.io/client-go/applyconfigurations/
+      msg: should not be used because managedFields was removed
   gocritic:
   staticcheck:
     checks:
