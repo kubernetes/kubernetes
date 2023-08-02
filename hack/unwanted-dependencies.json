@@ -104,7 +104,19 @@
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/raft/v3",
-        "go.etcd.io/etcd/server/v3"
+        "go.etcd.io/etcd/server/v3",
+        "k8s.io/api",
+        "k8s.io/apiextensions-apiserver",
+        "k8s.io/apimachinery",
+        "k8s.io/apiserver",
+        "k8s.io/client-go",
+        "k8s.io/code-generator",
+        "k8s.io/cri-api",
+        "k8s.io/kms",
+        "k8s.io/kube-aggregator",
+        "k8s.io/kubelet",
+        "k8s.io/kubernetes",
+        "k8s.io/metrics"
       ],
       "github.com/google/shlex": [
         "sigs.k8s.io/kustomize/api",
@@ -149,6 +161,8 @@
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "go.uber.org/zap",
         "gotest.tools/v3",
+        "k8s.io/kubectl",
+        "k8s.io/kubernetes",
         "k8s.io/system-validators",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
@@ -163,7 +177,9 @@
         "cloud.google.com/go/compute",
         "cloud.google.com/go/storage",
         "github.com/GoogleCloudPlatform/k8s-cloud-provider",
-        "github.com/googleapis/gax-go/v2"
+        "github.com/googleapis/gax-go/v2",
+        "k8s.io/kubernetes",
+        "k8s.io/legacy-cloud-providers"
       ],
       "google.golang.org/genproto": [
         "cloud.google.com/go",
