@@ -231,7 +231,7 @@ func (c *fromUnstructuredContext) pushKey(key string) {
 
 }
 
-// FromUnstructuredWithValidation converts an object from map[string]interface{} representation into a concrete type.
+// FromUnstructuredWIthValidation converts an object from map[string]interface{} representation into a concrete type.
 // It uses encoding/json/Unmarshaler if object implements it or reflection if not.
 // It takes a validationDirective that indicates how to behave when it encounters unknown fields.
 func (c *unstructuredConverter) FromUnstructuredWithValidation(u map[string]interface{}, obj interface{}, returnUnknownFields bool) error {
@@ -465,7 +465,7 @@ func sliceFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) e
 			}
 			dv.SetBytes(data)
 		} else {
-			dv.Set(reflect.MakeSlice(dt, 0, 0))
+			dv.Set(reflect.Zero(dt))
 		}
 		return nil
 	}
