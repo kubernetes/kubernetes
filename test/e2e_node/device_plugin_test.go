@@ -828,3 +828,26 @@ func matchContainerDevices(ident string, contDevs []*kubeletpodresourcesv1.Conta
 	}
 	return nil
 }
+
+// getSampleDevicePluginPod returns the Sample Device Plugin pod to be used e2e tests.
+func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
+	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+
+	ds := readDaemonSetV1OrDie(data)
+	dp := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: SampleDevicePluginName,
+		},
+		Spec: ds.Spec.Template.Spec,
+	}
+	for i := range dp.Spec.Containers[0].Env {
+		if dp.Spec.Containers[0].Env[i].Name == SampleDeviceEnvVarNamePluginSockDir {
+			dp.Spec.Containers[0].Env[i].Value = pluginSockDir
+		}
+	}
+
+	return dp
+}
