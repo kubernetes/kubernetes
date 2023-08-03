@@ -4272,7 +4272,7 @@ message Probe {
   // The action taken to determine the health of a container
   optional ProbeHandler handler = 1;
 
-  // Number of seconds after the container has started before liveness probes are initiated.
+  // Number of seconds after the container has started before startup, liveness or readiness probes are initiated.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
   // +optional
   optional int32 initialDelaySeconds = 2;

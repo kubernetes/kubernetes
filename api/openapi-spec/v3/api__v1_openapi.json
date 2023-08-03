@@ -5784,7 +5784,7 @@
             "description": "HTTPGet specifies the http request to perform."
           },
           "initialDelaySeconds": {
-            "description": "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+            "description": "Number of seconds after the container has started before startup, liveness or readiness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
             "format": "int32",
             "type": "integer"
           },
