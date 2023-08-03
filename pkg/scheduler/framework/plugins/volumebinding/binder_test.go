@@ -349,7 +349,7 @@ func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolum
 		}
 		pvs[i] = newPv
 	}
-	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pv := range pvs {
 			obj, err := env.internalPVCache.GetAPIObj(pv.Name)
 			if obj == nil || err != nil {
@@ -375,7 +375,7 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 		}
 		pvcs[i] = newPvc
 	}
-	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pvc := range pvcs {
 			obj, err := env.internalPVCCache.GetAPIObj(getPVCName(pvc))
 			if obj == nil || err != nil {

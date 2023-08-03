@@ -154,7 +154,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				t.Errorf("Failed to taint node in test %s <%s>, err: %v", name, nodes[nodeIndex].Name, err)
 			}
 
-			err = wait.PollImmediate(time.Second, time.Second*20, testutils.PodIsGettingEvicted(cs, testPod.Namespace, testPod.Name))
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, time.Second*20, true, testutils.PodIsGettingEvicted(cs, testPod.Namespace, testPod.Name))
 			if err != nil {
 				t.Fatalf("Error %q in test %q when waiting for terminating pod: %q", err, name, klog.KObj(testPod))
 			}

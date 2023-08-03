@@ -177,7 +177,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying LimitRange updating is effective")
-		err = wait.Poll(time.Second*2, time.Second*20, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second*2, time.Second*20, false, func(ctx context.Context) (bool, error) {
 			limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(ctx, limitRange.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			return reflect.DeepEqual(limitRange.Spec.Limits[0].Min, newMin), nil
@@ -199,7 +199,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying the LimitRange was deleted")
-		err = wait.Poll(time.Second*5, e2eservice.RespondingTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second*5, e2eservice.RespondingTimeout, false, func(ctx context.Context) (bool, error) {
 			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 
 			if err != nil {

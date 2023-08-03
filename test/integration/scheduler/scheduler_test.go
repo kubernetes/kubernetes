@@ -144,7 +144,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		if err == nil {
 			t.Errorf("Test %d: Pod scheduled successfully on unschedulable nodes", i)
 		}
-		if err != wait.ErrWaitTimeout {
+		if !wait.Interrupted(err) {
 			t.Errorf("Test %d: failed while trying to confirm the pod does not get scheduled on the node: %v", i, err)
 		} else {
 			t.Logf("Test %d: Pod did not get scheduled on an unschedulable node", i)
@@ -321,7 +321,7 @@ func TestMultipleSchedulingProfiles(t *testing.T) {
 	}
 
 	gotProfiles := make(map[string]string)
-	if err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		var ev watch.Event
 		select {
 		case ev = <-evs.ResultChan():
