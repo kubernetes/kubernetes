@@ -238,9 +238,7 @@ func (s *specProxier) getOpenAPIV3Root() handler3.OpenAPIV3Discovery {
 	s.rwMutex.RLock()
 	defer s.rwMutex.RUnlock()
 
-	merged := handler3.OpenAPIV3Discovery{
-		Paths: make(map[string]handler3.OpenAPIV3DiscoveryGroupVersion),
-	}
+	paths := make(map[string][]handler3.OpenAPIV3DiscoveryGroupVersion)
 
 	for _, apiServiceInfo := range s.apiServiceInfo {
 		if apiServiceInfo.discovery == nil {
@@ -248,10 +246,10 @@ func (s *specProxier) getOpenAPIV3Root() handler3.OpenAPIV3Discovery {
 		}
 
 		for key, item := range apiServiceInfo.discovery.Paths {
-			merged.Paths[key] = item
+			paths[key] = append(paths[key], item)
 		}
 	}
-	return merged
+	return mergeOpenAPIV3RootPaths(paths)
 }
 
 // handleDiscovery is the handler for OpenAPI V3 Discovery
@@ -278,18 +276,33 @@ func (s *specProxier) handleGroupVersion(w http.ResponseWriter, r *http.Request)
 	url := strings.SplitAfterN(r.URL.Path, "/", 4)
 	targetGV := url[3]
 
+	var eligibleURLs []string
+	eligibleURLsToAPIServiceInfos := make(map[string]*openAPIV3APIServiceInfo)
+
 	for _, apiServiceInfo := range s.apiServiceInfo {
 		if apiServiceInfo.discovery == nil {
 			continue
 		}
 
-		for key := range apiServiceInfo.discovery.Paths {
-			if targetGV == key {
-				apiServiceInfo.handler.ServeHTTP(w, r)
-				return
+		for key, value := range apiServiceInfo.discovery.Paths {
+			if targetGV == key && eligibleURLsToAPIServiceInfos[value.ServerRelativeURL] == nil {
+				// add only apiServices that do not duplicate ServerRelativeURL (path + hash)
+				eligibleURLsToAPIServiceInfos[value.ServerRelativeURL] = apiServiceInfo
+				eligibleURLs = append(eligibleURLs, value.ServerRelativeURL)
+				break
 			}
 		}
+		if len(eligibleURLsToAPIServiceInfos) > 0 && !strings.HasPrefix(targetGV, "apis/") {
+			// do not search for duplicates that are not part of apis/ prefix (eg.  /version)
+			break
+		}
 	}
+
+	if len(eligibleURLs) > 0 {
+		delegateAndMergeHandleGroupVersion(w, r, eligibleURLs, eligibleURLsToAPIServiceInfos)
+		return
+	}
+
 	// No group-versions match the desired request
 	w.WriteHeader(404)
 }
