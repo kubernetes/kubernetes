@@ -19,7 +19,6 @@ package handlers
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"reflect"
 	"time"
@@ -104,6 +103,26 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 		embeddedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
 	} else {
 		embeddedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
+	}
+
+	var memoryAllocator runtime.MemoryAllocator
+
+	if encoderWithAllocator, supportsAllocator := embeddedEncoder.(runtime.EncoderWithAllocator); supportsAllocator {
+		// don't put the allocator inside the embeddedEncodeFn as that would allocate memory on every call.
+		// instead, we allocate the buffer for the entire watch session and release it when we close the connection.
+		memoryAllocator = runtime.AllocatorPool.Get().(*runtime.Allocator)
+		defer runtime.AllocatorPool.Put(memoryAllocator)
+		embeddedEncoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
+	}
+
+	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
+		if memoryAllocator == nil {
+			// don't put the allocator inside the embeddedEncodeFn as that would allocate memory on every call.
+			// instead, we allocate the buffer for the entire watch session and release it when we close the connection.
+			memoryAllocator = runtime.AllocatorPool.Get().(*runtime.Allocator)
+			defer runtime.AllocatorPool.Put(memoryAllocator)
+		}
+		encoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
 	}
 
 	var serverShuttingDownCh <-chan struct{}
@@ -196,15 +215,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var e streaming.Encoder
-	var memoryAllocator runtime.MemoryAllocator
-
-	if encoder, supportsAllocator := s.Encoder.(runtime.EncoderWithAllocator); supportsAllocator {
-		memoryAllocator = runtime.AllocatorPool.Get().(*runtime.Allocator)
-		defer runtime.AllocatorPool.Put(memoryAllocator)
-		e = streaming.NewEncoderWithAllocator(framer, encoder, memoryAllocator)
-	} else {
-		e = streaming.NewEncoder(framer, s.Encoder)
-	}
+	e = streaming.NewEncoder(framer, s.Encoder)
 
 	// ensure the connection times out
 	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
@@ -222,19 +233,6 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	buf := runtime.NewSpliceBuffer()
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
-
-	embeddedEncodeFn := s.EmbeddedEncoder.Encode
-	if encoder, supportsAllocator := s.EmbeddedEncoder.(runtime.EncoderWithAllocator); supportsAllocator {
-		if memoryAllocator == nil {
-			// don't put the allocator inside the embeddedEncodeFn as that would allocate memory on every call.
-			// instead, we allocate the buffer for the entire watch session and release it when we close the connection.
-			memoryAllocator = runtime.AllocatorPool.Get().(*runtime.Allocator)
-			defer runtime.AllocatorPool.Put(memoryAllocator)
-		}
-		embeddedEncodeFn = func(obj runtime.Object, w io.Writer) error {
-			return encoder.EncodeWithAllocator(obj, w, memoryAllocator)
-		}
-	}
 
 	for {
 		select {
@@ -259,7 +257,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 
 			obj := s.Fixup(event.Object)
-			if err := embeddedEncodeFn(obj, buf); err != nil {
+			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
 				return
