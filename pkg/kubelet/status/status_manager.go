@@ -897,16 +897,14 @@ func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus, podIsFinished b
 	if pod.DeletionTimestamp == nil || kubetypes.IsMirrorPod(pod) {
 		return false
 	}
-	// Delay deletion of pods until the phase is terminal, based on pod.Status
-	// which comes from pod manager.
+	// Delay deletion of pods until the phase is terminal.
 	if !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
-		// For debugging purposes we also log the kubelet's local phase, when the deletion is delayed.
-		klog.V(3).InfoS("Delaying pod deletion as the phase is non-terminal", "phase", pod.Status.Phase, "localPhase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
+		klog.V(3).InfoS("Delaying pod deletion as the phase is non-terminal", "phase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
 		return false
 	}
 	// If this is an update completing pod termination then we know the pod termination is finished.
 	if podIsFinished {
-		klog.V(3).InfoS("The pod termination is finished as SyncTerminatedPod completes its execution", "phase", pod.Status.Phase, "localPhase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
+		klog.V(3).InfoS("The pod termination is finished as SyncTerminatedPod completes its execution", "phase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
 		return true
 	}
 	return false

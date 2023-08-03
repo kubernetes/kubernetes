@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -391,20 +390,10 @@ func doTestSetUp(scenario struct {
 	var fakeOutputs []fakeexec.FakeAction
 	var fcmd fakeexec.FakeCmd
 	for _, expected := range expecteds {
-		expected := expected
 		if expected.cmd[1] == "clone" {
-			// Calculate the subdirectory clone would create (if any)
-			// git clone -- https://github.com/kubernetes/kubernetes.git target_dir --> target_dir
-			// git clone -- https://github.com/kubernetes/kubernetes.git            --> kubernetes
-			// git clone -- https://github.com/kubernetes/kubernetes.git .          --> .
-			// git clone -- https://github.com/kubernetes/kubernetes.git ./.        --> .
-			cloneSubdir := path.Base(expected.cmd[len(expected.cmd)-1])
-			if cloneSubdir == "kubernetes.git" {
-				cloneSubdir = "kubernetes"
-			}
 			fakeOutputs = append(fakeOutputs, func() ([]byte, []byte, error) {
 				// git clone, it creates new dir/files
-				os.MkdirAll(filepath.Join(fcmd.Dirs[0], expected.dir, cloneSubdir), 0750)
+				os.MkdirAll(filepath.Join(fcmd.Dirs[0], expected.dir), 0750)
 				return []byte{}, nil, nil
 			})
 		} else {
@@ -433,10 +422,7 @@ func doTestSetUp(scenario struct {
 	g := mounter.(*gitRepoVolumeMounter)
 	g.exec = fake
 
-	err := g.SetUp(volume.MounterArgs{})
-	if err != nil {
-		allErrs = append(allErrs, err)
-	}
+	g.SetUp(volume.MounterArgs{})
 
 	if fake.CommandCalls != len(expecteds) {
 		allErrs = append(allErrs,

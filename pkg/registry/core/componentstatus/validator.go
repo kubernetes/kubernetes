@@ -17,15 +17,12 @@ limitations under the License.
 package componentstatus
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"sync"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	"k8s.io/kubernetes/pkg/probe"
 	httpprober "k8s.io/kubernetes/pkg/probe/http"
 )
@@ -36,11 +33,7 @@ const (
 
 type ValidatorFn func([]byte) error
 
-type Server interface {
-	DoServerCheck() (probe.Result, string, error)
-}
-
-type HttpServer struct {
+type Server struct {
 	Addr        string
 	Port        int
 	Path        string
@@ -64,7 +57,7 @@ type ServerStatus struct {
 	Err string `json:"err,omitempty"`
 }
 
-func (server *HttpServer) DoServerCheck() (probe.Result, string, error) {
+func (server *Server) DoServerCheck() (probe.Result, string, error) {
 	// setup the prober
 	server.Once.Do(func() {
 		if server.Prober != nil {
@@ -98,24 +91,4 @@ func (server *HttpServer) DoServerCheck() (probe.Result, string, error) {
 		}
 	}
 	return result, data, nil
-}
-
-type EtcdServer struct {
-	storagebackend.Config
-}
-
-func (server *EtcdServer) DoServerCheck() (probe.Result, string, error) {
-	prober, err := factory.CreateProber(server.Config)
-	if err != nil {
-		return probe.Failure, "", err
-	}
-	defer prober.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), probeTimeOut)
-	defer cancel()
-	err = prober.Probe(ctx)
-	if err != nil {
-		return probe.Failure, "", err
-	}
-	return probe.Success, "", err
 }
