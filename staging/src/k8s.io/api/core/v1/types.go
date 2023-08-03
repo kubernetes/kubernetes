@@ -2277,7 +2277,7 @@ type ExecAction struct {
 type Probe struct {
 	// The action taken to determine the health of a container
 	ProbeHandler `json:",inline" protobuf:"bytes,1,opt,name=handler"`
-	// Number of seconds after the container has started before liveness probes are initiated.
+	// Number of seconds after the container has started before startup, liveness or readiness probes are initiated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
 	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
