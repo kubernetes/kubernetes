@@ -130,8 +130,8 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	var proxier proxy.Provider
 	var err error
 
-	if !config.EnableServiceHealthCheckPort {
-		klog.InfoS("Disabling health check port serving", "EnableServiceHealthCheckPort", config.EnableServiceHealthCheckPort)
+	if !(*config.EnableServiceHealthCheckPort) {
+		klog.InfoS("Disabling health check port serving", "EnableServiceHealthCheckPort", *config.EnableServiceHealthCheckPort)
 		apiservice.DisableHealthCheckPortAllocation()
 	}
 

@@ -298,10 +298,11 @@ func TestAddFlags(t *testing.T) {
 		},
 
 		Extra: Extra{
-			ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
-			ServiceClusterIPRanges: (&net.IPNet{IP: netutils.ParseIPSloppy("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
-			EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
-			AllowPrivileged:        false,
+			ServiceNodePortRange:         kubeoptions.DefaultServiceNodePortRange,
+			EnableServiceHealthCheckPort: true,
+			ServiceClusterIPRanges:       (&net.IPNet{IP: netutils.ParseIPSloppy("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
+			EndpointReconcilerType:       string(reconcilers.LeaseEndpointReconcilerType),
+			AllowPrivileged:              false,
 			KubeletConfig: kubeletclient.KubeletClientConfig{
 				Port:         10250,
 				ReadOnlyPort: 10255,

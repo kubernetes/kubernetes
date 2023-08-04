@@ -159,6 +159,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 		return err
 	}
 	out.Logging = in.Logging
+	out.EnableServiceHealthCheckPort = (*bool)(unsafe.Pointer(in.EnableServiceHealthCheckPort))
 	return nil
 }
 
@@ -202,6 +203,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 		return err
 	}
 	out.Logging = in.Logging
+	out.EnableServiceHealthCheckPort = (*bool)(unsafe.Pointer(in.EnableServiceHealthCheckPort))
 	return nil
 }
 

@@ -19,6 +19,7 @@ detectLocal:
   interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
+enableServiceHealthCheckPort: null
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:

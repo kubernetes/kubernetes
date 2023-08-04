@@ -71,6 +71,11 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 	out.Winkernel = in.Winkernel
 	out.DetectLocal = in.DetectLocal
 	in.Logging.DeepCopyInto(&out.Logging)
+	if in.EnableServiceHealthCheckPort != nil {
+		in, out := &in.EnableServiceHealthCheckPort, &out.EnableServiceHealthCheckPort
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

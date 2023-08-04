@@ -189,6 +189,8 @@ type KubeProxyConfiguration struct {
 	// Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go)
 	// for more information.
 	Logging logsapi.LoggingConfiguration `json:"logging,omitempty"`
+	// EnableServiceHealthCheckPort enables health check port serving for LoadBalancer services
+	EnableServiceHealthCheckPort *bool `json:"enableServiceHealthCheckPort"`
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.
