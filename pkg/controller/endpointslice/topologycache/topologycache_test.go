@@ -625,6 +625,69 @@ func TestSetNodes(t *testing.T) {
 	}
 }
 
+func TestTopologyCacheRace(t *testing.T) {
+	sliceInfo := &SliceInfo{
+		ServiceKey:  "ns/svc",
+		AddressType: discovery.AddressTypeIPv4,
+		ToCreate: []*discovery.EndpointSlice{{
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.1.2.3"},
+				Zone:       utilpointer.String("zone-a"),
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.Bool(true)},
+			}, {
+				Addresses:  []string{"10.1.2.4"},
+				Zone:       utilpointer.String("zone-b"),
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.Bool(true)},
+			}},
+		}}}
+	type nodeInfo struct {
+		zone  string
+		cpu   resource.Quantity
+		ready v1.ConditionStatus
+	}
+	nodeInfos := []nodeInfo{
+		{zone: "zone-a", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
+		{zone: "zone-a", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
+		{zone: "zone-a", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
+		{zone: "zone-a", cpu: resource.MustParse("2000m"), ready: v1.ConditionTrue},
+		{zone: "zone-b", cpu: resource.MustParse("3000m"), ready: v1.ConditionTrue},
+		{zone: "zone-b", cpu: resource.MustParse("1500m"), ready: v1.ConditionTrue},
+		{zone: "zone-c", cpu: resource.MustParse("500m"), ready: v1.ConditionTrue},
+	}
+
+	cache := NewTopologyCache()
+	nodes := []*v1.Node{}
+	for _, node := range nodeInfos {
+		labels := map[string]string{}
+		if node.zone != "" {
+			labels[v1.LabelTopologyZone] = node.zone
+		}
+		conditions := []v1.NodeCondition{{
+			Type:   v1.NodeReady,
+			Status: node.ready,
+		}}
+		allocatable := v1.ResourceList{
+			v1.ResourceCPU: node.cpu,
+		}
+		nodes = append(nodes, &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: labels,
+			},
+			Status: v1.NodeStatus{
+				Allocatable: allocatable,
+				Conditions:  conditions,
+			},
+		})
+	}
+
+	go func() {
+		cache.SetNodes(nodes)
+	}()
+	go func() {
+		cache.AddHints(sliceInfo)
+	}()
+}
+
 // Test Helpers
 
 func expectEquivalentSlices(t *testing.T, actualSlices, expectedSlices []*discovery.EndpointSlice) {
