@@ -533,7 +533,7 @@ func hasPodInitialized(pod *v1.Pod) bool {
 
 // initializedContainers returns all status except for suffix of containers that are in Waiting
 // state, which is the set of containers that have attempted to start at least once. If all containers
-// are Watiing, the first container is always returned.
+// are Waiting, the first container is always returned.
 func initializedContainers(containers []v1.ContainerStatus) []v1.ContainerStatus {
 	for i := len(containers) - 1; i >= 0; i-- {
 		if containers[i].State.Waiting == nil || containers[i].LastTerminationState.Terminated != nil {
