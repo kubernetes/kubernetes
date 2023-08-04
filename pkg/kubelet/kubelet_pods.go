@@ -477,7 +477,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	if err != nil {
 		return nil, nil, err
 	}
-	// nodename will be equals to hostname if SetHostnameAsFQDN is nil or false. If SetHostnameFQDN
+	// nodename will be equal to hostname if SetHostnameAsFQDN is nil or false. If SetHostnameFQDN
 	// is true and hostDomainName is defined, nodename will be the FQDN (hostname.hostDomainName)
 	nodename, err := util.GetNodenameForKernel(hostname, hostDomainName, pod.Spec.SetHostnameAsFQDN)
 	if err != nil {
@@ -981,7 +981,7 @@ func (kl *Kubelet) isAdmittedPodTerminal(pod *v1.Pod) bool {
 		return true
 	}
 	// a pod that has been marked terminal within the Kubelet is considered
-	// inactive (may have been rejected by Kubelet admision)
+	// inactive (may have been rejected by Kubelet admission)
 	if status, ok := kl.statusManager.GetPodStatus(pod.UID); ok {
 		if status.Phase == v1.PodSucceeded || status.Phase == v1.PodFailed {
 			return true
