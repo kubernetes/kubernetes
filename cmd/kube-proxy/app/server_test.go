@@ -78,6 +78,7 @@ detectLocal:
 nodePortAddresses:
   - "10.20.30.40/16"
   - "fd00:1::0/64"
+enableServiceHealthCheckPort: true
 `
 
 	testCases := []struct {
@@ -224,6 +225,7 @@ nodePortAddresses:
 				Format:         "text",
 				FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 			},
+			EnableServiceHealthCheckPort: pointer.Bool(true),
 		}
 
 		options := NewOptions()

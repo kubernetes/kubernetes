@@ -125,6 +125,9 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.FeatureGates == nil {
 		obj.FeatureGates = make(map[string]bool)
 	}
+	if obj.EnableServiceHealthCheckPort == nil {
+		obj.EnableServiceHealthCheckPort = pointer.Bool(true)
+	}
 	// Use the Default LoggingConfiguration option
 	logsapi.SetRecommendedLoggingConfiguration(&obj.Logging)
 }

@@ -74,6 +74,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					Format:         "text",
 					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
+				EnableServiceHealthCheckPort: pointer.Bool(true),
 			},
 		},
 		{
@@ -114,6 +115,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					Format:         "text",
 					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
+				EnableServiceHealthCheckPort: pointer.Bool(true),
 			},
 		},
 	}
