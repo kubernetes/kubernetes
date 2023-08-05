@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"k8s.io/klog/v2"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,10 +45,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
+
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
-	"k8s.io/utils/pointer"
 )
 
 var (
@@ -199,13 +200,6 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 	cronJobCopy, requeueAfter, updateStatus, err := jm.syncCronJob(ctx, cronJob, jobsToBeReconciled)
 	if err != nil {
 		logger.V(2).Info("Error reconciling cronjob", "cronjob", klog.KObj(cronJob), "err", err)
-		if updateStatus {
-			if _, err := jm.cronJobControl.UpdateStatus(ctx, cronJobCopy); err != nil {
-				logger.V(2).Info("Unable to update status for cronjob", "cronjob", klog.KObj(cronJob), "resourceVersion", cronJob.ResourceVersion, "err", err)
-				return nil, err
-			}
-		}
-		return nil, err
 	}
 
 	if jm.cleanupFinishedJobs(ctx, cronJobCopy, jobsToBeReconciled) {
@@ -435,7 +429,7 @@ func (jm *ControllerV2) syncCronJob(
 		if !found && !IsJobFinished(j) {
 			cjCopy, err := jm.cronJobControl.GetCronJob(ctx, cronJob.Namespace, cronJob.Name)
 			if err != nil {
-				return nil, nil, updateStatus, err
+				return cronJob, nil, updateStatus, err
 			}
 			if inActiveList(cjCopy, j.ObjectMeta.UID) {
 				cronJob = cjCopy
