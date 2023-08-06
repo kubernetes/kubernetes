@@ -197,7 +197,7 @@ func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 }
 
 func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	return nil, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), injectReason)
+	return pl.inj.PreFilterResult, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
 func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
@@ -1621,6 +1621,56 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			wantPreFilterResult: nil,
 			wantSkippedPlugins:  sets.New("skip1", "skip2"),
 			wantStatusCode:      framework.Success,
+		},
+		{
+			name: "one PreFilter plugin returned Unschedulable, but another PreFilter plugin should be executed",
+			plugins: []*TestPlugin{
+				{
+					name: "unschedulable",
+					inj:  injectedResult{PreFilterStatus: int(framework.Unschedulable)},
+				},
+				{
+					// to make sure this plugin is executed, this plugin return Skip and we confirm it via wantSkippedPlugins.
+					name: "skip",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+			},
+			wantPreFilterResult: nil,
+			wantSkippedPlugins:  sets.New("skip"),
+			wantStatusCode:      framework.Unschedulable,
+		},
+		{
+			name: "one PreFilter plugin returned UnschedulableAndUnresolvable, and all other plugins aren't executed",
+			plugins: []*TestPlugin{
+				{
+					name: "unresolvable",
+					inj:  injectedResult{PreFilterStatus: int(framework.UnschedulableAndUnresolvable)},
+				},
+				{
+					// to make sure this plugin is not executed, this plugin return Skip and we confirm it via wantSkippedPlugins.
+					name: "skip",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+			},
+			wantPreFilterResult: nil,
+			wantStatusCode:      framework.UnschedulableAndUnresolvable,
+		},
+		{
+			name: "all nodes are filtered out by prefilter result, but all other plugins are executed",
+			plugins: []*TestPlugin{
+				{
+					name: "reject-all-nodes",
+					inj:  injectedResult{PreFilterResult: &framework.PreFilterResult{NodeNames: sets.New[string]()}},
+				},
+				{
+					// to make sure this plugin is not executed, this plugin return Skip and we confirm it via wantSkippedPlugins.
+					name: "skip",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+			},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New[string]()},
+			wantSkippedPlugins:  sets.New("skip"),
+			wantStatusCode:      framework.Unschedulable,
 		},
 	}
 	for _, tt := range tests {
@@ -3224,20 +3274,21 @@ func buildScoreConfigWithWeights(weights map[string]int32, ps ...string) *config
 }
 
 type injectedResult struct {
-	ScoreRes                 int64 `json:"scoreRes,omitempty"`
-	NormalizeRes             int64 `json:"normalizeRes,omitempty"`
-	ScoreStatus              int   `json:"scoreStatus,omitempty"`
-	NormalizeStatus          int   `json:"normalizeStatus,omitempty"`
-	PreFilterStatus          int   `json:"preFilterStatus,omitempty"`
-	PreFilterAddPodStatus    int   `json:"preFilterAddPodStatus,omitempty"`
-	PreFilterRemovePodStatus int   `json:"preFilterRemovePodStatus,omitempty"`
-	FilterStatus             int   `json:"filterStatus,omitempty"`
-	PostFilterStatus         int   `json:"postFilterStatus,omitempty"`
-	PreScoreStatus           int   `json:"preScoreStatus,omitempty"`
-	ReserveStatus            int   `json:"reserveStatus,omitempty"`
-	PreBindStatus            int   `json:"preBindStatus,omitempty"`
-	BindStatus               int   `json:"bindStatus,omitempty"`
-	PermitStatus             int   `json:"permitStatus,omitempty"`
+	ScoreRes                 int64                      `json:"scoreRes,omitempty"`
+	NormalizeRes             int64                      `json:"normalizeRes,omitempty"`
+	ScoreStatus              int                        `json:"scoreStatus,omitempty"`
+	NormalizeStatus          int                        `json:"normalizeStatus,omitempty"`
+	PreFilterResult          *framework.PreFilterResult `json:"preFilterResult,omitempty"`
+	PreFilterStatus          int                        `json:"preFilterStatus,omitempty"`
+	PreFilterAddPodStatus    int                        `json:"preFilterAddPodStatus,omitempty"`
+	PreFilterRemovePodStatus int                        `json:"preFilterRemovePodStatus,omitempty"`
+	FilterStatus             int                        `json:"filterStatus,omitempty"`
+	PostFilterStatus         int                        `json:"postFilterStatus,omitempty"`
+	PreScoreStatus           int                        `json:"preScoreStatus,omitempty"`
+	ReserveStatus            int                        `json:"reserveStatus,omitempty"`
+	PreBindStatus            int                        `json:"preBindStatus,omitempty"`
+	BindStatus               int                        `json:"bindStatus,omitempty"`
+	PermitStatus             int                        `json:"permitStatus,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *framework.Status) {

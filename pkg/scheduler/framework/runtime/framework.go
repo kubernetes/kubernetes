@@ -670,6 +670,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 	if verboseLogs {
 		logger = klog.LoggerWithName(logger, "PreFilter")
 	}
+	var returnStatus *framework.Status
 	for _, pl := range f.preFilterPlugins {
 		ctx := ctx
 		if verboseLogs {
@@ -684,7 +685,16 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 		if !s.IsSuccess() {
 			s.SetPlugin(pl.Name())
 			if s.IsRejected() {
-				return nil, s
+				if s.Code() == framework.UnschedulableAndUnresolvable {
+					// In this case, the preemption shouldn't happen in this scheduling cycle.
+					// So, no need to execute all PreFilter.
+					return nil, s
+				}
+				// In this case, the preemption should happen later in this scheduling cycle.
+				// So we need to execute all PreFilter.
+				// https://github.com/kubernetes/kubernetes/issues/119770
+				returnStatus = s
+				continue
 			}
 			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithPlugin(pl.Name())
 		}
@@ -697,10 +707,14 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			if len(pluginsWithNodes) == 1 {
 				msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", pluginsWithNodes[0])
 			}
-			return nil, framework.NewStatus(framework.Unschedulable, msg)
+			// In this case, the preemption should happen later in this scheduling cycle.
+			// So we need to execute all PreFilter.
+			// https://github.com/kubernetes/kubernetes/issues/119770
+			returnStatus = framework.NewStatus(framework.Unschedulable, msg)
+			continue
 		}
 	}
-	return result, nil
+	return result, returnStatus
 }
 
 func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
