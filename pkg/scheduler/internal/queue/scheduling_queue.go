@@ -732,6 +732,10 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	// In this case, we try to requeue this Pod to activeQ/backoffQ.
 	queue := p.requeuePodViaQueueingHint(logger, pInfo, schedulingHint, ScheduleAttemptFailure)
 	logger.V(6).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle)
+	if queue == activeQ {
+		// When the Pod is moved to activeQ, need to let p.cond know so that the Pod will be pop()ed out.
+		p.cond.Broadcast()
+	}
 
 	p.addNominatedPodUnlocked(logger, pInfo.PodInfo, nil)
 	return nil
