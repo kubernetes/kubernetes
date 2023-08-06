@@ -107,9 +107,10 @@ func TestServiceStatusStrategy(t *testing.T) {
 		t.Errorf("Service must be namespace scoped")
 	}
 	oldService := makeValidService()
-	newService := makeValidService()
+	oldService.Spec.Type = api.ServiceTypeLoadBalancer
 	oldService.ResourceVersion = "4"
-	newService.ResourceVersion = "4"
+	oldService.Spec.SessionAffinity = "None"
+	newService := oldService.DeepCopy()
 	newService.Spec.SessionAffinity = "ClientIP"
 	newService.Status = api.ServiceStatus{
 		LoadBalancer: api.LoadBalancerStatus{
