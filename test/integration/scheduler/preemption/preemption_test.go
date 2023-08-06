@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -100,8 +102,10 @@ func waitForNominatedNodeName(cs clientset.Interface, pod *v1.Pod) error {
 const tokenFilterName = "token-filter"
 
 type tokenFilter struct {
-	Tokens       int
-	Unresolvable bool
+	Tokens          int
+	PreFilterStatus *framework.Status
+	PreFilterResult *framework.PreFilterResult
+	FilterStatus    *framework.Status
 }
 
 // Name returns name of the plugin.
@@ -111,18 +115,39 @@ func (fp *tokenFilter) Name() string {
 
 func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
 	nodeInfo *framework.NodeInfo) *framework.Status {
+	if _, err := state.Read(tokenFilterName); err != nil {
+		// Should be bug.
+		// We don't store state only when PreFilter returned Skip.
+		// In other words, if reaches here, PreFilter returned Skip but somehow Filter is called.
+		return framework.NewStatus(framework.Error, err.Error())
+	}
+
 	if fp.Tokens > 0 {
 		fp.Tokens--
 		return nil
 	}
-	status := framework.Unschedulable
-	if fp.Unresolvable {
-		status = framework.UnschedulableAndUnresolvable
-	}
-	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
+	return fp.FilterStatus
+}
+
+type stateData struct{}
+
+func (sd *stateData) Clone() framework.StateData {
+	return sd
 }
 
 func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	if pod.Name == "preemptor-pod" && fp.PreFilterStatus.IsSkip() {
+		// not store stateData in CycleState when returning Skip.
+		// It shouldn't be problem because Filter shouldn't be called in preemption when PreFilter returned Skip.
+		// https://github.com/kubernetes/kubernetes/pull/119769
+		return nil, fp.PreFilterStatus
+	}
+
+	state.Write(tokenFilterName, &stateData{})
+
+	if pod.Name == "preemptor-pod" {
+		return fp.PreFilterResult, fp.PreFilterStatus
+	}
 	return nil, nil
 }
 
@@ -162,12 +187,19 @@ func TestPreemption(t *testing.T) {
 				Filter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
 						{Name: filterPluginName},
+						{Name: names.InterPodAffinity},
+						{Name: names.NodeResourcesFit},
 					},
+					Disabled: []configv1.Plugin{{Name: "*"}}, // disable all unrelated plugins
 				},
 				PreFilter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
 						{Name: filterPluginName},
+						{Name: names.InterPodAffinity},
+						{Name: names.NodeResourcesFit},
+						{Name: names.VolumeBinding},
 					},
+					Disabled: []configv1.Plugin{{Name: "*"}}, // disable all unrelated plugins
 				},
 			},
 		}},
@@ -195,6 +227,8 @@ func TestPreemption(t *testing.T) {
 		pod                           *v1.Pod
 		initTokens                    int
 		unresolvable                  bool
+		preFilterStatus               *framework.Status
+		preFilterResult               *framework.PreFilterResult
 		preemptedPodIndexes           map[int]struct{}
 		enablePodDisruptionConditions bool
 	}{
@@ -275,6 +309,58 @@ func TestPreemption(t *testing.T) {
 			preemptedPodIndexes: map[int]struct{}{0: {}},
 		},
 		{
+			name:            "no preemption when PreFilter returns UnschedulableAndUnresolvable",
+			initTokens:      1,
+			preFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable), // the preemption won't happen.
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "victim-pod",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{},
+		},
+		{
+			name:            "PreFilter plugin returning skip won't be called during preemption",
+			initTokens:      1,
+			preFilterStatus: framework.NewStatus(framework.Skip),
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "victim-pod",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{0: {}},
+		},
+		{
 			// same as the previous test, but the filter is unresolvable.
 			name:         "basic pod preemption with unresolvable filter",
 			initTokens:   1,
@@ -302,8 +388,83 @@ func TestPreemption(t *testing.T) {
 			preemptedPodIndexes: map[int]struct{}{},
 		},
 		{
+			name:       "preemption is performed to satisfy anti-affinity even if the previous PreFilter returns Unschedulable",
+			initTokens: maxTokens,
+			// remaining PreFilter will be executed even if one PreFilter returns Unschedulable
+			// It's to generate correct data in cycle state so that the preemption can use it.
+			// Otherwise, the preemption will fail because no expected data in cycle state.
+			// https://github.com/kubernetes/kubernetes/issues/119770
+			preFilterStatus: framework.NewStatus(framework.Unschedulable),
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name: "pod-0", Namespace: testCtx.NS.Name,
+					Priority:  &mediumPriority,
+					Labels:    map[string]string{"pod": "p0"},
+					Resources: defaultPodRes,
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name: "pod-1", Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Labels:    map[string]string{"pod": "p1"},
+					Resources: defaultPodRes,
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "pod",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"preemptor"},
+											},
+										},
+									},
+									TopologyKey: "node",
+								},
+							},
+						},
+					},
+				}),
+			},
+			// A higher priority pod with anti-affinity.
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &highPriority,
+				Labels:    map[string]string{"pod": "preemptor"},
+				Resources: defaultPodRes,
+				Affinity: &v1.Affinity{
+					PodAntiAffinity: &v1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "pod",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"p0"},
+										},
+									},
+								},
+								TopologyKey: "node",
+							},
+						},
+					},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{0: {}, 1: {}},
+		},
+		{
 			name:       "preemption is performed to satisfy anti-affinity",
 			initTokens: maxTokens,
+			// remaining PreFilter will be executed even if PreFilter(s) filter out all nodes with PreFilterResult
+			// It's to generate correct data in cycle state so that the preemption can use it.
+			// Otherwise, the preemption will fail because no expected data in cycle state.
+			// https://github.com/kubernetes/kubernetes/issues/119770
+			preFilterResult: &framework.PreFilterResult{
+				NodeNames: sets.New[string](),
+			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name: "pod-0", Namespace: testCtx.NS.Name,
@@ -445,7 +606,14 @@ func TestPreemption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			filter.Tokens = test.initTokens
-			filter.Unresolvable = test.unresolvable
+			if test.unresolvable {
+				filter.FilterStatus = framework.NewStatus(framework.UnschedulableAndUnresolvable)
+			} else {
+				filter.FilterStatus = framework.NewStatus(framework.Unschedulable)
+			}
+			filter.PreFilterResult = test.preFilterResult
+			filter.PreFilterStatus = test.preFilterStatus
+
 			pods := make([]*v1.Pod, len(test.existingPods))
 			// Create and run existingPods.
 			for i, p := range test.existingPods {
@@ -454,11 +622,27 @@ func TestPreemption(t *testing.T) {
 					t.Fatalf("Error running pause pod: %v", err)
 				}
 			}
+			time.Sleep(1 * time.Second)
 			// Create the "pod".
 			preemptor, err := createPausePod(cs, test.pod)
 			if err != nil {
 				t.Errorf("Error while creating high priority pod: %v", err)
 			}
+
+			// wait for preemptor to experience scheduling.
+			if err = wait.Poll(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+				pod, err := cs.CoreV1().Pods(preemptor.Namespace).Get(testCtx.Ctx, preemptor.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+				return pod.Spec.NodeName != "" || // pod is scheduled
+						cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable, // pod isn't successfully scheduled, but experienced scheduling
+					nil
+			}); err != nil {
+				t.Errorf("Pod %v/%v doesn't expecience scheduling", preemptor.Namespace, preemptor.Name)
+			}
+
 			// Wait for preemption of pods and make sure the other ones are not preempted.
 			for i, p := range pods {
 				if _, found := test.preemptedPodIndexes[i]; found {
@@ -476,7 +660,11 @@ func TestPreemption(t *testing.T) {
 						t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 					}
 				} else {
-					if p.DeletionTimestamp != nil {
+					pod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+					if err != nil {
+						t.Errorf("Error %v when getting the latest status for pod %v/%v ", err, p.Namespace, p.Name)
+					}
+					if pod.DeletionTimestamp != nil {
 						t.Errorf("Didn't expect pod %v to get preempted.", p.Name)
 					}
 				}
