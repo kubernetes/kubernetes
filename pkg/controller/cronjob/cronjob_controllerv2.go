@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"k8s.io/klog/v2"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -45,10 +44,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/utils/pointer"
-
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
+	"k8s.io/utils/pointer"
 )
 
 var (
