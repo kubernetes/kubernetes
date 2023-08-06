@@ -269,6 +269,17 @@ func (sched *Scheduler) bindingCycle(
 
 	// Run "permit" plugins.
 	if status := fwk.WaitOnPermit(ctx, assumedPod); !status.IsSuccess() {
+		if status.IsUnschedulable() {
+			fitErr := &framework.FitError{
+				NumAllNodes: 1,
+				Pod:         assumedPodInfo.Pod,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap:      framework.NodeToStatusMap{scheduleResult.SuggestedHost: status},
+					UnschedulablePlugins: sets.New(status.FailedPlugin()),
+				},
+			}
+			return framework.NewStatus(status.Code()).WithError(fitErr)
+		}
 		return status
 	}
 
