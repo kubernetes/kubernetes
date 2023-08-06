@@ -26,6 +26,7 @@ import (
 	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -136,7 +137,7 @@ func TestRunOnce(t *testing.T) {
 	fakeKillPodFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
 		return nil
 	}
-	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, nil, kb.recorder, nodeRef, kb.clock, kb.supportLocalStorageCapacityIsolation())
+	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, nil, kb.recorder, nodeRef, kb.clock, kb.supportLocalStorageCapacityIsolation(), oteltrace.NewNoopTracerProvider())
 
 	kb.evictionManager = evictionManager
 	kb.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
