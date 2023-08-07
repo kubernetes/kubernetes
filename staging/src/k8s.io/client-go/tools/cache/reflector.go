@@ -337,7 +337,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			if !apierrors.IsInvalid(err) {
 				return err
 			}
-			klog.Warning("the watch-list feature is not supported by the server, falling back to the previous LIST/WATCH semantic")
+			klog.Warning("The watch-list feature is not supported by the server, falling back to the previous LIST/WATCH semantics")
 			fallbackToList = true
 			// Ensure that we won't accidentally pass some garbage down the watch.
 			w = nil
@@ -350,6 +350,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			return err
 		}
 	}
+
+	klog.V(2).Infof("Caches populated for %v from %s", r.typeDescription, r.name)
 
 	resyncerrc := make(chan error, 1)
 	cancelCh := make(chan struct{})
