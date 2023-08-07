@@ -55,18 +55,10 @@ func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, 
 	return doTransformObject(ctx, obj, opts, mediaType, scope, req)
 }
 
+// doTransformResponseObject is used for handling all requests, including watch.
 func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
-	}
-
-	// ensure that for empty lists we don't return <nil> items.
-	// This is safe to modify without deep-copying the object, as
-	// List objects themselves are never cached.
-	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
-		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-			return nil, err
-		}
 	}
 
 	switch target := mediaType.Convert; {
@@ -128,11 +120,22 @@ func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.Media
 
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
+// transformResponseObject is used only for handling non-streaming requests.
 func transformResponseObject(ctx context.Context, scope *RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
 	options, err := optionsForTransform(mediaType, req)
 	if err != nil {
 		scope.err(err, w, req)
 		return
+	}
+
+	// ensure that for empty lists we don't return <nil> items.
+	// This is safe to modify without deep-copying the object, as
+	// List objects themselves are never cached.
+	if meta.IsListType(result) && meta.LenList(result) == 0 {
+		if err := meta.SetList(result, []runtime.Object{}); err != nil {
+			scope.err(err, w, req)
+			return
+		}
 	}
 
 	var obj runtime.Object
