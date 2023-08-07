@@ -199,6 +199,19 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 	cronJobCopy, requeueAfter, updateStatus, err := jm.syncCronJob(ctx, cronJob, jobsToBeReconciled)
 	if err != nil {
 		logger.V(2).Info("Error reconciling cronjob", "cronjob", klog.KObj(cronJob), "err", err)
+
+		if jm.cleanupFinishedJobs(ctx, cronJobCopy, jobsToBeReconciled) {
+			updateStatus = true
+		}
+
+		// Update the CronJob if needed
+		if updateStatus {
+			if _, err := jm.cronJobControl.UpdateStatus(ctx, cronJobCopy); err != nil {
+				logger.V(2).Info("Unable to update status for cronjob", "cronjob", klog.KObj(cronJob), "resourceVersion", cronJob.ResourceVersion, "err", err)
+				return nil, err
+			}
+		}
+		return nil, err
 	}
 
 	if jm.cleanupFinishedJobs(ctx, cronJobCopy, jobsToBeReconciled) {
