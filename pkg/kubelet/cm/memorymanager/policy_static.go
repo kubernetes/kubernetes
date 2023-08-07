@@ -93,7 +93,7 @@ func (p *staticPolicy) Start(s state.State) error {
 // Allocate call is idempotent
 func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
 	// allocate the memory only for guaranteed pods
-	if v1qos.PodQOSClass(pod) != v1.PodQOSGuaranteed {
+	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
 	}
 
@@ -362,7 +362,7 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 }
 
 func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	if v1qos.PodQOSClass(pod) != v1.PodQOSGuaranteed {
+	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
 	}
 
@@ -390,7 +390,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
 func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	if v1qos.PodQOSClass(pod) != v1.PodQOSGuaranteed {
+	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
 	}
 

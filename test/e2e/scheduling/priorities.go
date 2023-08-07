@@ -501,7 +501,7 @@ func computeCPUMemFraction(node v1.Node, resource *v1.ResourceRequirements, pods
 	for _, pod := range pods {
 		framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(pod).MilliCPU, getNonZeroRequests(pod).Memory)
 		// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
-		if v1qos.PodQOSClass(pod) == v1.PodQOSBestEffort {
+		if v1qos.GetPodQOS(pod) == v1.PodQOSBestEffort {
 			continue
 		}
 		totalRequestedCPUResource += getNonZeroRequests(pod).MilliCPU

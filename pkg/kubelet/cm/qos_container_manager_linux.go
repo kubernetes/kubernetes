@@ -173,7 +173,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	reuseReqs := make(v1.ResourceList, 4)
 	for i := range pods {
 		pod := pods[i]
-		qosClass := v1qos.PodQOSClass(pod)
+		qosClass := v1qos.GetPodQOS(pod)
 		if qosClass != v1.PodQOSBurstable {
 			// we only care about the burstable qos tier
 			continue
@@ -207,7 +207,7 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 	reuseReqs := make(v1.ResourceList, 4)
 	for _, pod := range pods {
 		podMemoryRequest := int64(0)
-		qosClass := v1qos.PodQOSClass(pod)
+		qosClass := v1qos.GetPodQOS(pod)
 		if qosClass == v1.PodQOSBestEffort {
 			// limits are not set for Best Effort pods
 			continue
