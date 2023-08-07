@@ -1688,12 +1688,12 @@ func TestCostEstimation(t *testing.T) {
 					"before": strType,
 					"after":  strType,
 				})
-				objType = withRule(objType, "self.str.replace(self.before, self.after) == 'does not matter'")
+				objType = withRule(objType, "self.str.replace(self.before, self.after) == '0123456789'")
 				return &objType
 			},
-			expectedCalcCost: 629154,
+			expectedCalcCost: 629152,
 			setMaxElements:   10,
-			expectedSetCost:  16,
+			expectedSetCost:  14,
 		},
 		{
 			name: "extended library split",
