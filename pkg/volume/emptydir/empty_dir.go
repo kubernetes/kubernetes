@@ -559,3 +559,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {
 
 	return volumeSource, readOnly
 }
+
+func GetQualifiedName() string {
+	return utilstrings.EscapeQualifiedName(emptyDirPluginName)
+}

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/util/removeall"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -128,7 +130,13 @@ func (kl *Kubelet) removeOrphanedPodVolumeDirs(uid types.UID) []error {
 	}
 	if len(volumePaths) > 0 {
 		for _, volumePath := range volumePaths {
-			if err := syscall.Rmdir(volumePath); err != nil {
+			var err error
+			if strings.Contains(volumePath, emptydir.GetQualifiedName()) {
+				err = os.RemoveAll(volumePath)
+			} else {
+				err = syscall.Rmdir(volumePath)
+			}
+			if err != nil {
 				orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to rmdir() volume at path %v: %v", uid, volumePath, err))
 			} else {
 				klog.InfoS("Cleaned up orphaned volume from pod", "podUID", uid, "path", volumePath)
