@@ -84,6 +84,10 @@ const (
 	// https://github.com/kubernetes/kubernetes/issues/72236
 	kubeIPVSFilterChain utiliptables.Chain = "KUBE-IPVS-FILTER"
 
+	// kubeIPVSOutFilterChain filters access to load balancer services from node.
+	// https://github.com/kubernetes/kubernetes/issues/119656
+	kubeIPVSOutFilterChain utiliptables.Chain = "KUBE-IPVS-OUT-FILTER"
+
 	// defaultScheduler is the default ipvs scheduler algorithm - round robin.
 	defaultScheduler = "rr"
 
@@ -113,6 +117,7 @@ var iptablesJumpChain = []struct {
 	{utiliptables.TableFilter, utiliptables.ChainInput, kubeProxyFirewallChain, "kube-proxy firewall rules"},
 	{utiliptables.TableFilter, utiliptables.ChainForward, kubeProxyFirewallChain, "kube-proxy firewall rules"},
 	{utiliptables.TableFilter, utiliptables.ChainInput, kubeIPVSFilterChain, "kubernetes ipvs access filter"},
+	{utiliptables.TableFilter, utiliptables.ChainOutput, kubeIPVSOutFilterChain, "kubernetes ipvs access filter"},
 }
 
 var iptablesChains = []struct {
@@ -129,6 +134,7 @@ var iptablesChains = []struct {
 	{utiliptables.TableFilter, kubeProxyFirewallChain},
 	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
 	{utiliptables.TableFilter, kubeIPVSFilterChain},
+	{utiliptables.TableFilter, kubeIPVSOutFilterChain},
 }
 
 var iptablesCleanupChains = []struct {
@@ -144,6 +150,7 @@ var iptablesCleanupChains = []struct {
 	{utiliptables.TableFilter, kubeProxyFirewallChain},
 	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
 	{utiliptables.TableFilter, kubeIPVSFilterChain},
+	{utiliptables.TableFilter, kubeIPVSOutFilterChain},
 }
 
 // ipsetInfo is all ipset we needed in ipvs proxier
@@ -295,6 +302,11 @@ type Proxier struct {
 	// A Set is used here since we end up calculating endpoint topology multiple times for the same Service
 	// if it has multiple ports but each Service should only be counted once.
 	serviceNoLocalEndpointsExternal sets.Set[string]
+	// lbNoNodeAccessIPPortProtocolEntries represents the set of loadBalancers IP + Port + Protocol that should not be accessible from K8s nodes
+	// We cannot directly restrict LB access from node using LoadBalancerSourceRanges, we need to install
+	// additional iptables rules.
+	// (ref: https://github.com/kubernetes/kubernetes/issues/119656)
+	lbNoNodeAccessIPPortProtocolEntries []*utilipset.Entry
 }
 
 // Proxier implements proxy.Provider
@@ -941,6 +953,9 @@ func (proxier *Proxier) syncProxyRules() {
 
 	proxier.serviceNoLocalEndpointsInternal = sets.New[string]()
 	proxier.serviceNoLocalEndpointsExternal = sets.New[string]()
+
+	proxier.lbNoNodeAccessIPPortProtocolEntries = make([]*utilipset.Entry, 0)
+
 	// Begin install iptables
 
 	// Reset all buffers used later.
@@ -1238,6 +1253,10 @@ func (proxier *Proxier) syncProxyRules() {
 						continue
 					}
 					proxier.ipsetList[kubeLoadBalancerSourceIPSet].activeEntries.Insert(entry.String())
+				} else {
+					// since nodeIP is not covered in any of SourceRange we need to explicitly block the lbIP access from k8s nodes.
+					proxier.lbNoNodeAccessIPPortProtocolEntries = append(proxier.lbNoNodeAccessIPPortProtocolEntries, entry)
+
 				}
 			}
 			// ipvs call
@@ -1628,6 +1647,17 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-A", string(kubeSourceRangesFirewallChain),
 		"-j", "DROP",
 	)
+
+	// disable LB access from node
+	// for IPVS src and dst both would be lbIP
+	for _, entry := range proxier.lbNoNodeAccessIPPortProtocolEntries {
+		proxier.filterRules.Write(
+			"-A", string(kubeIPVSOutFilterChain),
+			"-s", entry.IP,
+			"-m", "ipvs", "--vaddr", entry.IP, "--vproto", entry.Protocol, "--vport", strconv.Itoa(entry.Port),
+			"-j", "DROP",
+		)
+	}
 
 	// Accept all traffic with destination of ipvs virtual service, in case other iptables rules
 	// block the traffic, that may result in ipvs rules invalid.
