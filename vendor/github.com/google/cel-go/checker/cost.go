@@ -533,14 +533,34 @@ func (c *coster) functionCost(function, overloadID string, target *AstNode, args
 
 	if est := c.estimator.EstimateCallCost(function, overloadID, target, args); est != nil {
 		callEst := *est
-		return CallEstimate{CostEstimate: callEst.Add(argCostSum())}
+		return CallEstimate{CostEstimate: callEst.Add(argCostSum()), ResultSize: est.ResultSize}
 	}
 	switch overloadID {
 	// O(n) functions
-	case overloads.StartsWithString, overloads.EndsWithString, overloads.StringToBytes, overloads.BytesToString, overloads.ExtQuoteString, overloads.ExtFormatString:
-		if overloadID == overloads.ExtFormatString {
+	case overloads.ExtFormatString:
+		if target != nil {
+			// ResultSize not calculated because we can't bound the max size.
 			return CallEstimate{CostEstimate: c.sizeEstimate(*target).MultiplyByCostFactor(common.StringTraversalCostFactor).Add(argCostSum())}
 		}
+	case overloads.StringToBytes:
+		if len(args) == 1 {
+			sz := c.sizeEstimate(args[0])
+			// ResultSize max is when each char converts to 4 bytes.
+			return CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor).Add(argCostSum()), ResultSize: &SizeEstimate{Min: sz.Min, Max: sz.Max * 4}}
+		}
+	case overloads.BytesToString:
+		if len(args) == 1 {
+			sz := c.sizeEstimate(args[0])
+			// ResultSize min is when 4 bytes convert to 1 char.
+			return CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor).Add(argCostSum()), ResultSize: &SizeEstimate{Min: sz.Min / 4, Max: sz.Max}}
+		}
+	case overloads.ExtQuoteString:
+		if len(args) == 1 {
+			sz := c.sizeEstimate(args[0])
+			// ResultSize max is when each char is escaped. 2 quote chars always added.
+			return CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor).Add(argCostSum()), ResultSize: &SizeEstimate{Min: sz.Min + 2, Max: sz.Max*2 + 2}}
+		}
+	case overloads.StartsWithString, overloads.EndsWithString:
 		if len(args) == 1 {
 			return CallEstimate{CostEstimate: c.sizeEstimate(args[0]).MultiplyByCostFactor(common.StringTraversalCostFactor).Add(argCostSum())}
 		}
