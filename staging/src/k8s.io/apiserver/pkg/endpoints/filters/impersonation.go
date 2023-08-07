@@ -164,7 +164,7 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		req = req.WithContext(request.WithUser(ctx, newUser))
 
 		oldUser, _ := request.UserFrom(ctx)
-		httplog.LogOf(req, w).Addf("%v is acting as %v", oldUser, newUser)
+		httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(oldUser), userString(newUser))
 
 		ae := audit.AuditEventFrom(ctx)
 		audit.LogImpersonatedUser(ae, newUser)
@@ -181,6 +181,24 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 
 		handler.ServeHTTP(w, req)
 	})
+}
+
+func userString(u user.Info) string {
+	if u == nil {
+		return "<none>"
+	}
+	b := strings.Builder{}
+	if name := u.GetName(); name == "" {
+		b.WriteString("<empty>")
+	} else {
+		b.WriteString(name)
+	}
+	if groups := u.GetGroups(); len(groups) > 0 {
+		b.WriteString("[")
+		b.WriteString(strings.Join(groups, ","))
+		b.WriteString("]")
+	}
+	return b.String()
 }
 
 func unescapeExtraKey(encodedKey string) string {
