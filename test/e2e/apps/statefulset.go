@@ -1463,7 +1463,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	ginkgo.Describe("Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal]", func() {
+	ginkgo.Describe("Scaling StatefulSetStartOrdinal", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
