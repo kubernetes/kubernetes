@@ -41,7 +41,8 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 	return ComputePodQOS(pod)
 }
 
-// ComputePodQOS evaluates the list of containers to determine a pod's QoS class. This function is expensive.
+// ComputePodQOS evaluates the list of containers to determine a pod's QoS class. This function is more
+// expensive than GetPodQOS which should be used for pods having a non-empty .Status.QOSClass.
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
