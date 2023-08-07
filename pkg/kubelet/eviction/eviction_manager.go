@@ -151,7 +151,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	// Conditions other than memory pressure reject all pods
 	nodeOnlyHasMemoryPressureCondition := hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) && len(m.nodeConditions) == 1
 	if nodeOnlyHasMemoryPressureCondition {
-		notBestEffort := v1.PodQOSBestEffort != v1qos.PodQOSClass(attrs.Pod)
+		notBestEffort := v1.PodQOSBestEffort != v1qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}

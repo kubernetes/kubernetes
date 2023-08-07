@@ -871,7 +871,7 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			}
 		}
 		describeVolumes(pod.Spec.Volumes, w, "")
-		w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.PodQOSClass(pod))
+		w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
 		describeTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, w, "")

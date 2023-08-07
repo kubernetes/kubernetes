@@ -1839,7 +1839,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 	}
 
 	// set status for Pods created on versions of kube older than 1.6
-	apiPodStatus.QOSClass = v1qos.PodQOSClass(pod)
+	apiPodStatus.QOSClass = v1qos.GetPodQOS(pod)
 
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,

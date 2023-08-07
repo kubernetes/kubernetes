@@ -46,7 +46,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		return guaranteedOOMScoreAdj
 	}
 
-	switch v1qos.PodQOSClass(pod) {
+	switch v1qos.GetPodQOS(pod) {
 	case v1.PodQOSGuaranteed:
 		// Guaranteed containers should be the last to get killed.
 		return guaranteedOOMScoreAdj

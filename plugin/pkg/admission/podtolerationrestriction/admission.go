@@ -99,7 +99,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		extraTolerations = ts
 	}
 
-	if qoshelper.PodQOSClass(pod) != api.PodQOSBestEffort {
+	if qoshelper.GetPodQOS(pod) != api.PodQOSBestEffort {
 		extraTolerations = append(extraTolerations, api.Toleration{
 			Key:      corev1.TaintNodeMemoryPressure,
 			Operator: api.TolerationOpExists,

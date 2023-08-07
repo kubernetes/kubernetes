@@ -99,7 +99,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.
 func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, string) {
-	podQOS := v1qos.PodQOSClass(pod)
+	podQOS := v1qos.GetPodQOS(pod)
 	// Get the parent QOS container name
 	var parentContainer CgroupName
 	switch podQOS {

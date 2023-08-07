@@ -419,7 +419,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 }
 
 func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
-	if v1qos.PodQOSClass(pod) != v1.PodQOSGuaranteed {
+	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return 0
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]

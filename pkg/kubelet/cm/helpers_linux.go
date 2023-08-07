@@ -165,7 +165,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	}
 
 	// determine the qos class
-	qosClass := v1qos.PodQOSClass(pod)
+	qosClass := v1qos.GetPodQOS(pod)
 
 	// build the result
 	result := &ResourceConfig{}

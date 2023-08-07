@@ -375,7 +375,7 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 }
 
 func isBestEffort(pod *corev1.Pod) bool {
-	return qos.PodQOSClass(pod) == corev1.PodQOSBestEffort
+	return qos.GetPodQOS(pod) == corev1.PodQOSBestEffort
 }
 
 func isTerminating(pod *corev1.Pod) bool {
