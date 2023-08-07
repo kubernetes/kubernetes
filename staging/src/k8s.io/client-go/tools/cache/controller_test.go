@@ -33,6 +33,7 @@ import (
 	fcache "k8s.io/client-go/tools/cache/testing"
 
 	fuzz "github.com/google/gofuzz"
+	"github.com/stretchr/testify/assert"
 )
 
 func Example() {
@@ -573,4 +574,67 @@ func TestTransformingInformer(t *testing.T) {
 	verifyStore([]interface{}{expectedPod("pod2", "2"), expectedPod("pod3", "1")})
 
 	close(stopCh)
+}
+
+func TestFilteringResourceEventHandler(t *testing.T) {
+	result := sets.New[string]("foo")
+
+	handler1 := FilteringResourceEventHandler{
+		FilterFunc: func(obj interface{}) bool {
+			return !(obj == nil)
+		},
+		Handler: ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				result.Insert(obj.(string))
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				result.Delete(oldObj.(string))
+				result.Insert(newObj.(string))
+			},
+			DeleteFunc: func(obj interface{}) {
+				result.Delete(obj.(string))
+			},
+		},
+	}
+
+	// result: (foo, bar)
+	handler1.OnAdd("bar", false)
+	// result: (foo, bar)
+	handler1.OnUpdate(nil, nil)
+	// result: (foo)
+	handler1.OnUpdate("bar", nil)
+	// result: (foo, bar)
+	handler1.OnUpdate(nil, "bar")
+	// result: (foo, baz)
+	handler1.OnUpdate("bar", "baz")
+	// result: (foo)
+	handler1.OnDelete("baz")
+
+	if result.HasAny("bar", "baz") {
+		t.Errorf("bar and baz should not be included in result")
+	}
+	if !result.Has("foo") {
+		t.Errorf("foo should be included in result")
+	}
+
+	filter := sets.New[string]("foo")
+	added := []string{}
+
+	handler2 := FilteringResourceEventHandler{
+		FilterFunc: func(obj interface{}) bool {
+			return filter.Has(obj.(string))
+		},
+		Handler: ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				added = append(added, obj.(string))
+			},
+		},
+	}
+
+	handler2.OnAdd("foo", true)
+	handler2.OnAdd("bar", true)
+	filter.Insert("bar")
+
+	assert.Equal(t, "foo", added[0], "foo is added")
+	assert.Equal(t, 1, len(added), "bar is not added")
 }
