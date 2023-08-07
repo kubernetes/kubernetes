@@ -617,6 +617,11 @@ func (m *managerImpl) evictPod(ctx context.Context, pod *v1.Pod, gracePeriodOver
 		attribute.String("k8s.pod.name", pod.Name),
 		attribute.String("k8s.namespace.name", pod.Namespace),
 	))
+	otelSpan.AddEvent("Evicting pod", trace.WithAttributes(
+		attribute.String("pod", klog.KObj(pod).String()),
+		attribute.String("podUID", string(pod.UID)),
+		attribute.String("message", evictMsg),
+	))
 	defer otelSpan.End()
 	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
 		status.Phase = v1.PodFailed
