@@ -55,7 +55,7 @@ dependencies:
 
   # protoc
   - name: "protoc"
-    version: 3.19.4
+    version: 23.4
     refPaths:
     - path: hack/lib/protoc.sh
       match: PROTOC_VERSION=
