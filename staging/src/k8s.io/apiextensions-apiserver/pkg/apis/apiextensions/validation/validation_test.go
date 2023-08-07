@@ -8558,6 +8558,32 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				invalid("spec.validation.openAPIV3Schema.properties[f@2].x-kubernetes-validations[0].rule"),
 			},
 		},
+		{
+			name: "x-kubernetes-validations rule with lowerAscii check should be within estimated cost limit",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type:     "array",
+							MaxItems: pointer.Int64(5),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: pointer.Int64(5),
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule: "self.all(x, self.exists_one(y, x.lowerAscii() == y.lowerAscii()))",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
