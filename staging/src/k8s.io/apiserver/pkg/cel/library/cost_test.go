@@ -228,10 +228,22 @@ func TestStringLibrary(t *testing.T) {
 			expectRuntimeCost:  3,
 		},
 		{
+			name:               "lowerAsciiEquals",
+			expr:               "'ABCDEFGHIJ abcdefghij'.lowerAscii() == 'abcdefghij ABCDEFGHIJ'.lowerAscii()",
+			expectEsimatedCost: checker.CostEstimate{Min: 7, Max: 9},
+			expectRuntimeCost:  9,
+		},
+		{
 			name:               "upperAscii",
 			expr:               "'ABCDEFGHIJ abcdefghij'.upperAscii()",
 			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
+		},
+		{
+			name:               "upperAsciiEquals",
+			expr:               "'ABCDEFGHIJ abcdefghij'.upperAscii() == 'abcdefghij ABCDEFGHIJ'.upperAscii()",
+			expectEsimatedCost: checker.CostEstimate{Min: 7, Max: 9},
+			expectRuntimeCost:  9,
 		},
 		{
 			name:               "replace",
