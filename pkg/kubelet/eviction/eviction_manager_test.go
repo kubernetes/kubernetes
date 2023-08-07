@@ -25,6 +25,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -298,6 +299,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 					},
 				}
 				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
+
 				manager := &managerImpl{
 					clock:                        fakeClock,
 					killPodFunc:                  podKiller.killPodNow,
@@ -309,6 +311,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+					tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 				}
 
 				// synchronize to detect the memory pressure
@@ -491,6 +494,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 					nodeRef:                      nodeRef,
 					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+					tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 				}
 
 				// synchronize
@@ -595,6 +599,7 @@ func TestMemoryPressure(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	// create a best effort pod to test admission
@@ -994,6 +999,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 			}
 
 			// create a best effort pod to test admission
@@ -1231,6 +1237,7 @@ func TestMinReclaim(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	// synchronize
@@ -1516,6 +1523,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 			}
 
 			// synchronize
@@ -1973,6 +1981,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 				nodeRef:                      nodeRef,
 				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 			}
 
 			// create a best effort pod to test admission
@@ -2207,6 +2216,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	fakeClock.Step(1 * time.Minute)
@@ -2338,6 +2348,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	// create a best effort pod to test admission
@@ -2507,6 +2518,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 		thresholdNotifiers:           []ThresholdNotifier{thresholdNotifier},
+		tracer:                       oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	// The UpdateThreshold method should have been called once, since this is the first run.
@@ -2602,6 +2614,7 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 		nodeRef:                       nodeRef,
 		localStorageCapacityIsolation: true,
 		dedicatedImageFs:              diskInfoProvider.dedicatedImageFs,
+		tracer:                        oteltrace.NewNoopTracerProvider().Tracer(instrumentationScope),
 	}
 
 	activePodsFunc := func() []*v1.Pod {
