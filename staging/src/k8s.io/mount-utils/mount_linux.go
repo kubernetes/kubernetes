@@ -691,6 +691,7 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 	}
 
 	mountID := 0
+	parentID := -1
 	rootPath := ""
 	major := -1
 	minor := -1
@@ -702,6 +703,7 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 		if hostSource == mis[i].MountPoint || PathWithinBase(hostSource, mis[i].MountPoint) {
 			// If it's a mount point or path under a mount point.
 			mountID = mis[i].ID
+			parentID = mis[i].ParentID
 			rootPath = filepath.Join(mis[i].Root, strings.TrimPrefix(hostSource, mis[i].MountPoint))
 			major = mis[i].Major
 			minor = mis[i].Minor
@@ -715,8 +717,8 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 
 	var refs []string
 	for i := range mis {
-		if mis[i].ID == mountID {
-			// Ignore mount entry for mount source itself.
+		if mis[i].ID == mountID || (mis[i].ParentID != parentID && mountID != mis[i].ParentID) {
+			// Ignore mount entry for mount source itself, or if they don't share the same parent and the mount source isn't its parent.
 			continue
 		}
 		if mis[i].Root == rootPath && mis[i].Major == major && mis[i].Minor == minor {

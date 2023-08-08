@@ -324,6 +324,7 @@ func TestSearchMountPoints(t *testing.T) {
 40 29 0:34 / /sys/fs/cgroup/cpuset rw,nosuid,nodev,noexec,relatime shared:21 - cgroup cgroup rw,cpuset
 41 29 0:35 / /sys/fs/cgroup/net_cls,net_prio rw,nosuid,nodev,noexec,relatime shared:22 - cgroup cgroup rw,net_cls,net_prio
 58 25 7:1 / /mnt/disks/blkvol1 rw,relatime shared:38 - ext4 /dev/loop1 rw,data=ordere
+90 30 0:100 / /var/lib/test-mounts/test1 rw,relatime shared:100 - tmpfs tmpfs rw,size=5120k
 `
 
 	testcases := []struct {
@@ -427,6 +428,13 @@ func TestSearchMountPoints(t *testing.T) {
 				"/var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
 				"/var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
 			},
+			nil,
+		},
+		{
+			"dir-bindmounted-ignore-diff-parent",
+			"/var/lib/test-mounts/test1",
+			base + `91 42 0:100 / /mnt/lib/test-mounts/test1 rw,relatime shared:100 - tmpfs tmpfs rw,size=5120k`,
+			nil,
 			nil,
 		},
 	}
