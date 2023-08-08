@@ -518,11 +518,14 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 func authorityAddr(scheme string, authority string) (addr string) {
 	host, port, err := net.SplitHostPort(authority)
 	if err != nil { // authority didn't have a port
+		host = authority
+		port = ""
+	}
+	if port == "" { // authority's port was empty
 		port = "443"
 		if scheme == "http" {
 			port = "80"
 		}
-		host = authority
 	}
 	if a, err := idna.ToASCII(host); err == nil {
 		host = a
@@ -560,10 +563,11 @@ func (t *Transport) RoundTripOpt(req *http.Request, opt RoundTripOpt) (*http.Res
 		traceGotConn(req, cc, reused)
 		res, err := cc.RoundTrip(req)
 		if err != nil && retry <= 6 {
+			roundTripErr := err
 			if req, err = shouldRetryRequest(req, err); err == nil {
 				// After the first retry, do exponential backoff with 10% jitter.
 				if retry == 0 {
-					t.vlogf("RoundTrip retrying after failure: %v", err)
+					t.vlogf("RoundTrip retrying after failure: %v", roundTripErr)
 					continue
 				}
 				backoff := float64(uint(1) << (uint(retry) - 1))
@@ -572,7 +576,7 @@ func (t *Transport) RoundTripOpt(req *http.Request, opt RoundTripOpt) (*http.Res
 				timer := backoffNewTimer(d)
 				select {
 				case <-timer.C:
-					t.vlogf("RoundTrip retrying after failure: %v", err)
+					t.vlogf("RoundTrip retrying after failure: %v", roundTripErr)
 					continue
 				case <-req.Context().Done():
 					timer.Stop()
@@ -1265,6 +1269,29 @@ func (cc *ClientConn) RoundTrip(req *http.Request) (*http.Response, error) {
 		return res, nil
 	}
 
+	cancelRequest := func(cs *clientStream, err error) error {
+		cs.cc.mu.Lock()
+		bodyClosed := cs.reqBodyClosed
+		cs.cc.mu.Unlock()
+		// Wait for the request body to be closed.
+		//
+		// If nothing closed the body before now, abortStreamLocked
+		// will have started a goroutine to close it.
+		//
+		// Closing the body before returning avoids a race condition
+		// with net/http checking its readTrackingBody to see if the
+		// body was read from or closed. See golang/go#60041.
+		//
+		// The body is closed in a separate goroutine without the
+		// connection mutex held, but dropping the mutex before waiting
+		// will keep us from holding it indefinitely if the body
+		// close is slow for some reason.
+		if bodyClosed != nil {
+			<-bodyClosed
+		}
+		return err
+	}
+
 	for {
 		select {
 		case <-cs.respHeaderRecv:
@@ -1284,10 +1311,10 @@ func (cc *ClientConn) RoundTrip(req *http.Request) (*http.Response, error) {
 		case <-ctx.Done():
 			err := ctx.Err()
 			cs.abortStream(err)
-			return nil, err
+			return nil, cancelRequest(cs, err)
 		case <-cs.reqCancel:
 			cs.abortStream(errRequestCanceled)
-			return nil, errRequestCanceled
+			return nil, cancelRequest(cs, errRequestCanceled)
 		}
 	}
 }
@@ -1844,6 +1871,9 @@ func (cc *ClientConn) encodeHeaders(req *http.Request, addGzipHeader bool, trail
 	if err != nil {
 		return nil, err
 	}
+	if !httpguts.ValidHostHeader(host) {
+		return nil, errors.New("http2: invalid Host header")
+	}
 
 	var path string
 	if req.Method != "CONNECT" {
@@ -1880,7 +1910,7 @@ func (cc *ClientConn) encodeHeaders(req *http.Request, addGzipHeader bool, trail
 		// 8.1.2.3 Request Pseudo-Header Fields
 		// The :path pseudo-header field includes the path and query parts of the
 		// target URI (the path-absolute production and optionally a '?' character
-		// followed by the query production (see Sections 3.3 and 3.4 of
+		// followed by the query production, see Sections 3.3 and 3.4 of
 		// [RFC3986]).
 		f(":authority", host)
 		m := req.Method
@@ -2555,6 +2585,9 @@ func (b transportResponseBody) Close() error {
 	cs := b.cs
 	cc := cs.cc
 
+	cs.bufPipe.BreakWithError(errClosedResponseBody)
+	cs.abortStream(errClosedResponseBody)
+
 	unread := cs.bufPipe.Len()
 	if unread > 0 {
 		cc.mu.Lock()
@@ -2572,9 +2605,6 @@ func (b transportResponseBody) Close() error {
 		cc.bw.Flush()
 		cc.wmu.Unlock()
 	}
-
-	cs.bufPipe.BreakWithError(errClosedResponseBody)
-	cs.abortStream(errClosedResponseBody)
 
 	select {
 	case <-cs.donec:
