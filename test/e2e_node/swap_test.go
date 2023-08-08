@@ -53,15 +53,14 @@ var _ = SIGDescribe("Swap [NodeConformance][LinuxOnly]", func() {
 		pod = runPodAndWaitUntilScheduled(f, pod)
 
 		isCgroupV2 := isPodCgroupV2(f, pod)
-		isLimitedSwap := isLimitedSwap(f, pod)
 
-		if !isSwapFeatureGateEnabled() || !isCgroupV2 || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
-			ginkgo.By(fmt.Sprintf("Expecting no swap. feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
+		if !isSwapFeatureGateEnabled() || !isCgroupV2 || (isLimitedSwap() && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
+			ginkgo.By(fmt.Sprintf("Expecting no swap. feature gate on? %t isCgroupV2? %t is QoS burstable? %t is limited swap? %t", isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable, isLimitedSwap()))
 			expectNoSwap(f, pod, isCgroupV2)
 			return
 		}
 
-		if !isLimitedSwap {
+		if !isLimitedSwap() {
 			ginkgo.By("expecting unlimited swap")
 			expectUnlimitedSwap(f, pod, isCgroupV2)
 			return
@@ -246,7 +245,7 @@ func calcSwapForBurstablePod(f *framework.Framework, pod *v1.Pod) int64 {
 	return int64(swapAllocation)
 }
 
-func isLimitedSwap(f *framework.Framework, pod *v1.Pod) bool {
+func isLimitedSwap() bool {
 	kubeletCfg, err := getCurrentKubeletConfig(context.Background())
 	framework.ExpectNoError(err, "cannot get kubelet config")
 
