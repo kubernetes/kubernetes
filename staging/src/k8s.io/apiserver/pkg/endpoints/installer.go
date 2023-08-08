@@ -127,6 +127,9 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 			apiResourceList = append(apiResourceList, apidiscoveryv2beta1.APIResourceDiscovery{
 				Resource: split[0],
 				Scope:    scope,
+				// avoid nil panics in v0.26.0-v0.26.3 client-go clients
+				// see https://github.com/kubernetes/kubernetes/issues/118361
+				ResponseKind: &metav1.GroupVersionKind{},
 			})
 			parentidx = len(apiResourceList) - 1
 			parentResources[split[0]] = parentidx
@@ -140,6 +143,9 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 		subresource := apidiscoveryv2beta1.APISubresourceDiscovery{
 			Subresource: split[1],
 			Verbs:       r.Verbs,
+			// avoid nil panics in v0.26.0-v0.26.3 client-go clients
+			// see https://github.com/kubernetes/kubernetes/issues/118361
+			ResponseKind: &metav1.GroupVersionKind{},
 		}
 		if r.Kind != "" {
 			subresource.ResponseKind = &metav1.GroupVersionKind{
