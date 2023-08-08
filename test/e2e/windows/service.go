@@ -52,8 +52,9 @@ var _ = SIGDescribe("Services", func() {
 		ns := f.Namespace.Name
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		nodeIP, err := e2enode.PickIP(ctx, jig.Client)
+		nodeIPs, err := e2enode.GetPublicIps(ctx, jig.Client)
 		framework.ExpectNoError(err)
+		gomega.Expect(nodeIPs).NotTo(gomega.BeEmpty())
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
@@ -81,9 +82,12 @@ var _ = SIGDescribe("Services", func() {
 		ginkgo.By("verifying that pod has the correct nodeSelector")
 		// Admission controllers may sometimes do the wrong thing
 		gomega.Expect(testPod.Spec.NodeSelector).To(gomega.HaveKeyWithValue("kubernetes.io/os", "windows"), "pod.spec.nodeSelector")
-		ginkgo.By(fmt.Sprintf("checking connectivity Pod to curl http://%s:%d", nodeIP, nodePort))
-		assertConsistentConnectivity(ctx, f, testPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s", net.JoinHostPort(nodeIP, strconv.Itoa(nodePort)))))
 
+		// Iterate over all NodeIPs and check that the NodePort functionality works for all of them.
+		for _, nodeIP := range nodeIPs {
+			ginkgo.By(fmt.Sprintf("checking connectivity Pod to curl http://%s:%d", nodeIP, nodePort))
+			assertConsistentConnectivity(ctx, f, testPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s", net.JoinHostPort(nodeIP, strconv.Itoa(nodePort)))))
+		}
 	})
 
 })
