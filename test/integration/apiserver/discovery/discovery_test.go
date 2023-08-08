@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -94,6 +95,28 @@ var (
 						Verbs:      []string{"create", "list", "watch", "delete"},
 						ShortNames: []string{"jz"},
 						Categories: []string{"all"},
+					},
+				},
+				Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+			},
+		},
+	}
+
+	basicTestGroupWithFixup = apidiscoveryv2beta1.APIGroupDiscovery{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "stable.example.com",
+		},
+		Versions: []apidiscoveryv2beta1.APIVersionDiscovery{
+			{
+				Version: "v1",
+				Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
+					{
+						Resource:   "jobs",
+						Verbs:      []string{"create", "list", "watch", "delete"},
+						ShortNames: []string{"jz"},
+						Categories: []string{"all"},
+						// aggregator will populate this with a non-nil value
+						ResponseKind: &metav1.GroupVersionKind{},
 					},
 				},
 				Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
@@ -236,7 +259,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 
 	// Keep repeatedly fetching document from aggregator.
 	// Check to see if it contains our service within a reasonable amount of time
-	require.NoError(t, WaitForGroups(ctx, client, basicTestGroup))
+	require.NoError(t, WaitForGroups(ctx, client, basicTestGroupWithFixup))
 }
 
 func runTestCases(t *testing.T, cases []testCase) {
