@@ -17,6 +17,7 @@ limitations under the License.
 package factory
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,4 +61,21 @@ func CreateReadyCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() e
 	default:
 		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
+}
+
+func CreateProber(c storagebackend.Config) (Prober, error) {
+	switch c.Type {
+	case storagebackend.StorageTypeETCD2:
+		return nil, fmt.Errorf("%s is no longer a supported storage backend", c.Type)
+	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
+		return newETCD3Prober(c)
+	default:
+		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
+	}
+}
+
+// Prober is an interface that defines the Probe function for doing etcd readiness/liveness checks.
+type Prober interface {
+	Probe(ctx context.Context) error
+	Close() error
 }

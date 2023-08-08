@@ -4727,7 +4727,14 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 				// already effectively nil, no change needed
 			case mungedPodSpec.Affinity == nil && oldNodeAffinity != nil:
 				mungedPodSpec.Affinity = &core.Affinity{NodeAffinity: oldNodeAffinity} // +k8s:verify-mutation:reason=clone
+			case mungedPodSpec.Affinity != nil && oldPod.Spec.Affinity == nil &&
+				mungedPodSpec.Affinity.PodAntiAffinity == nil && mungedPodSpec.Affinity.PodAffinity == nil:
+				// We ensure no other fields are being changed, but the NodeAffinity. If that's the case, and the
+				// old pod's affinity is nil, we set the mungedPodSpec's affinity to nil.
+				mungedPodSpec.Affinity = nil // +k8s:verify-mutation:reason=clone
 			default:
+				// The node affinity is being updated and the old pod Affinity is not nil.
+				// We set the mungedPodSpec's node affinity to the old pod's node affinity.
 				mungedPodSpec.Affinity.NodeAffinity = oldNodeAffinity // +k8s:verify-mutation:reason=clone
 			}
 		}
