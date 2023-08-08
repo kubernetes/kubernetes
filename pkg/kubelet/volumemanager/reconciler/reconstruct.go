@@ -146,12 +146,12 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*gl
 			continue
 		}
 		for _, volume := range gvl.podVolumes {
-			err = rc.markVolumeState(volume, operationexecutor.VolumeMounted)
+			err = rc.markVolumeState(volume, operationexecutor.VolumeMountUncertain)
 			if err != nil {
 				klog.ErrorS(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
 				continue
 			}
-			klog.V(2).InfoS("Volume is marked as mounted and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
+			klog.V(2).InfoS("Volume is marked as uncertain and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
 		}
 		// If the volume has device to mount, we mark its device as mounted.
 		if gvl.deviceMounter != nil || gvl.blockVolumeMapper != nil {
@@ -160,12 +160,12 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*gl
 				klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", gvl.volumeName)
 				continue
 			}
-			err = rc.actualStateOfWorld.MarkDeviceAsMounted(gvl.volumeName, gvl.devicePath, deviceMountPath, "")
+			err = rc.actualStateOfWorld.MarkDeviceAsUncertain(gvl.volumeName, gvl.devicePath, deviceMountPath, "")
 			if err != nil {
 				klog.ErrorS(err, "Could not mark device is mounted to actual state of world", "volume", gvl.volumeName)
 				continue
 			}
-			klog.V(2).InfoS("Volume is marked device as mounted and added into the actual state", "volumeName", gvl.volumeName)
+			klog.V(2).InfoS("Volume is marked device as uncertain and added into the actual state", "volumeName", gvl.volumeName)
 		}
 	}
 	return nil
