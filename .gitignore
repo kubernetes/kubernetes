@@ -1,3 +1,7 @@
+# gopls gets indigestion without go.work, CI gets indigestion WITH go.work
+/go.work
+/go.work.sum
+
 # OSX leaves these everywhere on SMB shares
 ._*
 
@@ -63,6 +67,9 @@ network_closure.sh
 # Also ignore etcd installed by hack/install-etcd.sh
 /third_party/etcd*
 /default.etcd
+
+# Also ignore protoc installed by hack/install-protoc.sh
+/third_party/protoc*
 
 # User cluster configs
 .kubeconfig

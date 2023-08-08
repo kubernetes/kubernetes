@@ -4,10 +4,10 @@ metadata:
   name: restrictedvolumes5
 spec:
   containers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: container1
   initContainers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: initcontainer1
   securityContext:
     runAsNonRoot: true

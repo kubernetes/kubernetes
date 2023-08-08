@@ -128,12 +128,6 @@ var rootScopedKinds = map[schema.GroupKind]bool{
 	{Group: "", Kind: "PersistentVolume"}: true,
 	{Group: "", Kind: "ComponentStatus"}:  true,
 
-	{Group: "extensions", Kind: "PodSecurityPolicy"}: true,
-
-	{Group: "policy", Kind: "PodSecurityPolicy"}: true,
-
-	{Group: "extensions", Kind: "PodSecurityPolicy"}: true,
-
 	{Group: "rbac.authorization.k8s.io", Kind: "ClusterRole"}:        true,
 	{Group: "rbac.authorization.k8s.io", Kind: "ClusterRoleBinding"}: true,
 

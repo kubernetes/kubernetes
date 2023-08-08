@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eruntimeclass "k8s.io/kubernetes/test/e2e/framework/node/runtimeclass"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -92,11 +92,11 @@ func makePodToVerifyCgroupSize(cgroupNames []string, expectedCPU string, expecte
 
 var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("podoverhead-handling")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("PodOverhead cgroup accounting", func() {
 		ginkgo.Context("On running pod with PodOverhead defined", func() {
 			ginkgo.It("Pod cgroup should be sum of overhead and resource limits", func(ctx context.Context) {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !kubeletCfg.CgroupsPerQOS {
 					return
 				}
 
@@ -106,7 +106,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 					handler       string
 				)
 				ginkgo.By("Creating a RuntimeClass with Overhead definied", func() {
-					handler = e2enode.PreconfiguredRuntimeClassHandler
+					handler = e2eruntimeclass.PreconfiguredRuntimeClassHandler
 					rc := &nodev1.RuntimeClass{
 						ObjectMeta: metav1.ObjectMeta{Name: handler},
 						Handler:    handler,

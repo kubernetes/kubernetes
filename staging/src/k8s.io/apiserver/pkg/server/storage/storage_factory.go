@@ -22,14 +22,13 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 )
 
 // Backend describes the storage servers, the information here should be enough
@@ -52,8 +51,12 @@ type StorageFactory interface {
 	// centralized control over the shape of etcd directories
 	ResourcePrefix(groupResource schema.GroupResource) string
 
+	// Configs gets configurations for all of registered storage destinations.
+	Configs() []storagebackend.Config
+
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
+	// Deprecated: Use Configs instead
 	Backends() []Backend
 }
 
@@ -276,14 +279,41 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	return storageConfig.ForResource(groupResource), nil
 }
 
-// Backends returns all backends for all registered storage destinations.
-// Used for getting all instances for health validations.
+// Configs implements StorageFactory.
+func (s *DefaultStorageFactory) Configs() []storagebackend.Config {
+	return configs(s.StorageConfig, s.Overrides)
+}
+
+// Configs gets configurations for all of registered storage destinations.
+func Configs(storageConfig storagebackend.Config) []storagebackend.Config {
+	return configs(storageConfig, nil)
+}
+
+// Returns all storage configurations including those for group resource overrides
+func configs(storageConfig storagebackend.Config, grOverrides map[schema.GroupResource]groupResourceOverrides) []storagebackend.Config {
+	configs := []storagebackend.Config{storageConfig}
+
+	for _, override := range grOverrides {
+		if len(override.etcdLocation) == 0 {
+			continue
+		}
+		// copy
+		newConfig := storageConfig
+		override.Apply(&newConfig, &StorageCodecConfig{})
+		newConfig.Transport.ServerList = override.etcdLocation
+		configs = append(configs, newConfig)
+	}
+	return configs
+}
+
+// Backends implements StorageFactory.
 func (s *DefaultStorageFactory) Backends() []Backend {
 	return backends(s.StorageConfig, s.Overrides)
 }
 
 // Backends returns all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
+// Deprecated: Validate health by passing storagebackend.Config directly to storagefactory.CreateProber.
 func Backends(storageConfig storagebackend.Config) []Backend {
 	return backends(storageConfig, nil)
 }

@@ -21,9 +21,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// TODO: move to reconciler.go and remove old code there when SELinuxMountReadWriteOncePod is GA
+// TODO: move to reconciler.go and remove old code there when NewVolumeManagerReconstruction is GA
 
-// TODO: Replace Run() when SELinuxMountReadWriteOncePod is GA
+// TODO: Replace Run() when NewVolumeManagerReconstruction is GA
 func (rc *reconciler) runNew(stopCh <-chan struct{}) {
 	rc.reconstructVolumes()
 	klog.InfoS("Reconciler: start to sync state")
@@ -56,8 +56,14 @@ func (rc *reconciler) reconcileNew() {
 		rc.cleanOrphanVolumes()
 	}
 
-	if len(rc.volumesNeedDevicePath) != 0 {
-		rc.updateReconstructedDevicePaths()
+	if len(rc.volumesNeedUpdateFromNodeStatus) != 0 {
+		rc.updateReconstructedFromNodeStatus()
+	}
+	if len(rc.volumesNeedUpdateFromNodeStatus) == 0 {
+		// ASW is fully populated only after both devicePaths and uncertain volume attach-ability
+		// were reconstructed from the API server.
+		// This will start reconciliation of node.status.volumesInUse.
+		rc.updateLastSyncTime()
 	}
 
 	if len(rc.volumesNeedReportedInUse) != 0 && rc.populatorHasAddedPods() {

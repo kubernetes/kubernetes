@@ -320,6 +320,9 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
+        resizePolicy:
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -327,6 +330,7 @@ spec:
             limitsKey: "0"
           requests:
             requestsKey: "0"
+        restartPolicy: restartPolicyValue
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -523,6 +527,9 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
+        resizePolicy:
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -530,6 +537,7 @@ spec:
             limitsKey: "0"
           requests:
             requestsKey: "0"
+        restartPolicy: restartPolicyValue
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -728,6 +736,9 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
+        resizePolicy:
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -735,6 +746,7 @@ spec:
             limitsKey: "0"
           requests:
             requestsKey: "0"
+        restartPolicy: restartPolicyValue
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -1220,6 +1232,8 @@ spec:
     status:
       accessModes:
       - accessModesValue
+      allocatedResourceStatuses:
+        allocatedResourceStatusesKey: allocatedResourceStatusesValue
       allocatedResources:
         allocatedResourcesKey: "0"
       capacity:
@@ -1232,7 +1246,6 @@ spec:
         status: statusValue
         type: typeValue
       phase: phaseValue
-      resizeStatus: resizeStatusValue
 status:
   availableReplicas: 11
   collisionCount: 9

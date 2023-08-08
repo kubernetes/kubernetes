@@ -369,10 +369,10 @@ func TestPlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedDevicePath := "/dev/rbd1"
+	expectedDevicePath := "/dev/rbd0"
 	if runtime.GOOS == "windows" {
 		// Windows expects Disk Numbers.
-		expectedDevicePath = "1"
+		expectedDevicePath = "0"
 	}
 
 	podUID := uuid.NewUUID()

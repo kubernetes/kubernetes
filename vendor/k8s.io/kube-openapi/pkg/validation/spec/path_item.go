@@ -70,24 +70,20 @@ func (p *PathItem) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.D
 	if err := opts.UnmarshalNext(dec, &x); err != nil {
 		return err
 	}
-
-	p.Extensions = x.Extensions
-	p.PathItemProps = x.PathItemProps
-
-	if err := p.Refable.Ref.fromMap(p.Extensions); err != nil {
+	if err := p.Refable.Ref.fromMap(x.Extensions); err != nil {
 		return err
 	}
-
-	p.Extensions.sanitize()
-	if len(p.Extensions) == 0 {
-		p.Extensions = nil
-	}
+	p.Extensions = internal.SanitizeExtensions(x.Extensions)
+	p.PathItemProps = x.PathItemProps
 
 	return nil
 }
 
 // MarshalJSON converts this items object to JSON
 func (p PathItem) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshaling {
+		return internal.DeterministicMarshal(p)
+	}
 	b3, err := json.Marshal(p.Refable)
 	if err != nil {
 		return nil, err
@@ -102,4 +98,16 @@ func (p PathItem) MarshalJSON() ([]byte, error) {
 	}
 	concated := swag.ConcatJSON(b3, b4, b5)
 	return concated, nil
+}
+
+func (p PathItem) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref string `json:"$ref,omitempty"`
+		Extensions
+		PathItemProps
+	}
+	x.Ref = p.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(p.Extensions)
+	x.PathItemProps = p.PathItemProps
+	return opts.MarshalNext(enc, x)
 }

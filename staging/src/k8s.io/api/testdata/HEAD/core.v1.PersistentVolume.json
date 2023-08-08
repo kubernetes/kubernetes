@@ -304,6 +304,7 @@
   "status": {
     "phase": "phaseValue",
     "message": "messageValue",
-    "reason": "reasonValue"
+    "reason": "reasonValue",
+    "lastPhaseTransitionTime": "2004-01-01T01:01:01Z"
   }
 }

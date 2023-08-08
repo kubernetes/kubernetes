@@ -179,7 +179,7 @@ func TestRunHandlerHttp(t *testing.T) {
 			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
-					Port: intstr.FromInt(8080),
+					Port: intstr.FromInt32(8080),
 					Path: "bar",
 				},
 			},
@@ -216,7 +216,7 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
-					Port: intstr.FromInt(8080),
+					Port: intstr.FromInt32(8080),
 					Path: "/bar",
 					HTTPHeaders: []v1.HTTPHeader{
 						{Name: "Foo", Value: "bar"},
@@ -739,7 +739,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
-					Port: intstr.FromInt(8080),
+					Port: intstr.FromInt32(8080),
 					Path: "bar",
 				},
 			},

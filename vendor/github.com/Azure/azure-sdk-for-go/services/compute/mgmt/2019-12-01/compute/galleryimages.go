@@ -70,7 +70,7 @@ func (client GalleryImagesClient) CreateOrUpdate(ctx context.Context, resourceGr
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.GalleryImagesClient", "CreateOrUpdate", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.GalleryImagesClient", "CreateOrUpdate", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -105,6 +105,7 @@ func (client GalleryImagesClient) CreateOrUpdatePreparer(ctx context.Context, re
 // http.Response Body if it receives an error.
 func (client GalleryImagesClient) CreateOrUpdateSender(req *http.Request) (future GalleryImagesCreateOrUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -152,7 +153,7 @@ func (client GalleryImagesClient) Delete(ctx context.Context, resourceGroupName 
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.GalleryImagesClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.GalleryImagesClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -185,6 +186,7 @@ func (client GalleryImagesClient) DeletePreparer(ctx context.Context, resourceGr
 // http.Response Body if it receives an error.
 func (client GalleryImagesClient) DeleteSender(req *http.Request) (future GalleryImagesDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -430,7 +432,7 @@ func (client GalleryImagesClient) Update(ctx context.Context, resourceGroupName 
 
 	result, err = client.UpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.GalleryImagesClient", "Update", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.GalleryImagesClient", "Update", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -465,6 +467,7 @@ func (client GalleryImagesClient) UpdatePreparer(ctx context.Context, resourceGr
 // http.Response Body if it receives an error.
 func (client GalleryImagesClient) UpdateSender(req *http.Request) (future GalleryImagesUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

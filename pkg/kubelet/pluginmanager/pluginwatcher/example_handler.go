@@ -30,8 +30,8 @@ import (
 	"k8s.io/klog/v2"
 
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
-	v1beta1 "k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta1"
-	v1beta2 "k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta2"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta1"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta2"
 )
 
 type exampleHandler struct {
@@ -117,26 +117,9 @@ func (p *exampleHandler) DeRegisterPlugin(pluginName string) {
 	p.SendEvent(pluginName, exampleEventDeRegister)
 }
 
-func (p *exampleHandler) EventChan(pluginName string) chan examplePluginEvent {
-	return p.eventChans[pluginName]
-}
-
 func (p *exampleHandler) SendEvent(pluginName string, event examplePluginEvent) {
 	klog.V(2).InfoS("Sending event for plugin", "pluginName", pluginName, "event", event, "channel", p.eventChans[pluginName])
 	p.eventChans[pluginName] <- event
-}
-
-func (p *exampleHandler) AddPluginName(pluginName string) {
-	p.m.Lock()
-	defer p.m.Unlock()
-
-	v, ok := p.ExpectedNames[pluginName]
-	if !ok {
-		p.eventChans[pluginName] = make(chan examplePluginEvent)
-		v = 1
-	}
-
-	p.ExpectedNames[pluginName] = v
 }
 
 func (p *exampleHandler) DecreasePluginCount(pluginName string) (old int, ok bool) {

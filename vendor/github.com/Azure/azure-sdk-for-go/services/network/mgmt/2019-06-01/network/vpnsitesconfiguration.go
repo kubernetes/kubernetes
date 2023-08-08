@@ -62,7 +62,7 @@ func (client VpnSitesConfigurationClient) Download(ctx context.Context, resource
 
 	result, err = client.DownloadSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.VpnSitesConfigurationClient", "Download", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.VpnSitesConfigurationClient", "Download", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -96,6 +96,7 @@ func (client VpnSitesConfigurationClient) DownloadPreparer(ctx context.Context, 
 // http.Response Body if it receives an error.
 func (client VpnSitesConfigurationClient) DownloadSender(req *http.Request) (future VpnSitesConfigurationDownloadFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

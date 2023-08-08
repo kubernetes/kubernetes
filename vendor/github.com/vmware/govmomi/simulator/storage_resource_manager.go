@@ -31,14 +31,7 @@ type StorageResourceManager struct {
 	mo.StorageResourceManager
 }
 
-func NewStorageResourceManager(ref types.ManagedObjectReference) object.Reference {
-	m := &StorageResourceManager{}
-	m.Self = ref
-
-	return m
-}
-
-func (m *StorageResourceManager) ConfigureStorageDrsForPodTask(req *types.ConfigureStorageDrsForPod_Task) soap.HasFault {
+func (m *StorageResourceManager) ConfigureStorageDrsForPodTask(ctx *Context, req *types.ConfigureStorageDrsForPod_Task) soap.HasFault {
 	task := CreateTask(m, "configureStorageDrsForPod", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		cluster := Map.Get(req.Pod).(*StoragePod)
 
@@ -58,7 +51,7 @@ func (m *StorageResourceManager) ConfigureStorageDrsForPodTask(req *types.Config
 
 	return &methods.ConfigureStorageDrsForPod_TaskBody{
 		Res: &types.ConfigureStorageDrsForPod_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }

@@ -1,0 +1,7 @@
+apiVersion: resource.k8s.io/v1alpha1
+kind: ResourceClaimTemplate
+metadata:
+  name: claim-template
+spec:
+  spec:
+    resourceClassName: scheduler-performance

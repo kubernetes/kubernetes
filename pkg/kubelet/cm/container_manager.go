@@ -31,9 +31,7 @@ import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -41,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/utils/cpuset"
 )
 
 type ActivePodsFunc func() []*v1.Pod
@@ -118,20 +117,21 @@ type ContainerManager interface {
 	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
 	GetNodeAllocatableAbsolute() v1.ResourceList
 
-	// PrepareResource prepares pod resources
-	PrepareResources(pod *v1.Pod, container *v1.Container) (*dra.ContainerInfo, error)
+	// PrepareDynamicResource prepares dynamic pod resources
+	PrepareDynamicResources(*v1.Pod) error
 
-	// UnrepareResources unprepares pod resources
-	UnprepareResources(*v1.Pod) error
+	// UnrepareDynamicResources unprepares dynamic pod resources
+	UnprepareDynamicResources(*v1.Pod) error
 
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
 
-	// Implements the podresources Provider API for CPUs, Memory and Devices
+	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider
 	podresources.MemoryProvider
+	podresources.DynamicResourcesProvider
 }
 
 type NodeConfig struct {
@@ -146,18 +146,18 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	QOSReserved                              map[v1.ResourceName]int64
-	CPUManagerPolicy                         string
-	CPUManagerPolicyOptions                  map[string]string
-	ExperimentalTopologyManagerScope         string
-	CPUManagerReconcilePeriod                time.Duration
-	ExperimentalMemoryManagerPolicy          string
-	ExperimentalMemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
-	ExperimentalPodPidsLimit                 int64
-	EnforceCPULimits                         bool
-	CPUCFSQuotaPeriod                        time.Duration
-	ExperimentalTopologyManagerPolicy        string
-	ExperimentalTopologyManagerPolicyOptions map[string]string
+	QOSReserved                             map[v1.ResourceName]int64
+	CPUManagerPolicy                        string
+	CPUManagerPolicyOptions                 map[string]string
+	TopologyManagerScope                    string
+	CPUManagerReconcilePeriod               time.Duration
+	ExperimentalMemoryManagerPolicy         string
+	ExperimentalMemoryManagerReservedMemory []kubeletconfig.MemoryReservation
+	PodPidsLimit                            int64
+	EnforceCPULimits                        bool
+	CPUCFSQuotaPeriod                       time.Duration
+	TopologyManagerPolicy                   string
+	TopologyManagerPolicyOptions            map[string]string
 }
 
 type NodeAllocatableConfig struct {

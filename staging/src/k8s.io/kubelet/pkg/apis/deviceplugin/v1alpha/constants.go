@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package deviceplugin
+package v1alpha
 
 const (
 	// Healthy means that the device is healthy

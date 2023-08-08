@@ -17,8 +17,10 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -80,7 +82,7 @@ func TestListVolumesForPod(t *testing.T) {
 	defer close(stopCh)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
 	assert.NoError(t, err)
 
 	podName := util.GetUniquePodName(pod)
@@ -199,13 +201,138 @@ func TestPodVolumesExist(t *testing.T) {
 
 	kubelet.podManager.SetPods(pods)
 	for _, pod := range pods {
-		err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+		err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
 		assert.NoError(t, err)
 	}
 
 	for _, pod := range pods {
 		podVolumesExist := kubelet.podVolumesExist(pod.UID)
 		assert.True(t, podVolumesExist, "pod %q", pod.UID)
+	}
+}
+
+func TestPodVolumeDeadlineAttachAndMount(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	testKubelet := newTestKubeletWithImageList(t, nil /*imageList*/, false, /* controllerAttachDetachEnabled */
+		false /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/)
+
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	// any test cases added here should have volumes that fail to mount
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod1",
+				UID:  "pod1uid",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container1",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "vol1",
+								MountPath: "/mnt/vol1",
+							},
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: "vol1",
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
+								SecretName: "non-existent",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	stopCh := runVolumeManager(kubelet)
+	defer close(stopCh)
+
+	kubelet.podManager.SetPods(pods)
+	for _, pod := range pods {
+		start := time.Now()
+		// ensure our context times out quickly
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
+		err := kubelet.volumeManager.WaitForAttachAndMount(ctx, pod)
+		delta := time.Since(start)
+		// the standard timeout is 2 minutes, so if it's just a few seconds we know that the context timeout was the cause
+		assert.Lessf(t, delta, 10*time.Second, "WaitForAttachAndMount should timeout when the context is cancelled")
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		cancel()
+	}
+}
+
+func TestPodVolumeDeadlineUnmount(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	testKubelet := newTestKubeletWithImageList(t, nil /*imageList*/, false, /* controllerAttachDetachEnabled */
+		true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/)
+
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	// any test cases added here should have volumes that succeed at mounting
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod1",
+				UID:  "pod1uid",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container1",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "vol1",
+								MountPath: "/mnt/vol1",
+							},
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: "vol1",
+						VolumeSource: v1.VolumeSource{
+							RBD: &v1.RBDVolumeSource{
+								RBDImage: "fake-device",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	stopCh := runVolumeManager(kubelet)
+	defer close(stopCh)
+
+	kubelet.podManager.SetPods(pods)
+	for i, pod := range pods {
+		if err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod); err != nil {
+			t.Fatalf("pod %d failed: %v", i, err)
+		}
+		start := time.Now()
+		// ensure our context times out quickly
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
+		err := kubelet.volumeManager.WaitForUnmount(ctx, pod)
+		delta := time.Since(start)
+		// the standard timeout is 2 minutes, so if it's just a few seconds we know that the context timeout was the cause
+		assert.Lessf(t, delta, 10*time.Second, "WaitForUnmount should timeout when the context is cancelled")
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		cancel()
 	}
 }
 
@@ -246,7 +373,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	defer close(stopCh)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
@@ -308,7 +435,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 
 	// Verify volumes attached
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
@@ -335,7 +462,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podWorkers.(*fakePodWorkers).setPodRuntimeBeRemoved(pod.UID)
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
-	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(context.Background(), pod))
 	if actual := kubelet.volumeManager.GetMountedVolumesForPod(util.GetUniquePodName(pod)); len(actual) > 0 {
 		t.Fatalf("expected volume unmount to wait for no volumes: %v", actual)
 	}
@@ -418,7 +545,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		stopCh,
 		kubelet.volumeManager)
 
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
@@ -504,7 +631,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		kubelet.volumeManager)
 
 	// Verify volumes attached
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))

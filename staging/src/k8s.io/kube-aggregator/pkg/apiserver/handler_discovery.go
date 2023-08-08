@@ -61,14 +61,10 @@ type DiscoveryAggregationController interface {
 	// Spwans a worker which waits for added/updated apiservices and updates
 	// the unified discovery document by contacting the aggregated api services
 	Run(stopCh <-chan struct{})
-
-	// Returns true if all non-local APIServices that have been added
-	// are synced at least once to the discovery document
-	ExternalServicesSynced() bool
 }
 
 type discoveryManager struct {
-	// Locks `services`
+	// Locks `apiServices`
 	servicesLock sync.RWMutex
 
 	// Map from APIService's name (or a unique string for local servers)
@@ -146,9 +142,6 @@ type groupVersionInfo struct {
 	// This ensures that if the apiservice was changed after the last cached entry
 	// was stored, the discovery document will always be re-fetched.
 	lastMarkedDirty time.Time
-
-	// Last time sync function was run for this GV.
-	lastReconciled time.Time
 
 	// ServiceReference of this GroupVersion. This identifies the Service which
 	// describes how to contact the server responsible for this GroupVersion.
@@ -299,9 +292,9 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 			lastUpdated: now,
 		}
 
-		// Save the resolve, because it is still useful in case other services
-		// are already marked dirty. THey can use it without making http request
-		dm.setCacheEntryForService(info.service, cached)
+		// Do not save the resolve as the legacy fallback only fetches
+		// one group version and an API Service may serve multiple
+		// group versions.
 		return &cached, nil
 
 	case http.StatusOK:
@@ -350,11 +343,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	}
 
 	// Lookup last cached result for this apiservice's service.
-	now := time.Now()
 	cached, err := dm.fetchFreshDiscoveryForService(mgv, info)
-
-	info.lastReconciled = now
-	dm.setInfoForAPIService(apiServiceName, &info)
 
 	var entry apidiscoveryv2beta1.APIVersionDiscovery
 
@@ -432,7 +421,7 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
 	}
 
 	// Ensure that apiregistration.k8s.io is the first group in the discovery group.
-	dm.mergedDiscoveryHandler.SetGroupVersionPriority(APIRegistrationGroupVersion, APIRegistrationGroupPriority, 0)
+	dm.mergedDiscoveryHandler.WithSource(discoveryendpoint.BuiltinSource).SetGroupVersionPriority(APIRegistrationGroupVersion, APIRegistrationGroupPriority, 0)
 
 	wait.PollUntil(1*time.Minute, func() (done bool, err error) {
 		dm.servicesLock.Lock()
@@ -475,18 +464,6 @@ func (dm *discoveryManager) RemoveAPIService(apiServiceName string) {
 		// mark dirty if there was actually something deleted
 		dm.dirtyAPIServiceQueue.Add(apiServiceName)
 	}
-}
-
-func (dm *discoveryManager) ExternalServicesSynced() bool {
-	dm.servicesLock.RLock()
-	defer dm.servicesLock.RUnlock()
-	for _, info := range dm.apiServices {
-		if info.lastReconciled.IsZero() {
-			return false
-		}
-	}
-
-	return true
 }
 
 //

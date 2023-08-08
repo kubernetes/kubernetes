@@ -32,6 +32,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/websocket"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	example "k8s.io/apiserver/pkg/apis/example"
@@ -397,7 +397,7 @@ func TestWatchRead(t *testing.T) {
 						t.Fatalf("%s: Decode error: %v", name, err)
 					}
 					if e, a := object, gotObj; !apiequality.Semantic.DeepEqual(e, a) {
-						t.Errorf("%s: different: %s", name, diff.ObjectDiff(e, a))
+						t.Errorf("%s: different: %s", name, cmp.Diff(e, a))
 					}
 				}
 				w.Stop()

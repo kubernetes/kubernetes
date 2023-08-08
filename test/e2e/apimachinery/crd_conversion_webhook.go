@@ -118,7 +118,7 @@ var alternativeAPIVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]", func() {
 	var certCtx *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	servicePort := int32(9443)
 	containerPort := int32(9444)
 
@@ -149,8 +149,8 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
-							Path:      pointer.StringPtr("/crdconvert"),
-							Port:      pointer.Int32Ptr(servicePort),
+							Path:      pointer.String("/crdconvert"),
+							Port:      pointer.Int32(servicePort),
 						},
 					},
 					ConversionReviewVersions: []string{"v1", "v1beta1"},
@@ -184,8 +184,8 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
-							Path:      pointer.StringPtr("/crdconvert"),
-							Port:      pointer.Int32Ptr(servicePort),
+							Path:      pointer.String("/crdconvert"),
+							Port:      pointer.Int32(servicePort),
 						},
 					},
 					ConversionReviewVersions: []string{"v1", "v1beta1"},
@@ -349,25 +349,36 @@ func deployCustomResourceWebhookAndService(ctx context.Context, f *framework.Fra
 func verifyV1Object(crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v1"))
 	hostPort, exists := obj.Object["hostPort"]
-	framework.ExpectEqual(exists, true)
+	if !exists {
+		framework.Failf("HostPort not found.")
+	}
 
 	gomega.Expect(hostPort).To(gomega.BeEquivalentTo("localhost:8080"))
 	_, hostExists := obj.Object["host"]
-	framework.ExpectEqual(hostExists, false)
+	if hostExists {
+		framework.Failf("Host should not have been declared.")
+	}
 	_, portExists := obj.Object["port"]
-	framework.ExpectEqual(portExists, false)
+	if portExists {
+		framework.Failf("Port should not have been declared.")
+	}
 }
 
 func verifyV2Object(crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v2"))
 	_, hostPortExists := obj.Object["hostPort"]
-	framework.ExpectEqual(hostPortExists, false)
-
+	if hostPortExists {
+		framework.Failf("HostPort should not have been declared.")
+	}
 	host, hostExists := obj.Object["host"]
-	framework.ExpectEqual(hostExists, true)
+	if !hostExists {
+		framework.Failf("Host declaration not found.")
+	}
 	gomega.Expect(host).To(gomega.BeEquivalentTo("localhost"))
 	port, portExists := obj.Object["port"]
-	framework.ExpectEqual(portExists, true)
+	if !portExists {
+		framework.Failf("Port declaration not found.")
+	}
 	gomega.Expect(port).To(gomega.BeEquivalentTo("8080"))
 }
 

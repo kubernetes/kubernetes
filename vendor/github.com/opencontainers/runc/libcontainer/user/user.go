@@ -280,13 +280,13 @@ func GetExecUserPath(userSpec string, defaults *ExecUser, passwdPath, groupPath 
 // found in any entry in passwd and group respectively.
 //
 // Examples of valid user specifications are:
-//     * ""
-//     * "user"
-//     * "uid"
-//     * "user:group"
-//     * "uid:gid
-//     * "user:gid"
-//     * "uid:group"
+//   - ""
+//   - "user"
+//   - "uid"
+//   - "user:group"
+//   - "uid:gid
+//   - "user:gid"
+//   - "uid:group"
 //
 // It should be noted that if you specify a numeric user or group id, they will
 // not be evaluated as usernames (only the metadata will be filled). So attempting

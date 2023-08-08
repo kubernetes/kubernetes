@@ -4436,7 +4436,7 @@ var PerfCounter = []types.PerfCounterInfo{
 		NameInfo: &types.ElementDescription{
 			Description: types.Description{
 				Label:   "Net Throughput Contention",
-				Summary: "The aggregate network droppped packets for the host",
+				Summary: "The aggregate network dropped packets for the host",
 			},
 			Key: "throughput.contention",
 		},
@@ -7277,7 +7277,7 @@ var PerfCounter = []types.PerfCounterInfo{
 		Key: 251,
 		NameInfo: &types.ElementDescription{
 			Description: types.Description{
-				Label:   "VXLAN Nework Found Matched ARP Entry Throughput",
+				Label:   "VXLAN Network Found Matched ARP Entry Throughput",
 				Summary: "Count of transmitted packets that found matched ARP entry for this network",
 			},
 			Key: "throughput.vds.arpFound",
@@ -10728,7 +10728,7 @@ var PerfCounter = []types.PerfCounterInfo{
 		Key: 370,
 		NameInfo: &types.ElementDescription{
 			Description: types.Description{
-				Label:   "VXLAN Nework Found Matched ARP Entry Throughput",
+				Label:   "VXLAN Network Found Matched ARP Entry Throughput",
 				Summary: "Count of transmitted packets that found matched ARP entry for this network",
 			},
 			Key: "throughput.vds.arpFound",

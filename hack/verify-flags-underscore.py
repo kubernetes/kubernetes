@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -13,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from __future__ import print_function
 
 import argparse
 import os
@@ -107,7 +105,7 @@ def check_underscore_in_flags(rootdir, files):
         print("Are you certain this flag should not have been declared with an - instead?")
         l = list(new_excluded_flags)
         l.sort()
-        print("%s" % "\n".join(l))
+        print(("%s" % "\n".join(l)))
         sys.exit(1)
 
 def main():

@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -154,7 +155,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 			// Node1 Score: (100 + 90) / 2 = 95
 			// Node2 scores on 0-MaxNodeScore scale
 			// CPU Score: (5000 * MaxNodeScore) / 10000 = 50
-			// Memory Score: 8000 *MaxNodeScore / 8000 return 100
+			// Memory Score: 9000 * MaxNodeScore / 9000 return 100
 			// Node2 Score: (50 + 100) / 2 = 75
 			name: "resources requested equal node capacity",
 			requestedPod: st.MakePod().
@@ -342,12 +343,13 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
-			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
 			p, err := NewFit(
 				&config.NodeResourcesFitArgs{
@@ -362,6 +364,11 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 			}
 			if err != nil {
 				return
+			}
+
+			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
+			if !status.IsSuccess() {
+				t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 			}
 
 			var gotScores framework.NodeScoreList

@@ -247,7 +247,7 @@ func TestCheckForHostnameError(t *testing.T) {
 			}
 			req = req.WithContext(audit.WithAuditContext(req.Context()))
 			auditCtx := audit.AuditContextFrom(req.Context())
-			auditCtx.Event = &auditapi.Event{Level: auditapi.LevelMetadata}
+			auditCtx.Event.Level = auditapi.LevelMetadata
 
 			_, err = client.Transport.RoundTrip(req)
 
@@ -390,7 +390,7 @@ func TestCheckForInsecureAlgorithmError(t *testing.T) {
 			}
 			req = req.WithContext(audit.WithAuditContext(req.Context()))
 			auditCtx := audit.AuditContextFrom(req.Context())
-			auditCtx.Event = &auditapi.Event{Level: auditapi.LevelMetadata}
+			auditCtx.Event.Level = auditapi.LevelMetadata
 
 			// can't use tlsServer.Client() as it contains the server certificate
 			// in tls.Config.Certificates. The signatures are, however, only checked

@@ -100,7 +100,7 @@ func inClusterClientMustWork(ctx context.Context, f *framework.Framework, pod *v
 		numTokens, err := e2eauth.ParseInClusterClientLogs(logs)
 		if err != nil {
 			framework.Logf("Error parsing inclusterclient logs: %v", err)
-			return false, fmt.Errorf("inclusterclient reported an error: %v", err)
+			return false, fmt.Errorf("inclusterclient reported an error: %w", err)
 		}
 		if numTokens == 0 {
 			framework.Logf("No authenticated API calls found")

@@ -172,7 +172,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 		if cgroup2UnifiedMode {
 			if utils.FileExists(path.Join(memoryRoot, "memory.max")) {
 				spec.HasMemory = true
-				spec.Memory.Reservation = readUInt64(memoryRoot, "memory.high")
+				spec.Memory.Reservation = readUInt64(memoryRoot, "memory.min")
 				spec.Memory.Limit = readUInt64(memoryRoot, "memory.max")
 				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.swap.max")
 			}

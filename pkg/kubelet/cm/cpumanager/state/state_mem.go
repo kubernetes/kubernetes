@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
 type stateMemory struct {
@@ -36,7 +36,7 @@ func NewMemoryState() State {
 	klog.InfoS("Initialized new in-memory state store")
 	return &stateMemory{
 		assignments:   ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.NewCPUSet(),
+		defaultCPUSet: cpuset.New(),
 	}
 }
 

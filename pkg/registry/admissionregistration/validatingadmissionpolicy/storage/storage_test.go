@@ -211,7 +211,7 @@ func newStorage(t *testing.T, authorizer authorizer.Authorizer, resourceResolver
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "validatingadmissionpolicies"}
-	storage, err := NewREST(restOptions, authorizer, resourceResolver)
+	storage, _, err := NewREST(restOptions, authorizer, resourceResolver)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}

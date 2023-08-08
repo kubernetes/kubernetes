@@ -21,6 +21,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -38,6 +41,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -119,6 +123,10 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 // making sure that after registration, devices are correctly updated and if a re-registration
 // happens, we will NOT delete devices; and no orphaned devices left.
 func TestDevicePluginReRegistration(t *testing.T) {
+	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/115269 merges.
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
@@ -190,6 +198,10 @@ func TestDevicePluginReRegistration(t *testing.T) {
 // While testing above scenario, plugin discovery and registration will be done using
 // Kubelet probe based mechanism
 func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
+	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/115269 merges.
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
@@ -252,9 +264,10 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	cleanup(t, m, p1)
 }
 
-func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string) (Manager, <-chan interface{}) {
+func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string,
+	topology []cadvisorapi.Node) (Manager, <-chan interface{}) {
 	topologyStore := topologymanager.NewFakeManager()
-	m, err := newManagerImpl(socketName, nil, topologyStore)
+	m, err := newManagerImpl(socketName, topology, topologyStore)
 	require.NoError(t, err)
 	updateChan := make(chan interface{})
 
@@ -272,7 +285,9 @@ func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitor
 		return []*v1.Pod{}
 	}
 
-	err = w.Start(activePods, &sourcesReadyStub{})
+	// test steady state, initialization where sourcesReady, containerMap and containerRunningSet
+	// are relevant will be tested with a different flow
+	err = w.Start(activePods, &sourcesReadyStub{}, containermap.NewContainerMap(), sets.NewString())
 	require.NoError(t, err)
 
 	return w, updateChan
@@ -302,13 +317,13 @@ func runPluginManager(pluginManager pluginmanager.PluginManager) {
 }
 
 func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub) {
-	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
+	m, updateChan := setupDeviceManager(t, devs, callback, socketName, nil)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
 	return m, updateChan, p
 }
 
 func setupInProbeMode(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub, pluginmanager.PluginManager) {
-	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
+	m, updateChan := setupDeviceManager(t, devs, callback, socketName, nil)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
 	pm := setupPluginManager(t, pluginSocketName, m)
 	return m, updateChan, p, pm
@@ -563,16 +578,66 @@ func constructDevices(devices []string) checkpoint.DevicesPerNUMA {
 	return ret
 }
 
-func constructAllocResp(devices, mounts, envs map[string]string) *pluginapi.ContainerAllocateResponse {
+// containerAllocateResponseBuilder is a helper to build a ContainerAllocateResponse
+type containerAllocateResponseBuilder struct {
+	devices    map[string]string
+	mounts     map[string]string
+	envs       map[string]string
+	cdiDevices []string
+}
+
+// containerAllocateResponseBuilderOption defines a functional option for a containerAllocateResponseBuilder
+type containerAllocateResponseBuilderOption func(*containerAllocateResponseBuilder)
+
+// withDevices sets the devices for the containerAllocateResponseBuilder
+func withDevices(devices map[string]string) containerAllocateResponseBuilderOption {
+	return func(b *containerAllocateResponseBuilder) {
+		b.devices = devices
+	}
+}
+
+// withMounts sets the mounts for the containerAllocateResponseBuilder
+func withMounts(mounts map[string]string) containerAllocateResponseBuilderOption {
+	return func(b *containerAllocateResponseBuilder) {
+		b.mounts = mounts
+	}
+}
+
+// withEnvs sets the envs for the containerAllocateResponseBuilder
+func withEnvs(envs map[string]string) containerAllocateResponseBuilderOption {
+	return func(b *containerAllocateResponseBuilder) {
+		b.envs = envs
+	}
+}
+
+// withCDIDevices sets the cdiDevices for the containerAllocateResponseBuilder
+func withCDIDevices(cdiDevices ...string) containerAllocateResponseBuilderOption {
+	return func(b *containerAllocateResponseBuilder) {
+		b.cdiDevices = cdiDevices
+	}
+}
+
+// newContainerAllocateResponse creates a ContainerAllocateResponse with the given options.
+func newContainerAllocateResponse(opts ...containerAllocateResponseBuilderOption) *pluginapi.ContainerAllocateResponse {
+	b := &containerAllocateResponseBuilder{}
+	for _, opt := range opts {
+		opt(b)
+	}
+
+	return b.Build()
+}
+
+// Build uses the configured builder to create a ContainerAllocateResponse.
+func (b *containerAllocateResponseBuilder) Build() *pluginapi.ContainerAllocateResponse {
 	resp := &pluginapi.ContainerAllocateResponse{}
-	for k, v := range devices {
+	for k, v := range b.devices {
 		resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
 			HostPath:      k,
 			ContainerPath: v,
 			Permissions:   "mrw",
 		})
 	}
-	for k, v := range mounts {
+	for k, v := range b.mounts {
 		resp.Mounts = append(resp.Mounts, &pluginapi.Mount{
 			ContainerPath: k,
 			HostPath:      v,
@@ -580,9 +645,19 @@ func constructAllocResp(devices, mounts, envs map[string]string) *pluginapi.Cont
 		})
 	}
 	resp.Envs = make(map[string]string)
-	for k, v := range envs {
+	for k, v := range b.envs {
 		resp.Envs[k] = v
 	}
+
+	var cdiDevices []*pluginapi.CDIDevice
+	for _, dev := range b.cdiDevices {
+		cdiDevice := pluginapi.CDIDevice{
+			Name: dev,
+		}
+		cdiDevices = append(cdiDevices, &cdiDevice)
+	}
+	resp.CDIDevices = cdiDevices
+
 	return resp
 }
 
@@ -607,25 +682,41 @@ func TestCheckpoint(t *testing.T) {
 
 	testManager.podDevices.insert("pod1", "con1", resourceName1,
 		constructDevices([]string{"dev1", "dev2"}),
-		constructAllocResp(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+			withCDIDevices("domain1.com/resource1=dev1", "domain1.com/resource1=dev2"),
+		),
+	)
 	testManager.podDevices.insert("pod1", "con1", resourceName2,
 		constructDevices([]string{"dev1", "dev2"}),
-		constructAllocResp(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"},
-			map[string]string{"/home/r2lib1": "/usr/r2lib1"},
-			map[string]string{"r2devices": "dev1 dev2"}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"}),
+			withMounts(map[string]string{"/home/r2lib1": "/usr/r2lib1"}),
+			withEnvs(map[string]string{"r2devices": "dev1 dev2"}),
+		),
+	)
 	testManager.podDevices.insert("pod1", "con2", resourceName1,
 		constructDevices([]string{"dev3"}),
-		constructAllocResp(map[string]string{"/dev/r1dev3": "/dev/r1dev3"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev3": "/dev/r1dev3"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
 	testManager.podDevices.insert("pod2", "con1", resourceName1,
 		constructDevices([]string{"dev4"}),
-		constructAllocResp(map[string]string{"/dev/r1dev4": "/dev/r1dev4"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev4": "/dev/r1dev4"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
 	testManager.podDevices.insert("pod3", "con3", resourceName3,
 		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
-		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r3dev5": "/dev/r3dev5"}),
+			withMounts(map[string]string{"/home/r3lib1": "/usr/r3lib1"}),
+		),
+	)
 
 	testManager.healthyDevices[resourceName1] = sets.NewString()
 	testManager.healthyDevices[resourceName1].Insert("dev1")
@@ -985,6 +1076,113 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 
 }
 
+func TestPodContainerDeviceToAllocate(t *testing.T) {
+	resourceName1 := "domain1.com/resource1"
+	resourceName2 := "domain2.com/resource2"
+	resourceName3 := "domain2.com/resource3"
+	as := require.New(t)
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
+
+	testManager := &ManagerImpl{
+		endpoints:        make(map[string]endpointInfo),
+		healthyDevices:   make(map[string]sets.String),
+		unhealthyDevices: make(map[string]sets.String),
+		allocatedDevices: make(map[string]sets.String),
+		podDevices:       newPodDevices(),
+		activePods:       func() []*v1.Pod { return []*v1.Pod{} },
+		sourcesReady:     &sourcesReadyStub{},
+	}
+
+	testManager.podDevices.insert("pod1", "con1", resourceName1,
+		constructDevices([]string{"dev1", "dev2"}),
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"}),
+			withMounts(map[string]string{"/home/r2lib1": "/usr/r2lib1"}),
+			withEnvs(map[string]string{"r2devices": "dev1 dev2"}),
+		),
+	)
+	testManager.podDevices.insert("pod2", "con2", resourceName2,
+		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev5": "/dev/r1dev5"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
+	testManager.podDevices.insert("pod3", "con3", resourceName3,
+		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev5": "/dev/r1dev5"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
+
+	// no healthy devices for resourceName1 and devices corresponding to
+	// resource2 are intentionally omitted to simulate that the resource
+	// hasn't been registered.
+	testManager.healthyDevices[resourceName1] = sets.NewString()
+	testManager.healthyDevices[resourceName3] = sets.NewString()
+	// dev5 is no longer in the list of healthy devices
+	testManager.healthyDevices[resourceName3].Insert("dev7")
+	testManager.healthyDevices[resourceName3].Insert("dev8")
+
+	testCases := []struct {
+		description              string
+		podUID                   string
+		contName                 string
+		resource                 string
+		required                 int
+		reusableDevices          sets.String
+		expectedAllocatedDevices sets.String
+		expErr                   error
+	}{
+		{
+			description:              "Admission error in case no healthy devices to allocate present",
+			podUID:                   "pod1",
+			contName:                 "con1",
+			resource:                 resourceName1,
+			required:                 2,
+			reusableDevices:          sets.NewString(),
+			expectedAllocatedDevices: nil,
+			expErr:                   fmt.Errorf("no healthy devices present; cannot allocate unhealthy devices %s", resourceName1),
+		},
+		{
+			description:              "Admission error in case resource is not registered",
+			podUID:                   "pod2",
+			contName:                 "con2",
+			resource:                 resourceName2,
+			required:                 1,
+			reusableDevices:          sets.NewString(),
+			expectedAllocatedDevices: nil,
+			expErr:                   fmt.Errorf("cannot allocate unregistered device %s", resourceName2),
+		},
+		{
+			description:              "Admission error in case resource not devices previously allocated no longer healthy",
+			podUID:                   "pod3",
+			contName:                 "con3",
+			resource:                 resourceName3,
+			required:                 1,
+			reusableDevices:          sets.NewString(),
+			expectedAllocatedDevices: nil,
+			expErr:                   fmt.Errorf("previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s", resourceName3),
+		},
+	}
+
+	for _, testCase := range testCases {
+		allocDevices, err := testManager.devicesToAllocate(testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices)
+		if !reflect.DeepEqual(err, testCase.expErr) {
+			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expErr, err)
+		}
+		if !reflect.DeepEqual(allocDevices, testCase.expectedAllocatedDevices) {
+			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expectedAllocatedDevices, allocDevices)
+		}
+	}
+
+}
+
 func TestGetDeviceRunContainerOptions(t *testing.T) {
 	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",
@@ -1298,8 +1496,11 @@ func TestResetExtendedResource(t *testing.T) {
 	extendedResourceName := "domain.com/resource"
 	testManager.podDevices.insert("pod", "con", extendedResourceName,
 		constructDevices([]string{"dev1"}),
-		constructAllocResp(map[string]string{"/dev/dev1": "/dev/dev1"},
-			map[string]string{"/home/lib1": "/usr/lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/dev1": "/dev/dev1"}),
+			withMounts(map[string]string{"/home/lib1": "/usr/lib1"}),
+		),
+	)
 
 	testManager.healthyDevices[extendedResourceName] = sets.NewString()
 	testManager.healthyDevices[extendedResourceName].Insert("dev1")
@@ -1402,4 +1603,84 @@ func TestReadPreNUMACheckpoint(t *testing.T) {
 	// TODO: we should not calling private methods, but among the existing tests we do anyway
 	err = m.readCheckpoint()
 	require.NoError(t, err)
+}
+
+func TestGetTopologyHintsWithUpdates(t *testing.T) {
+	socketDir, socketName, _, err := tmpSocketDir()
+	defer os.RemoveAll(socketDir)
+	require.NoError(t, err)
+
+	devs := []pluginapi.Device{}
+	for i := 0; i < 1000; i++ {
+		devs = append(devs, pluginapi.Device{
+			ID:     fmt.Sprintf("dev-%d", i),
+			Health: pluginapi.Healthy,
+			Topology: &pluginapi.TopologyInfo{
+				Nodes: []*pluginapi.NUMANode{
+					{ID: 0},
+				},
+			}})
+	}
+	testPod := makePod(v1.ResourceList{
+		testResourceName: *resource.NewQuantity(int64(1), resource.DecimalSI),
+	})
+	topology := []cadvisorapi.Node{
+		{Id: 0},
+	}
+	testCases := []struct {
+		description string
+		count       int
+		devices     []pluginapi.Device
+		testfunc    func(manager *wrappedManagerImpl)
+	}{
+		{
+			description: "GetTopologyHints data race when update device",
+			count:       10,
+			devices:     devs,
+			testfunc: func(manager *wrappedManagerImpl) {
+				manager.GetTopologyHints(testPod, &testPod.Spec.Containers[0])
+			},
+		},
+		{
+			description: "GetPodTopologyHints data race when update device",
+			count:       10,
+			devices:     devs,
+			testfunc: func(manager *wrappedManagerImpl) {
+				manager.GetPodTopologyHints(testPod)
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.description, func(t *testing.T) {
+			m, _ := setupDeviceManager(t, nil, nil, socketName, topology)
+			defer m.Stop()
+			mimpl := m.(*wrappedManagerImpl)
+
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+
+			updated := atomic.Bool{}
+			updated.Store(false)
+			go func() {
+				defer wg.Done()
+				for i := 0; i < test.count; i++ {
+					// simulate the device plugin to send device updates
+					mimpl.genericDeviceUpdateCallback(testResourceName, devs)
+				}
+				updated.Store(true)
+			}()
+			go func() {
+				defer wg.Done()
+				for !updated.Load() {
+					// When a data race occurs, golang will throw an error, and recover() cannot catch this error,
+					// Such as: `throw("Concurrent map iteration and map writing")`.
+					// When this test ends quietly, no data race error occurs.
+					// Otherwise, the test process exits automatically and prints all goroutine call stacks.
+					test.testfunc(mimpl)
+				}
+			}()
+			wg.Wait()
+		})
+	}
 }

@@ -98,18 +98,18 @@ func (o HostNetworkSystem) AddVirtualSwitch(ctx context.Context, vswitchName str
 }
 
 // QueryNetworkHint wraps methods.QueryNetworkHint
-func (o HostNetworkSystem) QueryNetworkHint(ctx context.Context, device []string) error {
+func (o HostNetworkSystem) QueryNetworkHint(ctx context.Context, device []string) ([]types.PhysicalNicHintInfo, error) {
 	req := types.QueryNetworkHint{
 		This:   o.Reference(),
 		Device: device,
 	}
 
-	_, err := methods.QueryNetworkHint(ctx, o.c, &req)
+	res, err := methods.QueryNetworkHint(ctx, o.c, &req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return res.Returnval, err
 }
 
 // RefreshNetworkSystem wraps methods.RefreshNetworkSystem

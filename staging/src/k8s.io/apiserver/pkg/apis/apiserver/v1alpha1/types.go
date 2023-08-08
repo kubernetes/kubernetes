@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -154,16 +155,6 @@ type TLSConfig struct {
 type TracingConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// +optional
-	// Endpoint of the collector that's running on the control-plane node.
-	// The APIServer uses the egressType ControlPlane when sending data to the collector.
-	// The syntax is defined in https://github.com/grpc/grpc/blob/master/doc/naming.md.
-	// Defaults to the otlpgrpc default, localhost:4317
-	// The connection is insecure, and does not support TLS.
-	Endpoint *string `json:"endpoint,omitempty" protobuf:"bytes,1,opt,name=endpoint"`
-
-	// +optional
-	// SamplingRatePerMillion is the number of samples to collect per million spans.
-	// Defaults to 0.
-	SamplingRatePerMillion *int32 `json:"samplingRatePerMillion,omitempty" protobuf:"varint,2,opt,name=samplingRatePerMillion"`
+	// Embed the component config tracing configuration struct
+	tracingapi.TracingConfiguration `json:",inline"`
 }

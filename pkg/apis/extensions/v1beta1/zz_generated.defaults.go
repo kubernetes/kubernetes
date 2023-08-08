@@ -39,8 +39,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta1.IngressList{}, func(obj interface{}) { SetObjectDefaults_IngressList(obj.(*v1beta1.IngressList)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*v1beta1.NetworkPolicy)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*v1beta1.NetworkPolicyList)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.PodSecurityPolicy{}, func(obj interface{}) { SetObjectDefaults_PodSecurityPolicy(obj.(*v1beta1.PodSecurityPolicy)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.PodSecurityPolicyList{}, func(obj interface{}) { SetObjectDefaults_PodSecurityPolicyList(obj.(*v1beta1.PodSecurityPolicyList)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*v1beta1.ReplicaSet)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*v1beta1.ReplicaSetList)) })
 	return nil
@@ -623,17 +621,6 @@ func SetObjectDefaults_NetworkPolicyList(in *v1beta1.NetworkPolicyList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_NetworkPolicy(a)
-	}
-}
-
-func SetObjectDefaults_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy) {
-	SetDefaults_PodSecurityPolicySpec(&in.Spec)
-}
-
-func SetObjectDefaults_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_PodSecurityPolicy(a)
 	}
 }
 

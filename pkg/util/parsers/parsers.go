@@ -31,7 +31,7 @@ import (
 func ParseImageName(image string) (string, string, string, error) {
 	named, err := dockerref.ParseNormalizedNamed(image)
 	if err != nil {
-		return "", "", "", fmt.Errorf("couldn't parse image name: %v", err)
+		return "", "", "", fmt.Errorf("couldn't parse image name %q: %v", image, err)
 	}
 
 	repoToPull := named.Name()

@@ -2489,7 +2489,7 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.InfoS("TestStaticPolicyAllocateWithInitContainers", "test name", testCase.description)
+			klog.InfoS("TestStaticPolicyAllocateWithInitContainers", "name", testCase.description)
 			p, s, err := initTests(t, &testCase, testCase.topologyHint, testCase.initContainersReusableMemory)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)

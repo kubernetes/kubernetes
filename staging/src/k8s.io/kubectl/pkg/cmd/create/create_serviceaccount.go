@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -62,11 +63,11 @@ type ServiceAccountOpts struct {
 	Mapper meta.RESTMapper
 	Client *coreclient.CoreV1Client
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewServiceAccountOpts creates a new *ServiceAccountOpts with sane defaults
-func NewServiceAccountOpts(ioStreams genericclioptions.IOStreams) *ServiceAccountOpts {
+func NewServiceAccountOpts(ioStreams genericiooptions.IOStreams) *ServiceAccountOpts {
 	return &ServiceAccountOpts{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -74,7 +75,7 @@ func NewServiceAccountOpts(ioStreams genericclioptions.IOStreams) *ServiceAccoun
 }
 
 // NewCmdCreateServiceAccount is a macro command to create a new service account
-func NewCmdCreateServiceAccount(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateServiceAccount(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewServiceAccountOpts(ioStreams)
 
 	cmd := &cobra.Command{

@@ -48,13 +48,20 @@ fi
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
     DEFAULT_GCI_PROJECT=google-containers
-    if [[ "${GCI_VERSION}" == "cos"* ]]; then
+    if [[ "${GCI_VERSION}" == "cos"* ]] || [[ "${MASTER_IMAGE_FAMILY}" == "cos"* ]]; then
         DEFAULT_GCI_PROJECT=cos-cloud
     fi
     export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
-    # If the master image is not set, we use the latest GCI image.
-    # Otherwise, we respect whatever is set by the user.
-    export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
+
+    # If the master image is not set, we use the latest image based on image
+    # family.
+    kube_master_image="${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}"
+    if [[ -z "${kube_master_image}" ]]; then
+      kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY}" --format 'value(name)')
+    fi
+
+    echo "Using image: ${kube_master_image} from project: ${MASTER_IMAGE_PROJECT} as master image" >&2
+    export MASTER_IMAGE="${kube_master_image}"
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
@@ -69,14 +76,23 @@ fi
 function set-linux-node-image() {
   if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
     DEFAULT_GCI_PROJECT=google-containers
-    if [[ "${GCI_VERSION}" == "cos"* ]]; then
+    if [[ "${GCI_VERSION}" == "cos"* ]] || [[ "${NODE_IMAGE_FAMILY}" == "cos"* ]]; then
       DEFAULT_GCI_PROJECT=cos-cloud
     fi
 
-    # If the node image is not set, we use the latest GCI image.
+    # If the node image is not set, we use the latest image based on image
+    # family.
     # Otherwise, we respect whatever is set by the user.
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
     NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${DEFAULT_GCI_PROJECT}}
+    local kube_node_image
+
+    kube_node_image="${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}"
+    if [[ -z "${kube_node_image}" ]]; then
+      kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY}" --format 'value(name)')
+    fi
+
+    echo "Using image: ${kube_node_image} from project: ${NODE_IMAGE_PROJECT} as node image" >&2
+    export NODE_IMAGE="${kube_node_image}"
   fi
 }
 
@@ -327,9 +343,6 @@ function upload-tars() {
 
   for region in "${PREFERRED_REGION[@]}"; do
     suffix="-${region}"
-    if [[ "${suffix}" == "-us-central1" ]]; then
-      suffix=""
-    fi
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
@@ -518,10 +531,10 @@ function tars_from_version() {
     find-release-tars
     upload-tars
   elif [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SERVER_BINARY_TAR_URL="https://dl.k8s.io/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
-    KUBE_MANIFESTS_TAR_HASH=$(curl "${KUBE_MANIFESTS_TAR_URL}" --silent --show-error | ${sha512sum})
+    KUBE_MANIFESTS_TAR_HASH=$(curl -L "${KUBE_MANIFESTS_TAR_URL}" --silent --show-error | ${sha512sum})
     KUBE_MANIFESTS_TAR_HASH=${KUBE_MANIFESTS_TAR_HASH%%[[:blank:]]*}
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/k8s-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
@@ -761,8 +774,8 @@ function construct-linux-kubelet-flags {
     # Keep the values of --image-credential-provider-config and --image-credential-provider-bin-dir
     # in sync with value of auth_config_file and auth_provider_dir set in install-auth-provider-gcp function
     # in gci/configure.sh.
-    flags+="  --image-credential-provider-config=/home/kubernetes/cri_auth_config.yaml"
-    flags+="  --image-credential-provider-bin-dir=/home/kubernetes/bin"
+    flags+="  --image-credential-provider-config=${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}"
+    flags+="  --image-credential-provider-bin-dir=${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}"
   fi
 
   if [[ "${node_type}" == "master" ]]; then
@@ -771,7 +784,7 @@ function construct-linux-kubelet-flags {
       #TODO(mikedanese): allow static pods to start before creating a client
       #flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       #flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
-      flags+=" --register-with-taints=node-role.kubernetes.io/master=:NoSchedule"
+      flags+=" --register-with-taints=node-role.kubernetes.io/control-plane=:NoSchedule"
       flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       flags+=" --register-schedulable=false"
     fi
@@ -864,12 +877,15 @@ function construct-windows-kubelet-flags {
   # Turn off kernel memory cgroup notification.
   flags+=" --kernel-memcg-notification=false"
 
-  # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
-  # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
-  flags+=" --feature-gates=KubeletPodResources=false"
-
   WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
   flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
+
+  # If ENABLE_AUTH_PROVIDER_GCP is set to true, kubelet is enabled to use out-of-tree auth
+  # credential provider. https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider
+  if [[ "${ENABLE_AUTH_PROVIDER_GCP:-false}" == "true" ]]; then
+    flags+="  --image-credential-provider-config=${AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE}"
+    flags+="  --image-credential-provider-bin-dir=${AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR}"
+  fi
 
   KUBELET_ARGS="${flags}"
 }
@@ -1184,7 +1200,6 @@ PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote "${PROMETHEUS_TO_SD_ENDPOINT:-}")
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote "${PROMETHEUS_TO_SD_PREFIX:-}")
 ENABLE_PROMETHEUS_TO_SD: $(yaml-quote "${ENABLE_PROMETHEUS_TO_SD:-false}")
 DISABLE_PROMETHEUS_TO_SD_IN_DS: $(yaml-quote "${DISABLE_PROMETHEUS_TO_SD_IN_DS:-false}")
-CONTAINER_RUNTIME: $(yaml-quote "${CONTAINER_RUNTIME:-}")
 CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote "${CONTAINER_RUNTIME_ENDPOINT:-}")
 CONTAINER_RUNTIME_NAME: $(yaml-quote "${CONTAINER_RUNTIME_NAME:-}")
 CONTAINER_RUNTIME_TEST_HANDLER: $(yaml-quote "${CONTAINER_RUNTIME_TEST_HANDLER:-}")
@@ -1207,6 +1222,10 @@ ${CUSTOM_CALICO_NODE_DAEMONSET_YAML//\'/\'\'}
 CUSTOM_TYPHA_DEPLOYMENT_YAML: |
 ${CUSTOM_TYPHA_DEPLOYMENT_YAML//\'/\'\'}
 CONCURRENT_SERVICE_SYNCS: $(yaml-quote "${CONCURRENT_SERVICE_SYNCS:-}")
+AUTH_PROVIDER_GCP_STORAGE_PATH: $(yaml-quote "${AUTH_PROVIDER_GCP_STORAGE_PATH}")
+AUTH_PROVIDER_GCP_VERSION: $(yaml-quote "${AUTH_PROVIDER_GCP_VERSION}")
+AUTH_PROVIDER_GCP_LINUX_BIN_DIR: $(yaml-quote "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}")
+AUTH_PROVIDER_GCP_LINUX_CONF_FILE: $(yaml-quote "${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}")
 EOF
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \
@@ -1278,6 +1297,11 @@ EOF
   if [ -n "${RUN_CONTROLLERS:-}" ]; then
     cat >>"$file" <<EOF
 RUN_CONTROLLERS: $(yaml-quote "${RUN_CONTROLLERS}")
+EOF
+  fi
+  if [ -n "${RUN_CCM_CONTROLLERS:-}" ]; then
+    cat >>"$file" <<EOF
+RUN_CCM_CONTROLLERS: $(yaml-quote "${RUN_CCM_CONTROLLERS}")
 EOF
   fi
   if [ -n "${PROVIDER_VARS:-}" ]; then
@@ -1584,6 +1608,11 @@ NODE_PROBLEM_DETECTOR_RELEASE_PATH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_RELEAS
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS: $(yaml-quote "${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS}")
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
 WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE}")
+AUTH_PROVIDER_GCP_STORAGE_PATH: $(yaml-quote "${AUTH_PROVIDER_GCP_STORAGE_PATH}")
+AUTH_PROVIDER_GCP_VERSION: $(yaml-quote "${AUTH_PROVIDER_GCP_VERSION}")
+AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64: $(yaml-quote "${AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64}")
+AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR: $(yaml-quote "${AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR}")
+AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE: $(yaml-quote "${AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE}")
 EOF
 }
 
@@ -1702,7 +1731,7 @@ function setup-easyrsa {
   # Note: This was heavily cribbed from make-ca-cert.sh
   (set -x
     cd "${KUBE_TEMP}"
-    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
+    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://dl.k8s.io/easy-rsa/easy-rsa.tar.gz
     tar xzf easy-rsa.tar.gz
     mkdir easy-rsa-master/kubelet
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet

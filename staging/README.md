@@ -20,6 +20,7 @@ Repositories currently staged here:
 - [`k8s.io/controller-manager`](https://github.com/kubernetes/controller-manager)
 - [`k8s.io/cri-api`](https://github.com/kubernetes/cri-api)
 - [`k8s.io/csi-translation-lib`](https://github.com/kubernetes/csi-translation-lib)
+- [`k8s.io/dynamic-resource-allocation`](https://github.com/kubernetes/dynamic-resource-allocation)
 - [`k8s.io/kms`](https://github.com/kubernetes/kms)
 - [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
 - [`k8s.io/kube-controller-manager`](https://github.com/kubernetes/kube-controller-manager)
@@ -30,7 +31,6 @@ Repositories currently staged here:
 - [`k8s.io/legacy-cloud-providers`](https://github.com/kubernetes/legacy-cloud-providers)
 - [`k8s.io/metrics`](https://github.com/kubernetes/metrics)
 - [`k8s.io/mount-utils`](https://github.com/kubernetes/mount-utils)
-- [`k8s.io/noderesourcetopology-api`](https://github.com/kubernetes/noderesourcetopology-api)
 - [`k8s.io/pod-security-admission`](https://github.com/kubernetes/pod-security-admission)
 - [`k8s.io/sample-apiserver`](https://github.com/kubernetes/sample-apiserver)
 - [`k8s.io/sample-cli-plugin`](https://github.com/kubernetes/sample-cli-plugin)
@@ -109,7 +109,7 @@ update the publishing-bot to publish the staging repository by updating:
     - [`rules.yaml`](/staging/publishing/rules.yaml):
     Make sure that the list of dependencies reflects the staging repos in the `Godeps.json` file.
 
-    - [`fetch-all-latest-and-push.sh`](https://github.com/kubernetes/publishing-bot/blob/master/hack/fetch-all-latest-and-push.sh):
+    - [`repos.sh`](https://github.com/kubernetes/publishing-bot/blob/master/hack/repos.sh):
     Add the staging repo in the list of repos to be published.
 
 4. Add the staging and published repositories as a subproject for the

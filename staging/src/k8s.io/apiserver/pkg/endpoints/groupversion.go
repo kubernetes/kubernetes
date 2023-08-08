@@ -27,14 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storageversion"
-	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // ConvertabilityChecker indicates what versions a GroupKind is available in.
@@ -56,6 +55,11 @@ type APIGroupVersion struct {
 
 	// GroupVersion is the external group version
 	GroupVersion schema.GroupVersion
+
+	// AllServedVersionsByResource is indexed by resource and maps to a list of versions that resource exists in.
+	// This was created so that StorageVersion for APIs can include a list of all version that are served for each
+	// GroupResource tuple.
+	AllServedVersionsByResource map[string][]string
 
 	// OptionsExternalVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and metav1.ListOptions. Other implementors may
@@ -82,7 +86,7 @@ type APIGroupVersion struct {
 	Defaulter             runtime.ObjectDefaulter
 	Namer                 runtime.Namer
 	UnsafeConvertor       runtime.ObjectConvertor
-	TypeConverter         fieldmanager.TypeConverter
+	TypeConverter         managedfields.TypeConverter
 
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 
@@ -94,9 +98,6 @@ type APIGroupVersion struct {
 	Admit admission.Interface
 
 	MinRequestTimeout time.Duration
-
-	// OpenAPIModels exposes the OpenAPI models to each individual handler.
-	OpenAPIModels openapiproto.Models
 
 	// The limit on the request body size that would be accepted and decoded in a write request.
 	// 0 means no limit.

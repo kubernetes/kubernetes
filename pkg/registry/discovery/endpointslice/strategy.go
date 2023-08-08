@@ -18,6 +18,7 @@ package endpointslice
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
@@ -92,7 +93,13 @@ func (endpointSliceStrategy) Validate(ctx context.Context, obj runtime.Object) f
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (endpointSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	eps := obj.(*discovery.EndpointSlice)
+	if eps == nil {
+		return nil
+	}
+	var warnings []string
+	warnings = append(warnings, warnOnDeprecatedAddressType(eps.AddressType)...)
+	return warnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -206,4 +213,12 @@ func getDeprecatedTopologyNodeNames(eps *discovery.EndpointSlice) sets.String {
 		}
 	}
 	return names
+}
+
+// warnOnDeprecatedAddressType returns a warning for endpointslices with FQDN AddressType
+func warnOnDeprecatedAddressType(addressType discovery.AddressType) []string {
+	if addressType == discovery.AddressTypeFQDN {
+		return []string{fmt.Sprintf("%s: FQDN endpoints are deprecated", field.NewPath("spec").Child("addressType"))}
+	}
+	return nil
 }

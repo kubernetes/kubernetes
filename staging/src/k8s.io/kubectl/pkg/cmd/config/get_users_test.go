@@ -19,7 +19,7 @@ package config
 import (
 	"testing"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
@@ -56,7 +56,7 @@ minikube
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			pathOptions, err := tf.PathOptionsWithConfig(test.config)
 			if err != nil {
 				t.Fatalf("unexpected error executing command: %v", err)

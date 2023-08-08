@@ -82,7 +82,7 @@ func realVersion(s string) (string, error) {
 	framework.Logf("Getting real version for %q", s)
 	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
 	if err != nil {
-		return v, fmt.Errorf("error getting real version for %q: %v", s, err)
+		return v, fmt.Errorf("error getting real version for %q: %w", s, err)
 	}
 	framework.Logf("Version for %q is %q", s, v)
 	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil

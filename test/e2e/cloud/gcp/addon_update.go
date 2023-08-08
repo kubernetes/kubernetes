@@ -218,7 +218,7 @@ var _ = SIGDescribe("Addon update", func() {
 	var dir string
 	var sshClient *ssh.Client
 	f := framework.NewDefaultFramework("addon-update-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// This test requires:
@@ -267,7 +267,7 @@ var _ = SIGDescribe("Addon update", func() {
 		svcAddonEnsureExists := "addon-ensure-exists-service.yaml"
 		svcAddonEnsureExistsUpdated := "addon-ensure-exists-service-updated.yaml"
 
-		var remoteFiles []stringPair = []stringPair{
+		var remoteFiles = []stringPair{
 			{fmt.Sprintf(reconcileAddonController, addonNsName, serveHostnameImage), rcAddonReconcile},
 			{fmt.Sprintf(reconcileAddonControllerUpdated, addonNsName, serveHostnameImage), rcAddonReconcileUpdated},
 			{fmt.Sprintf(deprecatedLabelAddonService, addonNsName), svcAddonDeprecatedLabel},
@@ -375,7 +375,7 @@ func waitForReplicationController(ctx context.Context, c clientset.Interface, na
 	})
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
-		return fmt.Errorf("error waiting for ReplicationController %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+		return fmt.Errorf("error waiting for ReplicationController %s/%s %s: %w", namespace, name, stateMsg[exist], err)
 	}
 	return nil
 }
@@ -402,7 +402,7 @@ func waitForServiceWithSelector(ctx context.Context, c clientset.Interface, name
 	})
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
-		return fmt.Errorf("error waiting for service with %s in namespace %s %s: %v", selector.String(), namespace, stateMsg[exist], err)
+		return fmt.Errorf("error waiting for service with %s in namespace %s %s: %w", selector.String(), namespace, stateMsg[exist], err)
 	}
 	return nil
 }
@@ -426,7 +426,7 @@ func waitForReplicationControllerWithSelector(ctx context.Context, c clientset.I
 	})
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
-		return fmt.Errorf("error waiting for ReplicationControllers with %s in namespace %s %s: %v", selector.String(), namespace, stateMsg[exist], err)
+		return fmt.Errorf("error waiting for ReplicationControllers with %s in namespace %s %s: %w", selector.String(), namespace, stateMsg[exist], err)
 	}
 	return nil
 }
@@ -437,7 +437,7 @@ func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
 	signer, err := e2essh.GetSigner(framework.TestContext.Provider)
 	if err != nil {
-		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", framework.TestContext.Provider, err)
+		return nil, fmt.Errorf("error getting signer for provider %s: %w", framework.TestContext.Provider, err)
 	}
 
 	sshUser := os.Getenv("KUBE_SSH_USER")
@@ -453,7 +453,7 @@ func getMasterSSHClient() (*ssh.Client, error) {
 	host := framework.APIAddress() + ":22"
 	client, err := ssh.Dial("tcp", host, config)
 	if err != nil {
-		return nil, fmt.Errorf("error getting SSH client to host %s: '%v'", host, err)
+		return nil, fmt.Errorf("error getting SSH client to host %s: %w", host, err)
 	}
 	return client, err
 }
@@ -468,7 +468,7 @@ func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
 	framework.Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
 	session, err := client.NewSession()
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating session to host %s: '%v'", client.RemoteAddr(), err)
+		return "", "", 0, fmt.Errorf("error creating session to host %s: %w", client.RemoteAddr(), err)
 	}
 	defer session.Close()
 
@@ -490,7 +490,7 @@ func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
 		} else {
 			// Some other kind of error happened (e.g. an IOError); consider the
 			// SSH unsuccessful.
-			err = fmt.Errorf("failed running `%s` on %s: '%v'", cmd, client.RemoteAddr(), err)
+			err = fmt.Errorf("failed running `%s` on %s: %w", cmd, client.RemoteAddr(), err)
 		}
 	}
 	return bout.String(), berr.String(), code, err
@@ -500,7 +500,7 @@ func writeRemoteFile(sshClient *ssh.Client, data, dir, fileName string, mode os.
 	framework.Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, sshClient.RemoteAddr()))
 	session, err := sshClient.NewSession()
 	if err != nil {
-		return fmt.Errorf("error creating session to host %s: '%v'", sshClient.RemoteAddr(), err)
+		return fmt.Errorf("error creating session to host %s: %w", sshClient.RemoteAddr(), err)
 	}
 	defer session.Close()
 

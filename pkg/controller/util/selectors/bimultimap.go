@@ -152,7 +152,7 @@ func (m *BiMultimap) Put(key Key, labels map[string]string) {
 		m.selectingByLabeled[labelsKey] = selecting
 	}
 	selecting := m.selectingByLabeled[labelsKey]
-	selecting.refCount += 1
+	selecting.refCount++
 	for _, sObject := range selecting.objects {
 		// Associate labeled with selecting.
 		labeled := m.labeledBySelecting[sObject.selectorKey]
@@ -185,7 +185,7 @@ func (m *BiMultimap) delete(key Key) {
 		// Delete selectingObject to labeledObject association.
 		delete(m.labeledBySelecting[selectorKey].objects, key)
 	}
-	m.selectingByLabeled[labelsKey].refCount -= 1
+	m.selectingByLabeled[labelsKey].refCount--
 	// Garbage collect labeledObject to selectingObject associations.
 	if m.selectingByLabeled[labelsKey].refCount == 0 {
 		delete(m.selectingByLabeled, labelsKey)
@@ -246,7 +246,7 @@ func (m *BiMultimap) PutSelector(key Key, selector pkglabels.Selector) {
 		m.labeledBySelecting[selectorKey] = labeled
 	}
 	labeled := m.labeledBySelecting[selectorKey]
-	labeled.refCount += 1
+	labeled.refCount++
 	for _, labeledObject := range labeled.objects {
 		// Associate selecting with labeled.
 		selecting := m.selectingByLabeled[labeledObject.labelsKey]
@@ -280,7 +280,7 @@ func (m *BiMultimap) deleteSelector(key Key) {
 		// Delete labeledObject to selectingObject association.
 		delete(m.selectingByLabeled[labelsKey].objects, key)
 	}
-	m.labeledBySelecting[selectorKey].refCount -= 1
+	m.labeledBySelecting[selectorKey].refCount--
 	// Garbage collect selectingObjects to labeledObject associations.
 	if m.labeledBySelecting[selectorKey].refCount == 0 {
 		delete(m.labeledBySelecting, selectorKey)

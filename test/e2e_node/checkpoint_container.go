@@ -17,9 +17,13 @@ limitations under the License.
 package e2enode
 
 import (
+	"archive/tar"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -40,6 +44,10 @@ const (
 	// timeout for proxy requests.
 	proxyTimeout = 2 * time.Minute
 )
+
+type checkpointResult struct {
+	Items []string `json:"items"`
+}
 
 // proxyPostRequest performs a post on a node proxy endpoint given the nodename and rest client.
 func proxyPostRequest(ctx context.Context, c clientset.Interface, node, endpoint string, port int) (restclient.Result, error) {
@@ -68,7 +76,7 @@ func proxyPostRequest(ctx context.Context, c clientset.Interface, node, endpoint
 
 var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", func() {
 	f := framework.NewDefaultFramework("checkpoint-container-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.It("will checkpoint a container out of a pod", func(ctx context.Context) {
 		ginkgo.By("creating a target pod")
 		podClient := e2epod.NewPodClient(f)
@@ -150,10 +158,51 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 		}
 
 		framework.ExpectNoError(err)
-		// TODO: once a container engine implements the Checkpoint CRI API this needs
-		// to be extended to handle it.
-		//
+
 		// Checkpointing actually worked. Verify that the checkpoint exists and that
 		// it is a checkpoint.
+
+		raw, err := result.Raw()
+		framework.ExpectNoError(err)
+		answer := checkpointResult{}
+		err = json.Unmarshal(raw, &answer)
+		framework.ExpectNoError(err)
+
+		for _, item := range answer.Items {
+			// Check that the file exists
+			_, err := os.Stat(item)
+			framework.ExpectNoError(err)
+			// Check the content of the tar file
+			// At least looking for the following files
+			//  * spec.dump
+			//  * config.dump
+			//  * checkpoint/inventory.img
+			// If these files exist in the checkpoint archive it is
+			// probably a complete checkpoint.
+			checkForFiles := map[string]bool{
+				"spec.dump":                false,
+				"config.dump":              false,
+				"checkpoint/inventory.img": false,
+			}
+			fileReader, err := os.Open(item)
+			framework.ExpectNoError(err)
+			tr := tar.NewReader(fileReader)
+			for {
+				hdr, err := tr.Next()
+				if err == io.EOF {
+					// End of archive
+					break
+				}
+				framework.ExpectNoError(err)
+				if _, key := checkForFiles[hdr.Name]; key {
+					checkForFiles[hdr.Name] = true
+				}
+			}
+			for fileName := range checkForFiles {
+				framework.ExpectEqual(checkForFiles[fileName], true)
+			}
+			// cleanup checkpoint archive
+			os.RemoveAll(item)
+		}
 	})
 })

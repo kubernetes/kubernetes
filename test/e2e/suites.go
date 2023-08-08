@@ -49,22 +49,22 @@ func gatherTestSuiteMetrics(ctx context.Context) error {
 	framework.Logf("Gathering metrics")
 	config, err := framework.LoadConfig()
 	if err != nil {
-		return fmt.Errorf("error loading client config: %v", err)
+		return fmt.Errorf("error loading client config: %w", err)
 	}
 	c, err := clientset.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		return fmt.Errorf("error creating client: %w", err)
 	}
 
 	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case) and cluster autoscaler (optionally).
 	grabber, err := e2emetrics.NewMetricsGrabber(ctx, c, nil, config, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
 	if err != nil {
-		return fmt.Errorf("failed to create MetricsGrabber: %v", err)
+		return fmt.Errorf("failed to create MetricsGrabber: %w", err)
 	}
 
 	received, err := grabber.Grab(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to grab metrics: %v", err)
+		return fmt.Errorf("failed to grab metrics: %w", err)
 	}
 
 	metricsForE2E := (*e2emetrics.ComponentCollection)(&received)
@@ -72,7 +72,7 @@ func gatherTestSuiteMetrics(ctx context.Context) error {
 	if framework.TestContext.ReportDir != "" {
 		filePath := path.Join(framework.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
 		if err := os.WriteFile(filePath, []byte(metricsJSON), 0644); err != nil {
-			return fmt.Errorf("error writing to %q: %v", filePath, err)
+			return fmt.Errorf("error writing to %q: %w", filePath, err)
 		}
 	} else {
 		framework.Logf("\n\nTest Suite Metrics:\n%s\n", metricsJSON)

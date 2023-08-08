@@ -86,10 +86,11 @@ func NewREST(
 	proxyTransport http.RoundTripper) (*REST, *StatusREST, *svcreg.ProxyREST, error) {
 
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Service{} },
-		NewListFunc:              func() runtime.Object { return &api.ServiceList{} },
-		DefaultQualifiedResource: api.Resource("services"),
-		ReturnDeletedObject:      true,
+		NewFunc:                   func() runtime.Object { return &api.Service{} },
+		NewListFunc:               func() runtime.Object { return &api.ServiceList{} },
+		DefaultQualifiedResource:  api.Resource("services"),
+		SingularQualifiedResource: api.Resource("service"),
+		ReturnDeletedObject:       true,
 
 		CreateStrategy:      svcreg.Strategy,
 		UpdateStrategy:      svcreg.Strategy,

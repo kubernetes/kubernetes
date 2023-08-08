@@ -100,6 +100,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 	assert.Equal(summary.Node.StartTime, systemBootTime)
 	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
 	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
+	assert.Equal(summary.Node.Swap, cgroupStatsMap["/"].cs.Swap)
 	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ImageFs: imageFsStats})
@@ -112,6 +113,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/kubelet"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/kubelet"].cs.Swap,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "misc",
@@ -120,6 +122,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/misc"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/misc"].cs.Swap,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "runtime",
@@ -128,6 +131,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/runtime"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/runtime"].cs.Swap,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "pods",
@@ -136,6 +140,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/pods"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/pods"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/pods"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/pods"].cs.Swap,
 	})
 	assert.Equal(summary.Pods, podStats)
 }

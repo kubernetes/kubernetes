@@ -27,8 +27,11 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	allocatorstore "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -46,8 +49,8 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, portallocator.Inter
 	serviceNodePortRange := utilnet.PortRange{Base: basePortRange, Size: sizePortRange}
 	configForAllocations := etcdStorage.ForResource(api.Resource("servicenodeportallocations"))
 	var backing allocator.Interface
-	storage, err := portallocator.New(serviceNodePortRange, func(max int, rangeSpec string) (allocator.Interface, error) {
-		mem := allocator.NewAllocationMap(max, rangeSpec)
+	storage, err := portallocator.New(serviceNodePortRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+		mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 		backing = mem
 		etcd, err := allocatorstore.NewEtcd(mem, "/ranges/servicenodeports", configForAllocations)
 		if err != nil {
@@ -182,4 +185,80 @@ func TestReallocate(t *testing.T) {
 		t.Fatal(err)
 	}
 
+}
+
+func TestAllocateReserved(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceNodePortStaticSubrange, true)()
+
+	_, storage, _, si, destroyFunc := newStorage(t)
+	defer destroyFunc()
+	if err := si.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// allocate all ports on the dynamic block
+	// default range size is 2768, and dynamic block size is min(max(16,2768/32),128) = 86
+	dynamicOffset := 86
+	dynamicBlockSize := sizePortRange - dynamicOffset
+	for i := 0; i < dynamicBlockSize; i++ {
+		if _, err := storage.AllocateNext(); err != nil {
+			t.Errorf("Unexpected error trying to allocate: %v", err)
+		}
+	}
+	for i := dynamicOffset; i < sizePortRange; i++ {
+		port := i + basePortRange
+		if !storage.Has(port) {
+			t.Errorf("Port %d expected to be allocated", port)
+		}
+	}
+
+	// allocate all ports on the static block
+	for i := 0; i < dynamicOffset; i++ {
+		port := i + basePortRange
+		if err := storage.Allocate(port); err != nil {
+			t.Errorf("Unexpected error trying to allocate Port %d: %v", port, err)
+		}
+	}
+	if _, err := storage.AllocateNext(); err == nil {
+		t.Error("Allocator expected to be full")
+	}
+	// release one port in the allocated block and another a new one randomly
+	if err := storage.Release(basePortRange + 53); err != nil {
+		t.Fatalf("Unexpected error trying to release port 30053: %v", err)
+	}
+	if _, err := storage.AllocateNext(); err != nil {
+		t.Error(err)
+	}
+	if _, err := storage.AllocateNext(); err == nil {
+		t.Error("Allocator expected to be full")
+	}
+}
+
+func TestAllocateReservedDynamicBlockExhausted(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceNodePortStaticSubrange, true)()
+
+	_, storage, _, si, destroyFunc := newStorage(t)
+	defer destroyFunc()
+	if err := si.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// allocate all ports both on the dynamic and reserved blocks
+	// once the dynamic block has been exhausted
+	// the dynamic allocator will use the reserved block
+	for i := 0; i < sizePortRange; i++ {
+		if _, err := storage.AllocateNext(); err != nil {
+			t.Errorf("Unexpected error trying to allocate: %v", err)
+		}
+	}
+	for i := 0; i < sizePortRange; i++ {
+		port := i + basePortRange
+		if !storage.Has(port) {
+			t.Errorf("Port %d expected to be allocated", port)
+		}
+	}
+
+	if _, err := storage.AllocateNext(); err == nil {
+		t.Error("Allocator expected to be full")
+	}
 }

@@ -65,7 +65,7 @@ func (client RunsClient) Cancel(ctx context.Context, resourceGroupName string, r
 
 	result, err = client.CancelSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerregistry.RunsClient", "Cancel", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerregistry.RunsClient", "Cancel", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -98,6 +98,7 @@ func (client RunsClient) CancelPreparer(ctx context.Context, resourceGroupName s
 // http.Response Body if it receives an error.
 func (client RunsClient) CancelSender(req *http.Request) (future RunsCancelFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -468,7 +469,7 @@ func (client RunsClient) Update(ctx context.Context, resourceGroupName string, r
 
 	result, err = client.UpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerregistry.RunsClient", "Update", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerregistry.RunsClient", "Update", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -503,6 +504,7 @@ func (client RunsClient) UpdatePreparer(ctx context.Context, resourceGroupName s
 // http.Response Body if it receives an error.
 func (client RunsClient) UpdateSender(req *http.Request) (future RunsUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

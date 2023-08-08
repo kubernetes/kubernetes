@@ -158,6 +158,113 @@ func TestEndpointUpdates(t *testing.T) {
 
 }
 
+// TestExternalNameToClusterIPTransition tests that Service of type ExternalName
+// does not get endpoints, and after transition to ClusterIP, service gets endpoint,
+// without headless label
+func TestExternalNameToClusterIPTransition(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	informers := informers.NewSharedInformerFactory(client, 0)
+
+	epController := endpoint.NewEndpointController(
+		informers.Core().V1().Pods(),
+		informers.Core().V1().Services(),
+		informers.Core().V1().Endpoints(),
+		client,
+		0)
+
+	// Start informer and controllers
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go epController.Run(ctx, 1)
+
+	// Create namespace
+	ns := framework.CreateNamespaceOrDie(client, "test-endpoints-updates", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	// Create a pod with labels
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: ns.Name,
+			Labels:    labelMap(),
+		},
+		Spec: v1.PodSpec{
+			NodeName: "fakenode",
+			Containers: []v1.Container{
+				{
+					Name:  "fake-name",
+					Image: "fakeimage",
+				},
+			},
+		},
+	}
+
+	createdPod, err := client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
+	}
+
+	// Set pod IPs
+	createdPod.Status = v1.PodStatus{
+		Phase:  v1.PodRunning,
+		PodIPs: []v1.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
+	}
+	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, createdPod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
+	}
+
+	// Create an ExternalName service associated to the pod
+	svc := newExternalNameService(ns.Name, "foo1")
+	svc1, err := client.CoreV1().Services(ns.Name).Create(ctx, svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
+	}
+
+	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
+		if err == nil {
+			t.Errorf("expected no endpoints for externalName service, got: %v", endpoints)
+			return true, nil
+		}
+		return false, nil
+	})
+	if err == nil {
+		t.Errorf("expected error waiting for endpoints")
+	}
+
+	// update service to ClusterIP type and verify endpoint was created
+	svc1.Spec.Type = v1.ServiceTypeClusterIP
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc1, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update service %s: %v", svc1.Name, err)
+	}
+
+	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		ep, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc1.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Logf("no endpoints found, error: %v", err)
+			return false, nil
+		}
+		t.Logf("endpoint %s was successfully created", svc1.Name)
+		if _, ok := ep.Labels[v1.IsHeadlessService]; ok {
+			t.Errorf("ClusterIP endpoint should not have headless label, got: %v", ep)
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("endpoints not found: %v", err)
+	}
+}
+
 // TestEndpointWithTerminatingPod tests that terminating pods are NOT included in Endpoints.
 // This capability is only available in the newer EndpointSlice API and there are no plans to
 // include it for Endpoints. This test can be removed in the future if we decide to include
@@ -346,5 +453,12 @@ func newService(namespace, name string) *v1.Service {
 			},
 		},
 	}
+}
 
+// newExternalNameService returns an ExternalName service with selector and exposing ports
+func newExternalNameService(namespace, name string) *v1.Service {
+	svc := newService(namespace, name)
+	svc.Spec.Type = v1.ServiceTypeExternalName
+	svc.Spec.ExternalName = "google.com"
+	return svc
 }

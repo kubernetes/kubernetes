@@ -25,6 +25,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
@@ -55,7 +56,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	dialOpts := []grpc.DialOption{}
+	var dialOpts []grpc.DialOption
 	dialOpts = append(dialOpts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
@@ -71,6 +72,16 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
 			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
 	}
+
+	connParams := grpc.ConnectParams{
+		Backoff: backoff.DefaultConfig,
+	}
+	connParams.MinConnectTimeout = minConnectionTimeout
+	connParams.Backoff.BaseDelay = baseBackoffDelay
+	connParams.Backoff.MaxDelay = maxBackoffDelay
+	dialOpts = append(dialOpts,
+		grpc.WithConnectParams(connParams),
+	)
 
 	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
@@ -93,13 +104,11 @@ func (r *remoteImageService) validateServiceConnection(ctx context.Context, conn
 	klog.V(4).InfoS("Validating the CRI v1 API image version")
 	r.imageClient = runtimeapi.NewImageServiceClient(conn)
 
-	if _, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{}); err == nil {
-		klog.V(2).InfoS("Validated CRI v1 image API")
-
-	} else if status.Code(err) == codes.Unimplemented {
-		return fmt.Errorf("CRI v1 image API is not implemented for endpoint %q: %w", endpoint, err)
+	if _, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{}); err != nil {
+		return fmt.Errorf("validate CRI v1 image API for endpoint %q: %w", endpoint, err)
 	}
 
+	klog.V(2).InfoS("Validated CRI v1 image API")
 	return nil
 }
 
@@ -169,6 +178,17 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 	})
 	if err != nil {
 		klog.ErrorS(err, "PullImage from image service failed", "image", image.Image)
+
+		// We can strip the code from unknown status errors since they add no value
+		// and will make them easier to read in the logs/events.
+		//
+		// It also ensures that checking custom error types from pkg/kubelet/images/types.go
+		// works in `imageManager.EnsureImageExists` (pkg/kubelet/images/image_manager.go).
+		statusErr, ok := status.FromError(err)
+		if ok && statusErr.Code() == codes.Unknown {
+			return "", errors.New(statusErr.Message())
+		}
+
 		return "", err
 	}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -135,12 +137,6 @@ func (o *Options) ApplyDeprecated() {
 	if deprecated.Changed("kube-api-burst") {
 		o.ComponentConfig.ClientConnection.Burst = o.Deprecated.Burst
 	}
-	if deprecated.Changed("lock-object-namespace") {
-		o.ComponentConfig.LeaderElection.ResourceNamespace = o.Deprecated.ResourceNamespace
-	}
-	if deprecated.Changed("lock-object-name") {
-		o.ComponentConfig.LeaderElection.ResourceName = o.Deprecated.ResourceName
-	}
 }
 
 // ApplyLeaderElectionTo obtains the CLI args related with leaderelection, and override the values in `cfg`.
@@ -201,14 +197,14 @@ func (o *Options) initFlags() {
 }
 
 // ApplyTo applies the scheduler options to the given scheduler app configuration.
-func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
+func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) error {
 	if len(o.ConfigFile) == 0 {
 		// If the --config arg is not specified, honor the deprecated as well as leader election CLI args.
 		o.ApplyDeprecated()
 		o.ApplyLeaderElectionTo(o.ComponentConfig)
 		c.ComponentConfig = *o.ComponentConfig
 	} else {
-		cfg, err := loadConfigFromFile(o.ConfigFile)
+		cfg, err := LoadConfigFromFile(logger, o.ConfigFile)
 		if err != nil {
 			return err
 		}
@@ -268,7 +264,8 @@ func (o *Options) Validate() []error {
 }
 
 // Config return a scheduler config object
-func (o *Options) Config() (*schedulerappconfig.Config, error) {
+func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error) {
+	logger := klog.FromContext(ctx)
 	if o.SecureServing != nil {
 		if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 			return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -276,7 +273,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	c := &schedulerappconfig.Config{}
-	if err := o.ApplyTo(c); err != nil {
+	if err := o.ApplyTo(logger, c); err != nil {
 		return nil, err
 	}
 

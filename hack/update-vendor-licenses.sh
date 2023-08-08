@@ -201,8 +201,8 @@ for PACKAGE in ${modules}; do
 
   # if there are no files vendored under this package...
   if [[ -z "$(find "${DEPS_DIR}/${PACKAGE}" -mindepth 1 -maxdepth 1 -type f)" ]]; then
-    # and we have the same number of submodules as subdirectories...
-    if [[ "$(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq "$(echo "${modules}" | grep -cE "^${PACKAGE}/")" ]]; then
+    # and we have at least the same number of submodules as subdirectories...
+    if [[ "$(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type d | wc -l)" -le "$(echo "${modules}" | grep -cE "^${PACKAGE}/")" ]]; then
       echo "Only submodules of ${PACKAGE} are vendored, skipping" >&2
       continue
     fi

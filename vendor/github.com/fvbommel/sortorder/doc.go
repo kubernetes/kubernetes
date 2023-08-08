@@ -2,4 +2,4 @@
 //
 // Currently, it only implements so-called "natural order", where integers
 // embedded in strings are compared by value.
-package sortorder
+package sortorder // import "github.com/fvbommel/sortorder"

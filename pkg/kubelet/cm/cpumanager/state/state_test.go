@@ -20,14 +20,14 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
 func TestClone(t *testing.T) {
 	expect := ContainerCPUAssignments{
 		"pod": map[string]cpuset.CPUSet{
-			"container1": cpuset.NewCPUSet(4, 5, 6),
-			"container2": cpuset.NewCPUSet(1, 2, 3),
+			"container1": cpuset.New(4, 5, 6),
+			"container2": cpuset.New(1, 2, 3),
 		},
 	}
 	actual := expect.Clone()

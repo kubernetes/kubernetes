@@ -213,11 +213,11 @@ func SkipUnlessSSHKeyPresent() {
 func serverVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) (bool, error) {
 	serverVersion, err := c.ServerVersion()
 	if err != nil {
-		return false, fmt.Errorf("Unable to get server version: %v", err)
+		return false, fmt.Errorf("Unable to get server version: %w", err)
 	}
 	sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
 	if err != nil {
-		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
+		return false, fmt.Errorf("Unable to parse server version %q: %w", serverVersion.GitVersion, err)
 	}
 	return sv.AtLeast(v), nil
 }

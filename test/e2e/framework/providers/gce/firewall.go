@@ -374,22 +374,22 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 	expPorts := PackProtocolsPortsFromFirewall(exp.Allowed)
 	if portsSubset {
 		if err := isPortsSubset(expPorts, actualPorts); err != nil {
-			return fmt.Errorf("incorrect allowed protocol ports: %v", err)
+			return fmt.Errorf("incorrect allowed protocol ports: %w", err)
 		}
 	} else {
 		if err := SameStringArray(actualPorts, expPorts, false); err != nil {
-			return fmt.Errorf("incorrect allowed protocols ports: %v", err)
+			return fmt.Errorf("incorrect allowed protocols ports: %w", err)
 		}
 	}
 
 	if err := SameStringArray(res.SourceRanges, exp.SourceRanges, false); err != nil {
-		return fmt.Errorf("incorrect source ranges %v, expected %v: %v", res.SourceRanges, exp.SourceRanges, err)
+		return fmt.Errorf("incorrect source ranges %v, expected %v: %w", res.SourceRanges, exp.SourceRanges, err)
 	}
 	if err := SameStringArray(res.SourceTags, exp.SourceTags, false); err != nil {
-		return fmt.Errorf("incorrect source tags %v, expected %v: %v", res.SourceTags, exp.SourceTags, err)
+		return fmt.Errorf("incorrect source tags %v, expected %v: %w", res.SourceTags, exp.SourceTags, err)
 	}
 	if err := SameStringArray(res.TargetTags, exp.TargetTags, false); err != nil {
-		return fmt.Errorf("incorrect target tags %v, expected %v: %v", res.TargetTags, exp.TargetTags, err)
+		return fmt.Errorf("incorrect target tags %v, expected %v: %w", res.TargetTags, exp.TargetTags, err)
 	}
 	return nil
 }

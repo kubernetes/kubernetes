@@ -311,7 +311,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(ctx context.Context, 
 }
 
 func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
-	timeouts := framework.NewTimeoutContextWithDefaults()
+	timeouts := framework.NewTimeoutContext()
 	if d.Timeouts == nil {
 		return timeouts
 	}
@@ -422,5 +422,12 @@ func (d *driverDefinition) PrepareTest(ctx context.Context, f *framework.Framewo
 		Framework:           f,
 		ClientNodeSelection: e2epod.NodeSelection{Name: d.ClientNodeName},
 	}
+
+	if framework.NodeOSDistroIs("windows") {
+		e2econfig.ClientNodeSelection.Selector = map[string]string{"kubernetes.io/os": "windows"}
+	} else {
+		e2econfig.ClientNodeSelection.Selector = map[string]string{"kubernetes.io/os": "linux"}
+	}
+
 	return e2econfig
 }

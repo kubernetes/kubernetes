@@ -30,6 +30,7 @@ import (
 // in GetCanonicalTypeName means Go type names with full package path.
 //
 // Examples of REST friendly OpenAPI name:
+//
 //	Input:  k8s.io/api/core/v1.Pod
 //	Output: io.k8s.api.core.v1.Pod
 //
@@ -45,6 +46,7 @@ func ToCanonicalName(name string) string {
 // ToRESTFriendlyName converts Golang package/type canonical name into REST friendly OpenAPI name.
 //
 // Examples of REST friendly OpenAPI name:
+//
 //	Input:  k8s.io/api/core/v1.Pod
 //	Output: io.k8s.api.core.v1.Pod
 //
@@ -71,18 +73,21 @@ func ToRESTFriendlyName(name string) string {
 // OpenAPI canonical names are Go type names with full package path, for uniquely indentifying
 // a model / Go type. If a Go type is vendored from another package, only the path after "/vendor/"
 // should be used. For custom resource definition (CRD), the canonical name is expected to be
-//     group/version.kind
+//
+//	group/version.kind
 //
 // Examples of canonical name:
-//     Go type: k8s.io/kubernetes/pkg/apis/core.Pod
-//     CRD:     csi.storage.k8s.io/v1alpha1.CSINodeInfo
+//
+//	Go type: k8s.io/kubernetes/pkg/apis/core.Pod
+//	CRD:     csi.storage.k8s.io/v1alpha1.CSINodeInfo
 //
 // Example for vendored Go type:
-//     Original full path:  k8s.io/kubernetes/vendor/k8s.io/api/core/v1.Pod
-//     Canonical name:      k8s.io/api/core/v1.Pod
 //
-//     Original full path:  vendor/k8s.io/api/core/v1.Pod
-//     Canonical name:      k8s.io/api/core/v1.Pod
+//	Original full path:  k8s.io/kubernetes/vendor/k8s.io/api/core/v1.Pod
+//	Canonical name:      k8s.io/api/core/v1.Pod
+//
+//	Original full path:  vendor/k8s.io/api/core/v1.Pod
+//	Canonical name:      k8s.io/api/core/v1.Pod
 type OpenAPICanonicalTypeNamer interface {
 	OpenAPICanonicalTypeName() string
 }

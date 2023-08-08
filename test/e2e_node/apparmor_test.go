@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -41,7 +42,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/opencontainers/runc/libcontainer/apparmor"
@@ -55,7 +55,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 		})
 		ginkgo.Context("when running with AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
-			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+			f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject an unloaded profile", func(ctx context.Context) {
 				status := runAppArmorTest(ctx, f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
@@ -64,7 +64,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			ginkgo.It("should enforce a profile blocking writes", func(ctx context.Context) {
 				status := runAppArmorTest(ctx, f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
-					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					framework.Failf("Unexpected pod status: %s", dump.Pretty(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
@@ -75,7 +75,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			ginkgo.It("should enforce a permissive profile", func(ctx context.Context) {
 				status := runAppArmorTest(ctx, f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
-					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					framework.Failf("Unexpected pod status: %s", dump.Pretty(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
@@ -86,7 +86,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 	} else {
 		ginkgo.Context("when running without AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
-			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+			f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject a pod with an AppArmor profile", func(ctx context.Context) {
 				status := runAppArmorTest(ctx, f, false, v1.AppArmorBetaProfileRuntimeDefault)
@@ -122,13 +122,13 @@ profile e2e-node-apparmor-test-audit-write flags=(attach_disconnected) {
 func loadTestProfiles() error {
 	f, err := os.CreateTemp("/tmp", "apparmor")
 	if err != nil {
-		return fmt.Errorf("failed to open temp file: %v", err)
+		return fmt.Errorf("failed to open temp file: %w", err)
 	}
 	defer os.Remove(f.Name())
 	defer f.Close()
 
 	if _, err := f.WriteString(testProfiles); err != nil {
-		return fmt.Errorf("failed to write profiles to file: %v", err)
+		return fmt.Errorf("failed to write profiles to file: %w", err)
 	}
 
 	cmd := exec.Command("apparmor_parser", "-r", "-W", f.Name())
@@ -143,7 +143,7 @@ func loadTestProfiles() error {
 		if len(out) > 0 {
 			klog.Infof("apparmor_parser: %s", out)
 		}
-		return fmt.Errorf("failed to load profiles: %v", err)
+		return fmt.Errorf("failed to load profiles: %w", err)
 	}
 	klog.V(2).Infof("Loaded profiles: %v", out)
 	return nil

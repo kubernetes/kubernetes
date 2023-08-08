@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +22,7 @@ import (
 )
 
 type Key = groupcache.Key
+type EvictionFunc = func(key Key, value interface{})
 
 // Cache is a thread-safe fixed size LRU cache.
 type Cache struct {
@@ -34,6 +35,13 @@ func New(size int) *Cache {
 	return &Cache{
 		cache: groupcache.New(size),
 	}
+}
+
+// NewWithEvictionFunc creates an LRU of the given size with the given eviction func.
+func NewWithEvictionFunc(size int, f EvictionFunc) *Cache {
+	c := New(size)
+	c.cache.OnEvicted = f
+	return c
 }
 
 // Add adds a value to the cache.

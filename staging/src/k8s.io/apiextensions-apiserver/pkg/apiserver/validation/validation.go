@@ -22,29 +22,83 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 )
 
+type SchemaValidator interface {
+	SchemaCreateValidator
+	ValidateUpdate(new, old interface{}) *validate.Result
+}
+
+type SchemaCreateValidator interface {
+	Validate(value interface{}) *validate.Result
+}
+
+// basicSchemaValidator wraps a kube-openapi SchemaCreateValidator to
+// support ValidateUpdate. It implements ValidateUpdate by simply validating
+// the new value via kube-openapi, ignoring the old value.
+type basicSchemaValidator struct {
+	*validate.SchemaValidator
+}
+
+func (s basicSchemaValidator) ValidateUpdate(new, old interface{}) *validate.Result {
+	return s.Validate(new)
+}
+
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation.
-func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceValidation) (*validate.SchemaValidator, *spec.Schema, error) {
+//
+// If feature `CRDValidationRatcheting` is disabled, this returns validator which
+// validates all `Update`s and `Create`s as a `Create` - without considering old value.
+//
+// If feature `CRDValidationRatcheting` is enabled - the validator returned
+// will support ratcheting unchanged correlatable fields across an update.
+func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps) (SchemaValidator, *spec.Schema, error) {
 	// Convert CRD schema to openapi schema
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
 		// TODO: replace with NewStructural(...).ToGoOpenAPI
-		if err := ConvertJSONSchemaPropsWithPostProcess(customResourceValidation.OpenAPIV3Schema, openapiSchema, StripUnsupportedFormatsPostProcess); err != nil {
+		if err := ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, StripUnsupportedFormatsPostProcess); err != nil {
 			return nil, nil, err
 		}
 	}
-	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default), openapiSchema, nil
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
+		return NewRatchetingSchemaValidator(openapiSchema, nil, "", strfmt.Default), openapiSchema, nil
+	}
+	return basicSchemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)}, openapiSchema, nil
+}
+
+// ValidateCustomResourceUpdate validates the transition of Custom Resource from
+// `old` to `new` against the schema in the CustomResourceDefinition.
+// Both customResource and old represent a JSON data structures.
+//
+// If feature `CRDValidationRatcheting` is disabled, this behaves identically to
+// ValidateCustomResource(customResource).
+func ValidateCustomResourceUpdate(fldPath *field.Path, customResource, old interface{}, validator SchemaValidator) field.ErrorList {
+	// Additional feature gate check for sanity
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
+		return ValidateCustomResource(nil, customResource, validator)
+	} else if validator == nil {
+		return nil
+	}
+
+	result := validator.ValidateUpdate(customResource, old)
+	if result.IsValid() {
+		return nil
+	}
+
+	return kubeOpenAPIResultToFieldErrors(fldPath, result)
 }
 
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.
 // CustomResource is a JSON data structure.
-func ValidateCustomResource(fldPath *field.Path, customResource interface{}, validator *validate.SchemaValidator) field.ErrorList {
+func ValidateCustomResource(fldPath *field.Path, customResource interface{}, validator SchemaCreateValidator) field.ErrorList {
 	if validator == nil {
 		return nil
 	}
@@ -53,6 +107,11 @@ func ValidateCustomResource(fldPath *field.Path, customResource interface{}, val
 	if result.IsValid() {
 		return nil
 	}
+
+	return kubeOpenAPIResultToFieldErrors(fldPath, result)
+}
+
+func kubeOpenAPIResultToFieldErrors(fldPath *field.Path, result *validate.Result) field.ErrorList {
 	var allErrs field.ErrorList
 	for _, err := range result.Errors {
 		switch err := err.(type) {
@@ -287,7 +346,7 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		out.VendorExtensible.AddExtension("x-kubernetes-embedded-resource", true)
 	}
 	if len(in.XListMapKeys) != 0 {
-		out.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", in.XListMapKeys)
+		out.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", convertSliceToInterfaceSlice(in.XListMapKeys))
 	}
 	if in.XListType != nil {
 		out.VendorExtensible.AddExtension("x-kubernetes-list-type", *in.XListType)
@@ -300,9 +359,17 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		if err := apiextensionsv1.Convert_apiextensions_ValidationRules_To_v1_ValidationRules(&in.XValidations, &serializationValidationRules, nil); err != nil {
 			return err
 		}
-		out.VendorExtensible.AddExtension("x-kubernetes-validations", serializationValidationRules)
+		out.VendorExtensible.AddExtension("x-kubernetes-validations", convertSliceToInterfaceSlice(serializationValidationRules))
 	}
 	return nil
+}
+
+func convertSliceToInterfaceSlice[T any](in []T) []interface{} {
+	var res []interface{}
+	for _, v := range in {
+		res = append(res, v)
+	}
+	return res
 }
 
 func convertSliceOfJSONSchemaProps(in *[]apiextensions.JSONSchemaProps, out *[]spec.Schema, postProcess PostProcessFunc) error {

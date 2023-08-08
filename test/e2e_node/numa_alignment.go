@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -86,7 +86,7 @@ func getCPUsPerNUMANode(nodeNum int) ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cpus.ToSlice(), nil
+	return cpus.List(), nil
 }
 
 func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, environ map[string]string, numaNodes int) (map[int]int, error) {
@@ -99,7 +99,7 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Con
 			if err != nil {
 				return nil, err
 			}
-			cpuIDs = cpus.ToSlice()
+			cpuIDs = cpus.List()
 		}
 	}
 	if len(cpuIDs) == 0 {
@@ -115,7 +115,7 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Con
 		if err != nil {
 			return nil, err
 		}
-		cpusPerNUMA[numaNode] = cpus.ToSlice()
+		cpusPerNUMA[numaNode] = cpus.List()
 	}
 
 	// CPU IDs -> NUMA Node ID

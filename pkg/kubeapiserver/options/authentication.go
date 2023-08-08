@@ -237,6 +237,10 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 		}
 	}
 
+	if o.RequestHeader != nil {
+		allErrors = append(allErrors, o.RequestHeader.Validate()...)
+	}
+
 	return allErrors
 }
 
@@ -472,6 +476,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		}
 	}
 
+	authInfo.RequestHeaderConfig = authenticatorConfig.RequestHeaderConfig
 	authInfo.APIAudiences = o.APIAudiences
 	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuers) != 0 && len(o.APIAudiences) == 0 {
 		authInfo.APIAudiences = authenticator.Audiences(o.ServiceAccounts.Issuers)
@@ -485,9 +490,11 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 	)
 	authenticatorConfig.SecretsWriter = extclient.CoreV1()
 
-	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-		versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem),
-	)
+	if authenticatorConfig.BootstrapToken {
+		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+			versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem),
+		)
+	}
 
 	if egressSelector != nil {
 		egressDialer, err := egressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())

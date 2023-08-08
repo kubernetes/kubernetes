@@ -17,6 +17,7 @@ limitations under the License.
 package record
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -132,7 +133,9 @@ type EventBroadcaster interface {
 	// with the event source set to the given event source.
 	NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder
 
-	// Shutdown shuts down the broadcaster
+	// Shutdown shuts down the broadcaster. Once the broadcaster is shut
+	// down, it will only try to record an event in a sink once before
+	// giving up on it with an error message.
 	Shutdown()
 }
 
@@ -157,31 +160,34 @@ func (a *EventRecorderAdapter) Eventf(regarding, _ runtime.Object, eventtype, re
 
 // Creates a new event broadcaster.
 func NewBroadcaster() EventBroadcaster {
-	return &eventBroadcasterImpl{
-		Broadcaster:   watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
-		sleepDuration: defaultSleepDuration,
-	}
+	return newEventBroadcaster(watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), defaultSleepDuration)
 }
 
 func NewBroadcasterForTests(sleepDuration time.Duration) EventBroadcaster {
-	return &eventBroadcasterImpl{
-		Broadcaster:   watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
-		sleepDuration: sleepDuration,
-	}
+	return newEventBroadcaster(watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), sleepDuration)
 }
 
 func NewBroadcasterWithCorrelatorOptions(options CorrelatorOptions) EventBroadcaster {
-	return &eventBroadcasterImpl{
-		Broadcaster:   watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
-		sleepDuration: defaultSleepDuration,
-		options:       options,
+	eventBroadcaster := newEventBroadcaster(watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), defaultSleepDuration)
+	eventBroadcaster.options = options
+	return eventBroadcaster
+}
+
+func newEventBroadcaster(broadcaster *watch.Broadcaster, sleepDuration time.Duration) *eventBroadcasterImpl {
+	eventBroadcaster := &eventBroadcasterImpl{
+		Broadcaster:   broadcaster,
+		sleepDuration: sleepDuration,
 	}
+	eventBroadcaster.cancelationCtx, eventBroadcaster.cancel = context.WithCancel(context.Background())
+	return eventBroadcaster
 }
 
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
-	sleepDuration time.Duration
-	options       CorrelatorOptions
+	sleepDuration  time.Duration
+	options        CorrelatorOptions
+	cancelationCtx context.Context
+	cancel         func()
 }
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
@@ -191,15 +197,16 @@ func (e *eventBroadcasterImpl) StartRecordingToSink(sink EventSink) watch.Interf
 	eventCorrelator := NewEventCorrelatorWithOptions(e.options)
 	return e.StartEventWatcher(
 		func(event *v1.Event) {
-			recordToSink(sink, event, eventCorrelator, e.sleepDuration)
+			e.recordToSink(sink, event, eventCorrelator)
 		})
 }
 
 func (e *eventBroadcasterImpl) Shutdown() {
 	e.Broadcaster.Shutdown()
+	e.cancel()
 }
 
-func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrelator, sleepDuration time.Duration) {
+func (e *eventBroadcasterImpl) recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrelator) {
 	// Make a copy before modification, because there could be multiple listeners.
 	// Events are safe to copy like this.
 	eventCopy := *event
@@ -221,12 +228,18 @@ func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrela
 			klog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
 			break
 		}
+
 		// Randomize the first sleep so that various clients won't all be
 		// synced up if the master goes down.
+		delay := e.sleepDuration
 		if tries == 1 {
-			time.Sleep(time.Duration(float64(sleepDuration) * rand.Float64()))
-		} else {
-			time.Sleep(sleepDuration)
+			delay = time.Duration(float64(delay) * rand.Float64())
+		}
+		select {
+		case <-e.cancelationCtx.Done():
+			klog.Errorf("Unable to write event '%#v' (broadcaster is shut down)", event)
+			return
+		case <-time.After(delay):
 		}
 	}
 }
@@ -261,7 +274,7 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 		klog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
 		return true
 	case *errors.StatusError:
-		if errors.IsAlreadyExists(err) {
+		if errors.IsAlreadyExists(err) || errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 			klog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		} else {
 			klog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
@@ -343,6 +356,9 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations m
 
 	event := recorder.makeEvent(ref, annotations, eventtype, reason, message)
 	event.Source = recorder.source
+
+	event.ReportingInstance = recorder.source.Host
+	event.ReportingController = recorder.source.Component
 
 	// NOTE: events should be a non-blocking operation, but we also need to not
 	// put this in a goroutine, otherwise we'll race to write to a closed channel

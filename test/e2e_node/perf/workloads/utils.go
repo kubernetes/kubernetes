@@ -31,7 +31,7 @@ func runCmd(cmd string, args []string) error {
 func getMatchingLineFromLog(log string, pattern string) (line string, err error) {
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
-		return line, fmt.Errorf("failed to compile regexp %v: %v", pattern, err)
+		return line, fmt.Errorf("failed to compile regexp %v: %w", pattern, err)
 	}
 
 	logLines := strings.Split(log, "\n")

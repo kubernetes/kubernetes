@@ -89,6 +89,10 @@ var (
 		flowcontrol.PriorityLevelConfigurationNameExempt,
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementExempt,
+			Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+				NominalConcurrencyShares: pointer.Int32(0),
+				LendablePercent:          pointer.Int32(0),
+			},
 		},
 	)
 	MandatoryPriorityLevelConfigurationCatchAll = newPriorityLevelConfiguration(

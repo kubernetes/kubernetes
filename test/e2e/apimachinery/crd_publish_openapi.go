@@ -53,7 +53,7 @@ var (
 
 var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.16
@@ -129,7 +129,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := verifyKubectlExplain(f.Namespace.Name, crd.Crd.Spec.Names.Plural+".spec", `(?s)DESCRIPTION:.*Specification of Foo.*FIELDS:.*bars.*<\[\]Object>.*List of Bars and their specs`); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := verifyKubectlExplain(f.Namespace.Name, crd.Crd.Spec.Names.Plural+".spec.bars", `(?s)RESOURCE:.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
+		if err := verifyKubectlExplain(f.Namespace.Name, crd.Crd.Spec.Names.Plural+".spec.bars", `(?s)(FIELD|RESOURCE):.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -561,7 +561,7 @@ func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect [
 	})
 	crd, err := crd.CreateMultiVersionTestCRD(f, group, options...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create CRD: %v", err)
+		return nil, fmt.Errorf("failed to create CRD: %w", err)
 	}
 
 	for _, v := range crd.Crd.Spec.Versions {
@@ -623,7 +623,7 @@ func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) err
 		return true, ""
 	})
 	if err != nil {
-		return fmt.Errorf("failed to wait for definition %q to be served with the right OpenAPI schema: %v", name, err)
+		return fmt.Errorf("failed to wait for definition %q to be served with the right OpenAPI schema: %w", name, err)
 	}
 	return nil
 }
@@ -637,7 +637,7 @@ func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
 		return true, ""
 	})
 	if err != nil {
-		return fmt.Errorf("failed to wait for definition %q not to be served anymore: %v", name, err)
+		return fmt.Errorf("failed to wait for definition %q not to be served anymore: %w", name, err)
 	}
 	return nil
 }
@@ -718,7 +718,7 @@ func dropDefaults(s *spec.Schema) {
 func verifyKubectlExplain(ns, name, pattern string) error {
 	result, err := e2ekubectl.RunKubectl(ns, "explain", name)
 	if err != nil {
-		return fmt.Errorf("failed to explain %s: %v", name, err)
+		return fmt.Errorf("failed to explain %s: %w", name, err)
 	}
 	r := regexp.MustCompile(pattern)
 	if !r.Match([]byte(result)) {

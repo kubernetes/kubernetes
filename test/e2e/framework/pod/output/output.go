@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
-	apiv1pod "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -107,7 +107,7 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 			return out, nil
 		}
 		if elapsed := time.Since(start); elapsed > timeout {
-			return out, fmt.Errorf("RunHostCmd still failed after %v: %v", elapsed, err)
+			return out, fmt.Errorf("RunHostCmd still failed after %v: %w", elapsed, err)
 		}
 		framework.Logf("Waiting %v to retry failed RunHostCmd: %v", interval, err)
 		time.Sleep(interval)
@@ -118,6 +118,15 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
 		return e2ekubectl.RunKubectlOrDie(ns, "logs", podName, container)
+	})
+}
+
+// LookForStringInLogWithoutKubectl looks for the given string in the log of a specific pod container
+func LookForStringInLogWithoutKubectl(ctx context.Context, client clientset.Interface, ns string, podName string, container string, expectedString string, timeout time.Duration) (result string, err error) {
+	return lookForString(expectedString, timeout, func() string {
+		podLogs, err := e2epod.GetPodLogs(ctx, client, ns, podName, container)
+		framework.ExpectNoError(err)
+		return podLogs
 	})
 }
 
@@ -166,12 +175,12 @@ func MatchContainerOutput(
 	// Grab its logs.  Get host first.
 	podStatus, err := podClient.Get(ctx, createdPod.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get pod status: %v", err)
+		return fmt.Errorf("failed to get pod status: %w", err)
 	}
 
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
-		_ = apiv1pod.VisitContainers(&podStatus.Spec, apiv1pod.AllFeatureEnabledContainers(), func(c *v1.Container, containerType apiv1pod.ContainerType) bool {
+		_ = podutils.VisitContainers(&podStatus.Spec, podutils.AllContainers, func(c *v1.Container, containerType podutils.ContainerType) bool {
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns, podStatus.Name, c.Name)
 			if err != nil {
 				framework.Logf("Failed to get logs from node %q pod %q container %q: %v",
@@ -192,14 +201,14 @@ func MatchContainerOutput(
 	if err != nil {
 		framework.Logf("Failed to get logs from node %q pod %q container %q. %v",
 			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
+		return fmt.Errorf("failed to get logs from %s for %s: %w", podStatus.Name, containerName, err)
 	}
 
 	for _, expected := range expectedOutput {
 		m := matcher(expected)
 		matches, err := m.Match(logs)
 		if err != nil {
-			return fmt.Errorf("expected %q in container output: %v", expected, err)
+			return fmt.Errorf("expected %q in container output: %w", expected, err)
 		} else if !matches {
 			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
 		}

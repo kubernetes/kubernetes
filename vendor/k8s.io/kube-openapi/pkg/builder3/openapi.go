@@ -327,6 +327,21 @@ func BuildOpenAPISpecFromRoutes(webServices []common.RouteContainer, config *com
 	return a.spec, nil
 }
 
+// BuildOpenAPIDefinitionsForResource builds a partial OpenAPI spec given a sample object and common.Config to customize it.
+// BuildOpenAPIDefinitionsForResources returns the OpenAPI spec which includes the definitions for the
+// passed type names.
+func BuildOpenAPIDefinitionsForResources(config *common.Config, names ...string) (map[string]*spec.Schema, error) {
+	o := newOpenAPI(config)
+	// We can discard the return value of toSchema because all we care about is the side effect of calling it.
+	// All the models created for this resource get added to o.swagger.Definitions
+	for _, name := range names {
+		_, err := o.toSchema(name)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return o.spec.Components.Schemas, nil
+}
 func (o *openAPI) findCommonParameters(routes []common.Route) (map[interface{}]*spec3.Parameter, error) {
 	commonParamsMap := make(map[interface{}]*spec3.Parameter, 0)
 	paramOpsCountByName := make(map[interface{}]int, 0)

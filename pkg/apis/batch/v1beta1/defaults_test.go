@@ -41,8 +41,8 @@ func TestSetDefaultCronJob(t *testing.T) {
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.AllowConcurrent,
 					Suspend:                    newBool(false),
-					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(3),
-					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(1),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32(3),
+					FailedJobsHistoryLimit:     utilpointer.Int32(1),
 				},
 			},
 		},
@@ -51,16 +51,16 @@ func TestSetDefaultCronJob(t *testing.T) {
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
 					Suspend:                    newBool(true),
-					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
-					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32(5),
+					FailedJobsHistoryLimit:     utilpointer.Int32(5),
 				},
 			},
 			expected: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
 					Suspend:                    newBool(true),
-					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
-					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32(5),
+					FailedJobsHistoryLimit:     utilpointer.Int32(5),
 				},
 			},
 		},

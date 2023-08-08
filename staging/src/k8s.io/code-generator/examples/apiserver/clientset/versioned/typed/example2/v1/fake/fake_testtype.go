@@ -21,13 +21,12 @@ package fake
 import (
 	"context"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	example2v1 "k8s.io/code-generator/examples/apiserver/apis/example2/v1"
+	v1 "k8s.io/code-generator/examples/apiserver/apis/example2/v1"
 )
 
 // FakeTestTypes implements TestTypeInterface
@@ -36,25 +35,25 @@ type FakeTestTypes struct {
 	ns   string
 }
 
-var testtypesResource = schema.GroupVersionResource{Group: "example.test.apiserver.code-generator.k8s.io", Version: "v1", Resource: "testtypes"}
+var testtypesResource = v1.SchemeGroupVersion.WithResource("testtypes")
 
-var testtypesKind = schema.GroupVersionKind{Group: "example.test.apiserver.code-generator.k8s.io", Version: "v1", Kind: "TestType"}
+var testtypesKind = v1.SchemeGroupVersion.WithKind("TestType")
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *FakeTestTypes) Get(ctx context.Context, name string, options v1.GetOptions) (result *example2v1.TestType, err error) {
+func (c *FakeTestTypes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &example2v1.TestType{})
+		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &v1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2v1.TestType), err
+	return obj.(*v1.TestType), err
 }
 
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *FakeTestTypes) List(ctx context.Context, opts v1.ListOptions) (result *example2v1.TestTypeList, err error) {
+func (c *FakeTestTypes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.TestTypeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &example2v1.TestTypeList{})
+		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &v1.TestTypeList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +63,8 @@ func (c *FakeTestTypes) List(ctx context.Context, opts v1.ListOptions) (result *
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &example2v1.TestTypeList{ListMeta: obj.(*example2v1.TestTypeList).ListMeta}
-	for _, item := range obj.(*example2v1.TestTypeList).Items {
+	list := &v1.TestTypeList{ListMeta: obj.(*v1.TestTypeList).ListMeta}
+	for _, item := range obj.(*v1.TestTypeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +73,69 @@ func (c *FakeTestTypes) List(ctx context.Context, opts v1.ListOptions) (result *
 }
 
 // Watch returns a watch.Interface that watches the requested testTypes.
-func (c *FakeTestTypes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeTestTypes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(testtypesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Create(ctx context.Context, testType *example2v1.TestType, opts v1.CreateOptions) (result *example2v1.TestType, err error) {
+func (c *FakeTestTypes) Create(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (result *v1.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &example2v1.TestType{})
+		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &v1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2v1.TestType), err
+	return obj.(*v1.TestType), err
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Update(ctx context.Context, testType *example2v1.TestType, opts v1.UpdateOptions) (result *example2v1.TestType, err error) {
+func (c *FakeTestTypes) Update(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &example2v1.TestType{})
+		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &v1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2v1.TestType), err
+	return obj.(*v1.TestType), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeTestTypes) UpdateStatus(ctx context.Context, testType *example2v1.TestType, opts v1.UpdateOptions) (*example2v1.TestType, error) {
+func (c *FakeTestTypes) UpdateStatus(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (*v1.TestType, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &example2v1.TestType{})
+		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &v1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2v1.TestType), err
+	return obj.(*v1.TestType), err
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
-func (c *FakeTestTypes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeTestTypes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(testtypesResource, c.ns, name, opts), &example2v1.TestType{})
+		Invokes(testing.NewDeleteActionWithOptions(testtypesResource, c.ns, name, opts), &v1.TestType{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeTestTypes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeTestTypes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(testtypesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &example2v1.TestTypeList{})
+	_, err := c.Fake.Invokes(action, &v1.TestTypeList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *FakeTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *example2v1.TestType, err error) {
+func (c *FakeTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, pt, data, subresources...), &example2v1.TestType{})
+		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, pt, data, subresources...), &v1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example2v1.TestType), err
+	return obj.(*v1.TestType), err
 }

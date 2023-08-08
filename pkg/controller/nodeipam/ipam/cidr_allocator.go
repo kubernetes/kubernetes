@@ -91,11 +91,11 @@ type CIDRAllocator interface {
 	// AllocateOrOccupyCIDR looks at the given node, assigns it a valid
 	// CIDR if it doesn't currently have one or mark the CIDR as used if
 	// the node already have one.
-	AllocateOrOccupyCIDR(node *v1.Node) error
+	AllocateOrOccupyCIDR(logger klog.Logger, node *v1.Node) error
 	// ReleaseCIDR releases the CIDR of the removed node.
-	ReleaseCIDR(node *v1.Node) error
+	ReleaseCIDR(logger klog.Logger, node *v1.Node) error
 	// Run starts all the working logic of the allocator.
-	Run(stopCh <-chan struct{})
+	Run(ctx context.Context)
 }
 
 // CIDRAllocatorParams is parameters that's required for creating new
@@ -119,29 +119,30 @@ type nodeReservedCIDRs struct {
 }
 
 // New creates a new CIDR range allocator.
-func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, clusterCIDRInformer networkinginformers.ClusterCIDRInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
-	nodeList, err := listNodes(kubeClient)
+func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, clusterCIDRInformer networkinginformers.ClusterCIDRInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
+	logger := klog.FromContext(ctx)
+	nodeList, err := listNodes(logger, kubeClient)
 	if err != nil {
 		return nil, err
 	}
 
 	switch allocatorType {
 	case RangeAllocatorType:
-		return NewCIDRRangeAllocator(kubeClient, nodeInformer, allocatorParams, nodeList)
+		return NewCIDRRangeAllocator(logger, kubeClient, nodeInformer, allocatorParams, nodeList)
 	case MultiCIDRRangeAllocatorType:
 		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRRangeAllocator) {
 			return nil, fmt.Errorf("invalid CIDR allocator type: %v, feature gate %v must be enabled", allocatorType, features.MultiCIDRRangeAllocator)
 		}
-		return NewMultiCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDRInformer, allocatorParams, nodeList, nil)
+		return NewMultiCIDRRangeAllocator(ctx, kubeClient, nodeInformer, clusterCIDRInformer, allocatorParams, nodeList, nil)
 
 	case CloudAllocatorType:
-		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
+		return NewCloudCIDRAllocator(logger, kubeClient, cloud, nodeInformer)
 	default:
 		return nil, fmt.Errorf("invalid CIDR allocator type: %v", allocatorType)
 	}
 }
 
-func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
+func listNodes(logger klog.Logger, kubeClient clientset.Interface) (*v1.NodeList, error) {
 	var nodeList *v1.NodeList
 	// We must poll because apiserver might not be up. This error causes
 	// controller manager to restart.
@@ -152,7 +153,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 			LabelSelector: labels.Everything().String(),
 		})
 		if err != nil {
-			klog.Errorf("Failed to list all nodes: %v", err)
+			logger.Error(err, "Failed to list all nodes")
 			return false, nil
 		}
 		return true, nil

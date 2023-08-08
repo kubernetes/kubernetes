@@ -18,19 +18,24 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -38,6 +43,7 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
@@ -54,12 +60,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Create the new, version-branched kubelet ComponentConfig ConfigMap
-	if err := kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
+	if err := kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, patchesDir, client); err != nil {
 		errs = append(errs, errors.Wrap(err, "error creating kubelet configuration ConfigMap"))
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
-	if err := writeKubeletConfigFiles(client, cfg, patchesDir, dryRun, out); err != nil {
+	if err := WriteKubeletConfigFiles(cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -99,6 +105,41 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
 		errs = append(errs, err)
 	}
+
+	if err := PerformAddonsUpgrade(client, cfg, out); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errorsutil.NewAggregate(errs)
+}
+
+// PerformAddonsUpgrade performs the upgrade of the coredns and kube-proxy addons.
+// When UpgradeAddonsBeforeControlPlane feature gate is enabled, the addons will be upgraded immediately.
+// When UpgradeAddonsBeforeControlPlane feature gate is disabled, the addons will only get updated after all the control plane instances have been upgraded.
+func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, out io.Writer) error {
+	unupgradedControlPlanes, err := unupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
+		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
+			return err
+		}
+
+		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
+		klog.V(1).Info(err)
+	}
+	if len(unupgradedControlPlanes) > 0 {
+		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
+			fmt.Fprintf(out, "[upgrade/addons] skip upgrade addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
+			return nil
+		}
+
+		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
+		klog.V(1).Infof("upgrading addons when control plane instances %v have not been upgraded "+
+			"may lead to incompatibility problems. You can disable the UpgradeAddonsBeforeControlPlane feature gate to "+
+			"ensure that the addons upgrade is executed only when all the control plane instances have been upgraded.", unupgradedControlPlanes)
+	}
+
+	var errs []error
 
 	// If the coredns ConfigMap is missing, show a warning and assume that the
 	// DNS addon was skipped during "kubeadm init", and that its redeployment on upgrade is not desired.
@@ -153,12 +194,86 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	return errorsutil.NewAggregate(errs)
 }
 
-func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
+// unupgradedControlPlaneInstances returns a list of control palne instances that have not yet been upgraded.
+//
+// NB. This function can only be called after the current control plane instance has been upgraded already.
+// Because it determines whether the other control plane instances have been upgraded by checking whether
+// the kube-apiserver image of other control plane instance is the same as that of this instance.
+func unupgradedControlPlaneInstances(client clientset.Interface, nodeName string) ([]string, error) {
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{
+		"component": kubeadmconstants.KubeAPIServer,
+	}))
+	pods, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list kube-apiserver Pod from cluster")
+	}
+	if len(pods.Items) == 0 {
+		return nil, errors.Errorf("cannot find kube-apiserver Pod by label selector: %v", selector.String())
+	}
+
+	nodeImageMap := map[string]string{}
+
+	for _, pod := range pods.Items {
+		found := false
+		for _, c := range pod.Spec.Containers {
+			if c.Name == kubeadmconstants.KubeAPIServer {
+				nodeImageMap[pod.Spec.NodeName] = c.Image
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, errors.Errorf("cannot find container by name %q for Pod %v", kubeadmconstants.KubeAPIServer, klog.KObj(&pod))
+		}
+	}
+
+	upgradedImage, ok := nodeImageMap[nodeName]
+	if !ok {
+		return nil, errors.Errorf("cannot find kube-apiserver image for current control plane instance %v", nodeName)
+	}
+
+	unupgradedNodes := sets.New[string]()
+	for node, image := range nodeImageMap {
+		if image != upgradedImage {
+			unupgradedNodes.Insert(node)
+		}
+	}
+
+	if len(unupgradedNodes) > 0 {
+		return sets.List(unupgradedNodes), nil
+	}
+
+	return nil, nil
+}
+
+func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
+	// Set up the kubelet directory to use. If dry-running, this will return a fake directory
 	kubeletDir, err := GetKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
 		return err
 	}
+
+	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp/ folder.
+	backupDir, err := kubeadmconstants.CreateTempDirForKubeadm(kubeadmconstants.KubernetesDir, "kubeadm-kubelet-config")
+	if err != nil {
+		return err
+	}
+	src := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
+	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
+
+	if !dryRun {
+		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
+		err := kubeadmutil.CopyFile(src, dest)
+		if err != nil {
+			return errors.Wrap(err, "error backing up the kubelet config file")
+		}
+	} else {
+		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
+	}
+
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
 	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
@@ -166,7 +281,10 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	if dryRun { // Print what contents would be written
-		dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		if err != nil {
+			errs = append(errs, errors.Wrap(err, "error printing files on dryrun"))
+		}
 	}
 	return errorsutil.NewAggregate(errs)
 }

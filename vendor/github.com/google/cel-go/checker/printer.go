@@ -26,7 +26,7 @@ type semanticAdorner struct {
 
 var _ debug.Adorner = &semanticAdorner{}
 
-func (a *semanticAdorner) GetMetadata(elem interface{}) string {
+func (a *semanticAdorner) GetMetadata(elem any) string {
 	result := ""
 	e, isExpr := elem.(*exprpb.Expr)
 	if !isExpr {

@@ -20,6 +20,7 @@ import (
 	"path"
 	"reflect"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -62,4 +63,10 @@ func AnnotatedLocationWithOffset(annotation string, offset int) types.CodeLocati
 	codeLocation.FileName = path.Base(codeLocation.FileName)
 	codeLocation = types.NewCustomCodeLocation(annotation + " | " + codeLocation.String())
 	return codeLocation
+}
+
+// ConformanceIt is wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
+func ConformanceIt(text string, args ...interface{}) bool {
+	args = append(args, ginkgo.Offset(1))
+	return ginkgo.It(text+" [Conformance]", args...)
 }

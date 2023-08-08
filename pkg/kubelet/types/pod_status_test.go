@@ -26,7 +26,7 @@ import (
 )
 
 func TestPodConditionByKubelet(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHasNetworkCondition, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, true)()
 
 	trueCases := []v1.PodConditionType{
@@ -34,7 +34,7 @@ func TestPodConditionByKubelet(t *testing.T) {
 		v1.PodReady,
 		v1.PodInitialized,
 		v1.ContainersReady,
-		PodHasNetwork,
+		PodReadyToStartContainers,
 	}
 
 	for _, tc := range trueCases {

@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -85,7 +86,7 @@ type LabelOptions struct {
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	// Common shared fields
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -118,7 +119,7 @@ var (
 		kubectl label pods foo bar-`))
 )
 
-func NewLabelOptions(ioStreams genericclioptions.IOStreams) *LabelOptions {
+func NewLabelOptions(ioStreams genericiooptions.IOStreams) *LabelOptions {
 	return &LabelOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		Recorder:    genericclioptions.NoopRecorder{},
@@ -129,7 +130,7 @@ func NewLabelOptions(ioStreams genericclioptions.IOStreams) *LabelOptions {
 	}
 }
 
-func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdLabel(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewLabelOptions(ioStreams)
 
 	cmd := &cobra.Command{

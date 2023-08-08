@@ -39,7 +39,7 @@ import (
 
 var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 	f := framework.NewDefaultFramework("ingressclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var cs clientset.Interface
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
@@ -176,11 +176,11 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 			Spec: networkingv1.IngressClassSpec{
 				Controller: "example.com/controller",
 				Parameters: &networkingv1.IngressClassParametersReference{
-					Scope:     utilpointer.StringPtr("Namespace"),
-					Namespace: utilpointer.StringPtr("foo-ns"),
+					Scope:     utilpointer.String("Namespace"),
+					Namespace: utilpointer.String("foo-ns"),
 					Kind:      "fookind",
 					Name:      "fooname",
-					APIGroup:  utilpointer.StringPtr("example.com"),
+					APIGroup:  utilpointer.String("example.com"),
 				},
 			},
 		}
@@ -249,7 +249,7 @@ func deleteIngressClass(ctx context.Context, cs clientset.Interface, name string
 
 var _ = common.SIGDescribe("IngressClass API", func() {
 	f := framework.NewDefaultFramework("ingressclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var cs clientset.Interface
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet

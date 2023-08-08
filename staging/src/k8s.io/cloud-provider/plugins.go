@@ -40,7 +40,6 @@ var (
 		external bool
 		detail   string
 	}{
-		{"aws", false, "The AWS provider is deprecated and will be removed in a future release. Please use https://github.com/kubernetes/cloud-provider-aws"},
 		{"azure", false, "The Azure provider is deprecated and will be removed in a future release. Please use https://github.com/kubernetes-sigs/cloud-provider-azure"},
 		{"gce", false, "The GCE provider is deprecated and will be removed in a future release. Please use https://github.com/kubernetes/cloud-provider-gcp"},
 		{"vsphere", false, "The vSphere provider is deprecated and will be removed in a future release. Please use https://github.com/kubernetes/cloud-provider-vsphere"},

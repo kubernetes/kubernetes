@@ -57,7 +57,7 @@ const (
 
 var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-performance")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		client           clientset.Interface
@@ -86,7 +86,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, client)
 		framework.ExpectNoError(err)
-		gomega.Expect(len(nodes.Items)).To(gomega.BeNumerically(">=", 1), "Requires at least %d nodes (not %d)", 2, len(nodes.Items))
+		gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty(), "Requires at least one ready node")
 
 		msg := fmt.Sprintf("Cannot attach %d volumes to %d nodes. Maximum volumes that can be attached on %d nodes is %d", volumeCount, len(nodes.Items), len(nodes.Items), SCSIUnitsAvailablePerNode*len(nodes.Items))
 		gomega.Expect(volumeCount).To(gomega.BeNumerically("<=", SCSIUnitsAvailablePerNode*len(nodes.Items)), msg)
@@ -197,7 +197,7 @@ func invokeVolumeLifeCyclePerformance(ctx context.Context, f *framework.Framewor
 	start = time.Now()
 	for i, pvclaims := range totalpvclaims {
 		nodeSelector := nodeSelectorList[i%len(nodeSelectorList)]
-		pod, err := e2epod.CreatePod(ctx, client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(ctx, client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err)
 		totalpods = append(totalpods, pod)
 

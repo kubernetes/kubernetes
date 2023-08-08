@@ -29,7 +29,7 @@ providers:
 3. Configuring the following additional flags on the kubelet:
 
 ```
---feature-gates=DisableKubeletCloudCredentialProviders=true,KubeletCredentialProviders=true
+--feature-gates=DisableKubeletCloudCredentialProviders=true
 --image-credential-provider-config=/tmp/node-e2e-123456/credential-provider.yaml
 --image-credential-provider-bin-dir=/tmp/node-e2e-12345
 ```

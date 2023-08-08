@@ -65,12 +65,12 @@ func DeletePodWithWaitByName(ctx context.Context, c clientset.Interface, podName
 		if apierrors.IsNotFound(err) {
 			return nil // assume pod was already deleted
 		}
-		return fmt.Errorf("pod Delete API error: %v", err)
+		return fmt.Errorf("pod Delete API error: %w", err)
 	}
 	framework.Logf("Wait up to %v for pod %q to be fully deleted", PodDeleteTimeout, podName)
 	err = WaitForPodNotFoundInNamespace(ctx, c, podName, podNamespace, PodDeleteTimeout)
 	if err != nil {
-		return fmt.Errorf("pod %q was not deleted: %v", podName, err)
+		return fmt.Errorf("pod %q was not deleted: %w", podName, err)
 	}
 	return nil
 }
@@ -98,7 +98,7 @@ func DeletePodWithGracePeriodByName(ctx context.Context, c clientset.Interface, 
 		if apierrors.IsNotFound(err) {
 			return nil // assume pod was already deleted
 		}
-		return fmt.Errorf("pod Delete API error: %v", err)
+		return fmt.Errorf("pod Delete API error: %w", err)
 	}
 	return nil
 }

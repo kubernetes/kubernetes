@@ -686,7 +686,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 		g.generateSimpleProperty(typeString, format)
 		if enumType, isEnum := g.enumContext.EnumType(m.Type); isEnum {
 			// original type is an enum, add "Enum: " and the values
-			g.Do("Enum: []interface{}{$.$}", strings.Join(enumType.ValueStrings(), ", "))
+			g.Do("Enum: []interface{}{$.$},\n", strings.Join(enumType.ValueStrings(), ", "))
 		}
 		g.Do("},\n},\n", nil)
 		return nil

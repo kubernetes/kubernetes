@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -53,12 +53,12 @@ type ControllerStorage struct {
 }
 
 // ReplicasPathMappings returns the mappings between each group version and a replicas path
-func ReplicasPathMappings() fieldmanager.ResourcePathMappings {
+func ReplicasPathMappings() managedfields.ResourcePathMappings {
 	return replicasPathInReplicationController
 }
 
 // maps a group version to the replicas path in a deployment object
-var replicasPathInReplicationController = fieldmanager.ResourcePathMappings{
+var replicasPathInReplicationController = managedfields.ResourcePathMappings{
 	schema.GroupVersion{Group: "", Version: "v1"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
 }
 
@@ -82,10 +82,11 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.ReplicationController{} },
-		NewListFunc:              func() runtime.Object { return &api.ReplicationControllerList{} },
-		PredicateFunc:            replicationcontroller.MatchController,
-		DefaultQualifiedResource: api.Resource("replicationcontrollers"),
+		NewFunc:                   func() runtime.Object { return &api.ReplicationController{} },
+		NewListFunc:               func() runtime.Object { return &api.ReplicationControllerList{} },
+		PredicateFunc:             replicationcontroller.MatchController,
+		DefaultQualifiedResource:  api.Resource("replicationcontrollers"),
+		SingularQualifiedResource: api.Resource("replicationcontroller"),
 
 		CreateStrategy:      replicationcontroller.Strategy,
 		UpdateStrategy:      replicationcontroller.Strategy,
@@ -282,7 +283,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		}
 	}
 
-	managedFieldsHandler := fieldmanager.NewScaleHandler(
+	managedFieldsHandler := managedfields.NewScaleHandler(
 		replicationcontroller.ManagedFields,
 		groupVersion,
 		replicasPathInReplicationController,

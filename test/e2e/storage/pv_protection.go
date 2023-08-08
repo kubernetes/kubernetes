@@ -50,11 +50,11 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	)
 
 	f := framework.NewDefaultFramework("pv-protection")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, f.Timeouts.NodeSchedulable))
 
 		// Enforce binding only within test space via selector labels
 		volLabel = labels.Set{e2epv.VolumeSelectorKey: nameSpace}

@@ -37,7 +37,7 @@ import (
 
 var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 	f := framework.NewDefaultFramework("pvc-retroactive-storageclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var (
 		client    clientset.Interface
@@ -176,7 +176,7 @@ func waitForPVCStorageClass(ctx context.Context, c clientset.Interface, namespac
 	})
 
 	if err != nil {
-		return watchedPVC, fmt.Errorf("error waiting for claim %s to have StorageClass set to %s: %v", pvcName, scName, err)
+		return watchedPVC, fmt.Errorf("error waiting for claim %s to have StorageClass set to %s: %w", pvcName, scName, err)
 	}
 
 	return watchedPVC, nil

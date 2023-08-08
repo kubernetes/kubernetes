@@ -18,17 +18,16 @@ package explain
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/discovery"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	openapiclient "k8s.io/client-go/openapi"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/explain"
-	explainv2 "k8s.io/kubectl/pkg/explain/v2"
+	openapiv3explain "k8s.io/kubectl/pkg/explain/v2"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -36,26 +35,37 @@ import (
 
 var (
 	explainLong = templates.LongDesc(i18n.T(`
-		List the fields for supported resources.
+		Describe fields and structure of various resources.
 
 		This command describes the fields associated with each supported API resource.
 		Fields are identified via a simple JSONPath identifier:
 
 			<type>.<fieldName>[.<fieldName>]
 
-		Add the --recursive flag to display all of the fields at once without descriptions.
 		Information about each field is retrieved from the server in OpenAPI format.`))
 
 	explainExamples = templates.Examples(i18n.T(`
 		# Get the documentation of the resource and its fields
 		kubectl explain pods
 
+		# Get all the fields in the resource
+		kubectl explain pods --recursive
+
+		# Get the explanation for deployment in supported api versions
+		kubectl explain deployments --api-version=apps/v1
+
 		# Get the documentation of a specific field of a resource
-		kubectl explain pods.spec.containers`))
+		kubectl explain pods.spec.containers
+		
+		# Get the documentation of resources in different format
+		kubectl explain deployment --output=plaintext-openapiv2`))
+
+	plaintextTemplateName          = "plaintext"
+	plaintextOpenAPIV2TemplateName = "plaintext-openapiv2"
 )
 
 type ExplainOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	CmdParent  string
 	APIVersion string
@@ -66,33 +76,27 @@ type ExplainOptions struct {
 	Mapper meta.RESTMapper
 	Schema openapi.Resources
 
-	// Toggles whether the OpenAPI v3 template-based renderer should be used to show
-	// output.
-	EnableOpenAPIV3 bool
-
-	// Name of the template to use with the openapiv3 template renderer. If
-	// `EnableOpenAPIV3` is disabled, this does nothing
+	// Name of the template to use with the openapiv3 template renderer.
 	OutputFormat string
 
 	// Client capable of fetching openapi documents from the user's cluster
-	DiscoveryClient discovery.DiscoveryInterface
+	OpenAPIV3Client openapiclient.Client
 }
 
-func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *ExplainOptions {
+func NewExplainOptions(parent string, streams genericiooptions.IOStreams) *ExplainOptions {
 	return &ExplainOptions{
-		IOStreams:       streams,
-		CmdParent:       parent,
-		EnableOpenAPIV3: os.Getenv("KUBECTL_EXPLAIN_OPENAPIV3") == "true",
-		OutputFormat:    "plaintext",
+		IOStreams:    streams,
+		CmdParent:    parent,
+		OutputFormat: plaintextTemplateName,
 	}
 }
 
 // NewCmdExplain returns a cobra command for swagger docs
-func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewExplainOptions(parent, streams)
 
 	cmd := &cobra.Command{
-		Use:                   "explain RESOURCE",
+		Use:                   "explain TYPE [--recursive=FALSE|TRUE] [--api-version=api-version-group] [--output=plaintext|plaintext-openapiv2]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Get documentation for a resource"),
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
@@ -103,13 +107,11 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "Print the fields of fields (Currently only 1 level deep)")
-	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Get different explanations for particular API version (API group/version)")
+	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "When true, print the name of all the fields recursively. Otherwise, print the available fields with their description.")
+	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Use given api-version (group/version) of the resource.")
 
 	// Only enable --output as a valid flag if the feature is enabled
-	if o.EnableOpenAPIV3 {
-		cmd.Flags().StringVar(&o.OutputFormat, "output", o.OutputFormat, "Format in which to render the schema")
-	}
+	cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema. Valid values are: (plaintext, plaintext-openapiv2).")
 
 	return cmd
 }
@@ -127,12 +129,9 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	}
 
 	// Only openapi v3 needs the discovery client.
-	if o.EnableOpenAPIV3 {
-		discoveryClient, err := f.ToDiscoveryClient()
-		if err != nil {
-			return err
-		}
-		o.DiscoveryClient = discoveryClient
+	o.OpenAPIV3Client, err = f.OpenAPIV3Client()
+	if err != nil {
+		return err
 	}
 
 	o.args = args
@@ -152,13 +151,10 @@ func (o *ExplainOptions) Validate() error {
 
 // Run executes the appropriate steps to print a model's documentation
 func (o *ExplainOptions) Run() error {
-	recursive := o.Recursive
-	apiVersionString := o.APIVersion
-
 	var fullySpecifiedGVR schema.GroupVersionResource
 	var fieldsPath []string
 	var err error
-	if len(apiVersionString) == 0 {
+	if len(o.APIVersion) == 0 {
 		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequestWithMatchingPrefix(o.args[0], o.Mapper)
 		if err != nil {
 			return err
@@ -173,16 +169,44 @@ func (o *ExplainOptions) Run() error {
 		}
 	}
 
-	if o.EnableOpenAPIV3 {
-		return explainv2.PrintModelDescription(
+	// Fallback to openapiv2 implementation using special template name
+	switch o.OutputFormat {
+	case plaintextOpenAPIV2TemplateName:
+		return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
+	case plaintextTemplateName:
+		// Check whether the server reponds to OpenAPIV3.
+		if _, err := o.OpenAPIV3Client.Paths(); err != nil {
+			// Use v2 renderer if server does not support v3
+			return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
+		}
+
+		fallthrough
+	default:
+		if len(o.APIVersion) > 0 {
+			apiVersion, err := schema.ParseGroupVersion(o.APIVersion)
+			if err != nil {
+				return err
+			}
+			fullySpecifiedGVR.Group = apiVersion.Group
+			fullySpecifiedGVR.Version = apiVersion.Version
+		}
+
+		return openapiv3explain.PrintModelDescription(
 			fieldsPath,
 			o.Out,
-			o.DiscoveryClient.OpenAPIV3(),
+			o.OpenAPIV3Client,
 			fullySpecifiedGVR,
-			recursive,
+			o.Recursive,
 			o.OutputFormat,
 		)
 	}
+}
+
+func (o *ExplainOptions) renderOpenAPIV2(
+	fullySpecifiedGVR schema.GroupVersionResource,
+	fieldsPath []string,
+) error {
+	var err error
 
 	gvk, _ := o.Mapper.KindFor(fullySpecifiedGVR)
 	if gvk.Empty() {
@@ -192,8 +216,8 @@ func (o *ExplainOptions) Run() error {
 		}
 	}
 
-	if len(apiVersionString) != 0 {
-		apiVersion, err := schema.ParseGroupVersion(apiVersionString)
+	if len(o.APIVersion) != 0 {
+		apiVersion, err := schema.ParseGroupVersion(o.APIVersion)
 		if err != nil {
 			return err
 		}
@@ -205,5 +229,5 @@ func (o *ExplainOptions) Run() error {
 		return fmt.Errorf("couldn't find resource for %q", gvk)
 	}
 
-	return explain.PrintModelDescription(fieldsPath, o.Out, schema, gvk, recursive)
+	return explain.PrintModelDescription(fieldsPath, o.Out, schema, gvk, o.Recursive)
 }

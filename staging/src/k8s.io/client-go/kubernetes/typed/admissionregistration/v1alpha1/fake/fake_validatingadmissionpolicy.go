@@ -26,7 +26,6 @@ import (
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
@@ -38,9 +37,9 @@ type FakeValidatingAdmissionPolicies struct {
 	Fake *FakeAdmissionregistrationV1alpha1
 }
 
-var validatingadmissionpoliciesResource = schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Resource: "validatingadmissionpolicies"}
+var validatingadmissionpoliciesResource = v1alpha1.SchemeGroupVersion.WithResource("validatingadmissionpolicies")
 
-var validatingadmissionpoliciesKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingAdmissionPolicy"}
+var validatingadmissionpoliciesKind = v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicy")
 
 // Get takes name of the validatingAdmissionPolicy, and returns the corresponding validatingAdmissionPolicy object, and an error if there is any.
 func (c *FakeValidatingAdmissionPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
@@ -99,6 +98,17 @@ func (c *FakeValidatingAdmissionPolicies) Update(ctx context.Context, validating
 	return obj.(*v1alpha1.ValidatingAdmissionPolicy), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeValidatingAdmissionPolicies) UpdateStatus(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (*v1alpha1.ValidatingAdmissionPolicy, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateSubresourceAction(validatingadmissionpoliciesResource, "status", validatingAdmissionPolicy), &v1alpha1.ValidatingAdmissionPolicy{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ValidatingAdmissionPolicy), err
+}
+
 // Delete takes name of the validatingAdmissionPolicy and deletes it. Returns an error if one occurs.
 func (c *FakeValidatingAdmissionPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
@@ -139,6 +149,28 @@ func (c *FakeValidatingAdmissionPolicies) Apply(ctx context.Context, validatingA
 	}
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpoliciesResource, *name, types.ApplyPatchType, data), &v1alpha1.ValidatingAdmissionPolicy{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ValidatingAdmissionPolicy), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeValidatingAdmissionPolicies) ApplyStatus(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
+	if validatingAdmissionPolicy == nil {
+		return nil, fmt.Errorf("validatingAdmissionPolicy provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(validatingAdmissionPolicy)
+	if err != nil {
+		return nil, err
+	}
+	name := validatingAdmissionPolicy.Name
+	if name == nil {
+		return nil, fmt.Errorf("validatingAdmissionPolicy.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpoliciesResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.ValidatingAdmissionPolicy{})
 	if obj == nil {
 		return nil, err
 	}

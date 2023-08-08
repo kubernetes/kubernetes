@@ -57,12 +57,12 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 	)
 
 	f := framework.NewDefaultFramework("mounted-volume-expand")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, f.Timeouts.NodeSchedulable))
 
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
@@ -111,7 +111,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		// Keeping pod on same node reproduces the scenario that volume might already be mounted when resize is attempted.
 		// We should consider adding a unit test that exercises this better.
 		ginkgo.By("Creating a deployment with selected PVC")
-		deployment, err := e2edeployment.CreateDeployment(ctx, c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
+		deployment, err := e2edeployment.CreateDeployment(ctx, c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, admissionapi.LevelRestricted, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
 		ginkgo.DeferCleanup(c.AppsV1().Deployments(ns).Delete, deployment.Name, metav1.DeleteOptions{})
 
@@ -120,6 +120,14 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		pvs, err := e2epv.WaitForPVClaimBoundPhase(ctx, c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 		framework.ExpectEqual(len(pvs), 1)
+
+		ginkgo.By("Wait for a pod from deployment to be running")
+		podList, err := e2edeployment.GetPodsForDeployment(ctx, c, deployment)
+		framework.ExpectNoError(err, "While getting pods from deployment")
+		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
+		pod := podList.Items[0]
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+		framework.ExpectNoError(err, "While waiting for pods to be ready")
 
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
@@ -138,10 +146,10 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 		ginkgo.By("Getting a pod from deployment")
-		podList, err := e2edeployment.GetPodsForDeployment(ctx, c, deployment)
+		podList, err = e2edeployment.GetPodsForDeployment(ctx, c, deployment)
 		framework.ExpectNoError(err, "While getting pods from deployment")
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
-		pod := podList.Items[0]
+		pod = podList.Items[0]
 
 		ginkgo.By("Deleting the pod from deployment")
 		err = e2epod.DeletePodWithWait(ctx, c, &pod)
@@ -165,7 +173,7 @@ func waitForDeploymentToRecreatePod(ctx context.Context, client clientset.Interf
 	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 		podList, err := e2edeployment.GetPodsForDeployment(ctx, client, deployment)
 		if err != nil {
-			return false, fmt.Errorf("failed to get pods for deployment: %v", err)
+			return false, fmt.Errorf("failed to get pods for deployment: %w", err)
 		}
 		for _, pod := range podList.Items {
 			switch pod.Status.Phase {

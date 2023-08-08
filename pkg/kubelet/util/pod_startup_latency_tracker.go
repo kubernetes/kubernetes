@@ -102,7 +102,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 		klog.InfoS("Observed pod startup duration",
 			"pod", klog.KObj(pod),
 			"podStartSLOduration", podStartSLOduration,
-			"pod.CreationTimestamp", pod.CreationTimestamp.Time,
+			"podCreationTimestamp", pod.CreationTimestamp.Time,
 			"firstStartedPulling", state.firstStartedPulling,
 			"lastFinishedPulling", state.lastFinishedPulling,
 			"observedRunningTime", state.observedRunningTime,

@@ -21,7 +21,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::verify_go_version
+kube::golang::setup_env
 
 cd "${KUBE_ROOT}"
 
@@ -39,4 +39,5 @@ find_files() {
     \) -name 'OWNERS*'
 }
 
+export GO111MODULE=on
 find_files | xargs go run cmd/yamlfmt/yamlfmt.go

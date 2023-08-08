@@ -464,11 +464,11 @@ kubernetesVersion: %s`,
 			err := config.load()
 			if test.expectErr {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
 			}
-			for _, assertFunc := range test.assertions {
-				assertFunc(t, config)
+			if !test.expectErr && assert.NoError(t, err) {
+				for _, assertFunc := range test.assertions {
+					assertFunc(t, config)
+				}
 			}
 		})
 	}

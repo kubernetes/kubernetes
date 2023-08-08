@@ -25,6 +25,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,10 +38,13 @@ import (
 
 func TestWhoAmIRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		o         *WhoAmIOptions
-		args      []string
-		serverErr error
+		name           string
+		o              *WhoAmIOptions
+		args           []string
+		serverErr      error
+		alphaDisabled  bool
+		betaDisabled   bool
+		stableDisabled bool
 
 		expectedError       error
 		expectedBodyStrings []string
@@ -70,7 +74,7 @@ func TestWhoAmIRun(t *testing.T) {
 			expectedBodyStrings: []string{
 				`{
     "kind": "SelfSubjectReview",
-    "apiVersion": "authentication.k8s.io/v1alpha1",
+    "apiVersion": "authentication.k8s.io/v1",
     "metadata": {
         "creationTimestamp": null
     },
@@ -97,6 +101,128 @@ func TestWhoAmIRun(t *testing.T) {
 }
 `,
 			},
+		},
+		{
+			name: "success test no alpha",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:          []string{},
+			alphaDisabled: true,
+			expectedBodyStrings: []string{
+				`ATTRIBUTE         VALUE`,
+				`Username          jane.doe`,
+				`UID               uniq-id`,
+				`Groups            [students teachers]`,
+				`Extra: skills     [reading learning]`,
+				`Extra: subjects   [math sports]`,
+				``,
+			},
+		},
+		{
+			name: "JSON test no alpha and stable",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printers.NewTypeSetter(scheme.Scheme).ToPrinter(&printers.JSONPrinter{}).PrintObj,
+			},
+			args:           []string{},
+			alphaDisabled:  true,
+			stableDisabled: true,
+			expectedBodyStrings: []string{
+				`{
+    "kind": "SelfSubjectReview",
+    "apiVersion": "authentication.k8s.io/v1beta1",
+    "metadata": {
+        "creationTimestamp": null
+    },
+    "status": {
+        "userInfo": {
+            "username": "jane.doe",
+            "uid": "uniq-id",
+            "groups": [
+                "students",
+                "teachers"
+            ],
+            "extra": {
+                "skills": [
+                    "reading",
+                    "learning"
+                ],
+                "subjects": [
+                    "math",
+                    "sports"
+                ]
+            }
+        }
+    }
+}
+`,
+			},
+		},
+		{
+			name: "success test no beta",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:         []string{},
+			betaDisabled: true,
+			expectedBodyStrings: []string{
+				`ATTRIBUTE         VALUE`,
+				`Username          jane.doe`,
+				`UID               uniq-id`,
+				`Groups            [students teachers]`,
+				`Extra: skills     [reading learning]`,
+				`Extra: subjects   [math sports]`,
+				``,
+			},
+		},
+		{
+			name: "JSON test no beta",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printers.NewTypeSetter(scheme.Scheme).ToPrinter(&printers.JSONPrinter{}).PrintObj,
+			},
+			args:         []string{},
+			betaDisabled: true,
+			expectedBodyStrings: []string{
+				`{
+    "kind": "SelfSubjectReview",
+    "apiVersion": "authentication.k8s.io/v1",
+    "metadata": {
+        "creationTimestamp": null
+    },
+    "status": {
+        "userInfo": {
+            "username": "jane.doe",
+            "uid": "uniq-id",
+            "groups": [
+                "students",
+                "teachers"
+            ],
+            "extra": {
+                "skills": [
+                    "reading",
+                    "learning"
+                ],
+                "subjects": [
+                    "math",
+                    "sports"
+                ]
+            }
+        }
+    }
+}
+`,
+			},
+		},
+		{
+			name: "all API disabled",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:           []string{},
+			betaDisabled:   true,
+			alphaDisabled:  true,
+			stableDisabled: true,
+			expectedError:  notEnabledErr,
 		},
 		{
 			name: "Forbidden error",
@@ -150,22 +276,54 @@ func TestWhoAmIRun(t *testing.T) {
 						return true, nil, test.serverErr
 					}
 
-					res := &authenticationv1alpha1.SelfSubjectReview{
-						Status: authenticationv1alpha1.SelfSubjectReviewStatus{
-							UserInfo: authenticationv1.UserInfo{
-								Username: "jane.doe",
-								UID:      "uniq-id",
-								Groups:   []string{"students", "teachers"},
-								Extra: map[string]authenticationv1.ExtraValue{
-									"subjects": {"math", "sports"},
-									"skills":   {"reading", "learning"},
-								},
-							},
+					ui := authenticationv1.UserInfo{
+						Username: "jane.doe",
+						UID:      "uniq-id",
+						Groups:   []string{"students", "teachers"},
+						Extra: map[string]authenticationv1.ExtraValue{
+							"subjects": {"math", "sports"},
+							"skills":   {"reading", "learning"},
 						},
 					}
-					return true, res, nil
+
+					switch action.GetResource().GroupVersion().String() {
+					case "authentication.k8s.io/v1alpha1":
+						if test.alphaDisabled {
+							return true, nil, errors.NewNotFound(corev1.Resource("selfsubjectreviews"), "foo")
+						}
+						res := &authenticationv1alpha1.SelfSubjectReview{
+							Status: authenticationv1alpha1.SelfSubjectReviewStatus{
+								UserInfo: ui,
+							},
+						}
+						return true, res, nil
+					case "authentication.k8s.io/v1beta1":
+						if test.betaDisabled {
+							return true, nil, errors.NewNotFound(corev1.Resource("selfsubjectreviews"), "foo")
+						}
+						res := &authenticationv1beta1.SelfSubjectReview{
+							Status: authenticationv1beta1.SelfSubjectReviewStatus{
+								UserInfo: ui,
+							},
+						}
+						return true, res, nil
+					case "authentication.k8s.io/v1":
+						if test.stableDisabled {
+							return true, nil, errors.NewNotFound(corev1.Resource("selfsubjectreviews"), "foo")
+						}
+						res := &authenticationv1.SelfSubjectReview{
+							Status: authenticationv1.SelfSubjectReviewStatus{
+								UserInfo: ui,
+							},
+						}
+						return true, res, nil
+					default:
+						return false, nil, fmt.Errorf("unknown API")
+					}
 				})
-			test.o.authClient = fakeAuthClientSet.AuthenticationV1alpha1()
+			test.o.authV1beta1Client = fakeAuthClientSet.AuthenticationV1beta1()
+			test.o.authV1alpha1Client = fakeAuthClientSet.AuthenticationV1alpha1()
+			test.o.authV1Client = fakeAuthClientSet.AuthenticationV1()
 
 			err := test.o.Run()
 			switch {

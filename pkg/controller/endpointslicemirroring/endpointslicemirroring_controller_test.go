@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -48,11 +49,12 @@ type endpointSliceMirroringController struct {
 	serviceStore       cache.Store
 }
 
-func newController(batchPeriod time.Duration) (*fake.Clientset, *endpointSliceMirroringController) {
+func newController(ctx context.Context, batchPeriod time.Duration) (*fake.Clientset, *endpointSliceMirroringController) {
 	client := newClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	esController := NewController(
+		ctx,
 		informerFactory.Core().V1().Endpoints(),
 		informerFactory.Discovery().V1().EndpointSlices(),
 		informerFactory.Core().V1().Services(),
@@ -223,7 +225,8 @@ func TestSyncEndpoints(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			client, esController := newController(time.Duration(0))
+			_, ctx := ktesting.NewTestContext(t)
+			client, esController := newController(ctx, time.Duration(0))
 			tc.endpoints.Name = endpointsName
 			tc.endpoints.Namespace = namespace
 			esController.endpointsStore.Add(tc.endpoints)
@@ -242,7 +245,8 @@ func TestSyncEndpoints(t *testing.T) {
 				}
 			}
 
-			err := esController.syncEndpoints(fmt.Sprintf("%s/%s", namespace, endpointsName))
+			logger, _ := ktesting.NewTestContext(t)
+			err := esController.syncEndpoints(logger, fmt.Sprintf("%s/%s", namespace, endpointsName))
 			if err != nil {
 				t.Fatalf("Unexpected error from syncEndpoints: %v", err)
 			}
@@ -318,7 +322,8 @@ func TestShouldMirror(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, c := newController(time.Duration(0))
+			_, ctx := ktesting.NewTestContext(t)
+			_, c := newController(ctx, time.Duration(0))
 
 			if tc.endpoints != nil {
 				err := c.endpointsStore.Add(tc.endpoints)
@@ -435,7 +440,8 @@ func TestEndpointSlicesMirroredForService(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, c := newController(time.Duration(0))
+			_, ctx := ktesting.NewTestContext(t)
+			_, c := newController(ctx, time.Duration(0))
 
 			err := c.endpointSliceStore.Add(tc.endpointSlice)
 			if err != nil {

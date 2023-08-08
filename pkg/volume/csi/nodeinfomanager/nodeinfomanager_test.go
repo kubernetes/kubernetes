@@ -593,7 +593,7 @@ func TestInstallCSIDriver(t *testing.T) {
 							Name:         "com.example.csi.driver1",
 							NodeID:       "com.example.csi/csi-node1",
 							TopologyKeys: nil,
-							Allocatable:  generateVolumeLimits(10),
+							Allocatable:  generateVolumeLimits(20),
 						},
 					},
 				},

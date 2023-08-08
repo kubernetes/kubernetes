@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"unsafe"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/sys"
 	"github.com/cilium/ebpf/internal/unix"
 )
 
@@ -43,11 +44,6 @@ import (
 var (
 	tracefsPath = "/sys/kernel/debug/tracing"
 
-	// Trace event groups, names and kernel symbols must adhere to this set
-	// of characters. Non-empty, first character must not be a number, all
-	// characters must be alphanumeric or underscore.
-	rgxTraceEvent = regexp.MustCompile("^[a-zA-Z_][0-9a-zA-Z_]*$")
-
 	errInvalidInput = errors.New("invalid input")
 )
 
@@ -69,6 +65,8 @@ const (
 // can be attached to it. It is created based on a tracefs trace event or a
 // Performance Monitoring Unit (PMU).
 type perfEvent struct {
+	// The event type determines the types of programs that can be attached.
+	typ perfEventType
 
 	// Group and name of the tracepoint/kprobe/uprobe.
 	group string
@@ -79,53 +77,15 @@ type perfEvent struct {
 	// ID of the trace event read from tracefs. Valid IDs are non-zero.
 	tracefsID uint64
 
-	// The event type determines the types of programs that can be attached.
-	typ perfEventType
+	// User provided arbitrary value.
+	cookie uint64
 
-	fd *internal.FD
-}
-
-func (pe *perfEvent) isLink() {}
-
-func (pe *perfEvent) Pin(string) error {
-	return fmt.Errorf("pin perf event: %w", ErrNotSupported)
-}
-
-func (pe *perfEvent) Unpin() error {
-	return fmt.Errorf("unpin perf event: %w", ErrNotSupported)
-}
-
-// Since 4.15 (e87c6bc3852b "bpf: permit multiple bpf attachments for a single perf event"),
-// calling PERF_EVENT_IOC_SET_BPF appends the given program to a prog_array
-// owned by the perf event, which means multiple programs can be attached
-// simultaneously.
-//
-// Before 4.15, calling PERF_EVENT_IOC_SET_BPF more than once on a perf event
-// returns EEXIST.
-//
-// Detaching a program from a perf event is currently not possible, so a
-// program replacement mechanism cannot be implemented for perf events.
-func (pe *perfEvent) Update(prog *ebpf.Program) error {
-	return fmt.Errorf("can't replace eBPF program in perf event: %w", ErrNotSupported)
+	// This is the perf event FD.
+	fd *sys.FD
 }
 
 func (pe *perfEvent) Close() error {
-	if pe.fd == nil {
-		return nil
-	}
-
-	pfd, err := pe.fd.Value()
-	if err != nil {
-		return fmt.Errorf("getting perf event fd: %w", err)
-	}
-
-	err = unix.IoctlSetInt(int(pfd), unix.PERF_EVENT_IOC_DISABLE, 0)
-	if err != nil {
-		return fmt.Errorf("disabling perf event: %w", err)
-	}
-
-	err = pe.fd.Close()
-	if err != nil {
+	if err := pe.fd.Close(); err != nil {
 		return fmt.Errorf("closing perf event fd: %w", err)
 	}
 
@@ -148,49 +108,150 @@ func (pe *perfEvent) Close() error {
 	return nil
 }
 
+// perfEventLink represents a bpf perf link.
+type perfEventLink struct {
+	RawLink
+	pe *perfEvent
+}
+
+func (pl *perfEventLink) isLink() {}
+
+// Pinning requires the underlying perf event FD to stay open.
+//
+// | PerfEvent FD | BpfLink FD | Works |
+// |--------------|------------|-------|
+// | Open         | Open       | Yes   |
+// | Closed       | Open       | No    |
+// | Open         | Closed     | No (Pin() -> EINVAL) |
+// | Closed       | Closed     | No (Pin() -> EINVAL) |
+//
+// There is currently no pretty way to recover the perf event FD
+// when loading a pinned link, so leave as not supported for now.
+func (pl *perfEventLink) Pin(string) error {
+	return fmt.Errorf("perf event link pin: %w", ErrNotSupported)
+}
+
+func (pl *perfEventLink) Unpin() error {
+	return fmt.Errorf("perf event link unpin: %w", ErrNotSupported)
+}
+
+func (pl *perfEventLink) Close() error {
+	if err := pl.pe.Close(); err != nil {
+		return fmt.Errorf("perf event link close: %w", err)
+	}
+	return pl.fd.Close()
+}
+
+func (pl *perfEventLink) Update(prog *ebpf.Program) error {
+	return fmt.Errorf("perf event link update: %w", ErrNotSupported)
+}
+
+// perfEventIoctl implements Link and handles the perf event lifecycle
+// via ioctl().
+type perfEventIoctl struct {
+	*perfEvent
+}
+
+func (pi *perfEventIoctl) isLink() {}
+
+// Since 4.15 (e87c6bc3852b "bpf: permit multiple bpf attachments for a single perf event"),
+// calling PERF_EVENT_IOC_SET_BPF appends the given program to a prog_array
+// owned by the perf event, which means multiple programs can be attached
+// simultaneously.
+//
+// Before 4.15, calling PERF_EVENT_IOC_SET_BPF more than once on a perf event
+// returns EEXIST.
+//
+// Detaching a program from a perf event is currently not possible, so a
+// program replacement mechanism cannot be implemented for perf events.
+func (pi *perfEventIoctl) Update(prog *ebpf.Program) error {
+	return fmt.Errorf("perf event ioctl update: %w", ErrNotSupported)
+}
+
+func (pi *perfEventIoctl) Pin(string) error {
+	return fmt.Errorf("perf event ioctl pin: %w", ErrNotSupported)
+}
+
+func (pi *perfEventIoctl) Unpin() error {
+	return fmt.Errorf("perf event ioctl unpin: %w", ErrNotSupported)
+}
+
+func (pi *perfEventIoctl) Info() (*Info, error) {
+	return nil, fmt.Errorf("perf event ioctl info: %w", ErrNotSupported)
+}
+
 // attach the given eBPF prog to the perf event stored in pe.
 // pe must contain a valid perf event fd.
 // prog's type must match the program type stored in pe.
-func (pe *perfEvent) attach(prog *ebpf.Program) error {
+func attachPerfEvent(pe *perfEvent, prog *ebpf.Program) (Link, error) {
 	if prog == nil {
-		return errors.New("cannot attach a nil program")
-	}
-	if pe.fd == nil {
-		return errors.New("cannot attach to nil perf event")
+		return nil, errors.New("cannot attach a nil program")
 	}
 	if prog.FD() < 0 {
-		return fmt.Errorf("invalid program: %w", internal.ErrClosedFd)
+		return nil, fmt.Errorf("invalid program: %w", sys.ErrClosedFd)
 	}
+
 	switch pe.typ {
 	case kprobeEvent, kretprobeEvent, uprobeEvent, uretprobeEvent:
 		if t := prog.Type(); t != ebpf.Kprobe {
-			return fmt.Errorf("invalid program type (expected %s): %s", ebpf.Kprobe, t)
+			return nil, fmt.Errorf("invalid program type (expected %s): %s", ebpf.Kprobe, t)
 		}
 	case tracepointEvent:
 		if t := prog.Type(); t != ebpf.TracePoint {
-			return fmt.Errorf("invalid program type (expected %s): %s", ebpf.TracePoint, t)
+			return nil, fmt.Errorf("invalid program type (expected %s): %s", ebpf.TracePoint, t)
 		}
 	default:
-		return fmt.Errorf("unknown perf event type: %d", pe.typ)
+		return nil, fmt.Errorf("unknown perf event type: %d", pe.typ)
 	}
 
-	// The ioctl below will fail when the fd is invalid.
-	kfd, _ := pe.fd.Value()
+	if err := haveBPFLinkPerfEvent(); err == nil {
+		return attachPerfEventLink(pe, prog)
+	}
+	return attachPerfEventIoctl(pe, prog)
+}
+
+func attachPerfEventIoctl(pe *perfEvent, prog *ebpf.Program) (*perfEventIoctl, error) {
+	if pe.cookie != 0 {
+		return nil, fmt.Errorf("cookies are not supported: %w", ErrNotSupported)
+	}
 
 	// Assign the eBPF program to the perf event.
-	err := unix.IoctlSetInt(int(kfd), unix.PERF_EVENT_IOC_SET_BPF, prog.FD())
+	err := unix.IoctlSetInt(pe.fd.Int(), unix.PERF_EVENT_IOC_SET_BPF, prog.FD())
 	if err != nil {
-		return fmt.Errorf("setting perf event bpf program: %w", err)
+		return nil, fmt.Errorf("setting perf event bpf program: %w", err)
 	}
 
 	// PERF_EVENT_IOC_ENABLE and _DISABLE ignore their given values.
-	if err := unix.IoctlSetInt(int(kfd), unix.PERF_EVENT_IOC_ENABLE, 0); err != nil {
-		return fmt.Errorf("enable perf event: %s", err)
+	if err := unix.IoctlSetInt(pe.fd.Int(), unix.PERF_EVENT_IOC_ENABLE, 0); err != nil {
+		return nil, fmt.Errorf("enable perf event: %s", err)
 	}
 
+	pi := &perfEventIoctl{pe}
+
 	// Close the perf event when its reference is lost to avoid leaking system resources.
-	runtime.SetFinalizer(pe, (*perfEvent).Close)
-	return nil
+	runtime.SetFinalizer(pi, (*perfEventIoctl).Close)
+	return pi, nil
+}
+
+// Use the bpf api to attach the perf event (BPF_LINK_TYPE_PERF_EVENT, 5.15+).
+//
+// https://github.com/torvalds/linux/commit/b89fbfbb854c9afc3047e8273cc3a694650b802e
+func attachPerfEventLink(pe *perfEvent, prog *ebpf.Program) (*perfEventLink, error) {
+	fd, err := sys.LinkCreatePerfEvent(&sys.LinkCreatePerfEventAttr{
+		ProgFd:     uint32(prog.FD()),
+		TargetFd:   pe.fd.Uint(),
+		AttachType: sys.BPF_PERF_EVENT,
+		BpfCookie:  pe.cookie,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot create bpf perf link: %v", err)
+	}
+
+	pl := &perfEventLink{RawLink{fd: fd}, pe}
+
+	// Close the perf event when its reference is lost to avoid leaking system resources.
+	runtime.SetFinalizer(pl, (*perfEventLink).Close)
+	return pl, nil
 }
 
 // unsafeStringPtr returns an unsafe.Pointer to a NUL-terminated copy of str.
@@ -203,8 +264,12 @@ func unsafeStringPtr(str string) (unsafe.Pointer, error) {
 }
 
 // getTraceEventID reads a trace event's ID from tracefs given its group and name.
-// group and name must be alphanumeric or underscore, as required by the kernel.
+// The kernel requires group and name to be alphanumeric or underscore.
+//
+// name automatically has its invalid symbols converted to underscores so the caller
+// can pass a raw symbol name, e.g. a kernel symbol containing dots.
 func getTraceEventID(group, name string) (uint64, error) {
+	name = sanitizeSymbol(name)
 	tid, err := uint64FromFile(tracefsPath, "events", group, name, "id")
 	if errors.Is(err, os.ErrNotExist) {
 		return 0, fmt.Errorf("trace event %s/%s: %w", group, name, os.ErrNotExist)
@@ -235,7 +300,7 @@ func getPMUEventType(typ probeType) (uint64, error) {
 // openTracepointPerfEvent opens a tracepoint-type perf event. System-wide
 // [k,u]probes created by writing to <tracefs>/[k,u]probe_events are tracepoints
 // behind the scenes, and can be attached to using these perf events.
-func openTracepointPerfEvent(tid uint64, pid int) (*internal.FD, error) {
+func openTracepointPerfEvent(tid uint64, pid int) (*sys.FD, error) {
 	attr := unix.PerfEventAttr{
 		Type:        unix.PERF_TYPE_TRACEPOINT,
 		Config:      tid,
@@ -249,7 +314,7 @@ func openTracepointPerfEvent(tid uint64, pid int) (*internal.FD, error) {
 		return nil, fmt.Errorf("opening tracepoint perf event: %w", err)
 	}
 
-	return internal.NewFD(uint32(fd)), nil
+	return sys.NewFD(fd)
 }
 
 // uint64FromFile reads a uint64 from a file. All elements of path are sanitized
@@ -269,4 +334,61 @@ func uint64FromFile(base string, path ...string) (uint64, error) {
 
 	et := bytes.TrimSpace(data)
 	return strconv.ParseUint(string(et), 10, 64)
+}
+
+// Probe BPF perf link.
+//
+// https://elixir.bootlin.com/linux/v5.16.8/source/kernel/bpf/syscall.c#L4307
+// https://github.com/torvalds/linux/commit/b89fbfbb854c9afc3047e8273cc3a694650b802e
+var haveBPFLinkPerfEvent = internal.FeatureTest("bpf_link_perf_event", "5.15", func() error {
+	prog, err := ebpf.NewProgram(&ebpf.ProgramSpec{
+		Name: "probe_bpf_perf_link",
+		Type: ebpf.Kprobe,
+		Instructions: asm.Instructions{
+			asm.Mov.Imm(asm.R0, 0),
+			asm.Return(),
+		},
+		License: "MIT",
+	})
+	if err != nil {
+		return err
+	}
+	defer prog.Close()
+
+	_, err = sys.LinkCreatePerfEvent(&sys.LinkCreatePerfEventAttr{
+		ProgFd:     uint32(prog.FD()),
+		AttachType: sys.BPF_PERF_EVENT,
+	})
+	if errors.Is(err, unix.EINVAL) {
+		return internal.ErrNotSupported
+	}
+	if errors.Is(err, unix.EBADF) {
+		return nil
+	}
+	return err
+})
+
+// isValidTraceID implements the equivalent of a regex match
+// against "^[a-zA-Z_][0-9a-zA-Z_]*$".
+//
+// Trace event groups, names and kernel symbols must adhere to this set
+// of characters. Non-empty, first character must not be a number, all
+// characters must be alphanumeric or underscore.
+func isValidTraceID(s string) bool {
+	if len(s) < 1 {
+		return false
+	}
+	for i, c := range []byte(s) {
+		switch {
+		case c >= 'a' && c <= 'z':
+		case c >= 'A' && c <= 'Z':
+		case c == '_':
+		case i > 0 && c >= '0' && c <= '9':
+
+		default:
+			return false
+		}
+	}
+
+	return true
 }

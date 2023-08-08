@@ -42,7 +42,7 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-snapshot")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSI Volume Snapshots [Feature:VolumeSnapshotDataSource]", func() {

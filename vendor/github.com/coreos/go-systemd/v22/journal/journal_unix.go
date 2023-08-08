@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !windows
 // +build !windows
 
 // Package journal provides write bindings to the local systemd journal.
@@ -53,15 +54,9 @@ var (
 	onceConn sync.Once
 )
 
-func init() {
-	onceConn.Do(initConn)
-}
-
 // Enabled checks whether the local systemd journal is available for logging.
 func Enabled() bool {
-	onceConn.Do(initConn)
-
-	if (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr)) == nil {
+	if c := getOrInitConn(); c == nil {
 		return false
 	}
 
@@ -74,6 +69,58 @@ func Enabled() bool {
 	return true
 }
 
+// StderrIsJournalStream returns whether the process stderr is connected
+// to the Journal's stream transport.
+//
+// This can be used for automatic protocol upgrading described in [Journal Native Protocol].
+//
+// Returns true if JOURNAL_STREAM environment variable is present,
+// and stderr's device and inode numbers match it.
+//
+// Error is returned if unexpected error occurs: e.g. if JOURNAL_STREAM environment variable
+// is present, but malformed, fstat syscall fails, etc.
+//
+// [Journal Native Protocol]: https://systemd.io/JOURNAL_NATIVE_PROTOCOL/#automatic-protocol-upgrading
+func StderrIsJournalStream() (bool, error) {
+	return fdIsJournalStream(syscall.Stderr)
+}
+
+// StdoutIsJournalStream returns whether the process stdout is connected
+// to the Journal's stream transport.
+//
+// Returns true if JOURNAL_STREAM environment variable is present,
+// and stdout's device and inode numbers match it.
+//
+// Error is returned if unexpected error occurs: e.g. if JOURNAL_STREAM environment variable
+// is present, but malformed, fstat syscall fails, etc.
+//
+// Most users should probably use [StderrIsJournalStream].
+func StdoutIsJournalStream() (bool, error) {
+	return fdIsJournalStream(syscall.Stdout)
+}
+
+func fdIsJournalStream(fd int) (bool, error) {
+	journalStream := os.Getenv("JOURNAL_STREAM")
+	if journalStream == "" {
+		return false, nil
+	}
+
+	var expectedStat syscall.Stat_t
+	_, err := fmt.Sscanf(journalStream, "%d:%d", &expectedStat.Dev, &expectedStat.Ino)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse JOURNAL_STREAM=%q: %v", journalStream, err)
+	}
+
+	var stat syscall.Stat_t
+	err = syscall.Fstat(fd, &stat)
+	if err != nil {
+		return false, err
+	}
+
+	match := stat.Dev == expectedStat.Dev && stat.Ino == expectedStat.Ino
+	return match, nil
+}
+
 // Send a message to the local systemd journal. vars is a map of journald
 // fields to values.  Fields must be composed of uppercase letters, numbers,
 // and underscores, but must not start with an underscore. Within these
@@ -82,7 +129,7 @@ func Enabled() bool {
 // (http://www.freedesktop.org/software/systemd/man/systemd.journal-fields.html)
 // for more details.  vars may be nil.
 func Send(message string, priority Priority, vars map[string]string) error {
-	conn := (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr))
+	conn := getOrInitConn()
 	if conn == nil {
 		return errors.New("could not initialize socket to journald")
 	}
@@ -124,6 +171,16 @@ func Send(message string, priority Priority, vars map[string]string) error {
 	}
 
 	return nil
+}
+
+// getOrInitConn attempts to get the global `unixConnPtr` socket, initializing if necessary
+func getOrInitConn() *net.UnixConn {
+	conn := (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr))
+	if conn != nil {
+		return conn
+	}
+	onceConn.Do(initConn)
+	return (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr))
 }
 
 func appendVariable(w io.Writer, name, value string) {
@@ -194,7 +251,7 @@ func tempFd() (*os.File, error) {
 }
 
 // initConn initializes the global `unixConnPtr` socket.
-// It is meant to be called exactly once, at program startup.
+// It is automatically called when needed.
 func initConn() {
 	autobind, err := net.ResolveUnixAddr("unixgram", "")
 	if err != nil {

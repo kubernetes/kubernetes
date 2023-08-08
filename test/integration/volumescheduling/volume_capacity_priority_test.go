@@ -48,7 +48,7 @@ func mergeNodeLabels(node *v1.Node, labels map[string]string) *v1.Node {
 
 func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
 	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
-	testutil.SyncInformerFactory(testCtx)
+	testutil.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	clientset := testCtx.ClientSet
@@ -71,7 +71,6 @@ func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPe
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
-			testutil.CleanupTest(t, testCtx)
 		},
 	}
 }

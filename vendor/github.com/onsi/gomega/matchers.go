@@ -87,14 +87,17 @@ func Succeed() types.GomegaMatcher {
 	return &matchers.SucceedMatcher{}
 }
 
-// MatchError succeeds if actual is a non-nil error that matches the passed in string/error.
+// MatchError succeeds if actual is a non-nil error that matches the passed in
+// string, error, or matcher.
 //
 // These are valid use-cases:
 //
-//	Expect(err).Should(MatchError("an error")) //asserts that err.Error() == "an error"
-//	Expect(err).Should(MatchError(SomeError)) //asserts that err == SomeError (via reflect.DeepEqual)
+//  Expect(err).Should(MatchError("an error")) //asserts that err.Error() == "an error"
+//  Expect(err).Should(MatchError(SomeError)) //asserts that err == SomeError (via reflect.DeepEqual)
+//  Expect(err).Should(MatchError(ContainsSubstring("sprocket not found"))) // asserts that edrr.Error() contains substring "sprocket not found"
 //
-// It is an error for err to be nil or an object that does not implement the Error interface
+// It is an error for err to be nil or an object that does not implement the
+// Error interface
 func MatchError(expected interface{}) types.GomegaMatcher {
 	return &matchers.MatchErrorMatcher{
 		Expected: expected,
@@ -345,6 +348,20 @@ func BeKeyOf(element interface{}) types.GomegaMatcher {
 // Note that Go's type system does not allow you to write this as ConsistOf([]string{"FooBar", "Foo"}...) as []string and []interface{} are different types - hence the need for this special rule.
 func ConsistOf(elements ...interface{}) types.GomegaMatcher {
 	return &matchers.ConsistOfMatcher{
+		Elements: elements,
+	}
+}
+
+// HaveExactElemets succeeds if actual contains elements that precisely match the elemets passed into the matcher. The ordering of the elements does matter.
+// By default HaveExactElements() uses Equal() to match the elements, however custom matchers can be passed in instead.  Here are some examples:
+//
+//	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements("Foo", "FooBar"))
+//	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements("Foo", ContainSubstring("Bar")))
+//	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements(ContainSubstring("Foo"), ContainSubstring("Foo")))
+//
+// Actual must be an array or slice.
+func HaveExactElements(elements ...interface{}) types.GomegaMatcher {
+	return &matchers.HaveExactElementsMatcher{
 		Elements: elements,
 	}
 }

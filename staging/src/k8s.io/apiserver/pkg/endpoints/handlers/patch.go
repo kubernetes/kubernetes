@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -176,9 +177,8 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			userInfo,
 		)
 
-		if scope.FieldManager != nil {
-			admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
-		}
+		admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
+
 		mutatingAdmission, _ := admit.(admission.MutationInterface)
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,
@@ -297,7 +297,7 @@ type patchMechanism interface {
 type jsonPatcher struct {
 	*patcher
 
-	fieldManager *fieldmanager.FieldManager
+	fieldManager *managedfields.FieldManager
 }
 
 func (p *jsonPatcher) applyPatchToCurrentObject(requestContext context.Context, currentObject runtime.Object) (runtime.Object, error) {
@@ -344,9 +344,12 @@ func (p *jsonPatcher) applyPatchToCurrentObject(requestContext context.Context, 
 		}
 	}
 
-	if p.fieldManager != nil {
-		objToUpdate = p.fieldManager.UpdateNoErrors(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent))
+	if p.options == nil {
+		// Provide a more informative error for the crash that would
+		// happen on the next line
+		panic("PatchOptions required but not provided")
 	}
+	objToUpdate = p.fieldManager.UpdateNoErrors(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent))
 	return objToUpdate, nil
 }
 
@@ -417,7 +420,7 @@ type smpPatcher struct {
 
 	// Schema
 	schemaReferenceObj runtime.Object
-	fieldManager       *fieldmanager.FieldManager
+	fieldManager       *managedfields.FieldManager
 }
 
 func (p *smpPatcher) applyPatchToCurrentObject(requestContext context.Context, currentObject runtime.Object) (runtime.Object, error) {
@@ -440,9 +443,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(requestContext context.Context, c
 		return nil, err
 	}
 
-	if p.fieldManager != nil {
-		newObj = p.fieldManager.UpdateNoErrors(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent))
-	}
+	newObj = p.fieldManager.UpdateNoErrors(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent))
 	return newObj, nil
 }
 
@@ -455,7 +456,7 @@ type applyPatcher struct {
 	options             *metav1.PatchOptions
 	creater             runtime.ObjectCreater
 	kind                schema.GroupVersionKind
-	fieldManager        *fieldmanager.FieldManager
+	fieldManager        *managedfields.FieldManager
 	userAgent           string
 	validationDirective string
 }
@@ -653,9 +654,6 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	}
 
 	transformers := []rest.TransformFunc{p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer}
-	if scope.FieldManager != nil {
-		transformers = append(transformers, fieldmanager.IgnoreManagedFieldsTimestampsTransformer)
-	}
 
 	wasCreated := false
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, transformers...)

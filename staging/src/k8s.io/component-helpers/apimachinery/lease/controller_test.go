@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -39,6 +39,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestNewNodeLease(t *testing.T) {
@@ -204,7 +205,7 @@ func TestNewNodeLease(t *testing.T) {
 				t.Fatalf("the new lease must be newly allocated, but got same address as base")
 			}
 			if !apiequality.Semantic.DeepEqual(tc.expect, newLease) {
-				t.Errorf("unexpected result from newLease: %s", diff.ObjectDiff(tc.expect, newLease))
+				t.Errorf("unexpected result from newLease: %s", cmp.Diff(tc.expect, newLease))
 			}
 		})
 	}
@@ -270,6 +271,7 @@ func TestRetryUpdateNodeLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			cl := fake.NewSimpleClientset(node)
 			if tc.updateReactor != nil {
 				cl.PrependReactor("update", "leases", tc.updateReactor)
@@ -287,7 +289,7 @@ func TestRetryUpdateNodeLease(t *testing.T) {
 				onRepeatedHeartbeatFailure: tc.onRepeatedHeartbeatFailure,
 				newLeasePostProcessFunc:    setNodeOwnerFunc(cl, node.Name),
 			}
-			if err := c.retryUpdateLease(nil); tc.expectErr != (err != nil) {
+			if err := c.retryUpdateLease(ctx, nil); tc.expectErr != (err != nil) {
 				t.Fatalf("got %v, expected %v", err != nil, tc.expectErr)
 			}
 		})
@@ -405,6 +407,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			cl := fake.NewSimpleClientset(tc.existingObjs...)
 			if tc.updateReactor != nil {
 				cl.PrependReactor("update", "leases", tc.updateReactor)
@@ -426,7 +429,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 				newLeasePostProcessFunc: setNodeOwnerFunc(cl, node.Name),
 			}
 
-			c.sync()
+			c.sync(ctx)
 
 			if tc.expectLatestLease {
 				if tc.expectLeaseResourceVersion != c.latestLease.ResourceVersion {

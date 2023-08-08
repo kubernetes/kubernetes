@@ -170,6 +170,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/livez/poststarthook/storage-object-count-tracker-hook",
 		"/livez/poststarthook/wrapping-post-start-hook",
 		"/metrics",
+		"/metrics/slis",
 		"/readyz",
 		"/readyz/delegate-health",
 		"/readyz/informer-sync",
@@ -284,11 +285,6 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		// confirm that we can set an audit annotation in a handler before WithAudit
 		audit.AddAuditAnnotation(req.Context(), "pandas", "are awesome")
 
-		// confirm that trying to use the audit event directly would never work
-		if ae := audit.AuditEventFrom(req.Context()); ae != nil {
-			t.Errorf("expected nil audit event, got %v", ae)
-		}
-
 		return &authenticator.Response{User: &user.DefaultInfo{}}, true, nil
 	})
 	backend := &testBackend{}
@@ -298,12 +294,12 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		AuditPolicyRuleEvaluator: policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil),
 
 		// avoid nil panics
-		HandlerChainWaitGroup: &waitgroup.SafeWaitGroup{},
-		RequestInfoResolver:   &request.RequestInfoFactory{},
-		RequestTimeout:        10 * time.Second,
-		LongRunningFunc:       func(_ *http.Request, _ *request.RequestInfo) bool { return false },
-		lifecycleSignals:      newLifecycleSignals(),
-		TracerProvider:        tracing.NewNoopTracerProvider(),
+		NonLongRunningRequestWaitGroup: &waitgroup.SafeWaitGroup{},
+		RequestInfoResolver:            &request.RequestInfoFactory{},
+		RequestTimeout:                 10 * time.Second,
+		LongRunningFunc:                func(_ *http.Request, _ *request.RequestInfo) bool { return false },
+		lifecycleSignals:               newLifecycleSignals(),
+		TracerProvider:                 tracing.NewNoopTracerProvider(),
 	}
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

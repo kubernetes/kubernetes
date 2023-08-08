@@ -51,7 +51,7 @@ var _ = Describe("DNS addon", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("DNS")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
@@ -97,7 +97,7 @@ var _ = Describe("DNS addon", func() {
 
 				d := GetDeployment(f.ClientSet, kubeSystemNamespace, kubeDNSDeploymentName)
 
-				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, kubeDNSServiceAccountName)
+				gomega.Expect(d.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(kubeDNSServiceAccountName))
 			})
 		})
 	})
@@ -142,7 +142,7 @@ var _ = Describe("DNS addon", func() {
 
 				d := GetDeployment(f.ClientSet, kubeSystemNamespace, coreDNSDeploymentName)
 
-				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, coreDNSServiceAccountName)
+				gomega.Expect(d.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(coreDNSServiceAccountName))
 			})
 		})
 	})

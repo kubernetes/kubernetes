@@ -26,7 +26,6 @@ import (
 	v1alpha1 "k8s.io/api/networking/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	networkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
@@ -38,9 +37,9 @@ type FakeClusterCIDRs struct {
 	Fake *FakeNetworkingV1alpha1
 }
 
-var clustercidrsResource = schema.GroupVersionResource{Group: "networking.k8s.io", Version: "v1alpha1", Resource: "clustercidrs"}
+var clustercidrsResource = v1alpha1.SchemeGroupVersion.WithResource("clustercidrs")
 
-var clustercidrsKind = schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1alpha1", Kind: "ClusterCIDR"}
+var clustercidrsKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterCIDR")
 
 // Get takes name of the clusterCIDR, and returns the corresponding clusterCIDR object, and an error if there is any.
 func (c *FakeClusterCIDRs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterCIDR, err error) {

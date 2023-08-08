@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.25.0'
-$CRICTL_SHA256 = '417ea8f615298732bd4ea271abff897a6e135d8c2c3af028323f4e8071b2e69d'
+$CRICTL_VERSION = 'v1.27.0'
+$CRICTL_SHA256 = '24b077f0185b6d4ba2885283582167c84dd1968392f077708e57fc3c62fc3d90'
 
 Import-Module -Force C:\common.psm1
 
@@ -297,6 +297,12 @@ function Set-EnvironmentVars {
     "WINDOWS_ENABLE_HYPERV" = ${kube_env}['WINDOWS_ENABLE_HYPERV']
     "ENABLE_NODE_PROBLEM_DETECTOR" = ${kube_env}['ENABLE_NODE_PROBLEM_DETECTOR']
     "NODEPROBLEMDETECTOR_KUBECONFIG_FILE" = ${kube_env}['WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE']
+    "ENABLE_AUTH_PROVIDER_GCP" = ${kube_env}['ENABLE_AUTH_PROVIDER_GCP']
+    "AUTH_PROVIDER_GCP_STORAGE_PATH" = ${kube_env}['AUTH_PROVIDER_GCP_STORAGE_PATH']
+    "AUTH_PROVIDER_GCP_VERSION" = ${kube_env}['AUTH_PROVIDER_GCP_VERSION']
+    "AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64" = ${kube_env}['AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64']
+    "AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR" = ${kube_env}['AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR']
+    "AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE" = ${kube_env}['AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE']
 
     "Path" = ${env:Path} + ";" + ${kube_env}['NODE_DIR']
     "KUBE_NETWORK" = "l2bridge".ToLower()
@@ -2285,6 +2291,52 @@ $FLUENTD_CONFIG = @'
   </record>
 </filter>
 '@
+
+# Downloads the out-of-tree kubelet image credential provider binaries.
+function DownloadAndInstall-AuthProviderGcpBinary {
+  if ("${env:ENABLE_AUTH_PROVIDER_GCP}" -eq "true") {
+    $filename = 'auth-provider-gcp.exe'
+    if (ShouldWrite-File ${env:AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR}\$filename) {
+      Log-Output "Installing auth provider gcp binaries"
+      $tmp_dir = 'C:\k8s_tmp'
+      New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
+      $url = "${env:AUTH_PROVIDER_GCP_STORAGE_PATH}/${env:AUTH_PROVIDER_GCP_VERSION}/windows_amd64/$filename"
+      MustDownload-File -Hash $AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64 -Algorithm SHA512 -OutFile $tmp_dir\$filename -URLs $url
+      Move-Item -Force $tmp_dir\$filename ${env:AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR}
+      Remove-Item -Force -Recurse $tmp_dir
+    } else {
+      Log-Output "Skipping auth provider gcp binaries installation, auth-provider-gcp.exe file already exists."
+    }
+  }
+}
+
+# Creates config file for the out-of-tree kubelet image credential provider.
+function Create-AuthProviderGcpConfig {
+  if ("${env:ENABLE_AUTH_PROVIDER_GCP}" -eq "true") {
+    if (ShouldWrite-File ${env:AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE}) {
+      Log-Output "Creating auth provider gcp config file"
+      Set-Content ${env:AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE} @'
+kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+  - name: auth-provider-gcp.exe
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+    matchImages:
+    - "container.cloud.google.com"
+    - "gcr.io"
+    - "*.gcr.io"
+    - "*.pkg.dev"
+    args:
+    - get-credentials
+    - --v=3
+    defaultCacheDuration: 1m
+'@
+    } else {
+      Log-Output "Skipping auth provider gcp config file creation, it already exists"
+    }
+  }
+}
+
 
 # Export all public functions:
 Export-ModuleMember -Function *-*

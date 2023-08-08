@@ -22,7 +22,6 @@ package fsquota
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -164,6 +163,9 @@ func readProjectFiles(projects *os.File, projid *os.File) projectsList {
 	return projectsList{parseProjFile(projects, parseProject), parseProjFile(projid, parseProjid)}
 }
 
+// findAvailableQuota finds the next available quota from the FirstQuota
+// it returns error if QuotaIDIsInUse returns error when getting quota id in use;
+// it searches at most maxUnusedQuotasToSearch(128) time
 func findAvailableQuota(path string, idMap map[common.QuotaID]bool) (common.QuotaID, error) {
 	unusedQuotasSearched := 0
 	for id := common.FirstQuota; true; id++ {
@@ -187,13 +189,13 @@ func addDirToProject(path string, id common.QuotaID, list *projectsList) (common
 	idMap := make(map[common.QuotaID]bool)
 	for _, project := range list.projects {
 		if project.data == path {
-			if id != project.id {
+			if id != common.BadQuotaID && id != project.id {
 				return common.BadQuotaID, false, fmt.Errorf("attempt to reassign project ID for %s", path)
 			}
 			// Trying to reassign a directory to the project it's
 			// already in.  Maybe this should be an error, but for
 			// now treat it as an idempotent operation
-			return id, false, nil
+			return project.id, false, nil
 		}
 		idMap[project.id] = true
 	}
@@ -264,7 +266,7 @@ func writeProjectFile(base *os.File, projects []projectType) (string, error) {
 		return "", err
 	}
 	mode := stat.Mode() & os.ModePerm
-	f, err := ioutil.TempFile(filepath.Dir(oname), filepath.Base(oname))
+	f, err := os.CreateTemp(filepath.Dir(oname), filepath.Base(oname))
 	if err != nil {
 		return "", err
 	}
@@ -318,6 +320,7 @@ func writeProjectFiles(fProjects *os.File, fProjid *os.File, writeProjid bool, l
 	return fmt.Errorf("unable to write project files: %v", err)
 }
 
+// if ID is common.BadQuotaID, generate new project id if the dir is not in a project
 func createProjectID(path string, ID common.QuotaID) (common.QuotaID, error) {
 	quotaIDLock.Lock()
 	defer quotaIDLock.Unlock()

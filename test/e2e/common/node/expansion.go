@@ -29,6 +29,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 // These tests exercise the Kubernetes expansion syntax $(VAR).
@@ -36,7 +37,7 @@ import (
 // https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/expansion.md
 var _ = SIGDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -267,8 +268,8 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		podClient := e2epod.NewPodClient(f)
 		pod = podClient.Create(ctx, pod)
 
-		err := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		framework.ExpectError(err, "while waiting for pod to be running")
+		getPod := e2epod.Get(f.ClientSet, pod)
+		gomega.Consistently(ctx, getPod).WithTimeout(framework.PodStartShortTimeout).Should(e2epod.BeInPhase(v1.PodPending))
 
 		ginkgo.By("updating the pod")
 		podClient.Update(ctx, pod.ObjectMeta.Name, func(pod *v1.Pod) {
@@ -279,7 +280,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		})
 
 		ginkgo.By("waiting for pod running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		ginkgo.By("deleting the pod gracefully")
