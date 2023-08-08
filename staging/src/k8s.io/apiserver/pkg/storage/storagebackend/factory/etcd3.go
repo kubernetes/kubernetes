@@ -157,10 +157,10 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 	var prober *etcd3ProberMonitor
 	clientErr := fmt.Errorf("etcd client connection not yet established")
 
-	go wait.PollUntil(time.Second, func() (bool, error) {
-		newProber, err := newETCD3ProberMonitor(c)
+	go wait.PollImmediateUntil(time.Second, func() (bool, error) {
 		lock.Lock()
 		defer lock.Unlock()
+		newProber, err := newETCD3ProberMonitor(c)
 		// Ensure that server is already not shutting down.
 		select {
 		case <-stopCh:
