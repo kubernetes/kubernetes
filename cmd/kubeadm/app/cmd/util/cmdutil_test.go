@@ -17,9 +17,14 @@ limitations under the License.
 package util
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"k8s.io/client-go/tools/clientcmd"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 func TestValidateExactArgNumber(t *testing.T) {
@@ -101,5 +106,14 @@ func TestGetKubeConfigPath(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestCheckInvalidCommandUsageErrorf(t *testing.T) {
+	c := &cobra.Command{Use: "somepath"}
+	usageErr := usageErrorf(c, "%w %q", kubeadmutil.ErrInvalidSubCommand, strings.Join([]string{"arg1", "arg2"}, " "))
+
+	if errors.Is(usageErr, kubeadmutil.ErrInvalidSubCommand) == false {
+		t.Errorf("usageErrorf should wrap ErrInvalidSubCommand")
 	}
 }

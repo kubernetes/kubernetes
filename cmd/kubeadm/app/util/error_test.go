@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -40,6 +41,7 @@ func TestCheckErr(t *testing.T) {
 		{"error is nil", nil, 0},
 		{"empty error", errors.New(""), DefaultErrorExitCode},
 		{"preflight error", &pferror{}, PreFlightExitCode},
+		{"invalid subcommand", fmt.Errorf("%w test test", ErrInvalidSubCommand), DefaultErrorExitCode},
 	}
 
 	for _, rt := range tests {

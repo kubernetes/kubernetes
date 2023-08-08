@@ -45,7 +45,7 @@ import (
 func SubCmdRun() func(c *cobra.Command, args []string) {
 	return func(c *cobra.Command, args []string) {
 		if len(args) > 0 {
-			kubeadmutil.CheckErr(usageErrorf(c, "invalid subcommand %q", strings.Join(args, " ")))
+			kubeadmutil.CheckErr(usageErrorf(c, "%w %q", kubeadmutil.ErrInvalidSubCommand, strings.Join(args, " ")))
 		}
 		c.Help()
 		kubeadmutil.CheckErr(kubeadmutil.ErrExit)
@@ -53,8 +53,8 @@ func SubCmdRun() func(c *cobra.Command, args []string) {
 }
 
 func usageErrorf(c *cobra.Command, format string, args ...interface{}) error {
-	msg := fmt.Sprintf(format, args...)
-	return errors.Errorf("%s\nSee '%s -h' for help and examples", msg, c.CommandPath())
+	err := fmt.Errorf(format, args...)
+	return errors.WithStack(fmt.Errorf("%w\nSee '%s -h' for help and examples", err, c.CommandPath()))
 }
 
 // ValidateExactArgNumber validates that the required top-level arguments are specified

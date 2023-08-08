@@ -38,8 +38,8 @@ const (
 )
 
 var (
-	ErrInvalidSubCommandMsg = "invalid subcommand"
-	ErrExit                 = errors.New("exit")
+	ErrInvalidSubCommand = errors.New("invalid subcommand")
+	ErrExit              = errors.New("exit")
 )
 
 // fatal prints the message if set and then exits.
@@ -98,7 +98,7 @@ func checkErr(err error, handleErr func(string, int)) {
 	switch {
 	case err == ErrExit:
 		handleErr("", DefaultErrorExitCode)
-	case strings.Contains(err.Error(), ErrInvalidSubCommandMsg):
+	case errors.Is(err, ErrInvalidSubCommand):
 		handleErr(err.Error(), DefaultErrorExitCode)
 	default:
 		switch err.(type) {
