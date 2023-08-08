@@ -618,9 +618,11 @@ func (m *managerImpl) evictPod(ctx context.Context, pod *v1.Pod, gracePeriodOver
 		attribute.String("k8s.namespace.name", pod.Namespace),
 	))
 	otelSpan.AddEvent("Evicting pod", trace.WithAttributes(
+		attribute.String("k8s.pod.uid", string(pod.UID)),
 		attribute.String("pod", klog.KObj(pod).String()),
-		attribute.String("podUID", string(pod.UID)),
-		attribute.String("message", evictMsg),
+		attribute.String("k8s.pod.name", pod.Name),
+		attribute.String("k8s.namespace.name", pod.Namespace),
+		attribute.String("k8s.eviction.message", evictMsg),
 	))
 	defer otelSpan.End()
 	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
@@ -635,12 +637,18 @@ func (m *managerImpl) evictPod(ctx context.Context, pod *v1.Pod, gracePeriodOver
 		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
 		otelSpan.RecordError(fmt.Errorf("pod failed to evict: %w", err), trace.WithAttributes(
 			attribute.String("err", err.Error()),
+			attribute.String("k8s.pod.uid", string(pod.UID)),
 			attribute.String("pod", klog.KObj(pod).String()),
+			attribute.String("k8s.pod.name", pod.Name),
+			attribute.String("k8s.namespace.name", pod.Namespace),
 		))
 	} else {
 		klog.InfoS("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))
 		otelSpan.AddEvent("pod is evicted successfully", trace.WithAttributes(
+			attribute.String("k8s.pod.uid", string(pod.UID)),
 			attribute.String("pod", klog.KObj(pod).String()),
+			attribute.String("k8s.pod.name", pod.Name),
+			attribute.String("k8s.namespace.name", pod.Namespace),
 		))
 	}
 	return true
