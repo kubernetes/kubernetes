@@ -986,6 +986,7 @@ func newValidatingWebhookWithMatchConditions(
 ) *admissionregistrationv1.ValidatingWebhookConfiguration {
 	sideEffects := admissionregistrationv1.SideEffectClassNone
 	equivalent := admissionregistrationv1.Equivalent
+	namespaced := admissionregistrationv1.NamespacedScope
 	return &admissionregistrationv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: f.UniqueName,
@@ -999,6 +1000,7 @@ func newValidatingWebhookWithMatchConditions(
 						APIGroups:   []string{""},
 						APIVersions: []string{"v1"},
 						Resources:   []string{"*"},
+						Scope:       &namespaced,
 					},
 				}},
 				ClientConfig: admissionregistrationv1.WebhookClientConfig{
