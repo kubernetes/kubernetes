@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 	"sync"
 
 	_ "crypto/sha1"
@@ -27,7 +28,7 @@ const (
 // supportedCiphers lists ciphers we support but might not recommend.
 var supportedCiphers = []string{
 	"aes128-ctr", "aes192-ctr", "aes256-ctr",
-	"aes128-gcm@openssh.com",
+	"aes128-gcm@openssh.com", gcm256CipherID,
 	chacha20Poly1305ID,
 	"arcfour256", "arcfour128", "arcfour",
 	aes128cbcID,
@@ -36,7 +37,7 @@ var supportedCiphers = []string{
 
 // preferredCiphers specifies the default preference for ciphers.
 var preferredCiphers = []string{
-	"aes128-gcm@openssh.com",
+	"aes128-gcm@openssh.com", gcm256CipherID,
 	chacha20Poly1305ID,
 	"aes128-ctr", "aes192-ctr", "aes256-ctr",
 }
@@ -84,7 +85,7 @@ var supportedHostKeyAlgos = []string{
 // This is based on RFC 4253, section 6.4, but with hmac-md5 variants removed
 // because they have reached the end of their useful life.
 var supportedMACs = []string{
-	"hmac-sha2-256-etm@openssh.com", "hmac-sha2-256", "hmac-sha1", "hmac-sha1-96",
+	"hmac-sha2-512-etm@openssh.com", "hmac-sha2-256-etm@openssh.com", "hmac-sha2-256", "hmac-sha2-512", "hmac-sha1", "hmac-sha1-96",
 }
 
 var supportedCompressions = []string{compressionNone}
@@ -117,6 +118,20 @@ func algorithmsForKeyFormat(keyFormat string) []string {
 		return []string{keyFormat}
 	}
 }
+
+// supportedPubKeyAuthAlgos specifies the supported client public key
+// authentication algorithms. Note that this doesn't include certificate types
+// since those use the underlying algorithm. This list is sent to the client if
+// it supports the server-sig-algs extension. Order is irrelevant.
+var supportedPubKeyAuthAlgos = []string{
+	KeyAlgoED25519,
+	KeyAlgoSKED25519, KeyAlgoSKECDSA256,
+	KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521,
+	KeyAlgoRSASHA256, KeyAlgoRSASHA512, KeyAlgoRSA,
+	KeyAlgoDSA,
+}
+
+var supportedPubKeyAuthAlgosList = strings.Join(supportedPubKeyAuthAlgos, ",")
 
 // unexpectedMessageError results when the SSH message that we received didn't
 // match what we wanted.
@@ -153,7 +168,7 @@ func (a *directionAlgorithms) rekeyBytes() int64 {
 	// 2^(BLOCKSIZE/4) blocks. For all AES flavors BLOCKSIZE is
 	// 128.
 	switch a.Cipher {
-	case "aes128-ctr", "aes192-ctr", "aes256-ctr", gcmCipherID, aes128cbcID:
+	case "aes128-ctr", "aes192-ctr", "aes256-ctr", gcm128CipherID, gcm256CipherID, aes128cbcID:
 		return 16 * (1 << 32)
 
 	}
@@ -163,7 +178,8 @@ func (a *directionAlgorithms) rekeyBytes() int64 {
 }
 
 var aeadCiphers = map[string]bool{
-	gcmCipherID:        true,
+	gcm128CipherID:     true,
+	gcm256CipherID:     true,
 	chacha20Poly1305ID: true,
 }
 
