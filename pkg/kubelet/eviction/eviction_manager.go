@@ -633,7 +633,7 @@ func (m *managerImpl) evictPod(ctx context.Context, pod *v1.Pod, gracePeriodOver
 	})
 	if err != nil {
 		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
-		otelSpan.AddEvent("pod failed to evict", trace.WithAttributes(
+		otelSpan.RecordError(fmt.Errorf("pod failed to evict: %w", err), trace.WithAttributes(
 			attribute.String("err", err.Error()),
 			attribute.String("pod", klog.KObj(pod).String()),
 		))
