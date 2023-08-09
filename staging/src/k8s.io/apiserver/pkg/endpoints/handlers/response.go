@@ -37,9 +37,9 @@ import (
 // transformObject takes the object as returned by storage and ensures it is in
 // the client's desired form, as well as ensuring any API level fields like self-link
 // are properly set.
-func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
+func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, target *schema.GroupVersionKind, scope *RequestScope) (runtime.Object, error) {
 	if co, ok := obj.(runtime.CacheableObject); ok {
-		if mediaType.Convert != nil {
+		if target != nil {
 			// Non-nil mediaType.Convert means that some conversion of the object
 			// has to happen. Currently conversion may potentially modify the
 			// object or assume something about it (e.g. asTable operates on
@@ -49,19 +49,19 @@ func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, 
 			//
 			// TODO: Long-term, transformObject should be changed so that it
 			// implements runtime.Encoder interface.
-			return doTransformObject(ctx, co.GetObject(), opts, mediaType, scope, req)
+			return doTransformObject(ctx, co.GetObject(), opts, target, scope)
 		}
 	}
-	return doTransformObject(ctx, obj, opts, mediaType, scope, req)
+	return doTransformObject(ctx, obj, opts, target, scope)
 }
 
 // doTransformResponseObject is used for handling all requests, including watch.
-func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
+func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, target *schema.GroupVersionKind, scope *RequestScope) (runtime.Object, error) {
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
 
-	switch target := mediaType.Convert; {
+	switch {
 	case target == nil:
 		return obj, nil
 
@@ -140,7 +140,7 @@ func transformResponseObject(ctx context.Context, scope *RequestScope, req *http
 
 	var obj runtime.Object
 	do := func() {
-		obj, err = transformObject(ctx, result, options, mediaType, scope, req)
+		obj, err = transformObject(ctx, result, options, mediaType.Convert, scope)
 	}
 	endpointsrequest.TrackTransformResponseObjectLatency(ctx, do)
 

@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -107,10 +106,10 @@ func TestCacheableObject(t *testing.T) {
 	tableConvertor := rest.NewDefaultTableConvertor(examplev1.Resource("Pod"))
 
 	testCases := []struct {
-		desc      string
-		object    runtime.Object
-		opts      *metav1beta1.TableOptions
-		mediaType negotiation.MediaTypeOptions
+		desc   string
+		object runtime.Object
+		opts   *metav1beta1.TableOptions
+		target *schema.GroupVersionKind
 
 		expectedUnwrap bool
 		expectedObj    runtime.Object
@@ -125,14 +124,14 @@ func TestCacheableObject(t *testing.T) {
 		{
 			desc:        "cacheableObject nil convert",
 			object:      &mockCacheableObject{obj: pod},
-			mediaType:   negotiation.MediaTypeOptions{},
+			target:      nil,
 			expectedObj: &mockCacheableObject{obj: pod},
 			expectedErr: nil,
 		},
 		{
 			desc:        "cacheableObject as PartialObjectMeta",
 			object:      &mockCacheableObject{obj: pod},
-			mediaType:   negotiation.MediaTypeOptions{Convert: &pomGVK},
+			target:      &pomGVK,
 			expectedObj: podMeta,
 			expectedErr: nil,
 		},
@@ -140,7 +139,7 @@ func TestCacheableObject(t *testing.T) {
 			desc:        "cacheableObject as Table",
 			object:      &mockCacheableObject{obj: pod},
 			opts:        &metav1beta1.TableOptions{NoHeaders: true, IncludeObject: metav1.IncludeNone},
-			mediaType:   negotiation.MediaTypeOptions{Convert: &tableGVK},
+			target:      &tableGVK,
 			expectedObj: podTable,
 			expectedErr: nil,
 		},
@@ -150,12 +149,12 @@ func TestCacheableObject(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			result, err := transformObject(
 				request.WithRequestInfo(context.TODO(), &request.RequestInfo{}),
-				test.object, test.opts, test.mediaType,
+				test.object, test.opts, test.target,
 				&RequestScope{
 					Namer:          &mockNamer{},
 					TableConvertor: tableConvertor,
 				},
-				nil)
+			)
 
 			if err != test.expectedErr {
 				t.Errorf("unexpected error: %v, expected: %v", err, test.expectedErr)
