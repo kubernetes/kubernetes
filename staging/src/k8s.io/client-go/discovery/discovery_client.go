@@ -67,6 +67,9 @@ const (
 	acceptDiscoveryFormats = AcceptV2Beta1 + "," + AcceptV1
 )
 
+// Aggregated discovery content-type GVK.
+var v2Beta1GVK = schema.GroupVersionKind{Group: "apidiscovery.k8s.io", Version: "v2beta1", Kind: "APIGroupDiscoveryList"}
+
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
 type DiscoveryInterface interface {
@@ -260,16 +263,15 @@ func (d *DiscoveryClient) downloadLegacy() (
 	}
 
 	var resourcesByGV map[schema.GroupVersion]*metav1.APIResourceList
-	// Switch on content-type server responded with: aggregated or unaggregated.
-	switch {
-	case isV2Beta1ContentType(responseContentType):
+	// Based on the content-type server responded with: aggregated or unaggregated.
+	if isGVK, _ := ContentTypeIsGVK(responseContentType, v2Beta1GVK); isGVK {
 		var aggregatedDiscovery apidiscovery.APIGroupDiscoveryList
 		err = json.Unmarshal(body, &aggregatedDiscovery)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
-	default:
+	} else {
 		// Default is unaggregated discovery v1.
 		var v metav1.APIVersions
 		err = json.Unmarshal(body, &v)
@@ -313,16 +315,15 @@ func (d *DiscoveryClient) downloadAPIs() (
 	apiGroupList := &metav1.APIGroupList{}
 	failedGVs := map[schema.GroupVersion]error{}
 	var resourcesByGV map[schema.GroupVersion]*metav1.APIResourceList
-	// Switch on content-type server responded with: aggregated or unaggregated.
-	switch {
-	case isV2Beta1ContentType(responseContentType):
+	// Based on the content-type server responded with: aggregated or unaggregated.
+	if isGVK, _ := ContentTypeIsGVK(responseContentType, v2Beta1GVK); isGVK {
 		var aggregatedDiscovery apidiscovery.APIGroupDiscoveryList
 		err = json.Unmarshal(body, &aggregatedDiscovery)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
-	default:
+	} else {
 		// Default is unaggregated discovery v1.
 		err = json.Unmarshal(body, apiGroupList)
 		if err != nil {
@@ -333,26 +334,29 @@ func (d *DiscoveryClient) downloadAPIs() (
 	return apiGroupList, resourcesByGV, failedGVs, nil
 }
 
-// isV2Beta1ContentType checks of the content-type string is both
-// "application/json" and contains the v2beta1 content-type params.
+// ContentTypeIsGVK checks of the content-type string is both
+// "application/json" and matches the provided GVK. An error
+// is returned if the content type string is malformed.
 // NOTE: This function is resilient to the ordering of the
 // content-type parameters, as well as parameters added by
 // intermediaries such as proxies or gateways. Examples:
 //
-//	"application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList" = true
-//	"application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io" = true
-//	"application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io;charset=utf-8" = true
-//	"application/json" = false
-//	"application/json; charset=UTF-8" = false
-func isV2Beta1ContentType(contentType string) bool {
+//	("application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList", {apidiscovery.k8s.io, v2beta1, APIGroupDiscoveryList}) = (true, nil)
+//	("application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io", {apidiscovery.k8s.io, v2beta1, APIGroupDiscoveryList}) = (true, nil)
+//	("application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io;charset=utf-8", {apidiscovery.k8s.io, v2beta1, APIGroupDiscoveryList}) = (true, nil)
+//	("application/json", any GVK) = (false, nil)
+//	("application/json; charset=UTF-8", any GVK) = (false, nil)
+//	("malformed content type string", any GVK) = (false, error)
+func ContentTypeIsGVK(contentType string, gvk schema.GroupVersionKind) (bool, error) {
 	base, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		return false
+		return false, err
 	}
-	return runtime.ContentTypeJSON == base &&
-		params["g"] == "apidiscovery.k8s.io" &&
-		params["v"] == "v2beta1" &&
-		params["as"] == "APIGroupDiscoveryList"
+	gvkMatch := runtime.ContentTypeJSON == base &&
+		params["g"] == gvk.Group &&
+		params["v"] == gvk.Version &&
+		params["as"] == gvk.Kind
+	return gvkMatch, nil
 }
 
 // ServerGroups returns the supported groups, with information like supported versions and the

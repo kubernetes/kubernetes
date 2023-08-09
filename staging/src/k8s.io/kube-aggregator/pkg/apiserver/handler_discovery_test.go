@@ -596,9 +596,8 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 	require.Equal(t, doc.Items, expectAggregatedDiscovery)
 }
 
-func TestLegacyFallback(t *testing.T) {
+func testLegacyFallbackWithCustomRootHandler(t *testing.T, rootHandlerFn func(http.ResponseWriter, *http.Request)) {
 	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
-	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
 
 	legacyGroupHandler := discovery.NewAPIGroupHandler(scheme.Codecs, metav1.APIGroup{
 		Name: "stable.example.com",
@@ -657,7 +656,7 @@ func TestLegacyFallback(t *testing.T) {
 			// defer to legacy discovery
 			legacyResourceHandler.ServeHTTP(w, r)
 		} else if r.URL.Path == "/apis" {
-			rootAPIsHandler.ServeHTTP(w, r)
+			rootHandlerFn(w, r)
 		} else {
 			// Unknown url
 			t.Fatalf("unexpected request sent to %v", r.URL.Path)
@@ -685,6 +684,82 @@ func TestLegacyFallback(t *testing.T) {
 					Version:   resource.Version,
 					Resources: converted,
 					Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+				},
+			},
+		},
+	}, doc.Items)
+}
+func TestLegacyFallback(t *testing.T) {
+	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
+	testCases := []struct {
+		name        string
+		rootHandler func(http.ResponseWriter, *http.Request)
+	}{
+		{
+			name:        "Default root handler (406)",
+			rootHandler: rootAPIsHandler.ServeHTTP,
+		},
+		{
+			name: "Root handler with non 200 status code",
+			rootHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(404)
+			},
+		},
+		{
+			name: "Root handler with 200 response code no content type",
+			rootHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(200)
+			},
+		},
+		{
+			name: "Root handler with 200 response code incorrect content type",
+			rootHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json;g=apidiscovery.k8s.io;v=v1alpha1;as=APIGroupDiscoveryList")
+				w.WriteHeader(200)
+			},
+		},
+	}
+	for _, tc := range testCases {
+		testLegacyFallbackWithCustomRootHandler(t, tc.rootHandler)
+	}
+}
+
+func TestAPIServiceStale(t *testing.T) {
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+	}))
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go aggregatedManager.Run(testCtx.Done())
+	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
+
+	// At this point external services have synced. Check if discovery document
+	// lists the APIService group version as Stale.
+	_, _, doc := fetchPath(aggregatedResourceManager, "")
+	require.Equal(t, []apidiscoveryv2beta1.APIGroupDiscovery{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "stable.example.com",
+			},
+			Versions: []apidiscoveryv2beta1.APIVersionDiscovery{
+				{
+					Version:   "v1",
+					Freshness: apidiscoveryv2beta1.DiscoveryFreshnessStale,
 				},
 			},
 		},
