@@ -1293,10 +1293,10 @@ func TestJobStrategy_Validate(t *testing.T) {
 
 	theUID := types.UID("1a2b3c4d5e6f7g8h9i0k")
 	validSelector := &metav1.LabelSelector{
-		MatchLabels: map[string]string{"a": "b"},
+		MatchLabels: map[string]string{"a": "b", batch.LegacyJobNameLabel: "myjob2", batch.JobNameLabel: "myjob2", batch.LegacyControllerUidLabel: string(theUID), batch.ControllerUidLabel: string(theUID)},
 	}
-	validLabels := map[string]string{batch.LegacyJobNameLabel: "myjob2", batch.JobNameLabel: "myjob2", batch.LegacyControllerUidLabel: string(theUID), batch.ControllerUidLabel: string(theUID)}
 	labelsWithNonBatch := map[string]string{"a": "b", batch.LegacyJobNameLabel: "myjob2", batch.JobNameLabel: "myjob2", batch.LegacyControllerUidLabel: string(theUID), batch.ControllerUidLabel: string(theUID)}
+	defaultSelector := &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}}
 	validPodSpec := api.PodSpec{
 		RestartPolicy: api.RestartPolicyOnFailure,
 		DNSPolicy:     api.DNSClusterFirst,
@@ -1320,7 +1320,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       nil,
+					Selector: defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1332,7 +1332,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
+					Selector: defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1346,7 +1346,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       nil,
+					Selector: defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
 						Spec: validPodSpec,
@@ -1355,21 +1355,19 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
+					Selector: defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: validLabels,
-						},
 						Spec: validPodSpec,
 					}},
 			},
+			wantWarningCount: 5,
 		},
 		"labels exist": {
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       nil,
+					Selector:       defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1381,7 +1379,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
+					Selector:       defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1425,7 +1423,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       nil,
+					Selector:       defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1442,7 +1440,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
+					Selector:       defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1461,7 +1459,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       nil,
+					Selector:       defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1479,7 +1477,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
+					Selector:       defaultSelector,
 					ManualSelector: pointer.Bool(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
