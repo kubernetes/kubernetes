@@ -341,6 +341,10 @@ func TestQuantityParse(t *testing.T) {
 		{".0001k", decQuantity(100, -3, DecimalSI)},
 		{"1.", decQuantity(1, 0, DecimalSI)},
 		{"1.G", decQuantity(1, 9, DecimalSI)},
+
+		// no shift for max scale size(E)
+		{"1000E", decQuantity(1, 21, DecimalSI)},
+		{"10000E", decQuantity(10000, 18, DecimalSI)},
 	}
 
 	for _, asDec := range []bool{false, true} {
@@ -692,6 +696,9 @@ func TestQuantityString(t *testing.T) {
 		{decQuantity(1, -6, DecimalSI), "1u", ""},
 		{decQuantity(80, -6, DecimalSI), "80u", ""},
 		{decQuantity(1080, -6, DecimalSI), "1080u", ""},
+		{decQuantity(1001, 18, DecimalSI), "1001E", ""},
+		{decQuantity(1000, 18, DecimalSI), "1000E", ""},
+		{decQuantity(1, 21, DecimalSI), "1000E", ""},
 	}
 	for _, item := range table {
 		got := item.in.String()

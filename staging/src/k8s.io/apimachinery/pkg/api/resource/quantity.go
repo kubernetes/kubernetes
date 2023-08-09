@@ -337,6 +337,10 @@ func ParseQuantity(str string) (Quantity, error) {
 						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
 					}
 				}
+				// keep canonical string for no shift needed
+				if scale >= int32(maxScale) {
+					return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+				}
 				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
 			}
 		}

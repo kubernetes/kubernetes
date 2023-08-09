@@ -43,6 +43,8 @@ const (
 	Tera  Scale = 12
 	Peta  Scale = 15
 	Exa   Scale = 18
+
+	maxScale = Exa
 )
 
 var (
@@ -279,8 +281,8 @@ func (a infDecAmount) AsCanonicalBytes(out []byte) (result []byte, exponent int3
 	amount, times := removeBigIntFactors(amount, bigTen)
 	exponent += times
 
-	// make sure exponent is a multiple of 3
-	for exponent%3 != 0 {
+	// make sure exponent is a multiple of 3 and less then or equal 18(E)
+	for exponent%3 != 0 || exponent > int32(maxScale) {
 		amount.Mul(amount, bigTen)
 		exponent--
 	}
