@@ -25,6 +25,7 @@ import (
 	v2 "github.com/google/cadvisor/info/v2"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -487,59 +488,6 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 						[]string{"anon", "hierarchy"}, s.Timestamp)...)
 					values = append(values, getNumaStatsPerNode(s.Memory.HierarchicalData.NumaStats.Unevictable,
 						[]string{"unevictable", "hierarchy"}, s.Timestamp)...)
-					return values
-				},
-			},
-		}...)
-	}
-	if includedMetrics.Has(container.AcceleratorUsageMetrics) {
-		c.containerMetrics = append(c.containerMetrics, []containerMetric{
-			{
-				name:        "container_accelerator_memory_total_bytes",
-				help:        "Total accelerator memory.",
-				valueType:   prometheus.GaugeValue,
-				extraLabels: []string{"make", "model", "acc_id"},
-				getValues: func(s *info.ContainerStats) metricValues {
-					values := make(metricValues, 0, len(s.Accelerators))
-					for _, value := range s.Accelerators {
-						values = append(values, metricValue{
-							value:     float64(value.MemoryTotal),
-							labels:    []string{value.Make, value.Model, value.ID},
-							timestamp: s.Timestamp,
-						})
-					}
-					return values
-				},
-			}, {
-				name:        "container_accelerator_memory_used_bytes",
-				help:        "Total accelerator memory allocated.",
-				valueType:   prometheus.GaugeValue,
-				extraLabels: []string{"make", "model", "acc_id"},
-				getValues: func(s *info.ContainerStats) metricValues {
-					values := make(metricValues, 0, len(s.Accelerators))
-					for _, value := range s.Accelerators {
-						values = append(values, metricValue{
-							value:     float64(value.MemoryUsed),
-							labels:    []string{value.Make, value.Model, value.ID},
-							timestamp: s.Timestamp,
-						})
-					}
-					return values
-				},
-			}, {
-				name:        "container_accelerator_duty_cycle",
-				help:        "Percent of time over the past sample period during which the accelerator was actively processing.",
-				valueType:   prometheus.GaugeValue,
-				extraLabels: []string{"make", "model", "acc_id"},
-				getValues: func(s *info.ContainerStats) metricValues {
-					values := make(metricValues, 0, len(s.Accelerators))
-					for _, value := range s.Accelerators {
-						values = append(values, metricValue{
-							value:     float64(value.DutyCycle),
-							labels:    []string{value.Make, value.Model, value.ID},
-							timestamp: s.Timestamp,
-						})
-					}
 					return values
 				},
 			},

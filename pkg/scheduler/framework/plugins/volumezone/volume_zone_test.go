@@ -26,6 +26,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
@@ -92,10 +93,11 @@ func TestSingleZone(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		Pod        *v1.Pod
-		Node       *v1.Node
-		wantStatus *framework.Status
+		name                string
+		Pod                 *v1.Pod
+		Node                *v1.Node
+		wantPreFilterStatus *framework.Status
+		wantFilterStatus    *framework.Status
 	}{
 		{
 			name: "pod without volume",
@@ -106,6 +108,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
 				},
 			},
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 		},
 		{
 			name: "node without labels",
@@ -145,7 +148,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaRegion: "no_us-west1", "uselessLabel": "none"},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "beta zone label doesn't match",
@@ -156,7 +159,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "zone label matched",
@@ -187,7 +190,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelTopologyRegion: "no_us-west1", "uselessLabel": "none"},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "zone label doesn't match",
@@ -198,7 +201,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelTopologyZone: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "pv with zone and region, node with only zone",
@@ -211,13 +214,27 @@ func TestSingleZone(t *testing.T) {
 					},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+		},
+		{
+			name: "pv with zone,node with beta zone",
+			Pod:  createPodWithVolume("pod_1", "Vol_Stable_1", "PVC_Stable_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "host1",
+					Labels: map[string]string{
+						v1.LabelFailureDomainBetaZone: "us-west1-a",
+					},
+				},
+			},
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			state := framework.NewCycleState()
@@ -228,17 +245,13 @@ func TestSingleZone(t *testing.T) {
 				pvcLister,
 				nil,
 			}
-
-			_, gotPreFilterStatus := p.PreFilter(ctx, state, test.Pod)
-			if !gotPreFilterStatus.IsSuccess() {
-				if diff := cmp.Diff(gotPreFilterStatus, test.wantStatus); diff != "" {
-					t.Errorf("status does not match (-want,+got):\n%s", diff)
-				}
-			} else {
-				gotStatus := p.Filter(ctx, state, test.Pod, node)
-				if diff := cmp.Diff(gotStatus, test.wantStatus); diff != "" {
-					t.Errorf("status does not match (-want,+got):\n%s", diff)
-				}
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
+				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
+			}
+			filterStatus := p.Filter(ctx, state, test.Pod, node)
+			if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
+				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -291,10 +304,11 @@ func TestMultiZone(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		Pod        *v1.Pod
-		Node       *v1.Node
-		wantStatus *framework.Status
+		name                string
+		Pod                 *v1.Pod
+		Node                *v1.Node
+		wantPreFilterStatus *framework.Status
+		wantFilterStatus    *framework.Status
 	}{
 		{
 			name: "node without labels",
@@ -324,7 +338,7 @@ func TestMultiZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "zone label matched",
@@ -345,13 +359,14 @@ func TestMultiZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelTopologyZone: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			state := framework.NewCycleState()
@@ -362,16 +377,13 @@ func TestMultiZone(t *testing.T) {
 				pvcLister,
 				nil,
 			}
-			_, gotPreFilterStatus := p.PreFilter(ctx, state, test.Pod)
-			if !gotPreFilterStatus.IsSuccess() {
-				if diff := cmp.Diff(gotPreFilterStatus, test.wantStatus); diff != "" {
-					t.Errorf("status does not match (-want,+got):\n%s", diff)
-				}
-			} else {
-				gotStatus := p.Filter(context.Background(), state, test.Pod, node)
-				if diff := cmp.Diff(gotStatus, test.wantStatus); diff != "" {
-					t.Errorf("status does not match (-want,+got):\n%s", diff)
-				}
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
+				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
+			}
+			filterStatus := p.Filter(ctx, state, test.Pod, node)
+			if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
+				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -432,10 +444,11 @@ func TestWithBinding(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		Pod        *v1.Pod
-		Node       *v1.Node
-		wantStatus *framework.Status
+		name                string
+		Pod                 *v1.Pod
+		Node                *v1.Node
+		wantPreFilterStatus *framework.Status
+		wantFilterStatus    *framework.Status
 	}{
 		{
 			name: "label zone failure domain matched",
@@ -446,32 +459,39 @@ func TestWithBinding(t *testing.T) {
 			name: "unbound volume empty storage class",
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_EmptySC"),
 			Node: testNode,
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+				"PersistentVolumeClaim had no pv name and storageClass name"),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
 				"PersistentVolumeClaim had no pv name and storageClass name"),
 		},
 		{
 			name: "unbound volume no storage class",
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_NoSC"),
 			Node: testNode,
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+				"unable to find storage class: Class_0"),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
 				"unable to find storage class: Class_0"),
 		},
 		{
-			name:       "unbound volume immediate binding mode",
-			Pod:        createPodWithVolume("pod_1", "vol_1", "PVC_ImmediateSC"),
-			Node:       testNode,
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
+			name:                "unbound volume immediate binding mode",
+			Pod:                 createPodWithVolume("pod_1", "vol_1", "PVC_ImmediateSC"),
+			Node:                testNode,
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
+			wantFilterStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
 		},
 		{
-			name: "unbound volume wait binding mode",
-			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_WaitSC"),
-			Node: testNode,
+			name:                "unbound volume wait binding mode",
+			Pod:                 createPodWithVolume("pod_1", "vol_1", "PVC_WaitSC"),
+			Node:                testNode,
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			state := framework.NewCycleState()
@@ -482,16 +502,13 @@ func TestWithBinding(t *testing.T) {
 				pvcLister,
 				scLister,
 			}
-			_, gotPreFilterStatus := p.PreFilter(ctx, state, test.Pod)
-			if !gotPreFilterStatus.IsSuccess() {
-				if diff := cmp.Diff(gotPreFilterStatus, test.wantStatus); diff != "" {
-					t.Errorf("status does not match (-want,+got):\n%s", diff)
-				}
-			} else {
-				gotStatus := p.Filter(ctx, state, test.Pod, node)
-				if diff := cmp.Diff(gotStatus, test.wantStatus); diff != "" {
-					t.Errorf("status does not match (-want,+got):\n%s", diff)
-				}
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
+				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
+			}
+			filterStatus := p.Filter(ctx, state, test.Pod, node)
+			if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
+				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}

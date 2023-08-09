@@ -26,7 +26,6 @@ import (
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
@@ -39,9 +38,9 @@ type FakeRoles struct {
 	ns   string
 }
 
-var rolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "roles"}
+var rolesResource = v1alpha1.SchemeGroupVersion.WithResource("roles")
 
-var rolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "Role"}
+var rolesKind = v1alpha1.SchemeGroupVersion.WithKind("Role")
 
 // Get takes name of the role, and returns the corresponding role object, and an error if there is any.
 func (c *FakeRoles) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Role, err error) {

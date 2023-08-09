@@ -35,9 +35,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against ResourceClass.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &resource.ResourceClass{} },
-		NewListFunc:              func() runtime.Object { return &resource.ResourceClassList{} },
-		DefaultQualifiedResource: resource.Resource("resourceclasses"),
+		NewFunc:                   func() runtime.Object { return &resource.ResourceClass{} },
+		NewListFunc:               func() runtime.Object { return &resource.ResourceClassList{} },
+		DefaultQualifiedResource:  resource.Resource("resourceclasses"),
+		SingularQualifiedResource: resource.Resource("resourceclass"),
 
 		CreateStrategy:      resourceclass.Strategy,
 		UpdateStrategy:      resourceclass.Strategy,

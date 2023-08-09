@@ -97,7 +97,7 @@ func Listen(ctx context.Context, clientset kubernetes.Interface, restConfig *res
 		SubResource("portforward")
 	transport, upgrader, err := spdy.RoundTripperFor(restConfig)
 	if err != nil {
-		return nil, fmt.Errorf("create round tripper: %v", err)
+		return nil, fmt.Errorf("create round tripper: %w", err)
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 
@@ -212,7 +212,7 @@ type stream struct {
 func dial(ctx context.Context, prefix string, dialer httpstream.Dialer, port int) (s *stream, finalErr error) {
 	streamConn, _, err := dialer.Dial(portforward.PortForwardProtocolV1Name)
 	if err != nil {
-		return nil, fmt.Errorf("dialer failed: %v", err)
+		return nil, fmt.Errorf("dialer failed: %w", err)
 	}
 	requestID := "1"
 	defer func() {
@@ -231,7 +231,7 @@ func dial(ctx context.Context, prefix string, dialer httpstream.Dialer, port int
 	// This happens asynchronously.
 	errorStream, err := streamConn.CreateStream(headers)
 	if err != nil {
-		return nil, fmt.Errorf("error creating error stream: %v", err)
+		return nil, fmt.Errorf("error creating error stream: %w", err)
 	}
 	errorStream.Close()
 	go func() {
@@ -248,7 +248,7 @@ func dial(ctx context.Context, prefix string, dialer httpstream.Dialer, port int
 	headers.Set(v1.StreamType, v1.StreamTypeData)
 	dataStream, err := streamConn.CreateStream(headers)
 	if err != nil {
-		return nil, fmt.Errorf("error creating data stream: %v", err)
+		return nil, fmt.Errorf("error creating data stream: %w", err)
 	}
 
 	return &stream{

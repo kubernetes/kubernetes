@@ -6,7 +6,7 @@ metadata:
 data:
   a: b
 ---
-apiVersion: resource.k8s.io/v1alpha1
+apiVersion: resource.k8s.io/v1alpha2
 kind: ResourceClaimTemplate
 metadata:
   name: pause-template
@@ -30,12 +30,12 @@ metadata:
 spec:
   containers:
   - name: pause1
-    image: "k8s.gcr.io/pause:3.6"
+    image: "registry.k8s.io/pause:3.6"
     resources:
       claims:
       - name: resource1
   - name: pause2
-    image: "k8s.gcr.io/pause:3.6"
+    image: "registry.k8s.io/pause:3.6"
     resources:
       claims:
       - name: resource2

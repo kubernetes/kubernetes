@@ -1,6 +1,7 @@
 package outline
 
 import (
+	"github.com/onsi/ginkgo/v2/types"
 	"go/ast"
 	"go/token"
 	"strconv"
@@ -25,9 +26,10 @@ type ginkgoMetadata struct {
 	// End is the position of first character immediately after the spec or container block
 	End int `json:"end"`
 
-	Spec    bool `json:"spec"`
-	Focused bool `json:"focused"`
-	Pending bool `json:"pending"`
+	Spec    bool     `json:"spec"`
+	Focused bool     `json:"focused"`
+	Pending bool     `json:"pending"`
+	Labels  []string `json:"labels"`
 }
 
 // ginkgoNode is used to construct the outline as a tree
@@ -145,27 +147,35 @@ func ginkgoNodeFromCallExpr(fset *token.FileSet, ce *ast.CallExpr, ginkgoPackage
 	case "It", "Specify", "Entry":
 		n.Spec = true
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
+		n.Labels = labelFromCallExpr(ce)
+		n.Pending = pendingFromCallExpr(ce)
 		return &n, ginkgoPackageName != nil && *ginkgoPackageName == packageName
 	case "FIt", "FSpecify", "FEntry":
 		n.Spec = true
 		n.Focused = true
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
+		n.Labels = labelFromCallExpr(ce)
 		return &n, ginkgoPackageName != nil && *ginkgoPackageName == packageName
 	case "PIt", "PSpecify", "XIt", "XSpecify", "PEntry", "XEntry":
 		n.Spec = true
 		n.Pending = true
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
+		n.Labels = labelFromCallExpr(ce)
 		return &n, ginkgoPackageName != nil && *ginkgoPackageName == packageName
 	case "Context", "Describe", "When", "DescribeTable":
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
+		n.Labels = labelFromCallExpr(ce)
+		n.Pending = pendingFromCallExpr(ce)
 		return &n, ginkgoPackageName != nil && *ginkgoPackageName == packageName
 	case "FContext", "FDescribe", "FWhen", "FDescribeTable":
 		n.Focused = true
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
+		n.Labels = labelFromCallExpr(ce)
 		return &n, ginkgoPackageName != nil && *ginkgoPackageName == packageName
 	case "PContext", "PDescribe", "PWhen", "XContext", "XDescribe", "XWhen", "PDescribeTable", "XDescribeTable":
 		n.Pending = true
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
+		n.Labels = labelFromCallExpr(ce)
 		return &n, ginkgoPackageName != nil && *ginkgoPackageName == packageName
 	case "By":
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
@@ -215,4 +225,78 @@ func textFromCallExpr(ce *ast.CallExpr) (string, bool) {
 	default:
 		return text.Value, true
 	}
+}
+
+func labelFromCallExpr(ce *ast.CallExpr) []string {
+
+	labels := []string{}
+	if len(ce.Args) < 2 {
+		return labels
+	}
+
+	for _, arg := range ce.Args[1:] {
+		switch expr := arg.(type) {
+		case *ast.CallExpr:
+			id, ok := expr.Fun.(*ast.Ident)
+			if !ok {
+				// to skip over cases where the expr.Fun. is actually *ast.SelectorExpr
+				continue
+			}
+			if id.Name == "Label" {
+				ls := extractLabels(expr)
+				for _, label := range ls {
+					labels = append(labels, label)
+				}
+			}
+		}
+	}
+	return labels
+}
+
+func extractLabels(expr *ast.CallExpr) []string {
+	out := []string{}
+	for _, arg := range expr.Args {
+		switch expr := arg.(type) {
+		case *ast.BasicLit:
+			if expr.Kind == token.STRING {
+				unquoted, err := strconv.Unquote(expr.Value)
+				if err != nil {
+					unquoted = expr.Value
+				}
+				validated, err := types.ValidateAndCleanupLabel(unquoted, types.CodeLocation{})
+				if err == nil {
+					out = append(out, validated)
+				}
+			}
+		}
+	}
+
+	return out
+}
+
+func pendingFromCallExpr(ce *ast.CallExpr) bool {
+
+	pending := false
+	if len(ce.Args) < 2 {
+		return pending
+	}
+
+	for _, arg := range ce.Args[1:] {
+		switch expr := arg.(type) {
+		case *ast.CallExpr:
+			id, ok := expr.Fun.(*ast.Ident)
+			if !ok {
+				// to skip over cases where the expr.Fun. is actually *ast.SelectorExpr
+				continue
+			}
+			if id.Name == "Pending" {
+				pending = true
+			}
+		case *ast.Ident:
+			if expr.Name == "Pending" {
+				pending = true
+			}
+		}
+	}
+	return pending
 }

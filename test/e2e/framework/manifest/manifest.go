@@ -115,7 +115,7 @@ func DaemonSetFromURL(ctx context.Context, url string) (*appsv1.DaemonSet, error
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get url: %v", err)
+		return nil, fmt.Errorf("Failed to get url: %w", err)
 	}
 	if response.StatusCode != 200 {
 		return nil, fmt.Errorf("invalid http response status: %v", response.StatusCode)
@@ -124,7 +124,7 @@ func DaemonSetFromURL(ctx context.Context, url string) (*appsv1.DaemonSet, error
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read html response body: %v", err)
+		return nil, fmt.Errorf("Failed to read html response body: %w", err)
 	}
 	return DaemonSetFromData(data)
 }
@@ -134,12 +134,12 @@ func DaemonSetFromData(data []byte) (*appsv1.DaemonSet, error) {
 	var ds appsv1.DaemonSet
 	dataJSON, err := utilyaml.ToJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
+		return nil, fmt.Errorf("Failed to parse data to json: %w", err)
 	}
 
 	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), dataJSON, &ds)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
+		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %w", err)
 	}
 	return &ds, nil
 }

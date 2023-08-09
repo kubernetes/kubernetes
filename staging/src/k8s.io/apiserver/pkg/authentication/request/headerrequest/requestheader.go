@@ -163,17 +163,7 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 	extra := newExtra(req.Header, a.extraHeaderPrefixes.Value())
 
 	// clear headers used for authentication
-	for _, headerName := range a.nameHeaders.Value() {
-		req.Header.Del(headerName)
-	}
-	for _, headerName := range a.groupHeaders.Value() {
-		req.Header.Del(headerName)
-	}
-	for k := range extra {
-		for _, prefix := range a.extraHeaderPrefixes.Value() {
-			req.Header.Del(prefix + k)
-		}
-	}
+	ClearAuthenticationHeaders(req.Header, a.nameHeaders, a.groupHeaders, a.extraHeaderPrefixes)
 
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
@@ -182,6 +172,26 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 			Extra:  extra,
 		},
 	}, true, nil
+}
+
+func ClearAuthenticationHeaders(h http.Header, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) {
+	for _, headerName := range nameHeaders.Value() {
+		h.Del(headerName)
+	}
+	for _, headerName := range groupHeaders.Value() {
+		h.Del(headerName)
+	}
+	for _, prefix := range extraHeaderPrefixes.Value() {
+		for k := range h {
+			if hasPrefixIgnoreCase(k, prefix) {
+				delete(h, k) // we have the raw key so avoid relying on canonicalization
+			}
+		}
+	}
+}
+
+func hasPrefixIgnoreCase(s, prefix string) bool {
+	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
 }
 
 func headerValue(h http.Header, headerNames []string) string {
@@ -226,7 +236,7 @@ func newExtra(h http.Header, headerPrefixes []string) map[string][]string {
 	// we have to iterate over prefixes first in order to have proper ordering inside the value slices
 	for _, prefix := range headerPrefixes {
 		for headerName, vv := range h {
-			if !strings.HasPrefix(strings.ToLower(headerName), strings.ToLower(prefix)) {
+			if !hasPrefixIgnoreCase(headerName, prefix) {
 				continue
 			}
 

@@ -25,10 +25,11 @@ import (
 // +genclient:nonNamespaced
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.25
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
 
 // SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request.
-// When using impersonation, users will receive the user info of the user being impersonated.
+// When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or
+// request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
 type SelfSubjectReview struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

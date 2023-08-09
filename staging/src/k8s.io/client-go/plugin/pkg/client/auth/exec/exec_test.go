@@ -1085,7 +1085,7 @@ func TestTLSCredentials(t *testing.T) {
 		Status: &clientauthentication.ExecCredentialStatus{
 			ClientCertificateData: string(cert),
 			ClientKeyData:         string(key),
-			ExpirationTimestamp:   &v1.Time{now.Add(time.Hour)},
+			ExpirationTimestamp:   &v1.Time{Time: now.Add(time.Hour)},
 		},
 	}
 	get(t, "valid TLS cert", false)
@@ -1097,7 +1097,7 @@ func TestTLSCredentials(t *testing.T) {
 		Status: &clientauthentication.ExecCredentialStatus{
 			ClientCertificateData: string(nCert),
 			ClientKeyData:         string(nKey),
-			ExpirationTimestamp:   &v1.Time{now.Add(time.Hour)},
+			ExpirationTimestamp:   &v1.Time{Time: now.Add(time.Hour)},
 		},
 	}
 	get(t, "untrusted TLS cert", true)
@@ -1107,7 +1107,7 @@ func TestTLSCredentials(t *testing.T) {
 		Status: &clientauthentication.ExecCredentialStatus{
 			ClientCertificateData: string(cert),
 			ClientKeyData:         string(key),
-			ExpirationTimestamp:   &v1.Time{now.Add(time.Hour)},
+			ExpirationTimestamp:   &v1.Time{Time: now.Add(time.Hour)},
 		},
 	}
 	get(t, "valid TLS cert again", false)

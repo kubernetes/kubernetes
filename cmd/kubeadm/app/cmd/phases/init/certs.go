@@ -27,11 +27,11 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -219,7 +219,7 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 
 			// If CA Cert existed while dryrun, copy CA Cert to dryrun dir for later use
 			if data.DryRun() {
-				err := phases.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CACertName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CACertName))
+				err := kubeadmutil.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CACertName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CACertName))
 				if err != nil {
 					return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeadmconstants.CACertName, data.CertificateWriteDir())
 				}
@@ -227,7 +227,7 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 				// If CA Key existed while dryrun, copy CA Key to dryrun dir for later use
 				if data.DryRun() {
-					err := phases.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CAKeyName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CAKeyName))
+					err := kubeadmutil.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CAKeyName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CAKeyName))
 					if err != nil {
 						return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeadmconstants.CAKeyName, data.CertificateWriteDir())
 					}

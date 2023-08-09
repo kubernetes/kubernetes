@@ -213,7 +213,7 @@ define TEST_E2E_NODE_HELP_INFO
 #    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]".
 #  TEST_ARGS: A space-separated list of arguments to pass to node e2e test.
 #    Defaults to "".
-#  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
+#  RUN_UNTIL_FAILURE: If true, pass --until-it-fails=true to ginkgo so tests are run
 #    repeatedly until they fail.  Defaults to false.
 #  REMOTE: If true, run the tests on a remote host.  Defaults to false.
 #  REMOTE_MODE: For REMOTE=true only.  Mode for remote execution (eg. gce, ssh).
@@ -254,8 +254,11 @@ define TEST_E2E_NODE_HELP_INFO
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #    Defaults to false.
 #  TEST_SUITE: For REMOTE=true only. Test suite to use. Defaults to "default".
+#  SSH_USER: For REMOTE=true only  SSH username to use.
 #  SSH_KEY: For REMOTE=true only. Path to SSH key to use.
 #  SSH_OPTIONS: For REMOTE=true only. SSH options to use.
+#  INSTANCE_TYPE: For REMOTE=true only. Machine type to use.
+#  NODE_ENV: For REMOTE=true only. Additional metadata keys to add the instance.
 #  RUNTIME_CONFIG: The runtime configuration for the API server on the node e2e tests.
 #
 # Example:

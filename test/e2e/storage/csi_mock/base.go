@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -72,6 +73,7 @@ const (
 type csiCall struct {
 	expectedMethod string
 	expectedError  codes.Code
+	expectedSecret map[string]string
 	// This is a mark for the test itself to delete the tested pod *after*
 	// this csiCall is received.
 	deletePod bool
@@ -98,6 +100,7 @@ type testParameters struct {
 	fsGroupPolicy                 *storagev1.FSGroupPolicy
 	enableSELinuxMount            *bool
 	enableRecoverExpansionFailure bool
+	enableCSINodeExpandSecret     bool
 }
 
 type mockDriverSetup struct {
@@ -127,6 +130,9 @@ const (
 	volumeSnapshotContentFinalizer = "snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection"
 	volumeSnapshotBoundFinalizer   = "snapshot.storage.kubernetes.io/volumesnapshot-bound-protection"
 	errReasonNotEnoughSpace        = "node(s) did not have enough free storage"
+
+	csiNodeExpandSecretKey          = "csi.storage.k8s.io/node-expand-secret-name"
+	csiNodeExpandSecretNamespaceKey = "csi.storage.k8s.io/node-expand-secret-namespace"
 )
 
 var (
@@ -247,6 +253,18 @@ func (m *mockDriverSetup) createPod(ctx context.Context, withVolume volumeType) 
 	f := m.f
 
 	sc := m.driver.GetDynamicProvisionStorageClass(ctx, m.config, "")
+	if m.tp.enableCSINodeExpandSecret {
+		if sc.Parameters == nil {
+			parameters := map[string]string{
+				csiNodeExpandSecretKey:          "test-secret",
+				csiNodeExpandSecretNamespaceKey: f.Namespace.Name,
+			}
+			sc.Parameters = parameters
+		} else {
+			sc.Parameters[csiNodeExpandSecretKey] = "test-secret"
+			sc.Parameters[csiNodeExpandSecretNamespaceKey] = f.Namespace.Name
+		}
+	}
 	scTest := testsuites.StorageClassTest{
 		Name:                 m.driver.GetDriverInfo().Name,
 		Timeouts:             f.Timeouts,
@@ -664,6 +682,11 @@ func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentV
 			},
 		},
 	}
+	if node.Name != "" {
+		// Force schedule the pod to skip scheduler RWOP checks
+		framework.Logf("Forcing node name %s", node.Name)
+		pod.Spec.NodeName = node.Name
+	}
 	e2epod.SetNodeSelection(&pod.Spec, node)
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
@@ -810,6 +833,14 @@ func compareCSICalls(ctx context.Context, trackedCalls []string, expectedCallSeq
 		if c.Method != expectedCall.expectedMethod || c.FullError.Code != expectedCall.expectedError {
 			return allCalls, i, fmt.Errorf("Unexpected CSI call %d: expected %s (%d), got %s (%d)", i, expectedCall.expectedMethod, expectedCall.expectedError, c.Method, c.FullError.Code)
 		}
+
+		// if the secret is not nil, compare it
+		if expectedCall.expectedSecret != nil {
+			if !reflect.DeepEqual(expectedCall.expectedSecret, c.Request.Secrets) {
+				return allCalls, i, fmt.Errorf("Unexpected secret: expected %v, got %v", expectedCall.expectedSecret, c.Request.Secrets)
+			}
+		}
+
 	}
 	if len(calls) > len(expectedCallSequence) {
 		return allCalls, len(expectedCallSequence), fmt.Errorf("Received %d unexpected CSI driver calls", len(calls)-len(expectedCallSequence))
@@ -821,22 +852,26 @@ func compareCSICalls(ctx context.Context, trackedCalls []string, expectedCallSeq
 
 // createSELinuxMountPreHook creates a hook that records the mountOptions passed in
 // through NodeStageVolume and NodePublishVolume calls.
-func createSELinuxMountPreHook(nodeStageMountOpts, nodePublishMountOpts *[]string) *drivers.Hooks {
+func createSELinuxMountPreHook(nodeStageMountOpts, nodePublishMountOpts *[]string, stageCalls, unstageCalls, publishCalls, unpublishCalls *atomic.Int32) *drivers.Hooks {
 	return &drivers.Hooks{
 		Pre: func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
-			nodeStageRequest, ok := request.(*csipbv1.NodeStageVolumeRequest)
-			if ok {
-				mountVolume := nodeStageRequest.GetVolumeCapability().GetMount()
+			switch req := request.(type) {
+			case *csipbv1.NodeStageVolumeRequest:
+				stageCalls.Add(1)
+				mountVolume := req.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
 					*nodeStageMountOpts = mountVolume.MountFlags
 				}
-			}
-			nodePublishRequest, ok := request.(*csipbv1.NodePublishVolumeRequest)
-			if ok {
-				mountVolume := nodePublishRequest.GetVolumeCapability().GetMount()
+			case *csipbv1.NodePublishVolumeRequest:
+				publishCalls.Add(1)
+				mountVolume := req.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
 					*nodePublishMountOpts = mountVolume.MountFlags
 				}
+			case *csipbv1.NodeUnstageVolumeRequest:
+				unstageCalls.Add(1)
+			case *csipbv1.NodeUnpublishVolumeRequest:
+				unpublishCalls.Add(1)
 			}
 			return nil, nil
 		},

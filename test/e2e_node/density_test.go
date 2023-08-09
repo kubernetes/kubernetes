@@ -66,7 +66,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 	)
 
 	f := framework.NewDefaultFramework("density-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		// Start a standalone cadvisor pod using 'createSync', the pod is running when it returns

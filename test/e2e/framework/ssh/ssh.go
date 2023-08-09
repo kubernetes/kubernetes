@@ -103,12 +103,12 @@ func GetSigner(provider string) (ssh.Signer, error) {
 func makePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 	buffer, err := os.ReadFile(key)
 	if err != nil {
-		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
+		return nil, fmt.Errorf("error reading SSH key %s: %w", key, err)
 	}
 
 	signer, err := ssh.ParsePrivateKey(buffer)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing SSH key: '%v'", err)
+		return nil, fmt.Errorf("error parsing SSH key: %w", err)
 	}
 
 	return signer, err
@@ -201,7 +201,7 @@ func SSH(ctx context.Context, cmd, host, provider string) (Result, error) {
 	// Get a signer for the provider.
 	signer, err := GetSigner(provider)
 	if err != nil {
-		return result, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
+		return result, fmt.Errorf("error getting signer for provider %s: %w", provider, err)
 	}
 
 	// RunSSHCommand will default to Getenv("USER") if user == "", but we're
@@ -250,12 +250,12 @@ func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signe
 		})
 	}
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: '%v'", user, host, err)
+		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: %w", user, host, err)
 	}
 	defer client.Close()
 	session, err := client.NewSession()
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating session to %s@%s: '%v'", user, host, err)
+		return "", "", 0, fmt.Errorf("error creating session to %s@%s: %w", user, host, err)
 	}
 	defer session.Close()
 
@@ -275,7 +275,7 @@ func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signe
 		} else {
 			// Some other kind of error happened (e.g. an IOError); consider the
 			// SSH unsuccessful.
-			err = fmt.Errorf("failed running `%s` on %s@%s: '%v'", cmd, user, host, err)
+			err = fmt.Errorf("failed running `%s` on %s@%s: %w", cmd, user, host, err)
 		}
 	}
 	return bout.String(), berr.String(), code, err
@@ -304,26 +304,26 @@ func runSSHCommandViaBastion(ctx context.Context, cmd, user, bastion, host strin
 		})
 	}
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: %v", user, bastion, err)
+		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: %w", user, bastion, err)
 	}
 	defer bastionClient.Close()
 
 	conn, err := bastionClient.Dial("tcp", host)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error dialing %s from bastion: %v", host, err)
+		return "", "", 0, fmt.Errorf("error dialing %s from bastion: %w", host, err)
 	}
 	defer conn.Close()
 
 	ncc, chans, reqs, err := ssh.NewClientConn(conn, host, config)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating forwarding connection %s from bastion: %v", host, err)
+		return "", "", 0, fmt.Errorf("error creating forwarding connection %s from bastion: %w", host, err)
 	}
 	client := ssh.NewClient(ncc, chans, reqs)
 	defer client.Close()
 
 	session, err := client.NewSession()
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating session to %s@%s from bastion: '%v'", user, host, err)
+		return "", "", 0, fmt.Errorf("error creating session to %s@%s from bastion: %w", user, host, err)
 	}
 	defer session.Close()
 
@@ -343,7 +343,7 @@ func runSSHCommandViaBastion(ctx context.Context, cmd, user, bastion, host strin
 		} else {
 			// Some other kind of error happened (e.g. an IOError); consider the
 			// SSH unsuccessful.
-			err = fmt.Errorf("failed running `%s` on %s@%s: '%v'", cmd, user, host, err)
+			err = fmt.Errorf("failed running `%s` on %s@%s: %w", cmd, user, host, err)
 		}
 	}
 	return bout.String(), berr.String(), code, err

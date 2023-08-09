@@ -55,7 +55,7 @@ func (client VirtualMachineScaleSetRollingUpgradesClient) Cancel(ctx context.Con
 
 	result, err = client.CancelSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetRollingUpgradesClient", "Cancel", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetRollingUpgradesClient", "Cancel", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -87,6 +87,7 @@ func (client VirtualMachineScaleSetRollingUpgradesClient) CancelPreparer(ctx con
 // http.Response Body if it receives an error.
 func (client VirtualMachineScaleSetRollingUpgradesClient) CancelSender(req *http.Request) (future VirtualMachineScaleSetRollingUpgradesCancelFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -210,7 +211,7 @@ func (client VirtualMachineScaleSetRollingUpgradesClient) StartExtensionUpgrade(
 
 	result, err = client.StartExtensionUpgradeSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetRollingUpgradesClient", "StartExtensionUpgrade", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetRollingUpgradesClient", "StartExtensionUpgrade", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -242,6 +243,7 @@ func (client VirtualMachineScaleSetRollingUpgradesClient) StartExtensionUpgradeP
 // http.Response Body if it receives an error.
 func (client VirtualMachineScaleSetRollingUpgradesClient) StartExtensionUpgradeSender(req *http.Request) (future VirtualMachineScaleSetRollingUpgradesStartExtensionUpgradeFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -288,7 +290,7 @@ func (client VirtualMachineScaleSetRollingUpgradesClient) StartOSUpgrade(ctx con
 
 	result, err = client.StartOSUpgradeSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetRollingUpgradesClient", "StartOSUpgrade", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetRollingUpgradesClient", "StartOSUpgrade", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -320,6 +322,7 @@ func (client VirtualMachineScaleSetRollingUpgradesClient) StartOSUpgradePreparer
 // http.Response Body if it receives an error.
 func (client VirtualMachineScaleSetRollingUpgradesClient) StartOSUpgradeSender(req *http.Request) (future VirtualMachineScaleSetRollingUpgradesStartOSUpgradeFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

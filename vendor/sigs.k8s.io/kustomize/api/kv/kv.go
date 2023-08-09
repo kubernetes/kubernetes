@@ -7,15 +7,14 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"os"
-	"path"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/ifc"
+	"sigs.k8s.io/kustomize/api/internal/generators"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 )
 
 var utf8bom = []byte{0xEF, 0xBB, 0xBF}
@@ -41,23 +40,23 @@ func (kvl *loader) Load(
 	args types.KvPairSources) (all []types.Pair, err error) {
 	pairs, err := kvl.keyValuesFromEnvFiles(args.EnvSources)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf(
+		return nil, errors.WrapPrefixf(err,
 			"env source files: %v",
-			args.EnvSources))
+			args.EnvSources)
 	}
 	all = append(all, pairs...)
 
 	pairs, err = keyValuesFromLiteralSources(args.LiteralSources)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf(
-			"literal sources %v", args.LiteralSources))
+		return nil, errors.WrapPrefixf(err,
+			"literal sources %v", args.LiteralSources)
 	}
 	all = append(all, pairs...)
 
 	pairs, err = kvl.keyValuesFromFileSources(args.FileSources)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf(
-			"file sources: %v", args.FileSources))
+		return nil, errors.WrapPrefixf(err,
+			"file sources: %v", args.FileSources)
 	}
 	return append(all, pairs...), nil
 }
@@ -77,7 +76,7 @@ func keyValuesFromLiteralSources(sources []string) ([]types.Pair, error) {
 func (kvl *loader) keyValuesFromFileSources(sources []string) ([]types.Pair, error) {
 	var kvs []types.Pair
 	for _, s := range sources {
-		k, fPath, err := parseFileSource(s)
+		k, fPath, err := generators.ParseFileSource(s)
 		if err != nil {
 			return nil, err
 		}
@@ -162,42 +161,11 @@ func (kvl *loader) keyValuesFromLine(line []byte, currentLine int) (types.Pair, 
 	if len(data) == 2 {
 		kv.Value = data[1]
 	} else {
-		// No value (no `=` in the line) is a signal to obtain the value
-		// from the environment. This behaviour was accidentally imported from kubectl code, and
-		// will be removed in the next major release of Kustomize.
-		_, _ = fmt.Fprintln(os.Stderr, "WARNING: "+
-			"This Kustomization is relying on a bug that loads values from the environment "+
-			"when they are omitted from an env file. "+
-			"This behaviour will be removed in the next major release of Kustomize.")
-		kv.Value = os.Getenv(key)
+		// If there is no value (no `=` in the line), we set the value to an empty string
+		kv.Value = ""
 	}
 	kv.Key = key
 	return kv, nil
-}
-
-// ParseFileSource parses the source given.
-//
-//  Acceptable formats include:
-//   1.  source-path: the basename will become the key name
-//   2.  source-name=source-path: the source-name will become the key name and
-//       source-path is the path to the key file.
-//
-// Key names cannot include '='.
-func parseFileSource(source string) (keyName, filePath string, err error) {
-	numSeparators := strings.Count(source, "=")
-	switch {
-	case numSeparators == 0:
-		return path.Base(source), source, nil
-	case numSeparators == 1 && strings.HasPrefix(source, "="):
-		return "", "", fmt.Errorf("key name for file path %v missing", strings.TrimPrefix(source, "="))
-	case numSeparators == 1 && strings.HasSuffix(source, "="):
-		return "", "", fmt.Errorf("file path for key name %v missing", strings.TrimSuffix(source, "="))
-	case numSeparators > 1:
-		return "", "", errors.New("key names or file paths cannot contain '='")
-	default:
-		components := strings.Split(source, "=")
-		return components[0], components[1], nil
-	}
 }
 
 // ParseLiteralSource parses the source key=val pair into its component pieces.
@@ -219,7 +187,7 @@ func parseLiteralSource(source string) (keyName, value string, err error) {
 // removeQuotes removes the surrounding quotes from the provided string only if it is surrounded on both sides
 // rather than blindly trimming all quotation marks on either side.
 func removeQuotes(str string) string {
-	if len(str) == 0 || str[0] != str[len(str)-1] {
+	if len(str) < 2 || str[0] != str[len(str)-1] {
 		return str
 	}
 	if str[0] == '"' || str[0] == '\'' {

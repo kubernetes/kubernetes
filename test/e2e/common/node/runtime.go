@@ -39,7 +39,7 @@ import (
 
 var _ = SIGDescribe("Container Runtime", func() {
 	f := framework.NewDefaultFramework("container-runtime")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("blackbox test", func() {
 		ginkgo.Context("when starting a container that exits", func() {
@@ -310,7 +310,7 @@ while true; do sleep 1; done
 				checkContainerStatus := func(ctx context.Context) error {
 					status, err := container.GetStatus(ctx)
 					if err != nil {
-						return fmt.Errorf("failed to get container status: %v", err)
+						return fmt.Errorf("failed to get container status: %w", err)
 					}
 					// We need to check container state first. The default pod status is pending, If we check pod phase first,
 					// and the expected pod phase is Pending, the container status may not even show up when we check it.
@@ -335,7 +335,7 @@ while true; do sleep 1; done
 					// Check pod phase
 					phase, err := container.GetPhase(ctx)
 					if err != nil {
-						return fmt.Errorf("failed to get pod phase: %v", err)
+						return fmt.Errorf("failed to get pod phase: %w", err)
 					}
 					if phase != expectedPhase {
 						return fmt.Errorf("expected pod phase: %q, got: %q", expectedPhase, phase)

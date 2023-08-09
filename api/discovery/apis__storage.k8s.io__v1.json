@@ -1,0 +1,106 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "storage.k8s.io/v1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "CSIDriver",
+      "name": "csidrivers",
+      "namespaced": false,
+      "singularName": "csidriver",
+      "storageVersionHash": "hL6j/rwBV5w=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "CSINode",
+      "name": "csinodes",
+      "namespaced": false,
+      "singularName": "csinode",
+      "storageVersionHash": "Pe62DkZtjuo=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "CSIStorageCapacity",
+      "name": "csistoragecapacities",
+      "namespaced": true,
+      "singularName": "csistoragecapacity",
+      "storageVersionHash": "xeVl+2Ly1kE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "StorageClass",
+      "name": "storageclasses",
+      "namespaced": false,
+      "shortNames": [
+        "sc"
+      ],
+      "singularName": "storageclass",
+      "storageVersionHash": "K+m6uJwbjGY=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "VolumeAttachment",
+      "name": "volumeattachments",
+      "namespaced": false,
+      "singularName": "volumeattachment",
+      "storageVersionHash": "tJx/ezt6UDU=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "VolumeAttachment",
+      "name": "volumeattachments/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}

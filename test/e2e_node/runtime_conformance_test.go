@@ -36,7 +36,7 @@ import (
 
 var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
 
@@ -92,7 +92,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					checkContainerStatus := func(ctx context.Context) error {
 						status, err := container.GetStatus(ctx)
 						if err != nil {
-							return fmt.Errorf("failed to get container status: %v", err)
+							return fmt.Errorf("failed to get container status: %w", err)
 						}
 						// We need to check container state first. The default pod status is pending, If we check
 						// pod phase first, and the expected pod phase is Pending, the container status may not
@@ -118,7 +118,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 						// Check pod phase
 						phase, err := container.GetPhase(ctx)
 						if err != nil {
-							return fmt.Errorf("failed to get pod phase: %v", err)
+							return fmt.Errorf("failed to get pod phase: %w", err)
 						}
 						if phase != testCase.phase {
 							return fmt.Errorf("expected pod phase: %q, got: %q", testCase.phase, phase)

@@ -111,7 +111,7 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volumeio", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
 		l = local{}
@@ -263,7 +263,7 @@ func verifyFile(f *framework.Framework, pod *v1.Pod, fpath string, expectSize in
 	}
 	size, err := strconv.Atoi(strings.TrimSuffix(rtnstr, "\n"))
 	if err != nil {
-		return fmt.Errorf("unable to convert string %q to int: %v", rtnstr, err)
+		return fmt.Errorf("unable to convert string %q to int: %w", rtnstr, err)
 	}
 	if int64(size) != expectSize {
 		return fmt.Errorf("size of file %s is %d, expected %d", fpath, size, expectSize)
@@ -320,7 +320,7 @@ func testVolumeIO(ctx context.Context, f *framework.Framework, cs clientset.Inte
 	podsNamespacer := cs.CoreV1().Pods(config.Namespace)
 	clientPod, err = podsNamespacer.Create(ctx, clientPod, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create client pod %q: %v", clientPod.Name, err)
+		return fmt.Errorf("failed to create client pod %q: %w", clientPod.Name, err)
 	}
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		deleteFile(f, clientPod, ddInput)
@@ -339,7 +339,7 @@ func testVolumeIO(ctx context.Context, f *framework.Framework, cs clientset.Inte
 
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, clientPod.Name, clientPod.Namespace, f.Timeouts.PodStart)
 	if err != nil {
-		return fmt.Errorf("client pod %q not running: %v", clientPod.Name, err)
+		return fmt.Errorf("client pod %q not running: %w", clientPod.Name, err)
 	}
 
 	// create files of the passed-in file sizes and verify test file size and content

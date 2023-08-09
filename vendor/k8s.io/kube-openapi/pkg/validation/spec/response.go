@@ -30,6 +30,15 @@ type ResponseProps struct {
 	Examples    map[string]interface{} `json:"examples,omitempty"`
 }
 
+// Marshaling structure only, always edit along with corresponding
+// struct (or compilation will fail).
+type responsePropsOmitZero struct {
+	Description string                 `json:"description,omitempty"`
+	Schema      *Schema                `json:"schema,omitzero"`
+	Headers     map[string]Header      `json:"headers,omitempty"`
+	Examples    map[string]interface{} `json:"examples,omitempty"`
+}
+
 // Response describes a single response from an API Operation.
 //
 // For more information: http://goo.gl/8us55a#responseObject
@@ -68,23 +77,20 @@ func (r *Response) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.D
 		return err
 	}
 
-	r.Extensions = x.Extensions
-	r.ResponseProps = x.ResponseProps
-
-	if err := r.Refable.Ref.fromMap(r.Extensions); err != nil {
+	if err := r.Refable.Ref.fromMap(x.Extensions); err != nil {
 		return err
 	}
-
-	r.Extensions.sanitize()
-	if len(r.Extensions) == 0 {
-		r.Extensions = nil
-	}
+	r.Extensions = internal.SanitizeExtensions(x.Extensions)
+	r.ResponseProps = x.ResponseProps
 
 	return nil
 }
 
 // MarshalJSON converts this items object to JSON
 func (r Response) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshaling {
+		return internal.DeterministicMarshal(r)
+	}
 	b1, err := json.Marshal(r.ResponseProps)
 	if err != nil {
 		return nil, err
@@ -98,6 +104,18 @@ func (r Response) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2, b3), nil
+}
+
+func (r Response) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref string `json:"$ref,omitempty"`
+		Extensions
+		ResponseProps responsePropsOmitZero `json:",inline"`
+	}
+	x.Ref = r.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(r.Extensions)
+	x.ResponseProps = responsePropsOmitZero(r.ResponseProps)
+	return opts.MarshalNext(enc, x)
 }
 
 // NewResponse creates a new response instance

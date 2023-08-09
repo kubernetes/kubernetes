@@ -43,6 +43,9 @@ type Header struct {
 
 // MarshalJSON marshal this to JSON
 func (h Header) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshaling {
+		return internal.DeterministicMarshal(h)
+	}
 	b1, err := json.Marshal(h.CommonValidations)
 	if err != nil {
 		return nil, err
@@ -60,6 +63,20 @@ func (h Header) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2, b3, b4), nil
+}
+
+func (h Header) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		CommonValidations commonValidationsOmitZero `json:",inline"`
+		SimpleSchema      simpleSchemaOmitZero      `json:",inline"`
+		Extensions
+		HeaderProps
+	}
+	x.CommonValidations = commonValidationsOmitZero(h.CommonValidations)
+	x.SimpleSchema = simpleSchemaOmitZero(h.SimpleSchema)
+	x.Extensions = internal.SanitizeExtensions(h.Extensions)
+	x.HeaderProps = h.HeaderProps
+	return opts.MarshalNext(enc, x)
 }
 
 // UnmarshalJSON unmarshals this header from JSON
@@ -94,12 +111,8 @@ func (h *Header) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Dec
 
 	h.CommonValidations = x.CommonValidations
 	h.SimpleSchema = x.SimpleSchema
-	h.Extensions = x.Extensions
+	h.Extensions = internal.SanitizeExtensions(x.Extensions)
 	h.HeaderProps = x.HeaderProps
 
-	h.Extensions.sanitize()
-	if len(h.Extensions) == 0 {
-		h.Extensions = nil
-	}
 	return nil
 }

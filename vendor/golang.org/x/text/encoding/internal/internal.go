@@ -64,7 +64,7 @@ func (e FuncEncoding) NewEncoder() *encoding.Encoder {
 // byte.
 type RepertoireError byte
 
-// Error implements the error interrface.
+// Error implements the error interface.
 func (r RepertoireError) Error() string {
 	return "encoding: rune not supported by encoding."
 }

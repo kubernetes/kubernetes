@@ -20,8 +20,6 @@ limitations under the License.
 package gce
 
 import (
-	"k8s.io/klog/v2"
-
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
@@ -29,8 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
-	v1 "k8s.io/api/core/v1"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 )
 
 const (
@@ -41,18 +37,6 @@ const (
 	// TODO: use a shared constant once ports in pkg/cluster/ports are in a common external repo.
 	lbNodesHealthCheckPort = 10256
 )
-
-var (
-	minNodesHealthCheckVersion *utilversion.Version
-)
-
-func init() {
-	if v, err := utilversion.ParseGeneric("1.7.2"); err != nil {
-		klog.Fatalf("Failed to parse version for minNodesHealthCheckVersion: %v", err)
-	} else {
-		minNodesHealthCheckVersion = v
-	}
-}
 
 func newHealthcheckMetricContext(request string) *metricContext {
 	return newHealthcheckMetricContextWithVersion(request, computeV1Version)
@@ -273,26 +257,4 @@ func GetNodesHealthCheckPort() int32 {
 // balancers (l4) for performing health checks on nodes.
 func GetNodesHealthCheckPath() string {
 	return nodesHealthCheckPath
-}
-
-// isAtLeastMinNodesHealthCheckVersion checks if a version is higher than
-// `minNodesHealthCheckVersion`.
-func isAtLeastMinNodesHealthCheckVersion(vstring string) bool {
-	version, err := utilversion.ParseGeneric(vstring)
-	if err != nil {
-		klog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
-		return false
-	}
-	return version.AtLeast(minNodesHealthCheckVersion)
-}
-
-// supportsNodesHealthCheck returns false if anyone of the nodes has version
-// lower than `minNodesHealthCheckVersion`.
-func supportsNodesHealthCheck(nodes []*v1.Node) bool {
-	for _, node := range nodes {
-		if !isAtLeastMinNodesHealthCheckVersion(node.Status.NodeInfo.KubeProxyVersion) {
-			return false
-		}
-	}
-	return true
 }

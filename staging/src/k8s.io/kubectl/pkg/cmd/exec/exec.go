@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -76,7 +77,7 @@ const (
 	defaultPodExecTimeout = 60 * time.Second
 )
 
-func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdExec(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
 			IOStreams: streams,
@@ -143,7 +144,7 @@ type StreamOptions struct {
 	// InterruptParent, if set, is used to handle interrupts while attached
 	InterruptParent *interrupt.Handler
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	// for testing
 	overrideStreams func() (io.ReadCloser, io.Writer, io.Writer)

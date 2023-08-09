@@ -60,7 +60,7 @@ except:
 
 var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 	f := framework.NewDefaultFramework("cluster-dns")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var c clientset.Interface
 	ginkgo.BeforeEach(func() {
@@ -116,7 +116,7 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns.Name).List(ctx, options)
 			framework.ExpectNoError(err, "failed to list pods in namespace: %s", ns.Name)
-			err = e2epod.PodsResponding(ctx, c, ns.Name, backendName, false, pods)
+			err = e2epod.WaitForPodsResponding(ctx, c, ns.Name, backendName, false, 0, pods)
 			framework.ExpectNoError(err, "waiting for all pods to respond")
 			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 

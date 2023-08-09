@@ -148,6 +148,12 @@ func TestToKubeContainer(t *testing.T) {
 	got, err := m.toKubeContainer(c)
 	assert.NoError(t, err)
 	assert.Equal(t, expect, got)
+
+	// unable to convert a nil pointer to a runtime container
+	_, err = m.toKubeContainer(nil)
+	assert.Error(t, err)
+	_, err = m.sandboxToKubeContainer(nil)
+	assert.Error(t, err)
 }
 
 func TestGetImageUser(t *testing.T) {
@@ -231,5 +237,80 @@ func TestGetImageUser(t *testing.T) {
 			assert.Equal(t, test.expectedImageUserValues.uid, *uid, "TestCase[%d]", j)
 		}
 		assert.Equal(t, test.expectedImageUserValues.username, username, "TestCase[%d]", j)
+	}
+}
+
+func TestToRuntimeProtocol(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		protocol string
+		expected runtimeapi.Protocol
+	}{
+		{
+			name:     "TCP protocol",
+			protocol: "TCP",
+			expected: runtimeapi.Protocol_TCP,
+		},
+		{
+			name:     "UDP protocol",
+			protocol: "UDP",
+			expected: runtimeapi.Protocol_UDP,
+		},
+		{
+			name:     "SCTP protocol",
+			protocol: "SCTP",
+			expected: runtimeapi.Protocol_SCTP,
+		},
+		{
+			name:     "unknown protocol",
+			protocol: "unknown",
+			expected: runtimeapi.Protocol_TCP,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if result := toRuntimeProtocol(v1.Protocol(test.protocol)); result != test.expected {
+				t.Errorf("expected %d but got %d", test.expected, result)
+			}
+		})
+	}
+}
+
+func TestToKubeContainerState(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		state    int32
+		expected kubecontainer.State
+	}{
+		{
+			name:     "container created",
+			state:    0,
+			expected: kubecontainer.ContainerStateCreated,
+		},
+		{
+			name:     "container running",
+			state:    1,
+			expected: kubecontainer.ContainerStateRunning,
+		},
+		{
+			name:     "container exited",
+			state:    2,
+			expected: kubecontainer.ContainerStateExited,
+		},
+		{
+			name:     "unknown state",
+			state:    3,
+			expected: kubecontainer.ContainerStateUnknown,
+		},
+		{
+			name:     "not supported state",
+			state:    4,
+			expected: kubecontainer.ContainerStateUnknown,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if result := toKubeContainerState(runtimeapi.ContainerState(test.state)); result != test.expected {
+				t.Errorf("expected %s but got %s", test.expected, result)
+			}
+		})
 	}
 }

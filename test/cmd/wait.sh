@@ -78,6 +78,9 @@ spec:
         command: ["/bin/sh", "-c", "sleep infinity"]
 EOF
 
+    # Make sure deployment is successfully applied
+    kube::test::wait_object_assert deployments "{{range.items}}{{${id_field:?}}}{{end}}" 'dtest'
+
     set +o errexit
     # wait timeout error because condition is invalid
     start_sec=$(date +"%s")
@@ -90,6 +93,21 @@ EOF
 
     # Clean deployment
     kubectl delete deployment dtest
+
+    # create test data
+    kubectl create deployment test-3 --image=busybox
+
+    # wait with jsonpath without value to succeed
+    set +o errexit
+    # Command: Wait with jsonpath without value
+    output_message=$(kubectl wait --for=jsonpath='{.status.replicas}' deploy/test-3 2>&1)
+    set -o errexit
+
+    # Post-Condition: Wait succeed
+    kube::test::if_has_string "${output_message}" 'deployment.apps/test-3 condition met'
+
+    # Clean deployment
+    kubectl delete deployment test-3
 
     set +o nounset
     set +o errexit

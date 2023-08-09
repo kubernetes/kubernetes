@@ -79,7 +79,7 @@ func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 
 	file, err := os.Open(dataFileName)
 	if err != nil {
-		return nil, errors.New(log("failed to open volume data file [%s]: %v", dataFileName, err))
+		return nil, fmt.Errorf("%s: %w", log("failed to open volume data file [%s]", dataFileName), err)
 	}
 	defer file.Close()
 	data := map[string]string{}

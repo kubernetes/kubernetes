@@ -21,22 +21,26 @@ import (
 	"io"
 	"net"
 	"net/url"
-	"reflect"
 
 	"github.com/spf13/pflag"
 	oteltrace "go.opentelemetry.io/otel/trace"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
+	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
+	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/webhook"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/listers/core/v1"
 	netutils "k8s.io/utils/net"
 )
@@ -109,52 +113,29 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		return nil, err
 	}
 
-	serviceResolver := &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()}
-	authResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, oteltrace.NewNoopTracerProvider())
-	conversionFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
-	if err != nil {
-		return nil, err
-	}
-
-	crdRESTOptionsGetter, err := NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd)
-	if err != nil {
-		return nil, err
-	}
+	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions), openapinamer.NewDefinitionNamer(apiserver.Scheme, scheme.Scheme))
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
-			CRDRESTOptionsGetter: crdRESTOptionsGetter,
-			ConversionFactory:    conversionFactory,
+			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd, serverConfig.ResourceTransformers, serverConfig.StorageObjectCountTracker),
+			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
+			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, oteltrace.NewNoopTracerProvider()),
 		},
 	}
 	return config, nil
 }
 
 // NewCRDRESTOptionsGetter create a RESTOptionsGetter for CustomResources.
-// This works on a copy of the etcd options so we don't mutate originals.
-// We assume that the input etcd options have been completed already.
+//
 // Avoid messing with anything outside of changes to StorageConfig as that
 // may lead to unexpected behavior when the options are applied.
-func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) (genericregistry.RESTOptionsGetter, error) {
-	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
-	etcdOptions.WatchCacheSizes = nil      // this control is not provided for custom resources
-	etcdOptions.SkipHealthEndpoints = true // avoid double wiring of health checks
+func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions, resourceTransformers storagevalue.ResourceTransformers, tracker flowcontrolrequest.StorageObjectCountTracker) genericregistry.RESTOptionsGetter {
+	etcdOptionsCopy := etcdOptions
+	etcdOptionsCopy.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	etcdOptionsCopy.StorageConfig.StorageObjectCountTracker = tracker
+	etcdOptionsCopy.WatchCacheSizes = nil // this control is not provided for custom resources
 
-	// creates a generic apiserver config for etcdOptions to mutate
-	c := genericapiserver.Config{}
-	if err := etcdOptions.ApplyTo(&c); err != nil {
-		return nil, err
-	}
-	restOptionsGetter := c.RESTOptionsGetter
-	if restOptionsGetter == nil {
-		return nil, fmt.Errorf("server.Config RESTOptionsGetter should not be nil")
-	}
-	// sanity check that no other fields are set
-	c.RESTOptionsGetter = nil
-	if !reflect.DeepEqual(c, genericapiserver.Config{}) {
-		return nil, fmt.Errorf("only RESTOptionsGetter should have been mutated in server.Config")
-	}
-	return restOptionsGetter, nil
+	return etcdOptions.CreateRESTOptionsGetter(&genericoptions.SimpleStorageFactory{StorageConfig: etcdOptionsCopy.StorageConfig}, resourceTransformers)
 }
 
 type serviceResolver struct {

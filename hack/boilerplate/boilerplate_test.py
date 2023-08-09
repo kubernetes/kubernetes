@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -48,5 +48,5 @@ class TestBoilerplate(unittest.TestCase):
 
     sys.stdout = old_stdout
 
-    self.assertEquals(
+    self.assertEqual(
         output, ['././fail.go', '././fail.py'])

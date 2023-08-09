@@ -16,6 +16,14 @@ This package supports the following UUID versions:
 * Version 4, based on random numbers (RFC-4122)
 * Version 5, based on SHA-1 hashing of a named value (RFC-4122)
 
+This package also supports experimental Universally Unique Identifier implementations based on a
+[draft RFC](https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-04.html) that updates RFC-4122
+* Version 6, a k-sortable id based on timestamp, and field-compatible with v1 (draft-peabody-dispatch-new-uuid-format, RFC-4122)
+* Version 7, a k-sortable id based on timestamp (draft-peabody-dispatch-new-uuid-format, RFC-4122)
+
+The v6 and v7 IDs are **not** considered a part of the stable API, and may be subject to behavior or API changes as part of minor releases
+to this package. They will be updated as the draft RFC changes, and will become stable if and when the draft RFC is accepted.
+
 ## Project History
 
 This project was originally forked from the
@@ -106,3 +114,4 @@ func main() {
 
 * [RFC-4122](https://tools.ietf.org/html/rfc4122)
 * [DCE 1.1: Authentication and Security Services](http://pubs.opengroup.org/onlinepubs/9696989899/chap5.htm#tagcjh_08_02_01_01)
+* [New UUID Formats RFC Draft (Peabody) Rev 04](https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-04.html#)

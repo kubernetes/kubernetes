@@ -29,6 +29,7 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
 	"github.com/google/cel-go/interpreter/functions"
+	"github.com/google/cel-go/parser"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	descpb "google.golang.org/protobuf/types/descriptorpb"
@@ -61,6 +62,10 @@ const (
 	// on a CEL timestamp operation. This fixes the scenario where the input time
 	// is not already in UTC.
 	featureDefaultUTCTimeZone
+
+	// Enable the use of optional types in the syntax, type-system, type-checking,
+	// and runtime.
+	featureOptionalTypes
 )
 
 // EnvOption is a functional interface for configuring the environment.
@@ -163,19 +168,19 @@ func Container(name string) EnvOption {
 // Abbreviations can be useful when working with variables, functions, and especially types from
 // multiple namespaces:
 //
-//    // CEL object construction
-//    qual.pkg.version.ObjTypeName{
-//       field: alt.container.ver.FieldTypeName{value: ...}
-//    }
+//	// CEL object construction
+//	qual.pkg.version.ObjTypeName{
+//	   field: alt.container.ver.FieldTypeName{value: ...}
+//	}
 //
 // Only one the qualified names above may be used as the CEL container, so at least one of these
 // references must be a long qualified name within an otherwise short CEL program. Using the
 // following abbreviations, the program becomes much simpler:
 //
-//    // CEL Go option
-//    Abbrevs("qual.pkg.version.ObjTypeName", "alt.container.ver.FieldTypeName")
-//    // Simplified Object construction
-//    ObjTypeName{field: FieldTypeName{value: ...}}
+//	// CEL Go option
+//	Abbrevs("qual.pkg.version.ObjTypeName", "alt.container.ver.FieldTypeName")
+//	// Simplified Object construction
+//	ObjTypeName{field: FieldTypeName{value: ...}}
 //
 // There are a few rules for the qualified names and the simple abbreviations generated from them:
 // - Qualified names must be dot-delimited, e.g. `package.subpkg.name`.
@@ -188,9 +193,12 @@ func Container(name string) EnvOption {
 // - Expanded abbreviations do not participate in namespace resolution.
 // - Abbreviation expansion is done instead of the container search for a matching identifier.
 // - Containers follow C++ namespace resolution rules with searches from the most qualified name
-//   to the least qualified name.
+//
+//	to the least qualified name.
+//
 // - Container references within the CEL program may be relative, and are resolved to fully
-//   qualified names at either type-check time or program plan time, whichever comes first.
+//
+//	qualified names at either type-check time or program plan time, whichever comes first.
 //
 // If there is ever a case where an identifier could be in both the container and as an
 // abbreviation, the abbreviation wins as this will ensure that the meaning of a program is
@@ -216,7 +224,7 @@ func Abbrevs(qualifiedNames ...string) EnvOption {
 // environment by default.
 //
 // Note: This option must be specified after the CustomTypeProvider option when used together.
-func Types(addTypes ...interface{}) EnvOption {
+func Types(addTypes ...any) EnvOption {
 	return func(e *Env) (*Env, error) {
 		reg, isReg := e.provider.(ref.TypeRegistry)
 		if !isReg {
@@ -253,7 +261,7 @@ func Types(addTypes ...interface{}) EnvOption {
 //
 // TypeDescs are hermetic to a single Env object, but may be copied to other Env values via
 // extension or by re-using the same EnvOption with another NewEnv() call.
-func TypeDescs(descs ...interface{}) EnvOption {
+func TypeDescs(descs ...any) EnvOption {
 	return func(e *Env) (*Env, error) {
 		reg, isReg := e.provider.(ref.TypeRegistry)
 		if !isReg {
@@ -350,8 +358,8 @@ func Functions(funcs ...*functions.Overload) ProgramOption {
 // variables with the same name provided to the Eval() call. If Globals is used in a Library with
 // a Lib EnvOption, vars may shadow variables provided by previously added libraries.
 //
-// The vars value may either be an `interpreter.Activation` instance or a `map[string]interface{}`.
-func Globals(vars interface{}) ProgramOption {
+// The vars value may either be an `interpreter.Activation` instance or a `map[string]any`.
+func Globals(vars any) ProgramOption {
 	return func(p *prog) (*prog, error) {
 		defaultVars, err := interpreter.NewActivation(vars)
 		if err != nil {
@@ -404,6 +412,9 @@ const (
 	// OptTrackCost enables the runtime cost calculation while validation and return cost within evalDetails
 	// cost calculation is available via func ActualCost()
 	OptTrackCost EvalOption = 1 << iota
+
+	// OptCheckStringFormat enables compile-time checking of string.format calls for syntax/cardinality.
+	OptCheckStringFormat EvalOption = 1 << iota
 )
 
 // EvalOptions sets one or more evaluation options which may affect the evaluation or Result.
@@ -534,10 +545,35 @@ func DefaultUTCTimeZone(enabled bool) EnvOption {
 	return features(featureDefaultUTCTimeZone, enabled)
 }
 
+// OptionalTypes enable support for optional syntax and types in CEL. The optional value type makes
+// it possible to express whether variables have been provided, whether a result has been computed,
+// and in the future whether an object field path, map key value, or list index has a value.
+func OptionalTypes() EnvOption {
+	return Lib(optionalLibrary{})
+}
+
 // features sets the given feature flags.  See list of Feature constants above.
 func features(flag int, enabled bool) EnvOption {
 	return func(e *Env) (*Env, error) {
 		e.features[flag] = enabled
+		return e, nil
+	}
+}
+
+// ParserRecursionLimit adjusts the AST depth the parser will tolerate.
+// Defaults defined in the parser package.
+func ParserRecursionLimit(limit int) EnvOption {
+	return func(e *Env) (*Env, error) {
+		e.prsrOpts = append(e.prsrOpts, parser.MaxRecursionDepth(limit))
+		return e, nil
+	}
+}
+
+// ParserExpressionSizeLimit adjusts the number of code points the expression parser is allowed to parse.
+// Defaults defined in the parser package.
+func ParserExpressionSizeLimit(limit int) EnvOption {
+	return func(e *Env) (*Env, error) {
+		e.prsrOpts = append(e.prsrOpts, parser.ExpressionSizeCodePointLimit(limit))
 		return e, nil
 	}
 }

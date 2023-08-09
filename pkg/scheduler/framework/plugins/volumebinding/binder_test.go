@@ -43,6 +43,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 )
@@ -150,7 +151,8 @@ type testEnv struct {
 
 func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 	client := &fake.Clientset{}
-	reactor := pvtesting.NewVolumeReactor(client, nil, nil, nil)
+	_, ctx := ktesting.NewTestContext(t)
+	reactor := pvtesting.NewVolumeReactor(ctx, client, nil, nil, nil)
 	// TODO refactor all tests to use real watch mechanism, see #72327
 	client.AddWatchReactor("*", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -2341,7 +2343,7 @@ func TestGetEligibleNodes(t *testing.T) {
 		nodes []*v1.Node
 
 		// Expected return values
-		eligibleNodes sets.String
+		eligibleNodes sets.Set[string]
 	}
 
 	scenarios := map[string]scenarioType{
@@ -2387,7 +2389,7 @@ func TestGetEligibleNodes(t *testing.T) {
 				node1,
 				node2,
 			},
-			eligibleNodes: sets.NewString("node1"),
+			eligibleNodes: sets.New("node1"),
 		},
 		"multi-local-pv-with-different-nodes": {
 			pvcs: []*v1.PersistentVolumeClaim{
@@ -2404,7 +2406,7 @@ func TestGetEligibleNodes(t *testing.T) {
 				node1,
 				node2,
 			},
-			eligibleNodes: sets.NewString(),
+			eligibleNodes: sets.New[string](),
 		},
 		"local-and-non-local-pv": {
 			pvcs: []*v1.PersistentVolumeClaim{
@@ -2424,7 +2426,7 @@ func TestGetEligibleNodes(t *testing.T) {
 				node1,
 				node2,
 			},
-			eligibleNodes: sets.NewString("node1"),
+			eligibleNodes: sets.New("node1"),
 		},
 	}
 
@@ -2447,7 +2449,7 @@ func TestGetEligibleNodes(t *testing.T) {
 			fmt.Println("foo")
 		}
 
-		if compDiff := cmp.Diff(scenario.eligibleNodes, eligibleNodes, cmp.Comparer(func(a, b sets.String) bool {
+		if compDiff := cmp.Diff(scenario.eligibleNodes, eligibleNodes, cmp.Comparer(func(a, b sets.Set[string]) bool {
 			return reflect.DeepEqual(a, b)
 		})); compDiff != "" {
 			t.Errorf("Unexpected eligible nodes (-want +got):\n%s", compDiff)

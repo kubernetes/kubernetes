@@ -57,7 +57,7 @@ const (
 
 var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.13

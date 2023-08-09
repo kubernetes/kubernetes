@@ -23,6 +23,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // Test single call to syncClaim and syncVolume methods.
@@ -749,8 +750,8 @@ func TestSync(t *testing.T) {
 			test:            testSyncClaim,
 		},
 	}
-
-	runSyncTests(t, tests, []*storage.StorageClass{
+	_, ctx := ktesting.NewTestContext(t)
+	runSyncTests(t, ctx, tests, []*storage.StorageClass{
 		{
 			ObjectMeta:        metav1.ObjectMeta{Name: classWait},
 			VolumeBindingMode: &modeWait,
@@ -964,8 +965,8 @@ func TestSyncBlockVolume(t *testing.T) {
 			test:            testSyncVolume,
 		},
 	}
-
-	runSyncTests(t, tests, []*storage.StorageClass{}, []*v1.Pod{})
+	_, ctx := ktesting.NewTestContext(t)
+	runSyncTests(t, ctx, tests, []*storage.StorageClass{}, []*v1.Pod{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -1016,6 +1017,6 @@ func TestMultiSync(t *testing.T) {
 			test:           testSyncClaim,
 		},
 	}
-
-	runMultisyncTests(t, tests, []*storage.StorageClass{}, "")
+	_, ctx := ktesting.NewTestContext(t)
+	runMultisyncTests(t, ctx, tests, []*storage.StorageClass{}, "")
 }

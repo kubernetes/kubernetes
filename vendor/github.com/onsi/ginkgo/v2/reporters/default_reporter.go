@@ -12,6 +12,7 @@ import (
 	"io"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2/formatter"
@@ -23,7 +24,7 @@ type DefaultReporter struct {
 	writer io.Writer
 
 	// managing the emission stream
-	lastChar                 string
+	lastCharWasNewline       bool
 	lastEmissionWasDelimiter bool
 
 	// rendering
@@ -32,6 +33,7 @@ type DefaultReporter struct {
 	formatter    formatter.Formatter
 
 	runningInParallel bool
+	lock              *sync.Mutex
 }
 
 func NewDefaultReporterUnderTest(conf types.ReporterConfig, writer io.Writer) *DefaultReporter {
@@ -46,12 +48,13 @@ func NewDefaultReporter(conf types.ReporterConfig, writer io.Writer) *DefaultRep
 		conf:   conf,
 		writer: writer,
 
-		lastChar:                 "\n",
+		lastCharWasNewline:       true,
 		lastEmissionWasDelimiter: false,
 
 		specDenoter:  "•",
 		retryDenoter: "↺",
 		formatter:    formatter.NewWithNoColorBool(conf.NoColor),
+		lock:         &sync.Mutex{},
 	}
 	if runtime.GOOS == "windows" {
 		reporter.specDenoter = "+"
@@ -528,7 +531,7 @@ func (r *DefaultReporter) EmitReportEntry(entry types.ReportEntry) {
 }
 
 func (r *DefaultReporter) emitReportEntry(indent uint, entry types.ReportEntry) {
-	r.emitBlock(r.fi(indent, "{{bold}}"+entry.Name+"{{gray}} - %s @ %s{{/}}", entry.Location, entry.Time.Format(types.GINKGO_TIME_FORMAT)))
+	r.emitBlock(r.fi(indent, "{{bold}}"+entry.Name+"{{gray}} "+fmt.Sprintf("- %s @ %s{{/}}", entry.Location, entry.Time.Format(types.GINKGO_TIME_FORMAT))))
 	if representation := entry.StringRepresentation(); representation != "" {
 		r.emitBlock(r.fi(indent+1, representation))
 	}
@@ -619,31 +622,37 @@ func (r *DefaultReporter) emitSource(indent uint, fc types.FunctionCall) {
 
 /* Emitting to the writer */
 func (r *DefaultReporter) emit(s string) {
-	if len(s) > 0 {
-		r.lastChar = s[len(s)-1:]
-		r.lastEmissionWasDelimiter = false
-		r.writer.Write([]byte(s))
-	}
+	r._emit(s, false, false)
 }
 
 func (r *DefaultReporter) emitBlock(s string) {
-	if len(s) > 0 {
-		if r.lastChar != "\n" {
-			r.emit("\n")
-		}
-		r.emit(s)
-		if r.lastChar != "\n" {
-			r.emit("\n")
-		}
-	}
+	r._emit(s, true, false)
 }
 
 func (r *DefaultReporter) emitDelimiter(indent uint) {
-	if r.lastEmissionWasDelimiter {
+	r._emit(r.fi(indent, "{{gray}}%s{{/}}", strings.Repeat("-", 30)), true, true)
+}
+
+// a bit ugly - but we're trying to minimize locking on this hot codepath
+func (r *DefaultReporter) _emit(s string, block bool, isDelimiter bool) {
+	if len(s) == 0 {
 		return
 	}
-	r.emitBlock(r.fi(indent, "{{gray}}%s{{/}}", strings.Repeat("-", 30)))
-	r.lastEmissionWasDelimiter = true
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if isDelimiter && r.lastEmissionWasDelimiter {
+		return
+	}
+	if block && !r.lastCharWasNewline {
+		r.writer.Write([]byte("\n"))
+	}
+	r.lastCharWasNewline = (s[len(s)-1:] == "\n")
+	r.writer.Write([]byte(s))
+	if block && !r.lastCharWasNewline {
+		r.writer.Write([]byte("\n"))
+		r.lastCharWasNewline = true
+	}
+	r.lastEmissionWasDelimiter = isDelimiter
 }
 
 /* Rendering text */

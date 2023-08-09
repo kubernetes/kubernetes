@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/go-logr/logr"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -30,9 +32,28 @@ type objectReference struct {
 	Namespace string
 }
 
+// String is used when logging an objectReference in text format.
 func (s objectReference) String() string {
 	return fmt.Sprintf("[%s/%s, namespace: %s, name: %s, uid: %s]", s.APIVersion, s.Kind, s.Namespace, s.Name, s.UID)
 }
+
+// MarshalLog is used when logging an objectReference in JSON format.
+func (s objectReference) MarshalLog() interface{} {
+	return struct {
+		Name       string    `json:"name"`
+		Namespace  string    `json:"namespace"`
+		APIVersion string    `json:"apiVersion"`
+		UID        types.UID `json:"uid"`
+	}{
+		Namespace:  s.Namespace,
+		Name:       s.Name,
+		APIVersion: s.APIVersion,
+		UID:        s.UID,
+	}
+}
+
+var _ fmt.Stringer = objectReference{}
+var _ logr.Marshaler = objectReference{}
 
 // The single-threaded GraphBuilder.processGraphChanges() is the sole writer of the
 // nodes. The multi-threaded GarbageCollector.attemptToDeleteItem() reads the nodes.

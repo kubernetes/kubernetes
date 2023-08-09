@@ -18,11 +18,13 @@ import "fmt"
 
 type options struct {
 	maxRecursionDepth                int
+	errorReportingLimit              int
 	errorRecoveryTokenLookaheadLimit int
 	errorRecoveryLimit               int
 	expressionSizeCodePointLimit     int
 	macros                           map[string]Macro
 	populateMacroCalls               bool
+	enableOptionalSyntax             bool
 }
 
 // Option configures the behavior of the parser.
@@ -45,7 +47,7 @@ func MaxRecursionDepth(limit int) Option {
 // successfully resume. In some pathological cases, the parser can look through quite a large set of input which
 // in turn generates a lot of back-tracking and performance degredation.
 //
-// The limit must be > 1, and is recommended to be less than the default of 256.
+// The limit must be >= 1, and is recommended to be less than the default of 256.
 func ErrorRecoveryLookaheadTokenLimit(limit int) Option {
 	return func(opts *options) error {
 		if limit < 1 {
@@ -63,6 +65,19 @@ func ErrorRecoveryLimit(limit int) Option {
 			return fmt.Errorf("error recovery limit must be greater than or equal to -1: %d", limit)
 		}
 		opts.errorRecoveryLimit = limit
+		return nil
+	}
+}
+
+// ErrorReportingLimit limits the number of syntax error reports before terminating parsing.
+//
+// The limit must be at least 1. If unset, the limit will be 100.
+func ErrorReportingLimit(limit int) Option {
+	return func(opts *options) error {
+		if limit < 1 {
+			return fmt.Errorf("error reporting limit must be at least 1: %d", limit)
+		}
+		opts.errorReportingLimit = limit
 		return nil
 	}
 }
@@ -99,6 +114,14 @@ func Macros(macros ...Macro) Option {
 func PopulateMacroCalls(populateMacroCalls bool) Option {
 	return func(opts *options) error {
 		opts.populateMacroCalls = populateMacroCalls
+		return nil
+	}
+}
+
+// EnableOptionalSyntax enables syntax for optional field and index selection.
+func EnableOptionalSyntax(optionalSyntax bool) Option {
+	return func(opts *options) error {
+		opts.enableOptionalSyntax = optionalSyntax
 		return nil
 	}
 }

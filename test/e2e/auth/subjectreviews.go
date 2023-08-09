@@ -35,7 +35,19 @@ import (
 var _ = SIGDescribe("SubjectReview", func() {
 	f := framework.NewDefaultFramework("subjectreview")
 
-	ginkgo.It("should support SubjectReview API operations", func() {
+	/*
+		Release: v1.27
+		Testname: SubjectReview, API Operations
+		Description: A ServiceAccount is created which MUST succeed.
+		A clientset is created to impersonate the ServiceAccount.
+		A SubjectAccessReview is created for the ServiceAccount which
+		MUST succeed. The allowed status for the SubjectAccessReview
+		MUST match the expected allowed for the impersonated client
+		call. A LocalSubjectAccessReviews is created for the ServiceAccount
+		which MUST succeed. The allowed status for the LocalSubjectAccessReview
+		MUST match the expected allowed for the impersonated client call.
+	*/
+	framework.ConformanceIt("should support SubjectReview API operations", func() {
 
 		AuthClient := f.ClientSet.AuthorizationV1()
 		ns := f.Namespace.Name

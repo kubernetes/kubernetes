@@ -23,9 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -170,7 +168,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		return pb.tcp.Probe(host, port, timeout)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.GRPCContainerProbe) && p.GRPC != nil {
+	if p.GRPC != nil {
 		host := status.PodIP
 		service := ""
 		if p.GRPC.Service != nil {

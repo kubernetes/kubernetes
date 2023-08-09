@@ -81,11 +81,11 @@ func getInternalIP(node *v1.Node) (string, error) {
 func getSubnetPrefix(ctx context.Context, c clientset.Interface) (*net.IPNet, error) {
 	node, err := getReadySchedulableWorkerNode(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("error getting a ready schedulable worker Node, err: %v", err)
+		return nil, fmt.Errorf("error getting a ready schedulable worker Node, err: %w", err)
 	}
 	internalIP, err := getInternalIP(node)
 	if err != nil {
-		return nil, fmt.Errorf("error getting Node internal IP, err: %v", err)
+		return nil, fmt.Errorf("error getting Node internal IP, err: %w", err)
 	}
 	ip := netutils.ParseIPSloppy(internalIP)
 	if ip == nil {
@@ -121,7 +121,7 @@ func getReadySchedulableWorkerNode(ctx context.Context, c clientset.Interface) (
 
 var _ = common.SIGDescribe("LoadBalancers", func() {
 	f := framework.NewDefaultFramework("loadbalancers")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var subnetPrefix *net.IPNet
@@ -1018,7 +1018,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes", func(ctx context.Context) {
 		// requires cloud load-balancer support
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws", "azure")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "azure")
 		ns := f.Namespace.Name
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -1150,7 +1150,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes", func(ctx context.Context) {
 		// requires cloud load-balancer support
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws", "azure")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "azure")
 		ns := f.Namespace.Name
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 1)
 		framework.ExpectNoError(err)
@@ -1301,7 +1301,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 	f := framework.NewDefaultFramework("esipp")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var loadBalancerCreateTimeout time.Duration
 
 	var cs clientset.Interface
@@ -1741,6 +1741,9 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 
 	nodeNames := e2edaemonset.SchedulableNodes(ctx, cs, ds)
 	e2eskipper.SkipUnlessAtLeast(len(nodeNames), 2, "load-balancer rolling update test requires at least 2 schedulable nodes for the DaemonSet")
+	if len(nodeNames) > 25 {
+		e2eskipper.Skipf("load-balancer rolling update test skipped for large environments with more than 25 nodes")
+	}
 
 	ginkgo.By(fmt.Sprintf("Creating DaemonSet %q", name))
 	ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), ds, metav1.CreateOptions{})

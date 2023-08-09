@@ -17,18 +17,13 @@ limitations under the License.
 package util
 
 import (
-	"context"
-	"fmt"
-	"math/rand"
 	"net"
 	"reflect"
-	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	fake "k8s.io/kubernetes/pkg/proxy/util/testing"
 	netutils "k8s.io/utils/net"
 )
 
@@ -95,109 +90,6 @@ func TestBuildPortsToEndpointsMap(t *testing.T) {
 	portsToEndpoints := BuildPortsToEndpointsMap(endpoints)
 	if !reflect.DeepEqual(expectedPortsToEndpoints, portsToEndpoints) {
 		t.Errorf("expected ports to endpoints not seen")
-	}
-}
-
-func TestIsProxyableIP(t *testing.T) {
-	testCases := []struct {
-		ip   string
-		want error
-	}{
-		{"0.0.0.0", ErrAddressNotAllowed},
-		{"127.0.0.1", ErrAddressNotAllowed},
-		{"127.0.0.2", ErrAddressNotAllowed},
-		{"169.254.169.254", ErrAddressNotAllowed},
-		{"169.254.1.1", ErrAddressNotAllowed},
-		{"224.0.0.0", ErrAddressNotAllowed},
-		{"10.0.0.1", nil},
-		{"192.168.0.1", nil},
-		{"172.16.0.1", nil},
-		{"8.8.8.8", nil},
-		{"::", ErrAddressNotAllowed},
-		{"::1", ErrAddressNotAllowed},
-		{"fe80::", ErrAddressNotAllowed},
-		{"ff02::", ErrAddressNotAllowed},
-		{"ff01::", ErrAddressNotAllowed},
-		{"2600::", nil},
-		{"1", ErrAddressNotAllowed},
-		{"", ErrAddressNotAllowed},
-	}
-
-	for i := range testCases {
-		got := IsProxyableIP(testCases[i].ip)
-		if testCases[i].want != got {
-			t.Errorf("case %d: expected %v, got %v", i, testCases[i].want, got)
-		}
-	}
-}
-
-type dummyResolver struct {
-	ips []string
-	err error
-}
-
-func (r *dummyResolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
-	if r.err != nil {
-		return nil, r.err
-	}
-	resp := []net.IPAddr{}
-	for _, ipString := range r.ips {
-		resp = append(resp, net.IPAddr{IP: netutils.ParseIPSloppy(ipString)})
-	}
-	return resp, nil
-}
-
-func TestIsProxyableHostname(t *testing.T) {
-	testCases := []struct {
-		hostname string
-		ips      []string
-		want     error
-	}{
-		{"k8s.io", []string{}, ErrNoAddresses},
-		{"k8s.io", []string{"8.8.8.8"}, nil},
-		{"k8s.io", []string{"169.254.169.254"}, ErrAddressNotAllowed},
-		{"k8s.io", []string{"127.0.0.1", "8.8.8.8"}, ErrAddressNotAllowed},
-	}
-
-	for i := range testCases {
-		resolv := dummyResolver{ips: testCases[i].ips}
-		got := IsProxyableHostname(context.Background(), &resolv, testCases[i].hostname)
-		if testCases[i].want != got {
-			t.Errorf("case %d: expected %v, got %v", i, testCases[i].want, got)
-		}
-	}
-}
-
-func TestIsAllowedHost(t *testing.T) {
-	testCases := []struct {
-		ip     string
-		denied []string
-		want   error
-	}{
-		{"8.8.8.8", []string{}, nil},
-		{"169.254.169.254", []string{"169.0.0.0/8"}, ErrAddressNotAllowed},
-		{"169.254.169.254", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
-		{"fce9:beef::", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
-		{"127.0.0.1", []string{"127.0.0.1/32"}, ErrAddressNotAllowed},
-		{"34.107.204.206", []string{"fce8::/15"}, nil},
-		{"fce9:beef::", []string{"127.0.0.1/32"}, nil},
-		{"34.107.204.206", []string{"127.0.0.1/32"}, nil},
-		{"127.0.0.1", []string{}, nil},
-	}
-
-	for i := range testCases {
-		var denyList []*net.IPNet
-		for _, cidrStr := range testCases[i].denied {
-			_, ipNet, err := netutils.ParseCIDRSloppy(cidrStr)
-			if err != nil {
-				t.Fatalf("bad IP for test case: %v: %v", cidrStr, err)
-			}
-			denyList = append(denyList, ipNet)
-		}
-		got := IsAllowedHost(netutils.ParseIPSloppy(testCases[i].ip), denyList)
-		if testCases[i].want != got {
-			t.Errorf("case %d: expected %v, got %v", i, testCases[i].want, got)
-		}
 	}
 }
 
@@ -276,343 +168,6 @@ func TestShouldSkipService(t *testing.T) {
 		skip := ShouldSkipService(testCases[i].service)
 		if skip != testCases[i].shouldSkip {
 			t.Errorf("case %d: expect %v, got %v", i, testCases[i].shouldSkip, skip)
-		}
-	}
-}
-
-func TestNewFilteredDialContext(t *testing.T) {
-
-	_, cidr, _ := netutils.ParseCIDRSloppy("1.1.1.1/28")
-
-	testCases := []struct {
-		name string
-
-		// opts passed to NewFilteredDialContext
-		opts *FilteredDialOptions
-
-		// value passed to dial
-		dial string
-
-		// value expected to be passed to resolve
-		expectResolve string
-		// result from resolver
-		resolveTo  []net.IPAddr
-		resolveErr error
-
-		// expect the wrapped dialer to be called
-		expectWrappedDial bool
-		// expect an error result
-		expectErr string
-	}{
-		{
-			name:              "allow with nil opts",
-			opts:              nil,
-			dial:              "127.0.0.1:8080",
-			expectResolve:     "", // resolver not called, no-op opts
-			expectWrappedDial: true,
-			expectErr:         "",
-		},
-		{
-			name:              "allow localhost",
-			opts:              &FilteredDialOptions{AllowLocalLoopback: true},
-			dial:              "127.0.0.1:8080",
-			expectResolve:     "", // resolver not called, no-op opts
-			expectWrappedDial: true,
-			expectErr:         "",
-		},
-		{
-			name:              "disallow localhost",
-			opts:              &FilteredDialOptions{AllowLocalLoopback: false},
-			dial:              "127.0.0.1:8080",
-			expectResolve:     "127.0.0.1",
-			resolveTo:         []net.IPAddr{{IP: netutils.ParseIPSloppy("127.0.0.1")}},
-			expectWrappedDial: false,
-			expectErr:         "address not allowed",
-		},
-		{
-			name:              "disallow IP",
-			opts:              &FilteredDialOptions{AllowLocalLoopback: false, DialHostCIDRDenylist: []*net.IPNet{cidr}},
-			dial:              "foo.com:8080",
-			expectResolve:     "foo.com",
-			resolveTo:         []net.IPAddr{{IP: netutils.ParseIPSloppy("1.1.1.1")}},
-			expectWrappedDial: false,
-			expectErr:         "address not allowed",
-		},
-		{
-			name:              "allow IP",
-			opts:              &FilteredDialOptions{AllowLocalLoopback: false, DialHostCIDRDenylist: []*net.IPNet{cidr}},
-			dial:              "foo.com:8080",
-			expectResolve:     "foo.com",
-			resolveTo:         []net.IPAddr{{IP: netutils.ParseIPSloppy("2.2.2.2")}},
-			expectWrappedDial: true,
-			expectErr:         "",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			wrappedDialer := &testDialer{}
-			testResolver := &testResolver{addrs: tc.resolveTo, err: tc.resolveErr}
-			dialer := NewFilteredDialContext(wrappedDialer.DialContext, testResolver, tc.opts)
-			_, err := dialer(context.TODO(), "tcp", tc.dial)
-
-			if tc.expectResolve != testResolver.resolveAddress {
-				t.Fatalf("expected to resolve %s, got %s", tc.expectResolve, testResolver.resolveAddress)
-			}
-			if tc.expectWrappedDial != wrappedDialer.called {
-				t.Fatalf("expected wrapped dialer called %v, got %v", tc.expectWrappedDial, wrappedDialer.called)
-			}
-
-			if err != nil {
-				if len(tc.expectErr) == 0 {
-					t.Fatalf("unexpected error: %v", err)
-				} else if !strings.Contains(err.Error(), tc.expectErr) {
-					t.Fatalf("expected error containing %q, got %v", tc.expectErr, err)
-				}
-			} else {
-				if len(tc.expectErr) > 0 {
-					t.Fatalf("expected error, got none")
-				}
-			}
-		})
-	}
-}
-
-type testDialer struct {
-	called bool
-}
-
-func (t *testDialer) DialContext(_ context.Context, network, address string) (net.Conn, error) {
-	t.called = true
-	return nil, nil
-}
-
-type testResolver struct {
-	addrs []net.IPAddr
-	err   error
-
-	resolveAddress string
-}
-
-func (t *testResolver) LookupIPAddr(_ context.Context, address string) ([]net.IPAddr, error) {
-	t.resolveAddress = address
-	return t.addrs, t.err
-}
-
-type InterfaceAddrsPair struct {
-	itf   net.Interface
-	addrs []net.Addr
-}
-
-func TestGetNodeAddresses(t *testing.T) {
-	testCases := []struct {
-		cidrs         []string
-		nw            *fake.FakeNetwork
-		itfAddrsPairs []InterfaceAddrsPair
-		expected      sets.String
-		expectedErr   error
-	}{
-		{ // case 0
-			cidrs: []string{"10.20.30.0/24"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("10.20.30.51"), Mask: net.CIDRMask(24, 32)}},
-				},
-				{
-					itf:   net.Interface{Index: 2, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("100.200.201.1"), Mask: net.CIDRMask(24, 32)}},
-				},
-			},
-			expected: sets.NewString("10.20.30.51"),
-		},
-		{ // case 1
-			cidrs: []string{"0.0.0.0/0"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("10.20.30.51"), Mask: net.CIDRMask(24, 32)}},
-				},
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
-				},
-			},
-			expected: sets.NewString("0.0.0.0/0"),
-		},
-		{ // case 2
-			cidrs: []string{"2001:db8::/32", "::1/128"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(32, 128)}},
-				},
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
-				},
-			},
-			expected: sets.NewString("2001:db8::1", "::1"),
-		},
-		{ // case 3
-			cidrs: []string{"::/0"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(32, 128)}},
-				},
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
-				},
-			},
-			expected: sets.NewString("::/0"),
-		},
-		{ // case 4
-			cidrs: []string{"127.0.0.1/32"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("10.20.30.51"), Mask: net.CIDRMask(24, 32)}},
-				},
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
-				},
-			},
-			expected: sets.NewString("127.0.0.1"),
-		},
-		{ // case 5
-			cidrs: []string{"127.0.0.0/8"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.1.1"), Mask: net.CIDRMask(8, 32)}},
-				},
-			},
-			expected: sets.NewString("127.0.1.1"),
-		},
-		{ // case 6
-			cidrs: []string{"10.20.30.0/24", "100.200.201.0/24"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("10.20.30.51"), Mask: net.CIDRMask(24, 32)}},
-				},
-				{
-					itf:   net.Interface{Index: 2, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("100.200.201.1"), Mask: net.CIDRMask(24, 32)}},
-				},
-			},
-			expected: sets.NewString("10.20.30.51", "100.200.201.1"),
-		},
-		{ // case 7
-			cidrs: []string{"10.20.30.0/24", "100.200.201.0/24"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("192.168.1.2"), Mask: net.CIDRMask(24, 32)}},
-				},
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
-				},
-			},
-			expected:    nil,
-			expectedErr: fmt.Errorf("no addresses found for cidrs %v", []string{"10.20.30.0/24", "100.200.201.0/24"}),
-		},
-		{ // case 8
-			cidrs: []string{},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("192.168.1.2"), Mask: net.CIDRMask(24, 32)}},
-				},
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
-				},
-			},
-			expected: sets.NewString("0.0.0.0/0", "::/0"),
-		},
-		{ // case 9
-			cidrs: []string{},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(32, 128)}},
-				},
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
-				},
-			},
-			expected: sets.NewString("0.0.0.0/0", "::/0"),
-		},
-		{ // case 9
-			cidrs: []string{"1.2.3.0/24", "0.0.0.0/0"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)}},
-				},
-			},
-			expected: sets.NewString("0.0.0.0/0"),
-		},
-		{ // case 10
-			cidrs: []string{"0.0.0.0/0", "1.2.3.0/24", "::1/128"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)}},
-				},
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
-				},
-			},
-			expected: sets.NewString("0.0.0.0/0", "::1"),
-		},
-		{ // case 11
-			cidrs: []string{"::/0", "1.2.3.0/24", "::1/128"},
-			nw:    fake.NewFakeNetwork(),
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)}},
-				},
-				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
-				},
-			},
-			expected: sets.NewString("::/0", "1.2.3.4"),
-		},
-	}
-
-	for i := range testCases {
-		for _, pair := range testCases[i].itfAddrsPairs {
-			testCases[i].nw.AddInterfaceAddr(&pair.itf, pair.addrs)
-		}
-		addrList, err := GetNodeAddresses(testCases[i].cidrs, testCases[i].nw)
-		if !reflect.DeepEqual(err, testCases[i].expectedErr) {
-			t.Errorf("case [%d], unexpected error: %v", i, err)
-		}
-
-		if !addrList.Equal(testCases[i].expected) {
-			t.Errorf("case [%d], unexpected mismatch, expected: %v, got: %v", i, testCases[i].expected, addrList)
 		}
 	}
 }
@@ -1150,145 +705,6 @@ func TestRevertPorts(t *testing.T) {
 	}
 }
 
-func TestLineBufferWrite(t *testing.T) {
-	testCases := []struct {
-		name     string
-		input    []interface{}
-		expected string
-	}{
-		{
-			name:     "none",
-			input:    []interface{}{},
-			expected: "\n",
-		},
-		{
-			name:     "one string",
-			input:    []interface{}{"test1"},
-			expected: "test1\n",
-		},
-		{
-			name:     "one slice",
-			input:    []interface{}{[]string{"test1", "test2"}},
-			expected: "test1 test2\n",
-		},
-		{
-			name:     "mixed",
-			input:    []interface{}{"s1", "s2", []string{"s3", "s4"}, "", "s5", []string{}, []string{"s6"}, "s7"},
-			expected: "s1 s2 s3 s4  s5  s6 s7\n",
-		},
-	}
-	testBuffer := LineBuffer{}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			testBuffer.Reset()
-			testBuffer.Write(testCase.input...)
-			if want, got := testCase.expected, string(testBuffer.Bytes()); !strings.EqualFold(want, got) {
-				t.Fatalf("write word is %v\n expected: %q, got: %q", testCase.input, want, got)
-			}
-			if testBuffer.Lines() != 1 {
-				t.Fatalf("expected 1 line, got: %d", testBuffer.Lines())
-			}
-		})
-	}
-}
-
-func TestLineBufferWritePanic(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("did not panic")
-		}
-	}()
-	testBuffer := LineBuffer{}
-	testBuffer.Write("string", []string{"a", "slice"}, 1234)
-}
-
-func TestLineBufferWriteBytes(t *testing.T) {
-	testCases := []struct {
-		name     string
-		bytes    []byte
-		expected string
-	}{
-		{
-			name:     "empty bytes",
-			bytes:    []byte{},
-			expected: "\n",
-		},
-		{
-			name:     "test bytes",
-			bytes:    []byte("test write bytes line"),
-			expected: "test write bytes line\n",
-		},
-	}
-
-	testBuffer := LineBuffer{}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			testBuffer.Reset()
-			testBuffer.WriteBytes(testCase.bytes)
-			if want, got := testCase.expected, string(testBuffer.Bytes()); !strings.EqualFold(want, got) {
-				t.Fatalf("write bytes is %v\n expected: %s, got: %s", testCase.bytes, want, got)
-			}
-		})
-	}
-}
-
-func TestWriteCountLines(t *testing.T) {
-
-	testCases := []struct {
-		name     string
-		expected int
-	}{
-		{
-			name:     "write no line",
-			expected: 0,
-		},
-		{
-			name:     "write one line",
-			expected: 1,
-		},
-		{
-			name:     "write 100 lines",
-			expected: 100,
-		},
-		{
-			name:     "write 1000 lines",
-			expected: 1000,
-		},
-		{
-			name:     "write 10000 lines",
-			expected: 10000,
-		},
-		{
-			name:     "write 100000 lines",
-			expected: 100000,
-		},
-	}
-	testBuffer := LineBuffer{}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			testBuffer.Reset()
-			for i := 0; i < testCase.expected; i++ {
-				testBuffer.Write(randSeq())
-			}
-			n := testBuffer.Lines()
-			if n != testCase.expected {
-				t.Fatalf("lines expected: %d, got: %d", testCase.expected, n)
-			}
-		})
-	}
-}
-
-// obtained from https://stackoverflow.com/a/22892986
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func randSeq() string {
-	b := make([]rune, 30)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
-}
-
 func mustParseIPAddr(str string) net.Addr {
 	a, err := net.ResolveIPAddr("ip", str)
 	if err != nil {
@@ -1332,13 +748,13 @@ func TestAddressSet(t *testing.T) {
 		name      string
 		validator func(ip net.IP) bool
 		input     []net.Addr
-		expected  sets.String
+		expected  sets.Set[string]
 	}{
 		{
 			"Empty",
 			func(ip net.IP) bool { return false },
 			nil,
-			sets.NewString(),
+			nil,
 		},
 		{
 			"Reject IPAddr x 2",
@@ -1347,7 +763,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPAddr("8.8.8.8"),
 				mustParseIPAddr("1000::"),
 			},
-			sets.NewString(),
+			nil,
 		},
 		{
 			"Accept IPAddr x 2",
@@ -1356,7 +772,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPAddr("8.8.8.8"),
 				mustParseIPAddr("1000::"),
 			},
-			sets.NewString("8.8.8.8", "1000::"),
+			sets.New("8.8.8.8", "1000::"),
 		},
 		{
 			"Accept IPNet x 2",
@@ -1365,7 +781,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPNet("8.8.8.8/32"),
 				mustParseIPNet("1000::/128"),
 			},
-			sets.NewString("8.8.8.8", "1000::"),
+			sets.New("8.8.8.8", "1000::"),
 		},
 		{
 			"Accept Unix x 2",
@@ -1374,7 +790,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseUnix("/tmp/sock1"),
 				mustParseUnix("/tmp/sock2"),
 			},
-			sets.NewString(),
+			nil,
 		},
 		{
 			"Cidr IPv4",
@@ -1384,7 +800,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPAddr("1000::"),
 				mustParseIPAddr("192.168.1.1"),
 			},
-			sets.NewString("192.168.1.1"),
+			sets.New("192.168.1.1"),
 		},
 		{
 			"Cidr IPv6",
@@ -1394,7 +810,7 @@ func TestAddressSet(t *testing.T) {
 				mustParseIPAddr("1000::"),
 				mustParseIPAddr("192.168.1.1"),
 			},
-			sets.NewString("1000::"),
+			sets.New("1000::"),
 		},
 	}
 
@@ -1402,71 +818,6 @@ func TestAddressSet(t *testing.T) {
 		if !tc.expected.Equal(AddressSet(tc.validator, tc.input)) {
 			t.Errorf("%s", tc.name)
 		}
-	}
-}
-
-func TestContainsIPv4Loopback(t *testing.T) {
-	tests := []struct {
-		name        string
-		cidrStrings []string
-		want        bool
-	}{
-		{
-			name: "empty",
-			want: true,
-		},
-		{
-			name:        "all zeros ipv4",
-			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "0.0.0.0/0"},
-			want:        true,
-		},
-		{
-			name:        "all zeros ipv4 and invalid cidr",
-			cidrStrings: []string{"invalid.cidr", "192.168.0.0/16", "fd00:1:d::/64", "0.0.0.0/0"},
-			want:        true,
-		},
-		{
-			name:        "all zeros ipv6", // interpret all zeros equal for IPv4 and IPv6 as Golang stdlib
-			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::/0"},
-			want:        true,
-		},
-		{
-			name:        "ipv4 loopback",
-			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "127.0.0.0/8"},
-			want:        true,
-		},
-		{
-			name:        "ipv6 loopback",
-			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::1/128"},
-			want:        false,
-		},
-		{
-			name:        "ipv4 loopback smaller range",
-			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "127.0.2.0/28"},
-			want:        true,
-		},
-		{
-			name:        "ipv4 loopback within larger range",
-			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "64.0.0.0/2"},
-			want:        true,
-		},
-		{
-			name:        "non loop loopback",
-			cidrStrings: []string{"128.0.2.0/28", "224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64"},
-			want:        false,
-		},
-		{
-			name:        "invalid cidr",
-			cidrStrings: []string{"invalid.ip/invalid.mask"},
-			want:        false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := ContainsIPv4Loopback(tt.cidrStrings); got != tt.want {
-				t.Errorf("ContainLoopback() = %v, want %v", got, tt.want)
-			}
-		})
 	}
 }
 

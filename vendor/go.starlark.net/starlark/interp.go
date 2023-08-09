@@ -5,6 +5,8 @@ package starlark
 import (
 	"fmt"
 	"os"
+	"sync/atomic"
+	"unsafe"
 
 	"go.starlark.net/internal/compile"
 	"go.starlark.net/internal/spell"
@@ -19,6 +21,9 @@ const vmdebug = false // TODO(adonovan): use a bitfield of specific kinds of err
 // - opt: record MaxIterStack during compilation and preallocate the stack.
 
 func (fn *Function) CallInternal(thread *Thread, args Tuple, kwargs []Tuple) (Value, error) {
+	// Postcondition: args is not mutated. This is stricter than required by Callable,
+	// but allows CALL to avoid a copy.
+
 	if !resolve.AllowRecursion {
 		// detect recursion
 		for _, fr := range thread.stack[:len(thread.stack)-1] {
@@ -76,12 +81,36 @@ func (fn *Function) CallInternal(thread *Thread, args Tuple, kwargs []Tuple) (Va
 
 	var iterstack []Iterator // stack of active iterators
 
+	// Use defer so that application panics can pass through
+	// interpreter without leaving thread in a bad state.
+	defer func() {
+		// ITERPOP the rest of the iterator stack.
+		for _, iter := range iterstack {
+			iter.Done()
+		}
+
+		fr.locals = nil
+	}()
+
 	sp := 0
 	var pc uint32
 	var result Value
 	code := f.Code
 loop:
 	for {
+		thread.Steps++
+		if thread.Steps >= thread.maxSteps {
+			if thread.OnMaxSteps != nil {
+				thread.OnMaxSteps(thread)
+			} else {
+				thread.Cancel("too many steps")
+			}
+		}
+		if reason := atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&thread.cancelReason))); reason != nil {
+			err = fmt.Errorf("Starlark computation cancelled: %s", *(*string)(reason))
+			break loop
+		}
+
 		fr.pc = pc
 
 		op := compile.Opcode(code[pc])
@@ -206,6 +235,34 @@ loop:
 			stack[sp] = z
 			sp++
 
+		case compile.INPLACE_PIPE:
+			y := stack[sp-1]
+			x := stack[sp-2]
+			sp -= 2
+
+			// It's possible that y is not Dict but
+			// nonetheless defines x|y, in which case we
+			// should fall back to the general case.
+			var z Value
+			if xdict, ok := x.(*Dict); ok {
+				if ydict, ok := y.(*Dict); ok {
+					if err = xdict.ht.checkMutable("apply |= to"); err != nil {
+						break loop
+					}
+					xdict.ht.addAll(&ydict.ht) // can't fail
+					z = xdict
+				}
+			}
+			if z == nil {
+				z, err = Binary(syntax.PIPE, x, y)
+				if err != nil {
+					break loop
+				}
+			}
+
+			stack[sp] = z
+			sp++
+
 		case compile.NONE:
 			stack[sp] = None
 			sp++
@@ -276,9 +333,15 @@ loop:
 			// positional args
 			var positional Tuple
 			if npos := int(arg >> 8); npos > 0 {
-				positional = make(Tuple, npos)
+				positional = stack[sp-npos : sp]
 				sp -= npos
-				copy(positional, stack[sp:])
+
+				// Copy positional arguments into a new array,
+				// unless the callee is another Starlark function,
+				// in which case it can be trusted not to mutate them.
+				if _, ok := stack[sp-1].(*Function); !ok || args != nil {
+					positional = append(Tuple(nil), positional...)
+				}
 			}
 			if args != nil {
 				// Add elements from *args sequence.
@@ -527,11 +590,9 @@ loop:
 			locals[arg] = stack[sp-1]
 			sp--
 
-		case compile.SETCELL:
-			x := stack[sp-2]
-			y := stack[sp-1]
-			sp -= 2
-			y.(*cell).v = x
+		case compile.SETLOCALCELL:
+			locals[arg].(*cell).v = stack[sp-1]
+			sp--
 
 		case compile.SETGLOBAL:
 			fn.module.globals[arg] = stack[sp-1]
@@ -550,9 +611,23 @@ loop:
 			stack[sp] = fn.freevars[arg]
 			sp++
 
-		case compile.CELL:
-			x := stack[sp-1]
-			stack[sp-1] = x.(*cell).v
+		case compile.LOCALCELL:
+			v := locals[arg].(*cell).v
+			if v == nil {
+				err = fmt.Errorf("local variable %s referenced before assignment", f.Locals[arg].Name)
+				break loop
+			}
+			stack[sp] = v
+			sp++
+
+		case compile.FREECELL:
+			v := fn.freevars[arg].(*cell).v
+			if v == nil {
+				err = fmt.Errorf("local variable %s referenced before assignment", f.Freevars[arg].Name)
+				break loop
+			}
+			stack[sp] = v
+			sp++
 
 		case compile.GLOBAL:
 			x := fn.module.globals[arg]
@@ -582,14 +657,7 @@ loop:
 			break loop
 		}
 	}
-
-	// ITERPOP the rest of the iterator stack.
-	for _, iter := range iterstack {
-		iter.Done()
-	}
-
-	fr.locals = nil
-
+	// (deferred cleanup runs here)
 	return result, err
 }
 
@@ -621,7 +689,7 @@ func (mandatory) Hash() (uint32, error) { return 0, nil }
 // A cell is a box containing a Value.
 // Local variables marked as cells hold their value indirectly
 // so that they may be shared by outer and inner nested functions.
-// Cells are always accessed using indirect CELL/SETCELL instructions.
+// Cells are always accessed using indirect {FREE,LOCAL,SETLOCAL}CELL instructions.
 // The FreeVars tuple contains only cells.
 // The FREE instruction always yields a cell.
 type cell struct{ v Value }

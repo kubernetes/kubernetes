@@ -313,8 +313,7 @@ func Convert_apiserver_TLSConfig_To_v1alpha1_TLSConfig(in *apiserver.TLSConfig, 
 }
 
 func autoConvert_v1alpha1_TracingConfiguration_To_apiserver_TracingConfiguration(in *TracingConfiguration, out *apiserver.TracingConfiguration, s conversion.Scope) error {
-	out.Endpoint = (*string)(unsafe.Pointer(in.Endpoint))
-	out.SamplingRatePerMillion = (*int32)(unsafe.Pointer(in.SamplingRatePerMillion))
+	out.TracingConfiguration = in.TracingConfiguration
 	return nil
 }
 
@@ -324,8 +323,7 @@ func Convert_v1alpha1_TracingConfiguration_To_apiserver_TracingConfiguration(in 
 }
 
 func autoConvert_apiserver_TracingConfiguration_To_v1alpha1_TracingConfiguration(in *apiserver.TracingConfiguration, out *TracingConfiguration, s conversion.Scope) error {
-	out.Endpoint = (*string)(unsafe.Pointer(in.Endpoint))
-	out.SamplingRatePerMillion = (*int32)(unsafe.Pointer(in.SamplingRatePerMillion))
+	out.TracingConfiguration = in.TracingConfiguration
 	return nil
 }
 

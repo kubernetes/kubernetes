@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client"
 )
 
@@ -35,7 +36,7 @@ var errConnCloseTimeout = errors.New("close timeout")
 // conn is an implementation of net.Conn, where the data is transported
 // over an established tunnel defined by a gRPC service ProxyService.
 type conn struct {
-	stream  client.ProxyService_ProxyClient
+	tunnel  *grpcTunnel
 	connID  int64
 	random  int64
 	readCh  chan []byte
@@ -62,7 +63,7 @@ func (c *conn) Write(data []byte) (n int, err error) {
 
 	klog.V(5).InfoS("[tracing] send req", "type", req.Type)
 
-	err = c.stream.Send(req)
+	err = c.tunnel.Send(req)
 	if err != nil {
 		return 0, err
 	}
@@ -147,7 +148,7 @@ func (c *conn) Close() error {
 
 	klog.V(5).InfoS("[tracing] send req", "type", req.Type)
 
-	if err := c.stream.Send(req); err != nil {
+	if err := c.tunnel.Send(req); err != nil {
 		return err
 	}
 

@@ -57,6 +57,14 @@ run_kubectl_events_tests() {
     output_message=$(kubectl events -n test-events --for=Cronjob/pi "${kube_flags[@]:?}" 2>&1)
     kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
 
+    # Post-Condition: events returns event for fully qualified Cronjob.v1.batch/pi when --for flag is used
+    output_message=$(kubectl events -n test-events --for Cronjob.v1.batch/pi "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
+    # Post-Condition: events returns event for fully qualified without version Cronjob.batch/pi when --for flag is used
+    output_message=$(kubectl events -n test-events --for=Cronjob.batch/pi "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
     # Post-Condition: events returns event for Cronjob/pi when watch is enabled
     output_message=$(kubectl events -n test-events --for=Cronjob/pi --watch --request-timeout=1 "${kube_flags[@]:?}" 2>&1)
     kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"

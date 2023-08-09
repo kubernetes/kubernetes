@@ -85,12 +85,12 @@ func iperf2ServerDeployment(ctx context.Context, client clientset.Interface, nam
 
 	deployment, err := client.AppsV1().Deployments(namespace).Create(ctx, deploymentSpec, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
+		return nil, fmt.Errorf("deployment %q Create API error: %w", deploymentSpec.Name, err)
 	}
 	framework.Logf("Waiting for deployment %q to complete", deploymentSpec.Name)
 	err = e2edeployment.WaitForDeploymentComplete(client, deployment)
 	if err != nil {
-		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)
+		return nil, fmt.Errorf("deployment %q failed to complete: %w", deploymentSpec.Name, err)
 	}
 
 	return deployment, nil
@@ -119,7 +119,7 @@ func iperf2ClientDaemonSet(ctx context.Context, client clientset.Interface, name
 
 	ds, err := client.AppsV1().DaemonSets(namespace).Create(ctx, spec, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("daemonset %s Create API error: %v", spec.Name, err)
+		return nil, fmt.Errorf("daemonset %s Create API error: %w", spec.Name, err)
 	}
 	return ds, nil
 }
@@ -140,7 +140,7 @@ func iperf2ClientDaemonSet(ctx context.Context, client clientset.Interface, name
 var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
 	// this test runs iperf2: one pod as a server, and a daemonset of clients
 	f := framework.NewDefaultFramework("network-perf")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should run iperf2", func(ctx context.Context) {
 		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)

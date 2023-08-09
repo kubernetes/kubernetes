@@ -167,6 +167,13 @@ func (tr *storeTxnRead) rangeKeys(ctx context.Context, key, end []byte, curRev i
 				"range failed to find revision pair",
 				zap.Int64("revision-main", revpair.main),
 				zap.Int64("revision-sub", revpair.sub),
+				zap.Int64("revision-current", curRev),
+				zap.Int64("range-option-rev", ro.Rev),
+				zap.Int64("range-option-limit", ro.Limit),
+				zap.Binary("key", key),
+				zap.Binary("end", end),
+				zap.Int("len-revpairs", len(revpairs)),
+				zap.Int("len-values", len(vs)),
 			)
 		}
 		if err := kvs[i].Unmarshal(vs[0]); err != nil {

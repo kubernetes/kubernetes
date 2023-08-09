@@ -1,0 +1,47 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "networking.k8s.io/v1alpha1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "ClusterCIDR",
+      "name": "clustercidrs",
+      "namespaced": false,
+      "shortNames": [
+        "cc"
+      ],
+      "singularName": "clustercidr",
+      "storageVersionHash": "iC0u25BTSsc=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "IPAddress",
+      "name": "ipaddresses",
+      "namespaced": false,
+      "shortNames": [
+        "ip"
+      ],
+      "singularName": "ipaddress",
+      "storageVersionHash": "3APLM23DOxw=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    }
+  ]
+}

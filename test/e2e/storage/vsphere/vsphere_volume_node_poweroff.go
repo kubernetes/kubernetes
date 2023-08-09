@@ -47,7 +47,7 @@ Test to verify volume status after node power off:
 */
 var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-poweroff")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client    clientset.Interface
 		namespace string
@@ -58,7 +58,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, f.Timeouts.NodeSchedulable))
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		if len(nodeList.Items) < 2 {
@@ -101,7 +101,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 
 		ginkgo.By("Creating a Deployment")
-		deployment, err := e2edeployment.CreateDeployment(ctx, client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
+		deployment, err := e2edeployment.CreateDeployment(ctx, client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, admissionapi.LevelRestricted, "")
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
 		ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AppsV1().Deployments(namespace).Delete), deployment.Name, metav1.DeleteOptions{})
 

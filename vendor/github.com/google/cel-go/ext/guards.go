@@ -17,6 +17,7 @@ package ext
 import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // function invocation guards for common call signatures within extension functions.
@@ -47,4 +48,16 @@ func listStringOrError(strs []string, err error) ref.Val {
 		return types.NewErr(err.Error())
 	}
 	return types.DefaultTypeAdapter.NativeToValue(strs)
+}
+
+func macroTargetMatchesNamespace(ns string, target *exprpb.Expr) bool {
+	switch target.GetExprKind().(type) {
+	case *exprpb.Expr_IdentExpr:
+		if target.GetIdentExpr().GetName() != ns {
+			return false
+		}
+		return true
+	default:
+		return false
+	}
 }

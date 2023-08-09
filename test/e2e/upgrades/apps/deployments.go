@@ -184,7 +184,7 @@ func waitForDeploymentRevision(ctx context.Context, c clientset.Interface, d *ap
 		return revision == targetRevision, nil
 	})
 	if err != nil {
-		return fmt.Errorf("error waiting for revision to become %q for deployment %q: %v", targetRevision, d.Name, err)
+		return fmt.Errorf("error waiting for revision to become %q for deployment %q: %w", targetRevision, d.Name, err)
 	}
 	return nil
 }

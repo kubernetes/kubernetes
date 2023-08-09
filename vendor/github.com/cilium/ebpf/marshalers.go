@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/sys"
 )
 
 // marshalPtr converts an arbitrary value into a pointer suitable
@@ -19,17 +20,17 @@ import (
 //
 // As an optimization, it returns the original value if it is an
 // unsafe.Pointer.
-func marshalPtr(data interface{}, length int) (internal.Pointer, error) {
+func marshalPtr(data interface{}, length int) (sys.Pointer, error) {
 	if ptr, ok := data.(unsafe.Pointer); ok {
-		return internal.NewPointer(ptr), nil
+		return sys.NewPointer(ptr), nil
 	}
 
 	buf, err := marshalBytes(data, length)
 	if err != nil {
-		return internal.Pointer{}, err
+		return sys.Pointer{}, err
 	}
 
-	return internal.NewSlicePointer(buf), nil
+	return sys.NewSlicePointer(buf), nil
 }
 
 // marshalBytes converts an arbitrary value into a byte buffer.
@@ -73,13 +74,13 @@ func marshalBytes(data interface{}, length int) (buf []byte, err error) {
 	return buf, nil
 }
 
-func makeBuffer(dst interface{}, length int) (internal.Pointer, []byte) {
+func makeBuffer(dst interface{}, length int) (sys.Pointer, []byte) {
 	if ptr, ok := dst.(unsafe.Pointer); ok {
-		return internal.NewPointer(ptr), nil
+		return sys.NewPointer(ptr), nil
 	}
 
 	buf := make([]byte, length)
-	return internal.NewSlicePointer(buf), buf
+	return sys.NewSlicePointer(buf), buf
 }
 
 var bytesReaderPool = sync.Pool{
@@ -98,14 +99,7 @@ var bytesReaderPool = sync.Pool{
 func unmarshalBytes(data interface{}, buf []byte) error {
 	switch value := data.(type) {
 	case unsafe.Pointer:
-		var dst []byte
-		// Use unsafe.Slice when we drop support for pre1.17 (https://github.com/golang/go/issues/19367)
-		// We could opt for removing unsafe.Pointer support in the lib as well
-		sh := (*reflect.SliceHeader)(unsafe.Pointer(&dst))
-		sh.Data = uintptr(value)
-		sh.Len = len(buf)
-		sh.Cap = len(buf)
-
+		dst := unsafe.Slice((*byte)(value), len(buf))
 		copy(dst, buf)
 		runtime.KeepAlive(value)
 		return nil
@@ -164,21 +158,21 @@ func unmarshalBytes(data interface{}, buf []byte) error {
 // Values are initialized to zero if the slice has less elements than CPUs.
 //
 // slice must have a type like []elementType.
-func marshalPerCPUValue(slice interface{}, elemLength int) (internal.Pointer, error) {
+func marshalPerCPUValue(slice interface{}, elemLength int) (sys.Pointer, error) {
 	sliceType := reflect.TypeOf(slice)
 	if sliceType.Kind() != reflect.Slice {
-		return internal.Pointer{}, errors.New("per-CPU value requires slice")
+		return sys.Pointer{}, errors.New("per-CPU value requires slice")
 	}
 
 	possibleCPUs, err := internal.PossibleCPUs()
 	if err != nil {
-		return internal.Pointer{}, err
+		return sys.Pointer{}, err
 	}
 
 	sliceValue := reflect.ValueOf(slice)
 	sliceLen := sliceValue.Len()
 	if sliceLen > possibleCPUs {
-		return internal.Pointer{}, fmt.Errorf("per-CPU value exceeds number of CPUs")
+		return sys.Pointer{}, fmt.Errorf("per-CPU value exceeds number of CPUs")
 	}
 
 	alignedElemLength := internal.Align(elemLength, 8)
@@ -188,14 +182,14 @@ func marshalPerCPUValue(slice interface{}, elemLength int) (internal.Pointer, er
 		elem := sliceValue.Index(i).Interface()
 		elemBytes, err := marshalBytes(elem, elemLength)
 		if err != nil {
-			return internal.Pointer{}, err
+			return sys.Pointer{}, err
 		}
 
 		offset := i * alignedElemLength
 		copy(buf[offset:offset+elemLength], elemBytes)
 	}
 
-	return internal.NewSlicePointer(buf), nil
+	return sys.NewSlicePointer(buf), nil
 }
 
 // unmarshalPerCPUValue decodes a buffer into a slice containing one value per

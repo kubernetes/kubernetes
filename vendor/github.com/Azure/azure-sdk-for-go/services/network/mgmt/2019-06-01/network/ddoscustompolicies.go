@@ -55,7 +55,7 @@ func (client DdosCustomPoliciesClient) CreateOrUpdate(ctx context.Context, resou
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.DdosCustomPoliciesClient", "CreateOrUpdate", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.DdosCustomPoliciesClient", "CreateOrUpdate", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -90,6 +90,7 @@ func (client DdosCustomPoliciesClient) CreateOrUpdatePreparer(ctx context.Contex
 // http.Response Body if it receives an error.
 func (client DdosCustomPoliciesClient) CreateOrUpdateSender(req *http.Request) (future DdosCustomPoliciesCreateOrUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -136,7 +137,7 @@ func (client DdosCustomPoliciesClient) Delete(ctx context.Context, resourceGroup
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.DdosCustomPoliciesClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.DdosCustomPoliciesClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -168,6 +169,7 @@ func (client DdosCustomPoliciesClient) DeletePreparer(ctx context.Context, resou
 // http.Response Body if it receives an error.
 func (client DdosCustomPoliciesClient) DeleteSender(req *http.Request) (future DdosCustomPoliciesDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -290,7 +292,7 @@ func (client DdosCustomPoliciesClient) UpdateTags(ctx context.Context, resourceG
 
 	result, err = client.UpdateTagsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.DdosCustomPoliciesClient", "UpdateTags", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.DdosCustomPoliciesClient", "UpdateTags", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -324,6 +326,7 @@ func (client DdosCustomPoliciesClient) UpdateTagsPreparer(ctx context.Context, r
 // http.Response Body if it receives an error.
 func (client DdosCustomPoliciesClient) UpdateTagsSender(req *http.Request) (future DdosCustomPoliciesUpdateTagsFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

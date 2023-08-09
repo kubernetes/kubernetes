@@ -2,7 +2,7 @@
 
 The MIT License (MIT)
 
-Copyright (c) 2021 Microsoft
+Copyright (c) Microsoft Corporation.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,4 +21,5 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-= vendor/github.com/Azure/azure-sdk-for-go/LICENSE.txt a0bb788f0d0ea938b4210eccd2c50189
+
+= vendor/github.com/Azure/azure-sdk-for-go/LICENSE.txt 4f7454c9bcbb0acee6d9a971001befe2

@@ -21,11 +21,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -35,7 +35,7 @@ var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 	busyBoxImage := "registry.k8s.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff"
 
 	f := framework.NewDefaultFramework("image-id-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should be set to the manifest digest (from RepoDigests) when available", func(ctx context.Context) {
 		podDesc := &v1.Pod{
@@ -62,7 +62,7 @@ var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 		status := runningPod.Status
 
 		if len(status.ContainerStatuses) == 0 {
-			framework.Failf("Unexpected pod status; %s", spew.Sdump(status))
+			framework.Failf("Unexpected pod status; %s", dump.Pretty(status))
 			return
 		}
 

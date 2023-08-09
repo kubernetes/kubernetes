@@ -5,6 +5,7 @@
 package json
 
 import (
+	"bytes"
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/hex"
@@ -12,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strconv"
 	"sync"
 )
@@ -228,13 +230,7 @@ func makeBytesArshaler(t reflect.Type, fncs *arshaler) *arshaler {
 			}
 		}
 		val := enc.UnusedBuffer()
-		var b []byte
-		if va.Kind() == reflect.Array {
-			// TODO(https://go.dev/issue/47066): Avoid reflect.Value.Slice.
-			b = va.Slice(0, va.Len()).Bytes()
-		} else {
-			b = va.Bytes()
-		}
+		b := va.Bytes()
 		n := len(`"`) + encodedLen(len(b)) + len(`"`)
 		if cap(val) < n {
 			val = make([]byte, n)
@@ -248,19 +244,19 @@ func makeBytesArshaler(t reflect.Type, fncs *arshaler) *arshaler {
 	}
 	unmarshalDefault := fncs.unmarshal
 	fncs.unmarshal = func(uo UnmarshalOptions, dec *Decoder, va addressableValue) error {
-		decode, decodedLen := decodeBase64, decodedLenBase64
+		decode, decodedLen, encodedLen := decodeBase64, decodedLenBase64, encodedLenBase64
 		if uo.format != "" && uo.formatDepth == dec.tokens.depth() {
 			switch uo.format {
 			case "base64":
-				decode, decodedLen = decodeBase64, decodedLenBase64
+				decode, decodedLen, encodedLen = decodeBase64, decodedLenBase64, encodedLenBase64
 			case "base64url":
-				decode, decodedLen = decodeBase64URL, decodedLenBase64URL
+				decode, decodedLen, encodedLen = decodeBase64URL, decodedLenBase64URL, encodedLenBase64URL
 			case "base32":
-				decode, decodedLen = decodeBase32, decodedLenBase32
+				decode, decodedLen, encodedLen = decodeBase32, decodedLenBase32, encodedLenBase32
 			case "base32hex":
-				decode, decodedLen = decodeBase32Hex, decodedLenBase32Hex
+				decode, decodedLen, encodedLen = decodeBase32Hex, decodedLenBase32Hex, encodedLenBase32Hex
 			case "base16", "hex":
-				decode, decodedLen = decodeBase16, decodedLenBase16
+				decode, decodedLen, encodedLen = decodeBase16, decodedLenBase16, encodedLenBase16
 			case "array":
 				uo.format = ""
 				return unmarshalDefault(uo, dec, va)
@@ -290,23 +286,28 @@ func makeBytesArshaler(t reflect.Type, fncs *arshaler) *arshaler {
 				n--
 			}
 			n = decodedLen(n)
-			var b []byte
+			b := va.Bytes()
 			if va.Kind() == reflect.Array {
-				// TODO(https://go.dev/issue/47066): Avoid reflect.Value.Slice.
-				b = va.Slice(0, va.Len()).Bytes()
 				if n != len(b) {
 					err := fmt.Errorf("decoded base64 length of %d mismatches array length of %d", n, len(b))
 					return &SemanticError{action: "unmarshal", JSONKind: k, GoType: t, Err: err}
 				}
 			} else {
-				b = va.Bytes()
 				if b == nil || cap(b) < n {
 					b = make([]byte, n)
 				} else {
 					b = b[:n]
 				}
 			}
-			if _, err := decode(b, val); err != nil {
+			n2, err := decode(b, val)
+			if err == nil && len(val) != encodedLen(n2) {
+				// TODO(https://go.dev/issue/53845): RFC 4648, section 3.3,
+				// specifies that non-alphabet characters must be rejected.
+				// Unfortunately, the "base32" and "base64" packages allow
+				// '\r' and '\n' characters by default.
+				err = errors.New("illegal data at input byte " + strconv.Itoa(bytes.IndexAny(val, "\r\n")))
+			}
+			if err != nil {
 				return &SemanticError{action: "unmarshal", JSONKind: k, GoType: t, Err: err}
 			}
 			if va.Kind() == reflect.Slice {
@@ -412,7 +413,7 @@ func makeUintArshaler(t reflect.Type) *arshaler {
 			return nil
 		}
 
-		x := math.Float64frombits(uint64(va.Uint()))
+		x := math.Float64frombits(va.Uint())
 		return enc.writeNumber(x, rawUintNumber, mo.StringifyNumbers)
 	}
 	fncs.unmarshal = func(uo UnmarshalOptions, dec *Decoder, va addressableValue) error {
@@ -450,7 +451,7 @@ func makeUintArshaler(t reflect.Type) *arshaler {
 				err := fmt.Errorf("cannot parse %q as unsigned integer: %w", val, strconv.ErrRange)
 				return &SemanticError{action: "unmarshal", JSONKind: k, GoType: t, Err: err}
 			}
-			va.SetUint(uint64(n))
+			va.SetUint(n)
 			return nil
 		}
 		return &SemanticError{action: "unmarshal", JSONKind: k, GoType: t}
@@ -549,23 +550,9 @@ func makeFloatArshaler(t reflect.Type) *arshaler {
 	return &fncs
 }
 
-var mapIterPool = sync.Pool{
-	New: func() any { return new(reflect.MapIter) },
-}
-
-func getMapIter(mv reflect.Value) *reflect.MapIter {
-	iter := mapIterPool.Get().(*reflect.MapIter)
-	iter.Reset(mv)
-	return iter
-}
-func putMapIter(iter *reflect.MapIter) {
-	iter.Reset(reflect.Value{}) // allow underlying map to be garbage collected
-	mapIterPool.Put(iter)
-}
-
 func makeMapArshaler(t reflect.Type) *arshaler {
 	// NOTE: The logic below disables namespaces for tracking duplicate names
-	// when handling map keys with a unique represention.
+	// when handling map keys with a unique representation.
 
 	// NOTE: Values retrieved from a map are not addressable,
 	// so we shallow copy the values to make them addressable and
@@ -641,24 +628,76 @@ func makeMapArshaler(t reflect.Type) *arshaler {
 				enc.tokens.last.disableNamespace()
 			}
 
-			// NOTE: Map entries are serialized in a non-deterministic order.
-			// Users that need stable output should call RawValue.Canonicalize.
-			// TODO(go1.19): Remove use of a sync.Pool with reflect.MapIter.
-			// Calling reflect.Value.MapRange no longer allocates.
-			// See https://go.dev/cl/400675.
-			iter := getMapIter(va.Value)
-			defer putMapIter(iter)
-			for iter.Next() {
-				k.SetIterKey(iter)
-				if err := marshalKey(mko, enc, k); err != nil {
-					// TODO: If err is errMissingName, then wrap it as a
-					// SemanticError since this key type cannot be serialized
-					// as a JSON string.
-					return err
+			switch {
+			case !mo.Deterministic || n <= 1:
+				for iter := va.Value.MapRange(); iter.Next(); {
+					k.SetIterKey(iter)
+					if err := marshalKey(mko, enc, k); err != nil {
+						// TODO: If err is errMissingName, then wrap it as a
+						// SemanticError since this key type cannot be serialized
+						// as a JSON string.
+						return err
+					}
+					v.SetIterValue(iter)
+					if err := marshalVal(mo, enc, v); err != nil {
+						return err
+					}
 				}
-				v.SetIterValue(iter)
-				if err := marshalVal(mo, enc, v); err != nil {
-					return err
+			case !nonDefaultKey && t.Key().Kind() == reflect.String:
+				names := getStrings(n)
+				for i, iter := 0, va.Value.MapRange(); i < n && iter.Next(); i++ {
+					k.SetIterKey(iter)
+					(*names)[i] = k.String()
+				}
+				names.Sort()
+				for _, name := range *names {
+					if err := enc.WriteToken(String(name)); err != nil {
+						return err
+					}
+					// TODO(https://go.dev/issue/57061): Use v.SetMapIndexOf.
+					k.SetString(name)
+					v.Set(va.MapIndex(k.Value))
+					if err := marshalVal(mo, enc, v); err != nil {
+						return err
+					}
+				}
+				putStrings(names)
+			default:
+				type member struct {
+					name string // unquoted name
+					key  addressableValue
+				}
+				members := make([]member, n)
+				keys := reflect.MakeSlice(reflect.SliceOf(t.Key()), n, n)
+				for i, iter := 0, va.Value.MapRange(); i < n && iter.Next(); i++ {
+					// Marshal the member name.
+					k := addressableValue{keys.Index(i)} // indexed slice element is always addressable
+					k.SetIterKey(iter)
+					if err := marshalKey(mko, enc, k); err != nil {
+						// TODO: If err is errMissingName, then wrap it as a
+						// SemanticError since this key type cannot be serialized
+						// as a JSON string.
+						return err
+					}
+					name := enc.unwriteOnlyObjectMemberName()
+					members[i] = member{name, k}
+				}
+				// TODO: If AllowDuplicateNames is enabled, then sort according
+				// to reflect.Value as well if the names are equal.
+				// See internal/fmtsort.
+				// TODO(https://go.dev/issue/47619): Use slices.SortFunc instead.
+				sort.Slice(members, func(i, j int) bool {
+					return lessUTF16(members[i].name, members[j].name)
+				})
+				for _, member := range members {
+					if err := enc.WriteToken(String(member.name)); err != nil {
+						return err
+					}
+					// TODO(https://go.dev/issue/57061): Use v.SetMapIndexOf.
+					v.Set(va.MapIndex(member.key.Value))
+					if err := marshalVal(mo, enc, v); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -856,7 +895,7 @@ func makeStructArshaler(t reflect.Type) *arshaler {
 			//	2. The object namespace is guaranteed to be disabled.
 			//	3. The object name is guaranteed to be valid and pre-escaped.
 			//	4. There is no need to flush the buffer (for unwrite purposes).
-			//	5. There is no possibility of an error occuring.
+			//	5. There is no possibility of an error occurring.
 			if optimizeCommon {
 				// Append any delimiters or optional whitespace.
 				if enc.tokens.last.length() > 0 {
@@ -996,7 +1035,7 @@ func makeStructArshaler(t reflect.Type) *arshaler {
 
 						if fields.inlinedFallback == nil {
 							// Skip unknown value since we have no place to store it.
-							if err := dec.skipValue(); err != nil {
+							if err := dec.SkipValue(); err != nil {
 								return err
 							}
 						} else {

@@ -63,7 +63,6 @@ var PrePulledImages = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.Httpd),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
-	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
 	imageutils.GetE2EImage(imageutils.NonRoot),
 )
 
@@ -195,11 +194,11 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 		if err := wait.Poll(30*time.Second, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
 			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("error getting node info after reboot: %s", err)
+				return false, fmt.Errorf("error getting node info after reboot: %w", err)
 			}
 			return node.Status.NodeInfo.BootID != newNode.Status.NodeInfo.BootID, nil
 		}); err != nil {
-			return fmt.Errorf("error waiting for node %s boot ID to change: %s", node.Name, err)
+			return fmt.Errorf("error waiting for node %s boot ID to change: %w", node.Name, err)
 		}
 	}
 	return nil

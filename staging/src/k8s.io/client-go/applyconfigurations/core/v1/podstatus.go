@@ -26,19 +26,22 @@ import (
 // PodStatusApplyConfiguration represents an declarative configuration of the PodStatus type for use
 // with apply.
 type PodStatusApplyConfiguration struct {
-	Phase                      *v1.PodPhase                        `json:"phase,omitempty"`
-	Conditions                 []PodConditionApplyConfiguration    `json:"conditions,omitempty"`
-	Message                    *string                             `json:"message,omitempty"`
-	Reason                     *string                             `json:"reason,omitempty"`
-	NominatedNodeName          *string                             `json:"nominatedNodeName,omitempty"`
-	HostIP                     *string                             `json:"hostIP,omitempty"`
-	PodIP                      *string                             `json:"podIP,omitempty"`
-	PodIPs                     []PodIPApplyConfiguration           `json:"podIPs,omitempty"`
-	StartTime                  *metav1.Time                        `json:"startTime,omitempty"`
-	InitContainerStatuses      []ContainerStatusApplyConfiguration `json:"initContainerStatuses,omitempty"`
-	ContainerStatuses          []ContainerStatusApplyConfiguration `json:"containerStatuses,omitempty"`
-	QOSClass                   *v1.PodQOSClass                     `json:"qosClass,omitempty"`
-	EphemeralContainerStatuses []ContainerStatusApplyConfiguration `json:"ephemeralContainerStatuses,omitempty"`
+	Phase                      *v1.PodPhase                               `json:"phase,omitempty"`
+	Conditions                 []PodConditionApplyConfiguration           `json:"conditions,omitempty"`
+	Message                    *string                                    `json:"message,omitempty"`
+	Reason                     *string                                    `json:"reason,omitempty"`
+	NominatedNodeName          *string                                    `json:"nominatedNodeName,omitempty"`
+	HostIP                     *string                                    `json:"hostIP,omitempty"`
+	HostIPs                    []HostIPApplyConfiguration                 `json:"hostIPs,omitempty"`
+	PodIP                      *string                                    `json:"podIP,omitempty"`
+	PodIPs                     []PodIPApplyConfiguration                  `json:"podIPs,omitempty"`
+	StartTime                  *metav1.Time                               `json:"startTime,omitempty"`
+	InitContainerStatuses      []ContainerStatusApplyConfiguration        `json:"initContainerStatuses,omitempty"`
+	ContainerStatuses          []ContainerStatusApplyConfiguration        `json:"containerStatuses,omitempty"`
+	QOSClass                   *v1.PodQOSClass                            `json:"qosClass,omitempty"`
+	EphemeralContainerStatuses []ContainerStatusApplyConfiguration        `json:"ephemeralContainerStatuses,omitempty"`
+	Resize                     *v1.PodResizeStatus                        `json:"resize,omitempty"`
+	ResourceClaimStatuses      []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs an declarative configuration of the PodStatus type for use with
@@ -97,6 +100,19 @@ func (b *PodStatusApplyConfiguration) WithNominatedNodeName(value string) *PodSt
 // If called multiple times, the HostIP field is set to the value of the last call.
 func (b *PodStatusApplyConfiguration) WithHostIP(value string) *PodStatusApplyConfiguration {
 	b.HostIP = &value
+	return b
+}
+
+// WithHostIPs adds the given value to the HostIPs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the HostIPs field.
+func (b *PodStatusApplyConfiguration) WithHostIPs(values ...*HostIPApplyConfiguration) *PodStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithHostIPs")
+		}
+		b.HostIPs = append(b.HostIPs, *values[i])
+	}
 	return b
 }
 
@@ -172,6 +188,27 @@ func (b *PodStatusApplyConfiguration) WithEphemeralContainerStatuses(values ...*
 			panic("nil value passed to WithEphemeralContainerStatuses")
 		}
 		b.EphemeralContainerStatuses = append(b.EphemeralContainerStatuses, *values[i])
+	}
+	return b
+}
+
+// WithResize sets the Resize field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resize field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithResize(value v1.PodResizeStatus) *PodStatusApplyConfiguration {
+	b.Resize = &value
+	return b
+}
+
+// WithResourceClaimStatuses adds the given value to the ResourceClaimStatuses field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ResourceClaimStatuses field.
+func (b *PodStatusApplyConfiguration) WithResourceClaimStatuses(values ...*PodResourceClaimStatusApplyConfiguration) *PodStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithResourceClaimStatuses")
+		}
+		b.ResourceClaimStatuses = append(b.ResourceClaimStatuses, *values[i])
 	}
 	return b
 }

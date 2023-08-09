@@ -164,10 +164,17 @@ func (r *Resource) CopyMergeMetaDataFieldsFrom(other *Resource) error {
 		mergeStringMaps(other.GetLabels(), r.GetLabels())); err != nil {
 		return fmt.Errorf("copyMerge cannot set labels - %w", err)
 	}
-	if err := r.SetAnnotations(
-		mergeStringMapsWithBuildAnnotations(other.GetAnnotations(), r.GetAnnotations())); err != nil {
+
+	ra := r.GetAnnotations()
+	_, enableNameSuffixHash := ra[utils.BuildAnnotationsGenAddHashSuffix]
+	merged := mergeStringMapsWithBuildAnnotations(other.GetAnnotations(), ra)
+	if !enableNameSuffixHash {
+		delete(merged, utils.BuildAnnotationsGenAddHashSuffix)
+	}
+	if err := r.SetAnnotations(merged); err != nil {
 		return fmt.Errorf("copyMerge cannot set annotations - %w", err)
 	}
+
 	if err := r.SetName(other.GetName()); err != nil {
 		return fmt.Errorf("copyMerge cannot set name - %w", err)
 	}

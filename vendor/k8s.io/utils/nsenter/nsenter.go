@@ -49,26 +49,28 @@ type Nsenter = NSEnter
 //
 // NSEnter requires:
 //
-// 1.  Docker >= 1.6 due to the dependency on the slave propagation mode
+//  1. Docker >= 1.6 due to the dependency on the slave propagation mode
 //     of the bind-mount of the kubelet root directory in the container.
 //     Docker 1.5 used a private propagation mode for bind-mounts, so mounts
 //     performed in the host's mount namespace do not propagate out to the
 //     bind-mount in this docker version.
-// 2.  The host's root filesystem must be available at /rootfs
-// 3.  The nsenter binary must be on the Kubelet process' PATH in the container's
+//  2. The host's root filesystem must be available at /rootfs
+//  3. The nsenter binary must be on the Kubelet process' PATH in the container's
 //     filesystem.
-// 4.  The Kubelet process must have CAP_SYS_ADMIN (required by nsenter); at
+//  4. The Kubelet process must have CAP_SYS_ADMIN (required by nsenter); at
 //     the present, this effectively means that the kubelet is running in a
 //     privileged container.
-// 5.  The volume path used by the Kubelet must be the same inside and outside
+//  5. The volume path used by the Kubelet must be the same inside and outside
 //     the container and be writable by the container (to initialize volume)
 //     contents. TODO: remove this requirement.
-// 6.  The host image must have "mount", "findmnt", "umount", "stat", "touch",
+//  6. The host image must have "mount", "findmnt", "umount", "stat", "touch",
 //     "mkdir", "ls", "sh" and "chmod" binaries in /bin, /usr/sbin, or /usr/bin
-// 7.  The host image should have systemd-run in /bin, /usr/sbin, or /usr/bin if
+//  7. The host image should have systemd-run in /bin, /usr/sbin, or /usr/bin if
 //     systemd is installed/enabled in the operating system.
+//
 // For more information about mount propagation modes, see:
-//   https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
+//
+//	https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
 type NSEnter struct {
 	// a map of commands to their paths on the host filesystem
 	paths map[string]string
@@ -174,10 +176,13 @@ func (ne *NSEnter) SupportsSystemd() (string, bool) {
 // exist. When it's false, it evaluates symlinks of the existing part and
 // blindly adds the non-existing part:
 // pathname: /mnt/volume/non/existing/directory
-//     /mnt/volume exists
-//                non/existing/directory does not exist
+//
+//	/mnt/volume exists
+//	           non/existing/directory does not exist
+//
 // -> It resolves symlinks in /mnt/volume to say /mnt/foo and returns
-//    /mnt/foo/non/existing/directory.
+//
+//	/mnt/foo/non/existing/directory.
 //
 // BEWARE! EvalSymlinks is not able to detect symlink looks with mustExist=false!
 // If /tmp/link is symlink to /tmp/link, EvalSymlinks(/tmp/link/foo) returns /tmp/link/foo.

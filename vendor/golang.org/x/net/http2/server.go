@@ -441,14 +441,14 @@ func (s *Server) ServeConn(c net.Conn, opts *ServeConnOpts) {
 	if s.NewWriteScheduler != nil {
 		sc.writeSched = s.NewWriteScheduler()
 	} else {
-		sc.writeSched = NewPriorityWriteScheduler(nil)
+		sc.writeSched = newRoundRobinWriteScheduler()
 	}
 
 	// These start at the RFC-specified defaults. If there is a higher
 	// configured value for inflow, that will be updated when we send a
 	// WINDOW_UPDATE shortly after sending SETTINGS.
 	sc.flow.add(initialWindowSize)
-	sc.inflow.add(initialWindowSize)
+	sc.inflow.init(initialWindowSize)
 	sc.hpackEncoder = hpack.NewEncoder(&sc.headerWriteBuf)
 	sc.hpackEncoder.SetMaxDynamicTableSizeLimit(s.maxEncoderHeaderTableSize())
 
@@ -563,8 +563,8 @@ type serverConn struct {
 	wroteFrameCh     chan frameWriteResult  // from writeFrameAsync -> serve, tickles more frame writes
 	bodyReadCh       chan bodyReadMsg       // from handlers -> serve
 	serveMsgCh       chan interface{}       // misc messages & code to send to / run on the serve loop
-	flow             flow                   // conn-wide (not stream-specific) outbound flow control
-	inflow           flow                   // conn-wide inbound flow control
+	flow             outflow                // conn-wide (not stream-specific) outbound flow control
+	inflow           inflow                 // conn-wide inbound flow control
 	tlsState         *tls.ConnectionState   // shared by all handlers, like net/http
 	remoteAddrStr    string
 	writeSched       WriteScheduler
@@ -641,10 +641,10 @@ type stream struct {
 	cancelCtx func()
 
 	// owned by serverConn's serve loop:
-	bodyBytes        int64 // body bytes seen so far
-	declBodyBytes    int64 // or -1 if undeclared
-	flow             flow  // limits writing from Handler to client
-	inflow           flow  // what the client is allowed to POST/etc to us
+	bodyBytes        int64   // body bytes seen so far
+	declBodyBytes    int64   // or -1 if undeclared
+	flow             outflow // limits writing from Handler to client
+	inflow           inflow  // what the client is allowed to POST/etc to us
 	state            streamState
 	resetQueued      bool        // RST_STREAM queued for write; set by sc.resetStream
 	gotTrailerHeader bool        // HEADER frame for trailers was seen
@@ -843,8 +843,13 @@ type frameWriteResult struct {
 // and then reports when it's done.
 // At most one goroutine can be running writeFrameAsync at a time per
 // serverConn.
-func (sc *serverConn) writeFrameAsync(wr FrameWriteRequest) {
-	err := wr.write.writeFrame(sc)
+func (sc *serverConn) writeFrameAsync(wr FrameWriteRequest, wd *writeData) {
+	var err error
+	if wd == nil {
+		err = wr.write.writeFrame(sc)
+	} else {
+		err = sc.framer.endWrite()
+	}
 	sc.wroteFrameCh <- frameWriteResult{wr: wr, err: err}
 }
 
@@ -1251,9 +1256,16 @@ func (sc *serverConn) startFrameWrite(wr FrameWriteRequest) {
 		sc.writingFrameAsync = false
 		err := wr.write.writeFrame(sc)
 		sc.wroteFrame(frameWriteResult{wr: wr, err: err})
+	} else if wd, ok := wr.write.(*writeData); ok {
+		// Encode the frame in the serve goroutine, to ensure we don't have
+		// any lingering asynchronous references to data passed to Write.
+		// See https://go.dev/issue/58446.
+		sc.framer.startWriteDataPadded(wd.streamID, wd.endStream, wd.p, nil)
+		sc.writingFrameAsync = true
+		go sc.writeFrameAsync(wr, wd)
 	} else {
 		sc.writingFrameAsync = true
-		go sc.writeFrameAsync(wr)
+		go sc.writeFrameAsync(wr, nil)
 	}
 }
 
@@ -1503,7 +1515,7 @@ func (sc *serverConn) processFrame(f Frame) error {
 	if sc.inGoAway && (sc.goAwayCode != ErrCodeNo || f.Header().StreamID > sc.maxClientStreamID) {
 
 		if f, ok := f.(*DataFrame); ok {
-			if sc.inflow.available() < int32(f.Length) {
+			if !sc.inflow.take(f.Length) {
 				return sc.countError("data_flow", streamError(f.Header().StreamID, ErrCodeFlowControl))
 			}
 			sc.sendWindowUpdate(nil, int(f.Length)) // conn-level
@@ -1775,14 +1787,9 @@ func (sc *serverConn) processData(f *DataFrame) error {
 		// But still enforce their connection-level flow control,
 		// and return any flow control bytes since we're not going
 		// to consume them.
-		if sc.inflow.available() < int32(f.Length) {
+		if !sc.inflow.take(f.Length) {
 			return sc.countError("data_flow", streamError(id, ErrCodeFlowControl))
 		}
-		// Deduct the flow control from inflow, since we're
-		// going to immediately add it back in
-		// sendWindowUpdate, which also schedules sending the
-		// frames.
-		sc.inflow.take(int32(f.Length))
 		sc.sendWindowUpdate(nil, int(f.Length)) // conn-level
 
 		if st != nil && st.resetQueued {
@@ -1797,10 +1804,9 @@ func (sc *serverConn) processData(f *DataFrame) error {
 
 	// Sender sending more than they'd declared?
 	if st.declBodyBytes != -1 && st.bodyBytes+int64(len(data)) > st.declBodyBytes {
-		if sc.inflow.available() < int32(f.Length) {
+		if !sc.inflow.take(f.Length) {
 			return sc.countError("data_flow", streamError(id, ErrCodeFlowControl))
 		}
-		sc.inflow.take(int32(f.Length))
 		sc.sendWindowUpdate(nil, int(f.Length)) // conn-level
 
 		st.body.CloseWithError(fmt.Errorf("sender tried to send more than declared Content-Length of %d bytes", st.declBodyBytes))
@@ -1811,29 +1817,33 @@ func (sc *serverConn) processData(f *DataFrame) error {
 	}
 	if f.Length > 0 {
 		// Check whether the client has flow control quota.
-		if st.inflow.available() < int32(f.Length) {
+		if !takeInflows(&sc.inflow, &st.inflow, f.Length) {
 			return sc.countError("flow_on_data_length", streamError(id, ErrCodeFlowControl))
 		}
-		st.inflow.take(int32(f.Length))
 
 		if len(data) > 0 {
+			st.bodyBytes += int64(len(data))
 			wrote, err := st.body.Write(data)
 			if err != nil {
+				// The handler has closed the request body.
+				// Return the connection-level flow control for the discarded data,
+				// but not the stream-level flow control.
 				sc.sendWindowUpdate(nil, int(f.Length)-wrote)
-				return sc.countError("body_write_err", streamError(id, ErrCodeStreamClosed))
+				return nil
 			}
 			if wrote != len(data) {
 				panic("internal error: bad Writer")
 			}
-			st.bodyBytes += int64(len(data))
 		}
 
 		// Return any padded flow control now, since we won't
 		// refund it later on body reads.
-		if pad := int32(f.Length) - int32(len(data)); pad > 0 {
-			sc.sendWindowUpdate32(nil, pad)
-			sc.sendWindowUpdate32(st, pad)
-		}
+		// Call sendWindowUpdate even if there is no padding,
+		// to return buffered flow control credit if the sent
+		// window has shrunk.
+		pad := int32(f.Length) - int32(len(data))
+		sc.sendWindowUpdate32(nil, pad)
+		sc.sendWindowUpdate32(st, pad)
 	}
 	if f.StreamEnded() {
 		st.endStream()
@@ -2105,8 +2115,7 @@ func (sc *serverConn) newStream(id, pusherID uint32, state streamState) *stream 
 	st.cw.Init()
 	st.flow.conn = &sc.flow // link to conn-level counter
 	st.flow.add(sc.initialStreamSendWindowSize)
-	st.inflow.conn = &sc.inflow // link to conn-level counter
-	st.inflow.add(sc.srv.initialStreamRecvWindowSize())
+	st.inflow.init(sc.srv.initialStreamRecvWindowSize())
 	if sc.hs.WriteTimeout != 0 {
 		st.writeDeadline = time.AfterFunc(sc.hs.WriteTimeout, st.onWriteTimeout)
 	}
@@ -2198,7 +2207,7 @@ func (sc *serverConn) newWriterAndRequestNoBody(st *stream, rp requestParam) (*r
 		tlsState = sc.tlsState
 	}
 
-	needsContinue := rp.header.Get("Expect") == "100-continue"
+	needsContinue := httpguts.HeaderValuesContainsToken(rp.header["Expect"], "100-continue")
 	if needsContinue {
 		rp.header.Del("Expect")
 	}
@@ -2388,47 +2397,28 @@ func (sc *serverConn) noteBodyRead(st *stream, n int) {
 }
 
 // st may be nil for conn-level
-func (sc *serverConn) sendWindowUpdate(st *stream, n int) {
-	sc.serveG.check()
-	// "The legal range for the increment to the flow control
-	// window is 1 to 2^31-1 (2,147,483,647) octets."
-	// A Go Read call on 64-bit machines could in theory read
-	// a larger Read than this. Very unlikely, but we handle it here
-	// rather than elsewhere for now.
-	const maxUint31 = 1<<31 - 1
-	for n > maxUint31 {
-		sc.sendWindowUpdate32(st, maxUint31)
-		n -= maxUint31
-	}
-	sc.sendWindowUpdate32(st, int32(n))
+func (sc *serverConn) sendWindowUpdate32(st *stream, n int32) {
+	sc.sendWindowUpdate(st, int(n))
 }
 
 // st may be nil for conn-level
-func (sc *serverConn) sendWindowUpdate32(st *stream, n int32) {
+func (sc *serverConn) sendWindowUpdate(st *stream, n int) {
 	sc.serveG.check()
-	if n == 0 {
+	var streamID uint32
+	var send int32
+	if st == nil {
+		send = sc.inflow.add(n)
+	} else {
+		streamID = st.id
+		send = st.inflow.add(n)
+	}
+	if send == 0 {
 		return
 	}
-	if n < 0 {
-		panic("negative update")
-	}
-	var streamID uint32
-	if st != nil {
-		streamID = st.id
-	}
 	sc.writeFrame(FrameWriteRequest{
-		write:  writeWindowUpdate{streamID: streamID, n: uint32(n)},
+		write:  writeWindowUpdate{streamID: streamID, n: uint32(send)},
 		stream: st,
 	})
-	var ok bool
-	if st == nil {
-		ok = sc.inflow.add(n)
-	} else {
-		ok = st.inflow.add(n)
-	}
-	if !ok {
-		panic("internal error; sent too many window updates without decrements?")
-	}
 }
 
 // requestBody is the Handler's Request.Body type.
@@ -2439,7 +2429,7 @@ type requestBody struct {
 	conn          *serverConn
 	closeOnce     sync.Once // for use by Close only
 	sawEOF        bool      // for use by Read only
-	pipe          *pipe     // non-nil if we have a HTTP entity message body
+	pipe          *pipe     // non-nil if we have an HTTP entity message body
 	needsContinue bool      // need to send a 100-continue
 }
 
@@ -2579,7 +2569,8 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 				clen = ""
 			}
 		}
-		if clen == "" && rws.handlerDone && bodyAllowedForStatus(rws.status) && (len(p) > 0 || !isHeadResp) {
+		_, hasContentLength := rws.snapHeader["Content-Length"]
+		if !hasContentLength && clen == "" && rws.handlerDone && bodyAllowedForStatus(rws.status) && (len(p) > 0 || !isHeadResp) {
 			clen = strconv.Itoa(len(p))
 		}
 		_, hasContentType := rws.snapHeader["Content-Type"]
@@ -2784,7 +2775,7 @@ func (w *responseWriter) FlushError() error {
 		err = rws.bw.Flush()
 	} else {
 		// The bufio.Writer won't call chunkWriter.Write
-		// (writeChunk with zero bytes, so we have to do it
+		// (writeChunk with zero bytes), so we have to do it
 		// ourselves to force the HTTP response header and/or
 		// final DATA frame (with END_STREAM) to be sent.
 		_, err = chunkWriter{rws}.Write(nil)

@@ -32,6 +32,7 @@ type resetData interface {
 	InputReader() io.Reader
 	IgnorePreflightErrors() sets.Set[string]
 	Cfg() *kubeadmapi.InitConfiguration
+	ResetCfg() *kubeadmapi.ResetConfiguration
 	DryRun() bool
 	Client() clientset.Interface
 	CertificatesDir() string

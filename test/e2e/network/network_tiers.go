@@ -42,7 +42,7 @@ import (
 
 var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 	f := framework.NewDefaultFramework("services")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	serviceLBNames := []string{}

@@ -19,26 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
-source "${KUBE_ROOT}/hack/lib/init.sh"
 
-cd "${KUBE_ROOT}"
-
-# Filter out arguments that start with "-" and move them to goflags.
-targets=()
-goflags=()
-for arg; do
-  if [[ "${arg}" == -* ]]; then
-    goflags+=("${arg}")
-  else
-    targets+=("${arg}")
-  fi
-done
-
-if [[ ${#targets[@]} -eq 0 ]]; then
-  # Do not run on third_party directories or generated client code or build tools.
-  while IFS='' read -r line; do
-    targets+=("${line}")
-  done < <(go list -e ./... | grep -E -v "/(build|third_party|vendor|staging|clientset_generated|hack)/")
-fi
-
-go vet "${goflags[@]:+${goflags[@]}}" "${targets[@]}"
+# Ignore the usual golangci.yaml config because it would
+# enable additional linters, then enable just "go vet".
+"${KUBE_ROOT}/hack/verify-golangci-lint.sh" -c none -- --disable-all --enable=govet "$@"

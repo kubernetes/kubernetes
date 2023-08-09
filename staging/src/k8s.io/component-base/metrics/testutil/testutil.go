@@ -19,11 +19,13 @@ package testutil
 import (
 	"fmt"
 	"io"
+	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 // CollectAndCompare registers the provided Collector with a newly created
@@ -67,6 +69,13 @@ func CustomCollectAndCompare(c metrics.StableCollector, expected io.Reader, metr
 	return GatherAndCompare(registry, expected, metricNames...)
 }
 
+// ScrapeAndCompare calls a remote exporter's endpoint which is expected to return some metrics in
+// plain text format. Then it compares it with the results that the `expected` would return.
+// If the `metricNames` is not empty it would filter the comparison only to the given metric names.
+func ScrapeAndCompare(url string, expected io.Reader, metricNames ...string) error {
+	return testutil.ScrapeAndCompare(url, expected, metricNames...)
+}
+
 // NewFakeKubeRegistry creates a fake `KubeRegistry` that takes the input version as `build in version`.
 // It should only be used in testing scenario especially for the deprecated metrics.
 // The input version format should be `major.minor.patch`, e.g. '1.18.0'.
@@ -83,4 +92,63 @@ func NewFakeKubeRegistry(ver string) metrics.KubeRegistry {
 	}
 
 	return metrics.NewKubeRegistry()
+}
+
+func AssertVectorCount(t *testing.T, name string, labelFilter map[string]string, wantCount int) {
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %s", err)
+	}
+
+	counterSum := 0
+	for _, mf := range metrics {
+		if mf.GetName() != name {
+			continue // Ignore other metrics.
+		}
+		for _, metric := range mf.GetMetric() {
+			if !LabelsMatch(metric, labelFilter) {
+				continue
+			}
+			counterSum += int(metric.GetCounter().GetValue())
+		}
+	}
+	if wantCount != counterSum {
+		t.Errorf("Wanted count %d, got %d for metric %s with labels %#+v", wantCount, counterSum, name, labelFilter)
+		for _, mf := range metrics {
+			if mf.GetName() == name {
+				for _, metric := range mf.GetMetric() {
+					t.Logf("\tnear match: %s", metric.String())
+				}
+			}
+		}
+	}
+}
+
+func AssertHistogramTotalCount(t *testing.T, name string, labelFilter map[string]string, wantCount int) {
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %s", err)
+	}
+	counterSum := 0
+	for _, mf := range metrics {
+		if mf.GetName() != name {
+			continue // Ignore other metrics.
+		}
+		for _, metric := range mf.GetMetric() {
+			if !LabelsMatch(metric, labelFilter) {
+				continue
+			}
+			counterSum += int(metric.GetHistogram().GetSampleCount())
+		}
+	}
+	if wantCount != counterSum {
+		t.Errorf("Wanted count %d, got %d for metric %s with labels %#+v", wantCount, counterSum, name, labelFilter)
+		for _, mf := range metrics {
+			if mf.GetName() == name {
+				for _, metric := range mf.GetMetric() {
+					t.Logf("\tnear match: %s\n", metric.String())
+				}
+			}
+		}
+	}
 }

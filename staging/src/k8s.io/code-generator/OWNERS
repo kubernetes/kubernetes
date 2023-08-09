@@ -1,13 +1,15 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - lavalamp
+  - deads2k
   - wojtek-t
   - sttts
 reviewers:
-  - lavalamp
+  - deads2k
   - wojtek-t
   - sttts
 labels:
   - sig/api-machinery
   - area/code-generation
+emeritus_approvers:
+  - lavalamp

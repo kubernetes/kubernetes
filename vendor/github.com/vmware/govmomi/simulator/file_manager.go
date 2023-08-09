@@ -20,8 +20,8 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 
-	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/simulator/esx"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -33,30 +33,30 @@ type FileManager struct {
 	mo.FileManager
 }
 
-func NewFileManager(ref types.ManagedObjectReference) object.Reference {
-	m := &FileManager{}
-	m.Self = ref
-	return m
-}
-
 func (f *FileManager) findDatastore(ref mo.Reference, name string) (*Datastore, types.BaseMethodFault) {
 	var refs []types.ManagedObjectReference
 
-	switch obj := ref.(type) {
-	case *Folder:
-		refs = obj.ChildEntity
-	case *StoragePod:
-		refs = obj.ChildEntity
+	if d, ok := asFolderMO(ref); ok {
+		refs = d.ChildEntity
+	}
+	if p, ok := ref.(*StoragePod); ok {
+		refs = p.ChildEntity
 	}
 
 	for _, ref := range refs {
-		switch obj := Map.Get(ref).(type) {
-		case *Datastore:
-			if obj.Name == name {
-				return obj, nil
+		obj := Map.Get(ref)
+
+		if ds, ok := obj.(*Datastore); ok && ds.Name == name {
+			return ds, nil
+		}
+		if p, ok := obj.(*StoragePod); ok {
+			ds, _ := f.findDatastore(p, name)
+			if ds != nil {
+				return ds, nil
 			}
-		case *Folder, *StoragePod:
-			ds, _ := f.findDatastore(obj, name)
+		}
+		if d, ok := asFolderMO(obj); ok {
+			ds, _ := f.findDatastore(d, name)
 			if ds != nil {
 				return ds, nil
 			}
@@ -126,14 +126,14 @@ func (f *FileManager) deleteDatastoreFile(req *types.DeleteDatastoreFile_Task) t
 	return nil
 }
 
-func (f *FileManager) DeleteDatastoreFileTask(req *types.DeleteDatastoreFile_Task) soap.HasFault {
+func (f *FileManager) DeleteDatastoreFileTask(ctx *Context, req *types.DeleteDatastoreFile_Task) soap.HasFault {
 	task := CreateTask(f, "deleteDatastoreFile", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		return nil, f.deleteDatastoreFile(req)
 	})
 
 	return &methods.DeleteDatastoreFile_TaskBody{
 		Res: &types.DeleteDatastoreFile_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
@@ -190,14 +190,14 @@ func (f *FileManager) moveDatastoreFile(req *types.MoveDatastoreFile_Task) types
 	return nil
 }
 
-func (f *FileManager) MoveDatastoreFileTask(req *types.MoveDatastoreFile_Task) soap.HasFault {
+func (f *FileManager) MoveDatastoreFileTask(ctx *Context, req *types.MoveDatastoreFile_Task) soap.HasFault {
 	task := CreateTask(f, "moveDatastoreFile", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		return nil, f.moveDatastoreFile(req)
 	})
 
 	return &methods.MoveDatastoreFile_TaskBody{
 		Res: &types.MoveDatastoreFile_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
@@ -220,7 +220,7 @@ func (f *FileManager) copyDatastoreFile(req *types.CopyDatastoreFile_Task) types
 		}
 	}
 
-	r, err := os.Open(src)
+	r, err := os.Open(filepath.Clean(src))
 	if err != nil {
 		return f.fault(dst, err, new(types.CannotAccessFile))
 	}
@@ -239,14 +239,14 @@ func (f *FileManager) copyDatastoreFile(req *types.CopyDatastoreFile_Task) types
 	return nil
 }
 
-func (f *FileManager) CopyDatastoreFileTask(req *types.CopyDatastoreFile_Task) soap.HasFault {
+func (f *FileManager) CopyDatastoreFileTask(ctx *Context, req *types.CopyDatastoreFile_Task) soap.HasFault {
 	task := CreateTask(f, "copyDatastoreFile", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		return nil, f.copyDatastoreFile(req)
 	})
 
 	return &methods.CopyDatastoreFile_TaskBody{
 		Res: &types.CopyDatastoreFile_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }

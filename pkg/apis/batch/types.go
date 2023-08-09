@@ -22,16 +22,36 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
-// being deleted before being accounted in the Job status.
-//
-// Additionally, the apiserver and job controller use this string as a Job
-// annotation, to mark Jobs that are being tracked using pod finalizers.
-// However, this behavior is deprecated in kubernetes 1.26. This means that, in
-// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
-// apiserver and job controller will ignore this annotation and they will
-// always track jobs using finalizers.
-const JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
+const (
+	// Unprefixed labels are reserved for end-users
+	// so we will add a batch.kubernetes.io to designate these labels as official Kubernetes labels.
+	// See https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#label-selector-and-annotation-conventions
+	labelPrefix = "batch.kubernetes.io/"
+	// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
+	// being deleted before being accounted in the Job status.
+	//
+	// Additionally, the apiserver and job controller use this string as a Job
+	// annotation, to mark Jobs that are being tracked using pod finalizers.
+	// However, this behavior is deprecated in kubernetes 1.26. This means that, in
+	// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
+	// apiserver and job controller will ignore this annotation and they will
+	// always track jobs using finalizers.
+	JobTrackingFinalizer = labelPrefix + "job-tracking"
+	// LegacyJobName and LegacyControllerUid are legacy labels that were set using unprefixed labels.
+	LegacyJobNameLabel       = "job-name"
+	LegacyControllerUidLabel = "controller-uid"
+	// JobName is a user friendly way to refer to jobs and is set in the labels for jobs.
+	JobNameLabel = labelPrefix + LegacyJobNameLabel
+	// Controller UID is used for selectors and labels for jobs
+	ControllerUidLabel = labelPrefix + LegacyControllerUidLabel
+	// Annotation indicating the number of failures for the index corresponding
+	// to the pod, which are counted towards the backoff limit.
+	JobIndexFailureCountAnnotation = labelPrefix + "job-index-failure-count"
+	// Annotation indicating the number of failures for the index corresponding
+	// to the pod, which don't count towards the backoff limit, according to the
+	// pod failure policy. When the annotation is absent zero is implied.
+	JobIndexIgnoredFailureCountAnnotation = labelPrefix + "job-index-ignored-failure-count"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -66,22 +86,6 @@ type JobList struct {
 
 	// items is the list of Jobs.
 	Items []Job
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// JobTemplate describes a template for creating copies of a predefined pod.
-type JobTemplate struct {
-	metav1.TypeMeta
-	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
-	metav1.ObjectMeta
-
-	// Defines jobs that will be created from this template.
-	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	Template JobTemplateSpec
 }
 
 // JobTemplateSpec describes the data a Job should have when created from a template
@@ -122,6 +126,12 @@ const (
 	// pod's job as Failed and terminate all running pods.
 	PodFailurePolicyActionFailJob PodFailurePolicyAction = "FailJob"
 
+	// This is an action which might be taken on a pod failure - mark the
+	// Job's index as failed to avoid restarts within this index. This action
+	// can only be used when backoffLimitPerIndex is set.
+	// This value is alpha-level.
+	PodFailurePolicyActionFailIndex PodFailurePolicyAction = "FailIndex"
+
 	// This is an action which might be taken on a pod failure - the counter towards
 	// .backoffLimit, represented by the job's .status.failed field, is not
 	// incremented and a replacement pod is created.
@@ -139,6 +149,19 @@ type PodFailurePolicyOnExitCodesOperator string
 const (
 	PodFailurePolicyOnExitCodesOpIn    PodFailurePolicyOnExitCodesOperator = "In"
 	PodFailurePolicyOnExitCodesOpNotIn PodFailurePolicyOnExitCodesOperator = "NotIn"
+)
+
+// PodReplacementPolicy specifies the policy for creating pod replacements.
+// +enum
+type PodReplacementPolicy string
+
+const (
+	// TerminatingOrFailed means that we recreate pods
+	// when they are terminating (has a metadata.deletionTimestamp) or failed.
+	TerminatingOrFailed PodReplacementPolicy = "TerminatingOrFailed"
+	//Failed means to wait until a previously created Pod is fully terminated (has phase
+	//Failed or Succeeded) before creating a replacement Pod.
+	Failed PodReplacementPolicy = "Failed"
 )
 
 // PodFailurePolicyOnExitCodesRequirement describes the requirement for handling
@@ -198,6 +221,10 @@ type PodFailurePolicyRule struct {
 	//
 	// - FailJob: indicates that the pod's job is marked as Failed and all
 	//   running pods are terminated.
+	// - FailIndex: indicates that the pod's index is marked as Failed and will
+	//   not be restarted.
+	//   This value is alpha-level. It can be used when the
+	//   `JobBackoffLimitPerIndex` feature gate is enabled (disabled by default).
 	// - Ignore: indicates that the counter towards the .backoffLimit is not
 	//   incremented and a replacement pod is created.
 	// - Count: indicates that the pod is handled in the default way - the
@@ -254,8 +281,8 @@ type JobSpec struct {
 	// checked against the backoffLimit. This field cannot be used in combination
 	// with .spec.podTemplate.spec.restartPolicy=OnFailure.
 	//
-	// This field is alpha-level. To use this field, you must enable the
-	// `JobPodFailurePolicy` feature gate (disabled by default).
+	// This field is beta-level. It can be used when the `JobPodFailurePolicy`
+	// feature gate is enabled (enabled by default).
 	// +optional
 	PodFailurePolicy *PodFailurePolicy
 
@@ -271,6 +298,30 @@ type JobSpec struct {
 	// Defaults to 6
 	// +optional
 	BackoffLimit *int32
+
+	// Specifies the limit for the number of retries within an
+	// index before marking this index as failed. When enabled the number of
+	// failures per index is kept in the pod's
+	// batch.kubernetes.io/job-index-failure-count annotation. It can only
+	// be set when Job's completionMode=Indexed, and the Pod's restart
+	// policy is Never. The field is immutable.
+	// This field is alpha-level. It can be used when the `JobBackoffLimitPerIndex`
+	// feature gate is enabled (disabled by default).
+	// +optional
+	BackoffLimitPerIndex *int32
+
+	// Specifies the maximal number of failed indexes before marking the Job as
+	// failed, when backoffLimitPerIndex is set. Once the number of failed
+	// indexes exceeds this number the entire Job is marked as Failed and its
+	// execution is terminated. When left as null the job continues execution of
+	// all of its indexes and is marked with the `Complete` Job condition.
+	// It can only be specified when backoffLimitPerIndex is set.
+	// It can be null or up to completions. It is required and must be
+	// less than or equal to 10^4 when is completions greater than 10^5.
+	// This field is alpha-level. It can be used when the `JobBackoffLimitPerIndex`
+	// feature gate is enabled (disabled by default).
+	// +optional
+	MaxFailedIndexes *int32
 
 	// TODO enabled it when https://github.com/kubernetes/kubernetes/issues/28486 has been fixed
 	// Optional number of failed pods to retain.
@@ -295,6 +346,7 @@ type JobSpec struct {
 	ManualSelector *bool
 
 	// Describes the pod that will be created when executing a job.
+	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	Template api.PodTemplateSpec
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
@@ -342,6 +394,19 @@ type JobSpec struct {
 	//
 	// +optional
 	Suspend *bool
+
+	// podReplacementPolicy specifies when to create replacement Pods.
+	// Possible values are:
+	// - TerminatingOrFailed means that we recreate pods
+	//   when they are terminating (has a metadata.deletionTimestamp) or failed.
+	// - Failed means to wait until a previously created Pod is fully terminated (has phase
+	//   Failed or Succeeded) before creating a replacement Pod.
+	//
+	// When using podFailurePolicy, Failed is the the only allowed value.
+	// TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.
+	// This is an alpha field. Enable JobPodReplacementPolicy to be able to use this field.
+	// +optional
+	PodReplacementPolicy *PodReplacementPolicy
 }
 
 // JobStatus represents the current state of a Job.
@@ -374,6 +439,14 @@ type JobStatus struct {
 	// +optional
 	Active int32
 
+	// The number of pods which are terminating (in phase Pending or Running
+	// and have a deletionTimestamp).
+	//
+	// This field is alpha-level. The job controller populates the field when
+	// the feature gate JobPodReplacementPolicy is enabled (disabled by default).
+	// +optional
+	Terminating *int32
+
 	// The number of active pods which have a Ready condition.
 	//
 	// This field is beta-level. The job controller populates the field when
@@ -398,6 +471,19 @@ type JobStatus struct {
 	// represented as "1,3-5,7".
 	// +optional
 	CompletedIndexes string
+
+	// FailedIndexes holds the failed indexes when backoffLimitPerIndex=true.
+	// The indexes are represented in the text format analogous as for the
+	// `completedIndexes` field, ie. they are kept as decimal integers
+	// separated by commas. The numbers are listed in increasing order. Three or
+	// more consecutive numbers are compressed and represented by the first and
+	// last element of the series, separated by a hyphen.
+	// For example, if the failed indexes are 1, 3, 4, 5 and 7, they are
+	// represented as "1,3-5,7".
+	// This field is alpha-level. It can be used when the `JobBackoffLimitPerIndex`
+	// feature gate is enabled (disabled by default).
+	// +optional
+	FailedIndexes *string
 
 	// uncountedTerminatedPods holds the UIDs of Pods that have terminated but
 	// the job controller hasn't yet accounted for in the status counters.
@@ -516,7 +602,6 @@ type CronJobSpec struct {
 	// configuration, the controller will stop creating new new Jobs and will create a system event with the
 	// reason UnknownTimeZone.
 	// More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
-	// This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
 	// +optional
 	TimeZone *string
 

@@ -36,6 +36,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -318,7 +319,7 @@ func waitForServiceAccountInNamespace(ctx context.Context, c clientset.Interface
 // the default service account is what is associated with pods when they do not specify a service account
 // as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
 func WaitForDefaultServiceAccountInNamespace(ctx context.Context, c clientset.Interface, namespace string) error {
-	return waitForServiceAccountInNamespace(ctx, c, namespace, "default", ServiceAccountProvisionTimeout)
+	return waitForServiceAccountInNamespace(ctx, c, namespace, defaultServiceAccountName, ServiceAccountProvisionTimeout)
 }
 
 // WaitForKubeRootCAInNamespace waits for the configmap kube-root-ca.crt containing the service account
@@ -420,20 +421,37 @@ func CheckTestingNSDeletedExcept(ctx context.Context, c clientset.Interface, ski
 }
 
 // WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
+// Some components use EndpointSlices other Endpoints, we must verify that both objects meet the requirements.
 func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.PollWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
-		list, err := c.CoreV1().Endpoints(namespace).List(ctx, metav1.ListOptions{})
+		endpoint, err := c.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 		if err != nil {
-			return false, err
+			Logf("Unexpected error trying to get Endpoints for %s : %v", serviceName, err)
+			return false, nil
 		}
 
-		for _, e := range list.Items {
-			if e.Name == serviceName && countEndpointsNum(&e) == expectNum {
-				return true, nil
-			}
+		if countEndpointsNum(endpoint) != expectNum {
+			Logf("Unexpected number of Endpoints, got %d, expected %d", countEndpointsNum(endpoint), expectNum)
+			return false, nil
 		}
-		return false, nil
+
+		esList, err := c.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName)})
+		if err != nil {
+			Logf("Unexpected error trying to get EndpointSlices for %s : %v", serviceName, err)
+			return false, nil
+		}
+
+		if len(esList.Items) == 0 {
+			Logf("Waiting for at least 1 EndpointSlice to exist")
+			return false, nil
+		}
+
+		if countEndpointsSlicesNum(esList) != expectNum {
+			Logf("Unexpected number of Endpoints on Slices, got %d, expected %d", countEndpointsSlicesNum(esList), expectNum)
+			return false, nil
+		}
+		return true, nil
 	})
 }
 
@@ -443,6 +461,19 @@ func countEndpointsNum(e *v1.Endpoints) int {
 		num += len(sub.Addresses)
 	}
 	return num
+}
+
+func countEndpointsSlicesNum(epList *discoveryv1.EndpointSliceList) int {
+	// EndpointSlices can contain the same address on multiple Slices
+	addresses := sets.Set[string]{}
+	for _, epSlice := range epList.Items {
+		for _, ep := range epSlice.Endpoints {
+			if len(ep.Addresses) > 0 {
+				addresses.Insert(ep.Addresses[0])
+			}
+		}
+	}
+	return addresses.Len()
 }
 
 // restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.

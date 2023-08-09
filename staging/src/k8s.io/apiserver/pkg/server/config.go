@@ -34,6 +34,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/cryptobyte"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,6 +65,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
@@ -82,6 +84,13 @@ import (
 
 	// install apis
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
+)
+
+// hostnameFunc is a function to set the hostnameFunc of this apiserver.
+// To be used for testing purpose only, to simulate scenarios where multiple apiservers
+// exist. In such cases we want to ensure unique apiserver IDs which are a hash of hostnameFunc.
+var (
+	hostnameFunc = os.Hostname
 )
 
 const (
@@ -156,8 +165,14 @@ type Config struct {
 
 	// BuildHandlerChainFunc allows you to build custom handler chains by decorating the apiHandler.
 	BuildHandlerChainFunc func(apiHandler http.Handler, c *Config) (secure http.Handler)
-	// HandlerChainWaitGroup allows you to wait for all chain handlers exit after the server shutdown.
-	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
+	// NonLongRunningRequestWaitGroup allows you to wait for all chain
+	// handlers associated with non long-running requests
+	// to complete while the server is shuting down.
+	NonLongRunningRequestWaitGroup *utilwaitgroup.SafeWaitGroup
+	// WatchRequestWaitGroup allows us to wait for all chain
+	// handlers associated with active watch requests to
+	// complete while the server is shuting down.
+	WatchRequestWaitGroup *utilwaitgroup.RateLimitedSafeWaitGroup
 	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
@@ -183,6 +198,8 @@ type Config struct {
 	// SkipOpenAPIInstallation avoids installing the OpenAPI handler if set to true.
 	SkipOpenAPIInstallation bool
 
+	// ResourceTransformers are used to transform resources from and to etcd, e.g. encryption.
+	ResourceTransformers storagevalue.ResourceTransformers
 	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
@@ -269,6 +286,23 @@ type Config struct {
 
 	// AggregatedDiscoveryGroupManager serves /apis in an aggregated form.
 	AggregatedDiscoveryGroupManager discoveryendpoint.ResourceManager
+
+	// ShutdownWatchTerminationGracePeriod, if set to a positive value,
+	// is the maximum duration the apiserver will wait for all active
+	// watch request(s) to drain.
+	// Once this grace period elapses, the apiserver will no longer
+	// wait for any active watch request(s) in flight to drain, it will
+	// proceed to the next step in the graceful server shutdown process.
+	// If set to a positive value, the apiserver will keep track of the
+	// number of active watch request(s) in flight and during shutdown
+	// it will wait, at most, for the specified duration and allow these
+	// active watch requests to drain with some rate limiting in effect.
+	// The default is zero, which implies the apiserver will not keep
+	// track of active watch request(s) in flight and will not wait
+	// for them to drain, this maintains backward compatibility.
+	// This grace period is orthogonal to other grace periods, and
+	// it is not overridden by any other grace period.
+	ShutdownWatchTerminationGracePeriod time.Duration
 }
 
 type RecommendedConfig struct {
@@ -321,6 +355,8 @@ type AuthenticationInfo struct {
 	APIAudiences authenticator.Audiences
 	// Authenticator determines which subject is making the request
 	Authenticator authenticator.Request
+
+	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 }
 
 type AuthorizationInfo struct {
@@ -338,37 +374,54 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	var id string
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
-		hostname, err := os.Hostname()
+		hostname, err := hostnameFunc()
 		if err != nil {
 			klog.Fatalf("error getting hostname for apiserver identity: %v", err)
 		}
 
-		hash := sha256.Sum256([]byte(hostname))
-		id = "kube-apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
+		// Since the hash needs to be unique across each kube-apiserver and aggregated apiservers,
+		// the hash used for the identity should include both the hostname and the identity value.
+		// TODO: receive the identity value as a parameter once the apiserver identity lease controller
+		// post start hook is moved to generic apiserver.
+		b := cryptobyte.NewBuilder(nil)
+		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+			b.AddBytes([]byte(hostname))
+		})
+		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+			b.AddBytes([]byte("kube-apiserver"))
+		})
+		hashData, err := b.Bytes()
+		if err != nil {
+			klog.Fatalf("error building hash data for apiserver identity: %v", err)
+		}
+
+		hash := sha256.Sum256(hashData)
+		id = "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 	}
 	lifecycleSignals := newLifecycleSignals()
 
 	return &Config{
-		Serializer:                  codecs,
-		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
-		HandlerChainWaitGroup:       new(utilwaitgroup.SafeWaitGroup),
-		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
-		DisabledPostStartHooks:      sets.NewString(),
-		PostStartHooks:              map[string]PostStartHookConfigEntry{},
-		HealthzChecks:               append([]healthz.HealthChecker{}, defaultHealthChecks...),
-		ReadyzChecks:                append([]healthz.HealthChecker{}, defaultHealthChecks...),
-		LivezChecks:                 append([]healthz.HealthChecker{}, defaultHealthChecks...),
-		EnableIndex:                 true,
-		EnableDiscovery:             true,
-		EnableProfiling:             true,
-		DebugSocketPath:             "",
-		EnableMetrics:               true,
-		MaxRequestsInFlight:         400,
-		MaxMutatingRequestsInFlight: 200,
-		RequestTimeout:              time.Duration(60) * time.Second,
-		MinRequestTimeout:           1800,
-		LivezGracePeriod:            time.Duration(0),
-		ShutdownDelayDuration:       time.Duration(0),
+		Serializer:                     codecs,
+		BuildHandlerChainFunc:          DefaultBuildHandlerChain,
+		NonLongRunningRequestWaitGroup: new(utilwaitgroup.SafeWaitGroup),
+		WatchRequestWaitGroup:          &utilwaitgroup.RateLimitedSafeWaitGroup{},
+		LegacyAPIGroupPrefixes:         sets.NewString(DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:         sets.NewString(),
+		PostStartHooks:                 map[string]PostStartHookConfigEntry{},
+		HealthzChecks:                  append([]healthz.HealthChecker{}, defaultHealthChecks...),
+		ReadyzChecks:                   append([]healthz.HealthChecker{}, defaultHealthChecks...),
+		LivezChecks:                    append([]healthz.HealthChecker{}, defaultHealthChecks...),
+		EnableIndex:                    true,
+		EnableDiscovery:                true,
+		EnableProfiling:                true,
+		DebugSocketPath:                "",
+		EnableMetrics:                  true,
+		MaxRequestsInFlight:            400,
+		MaxMutatingRequestsInFlight:    200,
+		RequestTimeout:                 time.Duration(60) * time.Second,
+		MinRequestTimeout:              1800,
+		LivezGracePeriod:               time.Duration(0),
+		ShutdownDelayDuration:          time.Duration(0),
 		// 1.5MB is the default client request size in bytes
 		// the etcd server should accept. See
 		// https://github.com/etcd-io/etcd/blob/release-3.4/embed/config.go#L56.
@@ -389,9 +442,10 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
-		lifecycleSignals:          lifecycleSignals,
-		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(),
+		LongRunningFunc:                     genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		lifecycleSignals:                    lifecycleSignals,
+		StorageObjectCountTracker:           flowcontrolrequest.NewStorageObjectCountTracker(),
+		ShutdownWatchTerminationGracePeriod: time.Duration(0),
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
@@ -641,26 +695,28 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	apiServerHandler := NewAPIServerHandler(name, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
 
 	s := &GenericAPIServer{
-		discoveryAddresses:         c.DiscoveryAddresses,
-		LoopbackClientConfig:       c.LoopbackClientConfig,
-		legacyAPIGroupPrefixes:     c.LegacyAPIGroupPrefixes,
-		admissionControl:           c.AdmissionControl,
-		Serializer:                 c.Serializer,
-		AuditBackend:               c.AuditBackend,
-		Authorizer:                 c.Authorization.Authorizer,
-		delegationTarget:           delegationTarget,
-		EquivalentResourceRegistry: c.EquivalentResourceRegistry,
-		HandlerChainWaitGroup:      c.HandlerChainWaitGroup,
-		Handler:                    apiServerHandler,
-		UnprotectedDebugSocket:     debugSocket,
+		discoveryAddresses:             c.DiscoveryAddresses,
+		LoopbackClientConfig:           c.LoopbackClientConfig,
+		legacyAPIGroupPrefixes:         c.LegacyAPIGroupPrefixes,
+		admissionControl:               c.AdmissionControl,
+		Serializer:                     c.Serializer,
+		AuditBackend:                   c.AuditBackend,
+		Authorizer:                     c.Authorization.Authorizer,
+		delegationTarget:               delegationTarget,
+		EquivalentResourceRegistry:     c.EquivalentResourceRegistry,
+		NonLongRunningRequestWaitGroup: c.NonLongRunningRequestWaitGroup,
+		WatchRequestWaitGroup:          c.WatchRequestWaitGroup,
+		Handler:                        apiServerHandler,
+		UnprotectedDebugSocket:         debugSocket,
 
 		listedPathProvider: apiServerHandler,
 
-		minRequestTimeout:     time.Duration(c.MinRequestTimeout) * time.Second,
-		ShutdownTimeout:       c.RequestTimeout,
-		ShutdownDelayDuration: c.ShutdownDelayDuration,
-		SecureServingInfo:     c.SecureServing,
-		ExternalAddress:       c.ExternalAddress,
+		minRequestTimeout:                   time.Duration(c.MinRequestTimeout) * time.Second,
+		ShutdownTimeout:                     c.RequestTimeout,
+		ShutdownDelayDuration:               c.ShutdownDelayDuration,
+		ShutdownWatchTerminationGracePeriod: c.ShutdownWatchTerminationGracePeriod,
+		SecureServingInfo:                   c.SecureServing,
+		ExternalAddress:                     c.ExternalAddress,
 
 		openAPIConfig:           c.OpenAPIConfig,
 		openAPIV3Config:         c.OpenAPIV3Config,
@@ -694,10 +750,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		manager := c.AggregatedDiscoveryGroupManager
 		if manager == nil {
-			manager = discoveryendpoint.NewResourceManager()
+			manager = discoveryendpoint.NewResourceManager("apis")
 		}
 		s.AggregatedDiscoveryGroupManager = manager
-		s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager()
+		s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager("api")
 	}
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
@@ -848,14 +904,16 @@ func BuildHandlerChainWithStorageVersionPrecondition(apiHandler http.Handler, c 
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
-	handler := filterlatency.TrackCompleted(apiHandler)
+	handler := apiHandler
+
+	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authorization")
 
 	if c.FlowControl != nil {
 		workEstimatorCfg := flowcontrolrequest.DefaultWorkEstimatorConfig()
 		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(
-			c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount, workEstimatorCfg)
+			c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount, workEstimatorCfg, c.FlowControl.GetMaxSeats)
 		handler = filterlatency.TrackCompleted(handler)
 		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, requestWorkEstimator)
 		handler = filterlatency.TrackStarted(handler, c.TracerProvider, "priorityandfairness")
@@ -876,7 +934,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	failedHandler = filterlatency.TrackCompleted(failedHandler)
 	handler = filterlatency.TrackCompleted(handler)
-	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences)
+	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences, c.Authentication.RequestHeaderConfig)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authentication")
 
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
@@ -887,7 +945,10 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator,
 		c.LongRunningFunc, c.Serializer, c.RequestTimeout)
-	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.NonLongRunningRequestWaitGroup)
+	if c.ShutdownWatchTerminationGracePeriod > 0 {
+		handler = genericfilters.WithWatchTerminationDuringShutdown(handler, c.lifecycleSignals, c.WatchRequestWaitGroup)
+	}
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
 	}
@@ -1017,4 +1078,13 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens, authn.APIAudiences)
 	authn.Authenticator = authenticatorunion.New(tokenAuthenticator, authn.Authenticator)
+}
+
+// For testing purpose only
+func SetHostnameFuncForTests(name string) {
+	hostnameFunc = func() (host string, err error) {
+		host = name
+		err = nil
+		return
+	}
 }

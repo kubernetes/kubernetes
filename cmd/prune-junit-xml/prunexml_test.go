@@ -19,9 +19,10 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPruneXML(t *testing.T) {
@@ -49,10 +50,10 @@ func TestPruneXML(t *testing.T) {
 		</properties>
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestWatchRestartsIfTimeoutNotReached/group/InformerWatcher_survives_closed_watches" time="30.050000"></testcase>
 		<testcase classname="k8s.io/kubernetes/test/integration/apiserver" name="TestMaxResourceSize/JSONPatchType_should_handle_a_patch_just_under_the_max_limit" time="0.000000">
-			<skipped message="[... clipped...]ust_under_the_max_limit (0.00s)&#xA;"></skipped>
+			<skipped message="=== RUN   TestMa[...clipped...]x_limit (0.00s)&#xA;"></skipped>
 		</testcase>
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestSchedulerInformers" time="-0.000000">
-			<failure message="Failed" type="">[... clipped...]prometheus/client_metrics.go:160</failure>
+			<failure message="Failed" type="">&#xA;&#x9;/home/prow/go/[...clipped...]t_metrics.go:160</failure>
 		</testcase>
 	</testsuite>
 </testsuites>`
@@ -63,4 +64,55 @@ func TestPruneXML(t *testing.T) {
 	_ = streamXML(writer, suites)
 	_ = writer.Flush()
 	assert.Equal(t, outputXML, string(output.Bytes()), "xml was not pruned correctly")
+}
+
+func TestPruneTESTS(t *testing.T) {
+	sourceXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+	<testsuite tests="6" failures="0" time="5.50000" name="k8s.io/kubernetes/cluster/gce/cos" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestServerOverride/ETCD-SERVERS_is_not_set_-_default_override" time="0.950000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestServerOverride/ETCD-SERVERS_and_ETCD_SERVERS_OVERRIDES_are_set" time="0.660000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestServerOverride" time="1.610000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestStorageOptions/storage_options_are_supplied" time="0.860000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestStorageOptions/storage_options_are_not_supplied" time="0.280000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestStorageOptions" time="1.140000"></testcase>
+	</testsuite>
+	<testsuite tests="2" failures="1" time="30.050000" name="k8s.io/kubernetes/test/integration/apimachinery" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestWatchRestartsIfTimeoutNotReached/group/InformerWatcher_survives_closed_watches" time="30.050000"></testcase>
+		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestSchedulerInformers" time="-0.000000">
+			<failure message="Failed" type="">FailureContent</failure>
+		</testcase>
+	</testsuite>
+</testsuites>`
+
+	outputXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+	<testsuite tests="6" failures="0" time="5.50000" name="k8s.io/kubernetes/cluster/gce/cos" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/cluster/gce" name="cos" time="5.50000"></testcase>
+	</testsuite>
+	<testsuite tests="2" failures="1" time="30.050000" name="k8s.io/kubernetes/test/integration/apimachinery" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/test/integration" name="apimachinery" time="30.050000">
+			<failure message="Failed;" type="">FailureContent;</failure>
+		</testcase>
+	</testsuite>
+</testsuites>`
+	suites, _ := fetchXML(strings.NewReader(sourceXML))
+	pruneTESTS(suites)
+	var output bytes.Buffer
+	writer := bufio.NewWriter(&output)
+	_ = streamXML(writer, suites)
+	_ = writer.Flush()
+	assert.Equal(t, outputXML, string(output.Bytes()), "tests in xml was not pruned correctly")
 }

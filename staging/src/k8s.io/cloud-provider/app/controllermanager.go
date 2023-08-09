@@ -43,10 +43,13 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
+	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
+	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/slis"
@@ -56,6 +59,7 @@ import (
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/clientbuilder"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	controllerhealthz "k8s.io/controller-manager/pkg/healthz"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
@@ -64,6 +68,7 @@ import (
 
 func init() {
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 const (
@@ -76,7 +81,9 @@ const (
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
 // controllerInitFuncConstructors is a map of controller name(as defined by controllers flag in https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/#options) to their InitFuncConstructor.
 // additionalFlags provides controller specific flags to be included in the complete set of controller manager flags
-func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, controllerInitFuncConstructors map[string]ControllerInitFuncConstructor, additionalFlags cliflag.NamedFlagSets, stopCh <-chan struct{}) *cobra.Command {
+func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, controllerInitFuncConstructors map[string]ControllerInitFuncConstructor, controllerAliases map[string]string, additionalFlags cliflag.NamedFlagSets, stopCh <-chan struct{}) *cobra.Command {
+	logOptions := logs.NewOptions()
+
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
 		Long: `The Cloud controller manager is a daemon that embeds
@@ -85,7 +92,12 @@ the cloud specific control loops shipped with Kubernetes.`,
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
-			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List())
+			if err := logsapi.ValidateAndApply(logOptions, utilfeature.DefaultFeatureGate); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				return err
+			}
+
+			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
@@ -95,7 +107,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			cloud := cloudInitializer(completedConfig)
 			controllerInitializers := ConstructControllerInitializers(controllerInitFuncConstructors, completedConfig, cloud)
 
-			if err := Run(completedConfig, cloud, controllerInitializers, stopCh); err != nil {
+			if err := Run(completedConfig, cloud, controllerInitializers, make(map[string]WebhookHandler), stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
 			}
@@ -112,9 +124,12 @@ the cloud specific control loops shipped with Kubernetes.`,
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := s.Flags(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List())
-	verflag.AddFlags(namedFlagSets.FlagSet("global"))
-	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	namedFlagSets := s.Flags(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)
+
+	globalFlagSet := namedFlagSets.FlagSet("global")
+	verflag.AddFlags(globalFlagSet)
+	logsapi.AddFlags(logOptions, globalFlagSet)
+	globalflag.AddGlobalFlags(globalFlagSet, cmd.Name(), logs.SkipLoggingConfigurationFlags())
 
 	if flag.CommandLine.Lookup("cloud-provider-gce-lb-src-cidrs") != nil {
 		// hoist this flag from the global flagset to preserve the commandline until
@@ -147,7 +162,8 @@ the cloud specific control loops shipped with Kubernetes.`,
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
-func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, controllerInitializers map[string]InitFunc, stopCh <-chan struct{}) error {
+func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, controllerInitializers map[string]InitFunc, webhooks map[string]WebhookHandler,
+	stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
@@ -169,6 +185,16 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
 		checks = append(checks, electionChecker)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.CloudControllerManagerWebhook) {
+		if len(webhooks) > 0 {
+			klog.Info("Webhook Handlers enabled: ", webhooks)
+			handler := newHandler(webhooks)
+			if _, _, err := c.WebhookSecureServing.Serve(handler, 0, stopCh); err != nil {
+				return err
+			}
+		}
 	}
 
 	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
@@ -199,7 +225,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		ctx, _ := wait.ContextForChannel(stopCh)
+		ctx := wait.ContextForChannel(stopCh)
 		run(ctx, controllerInitializers)
 		<-stopCh
 		return nil
@@ -349,8 +375,20 @@ func ControllerNames(controllerInitFuncConstructors map[string]ControllerInitFun
 	return ret.List()
 }
 
-// ControllersDisabledByDefault is the controller disabled default when starting cloud-controller managers.
-var ControllersDisabledByDefault = sets.NewString()
+var (
+	// ControllersDisabledByDefault is the controller disabled default when starting cloud-controller managers.
+	ControllersDisabledByDefault = sets.NewString()
+
+	// AllWebhooks represents the list of all webhook options configured in
+	// this package.  This is empty because no webhooks are currently
+	// configured in this package.
+	AllWebhooks = []string{}
+
+	// DisabledByDefaultWebhooks represents the list of webhooks which must be
+	// explicitly enabled. This is empty because no webhooks are currently
+	// configured in this package.
+	DisabledByDefaultWebhooks = []string{}
+)
 
 // ConstructControllerInitializers is a map of controller name(as defined by controllers flag in https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/#options) to their InitFuncConstructor.
 // paired to their InitFunc.  This allows for structured downstream composition and subdivision.
@@ -404,25 +442,25 @@ var DefaultInitFuncConstructors = map[string]ControllerInitFuncConstructor{
 	// The cloud-node controller shares the "node-controller" identity with the cloud-node-lifecycle
 	// controller for historical reasons.  See
 	// https://github.com/kubernetes/kubernetes/pull/72764#issuecomment-453300990 for more context.
-	"cloud-node": {
+	names.CloudNodeController: {
 		InitContext: ControllerInitContext{
 			ClientName: "node-controller",
 		},
 		Constructor: StartCloudNodeControllerWrapper,
 	},
-	"cloud-node-lifecycle": {
+	names.CloudNodeLifecycleController: {
 		InitContext: ControllerInitContext{
 			ClientName: "node-controller",
 		},
 		Constructor: StartCloudNodeLifecycleControllerWrapper,
 	},
-	"service": {
+	names.ServiceLBController: {
 		InitContext: ControllerInitContext{
 			ClientName: "service-controller",
 		},
 		Constructor: StartServiceControllerWrapper,
 	},
-	"route": {
+	names.NodeRouteController: {
 		InitContext: ControllerInitContext{
 			ClientName: "route-controller",
 		},

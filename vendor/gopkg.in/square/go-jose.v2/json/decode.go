@@ -13,6 +13,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -245,6 +246,18 @@ func isValidNumber(s string) bool {
 	return s == ""
 }
 
+type NumberUnmarshalType int
+
+const (
+	// unmarshal a JSON number into an interface{} as a float64
+	UnmarshalFloat NumberUnmarshalType = iota
+	// unmarshal a JSON number into an interface{} as a `json.Number`
+	UnmarshalJSONNumber
+	// unmarshal a JSON number into an interface{} as a int64
+	// if value is an integer otherwise float64
+	UnmarshalIntOrFloat
+)
+
 // decodeState represents the state while decoding a JSON value.
 type decodeState struct {
 	data       []byte
@@ -252,7 +265,7 @@ type decodeState struct {
 	scan       scanner
 	nextscan   scanner // for calls to nextValue
 	savedError error
-	useNumber  bool
+	numberType NumberUnmarshalType
 }
 
 // errPhase is used for errors that should not happen unless
@@ -723,17 +736,38 @@ func (d *decodeState) literal(v reflect.Value) {
 	d.literalStore(d.data[start:d.off], v, false)
 }
 
-// convertNumber converts the number literal s to a float64 or a Number
-// depending on the setting of d.useNumber.
+// convertNumber converts the number literal s to a float64, int64 or a Number
+// depending on d.numberDecodeType.
 func (d *decodeState) convertNumber(s string) (interface{}, error) {
-	if d.useNumber {
+	switch d.numberType {
+
+	case UnmarshalJSONNumber:
 		return Number(s), nil
+	case UnmarshalIntOrFloat:
+		v, err := strconv.ParseInt(s, 10, 64)
+		if err == nil {
+			return v, nil
+		}
+
+		// tries to parse integer number in scientific notation
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return nil, &UnmarshalTypeError{"number " + s, reflect.TypeOf(0.0), int64(d.off)}
+		}
+
+		// if it has no decimal value use int64
+		if fi, fd := math.Modf(f); fd == 0.0 {
+			return int64(fi), nil
+		}
+		return f, nil
+	default:
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return nil, &UnmarshalTypeError{"number " + s, reflect.TypeOf(0.0), int64(d.off)}
+		}
+		return f, nil
 	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return nil, &UnmarshalTypeError{"number " + s, reflect.TypeOf(0.0), int64(d.off)}
-	}
-	return f, nil
+
 }
 
 var numberType = reflect.TypeOf(Number(""))

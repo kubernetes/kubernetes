@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"io"
 	"math/bits"
+	"sort"
 	"sync"
 )
 
@@ -148,3 +149,34 @@ func putStreamingDecoder(d *Decoder) {
 		streamingDecoderPool.Put(d)
 	}
 }
+
+var stringsPools = &sync.Pool{New: func() any { return new(stringSlice) }}
+
+type stringSlice []string
+
+// getStrings returns a non-nil pointer to a slice with length n.
+func getStrings(n int) *stringSlice {
+	s := stringsPools.Get().(*stringSlice)
+	if cap(*s) < n {
+		*s = make([]string, n)
+	}
+	*s = (*s)[:n]
+	return s
+}
+
+func putStrings(s *stringSlice) {
+	if cap(*s) > 1<<10 {
+		*s = nil // avoid pinning arbitrarily large amounts of memory
+	}
+	stringsPools.Put(s)
+}
+
+// Sort sorts the string slice according to RFC 8785, section 3.2.3.
+func (ss *stringSlice) Sort() {
+	// TODO(https://go.dev/issue/47619): Use slices.SortFunc instead.
+	sort.Sort(ss)
+}
+
+func (ss *stringSlice) Len() int           { return len(*ss) }
+func (ss *stringSlice) Less(i, j int) bool { return lessUTF16((*ss)[i], (*ss)[j]) }
+func (ss *stringSlice) Swap(i, j int)      { (*ss)[i], (*ss)[j] = (*ss)[j], (*ss)[i] }

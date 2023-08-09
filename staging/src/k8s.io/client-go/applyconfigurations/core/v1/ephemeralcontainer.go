@@ -126,6 +126,27 @@ func (b *EphemeralContainerApplyConfiguration) WithResources(value *ResourceRequ
 	return b
 }
 
+// WithResizePolicy adds the given value to the ResizePolicy field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ResizePolicy field.
+func (b *EphemeralContainerApplyConfiguration) WithResizePolicy(values ...*ContainerResizePolicyApplyConfiguration) *EphemeralContainerApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithResizePolicy")
+		}
+		b.ResizePolicy = append(b.ResizePolicy, *values[i])
+	}
+	return b
+}
+
+// WithRestartPolicy sets the RestartPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RestartPolicy field is set to the value of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithRestartPolicy(value corev1.ContainerRestartPolicy) *EphemeralContainerApplyConfiguration {
+	b.RestartPolicy = &value
+	return b
+}
+
 // WithVolumeMounts adds the given value to the VolumeMounts field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeMounts field.

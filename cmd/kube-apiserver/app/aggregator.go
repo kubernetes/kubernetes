@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +37,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -48,16 +48,17 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/crdregistration"
 )
 
 func createAggregatorConfig(
 	kubeAPIServerConfig genericapiserver.Config,
-	commandOptions *options.ServerRunOptions,
+	commandOptions controlplaneapiserver.CompletedOptions,
 	externalInformers kubeexternalinformers.SharedInformerFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	proxyTransport *http.Transport,
+	peerProxy utilpeerproxy.Interface,
 	pluginInitializers []admission.PluginInitializer,
 ) (*aggregatorapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
@@ -75,6 +76,16 @@ func createAggregatorConfig(
 		// The handler will block write requests to built-in resources until the
 		// target resources' storage versions are up-to-date.
 		genericConfig.BuildHandlerChainFunc = genericapiserver.BuildHandlerChainWithStorageVersionPrecondition
+	}
+
+	if peerProxy != nil {
+		originalHandlerChainBuilder := genericConfig.BuildHandlerChainFunc
+		genericConfig.BuildHandlerChainFunc = func(apiHandler http.Handler, c *genericapiserver.Config) http.Handler {
+			// Add peer proxy handler to aggregator-apiserver.
+			// wrap the peer proxy handler first.
+			apiHandler = peerProxy.WrapHandler(apiHandler)
+			return originalHandlerChainBuilder(apiHandler, c)
+		}
 	}
 
 	// copy the etcd options so we don't mutate originals.
@@ -105,6 +116,8 @@ func createAggregatorConfig(
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
 			ProxyClientCertFile:       commandOptions.ProxyClientCertFile,
 			ProxyClientKeyFile:        commandOptions.ProxyClientKeyFile,
+			PeerCAFile:                commandOptions.PeerCAFile,
+			PeerAdvertiseAddress:      commandOptions.PeerAdvertiseAddress,
 			ServiceResolver:           serviceResolver,
 			ProxyTransport:            proxyTransport,
 			RejectForwardingRedirects: commandOptions.AggregatorRejectForwardingRedirects,
@@ -117,8 +130,8 @@ func createAggregatorConfig(
 	return aggregatorConfig, nil
 }
 
-func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, apiExtensionInformers apiextensionsinformers.SharedInformerFactory) (*aggregatorapiserver.APIAggregator, error) {
-	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer)
+func createAggregatorServer(aggregatorConfig aggregatorapiserver.CompletedConfig, delegateAPIServer genericapiserver.DelegationTarget, apiExtensionInformers apiextensionsinformers.SharedInformerFactory, crdAPIEnabled bool) (*aggregatorapiserver.APIAggregator, error) {
+	aggregatorServer, err := aggregatorConfig.NewWithDelegate(delegateAPIServer)
 	if err != nil {
 		return nil, err
 	}
@@ -147,8 +160,12 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
 			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.
 			// we only need to do this if CRDs are enabled on this server.  We can't use discovery because we are the source for discovery.
-			if aggregatorConfig.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions")) {
+			if crdAPIEnabled {
+				klog.Infof("waiting for initial CRD sync...")
 				crdRegistrationController.WaitForInitialSync()
+				klog.Infof("initial CRD sync complete...")
+			} else {
+				klog.Infof("CRD API not enabled, starting APIService registration without waiting for initial CRD sync")
 			}
 			autoRegistrationController.Run(5, context.StopCh)
 		}()
@@ -250,6 +267,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "events.k8s.io", Version: "v1"}:                      {group: 17750, version: 15},
 	{Group: "events.k8s.io", Version: "v1beta1"}:                 {group: 17750, version: 5},
 	{Group: "authentication.k8s.io", Version: "v1"}:              {group: 17700, version: 15},
+	{Group: "authentication.k8s.io", Version: "v1beta1"}:         {group: 17700, version: 9},
 	{Group: "authentication.k8s.io", Version: "v1alpha1"}:        {group: 17700, version: 1},
 	{Group: "authorization.k8s.io", Version: "v1"}:               {group: 17600, version: 15},
 	{Group: "autoscaling", Version: "v1"}:                        {group: 17500, version: 15},
@@ -260,6 +278,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "batch", Version: "v1beta1"}:                         {group: 17400, version: 9},
 	{Group: "batch", Version: "v2alpha1"}:                        {group: 17400, version: 9},
 	{Group: "certificates.k8s.io", Version: "v1"}:                {group: 17300, version: 15},
+	{Group: "certificates.k8s.io", Version: "v1alpha1"}:          {group: 17300, version: 1},
 	{Group: "networking.k8s.io", Version: "v1"}:                  {group: 17200, version: 15},
 	{Group: "networking.k8s.io", Version: "v1alpha1"}:            {group: 17200, version: 1},
 	{Group: "policy", Version: "v1"}:                             {group: 17100, version: 15},
@@ -270,6 +289,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "storage.k8s.io", Version: "v1alpha1"}:               {group: 16800, version: 1},
 	{Group: "apiextensions.k8s.io", Version: "v1"}:               {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1"}:       {group: 16700, version: 15},
+	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}:  {group: 16700, version: 12},
 	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
 	{Group: "scheduling.k8s.io", Version: "v1"}:                  {group: 16600, version: 15},
 	{Group: "coordination.k8s.io", Version: "v1"}:                {group: 16500, version: 15},
@@ -283,7 +303,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"}:  {group: 16100, version: 12},
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"}: {group: 16100, version: 9},
 	{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"}:    {group: 16000, version: 9},
-	{Group: "resource.k8s.io", Version: "v1alpha1"}:              {group: 15900, version: 9},
+	{Group: "resource.k8s.io", Version: "v1alpha2"}:              {group: 15900, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

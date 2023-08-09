@@ -58,6 +58,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
@@ -65,22 +66,19 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
-	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"k8s.io/kube-openapi/pkg/validation/strfmt"
-	"k8s.io/kube-openapi/pkg/validation/validate"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -108,7 +106,7 @@ type crdHandler struct {
 	// CRD establishing process for HA clusters.
 	masterCount int
 
-	converterFactory conversion.Factory
+	converterFactory *conversion.CRConverterFactory
 
 	// so that we can do create on update.
 	authorizer authorizer.Authorizer
@@ -122,7 +120,7 @@ type crdHandler struct {
 	// staticOpenAPISpec is used as a base for the schema of CR's for the
 	// purpose of managing fields, it is how CR handlers get the structure
 	// of TypeMeta and ObjectMeta
-	staticOpenAPISpec *spec.Swagger
+	staticOpenAPISpec map[string]*spec.Schema
 
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
@@ -171,18 +169,14 @@ func NewCustomResourceDefinitionHandler(
 	restOptionsGetter generic.RESTOptionsGetter,
 	admission admission.Interface,
 	establishingController *establish.EstablishingController,
-	converterFactory conversion.Factory,
+	serviceResolver webhook.ServiceResolver,
+	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
 	masterCount int,
 	authorizer authorizer.Authorizer,
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
-	staticOpenAPISpec *spec.Swagger,
+	staticOpenAPISpec map[string]*spec.Schema,
 	maxRequestBodyBytes int64) (*crdHandler, error) {
-
-	if converterFactory == nil {
-		return nil, fmt.Errorf("converterFactory is required")
-	}
-
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -192,7 +186,6 @@ func NewCustomResourceDefinitionHandler(
 		restOptionsGetter:       restOptionsGetter,
 		admission:               admission,
 		establishingController:  establishingController,
-		converterFactory:        converterFactory,
 		masterCount:             masterCount,
 		authorizer:              authorizer,
 		requestTimeout:          requestTimeout,
@@ -207,6 +200,11 @@ func NewCustomResourceDefinitionHandler(
 			ret.removeDeadStorage()
 		},
 	})
+	crConverterFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
+	if err != nil {
+		return nil, err
+	}
+	ret.converterFactory = crConverterFactory
 
 	ret.customStorage.Store(crdStorageMap{})
 
@@ -681,26 +679,21 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		openAPIModels = nil
 	}
 
-	var typeConverter fieldmanager.TypeConverter = fieldmanager.DeducedTypeConverter{}
-	if openAPIModels != nil {
-		typeConverter, err = fieldmanager.NewTypeConverter(openAPIModels, crd.Spec.PreserveUnknownFields)
+	var typeConverter managedfields.TypeConverter = managedfields.NewDeducedTypeConverter()
+	if len(openAPIModels) > 0 {
+		typeConverter, err = managedfields.NewTypeConverter(openAPIModels, crd.Spec.PreserveUnknownFields)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	converter, err := r.converterFactory.NewConverter(crd)
-	if err != nil {
-		return nil, fmt.Errorf("error creating converter for %s: %w", crd.Name, err)
-	}
-
-	safeConverter, unsafeConverter, err := conversion.NewDelegatingConverter(crd, converter)
+	safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create replicasPathInCustomResource
-	replicasPathInCustomResource := fieldmanager.ResourcePathMappings{}
+	replicasPathInCustomResource := managedfields.ResourcePathMappings{}
 	for _, v := range crd.Spec.Versions {
 		subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, v.Name)
 		if err != nil {
@@ -732,6 +725,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
 		resource := schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Plural}
+		singularResource := schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Singular}
 		kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.Kind}
 		equivalentResourceRegistry.RegisterKindFor(resource, "", kind)
 
@@ -743,20 +737,22 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR schema")
 		}
+		var internalSchemaProps *apiextensionsinternal.JSONSchemaProps
 		var internalValidationSchema *apiextensionsinternal.CustomResourceValidation
 		if validationSchema != nil {
 			internalValidationSchema = &apiextensionsinternal.CustomResourceValidation{}
 			if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(validationSchema, internalValidationSchema, nil); err != nil {
 				return nil, fmt.Errorf("failed to convert CRD validation to internal version: %v", err)
 			}
+			internalSchemaProps = internalValidationSchema.OpenAPIV3Schema
 		}
-		validator, _, err := apiservervalidation.NewSchemaValidator(internalValidationSchema)
+		validator, _, err := apiservervalidation.NewSchemaValidator(internalSchemaProps)
 		if err != nil {
 			return nil, err
 		}
 
 		var statusSpec *apiextensionsinternal.CustomResourceSubresourceStatus
-		var statusValidator *validate.SchemaValidator
+		var statusValidator apiservervalidation.SchemaValidator
 		subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, v.Name)
 		if err != nil {
 			utilruntime.HandleError(err)
@@ -771,11 +767,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			// for the status subresource, validate only against the status schema
 			if internalValidationSchema != nil && internalValidationSchema.OpenAPIV3Schema != nil && internalValidationSchema.OpenAPIV3Schema.Properties != nil {
 				if statusSchema, ok := internalValidationSchema.OpenAPIV3Schema.Properties["status"]; ok {
-					openapiSchema := &spec.Schema{}
-					if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(&statusSchema, openapiSchema, apiservervalidation.StripUnsupportedFormatsPostProcess); err != nil {
+					statusValidator, _, err = apiservervalidation.NewSchemaValidator(&statusSchema)
+					if err != nil {
 						return nil, err
 					}
-					statusValidator = validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)
 				}
 			}
 		}
@@ -801,6 +796,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		storages[v.Name] = customresource.NewStorage(
 			resource.GroupResource(),
+			singularResource.GroupResource(),
 			kind,
 			schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.ListKind},
 			customresource.NewStrategy(
@@ -980,8 +976,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	return ret, nil
 }
 
-func scopeWithFieldManager(typeConverter fieldmanager.TypeConverter, reqScope handlers.RequestScope, resetFields map[fieldpath.APIVersion]*fieldpath.Set, subresource string) (handlers.RequestScope, error) {
-	fieldManager, err := fieldmanager.NewDefaultCRDFieldManager(
+func scopeWithFieldManager(typeConverter managedfields.TypeConverter, reqScope handlers.RequestScope, resetFields map[fieldpath.APIVersion]*fieldpath.Set, subresource string) (handlers.RequestScope, error) {
+	fieldManager, err := managedfields.NewDefaultCRDFieldManager(
 		typeConverter,
 		reqScope.Convertor,
 		reqScope.Defaulter,
@@ -1369,29 +1365,39 @@ func hasServedCRDVersion(spec *apiextensionsv1.CustomResourceDefinitionSpec, ver
 // buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
 // and merges it with the models defined in the static OpenAPI spec.
 // Returns nil models ifthe static spec is nil, or an error is encountered.
-func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensionsv1.CustomResourceDefinition) (proto.Models, error) {
+func buildOpenAPIModelsForApply(staticOpenAPISpec map[string]*spec.Schema, crd *apiextensionsv1.CustomResourceDefinition) (map[string]*spec.Schema, error) {
 	if staticOpenAPISpec == nil {
 		return nil, nil
 	}
 
-	specs := []*spec.Swagger{}
+	// Convert static spec to V3 format to be able to merge
+	staticSpecV3 := &spec3.OpenAPI{
+		Version: "3.0.0",
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Kubernetes CRD Swagger",
+				Version: "v0.1.0",
+			},
+		},
+		Components: &spec3.Components{
+			Schemas: staticOpenAPISpec,
+		},
+	}
+
+	specs := []*spec3.OpenAPI{staticSpecV3}
 	for _, v := range crd.Spec.Versions {
 		// Defaults are not pruned here, but before being served.
 		// See flag description in builder.go for flag usage
-		s, err := builder.BuildOpenAPIV2(crd, v.Name, builder.Options{V2: true, SkipFilterSchemaForKubectlOpenAPIV2Validation: true, StripValueValidation: true, StripNullable: true, AllowNonStructural: false})
+		s, err := builder.BuildOpenAPIV3(crd, v.Name, builder.Options{})
 		if err != nil {
 			return nil, err
 		}
 		specs = append(specs, s)
 	}
 
-	mergedOpenAPI, err := builder.MergeSpecs(staticOpenAPISpec, specs...)
+	mergedOpenAPI, err := builder.MergeSpecsV3(specs...)
 	if err != nil {
 		return nil, err
 	}
-	models, err := utilopenapi.ToProtoModels(mergedOpenAPI)
-	if err != nil {
-		return nil, err
-	}
-	return models, nil
+	return mergedOpenAPI.Components.Schemas, nil
 }

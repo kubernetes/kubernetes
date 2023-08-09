@@ -22,12 +22,12 @@ import (
 	"io"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveradmission "k8s.io/apiserver/pkg/admission/initializer"
@@ -288,11 +288,37 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !labels.Equals(oldPod.Labels, newPod.Labels) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update labels through pod status", nodeName))
 		}
+		if !resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, newPod.Status.ResourceClaimStatuses) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update resource claim statues", nodeName))
+		}
 		return nil
 
 	default:
 		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q", a.GetOperation()))
 	}
+}
+
+func resourceClaimStatusesEqual(statusA, statusB []api.PodResourceClaimStatus) bool {
+	if len(statusA) != len(statusB) {
+		return false
+	}
+	// In most cases, status entries only get added once and not modified.
+	// But this cannot be guaranteed, so for the sake of correctness in all
+	// cases this code here has to check.
+	for i := range statusA {
+		if statusA[i].Name != statusB[i].Name {
+			return false
+		}
+		claimNameA := statusA[i].ResourceClaimName
+		claimNameB := statusB[i].ResourceClaimName
+		if (claimNameA == nil) != (claimNameB == nil) {
+			return false
+		}
+		if claimNameA != nil && *claimNameA != *claimNameB {
+			return false
+		}
+	}
+	return true
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.
@@ -360,8 +386,8 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 		newPVC.Status.Conditions = nil
 
 		if p.expansionRecoveryEnabled {
-			oldPVC.Status.ResizeStatus = nil
-			newPVC.Status.ResizeStatus = nil
+			oldPVC.Status.AllocatedResourceStatuses = nil
+			newPVC.Status.AllocatedResourceStatuses = nil
 
 			oldPVC.Status.AllocatedResources = nil
 			newPVC.Status.AllocatedResources = nil
@@ -375,7 +401,7 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 
 		// ensure no metadata changed. nodes should not be able to relabel, add finalizers/owners, etc
 		if !apiequality.Semantic.DeepEqual(oldPVC, newPVC) {
-			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update fields other than status.capacity and status.conditions: %v", nodeName, diff.ObjectReflectDiff(oldPVC, newPVC)))
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update fields other than status.capacity and status.conditions: %v", nodeName, cmp.Diff(oldPVC, newPVC)))
 		}
 
 		return nil

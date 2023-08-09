@@ -82,7 +82,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 	})
 
 	f = framework.NewDefaultFramework("controllerrevisions")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	image := WebserverImage
 	dsName := "e2e-" + utilrand.String(5) + "-daemon-set"

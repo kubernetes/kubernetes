@@ -21,20 +21,24 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // matchPodFailurePolicy returns information about matching a given failed pod
 // against the pod failure policy rules. The information is represented as an
-// optional job failure message (present in case the pod matched a 'FailJob'
-// rule), a boolean indicating if the failure should be counted towards
-// backoffLimit (it should not be counted if the pod matched an 'Ignore' rule),
-// and a pointer to the matched pod failure policy action.
+//   - optional job failure message (present in case the pod matched a 'FailJob' rule),
+//   - a boolean indicating if the failure should be counted towards backoffLimit
+//     (and backoffLimitPerIndex if specified). It should not be counted
+//     if the pod matched an 'Ignore' rule,
+//   - a pointer to the matched pod failure policy action.
 func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *v1.Pod) (*string, bool, *batch.PodFailurePolicyAction) {
 	if podFailurePolicy == nil {
 		return nil, true, nil
 	}
 	ignore := batch.PodFailurePolicyActionIgnore
 	failJob := batch.PodFailurePolicyActionFailJob
+	failIndex := batch.PodFailurePolicyActionFailIndex
 	count := batch.PodFailurePolicyActionCount
 	for index, podFailurePolicyRule := range podFailurePolicy.Rules {
 		if podFailurePolicyRule.OnExitCodes != nil {
@@ -42,6 +46,10 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				switch podFailurePolicyRule.Action {
 				case batch.PodFailurePolicyActionIgnore:
 					return nil, false, &ignore
+				case batch.PodFailurePolicyActionFailIndex:
+					if feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+						return nil, true, &failIndex
+					}
 				case batch.PodFailurePolicyActionCount:
 					return nil, true, &count
 				case batch.PodFailurePolicyActionFailJob:
@@ -55,6 +63,10 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				switch podFailurePolicyRule.Action {
 				case batch.PodFailurePolicyActionIgnore:
 					return nil, false, &ignore
+				case batch.PodFailurePolicyActionFailIndex:
+					if feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+						return nil, true, &failIndex
+					}
 				case batch.PodFailurePolicyActionCount:
 					return nil, true, &count
 				case batch.PodFailurePolicyActionFailJob:

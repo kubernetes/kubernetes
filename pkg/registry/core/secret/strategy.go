@@ -18,6 +18,7 @@ package secret
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -61,7 +62,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return warningsForSecret(obj.(*api.Secret))
+}
 
 func (strategy) Canonicalize(obj runtime.Object) {
 }
@@ -88,7 +91,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 
 // WarningsOnUpdate returns warnings for the given update.
 func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	return warningsForSecret(obj.(*api.Secret))
 }
 
 func dropDisabledFields(secret *api.Secret, oldSecret *api.Secret) {
@@ -110,16 +113,10 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 // Matcher returns a selection predicate for a given label and field selector.
 func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
 	return pkgstorage.SelectionPredicate{
-		Label:       label,
-		Field:       field,
-		GetAttrs:    GetAttrs,
-		IndexFields: []string{"metadata.name"},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
-}
-
-// NameTriggerFunc returns value metadata.namespace of given object.
-func NameTriggerFunc(obj runtime.Object) string {
-	return obj.(*api.Secret).ObjectMeta.Name
 }
 
 // SelectableFields returns a field set that can be used for filter selection
@@ -129,4 +126,16 @@ func SelectableFields(obj *api.Secret) fields.Set {
 		"type": string(obj.Type),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, secretSpecificFieldsSet)
+}
+
+func warningsForSecret(secret *api.Secret) []string {
+	var warnings []string
+	if secret.Type == api.SecretTypeTLS {
+		// Verify that the key matches the cert.
+		_, err := tls.X509KeyPair(secret.Data[api.TLSCertKey], secret.Data[api.TLSPrivateKeyKey])
+		if err != nil {
+			warnings = append(warnings, err.Error())
+		}
+	}
+	return warnings
 }

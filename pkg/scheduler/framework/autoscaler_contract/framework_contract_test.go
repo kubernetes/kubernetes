@@ -26,13 +26,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
 type frameworkContract interface {
 	RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status)
-	RunFilterPlugins(context.Context, *framework.CycleState, *v1.Pod, *framework.NodeInfo) framework.PluginToStatus
+	RunFilterPlugins(context.Context, *framework.CycleState, *v1.Pod, *framework.NodeInfo) *framework.Status
 }
 
 func TestFrameworkContract(t *testing.T) {
@@ -42,8 +43,9 @@ func TestFrameworkContract(t *testing.T) {
 }
 
 func TestNewFramework(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	var f interface{}
-	if f, _ = runtime.NewFramework(nil, nil, nil); f != nil {
+	if f, _ = runtime.NewFramework(ctx, nil, nil); f != nil {
 		_, ok := f.(framework.Framework)
 		assert.True(t, ok)
 	}

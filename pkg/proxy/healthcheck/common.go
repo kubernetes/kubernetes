@@ -39,6 +39,7 @@ type httpServerFactory interface {
 // It is designed so that http.Server satisfies this interface,
 type httpServer interface {
 	Serve(listener net.Listener) error
+	Close() error
 }
 
 // Implement listener in terms of net.Listen.

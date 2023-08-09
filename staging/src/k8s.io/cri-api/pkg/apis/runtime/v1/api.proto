@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// To regenerate api.pb.go run hack/update-generated-runtime.sh
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
 syntax = "proto3";
 
 package runtime.v1;
@@ -131,6 +131,15 @@ service RuntimeService {
 
     // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
     rpc ListPodSandboxMetrics(ListPodSandboxMetricsRequest) returns (ListPodSandboxMetricsResponse) {}
+
+    // RuntimeConfig returns configuration information of the runtime.
+    // A couple of notes:
+    // - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
+    //   The former is for having runtime tell Kubelet what to do, the latter vice versa.
+    // - It is the expectation of the Kubelet that these fields are static for the lifecycle of the Kubelet.
+    //   The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
+    //   avoid updating them without a full node reboot.
+    rpc RuntimeConfig(RuntimeConfigRequest) returns (RuntimeConfigResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -199,7 +208,7 @@ message PortMapping {
 }
 
 enum MountPropagation {
-    // No mount propagation ("private" in Linux terminology).
+    // No mount propagation ("rprivate" in Linux terminology).
     PROPAGATION_PRIVATE = 0;
     // Mounts get propagated from the host to the container ("rslave" in Linux).
     PROPAGATION_HOST_TO_CONTAINER = 1;
@@ -222,6 +231,10 @@ message Mount {
     bool selinux_relabel = 4;
     // Requested propagation mode.
     MountPropagation propagation = 5;
+    // UidMappings specifies the runtime UID mappings for the mount.
+    repeated IDMapping uidMappings = 6;
+    // GidMappings specifies the runtime GID mappings for the mount.
+    repeated IDMapping gidMappings = 7;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -324,10 +337,10 @@ message LinuxSandboxSecurityContext {
     // If set, the root filesystem of the sandbox is read-only.
     bool readonly_rootfs = 4;
     // List of groups applied to the first process run in the sandbox, in
-    // addition to the sandbox's primary GID, and group memberships defined 
+    // addition to the sandbox's primary GID, and group memberships defined
     // in the container image for the sandbox's primary UID of the container process.
     // If the list is empty, no additional groups are added to any container.
-    // Note that group memberships defined in the container image for the sandbox's primary UID 
+    // Note that group memberships defined in the container image for the sandbox's primary UID
     // of the container process are still effective, even if they are not included in this list.
     repeated int64 supplemental_groups = 5;
     // Indicates whether the sandbox will be asked to run a privileged
@@ -420,7 +433,7 @@ message PodSandboxConfig {
     // containers. For example, the files might be newline separated JSON
     // structured logs, systemd-journald journal files, gRPC trace files, etc.
     // E.g.,
-    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
     //     ContainerConfig.LogPath = `containerName/Instance#.log`
     string log_directory = 3;
     // DNS config for the sandbox.
@@ -766,6 +779,9 @@ message ImageSpec {
     // ImageSpec Annotations can be used to help the runtime target specific
     // images in multi-arch images.
     map<string, string> annotations = 2;
+    // The container image reference specified by the user (e.g. image[:tag] or digest).
+    // Only set if available within the RPC context.
+    string user_specified_image = 18;
 }
 
 message KeyValue {
@@ -877,10 +893,10 @@ message LinuxContainerSecurityContext {
     // If set, the root filesystem of the container is read-only.
     bool readonly_rootfs = 7;
     // List of groups applied to the first process run in the container, in
-    // addition to the container's primary GID, and group memberships defined 
+    // addition to the container's primary GID, and group memberships defined
     // in the container image for the container's primary UID of the container process.
     // If the list is empty, no additional groups are added to any container.
-    // Note that group memberships defined in the container image for the container's primary UID 
+    // Note that group memberships defined in the container image for the container's primary UID
     // of the container process are still effective, even if they are not included in this list.
     repeated int64 supplemental_groups = 8;
     // no_new_privs defines if the flag for no_new_privs should be set on the
@@ -1017,6 +1033,15 @@ message Device {
     string permissions = 3;
 }
 
+// CDIDevice specifies a CDI device information.
+message CDIDevice {
+    // Fully qualified CDI device name
+    // for example: vendor.com/gpu=gpudevice1
+    // see more details in the CDI specification:
+    // https://github.com/container-orchestrated-devices/container-device-interface/blob/main/SPEC.md
+    string name = 1;
+}
+
 // ContainerConfig holds all the required and optional fields for creating a
 // container.
 message ContainerConfig {
@@ -1060,13 +1085,8 @@ message ContainerConfig {
     // Path relative to PodSandboxConfig.LogDirectory for container to store
     // the log (STDOUT and STDERR) on the host.
     // E.g.,
-    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
     //     ContainerConfig.LogPath = `containerName/Instance#.log`
-    //
-    // WARNING: Log management and how kubelet should interface with the
-    // container logs are under active discussion in
-    // https://issues.k8s.io/24677. There *may* be future change of direction
-    // for logging as the discussion carries on.
     string log_path = 11;
 
     // Variables for interactive containers, these have very specialized
@@ -1079,6 +1099,9 @@ message ContainerConfig {
     LinuxContainerConfig linux = 15;
     // Configuration specific to Windows containers.
     WindowsContainerConfig windows = 16;
+
+    // CDI devices for the container.
+    repeated CDIDevice CDI_devices = 17;
 }
 
 message CreateContainerRequest {
@@ -1216,6 +1239,7 @@ message ContainerStatus {
     // image ID
     string image_ref = 9;
     // Brief CamelCase string explaining why container is in its current state.
+    // Must be set to "OOMKilled" for containers terminated by cgroup-based Out-of-Memory killer.
     string reason = 10;
     // Human-readable message indicating details about why container is in its
     // current state.
@@ -1279,8 +1303,16 @@ message ExecSyncRequest {
 
 message ExecSyncResponse {
     // Captured command stdout output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stdout of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stdout = 1;
     // Captured command stderr output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stderr of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stderr = 2;
     // Exit code the command finished with. Default: 0 (success).
     int32 exit_code = 3;
@@ -1607,9 +1639,11 @@ message ContainerStats {
     MemoryUsage memory = 3;
     // Usage of the writable layer.
     FilesystemUsage writable_layer = 4;
+    // Swap usage gathered from the container.
+    SwapUsage swap = 5;
 }
 
-// WindowsContainerStats provides the resource usage statistics for a container specific for Windows 
+// WindowsContainerStats provides the resource usage statistics for a container specific for Windows
 message WindowsContainerStats {
     // Information of the container.
     ContainerAttributes attributes = 1;
@@ -1661,16 +1695,27 @@ message MemoryUsage {
     UInt64Value major_page_faults = 7;
 }
 
+message SwapUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Available swap for use. This is defined as the swap limit - swapUsageBytes.
+    UInt64Value swap_available_bytes = 2;
+    // Total memory in use. This includes all memory regardless of when it was accessed.
+    UInt64Value swap_usage_bytes = 3;
+}
+
 // WindowsMemoryUsage provides the memory usage information specific to Windows
 message WindowsMemoryUsage {
     // Timestamp in nanoseconds at which the information were collected. Must be > 0.
     int64 timestamp = 1;
     // The amount of working set memory in bytes.
     UInt64Value working_set_bytes = 2;
-    // Available memory for use. This is defined as the memory limit - workingSetBytes.
+    // Available memory for use. This is defined as the memory limit - commit_memory_bytes.
     UInt64Value available_bytes = 3;
     // Cumulative number of page faults.
     UInt64Value page_faults = 4;
+    // Total commit memory in use. Commit memory is total of physical and virtual memory in use.
+    UInt64Value commit_memory_bytes = 5;
 }
 
 message ReopenContainerLogRequest {
@@ -1745,7 +1790,7 @@ message MetricDescriptor {
     repeated string label_keys = 3;
 }
 
-message ListPodSandboxMetricsRequest {} 
+message ListPodSandboxMetricsRequest {}
 
 message ListPodSandboxMetricsResponse {
     repeated PodSandboxMetrics pod_metrics = 1;
@@ -1781,3 +1826,29 @@ enum MetricType {
     COUNTER = 0;
     GAUGE = 1;
 }
+
+message RuntimeConfigRequest {}
+
+message RuntimeConfigResponse {
+    // Configuration information for Linux-based runtimes. This field contains
+    // global runtime configuration options that are not specific to runtime
+    // handlers.
+    LinuxRuntimeConfiguration linux = 1;
+}
+
+message LinuxRuntimeConfiguration {
+    // Cgroup driver to use
+    // Note: this field should not change for the lifecycle of the Kubelet,
+    // or while there are running containers.
+    // The Kubelet will not re-request this after startup, and will construct the cgroup
+    // hierarchy assuming it is static.
+    // If the runtime wishes to change this value, it must be accompanied by removal of
+    // all pods, and a restart of the Kubelet. The easiest way to do this is with a full node reboot.
+    CgroupDriver cgroup_driver = 1;
+}
+
+enum CgroupDriver {
+    SYSTEMD = 0;
+    CGROUPFS = 1;
+}
+

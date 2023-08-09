@@ -31,6 +31,13 @@ func TestFromInt(t *testing.T) {
 	}
 }
 
+func TestFromInt32(t *testing.T) {
+	i := FromInt32(93)
+	if i.Type != Int || i.IntVal != 93 {
+		t.Errorf("Expected IntVal=93, got %+v", i)
+	}
+}
+
 func TestFromString(t *testing.T) {
 	i := FromString("76")
 	if i.Type != String || i.StrVal != "76" {
@@ -47,7 +54,7 @@ func TestIntOrStringUnmarshalJSON(t *testing.T) {
 		input  string
 		result IntOrString
 	}{
-		{"{\"val\": 123}", FromInt(123)},
+		{"{\"val\": 123}", FromInt32(123)},
 		{"{\"val\": \"123\"}", FromString("123")},
 	}
 
@@ -67,7 +74,7 @@ func TestIntOrStringMarshalJSON(t *testing.T) {
 		input  IntOrString
 		result string
 	}{
-		{FromInt(123), "{\"val\":123}"},
+		{FromInt32(123), "{\"val\":123}"},
 		{FromString("123"), "{\"val\":\"123\"}"},
 	}
 
@@ -87,7 +94,7 @@ func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
 	cases := []struct {
 		input IntOrString
 	}{
-		{FromInt(123)},
+		{FromInt32(123)},
 		{FromString("123")},
 	}
 
@@ -118,7 +125,7 @@ func TestGetIntFromIntOrString(t *testing.T) {
 		expectPerc bool
 	}{
 		{
-			input:      FromInt(200),
+			input:      FromInt32(200),
 			expectErr:  false,
 			expectVal:  200,
 			expectPerc: false,
@@ -191,7 +198,7 @@ func TestGetIntFromIntOrPercent(t *testing.T) {
 		expectVal int
 	}{
 		{
-			input:     FromInt(123),
+			input:     FromInt32(123),
 			expectErr: false,
 			expectVal: 123,
 		},

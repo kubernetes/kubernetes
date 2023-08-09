@@ -67,7 +67,7 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should support pod.Spec.SecurityContext.SupplementalGroups [LinuxOnly]", func(ctx context.Context) {
 		pod := scTestPod(false, false)
@@ -83,7 +83,6 @@ var _ = SIGDescribe("Security Context", func() {
 			gidDefinedInImage := int64(50000)
 			supplementalGroup := int64(60000)
 			agnhost := imageutils.GetConfig(imageutils.Agnhost)
-			(&agnhost).SetVersion("2.43")
 			pod := scTestPod(false, false)
 			pod.Spec.Containers[0].Image = agnhost.GetE2EImage()
 			pod.Spec.Containers[0].Command = []string{"id", "-G"}

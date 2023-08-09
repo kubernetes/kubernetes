@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -86,19 +86,19 @@ func TestDropConditions(t *testing.T) {
 
 				// old pvc should never be changed
 				if !reflect.DeepEqual(oldPvc, oldPvcInfo.pvc()) {
-					t.Errorf("old pvc changed: %v", diff.ObjectReflectDiff(oldPvc, oldPvcInfo.pvc()))
+					t.Errorf("old pvc changed: %v", cmp.Diff(oldPvc, oldPvcInfo.pvc()))
 				}
 
 				switch {
 				case oldPvcHasConditins || newPvcHasConditions:
 					// new pvc should not be changed if the feature is enabled, or if the old pvc had Conditions
 					if !reflect.DeepEqual(newPvc, newPvcInfo.pvc()) {
-						t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newPvc, newPvcInfo.pvc()))
+						t.Errorf("new pvc changed: %v", cmp.Diff(newPvc, newPvcInfo.pvc()))
 					}
 				default:
 					// new pvc should not need to be changed
 					if !reflect.DeepEqual(newPvc, newPvcInfo.pvc()) {
-						t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newPvc, newPvcInfo.pvc()))
+						t.Errorf("new pvc changed: %v", cmp.Diff(newPvc, newPvcInfo.pvc()))
 					}
 				}
 			})

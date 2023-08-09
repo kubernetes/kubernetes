@@ -20,11 +20,8 @@ import (
 	"sync"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
-
-// AutoWatchID is the watcher ID passed in WatchStream.Watch when no
-// user-provided ID is available. If pass, an ID will automatically be assigned.
-const AutoWatchID WatchID = 0
 
 var (
 	ErrWatcherNotExist    = errors.New("mvcc: watcher does not exist")
@@ -60,6 +57,13 @@ type WatchStream interface {
 	// The responses contains no events. The revision in the response is the progress
 	// of the watchers since the watcher is currently synced.
 	RequestProgress(id WatchID)
+
+	// RequestProgressAll requests a progress notification for all
+	// watchers sharing the stream.  If all watchers are synced, a
+	// progress notification with watch ID -1 will be sent to an
+	// arbitrary watcher of this stream, and the function returns
+	// true.
+	RequestProgressAll() bool
 
 	// Cancel cancels a watcher by giving its ID. If watcher does not exist, an error will be
 	// returned.
@@ -118,7 +122,7 @@ func (ws *watchStream) Watch(id WatchID, key, end []byte, startRev int64, fcs ..
 		return -1, ErrEmptyWatcherRange
 	}
 
-	if id == AutoWatchID {
+	if id == clientv3.AutoWatchID {
 		for ws.watchers[ws.nextID] != nil {
 			ws.nextID++
 		}
@@ -190,4 +194,10 @@ func (ws *watchStream) RequestProgress(id WatchID) {
 		return
 	}
 	ws.watchable.progress(w)
+}
+
+func (ws *watchStream) RequestProgressAll() bool {
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	return ws.watchable.progressAll(ws.watchers)
 }

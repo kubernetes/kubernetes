@@ -34,7 +34,10 @@ type QueueSetFactory interface {
 	// BeginConstruction does the first phase of creating a QueueSet.
 	// The RatioedGaugePair observes number of requests,
 	// execution covering just the regular phase.
+	// The denominator for the waiting phase is
+	// max(1, QueuingConfig.QueueLengthLimit) X max(1, QueuingConfig.DesiredNumQueues).
 	// The RatioedGauge observes number of seats occupied through all phases of execution.
+	// The denominator for all the ratioed concurrency gauges is supplied later in the DispatchingConfig.
 	// The Gauge observes the seat demand (executing + queued seats).
 	BeginConstruction(QueuingConfig, metrics.RatioedGaugePair, metrics.RatioedGauge, metrics.Gauge) (QueueSetCompleter, error)
 }
@@ -113,8 +116,11 @@ type QueuingConfig struct {
 	Name string
 
 	// DesiredNumQueues is the number of queues that the API says
-	// should exist now.  This may be zero, in which case
+	// should exist now.  This may be non-positive, in which case
 	// QueueLengthLimit, HandSize, and RequestWaitLimit are ignored.
+	// A value of zero means to respect the ConcurrencyLimit of the DispatchingConfig.
+	// A negative value means to always dispatch immediately upon arrival
+	// (i.e., the requests are "exempt" from limitation).
 	DesiredNumQueues int
 
 	// QueueLengthLimit is the maximum number of requests that may be waiting in a given queue at a time
@@ -133,4 +139,8 @@ type QueuingConfig struct {
 type DispatchingConfig struct {
 	// ConcurrencyLimit is the maximum number of requests of this QueueSet that may be executing at a time
 	ConcurrencyLimit int
+
+	// ConcurrencyDenominator is used in relative metrics of concurrency.
+	// It equals ConcurrencyLimit except when that is zero.
+	ConcurrencyDenominator int
 }

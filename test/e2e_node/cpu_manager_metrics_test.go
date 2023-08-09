@@ -31,17 +31,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/cpuset"
 )
 
 var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpumanager-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("when querying /metrics", func() {
 		var oldCfg *kubeletconfig.KubeletConfiguration
@@ -79,7 +79,7 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			newCfg := configureCPUManagerInKubelet(oldCfg,
 				&cpuManagerKubeletArguments{
 					policyName:              string(cpumanager.PolicyStatic),
-					reservedSystemCPUs:      cpuset.NewCPUSet(0),
+					reservedSystemCPUs:      cpuset.New(0),
 					enableCPUManagerOptions: true,
 					options:                 cpuPolicyOptions,
 				},
@@ -109,9 +109,9 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 
 		ginkgo.It("should report pinning failures when the cpumanager allocation is known to fail", func(ctx context.Context) {
@@ -132,9 +132,9 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 
 		ginkgo.It("should not report any pinning failures when the cpumanager allocation is expected to succeed", func(ctx context.Context) {
@@ -155,17 +155,16 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 	})
 })
 
-func getCPUManagerMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
-	// we are running out of good names, so we need to be unnecessarily specific to avoid clashes
-	ginkgo.By("getting CPU Manager metrics from the metrics API")
-	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, framework.TestContext.NodeName+":10255", "/metrics")
+func getKubeletMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
+	ginkgo.By("getting Kubelet metrics from the metrics API")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, nodeNameOrIP()+":10255", "/metrics")
 }
 
 func makeGuaranteedCPUExclusiveSleeperPod(name string, cpus int) *v1.Pod {
@@ -202,5 +201,6 @@ func timelessSample(value interface{}) types.GomegaMatcher {
 		"Metric":    gstruct.Ignore(),
 		"Value":     gomega.BeNumerically("==", value),
 		"Timestamp": gstruct.Ignore(),
+		"Histogram": gstruct.Ignore(),
 	}))
 }

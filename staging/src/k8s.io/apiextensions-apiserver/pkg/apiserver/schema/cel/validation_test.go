@@ -18,18 +18,21 @@ package cel
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"math"
 	"strings"
 	"testing"
 	"time"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
@@ -37,6 +40,7 @@ func TestValidationExpressions(t *testing.T) {
 	tests := []struct {
 		name          string
 		schema        *schema.Structural
+		oldSchema     *schema.Structural
 		obj           interface{}
 		oldObj        interface{}
 		valid         []string
@@ -170,6 +174,60 @@ func TestValidationExpressions(t *testing.T) {
 				"double(self.val1) < 10.0",
 				"double(self.val2) == 10.0",
 				"double(self.val3) > 10.0",
+
+				// Cross Type Numeric Comparisons: integers with all float types
+				"self.val1 < self.val4",
+				"self.val1 <= self.val4",
+				"self.val2 <= self.val4",
+				"self.val2 >= self.val4",
+				"self.val3 > self.val4",
+				"self.val3 >= self.val4",
+
+				"self.val1 < self.val4",
+				"self.val3 > self.val4",
+
+				"self.val1 < self.val5",
+				"self.val3 > self.val5",
+
+				"self.val1 < self.val5",
+				"self.val3 > self.val5",
+
+				"self.val1 < self.val6",
+				"self.val3 > self.val6",
+
+				"self.val1 < self.val6",
+				"self.val3 > self.val6",
+
+				// Cross Type Numeric Comparisons: float types backed by integer values,
+				// which is how integer literals are parsed from JSON for custom resources.
+				"self.val1 < self.val7",
+				"self.val3 > self.val7",
+
+				"self.val1 < int(self.val7)",
+				"self.val3 > int(self.val7)",
+
+				"self.val1 < self.val8",
+				"self.val3 > self.val8",
+
+				"self.val1 < self.val8",
+				"self.val3 > self.val8",
+
+				"self.val1 < self.val9",
+				"self.val3 > self.val9",
+
+				"self.val1 < self.val9",
+				"self.val3 > self.val9",
+
+				// Cross Type Numeric Comparisons: literal integers and floats
+				"5 < 10.0",
+				"15 > 10.0",
+
+				"5 < 10.0",
+				"15 > 10.0",
+
+				// Cross Type Numeric Comparisons: integers with literal floats
+				"self.val1 < 10.0",
+				"self.val3 > 10.0",
 			},
 		},
 		{name: "unicode strings",
@@ -205,6 +263,9 @@ func TestValidationExpressions(t *testing.T) {
 			errors: map[string]string{
 				// Invalid regex with a string constant regex pattern is compile time error
 				"self.val1.matches(')')": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				// strings version 0 does not have format or join
+				// TODO: Replace this error test with valid tests when the string version is bumped.
+				"'%s %i'.format('a', 1) == 'a 1'": "undeclared reference to 'format'",
 			},
 		},
 		{name: "escaped strings",
@@ -335,6 +396,21 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1 + self.val2 == [1, 2, 3, 1, 2, 3]",
 				"self.val1 + [4, 5] == [1, 2, 3, 4, 5]",
 			},
+			errors: map[string]string{
+				// Mixed type lists are not allowed since we have HomogeneousAggregateLiterals enabled
+				"[1, 'a', false].filter(x, string(x) == 'a')": "expected type 'int' but found 'string'",
+			},
+		},
+		{name: "string lists",
+			obj:    objs([]interface{}{"a", "b", "c"}),
+			schema: schemas(listType(&stringType)),
+			valid: []string{
+				// Join function
+				"self.val1.join('-') == 'a-b-c'",
+				"['a', 'b', 'c'].join('-') == 'a-b-c'",
+				"self.val1.join() == 'abc'",
+				"['a', 'b', 'c'].join() == 'abc'",
+			},
 		},
 		{name: "listSets",
 			obj:    objs([]interface{}{"a", "b", "c"}, []interface{}{"a", "c", "b"}),
@@ -348,6 +424,12 @@ func TestValidationExpressions(t *testing.T) {
 				"!('x' in self.val1)",
 				"self.val1 + self.val2 == ['a', 'b', 'c']",
 				"self.val1 + ['c', 'd'] == ['a', 'b', 'c', 'd']",
+
+				// Join function
+				"self.val1.join('-') == 'a-b-c'",
+				"['a', 'b', 'c'].join('-') == 'a-b-c'",
+				"self.val1.join() == 'abc'",
+				"['a', 'b', 'c'].join() == 'abc'",
 			},
 		},
 		{name: "listMaps",
@@ -399,6 +481,10 @@ func TestValidationExpressions(t *testing.T) {
 				"'k1' in self.val1",
 				"!('k3' in self.val1)",
 				"self.val1 == {'k1': 'a', 'k2': 'b'}",
+			},
+			errors: map[string]string{
+				// Mixed type maps are not allowed since we have HomogeneousAggregateLiterals enabled
+				"{'k1': 'a', 'k2': 1, 'k2': false}": "expected type 'string' but found 'int'",
 			},
 		},
 		{name: "objects",
@@ -1751,6 +1837,96 @@ func TestValidationExpressions(t *testing.T) {
 				"oldSelf == self",
 			},
 		},
+		{name: "authorizer is not supported for CRD Validation Rules",
+			obj:    []interface{}{},
+			oldObj: []interface{}{},
+			schema: objectTypePtr(map[string]schema.Structural{}),
+			errors: map[string]string{
+				"authorizer.path('/healthz').check('get').allowed()": "undeclared reference to 'authorizer'",
+			},
+		},
+		{name: "optionals", // https://github.com/google/cel-spec/wiki/proposal-246
+			obj: map[string]interface{}{
+				"presentObj": map[string]interface{}{
+					"presentStr": "value",
+				},
+				"m": map[string]interface{}{"k": "v"},
+				"l": []interface{}{"a"},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"presentObj": objectType(map[string]schema.Structural{
+					"presentStr": stringType,
+				}),
+				"absentObj": objectType(map[string]schema.Structural{
+					"absentStr": stringType,
+				}),
+				"m": mapType(&stringType),
+				"l": listType(&stringType),
+			}),
+			valid: []string{
+				"self.?presentObj.?presentStr == optional.of('value')",
+				"self.presentObj.?presentStr == optional.of('value')",
+				"self.presentObj.?presentStr.or(optional.of('nope')) == optional.of('value')",
+				"self.presentObj.?presentStr.orValue('') == 'value'",
+				"self.presentObj.?presentStr.hasValue() == true",
+				"self.presentObj.?presentStr.optMap(v, v == 'value').hasValue()",
+				"self.?absentObj.?absentStr == optional.none()",
+				"self.?absentObj.?absentStr.or(optional.of('nope')) == optional.of('nope')",
+				"self.?absentObj.?absentStr.orValue('nope') == 'nope'",
+				"self.?absentObj.?absentStr.hasValue() == false",
+				"self.?absentObj.?absentStr.optMap(v, v == 'value').hasValue() == false",
+
+				"self.m[?'k'] == optional.of('v')",
+				"self.m[?'k'].or(optional.of('nope')) == optional.of('v')",
+				"self.m[?'k'].orValue('') == 'v'",
+				"self.m[?'k'].hasValue() == true",
+				"self.m[?'k'].optMap(v, v == 'v').hasValue()",
+				"self.m[?'x'] == optional.none()",
+				"self.m[?'x'].or(optional.of('nope')) == optional.of('nope')",
+				"self.m[?'x'].orValue('nope') == 'nope'",
+				"self.m[?'x'].hasValue() == false",
+				"self.m[?'x'].hasValue() == false",
+
+				"self.l[?0] == optional.of('a')",
+				"self.l[?1] == optional.none()",
+				"self.l[?0].orValue('') == 'a'",
+				"self.l[?0].hasValue() == true",
+				"self.l[?0].optMap(v, v == 'a').hasValue()",
+				"self.l[?1] == optional.none()",
+				"self.l[?1].or(optional.of('nope')) == optional.of('nope')",
+				"self.l[?1].orValue('nope') == 'nope'",
+				"self.l[?1].hasValue() == false",
+				"self.l[?1].hasValue() == false",
+
+				"optional.ofNonZeroValue(1).hasValue()",
+				"optional.ofNonZeroValue(uint(1)).hasValue()",
+				"optional.ofNonZeroValue(1.1).hasValue()",
+				"optional.ofNonZeroValue('a').hasValue()",
+				"optional.ofNonZeroValue(true).hasValue()",
+				"optional.ofNonZeroValue(['a']).hasValue()",
+				"optional.ofNonZeroValue({'k': 'v'}).hasValue()",
+				"optional.ofNonZeroValue(timestamp('2011-08-18T00:00:00.000+01:00')).hasValue()",
+				"optional.ofNonZeroValue(duration('19h3m37s10ms')).hasValue()",
+				"optional.ofNonZeroValue(null) == optional.none()",
+				"optional.ofNonZeroValue(0) == optional.none()",
+				"optional.ofNonZeroValue(uint(0)) == optional.none()",
+				"optional.ofNonZeroValue(0.0) == optional.none()",
+				"optional.ofNonZeroValue('') == optional.none()",
+				"optional.ofNonZeroValue(false) == optional.none()",
+				"optional.ofNonZeroValue([]) == optional.none()",
+				"optional.ofNonZeroValue({}) == optional.none()",
+				"optional.ofNonZeroValue(timestamp('0001-01-01T00:00:00.000+00:00')) == optional.none()",
+				"optional.ofNonZeroValue(duration('0s')) == optional.none()",
+
+				"{?'k': optional.none(), 'k2': 'v2'} == {'k2': 'v2'}",
+				"{?'k': optional.of('v'), 'k2': 'v2'} == {'k': 'v', 'k2': 'v2'}",
+				"['a', ?optional.none(), 'c'] == ['a', 'c']",
+				"['a', ?optional.of('v'), 'c'] == ['a', 'v', 'c']",
+			},
+			errors: map[string]string{
+				"self.absentObj.?absentStr == optional.none()": "no such key: absentObj", // missing ?. operator on first deref is an error
+			},
+		},
 	}
 
 	for i := range tests {
@@ -1758,7 +1934,7 @@ func TestValidationExpressions(t *testing.T) {
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
 			tt := tests[i]
-			tt.costBudget = RuntimeCELCostBudget
+			tt.costBudget = celconfig.RuntimeCELCostBudget
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -1769,7 +1945,7 @@ func TestValidationExpressions(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -1793,7 +1969,7 @@ func TestValidationExpressions(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, true, PerCallLimit)
+					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2003,10 +2179,11 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.TODO()
-			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), PerCallLimit)
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -2073,7 +2250,7 @@ func TestCELValidationLimit(t *testing.T) {
 				t.Run(validRule, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), PerCallLimit)
+					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), celconfig.PerCallLimit)
 
 					// test with cost budget exceeded
 					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
@@ -2098,7 +2275,7 @@ func TestCELValidationLimit(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
 							found = true
@@ -2141,11 +2318,11 @@ func TestCELValidationContextCancellation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
-			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 			for _, err := range errs {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2154,7 +2331,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 			found := false
 			evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 			cancel()
-			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 			for _, err := range errs {
 				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
 					found = true
@@ -2170,7 +2347,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 
 // This is the most recursive operations we expect to be able to include in an expression.
 // This number could get larger with more improvements in the grammar or ANTLR stack, but should *never* decrease or previously valid expressions could be treated as invalid.
-const maxValidDepth = 243
+const maxValidDepth = 250
 
 // TestCELMaxRecursionDepth tests CEL setting for maxRecursionDepth.
 func TestCELMaxRecursionDepth(t *testing.T) {
@@ -2199,7 +2376,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.costBudget = RuntimeCELCostBudget
+			tt.costBudget = celconfig.RuntimeCELCostBudget
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -2207,7 +2384,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2231,7 +2408,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, true, PerCallLimit)
+					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2248,6 +2425,607 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMessageExpression(t *testing.T) {
+	klog.LogToStderr(false)
+	klog.InitFlags(nil)
+	setDefaultVerbosity(2)
+	defer klog.LogToStderr(true)
+	tests := []struct {
+		name                    string
+		costBudget              int64
+		perCallLimit            uint64
+		message                 string
+		messageExpression       string
+		expectedLogErr          string
+		expectedValidationErr   string
+		expectedRemainingBudget int64
+	}{
+		{
+			name:                    "no cost error expected",
+			messageExpression:       `"static string"`,
+			expectedValidationErr:   "static string",
+			costBudget:              300,
+			expectedRemainingBudget: 300,
+		},
+		{
+			name:                  "messageExpression takes precedence over message",
+			message:               "invisible",
+			messageExpression:     `"this is messageExpression"`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedValidationErr: "this is messageExpression",
+		},
+		{
+			name:                    "default rule message used if messageExpression does not eval to string",
+			messageExpression:       `true`,
+			costBudget:              celconfig.RuntimeCELCostBudget,
+			expectedValidationErr:   "failed rule",
+			expectedRemainingBudget: celconfig.RuntimeCELCostBudget,
+		},
+		{
+			name:                    "limit exceeded",
+			messageExpression:       `"string 1" + "string 2" + "string 3"`,
+			costBudget:              1,
+			expectedValidationErr:   "messageExpression evaluation failed due to running out of cost budget",
+			expectedRemainingBudget: -1,
+		},
+		{
+			name:                    "messageExpression budget (str concat)",
+			messageExpression:       `"str1 " + self.str`,
+			costBudget:              50,
+			expectedValidationErr:   "str1 a string",
+			expectedRemainingBudget: 46,
+		},
+		{
+			name:                    "runtime cost preserved if messageExpression fails during evaluation",
+			message:                 "message not messageExpression",
+			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
+			costBudget:              50,
+			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
+			expectedValidationErr:   "message not messageExpression",
+			expectedRemainingBudget: 47,
+		},
+		{
+			name:                    "runtime cost preserved if messageExpression fails during evaluation (no message set)",
+			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
+			costBudget:              50,
+			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
+			expectedValidationErr:   "failed rule",
+			expectedRemainingBudget: 47,
+		},
+		{
+			name:                    "per-call limit exceeded during messageExpression execution",
+			messageExpression:       `"string 1" + "string 2" + "string 3"`,
+			costBudget:              celconfig.RuntimeCELCostBudget,
+			perCallLimit:            1,
+			expectedValidationErr:   "call cost exceeds limit for messageExpression",
+			expectedRemainingBudget: -1,
+		},
+		{
+			name:                  "messageExpression is not allowed to generate a string with newlines",
+			message:               "message not messageExpression",
+			messageExpression:     `"str with \na newline"`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression should not contain line breaks",
+			expectedValidationErr: "message not messageExpression",
+		},
+		{
+			name:                  "messageExpression is not allowed to generate messages >5000 characters",
+			message:               "message not messageExpression",
+			messageExpression:     fmt.Sprintf(`"%s"`, genString(5121, 'a')),
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression beyond allowable length of 5120",
+			expectedValidationErr: "message not messageExpression",
+		},
+		{
+			name:                  "messageExpression is not allowed to generate an empty string",
+			message:               "message not messageExpression",
+			messageExpression:     `string("")`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression should evaluate to a non-empty string",
+			expectedValidationErr: "message not messageExpression",
+		},
+		{
+			name:                  "messageExpression is not allowed to generate a string with only spaces",
+			message:               "message not messageExpression",
+			messageExpression:     `string("     ")`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression should evaluate to a non-empty string",
+			expectedValidationErr: "message not messageExpression",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outputBuffer := strings.Builder{}
+			klog.SetOutput(&outputBuffer)
+
+			ctx := context.TODO()
+			var s schema.Structural
+			if tt.message != "" {
+				s = withRuleMessageAndMessageExpression(objectType(map[string]schema.Structural{
+					"str": stringType}), "false", tt.message, tt.messageExpression)
+			} else {
+				s = withRuleAndMessageExpression(objectType(map[string]schema.Structural{
+					"str": stringType}), "false", tt.messageExpression)
+			}
+			obj := map[string]interface{}{
+				"str": "a string",
+			}
+
+			callLimit := uint64(celconfig.PerCallLimit)
+			if tt.perCallLimit != 0 {
+				callLimit = tt.perCallLimit
+			}
+			celValidator := NewValidator(&s, false, callLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, obj, nil, tt.costBudget)
+			klog.Flush()
+
+			if len(errs) != 1 {
+				t.Fatalf("expected 1 error, got %d", len(errs))
+			}
+
+			if tt.expectedLogErr != "" {
+				if !strings.Contains(outputBuffer.String(), tt.expectedLogErr) {
+					t.Fatalf("did not find expected log error message: %q\n%q", tt.expectedLogErr, outputBuffer.String())
+				}
+			} else if tt.expectedLogErr == "" && outputBuffer.String() != "" {
+				t.Fatalf("expected no log output, got: %q", outputBuffer.String())
+			}
+
+			if tt.expectedValidationErr != "" {
+				if !strings.Contains(errs[0].Error(), tt.expectedValidationErr) {
+					t.Fatalf("did not find expected validation error message: %q", tt.expectedValidationErr)
+				}
+			}
+
+			if tt.expectedRemainingBudget != 0 {
+				if tt.expectedRemainingBudget != remainingBudget {
+					t.Fatalf("expected %d cost left, got %d", tt.expectedRemainingBudget, remainingBudget)
+				}
+			}
+		})
+	}
+}
+
+func TestReasonAndFldPath(t *testing.T) {
+	forbiddenReason := func() *apiextensions.FieldValueErrorReason {
+		r := apiextensions.FieldValueForbidden
+		return &r
+	}()
+	tests := []struct {
+		name      string
+		schema    *schema.Structural
+		obj       interface{}
+		errors    []string
+		errorType field.ErrorType
+	}{
+		{name: "Return error based on input reason",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", forbiddenReason),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeForbidden,
+			errors:    []string{"root.f: Forbidden"},
+		},
+		{name: "Return error default is invalid",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", nil),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeInvalid,
+			errors:    []string{"root.f: Invalid"},
+		},
+		{name: "Return error based on input fieldPath",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", ".m", forbiddenReason),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeForbidden,
+			errors:    []string{"root.f.m: Forbidden"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, nil, celconfig.RuntimeCELCostBudget)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != tt.errorType {
+					t.Errorf("expected error type %v, but got: %v", tt.errorType, err.Type)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+func TestValidateFieldPath(t *testing.T) {
+	sts := schema.Structural{
+		Generic: schema.Generic{
+			Type: "object",
+		},
+		Properties: map[string]schema.Structural{
+			"foo": {
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{
+						Structural: &schema.Structural{
+							Generic: schema.Generic{
+								Type: "object",
+							},
+							Properties: map[string]schema.Structural{
+								"subAdd": {
+									Generic: schema.Generic{
+										Type: "number",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"white space": {
+				Generic: schema.Generic{
+					Type: "number",
+				},
+			},
+			"'foo'bar": {
+				Generic: schema.Generic{
+					Type: "number",
+				},
+			},
+			"a": {
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"foo's": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"test\a": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"bb[b": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"bbb": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"c": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+							"34": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+						},
+					},
+					"bbb.c": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"a-b.3'4": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+						},
+					},
+				},
+			},
+			"list": {
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "object",
+					},
+					Properties: map[string]schema.Structural{
+						"a": {
+							Generic: schema.Generic{
+								Type: "number",
+							},
+						},
+						"a-b.3'4": {
+							Generic: schema.Generic{
+								Type: "number",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	path := field.NewPath("")
+
+	tests := []struct {
+		name            string
+		fieldPath       string
+		pathOfFieldPath *field.Path
+		schema          *schema.Structural
+		errDetail       string
+		validFieldPath  *field.Path
+	}{
+		{
+			name:            "Valid .a",
+			fieldPath:       ".a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a"),
+		},
+		{
+			name:            "Valid 'foo'bar",
+			fieldPath:       "['\\'foo\\'bar']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("'foo'bar"),
+		},
+		{
+			name:            "Invalid 'foo'bar",
+			fieldPath:       ".\\'foo\\'bar",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Invalid with whitespace",
+			fieldPath:       ". a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Valid with whitespace inside field",
+			fieldPath:       ".white space",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Valid with whitespace inside field",
+			fieldPath:       "['white space']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "invalid dot annotation",
+			fieldPath:       ".a.bb[b",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "valid with .",
+			fieldPath:       ".a['bbb.c']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a", "bbb.c"),
+		},
+		{
+			name:            "Unclosed ]",
+			fieldPath:       ".a['bbb.c'",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "unexpected end of JSON path",
+		},
+		{
+			name:            "Unexpected end of JSON path",
+			fieldPath:       ".",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "unexpected end of JSON path",
+		},
+		{
+			name:            "Valid map syntax .a.bbb",
+			fieldPath:       ".a['bbb.c']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a").Child("bbb.c"),
+		},
+		{
+			name:            "Valid map key",
+			fieldPath:       ".foo.subAdd",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("foo").Key("subAdd"),
+		},
+		{
+			name:            "Valid map key",
+			fieldPath:       ".foo['subAdd']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("foo").Key("subAdd"),
+		},
+		{
+			name:            "Invalid",
+			fieldPath:       ".a.foo's",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Escaping",
+			fieldPath:       ".a['foo\\'s']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a").Child("foo's"),
+		},
+		{
+			name:            "Escaping",
+			fieldPath:       ".a['test\\a']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a").Child("test\a"),
+		},
+
+		{
+			name:            "Invalid map key",
+			fieldPath:       ".a.foo",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Malformed map key",
+			fieldPath:       ".a.bbb[0]",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "expected single quoted string but got 0",
+		},
+		{
+			name:            "Valid refer for name has number",
+			fieldPath:       ".a.bbb.34",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Map syntax for special field names",
+			fieldPath:       ".a.bbb['34']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			//errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Valid .list",
+			fieldPath:       ".list",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("list"),
+		},
+		{
+			name:            "Invalid list index",
+			fieldPath:       ".list[0]",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "expected single quoted string but got 0",
+		},
+		{
+			name:            "Invalid list reference",
+			fieldPath:       ".list. a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Invalid .list.a",
+			fieldPath:       ".list['a']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Missing leading dot",
+			fieldPath:       "a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "expected [ or . but got: a",
+		},
+		{
+			name:            "Nonexistent field",
+			fieldPath:       ".c",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Duplicate dots",
+			fieldPath:       ".a..b",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "object of array",
+			fieldPath:       ".list.a-b.34",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			validField, err := ValidFieldPath(tc.fieldPath, tc.schema)
+
+			if err == nil && tc.errDetail != "" {
+				t.Errorf("expected err contains: %v but get nil", tc.errDetail)
+			}
+			if err != nil && tc.errDetail == "" {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err != nil && !strings.Contains(err.Error(), tc.errDetail) {
+				t.Errorf("expected error to contain: %v, but get: %v", tc.errDetail, err)
+			}
+			if tc.validFieldPath != nil && tc.validFieldPath.String() != path.Child(validField.String()).String() {
+				t.Errorf("expected %v, got %v", tc.validFieldPath, path.Child(validField.String()))
+			}
+		})
+	}
+}
+
+func genString(n int, c rune) string {
+	b := strings.Builder{}
+	for i := 0; i < n; i++ {
+		_, err := b.WriteRune(c)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return b.String()
+}
+
+func setDefaultVerbosity(v int) {
+	f := flag.CommandLine.Lookup("v")
+	_ = f.Value.Set(fmt.Sprintf("%d", v))
 }
 
 func BenchmarkCELValidationWithContext(b *testing.B) {
@@ -2276,12 +3054,12 @@ func BenchmarkCELValidationWithContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
-				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Fatalf("validation failed: %v", err)
 				}
@@ -2316,14 +3094,14 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
 				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 				cancel()
-				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 				//found := false
 				//for _, err := range errs {
 				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
@@ -2370,7 +3148,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 					},
 				},
 			}
-			validator := NewValidator(s, true, PerCallLimit)
+			validator := NewValidator(s, true, celconfig.PerCallLimit)
 			if validator == nil {
 				b.Fatal("expected non nil validator")
 			}
@@ -2381,7 +3159,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				errs, _ := validator.Validate(ctx, root, s, obj, obj, RuntimeCELCostBudget)
+				errs, _ := validator.Validate(ctx, root, s, obj, obj, celconfig.RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Errorf("unexpected error: %v", err)
 				}
@@ -2519,6 +3297,38 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 	s.Extensions.XValidations = apiextensions.ValidationRules{
 		{
 			Rule: rule,
+		},
+	}
+	return s
+}
+
+func withRuleMessageAndMessageExpression(s schema.Structural, rule, message, messageExpression string) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:              rule,
+			Message:           message,
+			MessageExpression: messageExpression,
+		},
+	}
+	return s
+}
+
+func withReasonAndFldPath(s schema.Structural, rule, jsonPath string, reason *apiextensions.FieldValueErrorReason) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:      rule,
+			FieldPath: jsonPath,
+			Reason:    reason,
+		},
+	}
+	return s
+}
+
+func withRuleAndMessageExpression(s schema.Structural, rule, messageExpression string) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:              rule,
+			MessageExpression: messageExpression,
 		},
 	}
 	return s

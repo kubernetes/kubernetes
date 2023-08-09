@@ -31,7 +31,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
@@ -51,7 +50,7 @@ var _ = SIGDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Seri
 		pollTimeout    = 1 * time.Minute
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var uid string
 	var ns, name, configName, eventNamespace string
@@ -434,7 +433,7 @@ current-context: local-context
 			ginkgo.By("Delete the node problem detector")
 			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, name, *metav1.NewDeleteOptions(0)))
 			ginkgo.By("Wait for the node problem detector to disappear")
-			gomega.Expect(e2epod.WaitForPodToDisappear(ctx, c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(gomega.Succeed())
+			gomega.Expect(e2epod.WaitForPodNotFoundInNamespace(ctx, c, name, ns, pollTimeout)).To(gomega.Succeed())
 			ginkgo.By("Delete the config map")
 			framework.ExpectNoError(c.CoreV1().ConfigMaps(ns).Delete(ctx, configName, metav1.DeleteOptions{}))
 			ginkgo.By("Clean up the events")

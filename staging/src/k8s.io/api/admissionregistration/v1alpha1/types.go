@@ -39,6 +39,18 @@ const (
 	AllScopes ScopeType = v1.AllScopes
 )
 
+// ParameterNotFoundActionType specifies a failure policy that defines how a binding
+// is evaluated when the param referred by its perNamespaceParamRef is not found.
+// +enum
+type ParameterNotFoundActionType string
+
+const (
+	// Ignore means that an error finding params for a binding is ignored
+	AllowAction ParameterNotFoundActionType = "Allow"
+	// Fail means that an error finding params for a binding is ignored
+	DenyAction ParameterNotFoundActionType = "Deny"
+)
+
 // FailurePolicyType specifies a failure policy that defines how unrecognized errors from the admission endpoint are handled.
 // +enum
 type FailurePolicyType string
@@ -74,6 +86,49 @@ type ValidatingAdmissionPolicy struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// Specification of the desired behavior of the ValidatingAdmissionPolicy.
 	Spec ValidatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	// The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+	// behaves in the expected way.
+	// Populated by the system.
+	// Read-only.
+	// +optional
+	Status ValidatingAdmissionPolicyStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.
+type ValidatingAdmissionPolicyStatus struct {
+	// The generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
+	// The results of type checking for each expression.
+	// Presence of this field indicates the completion of the type checking.
+	// +optional
+	TypeChecking *TypeChecking `json:"typeChecking,omitempty" protobuf:"bytes,2,opt,name=typeChecking"`
+	// The conditions represent the latest available observations of a policy's current state.
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" protobuf:"bytes,3,rep,name=conditions"`
+}
+
+// TypeChecking contains results of type checking the expressions in the
+// ValidatingAdmissionPolicy
+type TypeChecking struct {
+	// The type checking warnings for each expression.
+	// +optional
+	// +listType=atomic
+	ExpressionWarnings []ExpressionWarning `json:"expressionWarnings,omitempty" protobuf:"bytes,1,rep,name=expressionWarnings"`
+}
+
+// ExpressionWarning is a warning information that targets a specific expression.
+type ExpressionWarning struct {
+	// The path to the field that refers the expression.
+	// For example, the reference to the expression of the first item of
+	// validations is "spec.validations[0].expression"
+	FieldRef string `json:"fieldRef" protobuf:"bytes,2,opt,name=fieldRef"`
+	// The content of type checking information in a human-readable form.
+	// Each line of the warning contains the type that the expression is checked
+	// against, followed by the type check error from the compiler.
+	Warning string `json:"warning" protobuf:"bytes,3,opt,name=warning"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -107,19 +162,74 @@ type ValidatingAdmissionPolicySpec struct {
 	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
 	// Validations contain CEL expressions which is used to apply the validation.
-	// A minimum of one validation is required for a policy definition.
+	// Validations and AuditAnnotations may not both be empty; a minimum of one Validations or AuditAnnotations is
+	// required.
 	// +listType=atomic
-	// Required.
-	Validations []Validation `json:"validations" protobuf:"bytes,3,rep,name=validations"`
+	// +optional
+	Validations []Validation `json:"validations,omitempty" protobuf:"bytes,3,rep,name=validations"`
 
-	// FailurePolicy defines how to handle failures for the admission policy.
-	// Failures can occur from invalid or mis-configured policy definitions or bindings.
+	// failurePolicy defines how to handle failures for the admission policy. Failures can
+	// occur from CEL expression parse errors, type check errors, runtime errors and invalid
+	// or mis-configured policy definitions or bindings.
+	//
 	// A policy is invalid if spec.paramKind refers to a non-existent Kind.
 	// A binding is invalid if spec.paramRef.name refers to a non-existent resource.
+	//
+	// failurePolicy does not define how validations that evaluate to false are handled.
+	//
+	// When failurePolicy is set to Fail, ValidatingAdmissionPolicyBinding validationActions
+	// define how failures are enforced.
+	//
 	// Allowed values are Ignore or Fail. Defaults to Fail.
 	// +optional
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
+
+	// auditAnnotations contains CEL expressions which are used to produce audit
+	// annotations for the audit event of the API request.
+	// validations and auditAnnotations may not both be empty; a least one of validations or auditAnnotations is
+	// required.
+	// +listType=atomic
+	// +optional
+	AuditAnnotations []AuditAnnotation `json:"auditAnnotations,omitempty" protobuf:"bytes,5,rep,name=auditAnnotations"`
+
+	// MatchConditions is a list of conditions that must be met for a request to be validated.
+	// Match conditions filter requests that have already been matched by the rules,
+	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
+	// There are a maximum of 64 match conditions allowed.
+	//
+	// If a parameter object is provided, it can be accessed via the `params` handle in the same
+	// manner as validation expressions.
+	//
+	// The exact matching logic is (in order):
+	//   1. If ANY matchCondition evaluates to FALSE, the policy is skipped.
+	//   2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.
+	//   3. If any matchCondition evaluates to an error (but none are FALSE):
+	//      - If failurePolicy=Fail, reject the request
+	//      - If failurePolicy=Ignore, the policy is skipped
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=matchConditions"`
+
+	// Variables contain definitions of variables that can be used in composition of other expressions.
+	// Each variable is defined as a named CEL expression.
+	// The variables defined here will be available under `variables` in other expressions of the policy
+	// except MatchConditions because MatchConditions are evaluated before the rest of the policy.
+	//
+	// The expression of a variable can refer to other variables defined earlier in the list but not those after.
+	// Thus, Variables must be sorted by the order of first appearance and acyclic.
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Variables []Variable `json:"variables" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=variables"`
 }
+
+type MatchCondition v1.MatchCondition
 
 // ParamKind is a tuple of Group Kind and Version.
 // +structType=atomic
@@ -138,12 +248,19 @@ type ParamKind struct {
 type Validation struct {
 	// Expression represents the expression which will be evaluated by CEL.
 	// ref: https://github.com/google/cel-spec
-	// CEL expressions have access to the contents of the Admission request/response, organized into CEL variables as well as some other useful variables:
+	// CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:
 	//
-	//'object' - The object from the incoming request. The value is null for DELETE requests.
-	//'oldObject' - The existing object. The value is null for CREATE requests.
-	//'request' - Attributes of the admission request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
-	//'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
+	// - 'object' - The object from the incoming request. The value is null for DELETE requests.
+	// - 'oldObject' - The existing object. The value is null for CREATE requests.
+	// - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
+	// - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
+	// - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources.
+	// - 'variables' - Map of composited variables, from its name to its lazily evaluated value.
+	//   For example, a variable named 'foo' can be accessed as 'variables.foo'.
+	// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
+	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
+	// - 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
+	//   request resource.
 	//
 	// The `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the
 	// object. No other metadata properties are accessible.
@@ -188,6 +305,67 @@ type Validation struct {
 	// If not set, StatusReasonInvalid is used in the response to the client.
 	// +optional
 	Reason *metav1.StatusReason `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
+	// messageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails.
+	// Since messageExpression is used as a failure message, it must evaluate to a string.
+	// If both message and messageExpression are present on a validation, then messageExpression will be used if validation fails.
+	// If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced
+	// as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string
+	// that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and
+	// the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged.
+	// messageExpression has access to all the same variables as the `expression` except for 'authorizer' and 'authorizer.requestResource'.
+	// Example:
+	// "object.x must be less than max ("+string(params.max)+")"
+	// +optional
+	MessageExpression string `json:"messageExpression,omitempty" protobuf:"bytes,4,opt,name=messageExpression"`
+}
+
+// Variable is the definition of a variable that is used for composition.
+type Variable struct {
+	// Name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
+	// The variable can be accessed in other expressions through `variables`
+	// For example, if name is "foo", the variable will be available as `variables.foo`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=Name"`
+
+	// Expression is the expression that will be evaluated as the value of the variable.
+	// The CEL expression has access to the same identifiers as the CEL expressions in Validation.
+	Expression string `json:"expression" protobuf:"bytes,2,opt,name=Expression"`
+}
+
+// AuditAnnotation describes how to produce an audit annotation for an API request.
+type AuditAnnotation struct {
+	// key specifies the audit annotation key. The audit annotation keys of
+	// a ValidatingAdmissionPolicy must be unique. The key must be a qualified
+	// name ([A-Za-z0-9][-A-Za-z0-9_.]*) no more than 63 bytes in length.
+	//
+	// The key is combined with the resource name of the
+	// ValidatingAdmissionPolicy to construct an audit annotation key:
+	// "{ValidatingAdmissionPolicy name}/{key}".
+	//
+	// If an admission webhook uses the same resource name as this ValidatingAdmissionPolicy
+	// and the same audit annotation key, the annotation key will be identical.
+	// In this case, the first annotation written with the key will be included
+	// in the audit event and all subsequent annotations with the same key
+	// will be discarded.
+	//
+	// Required.
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
+
+	// valueExpression represents the expression which is evaluated by CEL to
+	// produce an audit annotation value. The expression must evaluate to either
+	// a string or null value. If the expression evaluates to a string, the
+	// audit annotation is included with the string value. If the expression
+	// evaluates to null or empty string the audit annotation will be omitted.
+	// The valueExpression may be no longer than 5kb in length.
+	// If the result of the valueExpression is more than 10kb in length, it
+	// will be truncated to 10kb.
+	//
+	// If multiple ValidatingAdmissionPolicyBinding resources match an
+	// API request, then the valueExpression will be evaluated for
+	// each binding. All unique values produced by the valueExpressions
+	// will be joined together in a comma-separated list.
+	//
+	// Required.
+	ValueExpression string `json:"valueExpression" protobuf:"bytes,2,opt,name=valueExpression"`
 }
 
 // +genclient
@@ -197,6 +375,15 @@ type Validation struct {
 
 // ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources.
 // ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
+//
+// For a given admission request, each binding will cause its policy to be
+// evaluated N times, where N is 1 for policies/bindings that don't use
+// params, otherwise N is the number of parameters selected by the binding.
+//
+// The CEL expressions of a policy must have a computed CEL cost below the maximum
+// CEL budget. Each evaluation of the policy is given an independent CEL cost budget.
+// Adding/removing policies, bindings, or params can not affect whether a
+// given (policy, binding, param) combination is within its own CEL budget.
 type ValidatingAdmissionPolicyBinding struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -227,9 +414,10 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// Required.
 	PolicyName string `json:"policyName,omitempty" protobuf:"bytes,1,rep,name=policyName"`
 
-	// ParamRef specifies the parameter resource used to configure the admission control policy.
+	// paramRef specifies the parameter resource used to configure the admission control policy.
 	// It should point to a resource of the type specified in ParamKind of the bound ValidatingAdmissionPolicy.
 	// If the policy specifies a ParamKind and the resource referred to by ParamRef does not exist, this binding is considered mis-configured and the FailurePolicy of the ValidatingAdmissionPolicy applied.
+	// If the policy does not specify a ParamKind then this field is ignored, and the rules are evaluated without a param.
 	// +optional
 	ParamRef *ParamRef `json:"paramRef,omitempty" protobuf:"bytes,2,rep,name=paramRef"`
 
@@ -240,17 +428,103 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// Note that this is differs from ValidatingAdmissionPolicy matchConstraints, where resourceRules are required.
 	// +optional
 	MatchResources *MatchResources `json:"matchResources,omitempty" protobuf:"bytes,3,rep,name=matchResources"`
+
+	// validationActions declares how Validations of the referenced ValidatingAdmissionPolicy are enforced.
+	// If a validation evaluates to false it is always enforced according to these actions.
+	//
+	// Failures defined by the ValidatingAdmissionPolicy's FailurePolicy are enforced according
+	// to these actions only if the FailurePolicy is set to Fail, otherwise the failures are
+	// ignored. This includes compilation errors, runtime errors and misconfigurations of the policy.
+	//
+	// validationActions is declared as a set of action values. Order does
+	// not matter. validationActions may not contain duplicates of the same action.
+	//
+	// The supported actions values are:
+	//
+	// "Deny" specifies that a validation failure results in a denied request.
+	//
+	// "Warn" specifies that a validation failure is reported to the request client
+	// in HTTP Warning headers, with a warning code of 299. Warnings can be sent
+	// both for allowed or denied admission responses.
+	//
+	// "Audit" specifies that a validation failure is included in the published
+	// audit event for the request. The audit event will contain a
+	// `validation.policy.admission.k8s.io/validation_failure` audit annotation
+	// with a value containing the details of the validation failures, formatted as
+	// a JSON list of objects, each with the following fields:
+	// - message: The validation failure message string
+	// - policy: The resource name of the ValidatingAdmissionPolicy
+	// - binding: The resource name of the ValidatingAdmissionPolicyBinding
+	// - expressionIndex: The index of the failed validations in the ValidatingAdmissionPolicy
+	// - validationActions: The enforcement actions enacted for the validation failure
+	// Example audit annotation:
+	// `"validation.policy.admission.k8s.io/validation_failure": "[{\"message\": \"Invalid value\", {\"policy\": \"policy.example.com\", {\"binding\": \"policybinding.example.com\", {\"expressionIndex\": \"1\", {\"validationActions\": [\"Audit\"]}]"`
+	//
+	// Clients should expect to handle additional values by ignoring
+	// any values not recognized.
+	//
+	// "Deny" and "Warn" may not be used together since this combination
+	// needlessly duplicates the validation failure both in the
+	// API response body and the HTTP warning headers.
+	//
+	// Required.
+	// +listType=set
+	ValidationActions []ValidationAction `json:"validationActions,omitempty" protobuf:"bytes,4,rep,name=validationActions"`
 }
 
-// ParamRef references a parameter resource
+// ParamRef describes how to locate the params to be used as input to
+// expressions of rules applied by a policy binding.
 // +structType=atomic
 type ParamRef struct {
-	// Name of the resource being referenced.
+	// `name` is the name of the resource being referenced.
+	//
+	// `name` and `selector` are mutually exclusive properties. If one is set,
+	// the other must be unset.
+	//
+	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,1,rep,name=name"`
-	// Namespace of the referenced resource.
-	// Should be empty for the cluster-scoped resources
+
+	// namespace is the namespace of the referenced resource. Allows limiting
+	// the search for params to a specific namespace. Applies to both `name` and
+	// `selector` fields.
+	//
+	// A per-namespace parameter may be used by specifying a namespace-scoped
+	// `paramKind` in the policy and leaving this field empty.
+	//
+	// - If `paramKind` is cluster-scoped, this field MUST be unset. Setting this
+	// field results in a configuration error.
+	//
+	// - If `paramKind` is namespace-scoped, the namespace of the object being
+	// evaluated for admission will be used when this field is left unset. Take
+	// care that if this is left empty the binding must not match any cluster-scoped
+	// resources, which will result in an error.
+	//
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,rep,name=namespace"`
+
+	// selector can be used to match multiple param objects based on their labels.
+	// Supply selector: {} to match all resources of the ParamKind.
+	//
+	// If multiple params are found, they are all evaluated with the policy expressions
+	// and the results are ANDed together.
+	//
+	// One of `name` or `selector` must be set, but `name` and `selector` are
+	// mutually exclusive properties. If one is set, the other must be unset.
+	//
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,3,rep,name=selector"`
+
+	// `parameterNotFoundAction` controls the behavior of the binding when the resource
+	// exists, and name or selector is valid, but there are no parameters
+	// matched by the binding. If the value is set to `Allow`, then no
+	// matched parameters will be treated as successful validation by the binding.
+	// If set to `Deny`, then no matched parameters will be subject to the
+	// `failurePolicy` of the policy.
+	//
+	// Allowed values are `Allow` or `Deny`
+	// Default to `Deny`
+	// +optional
+	ParameterNotFoundAction *ParameterNotFoundActionType `json:"parameterNotFoundAction,omitempty" protobuf:"bytes,4,rep,name=parameterNotFoundAction"`
 }
 
 // MatchResources decides whether to run the admission control policy on an object based
@@ -343,6 +617,24 @@ type MatchResources struct {
 	// +optional
 	MatchPolicy *MatchPolicyType `json:"matchPolicy,omitempty" protobuf:"bytes,7,opt,name=matchPolicy,casttype=MatchPolicyType"`
 }
+
+// ValidationAction specifies a policy enforcement action.
+// +enum
+type ValidationAction string
+
+const (
+	// Deny specifies that a validation failure results in a denied request.
+	Deny ValidationAction = "Deny"
+	// Warn specifies that a validation failure is reported to the request client
+	// in HTTP Warning headers, with a warning code of 299. Warnings can be sent
+	// both for allowed or denied admission responses.
+	Warn ValidationAction = "Warn"
+	// Audit specifies that a validation failure is included in the published
+	// audit event for the request. The audit event will contain a
+	// `validation.policy.admission.k8s.io/validation_failure` audit annotation
+	// with a value containing the details of the validation failure.
+	Audit ValidationAction = "Audit"
+)
 
 // NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.
 // +structType=atomic

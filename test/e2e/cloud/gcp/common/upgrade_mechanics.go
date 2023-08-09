@@ -131,7 +131,7 @@ func checkControlPlaneVersion(ctx context.Context, c clientset.Interface, want s
 		return true, nil
 	})
 	if waitErr != nil {
-		return fmt.Errorf("CheckControlPlane() couldn't get the control plane version: %v", err)
+		return fmt.Errorf("CheckControlPlane() couldn't get the control plane version: %w", err)
 	}
 	// We do prefix trimming and then matching because:
 	// want looks like:  0.19.3-815-g50e67d4

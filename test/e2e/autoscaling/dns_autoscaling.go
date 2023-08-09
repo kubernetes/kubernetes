@@ -48,7 +48,7 @@ const (
 
 var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	f := framework.NewDefaultFramework("dns-autoscaling")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var previousParams map[string]string
 	var originDNSReplicasCount int
@@ -355,7 +355,7 @@ func waitForDNSReplicasSatisfied(ctx context.Context, c clientset.Interface, get
 	}
 
 	if err = wait.Poll(2*time.Second, timeout, condition); err != nil {
-		return fmt.Errorf("err waiting for DNS replicas to satisfy %v, got %v: %v", expected, current, err)
+		return fmt.Errorf("err waiting for DNS replicas to satisfy %v, got %v: %w", expected, current, err)
 	}
 	framework.Logf("kube-dns reaches expected replicas: %v", expected)
 	return nil
@@ -372,7 +372,7 @@ func waitForDNSConfigMapCreated(ctx context.Context, c clientset.Interface, time
 	}
 
 	if err = wait.Poll(time.Second, timeout, condition); err != nil {
-		return nil, fmt.Errorf("err waiting for DNS autoscaling ConfigMap got re-created: %v", err)
+		return nil, fmt.Errorf("err waiting for DNS autoscaling ConfigMap got re-created: %w", err)
 	}
 	return configMap, nil
 }

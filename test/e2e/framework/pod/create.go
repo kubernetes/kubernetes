@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -40,7 +41,7 @@ type Config struct {
 	PVCs                   []*v1.PersistentVolumeClaim
 	PVCsReadOnly           bool
 	InlineVolumeSources    []*v1.VolumeSource
-	IsPrivileged           bool
+	SecurityLevel          admissionapi.Level
 	Command                string
 	HostIPC                bool
 	HostPID                bool
@@ -52,46 +53,46 @@ type Config struct {
 }
 
 // CreateUnschedulablePod with given claims based on node selector
-func CreateUnschedulablePod(ctx context.Context, client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
-	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
+func CreateUnschedulablePod(ctx context.Context, client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, securityLevel admissionapi.Level, command string) (*v1.Pod, error) {
+	pod := MakePod(namespace, nodeSelector, pvclaims, securityLevel, command)
 	pod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 	// Waiting for pod to become Unschedulable
 	err = WaitForPodNameUnschedulableInNamespace(ctx, client, pod.Name, namespace)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Unschedulable: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Unschedulable: %w", pod.Name, err)
 	}
 	// get fresh pod info
 	pod, err = client.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }
 
 // CreateClientPod defines and creates a pod with a mounted PV. Pod runs infinite loop until killed.
 func CreateClientPod(ctx context.Context, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
-	return CreatePod(ctx, c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
+	return CreatePod(ctx, c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, admissionapi.LevelPrivileged, "")
 }
 
 // CreatePod with given claims based on node selector
-func CreatePod(ctx context.Context, client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
-	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
+func CreatePod(ctx context.Context, client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, securityLevel admissionapi.Level, command string) (*v1.Pod, error) {
+	pod := MakePod(namespace, nodeSelector, pvclaims, securityLevel, command)
 	pod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 	// Waiting for pod to be running
 	err = WaitForPodNameRunningInNamespace(ctx, client, pod.Name, namespace)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Running: %w", pod.Name, err)
 	}
 	// get fresh pod info
 	pod, err = client.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }
@@ -105,30 +106,30 @@ func CreateSecPod(ctx context.Context, client clientset.Interface, podConfig *Co
 func CreateSecPodWithNodeSelection(ctx context.Context, client clientset.Interface, podConfig *Config, timeout time.Duration) (*v1.Pod, error) {
 	pod, err := MakeSecPod(podConfig)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create pod: %v", err)
+		return nil, fmt.Errorf("Unable to create pod: %w", err)
 	}
 
 	pod, err = client.CoreV1().Pods(podConfig.NS).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 
 	// Waiting for pod to be running
 	err = WaitTimeoutForPodRunningInNamespace(ctx, client, pod.Name, podConfig.NS, timeout)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Running: %w", pod.Name, err)
 	}
 	// get fresh pod info
 	pod, err = client.CoreV1().Pods(podConfig.NS).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }
 
 // MakePod returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
-func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
+func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, securityLevel admissionapi.Level, command string) *v1.Pod {
 	if len(command) == 0 {
 		command = "trap exit TERM; while true; do sleep 1; done"
 	}
@@ -147,7 +148,7 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 					Name:            "write-pod",
 					Image:           GetDefaultTestImage(),
 					Command:         GenerateScriptCmd(command),
-					SecurityContext: GenerateContainerSecurityContext(isPrivileged),
+					SecurityContext: GenerateContainerSecurityContext(securityLevel),
 				},
 			},
 			RestartPolicy: v1.RestartPolicyOnFailure,
@@ -157,6 +158,10 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 	if nodeSelector != nil {
 		podSpec.Spec.NodeSelector = nodeSelector
 	}
+	if securityLevel == admissionapi.LevelRestricted {
+		podSpec = MustMixinRestrictedPodSecurity(podSpec)
+	}
+
 	return podSpec
 }
 
@@ -196,6 +201,10 @@ func MakePodSpec(podConfig *Config) *v1.PodSpec {
 	if podConfig.ImageID != imageutils.None {
 		image = podConfig.ImageID
 	}
+	securityLevel := podConfig.SecurityLevel
+	if securityLevel == "" {
+		securityLevel = admissionapi.LevelBaseline
+	}
 	podSpec := &v1.PodSpec{
 		HostIPC:         podConfig.HostIPC,
 		HostPID:         podConfig.HostPID,
@@ -205,7 +214,7 @@ func MakePodSpec(podConfig *Config) *v1.PodSpec {
 				Name:            "write-pod",
 				Image:           GetTestImage(image),
 				Command:         GenerateScriptCmd(podConfig.Command),
-				SecurityContext: GenerateContainerSecurityContext(podConfig.IsPrivileged),
+				SecurityContext: GenerateContainerSecurityContext(securityLevel),
 			},
 		},
 		RestartPolicy: v1.RestartPolicyOnFailure,

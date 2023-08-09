@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilpointer "k8s.io/utils/pointer"
@@ -47,6 +47,6 @@ func SetDefaults_NetworkPolicy(obj *networkingv1.NetworkPolicy) {
 
 func SetDefaults_IngressClass(obj *networkingv1.IngressClass) {
 	if obj.Spec.Parameters != nil && obj.Spec.Parameters.Scope == nil {
-		obj.Spec.Parameters.Scope = utilpointer.StringPtr(networkingv1.IngressClassParametersReferenceScopeCluster)
+		obj.Spec.Parameters.Scope = utilpointer.String(networkingv1.IngressClassParametersReferenceScopeCluster)
 	}
 }

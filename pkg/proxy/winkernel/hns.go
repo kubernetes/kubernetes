@@ -97,6 +97,12 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 	}
 	endpointInfos := make(map[string]*(endpointsInfo))
 	for _, ep := range endpoints {
+
+		if len(ep.IpConfigurations) == 0 {
+			klog.V(3).InfoS("No IpConfigurations found in endpoint info of queried endpoints", "endpoint", ep)
+			continue
+		}
+
 		// Add to map with key endpoint ID or IP address
 		// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address.
 		// TODO: Store by IP only and remove any lookups by endpoint ID.
@@ -112,8 +118,28 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 			terminating: false,
 		}
 		endpointInfos[ep.IpConfigurations[0].IpAddress] = endpointInfos[ep.Id]
+
+		if len(ep.IpConfigurations) == 1 {
+			continue
+		}
+
+		// If ipFamilyPolicy is RequireDualStack or PreferDualStack, then there will be 2 IPS (iPV4 and IPV6)
+		// in the endpoint list
+		endpointDualstack := &endpointsInfo{
+			ip:         ep.IpConfigurations[1].IpAddress,
+			isLocal:    uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
+			macAddress: ep.MacAddress,
+			hnsID:      ep.Id,
+			hns:        hns,
+			// only ready and not terminating endpoints were added to HNS
+			ready:       true,
+			serving:     true,
+			terminating: false,
+		}
+		endpointInfos[ep.IpConfigurations[1].IpAddress] = endpointDualstack
 	}
 	klog.V(3).InfoS("Queried endpoints from network", "network", networkName)
+	klog.V(5).InfoS("Queried endpoints details", "network", networkName, "endpointInfos", endpointInfos)
 	return endpointInfos, nil
 }
 

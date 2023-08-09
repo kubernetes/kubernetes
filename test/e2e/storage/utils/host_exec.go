@@ -76,11 +76,18 @@ func (h *hostExecutor) launchNodeExecPod(ctx context.Context, node string) *v1.P
 
 	hostExecPod := e2epod.NewExecPodSpec(ns.Name, "", true)
 	hostExecPod.GenerateName = fmt.Sprintf("hostexec-%s-", node)
-	// Use NodeAffinity instead of NodeName so that pods will not
-	// be immediately Failed by kubelet if it's out of space. Instead
-	// Pods will be pending in the scheduler until there is space freed
-	// up.
-	e2epod.SetNodeAffinity(&hostExecPod.Spec, node)
+
+	if framework.TestContext.NodeE2E {
+		// E2E node tests do not run a scheduler, so set the node name directly
+		hostExecPod.Spec.NodeName = node
+	} else {
+		// Use NodeAffinity instead of NodeName so that pods will not
+		// be immediately Failed by kubelet if it's out of space. Instead
+		// Pods will be pending in the scheduler until there is space freed
+		// up.
+		e2epod.SetNodeAffinity(&hostExecPod.Spec, node)
+
+	}
 	hostExecPod.Spec.Volumes = []v1.Volume{
 		{
 			// Required to enter into host mount namespace via nsenter.

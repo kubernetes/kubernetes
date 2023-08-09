@@ -296,7 +296,7 @@ func CollectAddresses(nodes *v1.NodeList, addressType v1.NodeAddressType) []stri
 func PickIP(ctx context.Context, c clientset.Interface) (string, error) {
 	publicIps, err := GetPublicIps(ctx, c)
 	if err != nil {
-		return "", fmt.Errorf("get node public IPs error: %s", err)
+		return "", fmt.Errorf("get node public IPs error: %w", err)
 	}
 	if len(publicIps) == 0 {
 		return "", fmt.Errorf("got unexpected number (%d) of public IPs", len(publicIps))
@@ -309,7 +309,7 @@ func PickIP(ctx context.Context, c clientset.Interface) (string, error) {
 func GetPublicIps(ctx context.Context, c clientset.Interface) ([]string, error) {
 	nodes, err := GetReadySchedulableNodes(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("get schedulable and ready nodes error: %s", err)
+		return nil, fmt.Errorf("get schedulable and ready nodes error: %w", err)
 	}
 	ips := CollectAddresses(nodes, v1.NodeExternalIP)
 	if len(ips) == 0 {
@@ -327,7 +327,7 @@ func GetPublicIps(ctx context.Context, c clientset.Interface) ([]string, error) 
 func GetReadySchedulableNodes(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
 	nodes, err = checkWaitListSchedulableNodes(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
+		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
 		return IsNodeSchedulable(&node) && isNodeUntainted(&node)
@@ -376,7 +376,7 @@ func GetRandomReadySchedulableNode(ctx context.Context, c clientset.Interface) (
 func GetReadyNodesIncludingTainted(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
 	nodes, err = checkWaitListSchedulableNodes(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
+		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
 		return IsNodeSchedulable(&node)
@@ -393,25 +393,6 @@ func isNodeUntainted(node *v1.Node) bool {
 // isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
 // but allows for taints in the list of non-blocking taints.
 func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
-	fakePod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "fake-not-scheduled",
-			Namespace: "fake-not-scheduled",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "fake-not-scheduled",
-					Image: "fake-not-scheduled",
-				},
-			},
-		},
-	}
-
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}
 	for _, t := range strings.Split(nonblockingTaints, ",") {
@@ -431,7 +412,8 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		}
 		n = nodeCopy
 	}
-	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, fakePod.Spec.Tolerations)
+
+	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, nil)
 }
 
 func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {
@@ -536,7 +518,7 @@ func PodNodePairs(ctx context.Context, c clientset.Interface, ns string) ([]PodN
 func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
 	nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %v", err)
+		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %w", err)
 	}
 
 	// collect values of zone label from all nodes
@@ -554,15 +536,15 @@ func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.String, e
 }
 
 // GetSchedulableClusterZones returns the values of zone label collected from all nodes which are schedulable.
-func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
+func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (sets.Set[string], error) {
 	// GetReadySchedulableNodes already filters our tainted and unschedulable nodes.
 	nodes, err := GetReadySchedulableNodes(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("error getting nodes while attempting to list cluster zones: %v", err)
+		return nil, fmt.Errorf("error getting nodes while attempting to list cluster zones: %w", err)
 	}
 
 	// collect values of zone label from all nodes
-	zones := sets.NewString()
+	zones := sets.New[string]()
 	for _, node := range nodes.Items {
 		if zone, found := node.Labels[v1.LabelFailureDomainBetaZone]; found {
 			zones.Insert(zone)
@@ -781,7 +763,7 @@ func removeNodeTaint(ctx context.Context, c clientset.Interface, nodeName string
 func patchNodeTaints(ctx context.Context, c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
 	oldData, err := json.Marshal(oldNode)
 	if err != nil {
-		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
+		return fmt.Errorf("failed to marshal old node %#v for node %q: %w", oldNode, nodeName, err)
 	}
 
 	newTaints := newNode.Spec.Taints
@@ -789,12 +771,12 @@ func patchNodeTaints(ctx context.Context, c clientset.Interface, nodeName string
 	newNodeClone.Spec.Taints = newTaints
 	newData, err := json.Marshal(newNodeClone)
 	if err != nil {
-		return fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNodeClone, nodeName, err)
+		return fmt.Errorf("failed to marshal new node %#v for node %q: %w", newNodeClone, nodeName, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
 	if err != nil {
-		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
+		return fmt.Errorf("failed to create patch for node %q: %w", nodeName, err)
 	}
 
 	_, err = c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})

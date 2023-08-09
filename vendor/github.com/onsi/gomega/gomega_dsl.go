@@ -22,7 +22,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const GOMEGA_VERSION = "1.24.2"
+const GOMEGA_VERSION = "1.27.6"
 
 const nilGomegaPanic = `You are trying to make an assertion, but haven't registered Gomega's fail handler.
 If you're using Ginkgo then you probably forgot to put your assertion in an It().
@@ -204,7 +204,7 @@ func Ω(actual interface{}, extra ...interface{}) Assertion {
 // All subsequent arguments will be required to be nil/zero.
 //
 // This is convenient if you want to make an assertion on a method/function that returns
-// a value and an error - a common patter in Go.
+// a value and an error - a common pattern in Go.
 //
 // For example, given a function with signature:
 //
@@ -359,6 +359,16 @@ You can also pass additional arugments to functions that take a Gomega.  The onl
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(elements).To(ConsistOf(expected))
 	}).WithContext(ctx).WithArguments("/names", "Joe", "Jane", "Sam").Should(Succeed())
+
+You can ensure that you get a number of consecutive successful tries before succeeding using `MustPassRepeatedly(int)`. For Example:
+
+	int count := 0
+	Eventually(func() bool {
+		count++
+		return count > 2
+	}).MustPassRepeatedly(2).Should(BeTrue())
+	// Because we had to wait for 2 calls that returned true
+	Expect(count).To(Equal(3))
 
 Finally, in addition to passing timeouts and a context to Eventually you can be more explicit with Eventually's chaining configuration methods:
 

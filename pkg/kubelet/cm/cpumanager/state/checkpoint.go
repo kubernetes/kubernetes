@@ -18,11 +18,11 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
 	"hash/fnv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -102,21 +102,14 @@ func (cp *CPUManagerCheckpointV1) VerifyChecksum() error {
 		return nil
 	}
 
-	printer := spew.ConfigState{
-		Indent:         " ",
-		SortKeys:       true,
-		DisableMethods: true,
-		SpewKeys:       true,
-	}
-
 	ck := cp.Checksum
 	cp.Checksum = 0
-	object := printer.Sprintf("%#v", cp)
+	object := dump.ForHash(cp)
 	object = strings.Replace(object, "CPUManagerCheckpointV1", "CPUManagerCheckpoint", 1)
 	cp.Checksum = ck
 
 	hash := fnv.New32a()
-	printer.Fprintf(hash, "%v", object)
+	fmt.Fprintf(hash, "%v", object)
 	if cp.Checksum != checksum.Checksum(hash.Sum32()) {
 		return errors.ErrCorruptCheckpoint
 	}

@@ -58,7 +58,7 @@ import (
 
 var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	const (
 		NodeLabelKey = "vsphere_e2e_label_volume_diskformat"
 	)
@@ -74,7 +74,7 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeName = GetReadySchedulableRandomNodeInfo(ctx).Name
+		nodeName = GetReadySchedulableRandomNodeInfo(ctx, client).Name
 		nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
 		nodeKeyValueLabel = map[string]string{NodeLabelKey: nodeLabelValue}
 		e2enode.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)

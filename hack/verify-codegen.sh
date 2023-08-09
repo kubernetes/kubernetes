@@ -26,21 +26,27 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::util::ensure_clean_working_dir
+
+# This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
 kube::golang::setup_env
 
-# call verify on sub-project for now
-#
-# Note: these must be before the main script call because the later calls the sub-project's
-#       update-codegen.sh scripts. We wouldn't see any error on changes then.
-export CODEGEN_PKG=./vendor/k8s.io/code-generator
-vendor/k8s.io/code-generator/hack/verify-codegen.sh
-vendor/k8s.io/kube-aggregator/hack/verify-codegen.sh
-vendor/k8s.io/sample-apiserver/hack/verify-codegen.sh
-vendor/k8s.io/sample-controller/hack/verify-codegen.sh
-vendor/k8s.io/apiextensions-apiserver/hack/verify-codegen.sh
-vendor/k8s.io/metrics/hack/verify-codegen.sh
+_tmpdir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
+git worktree add -f -q "${_tmpdir}" HEAD
+kube::util::trap_add "git worktree remove -f ${_tmpdir}" EXIT
+cd "${_tmpdir}"
 
-# This won't actually update anything because of --verify-only, but it tells
-# the openapi tool to verify against the real filenames.
+# Update generated code
 export UPDATE_API_KNOWN_VIOLATIONS=true
-"${KUBE_ROOT}/hack/update-codegen.sh" --verify-only "$@"
+hack/update-codegen.sh "$@"
+
+# Test for diffs
+diffs=$(git status --porcelain | wc -l)
+if [[ ${diffs} -gt 0 ]]; then
+  git status >&2
+  git diff >&2
+  echo "Generated files need to be updated" >&2
+  echo "Please run 'hack/update-codegen.sh'" >&2
+  exit 1
+fi
+echo "Generated files are up to date"

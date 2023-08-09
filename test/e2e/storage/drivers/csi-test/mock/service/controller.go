@@ -651,7 +651,7 @@ func (s *service) DeleteSnapshot(ctx context.Context,
 	// leaks. The slice's elements may not be pointers, but the structs
 	// themselves have fields that are.
 	s.snapshots.Delete(i)
-	klog.V(5).InfoS("mock delete snapshot", "SnapshotId", req.SnapshotId)
+	klog.V(5).InfoS("mock delete snapshot", "snapshotId", req.SnapshotId)
 
 	if hookVal, hookMsg := s.execHook("DeleteSnapshotEnd"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)

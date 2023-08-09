@@ -52,7 +52,7 @@ func (origin *Origin) Append(path string) *Origin {
 	originCopy := origin.Copy()
 	repoSpec, err := git.NewRepoSpecFromURL(path)
 	if err == nil {
-		originCopy.Repo = repoSpec.Host + repoSpec.OrgRepo
+		originCopy.Repo = repoSpec.CloneSpec()
 		absPath := repoSpec.AbsPath()
 		path = absPath[strings.Index(absPath[1:], "/")+1:][1:]
 		originCopy.Path = ""

@@ -37,6 +37,8 @@ const (
 	Modulo        = "_%_"
 	Negate        = "-_"
 	Index         = "_[_]"
+	OptIndex      = "_[?_]"
+	OptSelect     = "_?._"
 
 	// Macros, must have a valid identifier.
 	Has       = "has"
@@ -99,6 +101,8 @@ var (
 		LogicalNot:    {displayName: "!", precedence: 2, arity: 1},
 		Negate:        {displayName: "-", precedence: 2, arity: 1},
 		Index:         {displayName: "", precedence: 1, arity: 2},
+		OptIndex:      {displayName: "", precedence: 1, arity: 2},
+		OptSelect:     {displayName: "", precedence: 1, arity: 2},
 	}
 )
 

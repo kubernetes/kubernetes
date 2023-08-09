@@ -33,7 +33,6 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	apiutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,7 +40,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -49,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 )
@@ -313,8 +312,8 @@ func (info *endpointsInfo) IsTerminating() bool {
 }
 
 // GetZoneHint returns the zone hint for the endpoint.
-func (info *endpointsInfo) GetZoneHints() sets.String {
-	return sets.String{}
+func (info *endpointsInfo) GetZoneHints() sets.Set[string] {
+	return sets.Set[string]{}
 }
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
@@ -613,20 +612,13 @@ type Proxier struct {
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	// These are effectively const and do not need the mutex to be held.
-	masqueradeAll  bool
-	masqueradeMark string
-	clusterCIDR    string
-	hostname       string
-	nodeIP         net.IP
-	recorder       events.EventRecorder
+	clusterCIDR string
+	hostname    string
+	nodeIP      net.IP
+	recorder    events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
-
-	// Since converting probabilities (floats) to strings is expensive
-	// and we are using only probabilities in the format of 1/n, we are
-	// precomputing some number of those and cache for future reuse.
-	precomputedProbabilities []string
 
 	hns               HostNetworkService
 	network           hnsNetworkInfo
@@ -676,8 +668,6 @@ var _ proxy.Provider = &Proxier{}
 func NewProxier(
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	masqueradeAll bool,
-	masqueradeBit int,
 	clusterCIDR string,
 	hostname string,
 	nodeIP net.IP,
@@ -686,9 +676,6 @@ func NewProxier(
 	config config.KubeProxyWinkernelConfiguration,
 	healthzPort int,
 ) (*Proxier, error) {
-	masqueradeValue := 1 << uint(masqueradeBit)
-	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
-
 	if nodeIP == nil {
 		klog.InfoS("Invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
 		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
@@ -698,7 +685,16 @@ func NewProxier(
 		klog.InfoS("ClusterCIDR not specified, unable to distinguish between internal and external traffic")
 	}
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, []string{} /* windows listen to all node addresses */)
+	isIPv6 := netutils.IsIPv6(nodeIP)
+	ipFamily := v1.IPv4Protocol
+	if isIPv6 {
+		ipFamily = v1.IPv6Protocol
+	}
+
+	// windows listens to all node addresses
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
+
 	hns, supportedFeatures := newHostNetworkService()
 	hnsNetworkName, err := getNetworkName(config.NetworkName)
 	if err != nil {
@@ -774,13 +770,10 @@ func NewProxier(
 		}
 	}
 
-	isIPv6 := netutils.IsIPv6(nodeIP)
 	proxier := &Proxier{
 		endPointsRefCount:     make(endPointsReferenceCountMap),
 		svcPortMap:            make(proxy.ServicePortMap),
 		endpointsMap:          make(proxy.EndpointsMap),
-		masqueradeAll:         masqueradeAll,
-		masqueradeMark:        masqueradeMark,
 		clusterCIDR:           clusterCIDR,
 		hostname:              hostname,
 		nodeIP:                nodeIP,
@@ -800,10 +793,6 @@ func NewProxier(
 		mapStaleLoadbalancers: make(map[string]bool),
 	}
 
-	ipFamily := v1.IPv4Protocol
-	if isIPv6 {
-		ipFamily = v1.IPv6Protocol
-	}
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, ipFamily, recorder, proxier.serviceMapChange)
 	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, proxier.endpointsMapChange)
 	proxier.endpointsChanges = endPointChangeTracker
@@ -818,11 +807,9 @@ func NewProxier(
 func NewDualStackProxier(
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	masqueradeAll bool,
-	masqueradeBit int,
 	clusterCIDR string,
 	hostname string,
-	nodeIP [2]net.IP,
+	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	config config.KubeProxyWinkernelConfiguration,
@@ -830,17 +817,19 @@ func NewDualStackProxier(
 ) (proxy.Provider, error) {
 
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
-		clusterCIDR, hostname, nodeIP[0], recorder, healthzServer, config, healthzPort)
+	ipv4Proxier, err := NewProxier(syncPeriod, minSyncPeriod,
+		clusterCIDR, hostname, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
+		config, healthzPort)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIP[0])
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIPs[v1.IPv4Protocol])
 	}
 
-	ipv6Proxier, err := NewProxier(syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
-		clusterCIDR, hostname, nodeIP[1], recorder, healthzServer, config, healthzPort)
+	ipv6Proxier, err := NewProxier(syncPeriod, minSyncPeriod,
+		clusterCIDR, hostname, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
+		config, healthzPort)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIP[1])
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIPs[v1.IPv6Protocol])
 	}
 
 	// Return a meta-proxier that dispatch calls between the two
@@ -1030,20 +1019,6 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.syncProxyRules()
 }
 
-func shouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
-	// if ClusterIP is "None" or empty, skip proxying
-	if !helper.IsServiceIPSet(service) {
-		klog.V(3).InfoS("Skipping service due to clusterIP", "serviceName", svcName, "clusterIP", service.Spec.ClusterIP)
-		return true
-	}
-	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
-	if service.Spec.Type == v1.ServiceTypeExternalName {
-		klog.V(3).InfoS("Skipping service due to Type=ExternalName", "serviceName", svcName)
-		return true
-	}
-	return false
-}
-
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
 func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
@@ -1198,12 +1173,12 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	staleServices := serviceUpdateResult.UDPStaleClusterIP
+	deletedUDPClusterIPs := serviceUpdateResult.DeletedUDPClusterIPs
 	// merge stale services gathered from updateEndpointsMap
-	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
+	for _, svcPortName := range endpointUpdateResult.NewlyActiveUDPServices {
 		if svcInfo, ok := proxier.svcPortMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
-			klog.V(2).InfoS("Stale udp service", "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP())
-			staleServices.Insert(svcInfo.ClusterIP().String())
+			klog.V(2).InfoS("Newly-active UDP service may have stale conntrack entries", "servicePortName", svcPortName)
+			deletedUDPClusterIPs.Insert(svcInfo.ClusterIP().String())
 		}
 	}
 	// Query HNS for endpoints and load balancers
@@ -1283,7 +1258,7 @@ func (proxier *Proxier) syncProxyRules() {
 		var allEndpointsTerminating, allEndpointsNonServing bool
 		someEndpointsServing := true
 
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ProxyTerminatingEndpoints) && len(svcInfo.loadBalancerIngressIPs) > 0 {
+		if len(svcInfo.loadBalancerIngressIPs) > 0 {
 			// Check should be done only if comes under the feature gate or enabled
 			// The check should be done only if Spec.Type == Loadbalancer.
 			allEndpointsTerminating = proxier.isAllEndpointsTerminating(svcName, svcInfo.localTrafficDSR)
@@ -1291,7 +1266,7 @@ func (proxier *Proxier) syncProxyRules() {
 			someEndpointsServing = !allEndpointsNonServing
 			klog.V(4).InfoS("Terminating status checked for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "allEndpointsTerminating", allEndpointsTerminating, "allEndpointsNonServing", allEndpointsNonServing, "localTrafficDSR", svcInfo.localTrafficDSR)
 		} else {
-			klog.V(4).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "proxyEndpointsFeatureGateEnabled", utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ProxyTerminatingEndpoints), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
+			klog.V(4).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
 		}
 
 		for _, epInfo := range proxier.endpointsMap[svcName] {
@@ -1467,14 +1442,14 @@ func (proxier *Proxier) syncProxyRules() {
 		endpointsAvailableForLB := !allEndpointsTerminating && !allEndpointsNonServing
 		proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
 
-		if endpointsAvailableForLB {
+		// clusterIPEndpoints is the endpoint list used for creating ClusterIP loadbalancer.
+		clusterIPEndpoints := hnsEndpoints
+		if svcInfo.internalTrafficLocal {
+			// Take local endpoints for clusterip loadbalancer when internal traffic policy is local.
+			clusterIPEndpoints = hnsLocalEndpoints
+		}
 
-			// clusterIPEndpoints is the endpoint list used for creating ClusterIP loadbalancer.
-			clusterIPEndpoints := hnsEndpoints
-			if svcInfo.internalTrafficLocal {
-				// Take local endpoints for clusterip loadbalancer when internal traffic policy is local.
-				clusterIPEndpoints = hnsLocalEndpoints
-			}
+		if len(clusterIPEndpoints) > 0 {
 
 			// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
 			// Cluster IP LoadBalancer creation
@@ -1640,16 +1615,16 @@ func (proxier *Proxier) syncProxyRules() {
 	// Update service healthchecks.  The endpoints list might include services that are
 	// not "OnlyLocal", but the services list will not, and the serviceHealthServer
 	// will just drop those endpoints.
-	if err := proxier.serviceHealthServer.SyncServices(serviceUpdateResult.HCServiceNodePorts); err != nil {
+	if err := proxier.serviceHealthServer.SyncServices(proxier.svcPortMap.HealthCheckNodePorts()); err != nil {
 		klog.ErrorS(err, "Error syncing healthcheck services")
 	}
-	if err := proxier.serviceHealthServer.SyncEndpoints(endpointUpdateResult.HCEndpointsLocalIPSize); err != nil {
+	if err := proxier.serviceHealthServer.SyncEndpoints(proxier.endpointsMap.LocalReadyEndpoints()); err != nil {
 		klog.ErrorS(err, "Error syncing healthcheck endpoints")
 	}
 
 	// Finish housekeeping.
 	// TODO: these could be made more consistent.
-	for _, svcIP := range staleServices.UnsortedList() {
+	for _, svcIP := range deletedUDPClusterIPs.UnsortedList() {
 		// TODO : Check if this is required to cleanup stale services here
 		klog.V(5).InfoS("Pending delete stale service IP connections", "IP", svcIP)
 	}

@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/v3"
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -55,7 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -72,10 +73,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 type alwaysMutatingDeny struct{}
@@ -234,6 +232,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		Creater:         scheme,
 		Convertor:       scheme,
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
@@ -370,6 +369,10 @@ func (storage *SimpleRESTStorage) NamespaceScoped() bool {
 
 func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
+}
+
+func (storate *SimpleRESTStorage) GetSingularName() string {
+	return "simple"
 }
 
 func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
@@ -575,6 +578,10 @@ func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string
 	return s.emptyConnectOptions, false, ""
 }
 
+func (s *ConnecterRESTStorage) GetSingularName() string {
+	return "simple"
+}
+
 type MetadataRESTStorage struct {
 	*SimpleRESTStorage
 	types []string
@@ -617,6 +624,10 @@ type GetWithOptionsRootRESTStorage struct {
 	*SimpleTypedStorage
 	optionsReceived runtime.Object
 	takesPath       string
+}
+
+func (r *GetWithOptionsRootRESTStorage) GetSingularName() string {
+	return "simple"
 }
 
 func (r *GetWithOptionsRootRESTStorage) NamespaceScoped() bool {
@@ -685,6 +696,10 @@ func (storage *SimpleTypedStorage) Get(ctx context.Context, id string, options *
 
 func (storage *SimpleTypedStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
+}
+
+func (storage *SimpleTypedStorage) GetSingularName() string {
+	return "simple"
 }
 
 func bodyOrDie(response *http.Response) string {
@@ -821,6 +836,10 @@ func (UnimplementedRESTStorage) New() runtime.Object {
 }
 
 func (UnimplementedRESTStorage) Destroy() {
+}
+
+func (UnimplementedRESTStorage) GetSingularName() string {
+	return ""
 }
 
 // TestUnimplementedRESTStorage ensures that if a rest.Storage does not implement a given
@@ -1815,7 +1834,7 @@ func TestGetTable(t *testing.T) {
 			}
 			if !reflect.DeepEqual(test.expected, &itemOut) {
 				t.Log(body)
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, &itemOut))
 			}
 		})
 	}
@@ -2044,13 +2063,7 @@ func TestWatchTable(t *testing.T) {
 				actual = append(actual, &event)
 			}
 			if !reflect.DeepEqual(test.expected, actual) {
-				for i := range test.expected {
-					if i >= len(actual) {
-						break
-					}
-					t.Logf("%s", diff.StringDiff(string(test.expected[i].Object.Raw), string(actual[i].Object.Raw)))
-				}
-				t.Fatalf("unexpected: %s", diff.ObjectReflectDiff(test.expected, actual))
+				t.Fatalf("unexpected: %s", cmp.Diff(test.expected, actual))
 			}
 		})
 	}
@@ -2068,7 +2081,7 @@ func watcher(mediaType string, r io.ReadCloser) streaming.Decoder {
 }
 
 func TestGetPartialObjectMetadata(t *testing.T) {
-	now := metav1.Time{metav1.Now().Rfc3339Copy().Local()}
+	now := metav1.Time{Time: metav1.Now().Rfc3339Copy().Local()}
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
@@ -2228,7 +2241,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(test.expected, itemOut) {
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, itemOut))
 			}
 			body = d
 		} else {
@@ -2812,7 +2825,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2852,7 +2865,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2895,7 +2908,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -3328,6 +3341,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Creater:         scheme,
 		Convertor:       scheme,
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
@@ -3521,6 +3535,8 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Name = populateName
 	simple.Namespace = "default" // populated by create handler to match request URL
@@ -3601,6 +3617,8 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -3663,6 +3681,8 @@ func TestCreateYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -3715,6 +3735,8 @@ func TestCreateInNamespace(t *testing.T) {
 		t.Fatalf("unexpected error: %v\n%s", err, data)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "other" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -4021,7 +4043,6 @@ var (
 
 // TestFieldValidation tests the create, update, and patch handlers for correctness when faced with field validation errors.
 func TestFieldValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
 	var (
 		strictDecodingErr          = `strict decoding error: duplicate field \"other\", unknown field \"unknown\"`
 		strictDecodingWarns        = []string{`duplicate field "other"`, `unknown field "unknown"`}
@@ -4160,7 +4181,6 @@ unknown: baz`)
 // BenchmarkFieldValidation benchmarks the create, update, and patch handlers for performance distinctions between
 // strict, warn, and ignore field validation handling.
 func BenchmarkFieldValidation(b *testing.B) {
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
 	var (
 		validJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo"}`)
 		validYAMLDataPost = []byte(`apiVersion: test.group/version
@@ -4289,6 +4309,10 @@ func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV sch
 	return storage.itemGVK
 }
 
+func (storage *SimpleXGSubresourceRESTStorage) GetSingularName() string {
+	return "simple"
+}
+
 func TestXGSubresource(t *testing.T) {
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
@@ -4311,6 +4335,7 @@ func TestXGSubresource(t *testing.T) {
 
 		Creater:         scheme,
 		Convertor:       scheme,
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,

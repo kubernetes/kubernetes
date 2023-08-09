@@ -143,7 +143,7 @@ func waitForKubeProxyStaticPodsRunning(ctx context.Context, c clientset.Interfac
 	}
 
 	if err := wait.PollImmediate(5*time.Second, defaultTestTimeout, condition); err != nil {
-		return fmt.Errorf("error waiting for kube-proxy static pods running: %v", err)
+		return fmt.Errorf("error waiting for kube-proxy static pods running: %w", err)
 	}
 	return nil
 }
@@ -166,7 +166,7 @@ func waitForKubeProxyStaticPodsDisappear(ctx context.Context, c clientset.Interf
 	}
 
 	if err := wait.PollImmediate(5*time.Second, defaultTestTimeout, condition); err != nil {
-		return fmt.Errorf("error waiting for kube-proxy static pods disappear: %v", err)
+		return fmt.Errorf("error waiting for kube-proxy static pods disappear: %w", err)
 	}
 	return nil
 }
@@ -190,7 +190,7 @@ func waitForKubeProxyDaemonSetRunning(ctx context.Context, f *framework.Framewor
 	}
 
 	if err := wait.PollImmediate(5*time.Second, defaultTestTimeout, condition); err != nil {
-		return fmt.Errorf("error waiting for kube-proxy DaemonSet running: %v", err)
+		return fmt.Errorf("error waiting for kube-proxy DaemonSet running: %w", err)
 	}
 	return nil
 }
@@ -213,7 +213,7 @@ func waitForKubeProxyDaemonSetDisappear(ctx context.Context, c clientset.Interfa
 	}
 
 	if err := wait.PollImmediate(5*time.Second, defaultTestTimeout, condition); err != nil {
-		return fmt.Errorf("error waiting for kube-proxy DaemonSet disappear: %v", err)
+		return fmt.Errorf("error waiting for kube-proxy DaemonSet disappear: %w", err)
 	}
 	return nil
 }

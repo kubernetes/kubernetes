@@ -225,3 +225,17 @@ func (f Folder) MoveInto(ctx context.Context, list []types.ManagedObjectReferenc
 
 	return NewTask(f.c, res.Returnval), nil
 }
+
+func (f Folder) PlaceVmsXCluster(ctx context.Context, spec types.PlaceVmsXClusterSpec) (*types.PlaceVmsXClusterResult, error) {
+	req := types.PlaceVmsXCluster{
+		This:          f.Reference(),
+		PlacementSpec: spec,
+	}
+
+	res, err := methods.PlaceVmsXCluster(ctx, f.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res.Returnval, nil
+}

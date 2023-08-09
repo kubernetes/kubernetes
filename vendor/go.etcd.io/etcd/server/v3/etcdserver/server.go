@@ -349,13 +349,13 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		)
 	}
 
-	if terr := fileutil.TouchDirAll(cfg.DataDir); terr != nil {
+	if terr := fileutil.TouchDirAll(cfg.Logger, cfg.DataDir); terr != nil {
 		return nil, fmt.Errorf("cannot access data directory: %v", terr)
 	}
 
 	haveWAL := wal.Exist(cfg.WALDir())
 
-	if err = fileutil.TouchDirAll(cfg.SnapDir()); err != nil {
+	if err = fileutil.TouchDirAll(cfg.Logger, cfg.SnapDir()); err != nil {
 		cfg.Logger.Fatal(
 			"failed to create snapshot directory",
 			zap.String("path", cfg.SnapDir()),
@@ -548,7 +548,7 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		return nil, fmt.Errorf("unsupported bootstrap config")
 	}
 
-	if terr := fileutil.TouchDirAll(cfg.MemberDir()); terr != nil {
+	if terr := fileutil.TouchDirAll(cfg.Logger, cfg.MemberDir()); terr != nil {
 		return nil, fmt.Errorf("cannot access member directory: %v", terr)
 	}
 
@@ -1744,6 +1744,10 @@ func (s *EtcdServer) mayPromoteMember(id types.ID) error {
 // Note: it will return nil if member is not found in cluster or if member is not learner.
 // These two conditions will be checked before apply phase later.
 func (s *EtcdServer) isLearnerReady(id uint64) error {
+	if err := s.waitAppliedIndex(); err != nil {
+		return err
+	}
+
 	rs := s.raftStatus()
 
 	// leader's raftStatus.Progress is not nil
@@ -1763,12 +1767,16 @@ func (s *EtcdServer) isLearnerReady(id uint64) error {
 		}
 	}
 
-	if isFound {
-		leaderMatch := rs.Progress[leaderID].Match
-		// the learner's Match not caught up with leader yet
-		if float64(learnerMatch) < float64(leaderMatch)*readyPercent {
-			return ErrLearnerNotReady
-		}
+	// We should return an error in API directly, to avoid the request
+	// being unnecessarily delivered to raft.
+	if !isFound {
+		return membership.ErrIDNotFound
+	}
+
+	leaderMatch := rs.Progress[leaderID].Match
+	// the learner's Match not caught up with leader yet
+	if float64(learnerMatch) < float64(leaderMatch)*readyPercent {
+		return ErrLearnerNotReady
 	}
 
 	return nil

@@ -34,6 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
@@ -487,7 +488,7 @@ func TestNodeAddresses(t *testing.T) {
 			metadataName:        "vm1",
 			vmType:              vmTypeStandard,
 			useInstanceMetadata: true,
-			expectedErrMsg:      fmt.Errorf("timed out waiting for the condition"),
+			expectedErrMsg:      wait.ErrWaitTimeout,
 		},
 		{
 			name:                "NodeAddresses should get IP addresses from Azure API if node's name isn't equal to metadataName",

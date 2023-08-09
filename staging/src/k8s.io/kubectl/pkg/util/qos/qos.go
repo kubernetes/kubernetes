@@ -37,6 +37,7 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 	limits := core.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
+	// note, ephemeral containers are not considered for QoS as they cannot define resources
 	allContainers := []core.Container{}
 	allContainers = append(allContainers, pod.Spec.Containers...)
 	allContainers = append(allContainers, pod.Spec.InitContainers...)

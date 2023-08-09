@@ -2,6 +2,7 @@ package generators
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/template"
@@ -25,6 +26,9 @@ func BuildBootstrapCommand() command.Command {
 			{Name: "template", KeyPath: "CustomTemplate",
 				UsageArgument: "template-file",
 				Usage:         "If specified, generate will use the contents of the file passed as the bootstrap template"},
+			{Name: "template-data", KeyPath: "CustomTemplateData",
+				UsageArgument: "template-data-file",
+				Usage:         "If specified, generate will use the contents of the file passed as data to be rendered in the bootstrap template"},
 		},
 		&conf,
 		types.GinkgoFlagSections{},
@@ -57,6 +61,7 @@ type bootstrapData struct {
 	GomegaImport  string
 	GinkgoPackage string
 	GomegaPackage string
+	CustomData    map[string]any
 }
 
 func generateBootstrap(conf GeneratorsConfig) {
@@ -95,17 +100,32 @@ func generateBootstrap(conf GeneratorsConfig) {
 		tpl, err := os.ReadFile(conf.CustomTemplate)
 		command.AbortIfError("Failed to read custom bootstrap file:", err)
 		templateText = string(tpl)
+		if conf.CustomTemplateData != "" {
+			var tplCustomDataMap map[string]any
+			tplCustomData, err := os.ReadFile(conf.CustomTemplateData)
+			command.AbortIfError("Failed to read custom boostrap data file:", err)
+			if !json.Valid([]byte(tplCustomData)) {
+				command.AbortWith("Invalid JSON object in custom data file.")
+			}
+			//create map from the custom template data
+			json.Unmarshal(tplCustomData, &tplCustomDataMap)
+			data.CustomData = tplCustomDataMap
+		}
 	} else if conf.Agouti {
 		templateText = agoutiBootstrapText
 	} else {
 		templateText = bootstrapText
 	}
 
-	bootstrapTemplate, err := template.New("bootstrap").Funcs(sprig.TxtFuncMap()).Parse(templateText)
+	//Setting the option to explicitly fail if template is rendered trying to access missing key
+	bootstrapTemplate, err := template.New("bootstrap").Funcs(sprig.TxtFuncMap()).Option("missingkey=error").Parse(templateText)
 	command.AbortIfError("Failed to parse bootstrap template:", err)
 
 	buf := &bytes.Buffer{}
-	bootstrapTemplate.Execute(buf, data)
+	//Being explicit about failing sooner during template rendering
+	//when accessing custom data rather than during the go fmt command
+	err = bootstrapTemplate.Execute(buf, data)
+	command.AbortIfError("Failed to render bootstrap template:", err)
 
 	buf.WriteTo(f)
 

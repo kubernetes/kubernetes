@@ -112,6 +112,18 @@ func (s *SelectionPredicate) MatchesObjectAttributes(l labels.Set, f fields.Set)
 	return matched
 }
 
+// MatchesSingleNamespace will return (namespace, true) if and only if s.Field matches on the object's
+// namespace.
+func (s *SelectionPredicate) MatchesSingleNamespace() (string, bool) {
+	if len(s.Continue) > 0 {
+		return "", false
+	}
+	if namespace, ok := s.Field.RequiresExactMatch("metadata.namespace"); ok {
+		return namespace, true
+	}
+	return "", false
+}
+
 // MatchesSingle will return (name, true) if and only if s.Field matches on the object's
 // name.
 func (s *SelectionPredicate) MatchesSingle() (string, bool) {

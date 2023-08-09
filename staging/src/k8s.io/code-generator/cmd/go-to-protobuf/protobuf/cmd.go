@@ -50,6 +50,7 @@ type Generator struct {
 	KeepGogoproto        bool
 	SkipGeneratedRewrite bool
 	DropEmbeddedFields   string
+	TrimPathPrefix       string
 }
 
 func New() *Generator {
@@ -95,6 +96,7 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.BoolVar(&g.KeepGogoproto, "keep-gogoproto", g.KeepGogoproto, "If true, the generated IDL will contain gogoprotobuf extensions which are normally removed")
 	flag.BoolVar(&g.SkipGeneratedRewrite, "skip-generated-rewrite", g.SkipGeneratedRewrite, "If true, skip fixing up the generated.pb.go file (debugging only).")
 	flag.StringVar(&g.DropEmbeddedFields, "drop-embedded-fields", g.DropEmbeddedFields, "Comma-delimited list of embedded Go types to omit from generated protobufs")
+	flag.StringVar(&g.TrimPathPrefix, "trim-path-prefix", g.TrimPathPrefix, "If set, trim the specified prefix from --output-package when generating files.")
 }
 
 func Run(g *Generator) {
@@ -200,6 +202,7 @@ func Run(g *Generator) {
 
 	c.Verify = g.Common.VerifyOnly
 	c.FileTypes["protoidl"] = NewProtoFile()
+	c.TrimPathPrefix = g.TrimPathPrefix
 
 	// order package by imports, importees first
 	deps := deps(c, protobufNames.packages)
@@ -270,14 +273,28 @@ func Run(g *Generator) {
 			outputPath = filepath.Join(g.VendorOutputBase, p.OutputPath())
 		}
 
+		// When working outside of GOPATH, we typically won't want to generate the
+		// full path for a package. For example, if our current project's root/base
+		// package is github.com/foo/bar, outDir=., p.Path()=github.com/foo/bar/generated,
+		// then we really want to be writing files to ./generated, not ./github.com/foo/bar/generated.
+		// The following will trim a path prefix (github.com/foo/bar) from p.Path() to arrive at
+		// a relative path that works with projects not in GOPATH.
+		if g.TrimPathPrefix != "" {
+			separator := string(filepath.Separator)
+			if !strings.HasSuffix(g.TrimPathPrefix, separator) {
+				g.TrimPathPrefix += separator
+			}
+
+			path = strings.TrimPrefix(path, g.TrimPathPrefix)
+			outputPath = strings.TrimPrefix(outputPath, g.TrimPathPrefix)
+		}
+
 		// generate the gogoprotobuf protoc
 		cmd := exec.Command("protoc", append(args, path)...)
 		out, err := cmd.CombinedOutput()
-		if len(out) > 0 {
-			log.Print(string(out))
-		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
+			log.Println(string(out))
 			log.Fatalf("Unable to generate protoc on %s: %v", p.PackageName, err)
 		}
 
@@ -397,9 +414,9 @@ func importOrder(deps map[string][]string) ([]string, error) {
 	if len(remainingNodes) > 0 {
 		return nil, fmt.Errorf("cycle: remaining nodes: %#v, remaining edges: %#v", remainingNodes, graph)
 	}
-	for _, n := range sorted {
-		fmt.Println("topological order", n)
-	}
+	//for _, n := range sorted {
+	//	fmt.Println("topological order", n)
+	//}
 	return sorted, nil
 }
 

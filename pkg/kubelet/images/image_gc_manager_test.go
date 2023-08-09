@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"k8s.io/client-go/tools/record"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -47,6 +49,7 @@ func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provide
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
 		sandboxImage:  sandboxImage,
+		tracer:        oteltrace.NewNoopTracerProvider().Tracer(""),
 	}, fakeRuntime
 }
 
@@ -464,6 +467,13 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 			},
 		}},
 	}
+	// manager.detectImages uses time.Now() to update the image's lastUsed field.
+	// On Windows, consecutive time.Now() calls can return the same timestamp, which would mean
+	// that the second image is NOT newer than the first one.
+	// time.Sleep will result in the timestamp to be updated as well.
+	if goruntime.GOOS == "windows" {
+		time.Sleep(time.Millisecond)
+	}
 	_, err = manager.detectImages(ctx, time.Now())
 	require.NoError(t, err)
 	fakeRuntime.AllPodList = []*containertest.FakePod{
@@ -535,7 +545,7 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 	manager, _ := newRealImageGCManager(policy, mockStatsProvider)
 
 	// Expect 40% usage.
-	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(&statsapi.FsStats{
+	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(&statsapi.FsStats{
 		AvailableBytes: uint64Ptr(600),
 		CapacityBytes:  uint64Ptr(1000),
 	}, nil)
@@ -554,7 +564,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
 	manager, _ := newRealImageGCManager(policy, mockStatsProvider)
 
-	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(&statsapi.FsStats{}, fmt.Errorf("error"))
+	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(&statsapi.FsStats{}, fmt.Errorf("error"))
 	assert.NotNil(t, manager.GarbageCollect(ctx))
 }
 
@@ -571,7 +581,7 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 	manager, fakeRuntime := newRealImageGCManager(policy, mockStatsProvider)
 
 	// Expect 95% usage and most of it gets freed.
-	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(&statsapi.FsStats{
+	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(&statsapi.FsStats{
 		AvailableBytes: uint64Ptr(50),
 		CapacityBytes:  uint64Ptr(1000),
 	}, nil)
@@ -594,7 +604,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 	manager, fakeRuntime := newRealImageGCManager(policy, mockStatsProvider)
 
 	// Expect 95% usage and little of it gets freed.
-	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(&statsapi.FsStats{
+	mockStatsProvider.EXPECT().ImageFsStats(gomock.Any()).Return(&statsapi.FsStats{
 		AvailableBytes: uint64Ptr(50),
 		CapacityBytes:  uint64Ptr(1000),
 	}, nil)
@@ -709,7 +719,7 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, ""); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, "", oteltrace.NewNoopTracerProvider()); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
