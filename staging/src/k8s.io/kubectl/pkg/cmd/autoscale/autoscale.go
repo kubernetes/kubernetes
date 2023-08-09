@@ -23,14 +23,15 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
-	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
+	autoscalingv2client "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
 	"k8s.io/client-go/scale"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -78,7 +79,7 @@ type AutoscaleOptions struct {
 	builder          *resource.Builder
 	fieldManager     string
 
-	HPAClient         autoscalingv1client.HorizontalPodAutoscalersGetter
+	HPAClient         autoscalingv2client.HorizontalPodAutoscalersGetter
 	scaleKindResolver scale.ScaleKindResolver
 
 	genericiooptions.IOStreams
@@ -157,7 +158,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	o.HPAClient = kubeClient.AutoscalingV1()
+	o.HPAClient = kubeClient.AutoscalingV2()
 
 	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -260,18 +261,18 @@ func (o *AutoscaleOptions) Run() error {
 	return nil
 }
 
-func (o *AutoscaleOptions) createHorizontalPodAutoscaler(refName string, mapping *meta.RESTMapping) *autoscalingv1.HorizontalPodAutoscaler {
+func (o *AutoscaleOptions) createHorizontalPodAutoscaler(refName string, mapping *meta.RESTMapping) *autoscalingv2.HorizontalPodAutoscaler {
 	name := o.Name
 	if len(name) == 0 {
 		name = refName
 	}
 
-	scaler := autoscalingv1.HorizontalPodAutoscaler{
+	scaler := autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
 				APIVersion: mapping.GroupVersionKind.GroupVersion().String(),
 				Kind:       mapping.GroupVersionKind.Kind,
 				Name:       refName,
@@ -286,7 +287,19 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscaler(refName string, mapping
 	}
 	if o.CPUPercent >= 0 {
 		c := int32(o.CPUPercent)
-		scaler.Spec.TargetCPUUtilizationPercentage = &c
+
+		scaler.Spec.Metrics = []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ResourceMetricSourceType,
+				Resource: &autoscalingv2.ResourceMetricSource{
+					Name: "cpu-percent",
+					Target: autoscalingv2.MetricTarget{
+						Type:               autoscalingv2.UtilizationMetricType,
+						AverageUtilization: &c,
+					},
+				},
+			},
+		}
 	}
 
 	return &scaler
