@@ -175,7 +175,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			}
 		}
 	}
-	klog.V(4).InfoS("Get volumes from pod directory", "path", podDir, "volumes", volumes)
+	klog.V(4).Info("Get volumes from pod directory", "path", podDir, "volumes", volumes)
 	return volumes, nil
 }
 

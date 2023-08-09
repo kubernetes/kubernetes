@@ -99,7 +99,7 @@ func (rc *reconciler) syncStates(kubeletPodDir string) {
 		if rc.operationExecutor.IsOperationPending(reconstructedVolume.volumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
 			klog.InfoS("Volume is in pending operation, skip cleaning up mounts")
 		}
-		klog.V(2).InfoS("Reconciler sync states: could not find pod information in desired state, update it in actual state", "reconstructedVolume", reconstructedVolume)
+		klog.V(2).Info("Reconciler sync states: could not find pod information in desired state, update it in actual state", "reconstructedVolume", reconstructedVolume)
 		volumesNeedUpdate[reconstructedVolume.volumeName] = gvl
 	}
 
