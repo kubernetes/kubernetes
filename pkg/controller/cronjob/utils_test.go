@@ -290,17 +290,19 @@ func TestByJobStartTime(t *testing.T) {
 func TestMostRecentScheduleTime(t *testing.T) {
 	metav1TopOfTheHour := metav1.NewTime(*topOfTheHour())
 	metav1HalfPastTheHour := metav1.NewTime(*deltaTimeAfterTopOfTheHour(30 * time.Minute))
+	metav1MinuteAfterTopOfTheHour := metav1.NewTime(*deltaTimeAfterTopOfTheHour(1 * time.Minute))
 	oneMinute := int64(60)
+	tenSeconds := int64(10)
 
 	tests := []struct {
-		name                   string
-		cj                     *batchv1.CronJob
-		includeSDS             bool
-		now                    time.Time
-		expectedEarliestTime   time.Time
-		expectedRecentTime     *time.Time
-		expectedNumberOfMisses int64
-		wantErr                bool
+		name                  string
+		cj                    *batchv1.CronJob
+		includeSDS            bool
+		now                   time.Time
+		expectedEarliestTime  time.Time
+		expectedRecentTime    *time.Time
+		expectedTooManyMissed bool
+		wantErr               bool
 	}{
 		{
 			name: "now before next schedule",
@@ -326,10 +328,9 @@ func TestMostRecentScheduleTime(t *testing.T) {
 					Schedule: "0 * * * *",
 				},
 			},
-			now:                    topOfTheHour().Add(61 * time.Minute),
-			expectedRecentTime:     deltaTimeAfterTopOfTheHour(60 * time.Minute),
-			expectedEarliestTime:   *topOfTheHour(),
-			expectedNumberOfMisses: 1,
+			now:                  topOfTheHour().Add(61 * time.Minute),
+			expectedRecentTime:   deltaTimeAfterTopOfTheHour(60 * time.Minute),
+			expectedEarliestTime: *topOfTheHour(),
 		},
 		{
 			name: "missed 5 schedules",
@@ -341,10 +342,93 @@ func TestMostRecentScheduleTime(t *testing.T) {
 					Schedule: "0 * * * *",
 				},
 			},
-			now:                    *deltaTimeAfterTopOfTheHour(301 * time.Minute),
-			expectedRecentTime:     deltaTimeAfterTopOfTheHour(300 * time.Minute),
-			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(10 * time.Second),
-			expectedNumberOfMisses: 5,
+			now:                  *deltaTimeAfterTopOfTheHour(301 * time.Minute),
+			expectedRecentTime:   deltaTimeAfterTopOfTheHour(300 * time.Minute),
+			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(10 * time.Second),
+		},
+		{
+			name: "complex schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                  *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+			expectedRecentTime:   deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+		},
+		{
+			name: "another complex schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 10,11,12 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                  *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
+			expectedRecentTime:   nil,
+			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+		},
+		{
+			name: "complex schedule with longer diff between executions",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                  *deltaTimeAfterTopOfTheHour(96*time.Hour + 31*time.Minute),
+			expectedRecentTime:   deltaTimeAfterTopOfTheHour(96*time.Hour + 30*time.Minute),
+			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+		},
+		{
+			name: "complex schedule with shorter diff between executions",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+			},
+			now:                  *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+			expectedRecentTime:   deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedEarliestTime: *topOfTheHour(),
+		},
+		{
+			name: "@every schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1.NewTime(*deltaTimeAfterTopOfTheHour(-59 * time.Minute)),
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule:                "@every 1h",
+					StartingDeadlineSeconds: &tenSeconds,
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1MinuteAfterTopOfTheHour,
+				},
+			},
+			now:                   *deltaTimeAfterTopOfTheHour(7 * 24 * time.Hour),
+			expectedRecentTime:    deltaTimeAfterTopOfTheHour((6 * 24 * time.Hour) + 23*time.Hour + 1*time.Minute),
+			expectedEarliestTime:  *deltaTimeAfterTopOfTheHour(1 * time.Minute),
+			expectedTooManyMissed: true,
 		},
 		{
 			name: "rogue cronjob",
@@ -356,10 +440,9 @@ func TestMostRecentScheduleTime(t *testing.T) {
 					Schedule: "59 23 31 2 *",
 				},
 			},
-			now:                    *deltaTimeAfterTopOfTheHour(1 * time.Hour),
-			expectedRecentTime:     nil,
-			expectedNumberOfMisses: 0,
-			wantErr:                true,
+			now:                *deltaTimeAfterTopOfTheHour(1 * time.Hour),
+			expectedRecentTime: nil,
+			wantErr:            true,
 		},
 		{
 			name: "earliestTime being CreationTimestamp and LastScheduleTime",
@@ -439,7 +522,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			if err != nil {
 				t.Errorf("error setting up the test, %s", err)
 			}
-			gotEarliestTime, gotRecentTime, gotNumberOfMisses, err := mostRecentScheduleTime(tt.cj, tt.now, sched, tt.includeSDS)
+			gotEarliestTime, gotRecentTime, gotTooManyMissed, err := mostRecentScheduleTime(tt.cj, tt.now, sched, tt.includeSDS)
 			if tt.wantErr {
 				if err == nil {
 					t.Error("mostRecentScheduleTime() got no error when expected one")
@@ -458,8 +541,8 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			if !reflect.DeepEqual(gotRecentTime, tt.expectedRecentTime) {
 				t.Errorf("expectedRecentTime - got %v, want %v", gotRecentTime, tt.expectedRecentTime)
 			}
-			if gotNumberOfMisses != tt.expectedNumberOfMisses {
-				t.Errorf("expectedNumberOfMisses - got %v, want %v", gotNumberOfMisses, tt.expectedNumberOfMisses)
+			if gotTooManyMissed != tt.expectedTooManyMissed {
+				t.Errorf("expectedNumberOfMisses - got %v, want %v", gotTooManyMissed, tt.expectedTooManyMissed)
 			}
 		})
 	}

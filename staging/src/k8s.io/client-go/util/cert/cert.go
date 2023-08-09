@@ -25,6 +25,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 	"os"
@@ -57,8 +58,14 @@ type AltNames struct {
 // NewSelfSignedCACert creates a CA certificate
 func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, error) {
 	now := time.Now()
+	// returns a uniform random value in [0, max-1), then add 1 to serial to make it a uniform random value in [1, max).
+	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
+	if err != nil {
+		return nil, err
+	}
+	serial = new(big.Int).Add(serial, big.NewInt(1))
 	tmpl := x509.Certificate{
-		SerialNumber: new(big.Int).SetInt64(0),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
 			Organization: cfg.Organization,
@@ -116,9 +123,14 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 	if err != nil {
 		return nil, nil, err
 	}
-
+	// returns a uniform random value in [0, max-1), then add 1 to serial to make it a uniform random value in [1, max).
+	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
+	if err != nil {
+		return nil, nil, err
+	}
+	serial = new(big.Int).Add(serial, big.NewInt(1))
 	caTemplate := x509.Certificate{
-		SerialNumber: big.NewInt(1),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			CommonName: fmt.Sprintf("%s-ca@%d", host, time.Now().Unix()),
 		},
@@ -144,9 +156,14 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 	if err != nil {
 		return nil, nil, err
 	}
-
+	// returns a uniform random value in [0, max-1), then add 1 to serial to make it a uniform random value in [1, max).
+	serial, err = cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
+	if err != nil {
+		return nil, nil, err
+	}
+	serial = new(big.Int).Add(serial, big.NewInt(1))
 	template := x509.Certificate{
-		SerialNumber: big.NewInt(2),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			CommonName: fmt.Sprintf("%s@%d", host, time.Now().Unix()),
 		},

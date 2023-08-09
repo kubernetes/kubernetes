@@ -276,6 +276,7 @@ func init() {
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (vs *VSphere) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 	vs.kubeClient = clientBuilder.ClientOrDie("vsphere-legacy-cloud-provider")
+	vs.nodeManager.SetNodeGetter(vs.kubeClient.CoreV1())
 }
 
 // Initialize Node Informers
@@ -318,6 +319,9 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 		cache.ResourceEventHandlerFuncs{UpdateFunc: vs.syncNodeZoneLabels},
 		zoneLabelsResyncPeriod,
 	)
+
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	vs.nodeManager.SetNodeLister(nodeLister)
 	klog.V(4).Infof("Node informers in vSphere cloud provider initialized")
 
 }

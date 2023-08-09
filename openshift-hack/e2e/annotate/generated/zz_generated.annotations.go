@@ -495,13 +495,13 @@ var Annotations = map[string]string{
 
 	"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs with a WhenDeleted policy": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal] Decreasing .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal Decreasing .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal] Increasing .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal Increasing .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal] Removing .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal Removing .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal] Setting .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal Setting .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-apps] TTLAfterFinished job should be deleted once it finishes after TTL seconds": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
