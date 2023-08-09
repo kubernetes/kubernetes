@@ -1462,7 +1462,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 
 	var terminating int32 = 0
 	if onlyReplaceFailedPods(jobCtx.job) {
-		// For PodFailurePolicy specified but PodRecreationPolicy disabled
+		// For PodFailurePolicy specified but PodReplacementPolicy disabled
 		// we still need to count terminating pods for replica counts
 		// But we will not allow updates to status.
 		if jobCtx.terminating == nil {
@@ -1870,8 +1870,8 @@ func countReadyPods(pods []*v1.Pod) int32 {
 	return cnt
 }
 
-// This checks if we should apply PodRecreationPolicy.
-// PodRecreationPolicy controls when we recreate pods if they are marked as terminating
+// This checks if we should apply PodReplacementPolicy.
+// PodReplacementPolicy controls when we recreate pods if they are marked as terminating
 // Failed means that we recreate only once the pod has terminated.
 func onlyReplaceFailedPods(job *batch.Job) bool {
 	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && *job.Spec.PodReplacementPolicy == batch.Failed {
