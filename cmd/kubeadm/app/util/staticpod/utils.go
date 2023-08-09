@@ -273,7 +273,7 @@ func createHTTPProbe(host, path string, port int, scheme v1.URIScheme, initialDe
 			HTTPGet: &v1.HTTPGetAction{
 				Host:   host,
 				Path:   path,
-				Port:   intstr.FromInt(port),
+				Port:   intstr.FromInt32(int32(port)),
 				Scheme: scheme,
 			},
 		},

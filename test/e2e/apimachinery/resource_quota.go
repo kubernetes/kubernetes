@@ -2058,7 +2058,7 @@ func newTestServiceForQuota(name string, serviceType v1.ServiceType, allocateLoa
 			Type: serviceType,
 			Ports: []v1.ServicePort{{
 				Port:       80,
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt32(80),
 			}},
 			AllocateLoadBalancerNodePorts: allocateNPs,
 		},

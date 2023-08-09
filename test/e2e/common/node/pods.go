@@ -481,7 +481,7 @@ var _ = SIGDescribe("Pods", func() {
 			Spec: v1.ServiceSpec{
 				Ports: []v1.ServicePort{{
 					Port:       8765,
-					TargetPort: intstr.FromInt(8080),
+					TargetPort: intstr.FromInt32(8080),
 				}},
 				Selector: map[string]string{
 					"name": serverName,

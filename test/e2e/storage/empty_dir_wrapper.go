@@ -232,7 +232,7 @@ func createGitServer(ctx context.Context, f *framework.Framework) (gitURL string
 				{
 					Name:       "http-portal",
 					Port:       int32(httpPort),
-					TargetPort: intstr.FromInt(containerPort),
+					TargetPort: intstr.FromInt32(int32(containerPort)),
 				},
 			},
 		},

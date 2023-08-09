@@ -79,7 +79,7 @@ func Parse(val string) IntOrString {
 	if err != nil {
 		return FromString(val)
 	}
-	return FromInt(i)
+	return FromInt32(int32(i))
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.

@@ -100,7 +100,7 @@ func tweakAddLBIngress(ip string) serviceTweak {
 func makeServicePort(protocol v1.Protocol, targetPort int) []v1.ServicePort {
 	sp := v1.ServicePort{Port: 80, Protocol: protocol}
 	if targetPort > 0 {
-		sp.TargetPort = intstr.FromInt(targetPort)
+		sp.TargetPort = intstr.FromInt32(int32(targetPort))
 	}
 	return []v1.ServicePort{sp}
 }

@@ -74,7 +74,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "example",
 					Port:       80,
-					TargetPort: intstr.FromInt(portNum),
+					TargetPort: intstr.FromInt32(int32(portNum)),
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},

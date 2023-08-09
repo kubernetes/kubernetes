@@ -585,7 +585,7 @@ func createService(ctx context.Context, c clientset.Interface, name, ns string, 
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				Port:       port,
-				TargetPort: intstr.FromInt(targetPort),
+				TargetPort: intstr.FromInt32(int32(targetPort)),
 			}},
 			Selector: selectors,
 		},

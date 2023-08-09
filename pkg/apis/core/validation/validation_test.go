@@ -8197,7 +8197,7 @@ func TestValidateInitContainers(t *testing.T) {
 		StartupProbe: &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				TCPSocket: &core.TCPSocketAction{
-					Port: intstr.FromInt(80),
+					Port: intstr.FromInt32(80),
 				},
 			},
 			SuccessThreshold: 1,
@@ -8413,7 +8413,7 @@ func TestValidateInitContainers(t *testing.T) {
 			RestartPolicy:            &containerRestartPolicyAlways,
 			StartupProbe: &core.Probe{
 				ProbeHandler: core.ProbeHandler{
-					TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+					TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
 				},
 				SuccessThreshold: 2,
 			},

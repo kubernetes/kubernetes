@@ -184,7 +184,7 @@ func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort i
 		Protocol:   corev1.ProtocolTCP,
 		Port:       int32(servicePort),
 		Name:       servicePortName,
-		TargetPort: intstr.FromInt(targetServicePort),
+		TargetPort: intstr.FromInt32(int32(targetServicePort)),
 	}}
 	serviceType := corev1.ServiceTypeClusterIP
 	if nodePort > 0 {
