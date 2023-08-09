@@ -516,11 +516,11 @@ func TestNewRSNewReplicas(t *testing.T) {
 			newDeployment.Spec.Strategy = apps.DeploymentStrategy{Type: test.strategyType}
 			newDeployment.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
 				MaxUnavailable: func(i int) *intstr.IntOrString {
-					x := intstr.FromInt(i)
+					x := intstr.FromInt32(int32(i))
 					return &x
 				}(1),
 				MaxSurge: func(i int) *intstr.IntOrString {
-					x := intstr.FromInt(i)
+					x := intstr.FromInt32(int32(i))
 					return &x
 				}(test.maxSurge),
 			}
@@ -705,8 +705,8 @@ func TestDeploymentComplete(t *testing.T) {
 				Replicas: &desired,
 				Strategy: apps.DeploymentStrategy{
 					RollingUpdate: &apps.RollingUpdateDeployment{
-						MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxUnavailable)),
-						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxSurge)),
+						MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt32(int32(i)); return &x }(int(maxUnavailable)),
+						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt32(int32(i)); return &x }(int(maxSurge)),
 					},
 					Type: apps.RollingUpdateDeploymentStrategyType,
 				},
@@ -960,7 +960,7 @@ func TestMaxUnavailable(t *testing.T) {
 				Replicas: func(i int32) *int32 { return &i }(replicas),
 				Strategy: apps.DeploymentStrategy{
 					RollingUpdate: &apps.RollingUpdateDeployment{
-						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt32(int32(i)); return &x }(int(1)),
 						MaxUnavailable: &maxUnavailable,
 					},
 					Type: apps.RollingUpdateDeploymentStrategyType,
@@ -1255,7 +1255,7 @@ func TestGetDeploymentsForReplicaSet(t *testing.T) {
 }
 
 func TestMinAvailable(t *testing.T) {
-	maxSurge := func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1))
+	maxSurge := func(i int) *intstr.IntOrString { x := intstr.FromInt32(int32(i)); return &x }(int(1))
 	deployment := func(replicas int32, maxUnavailable intstr.IntOrString) *apps.Deployment {
 		return &apps.Deployment{
 			Spec: apps.DeploymentSpec{

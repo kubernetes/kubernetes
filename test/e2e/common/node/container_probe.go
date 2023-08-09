@@ -1196,7 +1196,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers][Feature:SidecarContain
 			ProbeHandler: v1.ProbeHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Path: "/healthz",
-					Port: intstr.FromInt(8080),
+					Port: intstr.FromInt32(8080),
 				},
 			},
 			InitialDelaySeconds:           10,
@@ -1660,7 +1660,7 @@ func httpGetHandler(path string, port int) v1.ProbeHandler {
 	return v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: path,
-			Port: intstr.FromInt(port),
+			Port: intstr.FromInt32(int32(port)),
 		},
 	}
 }
@@ -1668,7 +1668,7 @@ func httpGetHandler(path string, port int) v1.ProbeHandler {
 func tcpSocketHandler(port int) v1.ProbeHandler {
 	return v1.ProbeHandler{
 		TCPSocket: &v1.TCPSocketAction{
-			Port: intstr.FromInt(port),
+			Port: intstr.FromInt32(int32(port)),
 		},
 	}
 }

@@ -194,7 +194,7 @@ func createSecondNodePortService(ctx context.Context, f *framework.Framework, co
 					Port:       e2enetwork.ClusterHTTPPort,
 					Name:       "http",
 					Protocol:   v1.ProtocolTCP,
-					TargetPort: intstr.FromInt(e2enetwork.EndpointHTTPPort),
+					TargetPort: intstr.FromInt32(e2enetwork.EndpointHTTPPort),
 				},
 			},
 			Selector: config.NodePortService.Spec.Selector,

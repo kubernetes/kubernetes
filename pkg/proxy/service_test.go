@@ -67,7 +67,7 @@ func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port
 		Protocol:   protocol,
 		Port:       port,
 		NodePort:   nodeport,
-		TargetPort: intstr.FromInt(targetPort),
+		TargetPort: intstr.FromInt32(int32(targetPort)),
 	}
 	return append(array, svcPort)
 }
