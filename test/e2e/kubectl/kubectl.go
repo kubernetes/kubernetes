@@ -207,7 +207,7 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 // assertCleanup asserts that cleanup of a namespace wrt selectors occurred.
 func assertCleanup(ns string, selectors ...string) {
 	var e error
-	verifyCleanupFunc := func() (bool, error) {
+	verifyCleanupFunc := func(ctx context.Context) (bool, error) {
 		e = nil
 		for _, selector := range selectors {
 			resources := e2ekubectl.RunKubectlOrDie(ns, "get", "rc,svc", "-l", selector, "--no-headers")
@@ -223,7 +223,7 @@ func assertCleanup(ns string, selectors ...string) {
 		}
 		return true, nil
 	}
-	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
+	err := wait.PollUntilContextTimeout(context.TODO(), 500*time.Millisecond, 1*time.Minute, true, verifyCleanupFunc)
 	if err != nil {
 		framework.Failf(e.Error())
 	}
@@ -751,7 +751,7 @@ metadata:
 		ginkgo.It("should support inline execution and attach", func(ctx context.Context) {
 			waitForStdinContent := func(pod, content string) string {
 				var logOutput string
-				err := wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
+				err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 5*time.Minute, false, func(ctx context.Context) (bool, error) {
 					logOutput = e2ekubectl.RunKubectlOrDie(ns, "logs", pod)
 					return strings.Contains(logOutput, content), nil
 				})
@@ -1442,7 +1442,7 @@ metadata:
 			e2ekubectl.RunKubectlOrDieInput(ns, cronjobYaml, "create", "-f", "-")
 
 			ginkgo.By("waiting for cronjob to start.")
-			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+			err := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 				cj, err := c.BatchV1().CronJobs(ns).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return false, fmt.Errorf("Failed getting CronJob %s: %w", ns, err)
@@ -1496,7 +1496,7 @@ metadata:
 				e2eoutput.LookForStringInLog(ns, pod.Name, "agnhost-primary", "Paused", framework.PodStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
-				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
+				err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, false, func(ctx context.Context) (bool, error) {
 					ep, err := c.CoreV1().Endpoints(ns).Get(ctx, name, metav1.GetOptions{})
 					if err != nil {
 						// log the real error
@@ -2100,7 +2100,7 @@ func checkOutput(output string, required [][]string) {
 
 func checkKubectlOutputWithRetry(namespace string, required [][]string, args ...string) {
 	var pollErr error
-	wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		output := e2ekubectl.RunKubectlOrDie(namespace, args...)
 		err := checkOutputReturnError(output, required)
 		if err != nil {
