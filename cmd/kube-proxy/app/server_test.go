@@ -19,13 +19,18 @@ package app
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -360,6 +365,125 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 					t.Fatalf("expected hostname: %s, but got: %s", tc.expectedHostname, options.config.HostnameOverride)
 				}
 			}
+		})
+	}
+}
+
+// TestOptionsComplete checks that command line flags are combined with a
+// config properly.
+func TestOptionsComplete(t *testing.T) {
+	header := `apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+`
+
+	// Determine default config (depends on platform defaults).
+	o := NewOptions()
+	require.NoError(t, o.Complete(new(pflag.FlagSet)))
+	expected := o.config
+
+	config := header + `logging:
+  format: json
+  flushFrequency: 1s
+  verbosity: 10
+  vmodule:
+  - filePattern: foo.go
+    verbosity: 6
+  - filePattern: bar.go
+    verbosity: 8
+`
+	expectedLoggingConfig := logsapi.LoggingConfiguration{
+		Format:         "json",
+		FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: time.Second}, SerializeAsString: true},
+		Verbosity:      10,
+		VModule: []logsapi.VModuleItem{
+			{
+				FilePattern: "foo.go",
+				Verbosity:   6,
+			},
+			{
+				FilePattern: "bar.go",
+				Verbosity:   8,
+			},
+		},
+		Options: logsapi.FormatOptions{
+			JSON: logsapi.JSONOptions{
+				InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+			},
+		},
+	}
+
+	for name, tc := range map[string]struct {
+		config   string
+		flags    []string
+		expected *kubeproxyconfig.KubeProxyConfiguration
+	}{
+		"empty": {
+			expected: expected,
+		},
+		"empty-config": {
+			config:   header,
+			expected: expected,
+		},
+		"logging-config": {
+			config: config,
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Logging = *expectedLoggingConfig.DeepCopy()
+				return c
+			}(),
+		},
+		"flags": {
+			flags: []string{
+				"-v=7",
+				"--vmodule", "goo.go=8",
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Logging.Verbosity = 7
+				c.Logging.VModule = append(c.Logging.VModule, logsapi.VModuleItem{
+					FilePattern: "goo.go",
+					Verbosity:   8,
+				})
+				return c
+			}(),
+		},
+		"both": {
+			config: config,
+			flags: []string{
+				"-v=7",
+				"--vmodule", "goo.go=8",
+				"--ipvs-scheduler", "some-scheduler", // Overwritten by config.
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Logging = *expectedLoggingConfig.DeepCopy()
+				// Flag wins.
+				c.Logging.Verbosity = 7
+				// Flag and config get merged with command line flags first.
+				c.Logging.VModule = append([]logsapi.VModuleItem{
+					{
+						FilePattern: "goo.go",
+						Verbosity:   8,
+					},
+				}, c.Logging.VModule...)
+				return c
+			}(),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			options := NewOptions()
+			fs := new(pflag.FlagSet)
+			options.AddFlags(fs)
+			flags := tc.flags
+			if len(tc.config) > 0 {
+				tmp := t.TempDir()
+				configFile := path.Join(tmp, "kube-proxy.conf")
+				require.NoError(t, ioutil.WriteFile(configFile, []byte(tc.config), 0666))
+				flags = append(flags, "--config", configFile)
+			}
+			require.NoError(t, fs.Parse(flags))
+			require.NoError(t, options.Complete(fs))
+			assert.Equal(t, tc.expected, options.config)
 		})
 	}
 }
