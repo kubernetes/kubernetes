@@ -4478,7 +4478,6 @@ func Convert_core_List_To_v1_List(in *core.List, out *v1.List, s conversion.Scop
 func autoConvert_v1_LoadBalancerIngress_To_core_LoadBalancerIngress(in *v1.LoadBalancerIngress, out *core.LoadBalancerIngress, s conversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
-	out.IPMode = (*core.LoadBalancerIPMode)(unsafe.Pointer(in.IPMode))
 	out.Ports = *(*[]core.PortStatus)(unsafe.Pointer(&in.Ports))
 	return nil
 }
@@ -4491,7 +4490,6 @@ func Convert_v1_LoadBalancerIngress_To_core_LoadBalancerIngress(in *v1.LoadBalan
 func autoConvert_core_LoadBalancerIngress_To_v1_LoadBalancerIngress(in *core.LoadBalancerIngress, out *v1.LoadBalancerIngress, s conversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
-	out.IPMode = (*v1.LoadBalancerIPMode)(unsafe.Pointer(in.IPMode))
 	out.Ports = *(*[]v1.PortStatus)(unsafe.Pointer(&in.Ports))
 	return nil
 }

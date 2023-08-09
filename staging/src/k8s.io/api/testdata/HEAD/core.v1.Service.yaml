@@ -77,7 +77,6 @@ status:
     ingress:
     - hostname: hostnameValue
       ip: ipValue
-      ipMode: ipModeValue
       ports:
       - error: errorValue
         port: 1
