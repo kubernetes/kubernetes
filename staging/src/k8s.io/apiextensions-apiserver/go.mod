@@ -5,7 +5,7 @@ module k8s.io/apiextensions-apiserver
 go 1.20
 
 require (
-	github.com/emicklei/go-restful/v3 v3.9.0
+	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cel-go v0.17.6

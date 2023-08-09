@@ -5,7 +5,7 @@ module k8s.io/kube-aggregator
 go 1.20
 
 require (
-	github.com/emicklei/go-restful/v3 v3.9.0
+	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.5.9
 	github.com/google/gofuzz v1.2.0
