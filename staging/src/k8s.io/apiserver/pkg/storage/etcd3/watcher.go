@@ -25,9 +25,6 @@ import (
 	"strings"
 	"sync"
 
-	grpccodes "google.golang.org/grpc/codes"
-	grpcstatus "google.golang.org/grpc/status"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,7 +35,6 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
-
 	"k8s.io/klog/v2"
 )
 
@@ -144,33 +140,16 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		// The filter doesn't filter out any object.
 		wc.internalPred = storage.Everything
 	}
-	wc.ctx, wc.cancel = context.WithCancel(ctx)
+
+	// The etcd server waits until it cannot find a leader for 3 election
+	// timeouts to cancel existing streams. 3 is currently a hard coded
+	// constant. The election timeout defaults to 1000ms. If the cluster is
+	// healthy, when the leader is stopped, the leadership transfer should be
+	// smooth. (leader transfers its leadership before stopping). If leader is
+	// hard killed, other servers will take an election timeout to realize
+	// leader lost and start campaign.
+	wc.ctx, wc.cancel = context.WithCancel(clientv3.WithRequireLeader(ctx))
 	return wc
-}
-
-type etcdError interface {
-	Code() grpccodes.Code
-	Error() string
-}
-
-type grpcError interface {
-	GRPCStatus() *grpcstatus.Status
-}
-
-func isCancelError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if err == context.Canceled {
-		return true
-	}
-	if etcdErr, ok := err.(etcdError); ok && etcdErr.Code() == grpccodes.Canceled {
-		return true
-	}
-	if grpcErr, ok := err.(grpcError); ok && grpcErr.GRPCStatus().Code() == grpccodes.Canceled {
-		return true
-	}
-	return false
 }
 
 func (wc *watchChan) run() {
@@ -183,7 +162,7 @@ func (wc *watchChan) run() {
 
 	select {
 	case err := <-wc.errChan:
-		if isCancelError(err) {
+		if err == context.Canceled {
 			break
 		}
 		errResult := transformErrorToEvent(err)
@@ -215,10 +194,6 @@ func (wc *watchChan) ResultChan() <-chan watch.Event {
 	return wc.resultChan
 }
 
-func (wc *watchChan) RequestWatchProgress() error {
-	return wc.watcher.client.RequestProgress(wc.ctx)
-}
-
 // sync tries to retrieve existing data and send them to process.
 // The revision to watch will be set to the revision in response.
 // All events sent will have isCreated=true
@@ -238,15 +213,12 @@ func (wc *watchChan) sync() error {
 	return nil
 }
 
+// logWatchChannelErr checks whether the error is about mvcc revision compaction which is regarded as warning
 func logWatchChannelErr(err error) {
-	switch {
-	case strings.Contains(err.Error(), "mvcc: required revision has been compacted"):
-		// mvcc revision compaction which is regarded as warning, not error
-		klog.Warningf("watch chan error: %v", err)
-	case isCancelError(err):
-		// expected when watches close, no need to log
-	default:
+	if !strings.Contains(err.Error(), "mvcc: required revision has been compacted") {
 		klog.Errorf("watch chan error: %v", err)
+	} else {
+		klog.Warningf("watch chan error: %v", err)
 	}
 }
 
@@ -284,7 +256,6 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 		}
 
 		for _, e := range wres.Events {
-			metrics.RecordEtcdEvent(wc.watcher.groupResource.String())
 			parsedEvent, err := parseEvent(e)
 			if err != nil {
 				logWatchChannelErr(err)

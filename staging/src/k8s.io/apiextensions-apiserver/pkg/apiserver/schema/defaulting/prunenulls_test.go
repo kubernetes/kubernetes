@@ -35,7 +35,7 @@ func TestPruneNonNullableNullsWithoutDefaults(t *testing.T) {
 		{"empty", "null", nil, "null"},
 		{"scalar", "4", &structuralschema.Structural{
 			Generic: structuralschema.Generic{
-				Default: structuralschema.JSON{Object: "foo"},
+				Default: structuralschema.JSON{"foo"},
 			},
 		}, "4"},
 		{"scalar array", "[1,null]", nil, "[1,null]"},
@@ -44,7 +44,7 @@ func TestPruneNonNullableNullsWithoutDefaults(t *testing.T) {
 				Properties: map[string]structuralschema.Structural{
 					"a": {
 						Generic: structuralschema.Generic{
-							Default: structuralschema.JSON{Object: "A"},
+							Default: structuralschema.JSON{"A"},
 						},
 					},
 					"b": {
@@ -54,7 +54,7 @@ func TestPruneNonNullableNullsWithoutDefaults(t *testing.T) {
 					},
 					"c": {
 						Generic: structuralschema.Generic{
-							Default:  structuralschema.JSON{Object: "C"},
+							Default:  structuralschema.JSON{"C"},
 							Nullable: true,
 						},
 					},

@@ -25,17 +25,7 @@ func (matcher *MatchErrorMatcher) Match(actual interface{}) (success bool, err e
 	expected := matcher.Expected
 
 	if isError(expected) {
-		// first try the built-in errors.Is
-		if errors.Is(actualErr, expected.(error)) {
-			return true, nil
-		}
-		// if not, try DeepEqual along the error chain
-		for unwrapped := actualErr; unwrapped != nil; unwrapped = errors.Unwrap(unwrapped) {
-			if reflect.DeepEqual(unwrapped, expected) {
-				return true, nil
-			}
-		}
-		return false, nil
+		return reflect.DeepEqual(actualErr, expected) || errors.Is(actualErr, expected.(error)), nil
 	}
 
 	if isString(expected) {

@@ -505,15 +505,6 @@ func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *
 	return true
 }
 
-// Returns true if and only if new maxAttachLimit doesn't require CSINode update
-func keepAllocatableCount(driverInfoSpec storagev1.CSINodeDriver, maxAttachLimit int64) bool {
-	if maxAttachLimit == 0 {
-		return driverInfoSpec.Allocatable == nil || driverInfoSpec.Allocatable.Count == nil
-	}
-
-	return driverInfoSpec.Allocatable != nil && driverInfoSpec.Allocatable.Count != nil && int64(*driverInfoSpec.Allocatable.Count) == maxAttachLimit
-}
-
 func (nim *nodeInfoManager) installDriverToCSINode(
 	nodeInfo *storagev1.CSINode,
 	driverName string,
@@ -526,7 +517,10 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 		return fmt.Errorf("error getting CSI client")
 	}
 
-	topologyKeys := sets.StringKeySet(topology)
+	topologyKeys := make(sets.String)
+	for k := range topology {
+		topologyKeys.Insert(k)
+	}
 
 	specModified := true
 	// Clone driver list, omitting the driver that matches the given driverName
@@ -534,8 +528,7 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 	for _, driverInfoSpec := range nodeInfo.Spec.Drivers {
 		if driverInfoSpec.Name == driverName {
 			if driverInfoSpec.NodeID == driverNodeID &&
-				sets.NewString(driverInfoSpec.TopologyKeys...).Equal(topologyKeys) &&
-				keepAllocatableCount(driverInfoSpec, maxAttachLimit) {
+				sets.NewString(driverInfoSpec.TopologyKeys...).Equal(topologyKeys) {
 				specModified = false
 			}
 		} else {

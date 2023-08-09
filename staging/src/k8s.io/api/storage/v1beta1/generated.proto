@@ -210,7 +210,6 @@ message CSIDriverSpec {
   //
   // Default is "false".
   //
-  // +featureGate=SELinuxMountReadWriteOncePod
   // +optional
   optional bool seLinuxMount = 8;
 }

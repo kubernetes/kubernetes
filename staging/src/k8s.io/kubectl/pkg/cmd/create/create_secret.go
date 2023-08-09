@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -42,13 +41,12 @@ import (
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets.
 // This is the entry point of create_secret.go which will be called by create.go
-func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "secret (docker-registry | generic | tls)",
-		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a secret using a specified subcommand"),
-		Long:                  secretLong,
-		Run:                   cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
+		Use:   "secret",
+		Short: i18n.T("Create a secret using specified subcommand"),
+		Long:  i18n.T("Create a secret using specified subcommand."),
+		Run:   cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
 	}
 	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateSecretTLS(f, ioStreams))
@@ -59,15 +57,6 @@ func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericiooptions.IOStreams)
 
 var (
 	secretLong = templates.LongDesc(i18n.T(`
-		Create a secret with specified type.
-		
-		A docker-registry type secret is for accessing a container registry.
-
-		A generic type secret indicate an Opaque secret type.
-
-		A tls type secret holds TLS certificate and its associated key.`))
-
-	secretForGenericLong = templates.LongDesc(i18n.T(`
 		Create a secret based on a file, directory, or specified literal value.
 
 		A single secret may package one or more key/value pairs.
@@ -80,7 +69,7 @@ var (
 		packaged into the secret. Any directory entries except regular files are ignored (e.g. subdirectories,
 		symlinks, devices, pipes, etc).`))
 
-	secretForGenericExample = templates.Examples(i18n.T(`
+	secretExample = templates.Examples(i18n.T(`
 	  # Create a new secret named my-secret with keys for each file in folder bar
 	  kubectl create secret generic my-secret --from-file=path/to/bar
 
@@ -125,11 +114,11 @@ type CreateSecretOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewSecretOptions creates a new *CreateSecretOptions with default value
-func NewSecretOptions(ioStreams genericiooptions.IOStreams) *CreateSecretOptions {
+func NewSecretOptions(ioStreams genericclioptions.IOStreams) *CreateSecretOptions {
 	return &CreateSecretOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -137,15 +126,15 @@ func NewSecretOptions(ioStreams genericiooptions.IOStreams) *CreateSecretOptions
 }
 
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
-func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSecretOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a secret from a local file, directory, or literal value"),
-		Long:                  secretForGenericLong,
-		Example:               secretForGenericExample,
+		Long:                  secretLong,
+		Example:               secretExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

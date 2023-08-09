@@ -23,7 +23,6 @@ import (
     "fmt"
     "net"
     "runtime"
-
     "github.com/vishvananda/netns"
 )
 

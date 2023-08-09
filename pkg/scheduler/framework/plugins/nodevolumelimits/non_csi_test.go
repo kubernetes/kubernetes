@@ -20,11 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
@@ -36,27 +36,32 @@ import (
 )
 
 var (
-	nonApplicablePod = st.MakePod().Volume(v1.Volume{
+	oneVolPod = st.MakePod().Volume(v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
+		},
+	}).Obj()
+	twoVolPod = st.MakePod().Volume(v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp1"},
+		},
+	}).Volume(v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp2"},
+		},
+	}).Obj()
+	splitVolsPod = st.MakePod().Volume(v1.Volume{
 		VolumeSource: v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{},
 		},
-	}).Obj()
-	onlyConfigmapAndSecretPod = st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			ConfigMap: &v1.ConfigMapVolumeSource{},
-		},
 	}).Volume(v1.Volume{
 		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{},
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "svp"},
 		},
 	}).Obj()
-	pvcPodWithConfigmapAndSecret = st.MakePod().PVC("pvcWithDeletedPV").Volume(v1.Volume{
+	nonApplicablePod = st.MakePod().Volume(v1.Volume{
 		VolumeSource: v1.VolumeSource{
-			ConfigMap: &v1.ConfigMapVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{},
+			HostPath: &v1.HostPathVolumeSource{},
 		},
 	}).Obj()
 
@@ -109,30 +114,14 @@ func TestEphemeralLimits(t *testing.T) {
 	conflictingClaim := ephemeralClaim.DeepCopy()
 	conflictingClaim.OwnerReferences = nil
 
-	ephemeralPodWithConfigmapAndSecret := st.MakePod().Name("abc").Namespace("test").UID("12345").Volume(v1.Volume{
-		Name: "xyz",
-		VolumeSource: v1.VolumeSource{
-			Ephemeral: &v1.EphemeralVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			ConfigMap: &v1.ConfigMapVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{},
-		},
-	}).Obj()
-
 	tests := []struct {
-		newPod              *v1.Pod
-		existingPods        []*v1.Pod
-		extraClaims         []v1.PersistentVolumeClaim
-		ephemeralEnabled    bool
-		maxVols             int
-		test                string
-		wantStatus          *framework.Status
-		wantPreFilterStatus *framework.Status
+		newPod           *v1.Pod
+		existingPods     []*v1.Pod
+		extraClaims      []v1.PersistentVolumeClaim
+		ephemeralEnabled bool
+		maxVols          int
+		test             string
+		wantStatus       *framework.Status
 	}{
 		{
 			newPod:           ephemeralVolumePod,
@@ -162,21 +151,6 @@ func TestEphemeralLimits(t *testing.T) {
 			test:             "volume unbound, exceeds limit",
 			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
-		{
-			newPod:              onlyConfigmapAndSecretPod,
-			ephemeralEnabled:    true,
-			extraClaims:         []v1.PersistentVolumeClaim{*ephemeralClaim},
-			maxVols:             1,
-			test:                "skip Filter when the pod only uses secrets and configmaps",
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
-		},
-		{
-			newPod:           ephemeralPodWithConfigmapAndSecret,
-			ephemeralEnabled: true,
-			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
-			maxVols:          1,
-			test:             "don't skip Filter when the pods has ephemeral volumes",
-		},
 	}
 
 	for _, test := range tests {
@@ -184,229 +158,163 @@ func TestEphemeralLimits(t *testing.T) {
 			fts := feature.Features{}
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), filterName)
 			p := newNonCSILimits(filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts).(framework.FilterPlugin)
-			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
-			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
-				t.Errorf("PreFilter status does not match (-want, +got): %s", diff)
-			}
-
-			if gotPreFilterStatus.Code() != framework.Skip {
-				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
-				}
+			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
+			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 		})
 	}
 }
 
 func TestAzureDiskLimits(t *testing.T) {
-	oneAzureDiskPod := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AzureDisk: &v1.AzureDiskVolumeSource{},
-		},
-	}).Obj()
-	twoAzureDiskPod := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AzureDisk: &v1.AzureDiskVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AzureDisk: &v1.AzureDiskVolumeSource{},
-		},
-	}).Obj()
-	splitAzureDiskPod := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AzureDisk: &v1.AzureDiskVolumeSource{},
-		},
-	}).Obj()
-	AzureDiskPodWithConfigmapAndSecret := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AzureDisk: &v1.AzureDiskVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			ConfigMap: &v1.ConfigMapVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{},
-		},
-	}).Obj()
 	tests := []struct {
-		newPod              *v1.Pod
-		existingPods        []*v1.Pod
-		filterName          string
-		driverName          string
-		maxVols             int
-		test                string
-		wantStatus          *framework.Status
-		wantPreFilterStatus *framework.Status
+		newPod       *v1.Pod
+		existingPods []*v1.Pod
+		filterName   string
+		driverName   string
+		maxVols      int
+		test         string
+		wantStatus   *framework.Status
 	}{
 		{
-			newPod:       oneAzureDiskPod,
-			existingPods: []*v1.Pod{twoAzureDiskPod, oneAzureDiskPod},
+			newPod:       oneVolPod,
+			existingPods: []*v1.Pod{twoVolPod, oneVolPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      4,
 			test:         "fits when node capacity >= new pod's AzureDisk volumes",
 		},
 		{
-			newPod:       twoAzureDiskPod,
-			existingPods: []*v1.Pod{oneAzureDiskPod},
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      2,
 			test:         "fit when node capacity < new pod's AzureDisk volumes",
 		},
 		{
-			newPod:       splitAzureDiskPod,
-			existingPods: []*v1.Pod{twoAzureDiskPod},
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{twoVolPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "new pod's count ignores non-AzureDisk volumes",
 		},
 		{
-			newPod:       twoAzureDiskPod,
-			existingPods: []*v1.Pod{splitAzureDiskPod, nonApplicablePod, emptyPod},
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "existing pods' counts ignore non-AzureDisk volumes",
 		},
 		{
 			newPod:       onePVCPod(azureDiskVolumeFilterType),
-			existingPods: []*v1.Pod{splitAzureDiskPod, nonApplicablePod, emptyPod},
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "new pod's count considers PVCs backed by AzureDisk volumes",
 		},
 		{
 			newPod:       splitPVCPod(azureDiskVolumeFilterType),
-			existingPods: []*v1.Pod{splitAzureDiskPod, oneAzureDiskPod},
+			existingPods: []*v1.Pod{splitVolsPod, oneVolPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "new pod's count ignores PVCs not backed by AzureDisk volumes",
 		},
 		{
-			newPod:       twoAzureDiskPod,
-			existingPods: []*v1.Pod{oneAzureDiskPod, onePVCPod(azureDiskVolumeFilterType)},
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, onePVCPod(azureDiskVolumeFilterType)},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "existing pods' counts considers PVCs backed by AzureDisk volumes",
 		},
 		{
-			newPod:       twoAzureDiskPod,
-			existingPods: []*v1.Pod{oneAzureDiskPod, twoAzureDiskPod, onePVCPod(azureDiskVolumeFilterType)},
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, twoVolPod, onePVCPod(azureDiskVolumeFilterType)},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      4,
 			test:         "already-mounted AzureDisk volumes are always ok to allow",
 		},
 		{
-			newPod:       splitAzureDiskPod,
-			existingPods: []*v1.Pod{oneAzureDiskPod, oneAzureDiskPod, onePVCPod(azureDiskVolumeFilterType)},
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{oneVolPod, oneVolPod, onePVCPod(azureDiskVolumeFilterType)},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "the same AzureDisk volumes are not counted multiple times",
 		},
 		{
 			newPod:       onePVCPod(azureDiskVolumeFilterType),
-			existingPods: []*v1.Pod{oneAzureDiskPod, deletedPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      2,
 			test:         "pod with missing PVC is counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(azureDiskVolumeFilterType),
-			existingPods: []*v1.Pod{oneAzureDiskPod, deletedPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "pod with missing PVC is counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(azureDiskVolumeFilterType),
-			existingPods: []*v1.Pod{oneAzureDiskPod, twoDeletedPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "pod with missing two PVCs is counted towards the PV limit twice",
 		},
 		{
 			newPod:       onePVCPod(azureDiskVolumeFilterType),
-			existingPods: []*v1.Pod{oneAzureDiskPod, deletedPVPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      2,
 			test:         "pod with missing PV is counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(azureDiskVolumeFilterType),
-			existingPods: []*v1.Pod{oneAzureDiskPod, deletedPVPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "pod with missing PV is counted towards the PV limit",
 		},
 		{
 			newPod:       deletedPVPod2,
-			existingPods: []*v1.Pod{oneAzureDiskPod, deletedPVPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      2,
 			test:         "two pods missing the same PV are counted towards the PV limit only once",
 		},
 		{
 			newPod:       anotherDeletedPVPod,
-			existingPods: []*v1.Pod{oneAzureDiskPod, deletedPVPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      2,
 			test:         "two pods missing different PVs are counted towards the PV limit twice",
 		},
 		{
 			newPod:       onePVCPod(azureDiskVolumeFilterType),
-			existingPods: []*v1.Pod{oneAzureDiskPod, unboundPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      2,
 			test:         "pod with unbound PVC is counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(azureDiskVolumeFilterType),
-			existingPods: []*v1.Pod{oneAzureDiskPod, unboundPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      3,
 			test:         "pod with unbound PVC is counted towards the PV limit",
 		},
 		{
 			newPod:       unboundPVCPod2,
-			existingPods: []*v1.Pod{oneAzureDiskPod, unboundPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      2,
 			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
 		},
 		{
 			newPod:       anotherUnboundPVCPod,
-			existingPods: []*v1.Pod{oneAzureDiskPod, unboundPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
 			filterName:   azureDiskVolumeFilterType,
 			maxVols:      2,
 			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
-		},
-		{
-			newPod:              onlyConfigmapAndSecretPod,
-			existingPods:        []*v1.Pod{twoAzureDiskPod, oneAzureDiskPod},
-			filterName:          azureDiskVolumeFilterType,
-			maxVols:             4,
-			test:                "skip Filter when the pod only uses secrets and configmaps",
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
-		},
-		{
-			newPod:       pvcPodWithConfigmapAndSecret,
-			existingPods: []*v1.Pod{oneAzureDiskPod, deletedPVPod},
-			filterName:   azureDiskVolumeFilterType,
-			maxVols:      2,
-			test:         "don't skip Filter when the pod has pvcs",
-		},
-		{
-			newPod:       AzureDiskPodWithConfigmapAndSecret,
-			existingPods: []*v1.Pod{twoAzureDiskPod, oneAzureDiskPod},
-			filterName:   azureDiskVolumeFilterType,
-			maxVols:      4,
-			test:         "don't skip Filter when the pod has AzureDisk volumes",
 		},
 	}
 
@@ -414,72 +322,26 @@ func TestAzureDiskLimits(t *testing.T) {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
-			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
-			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
-				t.Errorf("PreFilter status does not match (-want, +got): %s", diff)
-			}
-
-			if gotPreFilterStatus.Code() != framework.Skip {
-				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
-				}
+			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
+			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 		})
 	}
 }
 
 func TestEBSLimits(t *testing.T) {
-	oneVolPod := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
-		},
-	}).Obj()
-	twoVolPod := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp1"},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp2"},
-		},
-	}).Obj()
-	splitVolsPod := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "svp"},
-		},
-	}).Obj()
-
 	unboundPVCWithInvalidSCPod := st.MakePod().PVC("unboundPVCWithInvalidSCPod").Obj()
 	unboundPVCWithDefaultSCPod := st.MakePod().PVC("unboundPVCWithDefaultSCPod").Obj()
 
-	EBSPodWithConfigmapAndSecret := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			ConfigMap: &v1.ConfigMapVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{},
-		},
-	}).Obj()
-
 	tests := []struct {
-		newPod              *v1.Pod
-		existingPods        []*v1.Pod
-		filterName          string
-		driverName          string
-		maxVols             int
-		test                string
-		wantStatus          *framework.Status
-		wantPreFilterStatus *framework.Status
+		newPod       *v1.Pod
+		existingPods []*v1.Pod
+		filterName   string
+		driverName   string
+		maxVols      int
+		test         string
+		wantStatus   *framework.Status
 	}{
 		{
 			newPod:       oneVolPod,
@@ -664,260 +526,169 @@ func TestEBSLimits(t *testing.T) {
 			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
 			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
-		{
-			newPod:              onlyConfigmapAndSecretPod,
-			existingPods:        []*v1.Pod{twoVolPod, oneVolPod},
-			filterName:          ebsVolumeFilterType,
-			driverName:          csilibplugins.AWSEBSInTreePluginName,
-			maxVols:             4,
-			test:                "skip Filter when the pod only uses secrets and configmaps",
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
-		},
-		{
-			newPod:       pvcPodWithConfigmapAndSecret,
-			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
-			filterName:   ebsVolumeFilterType,
-			driverName:   csilibplugins.AWSEBSInTreePluginName,
-			maxVols:      2,
-			test:         "don't skip Filter when the pod has pvcs",
-		},
-		{
-			newPod:       EBSPodWithConfigmapAndSecret,
-			existingPods: []*v1.Pod{twoVolPod, oneVolPod},
-			filterName:   ebsVolumeFilterType,
-			driverName:   csilibplugins.AWSEBSInTreePluginName,
-			maxVols:      4,
-			test:         "don't skip Filter when the pod has EBS volumes",
-		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
-			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
-			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
-				t.Errorf("PreFilter status does not match (-want, +got): %s", diff)
-			}
-
-			if gotPreFilterStatus.Code() != framework.Skip {
-				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
-				}
+			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
+			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 		})
 	}
 }
 
 func TestGCEPDLimits(t *testing.T) {
-	oneGCEPDPod := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
-		},
-	}).Obj()
-	twoGCEPDPod := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
-		},
-	}).Obj()
-	splitGCEPDPod := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
-		},
-	}).Obj()
-	GCEPDPodWithConfigmapAndSecret := st.MakePod().Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			ConfigMap: &v1.ConfigMapVolumeSource{},
-		},
-	}).Volume(v1.Volume{
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{},
-		},
-	}).Obj()
 	tests := []struct {
-		newPod              *v1.Pod
-		existingPods        []*v1.Pod
-		filterName          string
-		driverName          string
-		maxVols             int
-		test                string
-		wantStatus          *framework.Status
-		wantPreFilterStatus *framework.Status
+		newPod       *v1.Pod
+		existingPods []*v1.Pod
+		filterName   string
+		driverName   string
+		maxVols      int
+		test         string
+		wantStatus   *framework.Status
 	}{
 		{
-			newPod:       oneGCEPDPod,
-			existingPods: []*v1.Pod{twoGCEPDPod, oneGCEPDPod},
+			newPod:       oneVolPod,
+			existingPods: []*v1.Pod{twoVolPod, oneVolPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      4,
 			test:         "fits when node capacity >= new pod's GCE volumes",
 		},
 		{
-			newPod:       twoGCEPDPod,
-			existingPods: []*v1.Pod{oneGCEPDPod},
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      2,
 			test:         "fit when node capacity < new pod's GCE volumes",
 		},
 		{
-			newPod:       splitGCEPDPod,
-			existingPods: []*v1.Pod{twoGCEPDPod},
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{twoVolPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "new pod's count ignores non-GCE volumes",
 		},
 		{
-			newPod:       twoGCEPDPod,
-			existingPods: []*v1.Pod{splitGCEPDPod, nonApplicablePod, emptyPod},
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "existing pods' counts ignore non-GCE volumes",
 		},
 		{
 			newPod:       onePVCPod(gcePDVolumeFilterType),
-			existingPods: []*v1.Pod{splitGCEPDPod, nonApplicablePod, emptyPod},
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "new pod's count considers PVCs backed by GCE volumes",
 		},
 		{
 			newPod:       splitPVCPod(gcePDVolumeFilterType),
-			existingPods: []*v1.Pod{splitGCEPDPod, oneGCEPDPod},
+			existingPods: []*v1.Pod{splitVolsPod, oneVolPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "new pod's count ignores PVCs not backed by GCE volumes",
 		},
 		{
-			newPod:       twoGCEPDPod,
-			existingPods: []*v1.Pod{oneGCEPDPod, onePVCPod(gcePDVolumeFilterType)},
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, onePVCPod(gcePDVolumeFilterType)},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "existing pods' counts considers PVCs backed by GCE volumes",
 		},
 		{
-			newPod:       twoGCEPDPod,
-			existingPods: []*v1.Pod{oneGCEPDPod, twoGCEPDPod, onePVCPod(gcePDVolumeFilterType)},
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, twoVolPod, onePVCPod(gcePDVolumeFilterType)},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      4,
 			test:         "already-mounted EBS volumes are always ok to allow",
 		},
 		{
-			newPod:       splitGCEPDPod,
-			existingPods: []*v1.Pod{oneGCEPDPod, oneGCEPDPod, onePVCPod(gcePDVolumeFilterType)},
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{oneVolPod, oneVolPod, onePVCPod(gcePDVolumeFilterType)},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "the same GCE volumes are not counted multiple times",
 		},
 		{
 			newPod:       onePVCPod(gcePDVolumeFilterType),
-			existingPods: []*v1.Pod{oneGCEPDPod, deletedPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      2,
 			test:         "pod with missing PVC is counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(gcePDVolumeFilterType),
-			existingPods: []*v1.Pod{oneGCEPDPod, deletedPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "pod with missing PVC is counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(gcePDVolumeFilterType),
-			existingPods: []*v1.Pod{oneGCEPDPod, twoDeletedPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "pod with missing two PVCs is counted towards the PV limit twice",
 		},
 		{
 			newPod:       onePVCPod(gcePDVolumeFilterType),
-			existingPods: []*v1.Pod{oneGCEPDPod, deletedPVPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      2,
 			test:         "pod with missing PV is counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(gcePDVolumeFilterType),
-			existingPods: []*v1.Pod{oneGCEPDPod, deletedPVPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "pod with missing PV is counted towards the PV limit",
 		},
 		{
 			newPod:       deletedPVPod2,
-			existingPods: []*v1.Pod{oneGCEPDPod, deletedPVPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      2,
 			test:         "two pods missing the same PV are counted towards the PV limit only once",
 		},
 		{
 			newPod:       anotherDeletedPVPod,
-			existingPods: []*v1.Pod{oneGCEPDPod, deletedPVPod},
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      2,
 			test:         "two pods missing different PVs are counted towards the PV limit twice",
 		},
 		{
 			newPod:       onePVCPod(gcePDVolumeFilterType),
-			existingPods: []*v1.Pod{oneGCEPDPod, unboundPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      2,
 			test:         "pod with unbound PVC is counted towards the PV limit",
 		},
 		{
 			newPod:       onePVCPod(gcePDVolumeFilterType),
-			existingPods: []*v1.Pod{oneGCEPDPod, unboundPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      3,
 			test:         "pod with unbound PVC is counted towards the PV limit",
 		},
 		{
 			newPod:       unboundPVCPod2,
-			existingPods: []*v1.Pod{oneGCEPDPod, unboundPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      2,
 			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
 		},
 		{
 			newPod:       anotherUnboundPVCPod,
-			existingPods: []*v1.Pod{oneGCEPDPod, unboundPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
 			filterName:   gcePDVolumeFilterType,
 			maxVols:      2,
 			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
-		},
-		{
-			newPod:              onlyConfigmapAndSecretPod,
-			existingPods:        []*v1.Pod{twoGCEPDPod, oneGCEPDPod},
-			filterName:          gcePDVolumeFilterType,
-			maxVols:             4,
-			test:                "skip Filter when the pod only uses secrets and configmaps",
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
-		},
-		{
-			newPod:       pvcPodWithConfigmapAndSecret,
-			existingPods: []*v1.Pod{oneGCEPDPod, deletedPVPod},
-			filterName:   gcePDVolumeFilterType,
-			maxVols:      2,
-			test:         "don't skip Filter when the pods has pvcs",
-		},
-		{
-			newPod:       GCEPDPodWithConfigmapAndSecret,
-			existingPods: []*v1.Pod{twoGCEPDPod, oneGCEPDPod},
-			filterName:   gcePDVolumeFilterType,
-			maxVols:      4,
-			test:         "don't skip Filter when the pods has GCE volumes",
 		},
 	}
 
@@ -925,22 +696,17 @@ func TestGCEPDLimits(t *testing.T) {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
-			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
-			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
-				t.Errorf("PreFilter status does not match (-want, +got): %s", diff)
-			}
-
-			if gotPreFilterStatus.Code() != framework.Skip {
-				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
-				}
+			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
+			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 		})
 	}
 }
 
 func TestGetMaxVols(t *testing.T) {
+	previousValue := os.Getenv(KubeMaxPDVols)
+
 	tests := []struct {
 		rawMaxVols string
 		expected   int
@@ -965,12 +731,17 @@ func TestGetMaxVols(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Setenv(KubeMaxPDVols, test.rawMaxVols)
+			os.Setenv(KubeMaxPDVols, test.rawMaxVols)
 			result := getMaxVolLimitFromEnv()
 			if result != test.expected {
 				t.Errorf("expected %v got %v", test.expected, result)
 			}
 		})
+	}
+
+	os.Unsetenv(KubeMaxPDVols)
+	if previousValue != "" {
+		os.Setenv(KubeMaxPDVols, previousValue)
 	}
 }
 

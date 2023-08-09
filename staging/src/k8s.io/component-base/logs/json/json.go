@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package json
+package logs
 
 import (
 	"io"
-	"sync/atomic"
+	"os"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -35,32 +35,12 @@ var (
 	timeNow = time.Now
 )
 
-type runtime struct {
-	v uint32
-}
-
-func (r *runtime) ZapV() zapcore.Level {
-	// zap levels are inverted: everything with a verbosity >= threshold gets logged.
-	return -zapcore.Level(atomic.LoadUint32(&r.v))
-}
-
-// Enabled implements the zapcore.LevelEnabler interface.
-func (r *runtime) Enabled(level zapcore.Level) bool {
-	return level >= r.ZapV()
-}
-
-func (r *runtime) SetVerbosityLevel(v uint32) error {
-	atomic.StoreUint32(&r.v, v)
-	return nil
-}
-
-var _ zapcore.LevelEnabler = &runtime{}
-
 // NewJSONLogger creates a new json logr.Logger and its associated
-// control interface. The separate error stream is optional and may be nil.
+// flush function. The separate error stream is optional and may be nil.
 // The encoder config is also optional.
-func NewJSONLogger(v logsapi.VerbosityLevel, infoStream, errorStream zapcore.WriteSyncer, encoderConfig *zapcore.EncoderConfig) (logr.Logger, logsapi.RuntimeControl) {
-	r := &runtime{v: uint32(v)}
+func NewJSONLogger(v logsapi.VerbosityLevel, infoStream, errorStream zapcore.WriteSyncer, encoderConfig *zapcore.EncoderConfig) (logr.Logger, func()) {
+	// zap levels are inverted: everything with a verbosity >= threshold gets logged.
+	zapV := -zapcore.Level(v)
 
 	if encoderConfig == nil {
 		encoderConfig = &zapcore.EncoderConfig{
@@ -77,13 +57,13 @@ func NewJSONLogger(v logsapi.VerbosityLevel, infoStream, errorStream zapcore.Wri
 	encoder := zapcore.NewJSONEncoder(*encoderConfig)
 	var core zapcore.Core
 	if errorStream == nil {
-		core = zapcore.NewCore(encoder, infoStream, r)
+		core = zapcore.NewCore(encoder, infoStream, zapV)
 	} else {
 		highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl >= zapcore.ErrorLevel && r.Enabled(lvl)
+			return lvl >= zapcore.ErrorLevel && lvl >= zapV
 		})
 		lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl < zapcore.ErrorLevel && r.Enabled(lvl)
+			return lvl < zapcore.ErrorLevel && lvl >= zapV
 		})
 		core = zapcore.NewTee(
 			zapcore.NewCore(encoder, errorStream, highPriority),
@@ -91,13 +71,9 @@ func NewJSONLogger(v logsapi.VerbosityLevel, infoStream, errorStream zapcore.Wri
 		)
 	}
 	l := zap.New(core, zap.WithCaller(true))
-	return zapr.NewLoggerWithOptions(l, zapr.LogInfoLevel("v"), zapr.ErrorKey("err")),
-		logsapi.RuntimeControl{
-			SetVerbosityLevel: r.SetVerbosityLevel,
-			Flush: func() {
-				_ = l.Sync()
-			},
-		}
+	return zapr.NewLoggerWithOptions(l, zapr.LogInfoLevel("v"), zapr.ErrorKey("err")), func() {
+		l.Sync()
+	}
 }
 
 func epochMillisTimeEncoder(_ time.Time, enc zapcore.PrimitiveArrayEncoder) {
@@ -115,7 +91,7 @@ func (f Factory) Feature() featuregate.Feature {
 	return logsapi.LoggingBetaOptions
 }
 
-func (f Factory) Create(c logsapi.LoggingConfiguration, o logsapi.LoggingOptions) (logr.Logger, logsapi.RuntimeControl) {
+func (f Factory) Create(c logsapi.LoggingConfiguration) (logr.Logger, func()) {
 	// We intentionally avoid all os.File.Sync calls. Output is unbuffered,
 	// therefore we don't need to flush, and calling the underlying fsync
 	// would just slow down writing.
@@ -124,9 +100,9 @@ func (f Factory) Create(c logsapi.LoggingConfiguration, o logsapi.LoggingOptions
 	// written to the output stream before the process terminates, but
 	// doesn't need to worry about data not being written because of a
 	// system crash or powerloss.
-	stderr := zapcore.Lock(AddNopSync(o.ErrorStream))
+	stderr := zapcore.Lock(AddNopSync(os.Stderr))
 	if c.Options.JSON.SplitStream {
-		stdout := zapcore.Lock(AddNopSync(o.InfoStream))
+		stdout := zapcore.Lock(AddNopSync(os.Stdout))
 		size := c.Options.JSON.InfoBufferSize.Value()
 		if size > 0 {
 			// Prevent integer overflow.

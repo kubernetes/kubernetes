@@ -18,9 +18,9 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/golang/protobuf/proto" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	"github.com/matttproud/golang_protobuf_extensions/pbutil"
 	"github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg"
-	"google.golang.org/protobuf/encoding/prototext"
 
 	dto "github.com/prometheus/client_model/go"
 )
@@ -99,11 +99,8 @@ func NegotiateIncludingOpenMetrics(h http.Header) Format {
 		if ac.Type == "text" && ac.SubType == "plain" && (ver == TextVersion || ver == "") {
 			return FmtText
 		}
-		if ac.Type+"/"+ac.SubType == OpenMetricsType && (ver == OpenMetricsVersion_0_0_1 || ver == OpenMetricsVersion_1_0_0 || ver == "") {
-			if ver == OpenMetricsVersion_1_0_0 {
-				return FmtOpenMetrics_1_0_0
-			}
-			return FmtOpenMetrics_0_0_1
+		if ac.Type+"/"+ac.SubType == OpenMetricsType && (ver == OpenMetricsVersion || ver == "") {
+			return FmtOpenMetrics
 		}
 	}
 	return FmtText
@@ -136,7 +133,7 @@ func NewEncoder(w io.Writer, format Format) Encoder {
 	case FmtProtoText:
 		return encoderCloser{
 			encode: func(v *dto.MetricFamily) error {
-				_, err := fmt.Fprintln(w, prototext.Format(v))
+				_, err := fmt.Fprintln(w, proto.MarshalTextString(v))
 				return err
 			},
 			close: func() error { return nil },
@@ -149,7 +146,7 @@ func NewEncoder(w io.Writer, format Format) Encoder {
 			},
 			close: func() error { return nil },
 		}
-	case FmtOpenMetrics_0_0_1, FmtOpenMetrics_1_0_0:
+	case FmtOpenMetrics:
 		return encoderCloser{
 			encode: func(v *dto.MetricFamily) error {
 				_, err := MetricFamilyToOpenMetrics(w, v)

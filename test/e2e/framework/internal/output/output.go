@@ -18,7 +18,7 @@ package output
 
 import (
 	"encoding/xml"
-	"os"
+	"io/ioutil"
 	"path"
 	"regexp"
 	"testing"
@@ -52,7 +52,7 @@ func TestGinkgoOutput(t *testing.T, expected TestResult, runSpecsArgs ...interfa
 	ginkgo.RunSpecs(fakeT, "Logging Suite", runSpecsArgs...)
 
 	var actual reporters.JUnitTestSuites
-	data, err := os.ReadFile(junitFile)
+	data, err := ioutil.ReadFile(junitFile)
 	require.NoError(t, err)
 	err = xml.Unmarshal(data, &actual)
 	require.NoError(t, err)
@@ -122,9 +122,6 @@ var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:d
 // elapsedSuffix matches "Elapsed: 16.189µs"
 var elapsedSuffix = regexp.MustCompile(`Elapsed: [[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m)`)
 
-// afterSuffix matches "after 5.001s."
-var afterSuffix = regexp.MustCompile(`after [[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m).`)
-
 // timeSuffix matches "@ 09/06/22 15:36:43.44 (5.001s)" as printed by Ginkgo v2 for log output, with the duration being optional.
 var timeSuffix = regexp.MustCompile(`(?m)@[[:space:]][[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}(\.[[:digit:]]{1,3})?( \([[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m)\))?$`)
 
@@ -132,7 +129,6 @@ func stripTimes(in string) string {
 	out := timePrefix.ReplaceAllString(in, "")
 	out = elapsedSuffix.ReplaceAllString(out, "Elapsed: <elapsed>")
 	out = timeSuffix.ReplaceAllString(out, "<time>")
-	out = afterSuffix.ReplaceAllString(out, "after <after>.")
 	return out
 }
 

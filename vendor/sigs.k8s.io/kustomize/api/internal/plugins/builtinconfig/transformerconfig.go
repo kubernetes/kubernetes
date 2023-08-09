@@ -10,7 +10,6 @@ import (
 	"sigs.k8s.io/kustomize/api/ifc"
 	"sigs.k8s.io/kustomize/api/konfig/builtinpluginconsts"
 	"sigs.k8s.io/kustomize/api/types"
-	"sigs.k8s.io/kustomize/kyaml/errors"
 )
 
 // TransformerConfig holds the data needed to perform transformations.
@@ -19,7 +18,6 @@ type TransformerConfig struct {
 	NameSuffix        types.FsSlice `json:"nameSuffix,omitempty" yaml:"nameSuffix,omitempty"`
 	NameSpace         types.FsSlice `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	CommonLabels      types.FsSlice `json:"commonLabels,omitempty" yaml:"commonLabels,omitempty"`
-	TemplateLabels    types.FsSlice `json:"templateLabels,omitempty" yaml:"templateLabels,omitempty"`
 	CommonAnnotations types.FsSlice `json:"commonAnnotations,omitempty" yaml:"commonAnnotations,omitempty"`
 	NameReference     nbrSlice      `json:"nameReference,omitempty" yaml:"nameReference,omitempty"`
 	VarReference      types.FsSlice `json:"varReference,omitempty" yaml:"varReference,omitempty"`
@@ -60,10 +58,8 @@ func MakeTransformerConfig(
 // sortFields provides determinism in logging, tests, etc.
 func (t *TransformerConfig) sortFields() {
 	sort.Sort(t.NamePrefix)
-	sort.Sort(t.NameSuffix)
 	sort.Sort(t.NameSpace)
 	sort.Sort(t.CommonLabels)
-	sort.Sort(t.TemplateLabels)
 	sort.Sort(t.CommonAnnotations)
 	sort.Sort(t.NameReference)
 	sort.Sort(t.VarReference)
@@ -112,44 +108,40 @@ func (t *TransformerConfig) Merge(input *TransformerConfig) (
 	merged = &TransformerConfig{}
 	merged.NamePrefix, err = t.NamePrefix.MergeAll(input.NamePrefix)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge NamePrefix fieldSpec")
+		return nil, err
 	}
 	merged.NameSuffix, err = t.NameSuffix.MergeAll(input.NameSuffix)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge NameSuffix fieldSpec")
+		return nil, err
 	}
 	merged.NameSpace, err = t.NameSpace.MergeAll(input.NameSpace)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge NameSpace fieldSpec")
+		return nil, err
 	}
 	merged.CommonAnnotations, err = t.CommonAnnotations.MergeAll(
 		input.CommonAnnotations)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge CommonAnnotations fieldSpec")
+		return nil, err
 	}
 	merged.CommonLabels, err = t.CommonLabels.MergeAll(input.CommonLabels)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge CommonLabels fieldSpec")
-	}
-	merged.TemplateLabels, err = t.TemplateLabels.MergeAll(input.TemplateLabels)
-	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge TemplateLabels fieldSpec")
+		return nil, err
 	}
 	merged.VarReference, err = t.VarReference.MergeAll(input.VarReference)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge VarReference fieldSpec")
+		return nil, err
 	}
 	merged.NameReference, err = t.NameReference.mergeAll(input.NameReference)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge NameReference fieldSpec")
+		return nil, err
 	}
 	merged.Images, err = t.Images.MergeAll(input.Images)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge Images fieldSpec")
+		return nil, err
 	}
 	merged.Replicas, err = t.Replicas.MergeAll(input.Replicas)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, "failed to merge Replicas fieldSpec")
+		return nil, err
 	}
 	merged.sortFields()
 	return merged, nil

@@ -28,20 +28,19 @@ import (
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicy struct {
 	metav1.TypeMeta `json:",inline"`
-
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// spec represents the specification of the desired behavior for this NetworkPolicy.
+	// Specification of the desired behavior for this NetworkPolicy.
 	// +optional
 	Spec NetworkPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status is tombstoned to show why 3 is a reserved protobuf tag.
-	// This commented field should remain, so in the future if we decide to reimplement
-	// NetworkPolicyStatus a different protobuf name and tag SHOULD be used!
-	// Status NetworkPolicyStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	// Status is the current state of the NetworkPolicy.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Status NetworkPolicyStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // PolicyType string describes the NetworkPolicy type
@@ -58,16 +57,16 @@ const (
 
 // NetworkPolicySpec provides the specification of a NetworkPolicy
 type NetworkPolicySpec struct {
-	// podSelector selects the pods to which this NetworkPolicy object applies.
-	// The array of ingress rules is applied to any pods selected by this field.
-	// Multiple network policies can select the same set of pods. In this case,
-	// the ingress rules for each are combined additively.
-	// This field is NOT optional and follows standard label selector semantics.
-	// An empty podSelector matches all pods in this namespace.
+	// Selects the pods to which this NetworkPolicy object applies. The array of
+	// ingress rules is applied to any pods selected by this field. Multiple network
+	// policies can select the same set of pods. In this case, the ingress rules for
+	// each are combined additively. This field is NOT optional and follows standard
+	// label selector semantics. An empty podSelector matches all pods in this
+	// namespace.
 	PodSelector metav1.LabelSelector `json:"podSelector" protobuf:"bytes,1,opt,name=podSelector"`
 
-	// ingress is a list of ingress rules to be applied to the selected pods.
-	// Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod
+	// List of ingress rules to be applied to the selected pods. Traffic is allowed to
+	// a pod if there are no NetworkPolicies selecting the pod
 	// (and cluster policy otherwise allows the traffic), OR if the traffic source is
 	// the pod's local node, OR if the traffic matches at least one ingress rule
 	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
@@ -76,8 +75,8 @@ type NetworkPolicySpec struct {
 	// +optional
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty" protobuf:"bytes,2,rep,name=ingress"`
 
-	// egress is a list of egress rules to be applied to the selected pods. Outgoing traffic
-	// is allowed if there are no NetworkPolicies selecting the pod (and cluster policy
+	// List of egress rules to be applied to the selected pods. Outgoing traffic is
+	// allowed if there are no NetworkPolicies selecting the pod (and cluster policy
 	// otherwise allows the traffic), OR if the traffic matches at least one egress rule
 	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
 	// this field is empty then this NetworkPolicy limits all outgoing traffic (and serves
@@ -86,15 +85,15 @@ type NetworkPolicySpec struct {
 	// +optional
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
-	// policyTypes is a list of rule types that the NetworkPolicy relates to.
+	// List of rule types that the NetworkPolicy relates to.
 	// Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"].
-	// If this field is not specified, it will default based on the existence of ingress or egress rules;
-	// policies that contain an egress section are assumed to affect egress, and all policies
-	// (whether or not they contain an ingress section) are assumed to affect ingress.
+	// If this field is not specified, it will default based on the existence of Ingress or Egress rules;
+	// policies that contain an Egress section are assumed to affect Egress, and all policies
+	// (whether or not they contain an Ingress section) are assumed to affect Ingress.
 	// If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ].
 	// Likewise, if you want to write a policy that specifies that no egress is allowed,
 	// you must specify a policyTypes value that include "Egress" (since such a policy would not include
-	// an egress section and would otherwise default to just [ "Ingress" ]).
+	// an Egress section and would otherwise default to just [ "Ingress" ]).
 	// This field is beta-level in 1.8
 	// +optional
 	PolicyTypes []PolicyType `json:"policyTypes,omitempty" protobuf:"bytes,4,rep,name=policyTypes,casttype=PolicyType"`
@@ -103,15 +102,15 @@ type NetworkPolicySpec struct {
 // NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods
 // matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and from.
 type NetworkPolicyIngressRule struct {
-	// ports is a list of ports which should be made accessible on the pods selected for
-	// this rule. Each item in this list is combined using a logical OR. If this field is
+	// List of ports which should be made accessible on the pods selected for this
+	// rule. Each item in this list is combined using a logical OR. If this field is
 	// empty or missing, this rule matches all ports (traffic not restricted by port).
 	// If this field is present and contains at least one item, then this rule allows
 	// traffic only if the traffic matches at least one port in the list.
 	// +optional
 	Ports []NetworkPolicyPort `json:"ports,omitempty" protobuf:"bytes,1,rep,name=ports"`
 
-	// from is a list of sources which should be able to access the pods selected for this rule.
+	// List of sources which should be able to access the pods selected for this rule.
 	// Items in this list are combined using a logical OR operation. If this field is
 	// empty or missing, this rule matches all sources (traffic not restricted by
 	// source). If this field is present and contains at least one item, this rule
@@ -124,7 +123,7 @@ type NetworkPolicyIngressRule struct {
 // matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.
 // This type is beta-level in 1.8
 type NetworkPolicyEgressRule struct {
-	// ports is a list of destination ports for outgoing traffic.
+	// List of destination ports for outgoing traffic.
 	// Each item in this list is combined using a logical OR. If this field is
 	// empty or missing, this rule matches all ports (traffic not restricted by port).
 	// If this field is present and contains at least one item, then this rule allows
@@ -132,7 +131,7 @@ type NetworkPolicyEgressRule struct {
 	// +optional
 	Ports []NetworkPolicyPort `json:"ports,omitempty" protobuf:"bytes,1,rep,name=ports"`
 
-	// to is a list of destinations for outgoing traffic of pods selected for this rule.
+	// List of destinations for outgoing traffic of pods selected for this rule.
 	// Items in this list are combined using a logical OR operation. If this field is
 	// empty or missing, this rule matches all destinations (traffic not restricted by
 	// destination). If this field is present and contains at least one item, this rule
@@ -143,19 +142,19 @@ type NetworkPolicyEgressRule struct {
 
 // NetworkPolicyPort describes a port to allow traffic on
 type NetworkPolicyPort struct {
-	// protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
-	// If not specified, this field defaults to TCP.
+	// The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this
+	// field defaults to TCP.
 	// +optional
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
 
-	// port represents the port on the given protocol. This can either be a numerical or named
+	// The port on the given protocol. This can either be a numerical or named
 	// port on a pod. If this field is not provided, this matches all port names and
 	// numbers.
 	// If present, only traffic on the specified protocol AND port will be matched.
 	// +optional
 	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 
-	// endPort indicates that the range of ports from port to endPort if set, inclusive,
+	// If set, indicates that the range of ports from port to endPort, inclusive,
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
@@ -167,13 +166,12 @@ type NetworkPolicyPort struct {
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
 type IPBlock struct {
-	// cidr is a string representing the IPBlock
+	// CIDR is a string representing the IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
-
-	// except is a slice of CIDRs that should not be included within an IPBlock
+	// Except is a slice of CIDRs that should not be included within an IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
-	// Except values will be rejected if they are outside the cidr range
+	// Except values will be rejected if they are outside the CIDR range
 	// +optional
 	Except []string `json:"except,omitempty" protobuf:"bytes,2,rep,name=except"`
 }
@@ -181,28 +179,70 @@ type IPBlock struct {
 // NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of
 // fields are allowed
 type NetworkPolicyPeer struct {
-	// podSelector is a label selector which selects pods. This field follows standard label
+	// This is a label selector which selects Pods. This field follows standard label
 	// selector semantics; if present but empty, it selects all pods.
 	//
-	// If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
-	// the pods matching podSelector in the Namespaces selected by NamespaceSelector.
-	// Otherwise it selects the pods matching podSelector in the policy's own namespace.
+	// If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+	// the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
+	// Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
 	// +optional
 	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty" protobuf:"bytes,1,opt,name=podSelector"`
 
-	// namespaceSelector selects namespaces using cluster-scoped labels. This field follows
-	// standard label selector semantics; if present but empty, it selects all namespaces.
+	// Selects Namespaces using cluster-scoped labels. This field follows standard label
+	// selector semantics; if present but empty, it selects all namespaces.
 	//
-	// If podSelector is also set, then the NetworkPolicyPeer as a whole selects
-	// the pods matching podSelector in the namespaces selected by namespaceSelector.
-	// Otherwise it selects all pods in the namespaces selected by namespaceSelector.
+	// If PodSelector is also set, then the NetworkPolicyPeer as a whole selects
+	// the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
+	// Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,2,opt,name=namespaceSelector"`
 
-	// ipBlock defines policy on a particular IPBlock. If this field is set then
+	// IPBlock defines policy on a particular IPBlock. If this field is set then
 	// neither of the other fields can be.
 	// +optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
+}
+
+// NetworkPolicyConditionType is the type for status conditions on
+// a NetworkPolicy. This type should be used with the
+// NetworkPolicyStatus.Conditions field.
+type NetworkPolicyConditionType string
+
+const (
+	// NetworkPolicyConditionStatusAccepted represents status of a Network Policy that could be properly parsed by
+	// the Network Policy provider and will be implemented in the cluster
+	NetworkPolicyConditionStatusAccepted NetworkPolicyConditionType = "Accepted"
+
+	// NetworkPolicyConditionStatusPartialFailure represents status of a Network Policy that could be partially
+	// parsed by the Network Policy provider and may not be completely implemented due to a lack of a feature or some
+	// other condition
+	NetworkPolicyConditionStatusPartialFailure NetworkPolicyConditionType = "PartialFailure"
+
+	// NetworkPolicyConditionStatusFailure represents status of a Network Policy that could not be parsed by the
+	// Network Policy provider and will not be implemented in the cluster
+	NetworkPolicyConditionStatusFailure NetworkPolicyConditionType = "Failure"
+)
+
+// NetworkPolicyConditionReason defines the set of reasons that explain why a
+// particular NetworkPolicy condition type has been raised.
+type NetworkPolicyConditionReason string
+
+const (
+	// NetworkPolicyConditionReasonFeatureNotSupported represents a reason where the Network Policy may not have been
+	// implemented in the cluster due to a lack of some feature not supported by the Network Policy provider
+	NetworkPolicyConditionReasonFeatureNotSupported NetworkPolicyConditionReason = "FeatureNotSupported"
+)
+
+// NetworkPolicyStatus describe the current state of the NetworkPolicy.
+type NetworkPolicyStatus struct {
+	// Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
+	// Current service state
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -210,13 +250,12 @@ type NetworkPolicyPeer struct {
 // NetworkPolicyList is a list of NetworkPolicy objects.
 type NetworkPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
-
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// items is a list of schema objects.
+	// Items is a list of schema objects.
 	Items []NetworkPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -229,18 +268,17 @@ type NetworkPolicyList struct {
 // based virtual hosting etc.
 type Ingress struct {
 	metav1.TypeMeta `json:",inline"`
-
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// spec is the desired state of the Ingress.
+	// Spec is the desired state of the Ingress.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec IngressSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// status is the current state of the Ingress.
+	// Status is the current state of the Ingress.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status IngressStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
@@ -251,19 +289,18 @@ type Ingress struct {
 // IngressList is a collection of Ingress.
 type IngressList struct {
 	metav1.TypeMeta `json:",inline"`
-
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// items is the list of Ingress.
+	// Items is the list of Ingress.
 	Items []Ingress `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
-	// ingressClassName is the name of an IngressClass cluster resource. Ingress
+	// IngressClassName is the name of an IngressClass cluster resource. Ingress
 	// controller implementations use this field to know whether they should be
 	// serving this Ingress resource, by a transitive connection
 	// (controller -> IngressClass -> Ingress resource). Although the
@@ -276,73 +313,72 @@ type IngressSpec struct {
 	// +optional
 	IngressClassName *string `json:"ingressClassName,omitempty" protobuf:"bytes,4,opt,name=ingressClassName"`
 
-	// defaultBackend is the backend that should handle requests that don't
+	// DefaultBackend is the backend that should handle requests that don't
 	// match any rule. If Rules are not specified, DefaultBackend must be specified.
 	// If DefaultBackend is not set, the handling of requests that do not match any
 	// of the rules will be up to the Ingress controller.
 	// +optional
 	DefaultBackend *IngressBackend `json:"defaultBackend,omitempty" protobuf:"bytes,1,opt,name=defaultBackend"`
 
-	// tls represents the TLS configuration. Currently the Ingress only supports a
-	// single TLS port, 443. If multiple members of this list specify different hosts,
-	// they will be multiplexed on the same port according to the hostname specified
+	// TLS configuration. Currently the Ingress only supports a single TLS
+	// port, 443. If multiple members of this list specify different hosts, they
+	// will be multiplexed on the same port according to the hostname specified
 	// through the SNI TLS extension, if the ingress controller fulfilling the
 	// ingress supports SNI.
 	// +listType=atomic
 	// +optional
 	TLS []IngressTLS `json:"tls,omitempty" protobuf:"bytes,2,rep,name=tls"`
 
-	// rules is a list of host rules used to configure the Ingress. If unspecified,
-	// or no rule matches, all traffic is sent to the default backend.
+	// A list of host rules used to configure the Ingress. If unspecified, or
+	// no rule matches, all traffic is sent to the default backend.
 	// +listType=atomic
 	// +optional
 	Rules []IngressRule `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 }
 
-// IngressTLS describes the transport layer security associated with an ingress.
+// IngressTLS describes the transport layer security associated with an Ingress.
 type IngressTLS struct {
-	// hosts is a list of hosts included in the TLS certificate. The values in
+	// Hosts are a list of hosts included in the TLS certificate. The values in
 	// this list must match the name/s used in the tlsSecret. Defaults to the
 	// wildcard host setting for the loadbalancer controller fulfilling this
 	// Ingress, if left unspecified.
 	// +listType=atomic
 	// +optional
 	Hosts []string `json:"hosts,omitempty" protobuf:"bytes,1,rep,name=hosts"`
-
-	// secretName is the name of the secret used to terminate TLS traffic on
+	// SecretName is the name of the secret used to terminate TLS traffic on
 	// port 443. Field is left optional to allow TLS routing based on SNI
 	// hostname alone. If the SNI host in a listener conflicts with the "Host"
 	// header field used by an IngressRule, the SNI host is used for termination
-	// and value of the "Host" header is used for routing.
+	// and value of the Host header is used for routing.
 	// +optional
 	SecretName string `json:"secretName,omitempty" protobuf:"bytes,2,opt,name=secretName"`
 }
 
 // IngressStatus describe the current state of the Ingress.
 type IngressStatus struct {
-	// loadBalancer contains the current status of the load-balancer.
+	// LoadBalancer contains the current status of the load-balancer.
 	// +optional
 	LoadBalancer IngressLoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
 }
 
 // IngressLoadBalancerStatus represents the status of a load-balancer.
 type IngressLoadBalancerStatus struct {
-	// ingress is a list containing ingress points for the load-balancer.
+	// Ingress is a list containing ingress points for the load-balancer.
 	// +optional
 	Ingress []IngressLoadBalancerIngress `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
 }
 
 // IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
 type IngressLoadBalancerIngress struct {
-	// ip is set for load-balancer ingress points that are IP based.
+	// IP is set for load-balancer ingress points that are IP based.
 	// +optional
 	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
 
-	// hostname is set for load-balancer ingress points that are DNS based.
+	// Hostname is set for load-balancer ingress points that are DNS based.
 	// +optional
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
 
-	// ports provides information about the ports exposed by this LoadBalancer.
+	// Ports provides information about the ports exposed by this LoadBalancer.
 	// +listType=atomic
 	// +optional
 	Ports []IngressPortStatus `json:"ports,omitempty" protobuf:"bytes,4,rep,name=ports"`
@@ -350,14 +386,14 @@ type IngressLoadBalancerIngress struct {
 
 // IngressPortStatus represents the error condition of a service port
 type IngressPortStatus struct {
-	// port is the port number of the ingress port.
+	// Port is the port number of the ingress port.
 	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
 
-	// protocol is the protocol of the ingress port.
+	// Protocol is the protocol of the ingress port.
 	// The supported values are: "TCP", "UDP", "SCTP"
 	Protocol v1.Protocol `json:"protocol" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
-	// error is to record the problem with the service port
+	// Error is to record the problem with the service port
 	// The format of the error shall comply with the following rules:
 	// - built-in error values shall be specified in this file and those shall use
 	//   CamelCase names
@@ -376,7 +412,7 @@ type IngressPortStatus struct {
 // the related backend services. Incoming requests are first evaluated for a host
 // match, then routed to the backend associated with the matching IngressRuleValue.
 type IngressRule struct {
-	// host is the fully qualified domain name of a network host, as defined by RFC 3986.
+	// Host is the fully qualified domain name of a network host, as defined by RFC 3986.
 	// Note the following deviations from the "host" part of the
 	// URI as defined in RFC 3986:
 	// 1. IPs are not allowed. Currently an IngressRuleValue can only apply to
@@ -389,14 +425,14 @@ type IngressRule struct {
 	// IngressRuleValue. If the host is unspecified, the Ingress routes all
 	// traffic based on the specified IngressRuleValue.
 	//
-	// host can be "precise" which is a domain name without the terminating dot of
+	// Host can be "precise" which is a domain name without the terminating dot of
 	// a network host (e.g. "foo.bar.com") or "wildcard", which is a domain name
 	// prefixed with a single wildcard label (e.g. "*.foo.com").
 	// The wildcard character '*' must appear by itself as the first DNS label and
 	// matches only a single label. You cannot have a wildcard label by itself (e.g. Host == "*").
 	// Requests will be matched against the Host field in the following way:
-	// 1. If host is precise, the request matches this rule if the http host header is equal to Host.
-	// 2. If host is a wildcard, then the request matches this rule if the http host header
+	// 1. If Host is precise, the request matches this rule if the http host header is equal to Host.
+	// 2. If Host is a wildcard, then the request matches this rule if the http host header
 	// is to equal to the suffix (removing the first label) of the wildcard rule.
 	// +optional
 	Host string `json:"host,omitempty" protobuf:"bytes,1,opt,name=host"`
@@ -424,7 +460,7 @@ type IngressRuleValue struct {
 // to match against everything after the last '/' and before the first '?'
 // or '#'.
 type HTTPIngressRuleValue struct {
-	// paths is a collection of paths that map requests to backends.
+	// A collection of paths that map requests to backends.
 	// +listType=atomic
 	Paths []HTTPIngressPath `json:"paths" protobuf:"bytes,1,rep,name=paths"`
 }
@@ -463,14 +499,14 @@ const (
 // HTTPIngressPath associates a path with a backend. Incoming urls matching the
 // path are forwarded to the backend.
 type HTTPIngressPath struct {
-	// path is matched against the path of an incoming request. Currently it can
+	// Path is matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path" part of a URL
 	// as defined by RFC 3986. Paths must begin with a '/' and must be present
 	// when using PathType with value "Exact" or "Prefix".
 	// +optional
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 
-	// pathType determines the interpretation of the path matching. PathType can
+	// PathType determines the interpretation of the Path matching. PathType can
 	// be one of the following values:
 	// * Exact: Matches the URL path exactly.
 	// * Prefix: Matches based on a URL path prefix split by '/'. Matching is
@@ -486,19 +522,19 @@ type HTTPIngressPath struct {
 	// Implementations are required to support all path types.
 	PathType *PathType `json:"pathType" protobuf:"bytes,3,opt,name=pathType"`
 
-	// backend defines the referenced service endpoint to which the traffic
+	// Backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
 	Backend IngressBackend `json:"backend" protobuf:"bytes,2,opt,name=backend"`
 }
 
 // IngressBackend describes all endpoints for a given service and port.
 type IngressBackend struct {
-	// service references a service as a backend.
+	// Service references a Service as a Backend.
 	// This is a mutually exclusive setting with "Resource".
 	// +optional
 	Service *IngressServiceBackend `json:"service,omitempty" protobuf:"bytes,4,opt,name=service"`
 
-	// resource is an ObjectRef to another Kubernetes resource in the namespace
+	// Resource is an ObjectRef to another Kubernetes resource in the namespace
 	// of the Ingress object. If resource is specified, a service.Name and
 	// service.Port must not be specified.
 	// This is a mutually exclusive setting with "Service".
@@ -508,23 +544,23 @@ type IngressBackend struct {
 
 // IngressServiceBackend references a Kubernetes Service as a Backend.
 type IngressServiceBackend struct {
-	// name is the referenced service. The service must exist in
+	// Name is the referenced service. The service must exist in
 	// the same namespace as the Ingress object.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
-	// port of the referenced service. A port name or port number
+	// Port of the referenced service. A port name or port number
 	// is required for a IngressServiceBackend.
 	Port ServiceBackendPort `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 }
 
 // ServiceBackendPort is the service port being referenced.
 type ServiceBackendPort struct {
-	// name is the name of the port on the Service.
+	// Name is the name of the port on the Service.
 	// This is a mutually exclusive setting with "Number".
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 
-	// number is the numerical port number (e.g. 80) on the Service.
+	// Number is the numerical port number (e.g. 80) on the Service.
 	// This is a mutually exclusive setting with "Name".
 	// +optional
 	Number int32 `json:"number,omitempty" protobuf:"bytes,2,opt,name=number"`
@@ -541,13 +577,12 @@ type ServiceBackendPort struct {
 // resources without a class specified will be assigned this default class.
 type IngressClass struct {
 	metav1.TypeMeta `json:",inline"`
-
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// spec is the desired state of the IngressClass.
+	// Spec is the desired state of the IngressClass.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec IngressClassSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
@@ -555,15 +590,15 @@ type IngressClass struct {
 
 // IngressClassSpec provides information about the class of an Ingress.
 type IngressClassSpec struct {
-	// controller refers to the name of the controller that should handle this
+	// Controller refers to the name of the controller that should handle this
 	// class. This allows for different "flavors" that are controlled by the
-	// same controller. For example, you may have different parameters for the
+	// same controller. For example, you may have different Parameters for the
 	// same implementing controller. This should be specified as a
 	// domain-prefixed path no more than 250 characters in length, e.g.
 	// "acme.io/ingress-controller". This field is immutable.
 	Controller string `json:"controller,omitempty" protobuf:"bytes,1,opt,name=controller"`
 
-	// parameters is a link to a custom resource containing additional
+	// Parameters is a link to a custom resource containing additional
 	// configuration for the controller. This is optional if the controller does
 	// not require extra parameters.
 	// +optional
@@ -582,24 +617,20 @@ const (
 // IngressClassParametersReference identifies an API object. This can be used
 // to specify a cluster or namespace-scoped resource.
 type IngressClassParametersReference struct {
-	// apiGroup is the group for the resource being referenced. If APIGroup is
+	// APIGroup is the group for the resource being referenced. If APIGroup is
 	// not specified, the specified Kind must be in the core API group. For any
 	// other third-party types, APIGroup is required.
 	// +optional
 	APIGroup *string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=aPIGroup"`
-
-	// kind is the type of resource being referenced.
+	// Kind is the type of resource being referenced.
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
-
-	// name is the name of resource being referenced.
+	// Name is the name of resource being referenced.
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
-
-	// scope represents if this refers to a cluster or namespace scoped resource.
+	// Scope represents if this refers to a cluster or namespace scoped resource.
 	// This may be set to "Cluster" (default) or "Namespace".
 	// +optional
 	Scope *string `json:"scope" protobuf:"bytes,4,opt,name=scope"`
-
-	// namespace is the namespace of the resource being referenced. This field is
+	// Namespace is the namespace of the resource being referenced. This field is
 	// required when scope is set to "Namespace" and must be unset when scope is set to
 	// "Cluster".
 	// +optional
@@ -611,11 +642,10 @@ type IngressClassParametersReference struct {
 // IngressClassList is a collection of IngressClasses.
 type IngressClassList struct {
 	metav1.TypeMeta `json:",inline"`
-
 	// Standard list metadata.
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// items is the list of IngressClasses.
+	// Items is the list of IngressClasses.
 	Items []IngressClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

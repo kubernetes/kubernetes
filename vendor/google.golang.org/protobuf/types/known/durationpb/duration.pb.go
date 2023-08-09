@@ -35,7 +35,8 @@
 //
 // The Duration message represents a signed span of time.
 //
-// # Conversion to a Go Duration
+//
+// Conversion to a Go Duration
 //
 // The AsDuration method can be used to convert a Duration message to a
 // standard Go time.Duration value:
@@ -64,13 +65,15 @@
 // the resulting value to the closest representable value (e.g., math.MaxInt64
 // for positive overflow and math.MinInt64 for negative overflow).
 //
-// # Conversion from a Go Duration
+//
+// Conversion from a Go Duration
 //
 // The durationpb.New function can be used to construct a Duration message
 // from a standard Go time.Duration value:
 //
 //	dur := durationpb.New(d)
 //	... // make use of d as a *durationpb.Duration
+//
 package durationpb
 
 import (
@@ -93,43 +96,43 @@ import (
 //
 // Example 1: Compute Duration from two Timestamps in pseudo code.
 //
-//	Timestamp start = ...;
-//	Timestamp end = ...;
-//	Duration duration = ...;
+//     Timestamp start = ...;
+//     Timestamp end = ...;
+//     Duration duration = ...;
 //
-//	duration.seconds = end.seconds - start.seconds;
-//	duration.nanos = end.nanos - start.nanos;
+//     duration.seconds = end.seconds - start.seconds;
+//     duration.nanos = end.nanos - start.nanos;
 //
-//	if (duration.seconds < 0 && duration.nanos > 0) {
-//	  duration.seconds += 1;
-//	  duration.nanos -= 1000000000;
-//	} else if (duration.seconds > 0 && duration.nanos < 0) {
-//	  duration.seconds -= 1;
-//	  duration.nanos += 1000000000;
-//	}
+//     if (duration.seconds < 0 && duration.nanos > 0) {
+//       duration.seconds += 1;
+//       duration.nanos -= 1000000000;
+//     } else if (duration.seconds > 0 && duration.nanos < 0) {
+//       duration.seconds -= 1;
+//       duration.nanos += 1000000000;
+//     }
 //
 // Example 2: Compute Timestamp from Timestamp + Duration in pseudo code.
 //
-//	Timestamp start = ...;
-//	Duration duration = ...;
-//	Timestamp end = ...;
+//     Timestamp start = ...;
+//     Duration duration = ...;
+//     Timestamp end = ...;
 //
-//	end.seconds = start.seconds + duration.seconds;
-//	end.nanos = start.nanos + duration.nanos;
+//     end.seconds = start.seconds + duration.seconds;
+//     end.nanos = start.nanos + duration.nanos;
 //
-//	if (end.nanos < 0) {
-//	  end.seconds -= 1;
-//	  end.nanos += 1000000000;
-//	} else if (end.nanos >= 1000000000) {
-//	  end.seconds += 1;
-//	  end.nanos -= 1000000000;
-//	}
+//     if (end.nanos < 0) {
+//       end.seconds -= 1;
+//       end.nanos += 1000000000;
+//     } else if (end.nanos >= 1000000000) {
+//       end.seconds += 1;
+//       end.nanos -= 1000000000;
+//     }
 //
 // Example 3: Compute Duration from datetime.timedelta in Python.
 //
-//	td = datetime.timedelta(days=3, minutes=10)
-//	duration = Duration()
-//	duration.FromTimedelta(td)
+//     td = datetime.timedelta(days=3, minutes=10)
+//     duration = Duration()
+//     duration.FromTimedelta(td)
 //
 // # JSON Mapping
 //
@@ -140,6 +143,8 @@ import (
 // encoded in JSON format as "3s", while 3 seconds and 1 nanosecond should
 // be expressed in JSON format as "3.000000001s", and 3 seconds and 1
 // microsecond should be expressed in JSON format as "3.000001s".
+//
+//
 type Duration struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

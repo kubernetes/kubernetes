@@ -65,8 +65,6 @@ spec:
 status:
   accessModes:
   - accessModesValue
-  allocatedResourceStatuses:
-    allocatedResourceStatusesKey: allocatedResourceStatusesValue
   allocatedResources:
     allocatedResourcesKey: "0"
   capacity:
@@ -79,3 +77,4 @@ status:
     status: statusValue
     type: typeValue
   phase: phaseValue
+  resizeStatus: resizeStatusValue

@@ -24,8 +24,6 @@ import (
 	"reflect"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -174,7 +172,7 @@ func TestGetPatchSetsForPathMustBeDirectory(t *testing.T) {
 	if err != nil {
 		t.Errorf("error creating temporary file: %v", err)
 	}
-	defer utiltesting.CloseAndRemove(t, tempFile)
+	defer os.Remove(tempFile.Name())
 
 	_, _, _, err = getPatchSetsFromPath(tempFile.Name(), testKnownTargets, io.Discard)
 	var pathErr *os.PathError

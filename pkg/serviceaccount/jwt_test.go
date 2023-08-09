@@ -30,7 +30,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
@@ -343,15 +342,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 				return tc.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 		)
-		var secretsWriter typedv1core.SecretsGetter
-		if tc.Client != nil {
-			secretsWriter = tc.Client.CoreV1()
-		}
-		validator, err := serviceaccount.NewLegacyValidator(tc.Client != nil, getter, secretsWriter)
-		if err != nil {
-			t.Fatalf("While creating legacy validator, err: %v", err)
-		}
-		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, validator)
+		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter, nil))
 
 		// An invalid, non-JWT token should always fail
 		ctx := authenticator.WithAudiences(context.Background(), auds)

@@ -40,10 +40,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against pod disruption budgets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &policyapi.PodDisruptionBudget{} },
-		NewListFunc:               func() runtime.Object { return &policyapi.PodDisruptionBudgetList{} },
-		DefaultQualifiedResource:  policyapi.Resource("poddisruptionbudgets"),
-		SingularQualifiedResource: policyapi.Resource("poddisruptionbudget"),
+		NewFunc:                  func() runtime.Object { return &policyapi.PodDisruptionBudget{} },
+		NewListFunc:              func() runtime.Object { return &policyapi.PodDisruptionBudgetList{} },
+		DefaultQualifiedResource: policyapi.Resource("poddisruptionbudgets"),
 
 		CreateStrategy:      poddisruptionbudget.Strategy,
 		UpdateStrategy:      poddisruptionbudget.Strategy,

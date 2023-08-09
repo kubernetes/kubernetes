@@ -113,9 +113,9 @@ func (n *node) prevSibling() *node {
 }
 
 // put inserts a key/value.
-func (n *node) put(oldKey, newKey, value []byte, pgId pgid, flags uint32) {
-	if pgId >= n.bucket.tx.meta.pgid {
-		panic(fmt.Sprintf("pgId (%d) above high water mark (%d)", pgId, n.bucket.tx.meta.pgid))
+func (n *node) put(oldKey, newKey, value []byte, pgid pgid, flags uint32) {
+	if pgid >= n.bucket.tx.meta.pgid {
+		panic(fmt.Sprintf("pgid (%d) above high water mark (%d)", pgid, n.bucket.tx.meta.pgid))
 	} else if len(oldKey) <= 0 {
 		panic("put: zero-length old key")
 	} else if len(newKey) <= 0 {
@@ -136,7 +136,7 @@ func (n *node) put(oldKey, newKey, value []byte, pgId pgid, flags uint32) {
 	inode.flags = flags
 	inode.key = newKey
 	inode.value = value
-	inode.pgid = pgId
+	inode.pgid = pgid
 	_assert(len(inode.key) > 0, "put: zero-length inode key")
 }
 
@@ -188,16 +188,12 @@ func (n *node) read(p *page) {
 }
 
 // write writes the items onto one or more pages.
-// The page should have p.id (might be 0 for meta or bucket-inline page) and p.overflow set
-// and the rest should be zeroed.
 func (n *node) write(p *page) {
-	_assert(p.count == 0 && p.flags == 0, "node cannot be written into a not empty page")
-
 	// Initialize page.
 	if n.isLeaf {
-		p.flags = leafPageFlag
+		p.flags |= leafPageFlag
 	} else {
-		p.flags = branchPageFlag
+		p.flags |= branchPageFlag
 	}
 
 	if len(n.inodes) >= 0xFFFF {
@@ -304,7 +300,7 @@ func (n *node) splitTwo(pageSize uintptr) (*node, *node) {
 	n.inodes = n.inodes[:splitIndex]
 
 	// Update the statistics.
-	n.bucket.tx.stats.IncSplit(1)
+	n.bucket.tx.stats.Split++
 
 	return n, next
 }
@@ -391,7 +387,7 @@ func (n *node) spill() error {
 		}
 
 		// Update the statistics.
-		tx.stats.IncSpill(1)
+		tx.stats.Spill++
 	}
 
 	// If the root node split and created a new root then we need to spill that
@@ -413,7 +409,7 @@ func (n *node) rebalance() {
 	n.unbalanced = false
 
 	// Update statistics.
-	n.bucket.tx.stats.IncRebalance(1)
+	n.bucket.tx.stats.Rebalance++
 
 	// Ignore if node is above threshold (25%) and has enough keys.
 	var threshold = n.bucket.tx.db.pageSize / 4
@@ -547,7 +543,7 @@ func (n *node) dereference() {
 	}
 
 	// Update statistics.
-	n.bucket.tx.stats.IncNodeDeref(1)
+	n.bucket.tx.stats.NodeDeref++
 }
 
 // free adds the node's underlying page to the freelist.
@@ -584,10 +580,6 @@ func (n *node) dump() {
 	warn("")
 }
 */
-
-func compareKeys(left, right []byte) int {
-	return bytes.Compare(left, right)
-}
 
 type nodes []*node
 

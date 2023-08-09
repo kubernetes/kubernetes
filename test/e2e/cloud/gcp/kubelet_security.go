@@ -35,7 +35,7 @@ import (
 
 var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	f := framework.NewDefaultFramework("kubelet-security")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var node *v1.Node
 	var nodeName string

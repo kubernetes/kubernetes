@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
@@ -124,8 +123,7 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 		InformersStarted:          alwaysStarted,
 		InformerFactory:           informerFactory,
 	}
-	_, ctx := ktesting.NewTestContext(t)
-	qc, err := NewController(ctx, resourceQuotaControllerOptions)
+	qc, err := NewController(resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -797,7 +795,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		for _, action := range kubeClient.Actions() {
 			actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
 		}
-		if !actionSet.IsSuperset(testCase.expectedActionSet) {
+		if !actionSet.HasAll(testCase.expectedActionSet.List()...) {
 			t.Errorf("test: %s,\nExpected actions:\n%v\n but got:\n%v\nDifference:\n%v", testName, testCase.expectedActionSet, actionSet, testCase.expectedActionSet.Difference(actionSet))
 		}
 
@@ -978,8 +976,7 @@ func TestAddQuota(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
-		qc.addQuota(logger, tc.quota)
+		qc.addQuota(tc.quota)
 		if tc.expectedPriority {
 			if e, a := 1, qc.missingUsageQueue.Len(); e != a {
 				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
@@ -1078,8 +1075,7 @@ func TestDiscoverySync(t *testing.T) {
 	// The 1s sleep in the test allows GetQuotableResources and
 	// resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	_, ctx := ktesting.NewTestContext(t)
-	go qc.Sync(ctx, fakeDiscoveryClient.ServerPreferredNamespacedResources, 200*time.Millisecond)
+	go qc.Sync(fakeDiscoveryClient.ServerPreferredNamespacedResources, 200*time.Millisecond, stopSync)
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)

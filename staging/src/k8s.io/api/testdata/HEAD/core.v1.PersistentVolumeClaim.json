@@ -110,8 +110,6 @@
     "allocatedResources": {
       "allocatedResourcesKey": "0"
     },
-    "allocatedResourceStatuses": {
-      "allocatedResourceStatusesKey": "allocatedResourceStatusesValue"
-    }
+    "resizeStatus": "resizeStatusValue"
   }
 }

@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -54,7 +53,7 @@ var (
 		by creating a dockercfg secret and attaching it to your service account.`))
 
 	secretForDockerRegistryExample = templates.Examples(i18n.T(`
-		  # If you do not already have a .dockercfg file, create a dockercfg secret directly
+		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
 		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
 
 		  # Create a new secret named my-secret from ~/.docker/config.json
@@ -112,11 +111,11 @@ type CreateSecretDockerRegistryOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewSecretDockerRegistryOptions creates a new *CreateSecretDockerRegistryOptions with default value
-func NewSecretDockerRegistryOptions(ioStreams genericiooptions.IOStreams) *CreateSecretDockerRegistryOptions {
+func NewSecretDockerRegistryOptions(ioStreams genericclioptions.IOStreams) *CreateSecretDockerRegistryOptions {
 	return &CreateSecretDockerRegistryOptions{
 		Server:     "https://index.docker.io/v1/",
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -125,7 +124,7 @@ func NewSecretDockerRegistryOptions(ioStreams genericiooptions.IOStreams) *Creat
 }
 
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
-func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSecretDockerRegistryOptions(ioStreams)
 
 	cmd := &cobra.Command{

@@ -37,7 +37,6 @@ type MutatingWebhookApplyConfiguration struct {
 	TimeoutSeconds          *int32                                          `json:"timeoutSeconds,omitempty"`
 	AdmissionReviewVersions []string                                        `json:"admissionReviewVersions,omitempty"`
 	ReinvocationPolicy      *admissionregistrationv1.ReinvocationPolicyType `json:"reinvocationPolicy,omitempty"`
-	MatchConditions         []MatchConditionApplyConfiguration              `json:"matchConditions,omitempty"`
 }
 
 // MutatingWebhookApplyConfiguration constructs an declarative configuration of the MutatingWebhook type for use with
@@ -138,18 +137,5 @@ func (b *MutatingWebhookApplyConfiguration) WithAdmissionReviewVersions(values .
 // If called multiple times, the ReinvocationPolicy field is set to the value of the last call.
 func (b *MutatingWebhookApplyConfiguration) WithReinvocationPolicy(value admissionregistrationv1.ReinvocationPolicyType) *MutatingWebhookApplyConfiguration {
 	b.ReinvocationPolicy = &value
-	return b
-}
-
-// WithMatchConditions adds the given value to the MatchConditions field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the MatchConditions field.
-func (b *MutatingWebhookApplyConfiguration) WithMatchConditions(values ...*MatchConditionApplyConfiguration) *MutatingWebhookApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithMatchConditions")
-		}
-		b.MatchConditions = append(b.MatchConditions, *values[i])
-	}
 	return b
 }

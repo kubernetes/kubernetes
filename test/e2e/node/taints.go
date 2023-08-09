@@ -165,7 +165,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	var cs clientset.Interface
 	var ns string
 	f := framework.NewDefaultFramework("taint-single-pod")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = f.ClientSet
@@ -374,7 +374,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 	var cs clientset.Interface
 	var ns string
 	f := framework.NewDefaultFramework("taint-multiple-pods")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = f.ClientSet

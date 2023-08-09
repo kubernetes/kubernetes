@@ -26,6 +26,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -158,7 +159,7 @@ func getHostFromHostPort(hostPort string) string {
 
 var _ = utils.SIGDescribe("Flexvolumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	// note that namespace deletion is handled by delete-namespace flag
 
@@ -196,6 +197,11 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 		testFlexVolume(ctx, driverInstallAs, config, f)
 
+		ginkgo.By("waiting for flex client pod to terminate")
+		if err := e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, config.Prefix+"-client", "", f.Namespace.Name); !apierrors.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		}
+
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
 		uninstallFlex(ctx, cs, node, "k8s", driverInstallAs)
 	})
@@ -210,6 +216,11 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		installFlex(ctx, cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
 
 		testFlexVolume(ctx, driverInstallAs, config, f)
+
+		ginkgo.By("waiting for flex client pod to terminate")
+		if err := e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, config.Prefix+"-client", "", f.Namespace.Name); !apierrors.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		}
 
 		// Detach might occur after pod deletion. Wait before deleting driver.
 		time.Sleep(detachTimeout)

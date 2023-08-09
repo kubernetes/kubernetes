@@ -17,7 +17,6 @@ limitations under the License.
 package namespace
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -64,7 +63,6 @@ type NamespaceController struct {
 
 // NewNamespaceController creates a new NamespaceController
 func NewNamespaceController(
-	ctx context.Context,
 	kubeClient clientset.Interface,
 	metadataClient metadata.Interface,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
@@ -75,7 +73,7 @@ func NewNamespaceController(
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
 		queue:                      workqueue.NewNamedRateLimitingQueue(nsControllerRateLimiter(), "namespace"),
-		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(ctx, kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
+		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
 	}
 
 	// configure the namespace informer event handlers
@@ -134,15 +132,15 @@ func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 // Each namespace can be in the queue at most once.
 // The system ensures that no two workers can process
 // the same namespace at the same time.
-func (nm *NamespaceController) worker(ctx context.Context) {
-	workFunc := func(ctx context.Context) bool {
+func (nm *NamespaceController) worker() {
+	workFunc := func() bool {
 		key, quit := nm.queue.Get()
 		if quit {
 			return true
 		}
 		defer nm.queue.Done(key)
 
-		err := nm.syncNamespaceFromKey(ctx, key.(string))
+		err := nm.syncNamespaceFromKey(key.(string))
 		if err == nil {
 			// no error, forget this entry and return
 			nm.queue.Forget(key)
@@ -151,7 +149,7 @@ func (nm *NamespaceController) worker(ctx context.Context) {
 
 		if estimate, ok := err.(*deletion.ResourcesRemainingError); ok {
 			t := estimate.Estimate/2 + 1
-			klog.FromContext(ctx).V(4).Info("Content remaining in namespace", "namespace", key, "waitSeconds", t)
+			klog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
 			nm.queue.AddAfter(key, time.Duration(t)*time.Second)
 		} else {
 			// rather than wait for a full resync, re-add the namespace to the queue to be processed
@@ -160,8 +158,9 @@ func (nm *NamespaceController) worker(ctx context.Context) {
 		}
 		return false
 	}
+
 	for {
-		quit := workFunc(ctx)
+		quit := workFunc()
 
 		if quit {
 			return
@@ -170,40 +169,39 @@ func (nm *NamespaceController) worker(ctx context.Context) {
 }
 
 // syncNamespaceFromKey looks for a namespace with the specified key in its store and synchronizes it
-func (nm *NamespaceController) syncNamespaceFromKey(ctx context.Context, key string) (err error) {
+func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 	startTime := time.Now()
-	logger := klog.FromContext(ctx)
 	defer func() {
-		logger.V(4).Info("Finished syncing namespace", "namespace", key, "duration", time.Since(startTime))
+		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, err := nm.lister.Get(key)
 	if errors.IsNotFound(err) {
-		logger.Info("Namespace has been deleted", "namespace", key)
+		klog.Infof("Namespace has been deleted %v", key)
 		return nil
 	}
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to retrieve namespace %v from store: %v", key, err))
 		return err
 	}
-	return nm.namespacedResourcesDeleter.Delete(ctx, namespace.Name)
+	return nm.namespacedResourcesDeleter.Delete(namespace.Name)
 }
 
 // Run starts observing the system with the specified number of workers.
-func (nm *NamespaceController) Run(ctx context.Context, workers int) {
+func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting namespace controller")
-	defer logger.Info("Shutting down namespace controller")
 
-	if !cache.WaitForNamedCacheSync("namespace", ctx.Done(), nm.listerSynced) {
+	klog.Infof("Starting namespace controller")
+	defer klog.Infof("Shutting down namespace controller")
+
+	if !cache.WaitForNamedCacheSync("namespace", stopCh, nm.listerSynced) {
 		return
 	}
 
-	logger.V(5).Info("Starting workers of namespace controller")
+	klog.V(5).Info("Starting workers of namespace controller")
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, nm.worker, time.Second)
+		go wait.Until(nm.worker, time.Second, stopCh)
 	}
-	<-ctx.Done()
+	<-stopCh
 }

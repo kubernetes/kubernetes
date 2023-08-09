@@ -104,11 +104,6 @@ func (kl *Kubelet) GetPodDir(podUID types.UID) string {
 	return kl.getPodDir(podUID)
 }
 
-// ListPodsFromDisk gets a list of pods that have data directories.
-func (kl *Kubelet) ListPodsFromDisk() ([]types.UID, error) {
-	return kl.listPodsFromDisk()
-}
-
 // getPodDir returns the full path to the per-pod directory for the pod with
 // the given UID.
 func (kl *Kubelet) getPodDir(podUID types.UID) string {
@@ -181,14 +176,11 @@ func (kl *Kubelet) GetPods() []*v1.Pod {
 	pods := kl.podManager.GetPods()
 	// a kubelet running without apiserver requires an additional
 	// update of the static pod status. See #57106
-	for i, p := range pods {
+	for _, p := range pods {
 		if kubelettypes.IsStaticPod(p) {
 			if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
 				klog.V(2).InfoS("Pod status updated", "pod", klog.KObj(p), "status", status.Phase)
-				// do not mutate the cache
-				p = p.DeepCopy()
 				p.Status = status
-				pods[i] = p
 			}
 		}
 	}

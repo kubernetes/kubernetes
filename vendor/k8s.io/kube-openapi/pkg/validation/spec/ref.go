@@ -21,8 +21,6 @@ import (
 	"path/filepath"
 
 	"github.com/go-openapi/jsonreference"
-
-	"k8s.io/kube-openapi/pkg/internal"
 )
 
 // Refable is a struct for things that accept a $ref property
@@ -151,5 +149,19 @@ func (r *Ref) UnmarshalJSON(d []byte) error {
 }
 
 func (r *Ref) fromMap(v map[string]interface{}) error {
-	return internal.JSONRefFromMap(&r.Ref, v)
+	if v == nil {
+		return nil
+	}
+
+	if vv, ok := v["$ref"]; ok {
+		if str, ok := vv.(string); ok {
+			ref, err := jsonreference.New(str)
+			if err != nil {
+				return err
+			}
+			*r = Ref{Ref: ref}
+		}
+	}
+
+	return nil
 }

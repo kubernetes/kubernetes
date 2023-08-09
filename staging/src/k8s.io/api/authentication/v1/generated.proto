@@ -56,26 +56,6 @@ message ExtraValue {
   repeated string items = 1;
 }
 
-// SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request.
-// When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or
-// request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
-message SelfSubjectReview {
-  // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // Status is filled in by the server with the user attributes.
-  optional SelfSubjectReviewStatus status = 2;
-}
-
-// SelfSubjectReviewStatus is filled by the kube-apiserver and sent back to a user.
-message SelfSubjectReviewStatus {
-  // User attributes of the user making this request.
-  // +optional
-  optional UserInfo userInfo = 1;
-}
-
 // TokenRequest requests a token for a given service account.
 message TokenRequest {
   // Standard object's metadata.

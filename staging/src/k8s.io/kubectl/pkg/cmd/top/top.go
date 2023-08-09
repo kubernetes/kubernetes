@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -37,14 +37,14 @@ var (
 		"v1beta1",
 	}
 	topLong = templates.LongDesc(i18n.T(`
-		Display resource (CPU/memory) usage.
+		Display Resource (CPU/Memory) usage.
 
 		The top command allows you to see the resource consumption for nodes or pods.
 
 		This command requires Metrics Server to be correctly configured and working on the server. `))
 )
 
-func NewCmdTop(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdTop(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "top",
 		Short: i18n.T("Display resource (CPU/memory) usage"),

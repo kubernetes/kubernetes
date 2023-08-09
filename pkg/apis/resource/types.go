@@ -97,9 +97,9 @@ type ResourceClaimStatus struct {
 	// +optional
 	DriverName string
 
-	// Allocation is set by the resource driver once a resource or set of
-	// resources has been allocated successfully. If this is not specified, the
-	// resources have not been allocated yet.
+	// Allocation is set by the resource driver once a resource has been
+	// allocated successfully. If this is not specified, the resource is
+	// not yet allocated.
 	// +optional
 	Allocation *AllocationResult
 
@@ -128,28 +128,21 @@ type ResourceClaimStatus struct {
 // claim.status.reservedFor.
 const ResourceClaimReservedForMaxSize = 32
 
-// AllocationResult contains attributes of an allocated resource.
+// AllocationResult contains attributed of an allocated resource.
 type AllocationResult struct {
-	// ResourceHandles contain the state associated with an allocation that
-	// should be maintained throughout the lifetime of a claim. Each
-	// ResourceHandle contains data that should be passed to a specific kubelet
-	// plugin once it lands on a node. This data is returned by the driver
-	// after a successful allocation and is opaque to Kubernetes. Driver
-	// documentation may explain to users how to interpret this data if needed.
+	// ResourceHandle contains arbitrary data returned by the driver after a
+	// successful allocation. This is opaque for
+	// Kubernetes. Driver documentation may explain to users how to
+	// interpret this data if needed.
 	//
-	// Setting this field is optional. It has a maximum size of 32 entries.
-	// If null (or empty), it is assumed this allocation will be processed by a
-	// single kubelet plugin with no ResourceHandle data attached. The name of
-	// the kubelet plugin invoked will match the DriverName set in the
-	// ResourceClaimStatus this AllocationResult is embedded in.
-	//
-	// +listType=atomic
+	// The maximum size of this field is 16KiB. This may get
+	// increased in the future, but not reduced.
 	// +optional
-	ResourceHandles []ResourceHandle
+	ResourceHandle string
 
-	// This field will get set by the resource driver after it has allocated
-	// the resource to inform the scheduler where it can schedule Pods using
-	// the ResourceClaim.
+	// This field will get set by the resource driver after it has
+	// allocated the resource driver to inform the scheduler where it can
+	// schedule Pods using the ResourceClaim.
 	//
 	// Setting this field is optional. If null, the resource is available
 	// everywhere.
@@ -162,33 +155,8 @@ type AllocationResult struct {
 	Shareable bool
 }
 
-// AllocationResultResourceHandlesMaxSize represents the maximum number of
-// entries in allocation.resourceHandles.
-const AllocationResultResourceHandlesMaxSize = 32
-
-// ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.
-type ResourceHandle struct {
-	// DriverName specifies the name of the resource driver whose kubelet
-	// plugin should be invoked to process this ResourceHandle's data once it
-	// lands on a node. This may differ from the DriverName set in
-	// ResourceClaimStatus this ResourceHandle is embedded in.
-	DriverName string
-
-	// Data contains the opaque data associated with this ResourceHandle. It is
-	// set by the controller component of the resource driver whose name
-	// matches the DriverName set in the ResourceClaimStatus this
-	// ResourceHandle is embedded in. It is set at allocation time and is
-	// intended for processing by the kubelet plugin whose name matches
-	// the DriverName set in this ResourceHandle.
-	//
-	// The maximum size of this field is 16KiB. This may get increased in the
-	// future, but not reduced.
-	// +optional
-	Data string
-}
-
-// ResourceHandleDataMaxSize represents the maximum size of resourceHandle.data.
-const ResourceHandleDataMaxSize = 16 * 1024
+// ResourceHandleMaxSize is the maximum size of allocation.resourceHandle.
+const ResourceHandleMaxSize = 16 * 1024
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -205,27 +173,27 @@ type ResourceClaimList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodSchedulingContext objects hold information that is needed to schedule
+// PodScheduling objects hold information that is needed to schedule
 // a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
 // mode.
 //
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
-type PodSchedulingContext struct {
+type PodScheduling struct {
 	metav1.TypeMeta
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Spec describes where resources for the Pod are needed.
-	Spec PodSchedulingContextSpec
+	Spec PodSchedulingSpec
 
 	// Status describes where resources for the Pod can be allocated.
-	Status PodSchedulingContextStatus
+	Status PodSchedulingStatus
 }
 
-// PodSchedulingContextSpec describes where resources for the Pod are needed.
-type PodSchedulingContextSpec struct {
+// PodSchedulingSpec describes where resources for the Pod are needed.
+type PodSchedulingSpec struct {
 	// SelectedNode is the node for which allocation of ResourceClaims that
 	// are referenced by the Pod and that use "WaitForFirstConsumer"
 	// allocation is to be attempted.
@@ -241,8 +209,8 @@ type PodSchedulingContextSpec struct {
 	PotentialNodes []string
 }
 
-// PodSchedulingContextStatus describes where resources for the Pod can be allocated.
-type PodSchedulingContextStatus struct {
+// PodSchedulingStatus describes where resources for the Pod can be allocated.
+type PodSchedulingStatus struct {
 	// ResourceClaims describes resource availability for each
 	// pod.spec.resourceClaim entry where the corresponding ResourceClaim
 	// uses "WaitForFirstConsumer" allocation mode.
@@ -271,21 +239,21 @@ type ResourceClaimSchedulingStatus struct {
 }
 
 // PodSchedulingNodeListMaxSize defines the maximum number of entries in the
-// node lists that are stored in PodSchedulingContext objects. This limit is part
+// node lists that are stored in PodScheduling objects. This limit is part
 // of the API.
 const PodSchedulingNodeListMaxSize = 128
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodSchedulingContextList is a collection of Pod scheduling objects.
-type PodSchedulingContextList struct {
+// PodSchedulingList is a collection of Pod scheduling objects.
+type PodSchedulingList struct {
 	metav1.TypeMeta
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta
 
-	// Items is the list of PodSchedulingContext objects.
-	Items []PodSchedulingContext
+	// Items is the list of PodScheduling objects.
+	Items []PodScheduling
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

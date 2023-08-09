@@ -18,19 +18,17 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -40,11 +38,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/cloud-provider/api"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/component-base/featuregate"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
-	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 )
 
@@ -290,15 +286,8 @@ func (c *Controller) processNextServiceItem(ctx context.Context) bool {
 		return true
 	}
 
-	var re *api.RetryError
-	if errors.As(err, &re) {
-		klog.Warningf("error processing service %v (retrying in %s): %v", key, re.RetryAfter(), err)
-		c.serviceQueue.AddAfter(key, re.RetryAfter())
-	} else {
-		runtime.HandleError(fmt.Errorf("error processing service %v (retrying with exponential backoff): %v", key, err))
-		c.serviceQueue.AddRateLimited(key)
-	}
-
+	runtime.HandleError(fmt.Errorf("error processing service %v (will retry): %v", key, err))
+	c.serviceQueue.AddRateLimited(key)
 	return true
 }
 
@@ -410,8 +399,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 				klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error", key, c.cloud.ProviderName())
 				return op, nil
 			}
-			// Use %w deliberately so that a returned RetryError can be handled.
-			return op, fmt.Errorf("failed to ensure load balancer: %w", err)
+			return op, fmt.Errorf("failed to ensure load balancer: %v", err)
 		}
 		if newStatus == nil {
 			return op, fmt.Errorf("service status returned by EnsureLoadBalancer is nil")
@@ -425,7 +413,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 		// - Not found error mostly happens when service disappears right after
 		//   we remove the finalizer.
 		// - We can't patch status on non-exist service anyway.
-		if !apierrors.IsNotFound(err) {
+		if !errors.IsNotFound(err) {
 			return op, fmt.Errorf("failed to update load balancer status: %v", err)
 		}
 	}
@@ -592,15 +580,6 @@ func (c *Controller) needsUpdate(oldService *v1.Service, newService *v1.Service)
 		return true
 	}
 
-	// User can upgrade (add another clusterIP or ipFamily) or can downgrade (remove secondary clusterIP or ipFamily),
-	// but CAN NOT change primary/secondary clusterIP || ipFamily UNLESS they are changing from/to/ON ExternalName
-	// so not care about order, only need check the length.
-	if len(oldService.Spec.IPFamilies) != len(newService.Spec.IPFamilies) {
-		c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "IPFamilies", "Count: %v -> %v",
-			len(oldService.Spec.IPFamilies), len(newService.Spec.IPFamilies))
-		return true
-	}
-
 	return false
 }
 
@@ -680,9 +659,8 @@ func nodeNames(nodes []*v1.Node) sets.String {
 
 func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	// Evaluate the individual node exclusion predicate before evaluating the
-	// compounded result of all predicates. We don't sync changes on the
-	// readiness condition for eTP:Local services or when
-	// StableLoadBalancerNodeSet is enabled, hence if a node remains NotReady
+	// compounded result of all predicates. We don't sync ETP=local services
+	// for changes on the readiness condition, hence if a node remains NotReady
 	// and a user adds the exclusion label we will need to sync as to make sure
 	// this change is reflected correctly on ETP=local services. The sync
 	// function compares lastSyncedNodes with the new (existing) set of nodes
@@ -693,14 +671,7 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate) {
 		return true
 	}
-	// For the same reason as above, also check for any change to the providerID
-	if oldNode.Spec.ProviderID != newNode.Spec.ProviderID {
-		return true
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
-		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
-	}
-	return false
+	return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
 }
 
 // syncNodes handles updating the hosts pointed to by all load
@@ -728,8 +699,8 @@ func (c *Controller) syncNodes(ctx context.Context, workers int) sets.String {
 // there's no need. This function returns true if we tried to update load balancers and
 // failed, indicating to the caller that we should try again.
 func (c *Controller) nodeSyncService(svc *v1.Service, oldNodes, newNodes []*v1.Node) bool {
-	const retSuccess = false
-	const retNeedRetry = true
+	retSuccess := false
+	retNeedRetry := true
 	if svc == nil || !wantsLoadBalancer(svc) {
 		return retSuccess
 	}
@@ -741,7 +712,6 @@ func (c *Controller) nodeSyncService(svc *v1.Service, oldNodes, newNodes []*v1.N
 	klog.V(4).Infof("nodeSyncService started for service %s/%s", svc.Namespace, svc.Name)
 	if err := c.lockedUpdateLoadBalancerHosts(svc, newNodes); err != nil {
 		runtime.HandleError(fmt.Errorf("failed to update load balancer hosts for service %s/%s: %v", svc.Namespace, svc.Name, err))
-		nodeSyncErrorCount.Inc()
 		return retNeedRetry
 	}
 	klog.V(4).Infof("nodeSyncService finished successfully for service %s/%s", svc.Namespace, svc.Name)
@@ -785,7 +755,6 @@ func (c *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1
 // associated with the service.
 func (c *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []*v1.Node) error {
 	startTime := time.Now()
-	loadBalancerSyncCount.Inc()
 	defer func() {
 		latency := time.Since(startTime).Seconds()
 		klog.V(4).Infof("It took %v seconds to update load balancer hosts for service %s/%s", latency, service.Namespace, service.Name)
@@ -847,7 +816,7 @@ func (c *Controller) syncService(ctx context.Context, key string) error {
 	// service holds the latest service info from apiserver
 	service, err := c.serviceLister.Services(namespace).Get(name)
 	switch {
-	case apierrors.IsNotFound(err):
+	case errors.IsNotFound(err):
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		err = c.processServiceDeletion(ctx, key)
 	case err != nil:
@@ -963,22 +932,9 @@ var (
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
 	}
-	stableNodeSetPredicates []NodeConditionPredicate = []NodeConditionPredicate{
-		nodeNotDeletedPredicate,
-		nodeIncludedPredicate,
-		// This is not perfect, but probably good enough. We won't update the
-		// LBs just because the taint was added (see shouldSyncUpdatedNode) but
-		// if any other situation causes an LB sync, tainted nodes will be
-		// excluded at that time and cause connections on said node to not
-		// connection drain.
-		nodeUnTaintedPredicate,
-	}
 )
 
 func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
-		return stableNodeSetPredicates
-	}
 	if service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal {
 		return etpLocalNodePredicates
 	}
@@ -1009,10 +965,6 @@ func nodeReadyPredicate(node *v1.Node) bool {
 		}
 	}
 	return false
-}
-
-func nodeNotDeletedPredicate(node *v1.Node) bool {
-	return node.DeletionTimestamp.IsZero()
 }
 
 // listWithPredicate gets nodes that matches all predicate functions.

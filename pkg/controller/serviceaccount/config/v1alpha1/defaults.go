@@ -17,9 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 )
 
@@ -35,12 +32,5 @@ import (
 func RecommendedDefaultSAControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.SAControllerConfiguration) {
 	if obj.ConcurrentSATokenSyncs == 0 {
 		obj.ConcurrentSATokenSyncs = 5
-	}
-}
-
-func RecommendedDefaultLegacySATokenCleanerConfiguration(obj *kubectrlmgrconfigv1alpha1.LegacySATokenCleanerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.CleanUpPeriod == zero {
-		obj.CleanUpPeriod = metav1.Duration{Duration: 365 * 24 * time.Hour}
 	}
 }

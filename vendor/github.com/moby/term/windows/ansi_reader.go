@@ -1,4 +1,3 @@
-//go:build windows
 // +build windows
 
 package windowsconsole
@@ -191,6 +190,7 @@ func keyToString(keyEvent *winterm.KEY_EVENT_RECORD, escapeSequence []byte) stri
 		// <Ctrl>-S  Suspends printing on the screen (does not stop the program).
 		// <Ctrl>-U  Deletes all characters on the current line. Also called the KILL key.
 		// <Ctrl>-E  Quits current command and creates a core
+
 	}
 
 	// <Alt>+Key generates ESC N Key

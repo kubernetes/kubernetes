@@ -42,21 +42,19 @@ func (l *klogger) Init(info logr.RuntimeInfo) {
 	l.callDepth += info.CallDepth
 }
 
-func (l *klogger) Info(level int, msg string, kvList ...interface{}) {
+func (l klogger) Info(level int, msg string, kvList ...interface{}) {
 	merged := serialize.MergeKVs(l.values, kvList)
 	if l.prefix != "" {
 		msg = l.prefix + ": " + msg
 	}
-	// Skip this function.
-	VDepth(l.callDepth+1, Level(level)).InfoSDepth(l.callDepth+1, msg, merged...)
+	V(Level(level)).InfoSDepth(l.callDepth+1, msg, merged...)
 }
 
-func (l *klogger) Enabled(level int) bool {
-	// Skip this function and logr.Logger.Info where Enabled is called.
-	return VDepth(l.callDepth+2, Level(level)).Enabled()
+func (l klogger) Enabled(level int) bool {
+	return V(Level(level)).Enabled()
 }
 
-func (l *klogger) Error(err error, msg string, kvList ...interface{}) {
+func (l klogger) Error(err error, msg string, kvList ...interface{}) {
 	merged := serialize.MergeKVs(l.values, kvList)
 	if l.prefix != "" {
 		msg = l.prefix + ": " + msg

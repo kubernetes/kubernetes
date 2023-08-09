@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -58,7 +57,7 @@ func TestResourcesLocal(t *testing.T) {
 
 	outputFormat := "name"
 
-	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdResources(tf, streams)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -107,7 +106,7 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 
 	outputFormat := "name"
 
-	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdResources(tf, streams)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -498,7 +497,7 @@ func TestSetResourcesRemote(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			streams := genericiooptions.NewTestIOStreamsDiscard()
+			streams := genericclioptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdResources(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			opts := SetResourcesOptions{
@@ -607,7 +606,7 @@ func TestSetResourcesRemoteWithSpecificContainers(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			streams := genericiooptions.NewTestIOStreamsDiscard()
+			streams := genericclioptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdResources(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			opts := SetResourcesOptions{

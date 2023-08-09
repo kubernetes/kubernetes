@@ -28,9 +28,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
@@ -38,10 +41,7 @@ import (
 )
 
 var (
-	// testHostNameserver and testHostDomain are also being used in dns_windows_test.go.
-	testHostNameserver = "8.8.8.8"
-	testHostDomain     = "host.domain"
-	fetchEvent         = func(recorder *record.FakeRecorder) string {
+	fetchEvent = func(recorder *record.FakeRecorder) string {
 		select {
 		case event := <-recorder.Events:
 			return event
@@ -153,10 +153,11 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 	}
 
 	testCases := []struct {
-		desc         string
-		hostNames    []string
-		resultSearch []string
-		events       []string
+		desc              string
+		hostNames         []string
+		resultSearch      []string
+		events            []string
+		expandedDNSConfig bool
 	}{
 		{
 			desc:         "valid: 3 search paths",
@@ -180,50 +181,57 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 		},
 
 		{
-			desc:         "valid: 2048 characters in search path list",
-			hostNames:    searchPathList2048Chars,
-			resultSearch: searchPathList2048Chars,
-			events:       []string{},
+			desc:              "valid ExpandedDNSConfig: 2048 characters in search path list",
+			hostNames:         searchPathList2048Chars,
+			resultSearch:      searchPathList2048Chars,
+			events:            []string{},
+			expandedDNSConfig: true,
 		},
 
 		{
-			desc:         "invalid: 2050 characters in search path list",
-			hostNames:    append(searchPathList2048Chars, "B"),
-			resultSearch: searchPathList2048Chars,
-			events:       []string{fmt.Sprintf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(searchPathList2048Chars, " "))},
+			desc:              "invalid ExpandedDNSConfig: 2050 characters in search path list",
+			hostNames:         append(searchPathList2048Chars, "B"),
+			resultSearch:      searchPathList2048Chars,
+			events:            []string{fmt.Sprintf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(searchPathList2048Chars, " "))},
+			expandedDNSConfig: true,
 		},
 
 		{
-			desc:         "invalid: 256 characters search path",
-			hostNames:    []string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", strings.Repeat("B", 256), "BBB"},
-			resultSearch: []string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB"},
-			events:       []string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB"},
+			desc:              "invalid ExpandedDNSConfig: 256 characters search path",
+			hostNames:         []string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", strings.Repeat("B", 256), "BBB"},
+			resultSearch:      []string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB"},
+			events:            []string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB"},
+			expandedDNSConfig: true,
 		},
 
 		{
-			desc:         "valid: 7 search paths",
+			desc:         "invalid: 7 search paths",
 			hostNames:    []string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC", "DDD"},
-			resultSearch: []string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC", "DDD"},
-			events:       []string{},
+			resultSearch: []string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC"},
+			events:       []string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB CCC"},
 		},
 
 		{
-			desc:         "valid: 32 search paths",
-			hostNames:    []string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
-			resultSearch: []string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
-			events:       []string{},
+			desc:              "valid ExpandedDNSConfig: 32 search paths",
+			hostNames:         []string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
+			resultSearch:      []string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
+			events:            []string{},
+			expandedDNSConfig: true,
 		},
 
 		{
-			desc:         "invalid: 33 search paths",
-			hostNames:    []string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33"},
-			resultSearch: []string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
-			events:       []string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32"},
+			desc:              "invalid ExpandedDNSConfig: 33 search paths",
+			hostNames:         []string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33"},
+			resultSearch:      []string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
+			events:            []string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32"},
+			expandedDNSConfig: true,
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandedDNSConfig, tc.expandedDNSConfig)()
+
 			dnsSearch := configurer.formDNSSearchFitsLimits(tc.hostNames, pod)
 			assert.EqualValues(t, tc.resultSearch, dnsSearch, "test [%d]", i)
 			for _, expectedEvent := range tc.events {
@@ -445,6 +453,29 @@ func TestGetPodDNSType(t *testing.T) {
 }
 
 func TestGetPodDNS(t *testing.T) {
+	testCases := []struct {
+		desc              string
+		expandedDNSConfig bool
+	}{
+		{
+			desc:              "Not ExpandedDNSConfig",
+			expandedDNSConfig: false,
+		},
+		{
+			desc:              "ExpandedDNSConfig",
+			expandedDNSConfig: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandedDNSConfig, tc.expandedDNSConfig)()
+			testGetPodDNS(t)
+		})
+	}
+}
+
+func testGetPodDNS(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -502,8 +533,8 @@ func TestGetPodDNS(t *testing.T) {
 		t.Errorf("expected search \".\", got %+v", options[3].DNSSearch)
 	}
 
-	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, defaultResolvConf)
-	configurer.getHostDNSConfig = fakeGetHostDNSConfigCustom
+	testResolverConfig := "/etc/resolv.conf"
+	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, testResolverConfig)
 	for i, pod := range pods {
 		var err error
 		dnsConfig, err := configurer.GetPodDNS(pod)
@@ -520,7 +551,10 @@ func TestGetPodDNS(t *testing.T) {
 	}
 	expLength := len(options[1].DNSSearch) + 3
 
-	maxDNSSearchPaths := validation.MaxDNSSearchPaths
+	maxDNSSearchPaths := validation.MaxDNSSearchPathsLegacy
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) {
+		maxDNSSearchPaths = validation.MaxDNSSearchPathsExpanded
+	}
 
 	if expLength > maxDNSSearchPaths {
 		expLength = maxDNSSearchPaths
@@ -557,6 +591,8 @@ func TestGetPodDNSCustom(t *testing.T) {
 	testSvcDomain := fmt.Sprintf("svc.%s", testClusterDNSDomain)
 	testNsSvcDomain := fmt.Sprintf("%s.svc.%s", testPodNamespace, testClusterDNSDomain)
 	testNdotsOptionValue := "3"
+	testHostNameserver := "8.8.8.8"
+	testHostDomain := "host.domain"
 
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

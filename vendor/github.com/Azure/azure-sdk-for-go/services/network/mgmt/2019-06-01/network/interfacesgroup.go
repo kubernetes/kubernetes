@@ -54,7 +54,7 @@ func (client InterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroup
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "CreateOrUpdate", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "CreateOrUpdate", nil, "Failure sending request")
 		return
 	}
 
@@ -88,7 +88,6 @@ func (client InterfacesClient) CreateOrUpdatePreparer(ctx context.Context, resou
 // http.Response Body if it receives an error.
 func (client InterfacesClient) CreateOrUpdateSender(req *http.Request) (future InterfacesCreateOrUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -135,7 +134,7 @@ func (client InterfacesClient) Delete(ctx context.Context, resourceGroupName str
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "Delete", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "Delete", nil, "Failure sending request")
 		return
 	}
 
@@ -167,7 +166,6 @@ func (client InterfacesClient) DeletePreparer(ctx context.Context, resourceGroup
 // http.Response Body if it receives an error.
 func (client InterfacesClient) DeleteSender(req *http.Request) (future InterfacesDeleteFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -293,7 +291,7 @@ func (client InterfacesClient) GetEffectiveRouteTable(ctx context.Context, resou
 
 	result, err = client.GetEffectiveRouteTableSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "GetEffectiveRouteTable", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "GetEffectiveRouteTable", nil, "Failure sending request")
 		return
 	}
 
@@ -325,7 +323,6 @@ func (client InterfacesClient) GetEffectiveRouteTablePreparer(ctx context.Contex
 // http.Response Body if it receives an error.
 func (client InterfacesClient) GetEffectiveRouteTableSender(req *http.Request) (future InterfacesGetEffectiveRouteTableFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -772,7 +769,7 @@ func (client InterfacesClient) ListEffectiveNetworkSecurityGroups(ctx context.Co
 
 	result, err = client.ListEffectiveNetworkSecurityGroupsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "ListEffectiveNetworkSecurityGroups", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "ListEffectiveNetworkSecurityGroups", nil, "Failure sending request")
 		return
 	}
 
@@ -804,7 +801,6 @@ func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsPreparer(ctx co
 // http.Response Body if it receives an error.
 func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsSender(req *http.Request) (future InterfacesListEffectiveNetworkSecurityGroupsFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -1218,7 +1214,7 @@ func (client InterfacesClient) UpdateTags(ctx context.Context, resourceGroupName
 
 	result, err = client.UpdateTagsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "UpdateTags", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "UpdateTags", nil, "Failure sending request")
 		return
 	}
 
@@ -1252,7 +1248,6 @@ func (client InterfacesClient) UpdateTagsPreparer(ctx context.Context, resourceG
 // http.Response Body if it receives an error.
 func (client InterfacesClient) UpdateTagsSender(req *http.Request) (future InterfacesUpdateTagsFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

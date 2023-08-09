@@ -209,7 +209,7 @@ func TestUntilWithSync(t *testing.T) {
 			conditionFunc: func(e watch.Event) (bool, error) {
 				return true, nil
 			},
-			expectedErr:   wait.ErrWaitTimeout,
+			expectedErr:   errors.New("timed out waiting for the condition"),
 			expectedEvent: nil,
 		},
 		{

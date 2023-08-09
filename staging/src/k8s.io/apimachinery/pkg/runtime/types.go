@@ -123,7 +123,7 @@ type Unknown struct {
 	// Raw will hold the complete serialized object which couldn't be matched
 	// with a registered type. Most likely, nothing should be done with this
 	// except for passing it through the system.
-	Raw []byte `json:"-" protobuf:"bytes,2,opt,name=raw"`
+	Raw []byte `protobuf:"bytes,2,opt,name=raw"`
 	// ContentEncoding is encoding used to encode 'Raw' data.
 	// Unspecified means no encoding.
 	ContentEncoding string `protobuf:"bytes,3,opt,name=contentEncoding"`

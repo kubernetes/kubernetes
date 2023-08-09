@@ -18,7 +18,6 @@ package reconciler
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -104,24 +103,24 @@ func NewReconciler(
 	volumePluginMgr *volumepkg.VolumePluginMgr,
 	kubeletPodsDir string) Reconciler {
 	return &reconciler{
-		kubeClient:                      kubeClient,
-		controllerAttachDetachEnabled:   controllerAttachDetachEnabled,
-		loopSleepDuration:               loopSleepDuration,
-		waitForAttachTimeout:            waitForAttachTimeout,
-		nodeName:                        nodeName,
-		desiredStateOfWorld:             desiredStateOfWorld,
-		actualStateOfWorld:              actualStateOfWorld,
-		populatorHasAddedPods:           populatorHasAddedPods,
-		operationExecutor:               operationExecutor,
-		mounter:                         mounter,
-		hostutil:                        hostutil,
-		skippedDuringReconstruction:     map[v1.UniqueVolumeName]*globalVolumeInfo{},
-		volumePluginMgr:                 volumePluginMgr,
-		kubeletPodsDir:                  kubeletPodsDir,
-		timeOfLastSync:                  time.Time{},
-		volumesFailedReconstruction:     make([]podVolume, 0),
-		volumesNeedUpdateFromNodeStatus: make([]v1.UniqueVolumeName, 0),
-		volumesNeedReportedInUse:        make([]v1.UniqueVolumeName, 0),
+		kubeClient:                    kubeClient,
+		controllerAttachDetachEnabled: controllerAttachDetachEnabled,
+		loopSleepDuration:             loopSleepDuration,
+		waitForAttachTimeout:          waitForAttachTimeout,
+		nodeName:                      nodeName,
+		desiredStateOfWorld:           desiredStateOfWorld,
+		actualStateOfWorld:            actualStateOfWorld,
+		populatorHasAddedPods:         populatorHasAddedPods,
+		operationExecutor:             operationExecutor,
+		mounter:                       mounter,
+		hostutil:                      hostutil,
+		skippedDuringReconstruction:   map[v1.UniqueVolumeName]*globalVolumeInfo{},
+		volumePluginMgr:               volumePluginMgr,
+		kubeletPodsDir:                kubeletPodsDir,
+		timeOfLastSync:                time.Time{},
+		volumesFailedReconstruction:   make([]podVolume, 0),
+		volumesNeedDevicePath:         make([]v1.UniqueVolumeName, 0),
+		volumesNeedReportedInUse:      make([]v1.UniqueVolumeName, 0),
 	}
 }
 
@@ -140,16 +139,14 @@ type reconciler struct {
 	volumePluginMgr               *volumepkg.VolumePluginMgr
 	skippedDuringReconstruction   map[v1.UniqueVolumeName]*globalVolumeInfo
 	kubeletPodsDir                string
-	// lock protects timeOfLastSync for updating and checking
-	timeOfLastSyncLock              sync.Mutex
-	timeOfLastSync                  time.Time
-	volumesFailedReconstruction     []podVolume
-	volumesNeedUpdateFromNodeStatus []v1.UniqueVolumeName
-	volumesNeedReportedInUse        []v1.UniqueVolumeName
+	timeOfLastSync                time.Time
+	volumesFailedReconstruction   []podVolume
+	volumesNeedDevicePath         []v1.UniqueVolumeName
+	volumesNeedReportedInUse      []v1.UniqueVolumeName
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		rc.runNew(stopCh)
 		return
 	}
@@ -178,7 +175,7 @@ func (rc *reconciler) unmountVolumes() {
 func (rc *reconciler) mountOrAttachVolumes() {
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
-		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.DesiredPersistentVolumeSize, volumeToMount.SELinuxLabel)
+		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.PersistentVolumeSize, volumeToMount.SELinuxLabel)
 		volumeToMount.DevicePath = devicePath
 		if cache.IsSELinuxMountMismatchError(err) {
 			// The volume is mounted, but with an unexpected SELinux context.
@@ -236,7 +233,6 @@ func (rc *reconciler) mountAttachedVolumes(volumeToMount cache.VolumeToMount, po
 }
 
 func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
-	logger := klog.TODO()
 	if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
 		//// lets not spin a goroutine and unnecessarily trigger exponential backoff if this happens
 		if volumeToMount.PluginIsAttachable && !volumeToMount.ReportedInUse {
@@ -247,7 +243,6 @@ func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
 		// for controller to finish attaching volume.
 		klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.VerifyControllerAttachedVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
 		err := rc.operationExecutor.VerifyControllerAttachedVolume(
-			logger,
 			volumeToMount.VolumeToMount,
 			rc.nodeName,
 			rc.actualStateOfWorld)
@@ -266,7 +261,7 @@ func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
 			NodeName:   rc.nodeName,
 		}
 		klog.V(5).InfoS(volumeToAttach.GenerateMsgDetailed("Starting operationExecutor.AttachVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
-		err := rc.operationExecutor.AttachVolume(logger, volumeToAttach, rc.actualStateOfWorld)
+		err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
 		if err != nil && !isExpectedError(err) {
 			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.AttachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error(), "pod", klog.KObj(volumeToMount.Pod))
 		}
@@ -302,7 +297,7 @@ func (rc *reconciler) unmountDetachDevices() {
 					// Only detach if kubelet detach is enabled
 					klog.V(5).InfoS(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.DetachVolume", ""))
 					err := rc.operationExecutor.DetachVolume(
-						klog.TODO(), attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
+						attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
 					if err != nil && !isExpectedError(err) {
 						klog.ErrorS(err, attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.DetachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
 					}

@@ -120,8 +120,8 @@ func New(c controller, cloudAlias cloudAlias, kubeAPI kubeAPI, mode NodeSyncMode
 
 // Loop runs the sync loop for a given node. done is an optional channel that
 // is closed when the Loop() returns.
-func (sync *NodeSync) Loop(logger klog.Logger, done chan struct{}) {
-	logger.V(2).Info("Starting sync loop", "node", klog.KRef("", sync.nodeName))
+func (sync *NodeSync) Loop(done chan struct{}) {
+	klog.V(2).Infof("Starting sync loop for node %q", sync.nodeName)
 
 	defer func() {
 		if done != nil {
@@ -131,27 +131,27 @@ func (sync *NodeSync) Loop(logger klog.Logger, done chan struct{}) {
 
 	timeout := sync.c.ResyncTimeout()
 	delayTimer := time.NewTimer(timeout)
-	logger.V(4).Info("Try to resync node later", "node", klog.KRef("", sync.nodeName), "resyncTime", timeout)
+	klog.V(4).Infof("Resync node %q in %v", sync.nodeName, timeout)
 
 	for {
 		select {
 		case op, more := <-sync.opChan:
 			if !more {
-				logger.V(2).Info("Stopping sync loop")
+				klog.V(2).Infof("Stopping sync loop")
 				return
 			}
-			sync.c.ReportResult(op.run(logger, sync))
+			sync.c.ReportResult(op.run(sync))
 			if !delayTimer.Stop() {
 				<-delayTimer.C
 			}
 		case <-delayTimer.C:
-			logger.V(4).Info("Running resync", "node", klog.KRef("", sync.nodeName))
-			sync.c.ReportResult((&updateOp{}).run(logger, sync))
+			klog.V(4).Infof("Running resync for node %q", sync.nodeName)
+			sync.c.ReportResult((&updateOp{}).run(sync))
 		}
 
 		timeout := sync.c.ResyncTimeout()
 		delayTimer.Reset(timeout)
-		logger.V(4).Info("Try to resync node later", "node", klog.KRef("", sync.nodeName), "resyncTime", timeout)
+		klog.V(4).Infof("Resync node %q in %v", sync.nodeName, timeout)
 	}
 }
 
@@ -175,7 +175,7 @@ func (sync *NodeSync) Delete(node *v1.Node) {
 // syncOp is the interface for generic sync operation.
 type syncOp interface {
 	// run the requested sync operation.
-	run(logger klog.Logger, sync *NodeSync) error
+	run(sync *NodeSync) error
 }
 
 // updateOp handles creation and updates of a node.
@@ -190,16 +190,16 @@ func (op *updateOp) String() string {
 	return fmt.Sprintf("updateOp(%q,%v)", op.node.Name, op.node.Spec.PodCIDR)
 }
 
-func (op *updateOp) run(logger klog.Logger, sync *NodeSync) error {
-	logger.V(3).Info("Running updateOp", "updateOp", op)
+func (op *updateOp) run(sync *NodeSync) error {
+	klog.V(3).Infof("Running updateOp %+v", op)
 
 	ctx := context.Background()
 
 	if op.node == nil {
-		logger.V(3).Info("Getting node spec", "node", klog.KRef("", sync.nodeName))
+		klog.V(3).Infof("Getting node spec for %q", sync.nodeName)
 		node, err := sync.kubeAPI.Node(ctx, sync.nodeName)
 		if err != nil {
-			logger.Error(err, "Error getting node pec", "node", klog.KRef("", sync.nodeName))
+			klog.Errorf("Error getting node %q spec: %v", sync.nodeName, err)
 			return err
 		}
 		op.node = node
@@ -207,7 +207,7 @@ func (op *updateOp) run(logger klog.Logger, sync *NodeSync) error {
 
 	aliasRange, err := sync.cloudAlias.Alias(ctx, op.node)
 	if err != nil {
-		logger.Error(err, "Error getting cloud alias for node", "node", klog.KRef("", sync.nodeName))
+		klog.Errorf("Error getting cloud alias for node %q: %v", sync.nodeName, err)
 		return err
 	}
 
@@ -229,13 +229,14 @@ func (op *updateOp) run(logger klog.Logger, sync *NodeSync) error {
 // match.
 func (op *updateOp) validateRange(ctx context.Context, sync *NodeSync, node *v1.Node, aliasRange *net.IPNet) error {
 	if node.Spec.PodCIDR != aliasRange.String() {
-		klog.FromContext(ctx).Error(nil, "Inconsistency detected between node PodCIDR and node alias", "podCIDR", node.Spec.PodCIDR, "alias", aliasRange)
+		klog.Errorf("Inconsistency detected between node PodCIDR and node alias (%v != %v)",
+			node.Spec.PodCIDR, aliasRange)
 		sync.kubeAPI.EmitNodeWarningEvent(node.Name, MismatchEvent,
 			"Node.Spec.PodCIDR != cloud alias (%v != %v)", node.Spec.PodCIDR, aliasRange)
 		// User intervention is required in this case, as this is most likely due
 		// to the user mucking around with their VM aliases on the side.
 	} else {
-		klog.FromContext(ctx).V(4).Info("Node CIDR range is matches cloud assignment", "node", klog.KObj(node), "podCIDR", node.Spec.PodCIDR)
+		klog.V(4).Infof("Node %q CIDR range %v is matches cloud assignment", node.Name, node.Spec.PodCIDR)
 	}
 	return nil
 }
@@ -248,27 +249,27 @@ func (op *updateOp) updateNodeFromAlias(ctx context.Context, sync *NodeSync, nod
 			"Cannot sync from cloud in mode %q", sync.mode)
 		return fmt.Errorf("cannot sync from cloud in mode %q", sync.mode)
 	}
-	logger := klog.FromContext(ctx)
-	logger.V(2).Info("Updating node spec with alias range", "podCIDR", aliasRange)
+
+	klog.V(2).Infof("Updating node spec with alias range, node.PodCIDR = %v", aliasRange)
 
 	if err := sync.set.Occupy(aliasRange); err != nil {
-		logger.Error(nil, "Error occupying range for node", "node", klog.KRef("", sync.nodeName), "alias", aliasRange)
+		klog.Errorf("Error occupying range %v for node %v", aliasRange, sync.nodeName)
 		return err
 	}
 
 	if err := sync.kubeAPI.UpdateNodePodCIDR(ctx, node, aliasRange); err != nil {
-		logger.Error(err, "Could not update node PodCIDR", "node", klog.KObj(node), "podCIDR", aliasRange)
+		klog.Errorf("Could not update node %q PodCIDR to %v: %v", node.Name, aliasRange, err)
 		return err
 	}
 
-	logger.V(2).Info("Node PodCIDR updated", "node", klog.KObj(node), "podCIDR", aliasRange)
+	klog.V(2).Infof("Node %q PodCIDR set to %v", node.Name, aliasRange)
 
 	if err := sync.kubeAPI.UpdateNodeNetworkUnavailable(node.Name, false); err != nil {
-		logger.Error(err, "Could not update node NetworkUnavailable status to false")
+		klog.Errorf("Could not update node NetworkUnavailable status to false: %v", err)
 		return err
 	}
 
-	logger.V(2).Info("Updated node PodCIDR from cloud alias", "node", klog.KObj(node), "alias", aliasRange)
+	klog.V(2).Infof("Updated node %q PodCIDR from cloud alias %v", node.Name, aliasRange)
 
 	return nil
 }
@@ -282,29 +283,29 @@ func (op *updateOp) updateAliasFromNode(ctx context.Context, sync *NodeSync, nod
 	}
 
 	_, aliasRange, err := netutils.ParseCIDRSloppy(node.Spec.PodCIDR)
-
-	logger := klog.FromContext(ctx)
 	if err != nil {
-		logger.Error(err, "Could not parse PodCIDR for node", "node", klog.KObj(node), "podCIDR", node.Spec.PodCIDR)
+		klog.Errorf("Could not parse PodCIDR (%q) for node %q: %v",
+			node.Spec.PodCIDR, node.Name, err)
 		return err
 	}
 
 	if err := sync.set.Occupy(aliasRange); err != nil {
-		logger.Error(nil, "Error occupying range for node", "node", klog.KRef("", sync.nodeName), "alias", aliasRange)
+		klog.Errorf("Error occupying range %v for node %v", aliasRange, sync.nodeName)
 		return err
 	}
 
 	if err := sync.cloudAlias.AddAlias(ctx, node, aliasRange); err != nil {
-		logger.Error(err, "Could not add alias for node", "node", klog.KObj(node), "alias", aliasRange)
+		klog.Errorf("Could not add alias %v for node %q: %v", aliasRange, node.Name, err)
 		return err
 	}
 
 	if err := sync.kubeAPI.UpdateNodeNetworkUnavailable(node.Name, false); err != nil {
-		logger.Error(err, "Could not update node NetworkUnavailable status to false")
+		klog.Errorf("Could not update node NetworkUnavailable status to false: %v", err)
 		return err
 	}
 
-	logger.V(2).Info("Updated node cloud alias with node spec", "node", klog.KObj(node), "podCIDR", node.Spec.PodCIDR)
+	klog.V(2).Infof("Updated node %q cloud alias with node spec, node.PodCIDR = %v",
+		node.Name, node.Spec.PodCIDR)
 
 	return nil
 }
@@ -325,23 +326,22 @@ func (op *updateOp) allocateRange(ctx context.Context, sync *NodeSync, node *v1.
 	// If addAlias returns a hard error, cidrRange will be leaked as there
 	// is no durable record of the range. The missing space will be
 	// recovered on the next restart of the controller.
-	logger := klog.FromContext(ctx)
 	if err := sync.cloudAlias.AddAlias(ctx, node, cidrRange); err != nil {
-		logger.Error(err, "Could not add alias for node", "node", klog.KObj(node), "alias", cidrRange)
+		klog.Errorf("Could not add alias %v for node %q: %v", cidrRange, node.Name, err)
 		return err
 	}
 
 	if err := sync.kubeAPI.UpdateNodePodCIDR(ctx, node, cidrRange); err != nil {
-		logger.Error(err, "Could not update node PodCIDR", "node", klog.KObj(node), "podCIDR", cidrRange)
+		klog.Errorf("Could not update node %q PodCIDR to %v: %v", node.Name, cidrRange, err)
 		return err
 	}
 
 	if err := sync.kubeAPI.UpdateNodeNetworkUnavailable(node.Name, false); err != nil {
-		logger.Error(err, "Could not update node NetworkUnavailable status to false")
+		klog.Errorf("Could not update node NetworkUnavailable status to false: %v", err)
 		return err
 	}
 
-	logger.V(2).Info("Allocated PodCIDR for node", "node", klog.KObj(node), "podCIDR", cidrRange)
+	klog.V(2).Infof("Allocated PodCIDR %v for node %q", cidrRange, node.Name)
 
 	return nil
 }
@@ -358,23 +358,25 @@ func (op *deleteOp) String() string {
 	return fmt.Sprintf("deleteOp(%q,%v)", op.node.Name, op.node.Spec.PodCIDR)
 }
 
-func (op *deleteOp) run(logger klog.Logger, sync *NodeSync) error {
-	logger.V(3).Info("Running deleteOp", "deleteOp", op)
+func (op *deleteOp) run(sync *NodeSync) error {
+	klog.V(3).Infof("Running deleteOp %+v", op)
 	if op.node.Spec.PodCIDR == "" {
-		logger.V(2).Info("Node was deleted, node had no PodCIDR range assigned", "node", klog.KObj(op.node))
+		klog.V(2).Infof("Node %q was deleted, node had no PodCIDR range assigned", op.node.Name)
 		return nil
 	}
 
 	_, cidrRange, err := netutils.ParseCIDRSloppy(op.node.Spec.PodCIDR)
 	if err != nil {
-		logger.Error(err, "Deleted node has an invalid podCIDR", "node", klog.KObj(op.node), "podCIDR", op.node.Spec.PodCIDR)
+		klog.Errorf("Deleted node %q has an invalid podCIDR %q: %v",
+			op.node.Name, op.node.Spec.PodCIDR, err)
 		sync.kubeAPI.EmitNodeWarningEvent(op.node.Name, InvalidPodCIDR,
 			"Node %q has an invalid PodCIDR: %q", op.node.Name, op.node.Spec.PodCIDR)
 		return nil
 	}
 
 	sync.set.Release(cidrRange)
-	logger.V(2).Info("Node was deleted, releasing CIDR range", "node", klog.KObj(op.node), "podCIDR", op.node.Spec.PodCIDR)
+	klog.V(2).Infof("Node %q was deleted, releasing CIDR range %v",
+		op.node.Name, op.node.Spec.PodCIDR)
 
 	return nil
 }

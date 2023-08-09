@@ -35,10 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
-	"k8s.io/apiserver/pkg/features"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -518,14 +516,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 			if innerErr != nil {
 				return quotas, innerErr
 			}
-			if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				// allow negative usage for pods as pod resources can increase or decrease
-				if a.GetResource().GroupResource() == corev1.Resource("pods") {
-					deltaUsage = quota.Subtract(deltaUsage, prevUsage)
-				}
-			} else {
-				deltaUsage = quota.SubtractWithNonNegativeResult(deltaUsage, prevUsage)
-			}
+			deltaUsage = quota.SubtractWithNonNegativeResult(deltaUsage, prevUsage)
 		}
 	}
 

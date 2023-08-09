@@ -150,14 +150,14 @@ func (CSITranslator) GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v
 				return curPlugin.GetInTreePluginName(), nil
 			}
 		}
-		return "", fmt.Errorf("could not find in-tree plugin name from persistent volume %s", pv.Name)
+		return "", fmt.Errorf("could not find in-tree plugin name from persistent volume %v", pv)
 	} else if vol != nil {
 		for _, curPlugin := range inTreePlugins {
 			if curPlugin.CanSupportInline(vol) {
 				return curPlugin.GetInTreePluginName(), nil
 			}
 		}
-		return "", fmt.Errorf("could not find in-tree plugin name from volume %s", vol.Name)
+		return "", fmt.Errorf("could not find in-tree plugin name from volume %v", vol)
 	} else {
 		return "", errors.New("both persistent volume and volume are nil")
 	}
@@ -171,7 +171,7 @@ func (CSITranslator) GetCSINameFromInTreeName(pluginName string) (string, error)
 			return csiDriverName, nil
 		}
 	}
-	return "", fmt.Errorf("could not find CSI Driver name for plugin %s", pluginName)
+	return "", fmt.Errorf("could not find CSI Driver name for plugin %v", pluginName)
 }
 
 // GetInTreeNameFromCSIName returns the name of the in-tree plugin superseded by
@@ -180,7 +180,7 @@ func (CSITranslator) GetInTreeNameFromCSIName(pluginName string) (string, error)
 	if plugin, ok := inTreePlugins[pluginName]; ok {
 		return plugin.GetInTreePluginName(), nil
 	}
-	return "", fmt.Errorf("could not find In-Tree driver name for CSI plugin %s", pluginName)
+	return "", fmt.Errorf("could not find In-Tree driver name for CSI plugin %v", pluginName)
 }
 
 // IsPVMigratable tests whether there is migration logic for the given Persistent Volume
@@ -208,5 +208,5 @@ func (CSITranslator) RepairVolumeHandle(driverName, volumeHandle, nodeID string)
 	if plugin, ok := inTreePlugins[driverName]; ok {
 		return plugin.RepairVolumeHandle(volumeHandle, nodeID)
 	}
-	return "", fmt.Errorf("could not find In-Tree driver name for CSI plugin %s", driverName)
+	return "", fmt.Errorf("could not find In-Tree driver name for CSI plugin %v", driverName)
 }

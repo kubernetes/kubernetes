@@ -136,40 +136,30 @@ func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
 }
 
 func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (string, volume.DeviceMountableVolumePlugin) {
-	var (
-		source string
-		err    error
-	)
-
-	if isBlockDevice && runtime.GOOS == "windows" {
-		// On Windows, block devices are referenced by the disk number, which is validated by the mounter,
-		source = "0"
-	} else {
-		source, err = utiltesting.MkTmpdir("localVolumeTest")
-		if err != nil {
-			t.Fatalf("can't make a temp dir: %v", err)
-		}
+	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
 	var pathToFSType map[string]hostutil.FileType
 	if isBlockDevice {
 		pathToFSType = map[string]hostutil.FileType{
-			source: hostutil.FileTypeBlockDev,
+			tmpDir: hostutil.FileTypeBlockDev,
 		}
 	}
 
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHostWithMounterFSType(t, source, nil, nil, pathToFSType))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHostWithMounterFSType(t, tmpDir, nil, nil, pathToFSType))
 
 	plug, err := plugMgr.FindDeviceMountablePluginByName(localVolumePluginName)
 	if err != nil {
-		os.RemoveAll(source)
+		os.RemoveAll(tmpDir)
 		t.Fatalf("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != localVolumePluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	return source, plug
+	return tmpDir, plug
 }
 
 func getTestVolume(readOnly bool, path string, isBlock bool, mountOptions []string) *volume.Spec {

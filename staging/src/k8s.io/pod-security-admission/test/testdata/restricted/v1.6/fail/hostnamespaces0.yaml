@@ -4,11 +4,11 @@ metadata:
   name: hostnamespaces0
 spec:
   containers:
-  - image: registry.k8s.io/pause
+  - image: k8s.gcr.io/pause
     name: container1
   hostIPC: true
   initContainers:
-  - image: registry.k8s.io/pause
+  - image: k8s.gcr.io/pause
     name: initcontainer1
   securityContext:
     runAsNonRoot: true

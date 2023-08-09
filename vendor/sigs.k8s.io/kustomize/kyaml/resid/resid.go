@@ -60,6 +60,25 @@ func (id ResId) String() string {
 		[]string{id.Gvk.String(), strings.Join([]string{nm, ns}, fieldSep)}, separator)
 }
 
+// LegacySortString returns an older version of String() that LegacyOrderTransformer depends on
+// to keep its ordering stable across Kustomize versions
+func (id ResId) LegacySortString() string {
+	legacyNoNamespace := "~X"
+	legacyNoName := "~N"
+	legacySeparator := "|"
+
+	ns := id.Namespace
+	if ns == "" {
+		ns = legacyNoNamespace
+	}
+	nm := id.Name
+	if nm == "" {
+		nm = legacyNoName
+	}
+	return strings.Join(
+		[]string{id.Gvk.String(), ns, nm}, legacySeparator)
+}
+
 func FromString(s string) ResId {
 	values := strings.Split(s, separator)
 	gvk := GvkFromString(values[0])

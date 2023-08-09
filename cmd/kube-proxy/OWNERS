@@ -6,4 +6,3 @@ approvers:
   - sig-network-approvers
 labels:
   - sig/network
-  - area/kube-proxy

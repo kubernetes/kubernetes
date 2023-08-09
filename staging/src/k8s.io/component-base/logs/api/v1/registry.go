@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/go-logr/logr"
 
@@ -31,7 +30,6 @@ var logRegistry = newLogFormatRegistry()
 
 // logFormatRegistry stores factories for all supported logging formats.
 type logFormatRegistry struct {
-	mutex    sync.Mutex
 	registry map[string]logFormat
 	frozen   bool
 }
@@ -41,29 +39,14 @@ type logFormat struct {
 	feature featuregate.Feature
 }
 
-// +k8s:deepcopy-gen=false
-
-// RuntimeControl provides operations that aren't available through the normal
-// Logger or LogSink API.
-type RuntimeControl struct {
-	// Flush ensures that all in-memory data is written.
-	// May be nil.
-	Flush func()
-
-	// SetVerbosityLevel changes the level for all Logger instances
-	// derived from the initial one. May be nil.
-	//
-	// The parameter is intentionally a plain uint32 instead of
-	// VerbosityLevel to enable implementations that don't need to import
-	// the API (helps avoid circular dependencies).
-	SetVerbosityLevel func(v uint32) error
-}
-
 // LogFormatFactory provides support for a certain additional,
 // non-default log format.
 type LogFormatFactory interface {
 	// Create returns a logger with the requested configuration.
-	Create(c LoggingConfiguration, o LoggingOptions) (logr.Logger, RuntimeControl)
+	// Returning a flush function for the logger is optional.
+	// If provided, the caller must ensure that it is called
+	// periodically (if desired) and at program exit.
+	Create(c LoggingConfiguration) (log logr.Logger, flush func())
 }
 
 // RegisterLogFormat registers support for a new logging format. This must be called
@@ -85,8 +68,6 @@ func newLogFormatRegistry() *logFormatRegistry {
 
 // register adds a new log format. It's an error to modify an existing one.
 func (lfr *logFormatRegistry) register(name string, format logFormat) error {
-	lfr.mutex.Lock()
-	defer lfr.mutex.Unlock()
 	if lfr.frozen {
 		return fmt.Errorf("log format registry is frozen, unable to register log format %s", name)
 	}
@@ -102,8 +83,6 @@ func (lfr *logFormatRegistry) register(name string, format logFormat) error {
 
 // get specified log format factory
 func (lfr *logFormatRegistry) get(name string) (*logFormat, error) {
-	lfr.mutex.Lock()
-	defer lfr.mutex.Unlock()
 	format, ok := lfr.registry[name]
 	if !ok {
 		return nil, fmt.Errorf("log format: %s does not exists", name)
@@ -113,8 +92,6 @@ func (lfr *logFormatRegistry) get(name string) (*logFormat, error) {
 
 // list names of registered log formats, including feature gates (sorted)
 func (lfr *logFormatRegistry) list() string {
-	lfr.mutex.Lock()
-	defer lfr.mutex.Unlock()
 	formats := make([]string, 0, len(lfr.registry))
 	for name, format := range lfr.registry {
 		item := fmt.Sprintf(`"%s"`, name)
@@ -129,7 +106,5 @@ func (lfr *logFormatRegistry) list() string {
 
 // freeze prevents further modifications of the registered log formats.
 func (lfr *logFormatRegistry) freeze() {
-	lfr.mutex.Lock()
-	defer lfr.mutex.Unlock()
 	lfr.frozen = true
 }

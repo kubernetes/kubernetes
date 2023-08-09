@@ -103,7 +103,7 @@ var (
 		},
 		[]string{"action"})
 
-	// TerminatedPodsTrackingFinalizerTotal records the addition and removal of
+	// TerminatedPodsWithTrackingFinalizer records the addition and removal of
 	// terminated pods that have the finalizer batch.kubernetes.io/job-tracking,
 	// regardless of whether they are owned by a Job.
 	TerminatedPodsTrackingFinalizerTotal = metrics.NewCounterVec(

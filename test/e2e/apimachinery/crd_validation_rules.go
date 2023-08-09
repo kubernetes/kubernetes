@@ -37,7 +37,7 @@ import (
 
 var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("crd-validation-expressions")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var apiExtensionClient *clientset.Clientset
 	ginkgo.BeforeEach(func() {

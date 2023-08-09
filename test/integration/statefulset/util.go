@@ -161,7 +161,7 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 }
 
 // scSetup sets up necessities for Statefulset integration test, including control plane, apiserver, informers, and clientset
-func scSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
+func scSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
@@ -174,7 +174,6 @@ func scSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
 
 	sc := statefulset.NewStatefulSetController(
-		ctx,
 		informers.Core().V1().Pods(),
 		informers.Apps().V1().StatefulSets(),
 		informers.Core().V1().PersistentVolumeClaims(),
@@ -200,8 +199,9 @@ func createHeadlessService(t *testing.T, clientSet clientset.Interface, headless
 	}
 }
 
-func createSTSs(t *testing.T, clientSet clientset.Interface, stss []*appsv1.StatefulSet) []*appsv1.StatefulSet {
+func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*appsv1.StatefulSet, pods []*v1.Pod) ([]*appsv1.StatefulSet, []*v1.Pod) {
 	var createdSTSs []*appsv1.StatefulSet
+	var createdPods []*v1.Pod
 	for _, sts := range stss {
 		createdSTS, err := clientSet.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
 		if err != nil {
@@ -209,11 +209,6 @@ func createSTSs(t *testing.T, clientSet clientset.Interface, stss []*appsv1.Stat
 		}
 		createdSTSs = append(createdSTSs, createdSTS)
 	}
-	return createdSTSs
-}
-
-func createPods(t *testing.T, clientSet clientset.Interface, pods []*v1.Pod) []*v1.Pod {
-	var createdPods []*v1.Pod
 	for _, pod := range pods {
 		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
@@ -222,11 +217,7 @@ func createPods(t *testing.T, clientSet clientset.Interface, pods []*v1.Pod) []*
 		createdPods = append(createdPods, createdPod)
 	}
 
-	return createdPods
-}
-
-func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*appsv1.StatefulSet, pods []*v1.Pod) ([]*appsv1.StatefulSet, []*v1.Pod) {
-	return createSTSs(t, clientSet, stss), createPods(t, clientSet, pods)
+	return createdSTSs, createdPods
 }
 
 // Verify .Status.Replicas is equal to .Spec.Replicas

@@ -26,6 +26,7 @@ import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
@@ -37,9 +38,9 @@ type FakeCSIDrivers struct {
 	Fake *FakeStorageV1beta1
 }
 
-var csidriversResource = v1beta1.SchemeGroupVersion.WithResource("csidrivers")
+var csidriversResource = schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "csidrivers"}
 
-var csidriversKind = v1beta1.SchemeGroupVersion.WithKind("CSIDriver")
+var csidriversKind = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "CSIDriver"}
 
 // Get takes name of the cSIDriver, and returns the corresponding cSIDriver object, and an error if there is any.
 func (c *FakeCSIDrivers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CSIDriver, err error) {

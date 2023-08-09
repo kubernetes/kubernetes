@@ -60,12 +60,6 @@ type RuntimeHelper interface {
 
 	// GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
 	GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error)
-
-	// PrepareDynamicResources prepares resources for a pod.
-	PrepareDynamicResources(pod *v1.Pod) error
-
-	// UnprepareDynamicResources unprepares resources for a a pod.
-	UnprepareDynamicResources(pod *v1.Pod) error
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
@@ -115,23 +109,6 @@ func HashContainer(container *v1.Container) uint64 {
 	containerJSON, _ := json.Marshal(container)
 	hashutil.DeepHashObject(hash, containerJSON)
 	return uint64(hash.Sum32())
-}
-
-// HashContainerWithoutResources returns the hash of the container with Resources field zero'd out.
-func HashContainerWithoutResources(container *v1.Container) uint64 {
-	// InPlacePodVerticalScaling enables mutable Resources field.
-	// Changes to this field may not require container restart depending on policy.
-	// Compute hash over fields besides the Resources field
-	// NOTE: This is needed during alpha and beta so that containers using Resources but
-	//       not subject to In-place resize are not unexpectedly restarted when
-	//       InPlacePodVerticalScaling feature-gate is toggled.
-	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this in GA+1 and make HashContainerWithoutResources to become Hash.
-	hashWithoutResources := fnv.New32a()
-	containerCopy := container.DeepCopy()
-	containerCopy.Resources = v1.ResourceRequirements{}
-	containerJSON, _ := json.Marshal(containerCopy)
-	hashutil.DeepHashObject(hashWithoutResources, containerJSON)
-	return uint64(hashWithoutResources.Sum32())
 }
 
 // envVarsToMap constructs a map of environment name to value from a slice
@@ -269,13 +246,12 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 			continue
 		}
 		container := &Container{
-			ID:                   containerStatus.ID,
-			Name:                 containerStatus.Name,
-			Image:                containerStatus.Image,
-			ImageID:              containerStatus.ImageID,
-			Hash:                 containerStatus.Hash,
-			HashWithoutResources: containerStatus.HashWithoutResources,
-			State:                containerStatus.State,
+			ID:      containerStatus.ID,
+			Name:    containerStatus.Name,
+			Image:   containerStatus.Image,
+			ImageID: containerStatus.ImageID,
+			Hash:    containerStatus.Hash,
+			State:   containerStatus.State,
 		}
 		runningPod.Containers = append(runningPod.Containers, container)
 	}
@@ -396,28 +372,4 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 		names[name] = struct{}{}
 	}
 	return
-}
-
-// HasAnyRegularContainerStarted returns true if any regular container has
-// started, which indicates all init containers have been initialized.
-func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStatus) bool {
-	if len(statuses) == 0 {
-		return false
-	}
-
-	containerNames := make(map[string]struct{})
-	for _, c := range spec.Containers {
-		containerNames[c.Name] = struct{}{}
-	}
-
-	for _, status := range statuses {
-		if _, ok := containerNames[status.Name]; !ok {
-			continue
-		}
-		if status.State.Running != nil || status.State.Terminated != nil {
-			return true
-		}
-	}
-
-	return false
 }

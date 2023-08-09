@@ -47,5 +47,3 @@ status:
     decodableVersions:
     - decodableVersionsValue
     encodingVersion: encodingVersionValue
-    servedVersions:
-    - servedVersionsValue

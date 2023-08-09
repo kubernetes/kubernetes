@@ -61,7 +61,7 @@ func newAdapter(k8s clientset.Interface, cloud *gce.Cloud) *adapter {
 	return ret
 }
 
-func (a *adapter) Run(ctx context.Context) {
+func (a *adapter) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
 	// Start event processing pipeline.
@@ -69,7 +69,7 @@ func (a *adapter) Run(ctx context.Context) {
 	a.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: a.k8s.CoreV1().Events("")})
 	defer a.broadcaster.Shutdown()
 
-	<-ctx.Done()
+	<-stopCh
 }
 
 func (a *adapter) Alias(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
@@ -88,7 +88,7 @@ func (a *adapter) Alias(ctx context.Context, node *v1.Node) (*net.IPNet, error) 
 	case 1:
 		break
 	default:
-		klog.FromContext(ctx).Info("Node has more than one alias assigned, defaulting to the first", "node", klog.KObj(node), "CIDRs", cidrs)
+		klog.Warningf("Node %q has more than one alias assigned (%v), defaulting to the first", node.Name, cidrs)
 	}
 
 	_, cidrRange, err := netutils.ParseCIDRSloppy(cidrs[0])

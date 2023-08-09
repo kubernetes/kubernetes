@@ -29,13 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	k8stest "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func convertToUnstructured(b *testing.B, obj runtime.Object) runtime.Object {
-	converter := managedfields.NewDeducedTypeConverter()
+	converter := fieldmanager.DeducedTypeConverter{}
 	typed, err := converter.ObjectToTyped(obj)
 	require.NoError(b, err)
 	res, err := converter.TypedToObject(typed)

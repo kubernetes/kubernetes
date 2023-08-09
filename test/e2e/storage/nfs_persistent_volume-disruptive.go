@@ -78,7 +78,7 @@ func checkForControllerManagerHealthy(ctx context.Context, duration time.Duratio
 var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		c                           clientset.Interface
 		ns                          string
@@ -178,7 +178,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.ExpectNoError(e2epv.WaitOnPVandPVC(ctx, c, f.Timeouts, ns, pv2, pvc2))
 
 			ginkgo.By("Attaching both PVC's to a single pod")
-			clientPod, err = e2epod.CreatePod(ctx, c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, f.NamespacePodSecurityLevel, "")
+			clientPod, err = e2epod.CreatePod(ctx, c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
 			framework.ExpectNoError(err)
 		})
 
@@ -301,7 +301,7 @@ func initTestCase(ctx context.Context, f *framework.Framework, c clientset.Inter
 		}
 	}()
 	framework.ExpectNoError(err)
-	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, f.NamespacePodSecurityLevel, "")
+	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating NFS client pod.")
 	pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})

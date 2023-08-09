@@ -22,15 +22,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	semver "github.com/blang/semver/v4"
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -91,7 +90,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 	})
 
 	f := framework.NewDefaultFramework("host-process-test-windows")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a process on the host/node", func(ctx context.Context) {
 
@@ -141,7 +140,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
-		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
+		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
 	ginkgo.It("should support init containers", func(ctx context.Context) {
@@ -201,7 +200,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			}
 			framework.Logf("Pod phase: %v\nlogs:\n%s", p.Status.Phase, logs)
 		}
-		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
+		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
 	ginkgo.It("container command path validation", func(ctx context.Context) {
@@ -510,7 +509,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
-		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
+		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
 	ginkgo.It("metrics should report count of started and failed to start HostProcess containers", func(ctx context.Context) {
@@ -656,14 +655,42 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 		ginkgo.By("Waiting for the pod to start running")
 		timeout := 3 * time.Minute
-		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, timeout)
+		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, timeout, make(map[string]string))
 
 		ginkgo.By("Getting container stats for pod")
-		statsChecked := false
+		nodeStats, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, targetNode.Name)
+		framework.ExpectNoError(err, "Error getting node stats")
 
-		wait.Poll(2*time.Second, timeout, func() (bool, error) {
-			return ensurePodsStatsOnNode(ctx, f.ClientSet, f.Namespace.Name, targetNode.Name, &statsChecked)
-		})
+		statsChecked := false
+		for _, podStats := range nodeStats.Pods {
+
+			if podStats.PodRef.Namespace != f.Namespace.Name {
+				continue
+			}
+
+			// check various pod stats
+			if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
+				framework.Failf("Pod %s/%s stats report cpu usage equal to %v but should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+			}
+			if *podStats.Memory.WorkingSetBytes <= 0 {
+				framework.Failf("Pod %s/%s stats report memory usage equal to %v but should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+			}
+
+			for _, containerStats := range podStats.Containers {
+				statsChecked = true
+
+				// check various container stats
+				if *containerStats.CPU.UsageCoreNanoSeconds <= 0 {
+					framework.Failf("Container %s stats report cpu usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.CPU.UsageCoreNanoSeconds)
+				}
+				if *containerStats.Memory.WorkingSetBytes <= 0 {
+					framework.Failf("Container %s stats report memory usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.Memory.WorkingSetBytes)
+				}
+				if *containerStats.Logs.UsedBytes <= 0 {
+					framework.Failf("Container %s stats log usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.Logs.UsedBytes)
+				}
+			}
+		}
 
 		if !statsChecked {
 			framework.Failf("Failed to get stats for pod %s/%s", f.Namespace.Name, podName)
@@ -672,7 +699,21 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 	ginkgo.It("should support querying api-server using in-cluster config", func(ctx context.Context) {
 		// This functionality is only support on containerd  v1.7+
-		skipUnlessContainerdOneSevenOrGreater(ctx, f)
+		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
+		windowsNode, err := findWindowsNode(ctx, f)
+		framework.ExpectNoError(err, "error finding Windows node")
+		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
+		framework.ExpectNoError(err, "error getting node container runtime and version")
+		framework.Logf("Got runtime: %s, version %v for node %s", r, v, windowsNode.Name)
+
+		if !strings.EqualFold(r, "containerd") {
+			e2eskipper.Skipf("container runtime is not containerd")
+		}
+
+		v1dot7 := semver.MustParse("1.7.0")
+		if v.LT(v1dot7) {
+			e2eskipper.Skipf("container runtime is < 1.7.0")
+		}
 
 		ginkgo.By("Scheduling a pod that runs agnhost inclusterclient")
 		podName := "host-process-agnhost-icc"
@@ -710,7 +751,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		pc.Create(ctx, pod)
 
 		ginkgo.By("Waiting for pod to run")
-		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, 3*time.Minute)
+		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, 3*time.Minute, make(map[string]string))
 
 		ginkgo.By("Waiting for 60 seconds")
 		// We wait an additional 60 seconds after the pod is Running because the
@@ -737,7 +778,21 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 	ginkgo.It("should run as localgroup accounts", func(ctx context.Context) {
 		// This functionality is only supported on containerd v1.7+
-		skipUnlessContainerdOneSevenOrGreater(ctx, f)
+		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
+		windowsNode, err := findWindowsNode(ctx, f)
+		framework.ExpectNoError(err, "error finding Windows node")
+		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
+		framework.ExpectNoError(err, "error getting node container runtime and version")
+		framework.Logf("Got runtime: %s, version %v for node %s", r, v, windowsNode.Name)
+
+		if !strings.EqualFold(r, "containerd") {
+			e2eskipper.Skipf("container runtime is not containerd")
+		}
+
+		v1dot7 := semver.MustParse("1.7.0")
+		if v.LT(v1dot7) {
+			e2eskipper.Skipf("container runtime is < 1.7.0")
+		}
 
 		ginkgo.By("Scheduling a pod that creates a localgroup from an init container then starts a container using that group")
 		localGroupName := getRandomUserGrounName()
@@ -792,7 +847,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "error retrieving pod")
-		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
+		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 
 		// whoami will output %COMPUTER_NAME%/{randomly generated username} here.
 		// It is sufficient to just check that the logs do not container `nt authority`
@@ -946,47 +1001,6 @@ type HostProcessContainersMetrics struct {
 	StartedContainersErrorCount     int64
 	StartedInitContainersCount      int64
 	StartedInitContainersErrorCount int64
-}
-
-// ensurePodsStatsOnNode returns a boolean after checking Pods statistics on a particular node
-func ensurePodsStatsOnNode(ctx context.Context, c clientset.Interface, namespace, nodeName string, statsChecked *bool) (bool, error) {
-	nodeStats, err := e2ekubelet.GetStatsSummary(ctx, c, nodeName)
-	framework.ExpectNoError(err, "Error getting node stats")
-
-	for _, podStats := range nodeStats.Pods {
-		if podStats.PodRef.Namespace != namespace {
-			continue
-		}
-
-		// check various pod stats
-		if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
-			framework.Logf("Pod %s/%s stats report cpu usage equal to %v but should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
-			return false, nil
-		}
-		if *podStats.Memory.WorkingSetBytes <= 0 {
-			framework.Logf("Pod %s/%s stats report memory usage equal to %v but should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
-			return false, nil
-		}
-
-		for _, containerStats := range podStats.Containers {
-			*statsChecked = true
-
-			// check various container stats
-			if *containerStats.CPU.UsageCoreNanoSeconds <= 0 {
-				framework.Logf("Container %s stats report cpu usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.CPU.UsageCoreNanoSeconds)
-				return false, nil
-			}
-			if *containerStats.Memory.WorkingSetBytes <= 0 {
-				framework.Logf("Container %s stats report memory usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.Memory.WorkingSetBytes)
-				return false, nil
-			}
-			if *containerStats.Logs.UsedBytes <= 0 {
-				framework.Logf("Container %s stats log usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.Logs.UsedBytes)
-				return false, nil
-			}
-		}
-	}
-	return true, nil
 }
 
 // getCurrentHostProcessMetrics returns a HostPRocessContainersMetrics object. Any metrics that do not have any

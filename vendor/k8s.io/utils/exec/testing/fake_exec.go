@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
 
 	"k8s.io/utils/exec"
 )
@@ -33,12 +32,11 @@ type FakeExec struct {
 	// ExactOrder enforces that commands are called in the order they are scripted,
 	// and with the exact same arguments
 	ExactOrder bool
-	// DisableScripts removes the requirement that CommandScripts be populated
-	// before calling Command(). This makes Command() and subsequent calls to
-	// Run() or CombinedOutput() always return success and empty output.
+	// DisableScripts removes the requirement that a slice of FakeCommandAction be
+	// populated before calling Command(). This makes the fakeexec (and subsequent
+	// calls to Run() or CombinedOutput() always return success and there is no
+	// ability to set their output.
 	DisableScripts bool
-
-	mu sync.Mutex
 }
 
 var _ exec.Interface = &FakeExec{}
@@ -46,15 +44,18 @@ var _ exec.Interface = &FakeExec{}
 // FakeCommandAction is the function to be executed
 type FakeCommandAction func(cmd string, args ...string) exec.Cmd
 
-// Command returns the next unexecuted command in CommandScripts.
-// This function is safe for concurrent access as long as the underlying
-// FakeExec struct is not modified during execution.
+// Command is to track the commands that are executed
 func (fake *FakeExec) Command(cmd string, args ...string) exec.Cmd {
 	if fake.DisableScripts {
 		fakeCmd := &FakeCmd{DisableScripts: true}
 		return InitFakeCmd(fakeCmd, cmd, args...)
 	}
-	fakeCmd := fake.nextCommand(cmd, args)
+	if fake.CommandCalls > len(fake.CommandScript)-1 {
+		panic(fmt.Sprintf("ran out of Command() actions. Could not handle command [%d]: %s args: %v", fake.CommandCalls, cmd, args))
+	}
+	i := fake.CommandCalls
+	fake.CommandCalls++
+	fakeCmd := fake.CommandScript[i](cmd, args...)
 	if fake.ExactOrder {
 		argv := append([]string{cmd}, args...)
 		fc := fakeCmd.(*FakeCmd)
@@ -71,18 +72,6 @@ func (fake *FakeExec) Command(cmd string, args ...string) exec.Cmd {
 		}
 	}
 	return fakeCmd
-}
-
-func (fake *FakeExec) nextCommand(cmd string, args []string) exec.Cmd {
-	fake.mu.Lock()
-	defer fake.mu.Unlock()
-
-	if fake.CommandCalls > len(fake.CommandScript)-1 {
-		panic(fmt.Sprintf("ran out of Command() actions. Could not handle command [%d]: %s args: %v", fake.CommandCalls, cmd, args))
-	}
-	i := fake.CommandCalls
-	fake.CommandCalls++
-	return fake.CommandScript[i](cmd, args...)
 }
 
 // CommandContext wraps arguments into exec.Cmd

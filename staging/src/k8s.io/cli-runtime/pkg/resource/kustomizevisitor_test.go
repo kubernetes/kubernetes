@@ -17,11 +17,10 @@ limitations under the License.
 package resource
 
 import (
-	"testing"
-
-	"k8s.io/apimachinery/pkg/util/dump"
+	"github.com/davecgh/go-spew/spew"
 	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
+	"testing"
 )
 
 const (
@@ -152,7 +151,7 @@ func TestKustomizeVisitor(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(tv.Infos) != 4 {
-		t.Fatal(dump.Pretty(tv.Infos))
+		t.Fatal(spew.Sdump(tv.Infos))
 	}
 	if string(kv.yml) != expectedContent {
 		t.Fatalf("expected:\n%s\nbut got:\n%s", expectedContent, string(kv.yml))

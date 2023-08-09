@@ -22,6 +22,7 @@ package cadvisor
 import (
 	// Register cloud info providers.
 	// TODO(#68522): Remove this in 1.20+ once the cAdvisor endpoints are removed.
+	_ "github.com/google/cadvisor/utils/cloudinfo/aws"
 	_ "github.com/google/cadvisor/utils/cloudinfo/azure"
 	_ "github.com/google/cadvisor/utils/cloudinfo/gce"
 )

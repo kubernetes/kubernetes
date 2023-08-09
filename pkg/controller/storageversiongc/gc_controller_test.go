@@ -29,16 +29,15 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
 	utilpointer "k8s.io/utils/pointer"
 )
 
-func setupController(ctx context.Context, clientset kubernetes.Interface) {
+func setupController(clientset kubernetes.Interface) {
 	informerFactory := informers.NewSharedInformerFactory(clientset, 100*time.Millisecond)
 	leaseInformer := informerFactory.Coordination().V1().Leases()
 	storageVersionInformer := informerFactory.Internal().V1alpha1().StorageVersions()
 
-	controller := NewStorageVersionGC(ctx, clientset, leaseInformer, storageVersionInformer)
+	controller := NewStorageVersionGC(clientset, leaseInformer, storageVersionInformer)
 	go controller.Run(context.Background())
 	informerFactory.Start(nil)
 }
@@ -49,7 +48,7 @@ func newKubeApiserverLease(name, holderIdentity string) *coordinationv1.Lease {
 			Name:      name,
 			Namespace: metav1.NamespaceSystem,
 			Labels: map[string]string{
-				"apiserver.kubernetes.io/identity": "kube-apiserver",
+				"k8s.io/component": "kube-apiserver",
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{
@@ -94,8 +93,7 @@ func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *te
 	}
 
 	clientset := fake.NewSimpleClientset(lease1, lease2, lease3, storageVersion)
-	_, ctx := ktesting.NewTestContext(t)
-	setupController(ctx, clientset)
+	setupController(clientset)
 
 	// Delete the lease object and verify that storage version status is updated
 	if err := clientset.CoordinationV1().Leases(metav1.NamespaceSystem).Delete(context.Background(), "kube-apiserver-1", metav1.DeleteOptions{}); err != nil {
@@ -179,8 +177,7 @@ func Test_StorageVersionUpdatedWithDifferentEncodingVersionsOnLeaseDeletion(t *t
 	}
 
 	clientset := fake.NewSimpleClientset(lease1, lease2, lease3, storageVersion)
-	_, ctx := ktesting.NewTestContext(t)
-	setupController(ctx, clientset)
+	setupController(clientset)
 
 	// Delete the lease object and verify that storage version status is updated
 	if err := clientset.CoordinationV1().Leases(metav1.NamespaceSystem).Delete(context.Background(), "kube-apiserver-2", metav1.DeleteOptions{}); err != nil {
@@ -260,8 +257,7 @@ func Test_StorageVersionContainsInvalidLeaseID(t *testing.T) {
 	}
 
 	clientset := fake.NewSimpleClientset(lease1, lease2, lease3, storageVersion)
-	_, ctx := ktesting.NewTestContext(t)
-	setupController(ctx, clientset)
+	setupController(clientset)
 
 	// add a delay to ensure controller had a chance to reconcile
 	time.Sleep(2 * time.Second)
@@ -329,8 +325,7 @@ func Test_StorageVersionDeletedOnLeaseDeletion(t *testing.T) {
 	}
 
 	clientset := fake.NewSimpleClientset(lease1, storageVersion)
-	_, ctx := ktesting.NewTestContext(t)
-	setupController(ctx, clientset)
+	setupController(clientset)
 
 	// Delete the lease object and verify that storage version status is updated
 	if err := clientset.CoordinationV1().Leases(metav1.NamespaceSystem).Delete(context.Background(), "kube-apiserver-1", metav1.DeleteOptions{}); err != nil {

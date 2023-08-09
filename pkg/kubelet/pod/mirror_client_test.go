@@ -137,7 +137,7 @@ func TestCreateMirrorPod(t *testing.T) {
 				Kind:       "Node",
 				Name:       testNodeName,
 				UID:        testNodeUID,
-				Controller: pointer.Bool(true),
+				Controller: pointer.BoolPtr(true),
 			}
 			assert.Equal(t, expectedOwnerRef, createdPod.OwnerReferences[0])
 		})

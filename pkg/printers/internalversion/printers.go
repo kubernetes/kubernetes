@@ -31,7 +31,6 @@ import (
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -39,8 +38,9 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -367,6 +367,20 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(configMapColumnDefinitions, printConfigMap)
 	_ = h.TableHandler(configMapColumnDefinitions, printConfigMapList)
 
+	podSecurityPolicyColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Priv", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
+		{Name: "Caps", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["allowedCapabilities"]},
+		{Name: "SELinux", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["seLinux"]},
+		{Name: "RunAsUser", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["runAsUser"]},
+		{Name: "FsGroup", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["fsGroup"]},
+		{Name: "SupGroup", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["supplementalGroups"]},
+		{Name: "ReadOnlyRootFs", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["readOnlyRootFilesystem"]},
+		{Name: "Volumes", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["volumes"]},
+	}
+	_ = h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicy)
+	_ = h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicyList)
+
 	networkPolicyColumnDefinitioins := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Pod-Selector", Type: "string", Description: extensionsv1beta1.NetworkPolicySpec{}.SwaggerDoc()["podSelector"]},
@@ -407,13 +421,6 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequest)
 	_ = h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequestList)
-
-	clusterTrustBundleColumnDefinitions := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "SignerName", Type: "string", Description: certificatesv1alpha1.ClusterTrustBundleSpec{}.SwaggerDoc()["signerName"]},
-	}
-	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundle)
-	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundleList)
 
 	leaseColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -621,7 +628,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceClassColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "DriverName", Type: "string", Description: resourcev1alpha2.ResourceClass{}.SwaggerDoc()["driverName"]},
+		{Name: "DriverName", Type: "string", Description: resourcev1alpha1.ResourceClass{}.SwaggerDoc()["driverName"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(resourceClassColumnDefinitions, printResourceClass)
@@ -629,8 +636,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceClaimColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "ResourceClassName", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
-		{Name: "AllocationMode", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["allocationMode"]},
+		{Name: "ResourceClassName", Type: "string", Description: resourcev1alpha1.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
+		{Name: "AllocationMode", Type: "string", Description: resourcev1alpha1.ResourceClaimSpec{}.SwaggerDoc()["allocationMode"]},
 		{Name: "State", Type: "string", Description: "A summary of the current state (allocated, pending, reserved, etc.)."},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
@@ -639,28 +646,20 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceClaimTemplateColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "ResourceClassName", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
-		{Name: "AllocationMode", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["allocationMode"]},
+		{Name: "ResourceClassName", Type: "string", Description: resourcev1alpha1.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
+		{Name: "AllocationMode", Type: "string", Description: resourcev1alpha1.ResourceClaimSpec{}.SwaggerDoc()["allocationMode"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(resourceClaimTemplateColumnDefinitions, printResourceClaimTemplate)
 	_ = h.TableHandler(resourceClaimTemplateColumnDefinitions, printResourceClaimTemplateList)
 
-	podSchedulingCtxColumnDefinitions := []metav1.TableColumnDefinition{
+	podSchedulingColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "SelectedNode", Type: "string", Description: resourcev1alpha2.PodSchedulingContextSpec{}.SwaggerDoc()["selectedNode"]},
+		{Name: "SelectedNode", Type: "string", Description: resourcev1alpha1.PodSchedulingSpec{}.SwaggerDoc()["selectedNode"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContext)
-	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContextList)
-
-	ipAddressColumnDefinitions := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "ParentRef", Type: "string", Description: networkingv1alpha1.IPAddressSpec{}.SwaggerDoc()["parentRef"]},
-	}
-
-	h.TableHandler(ipAddressColumnDefinitions, printIPAddress)
-	h.TableHandler(ipAddressColumnDefinitions, printIPAddressList)
+	_ = h.TableHandler(podSchedulingColumnDefinitions, printPodScheduling)
+	_ = h.TableHandler(podSchedulingColumnDefinitions, printPodSchedulingList)
 }
 
 // Pass ports=nil for all ports.
@@ -815,11 +814,9 @@ func printPodList(podList *api.PodList, options printers.GenerateOptions) ([]met
 
 func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	restarts := 0
-	restartableInitContainerRestarts := 0
 	totalContainers := len(pod.Spec.Containers)
 	readyContainers := 0
 	lastRestartDate := metav1.NewTime(time.Time{})
-	lastRestartableInitContainerRestartDate := metav1.NewTime(time.Time{})
 
 	reason := string(pod.Status.Phase)
 	if pod.Status.Reason != "" {
@@ -844,14 +841,6 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		row.Conditions = podFailedConditions
 	}
 
-	initContainers := make(map[string]*api.Container)
-	for i := range pod.Spec.InitContainers {
-		initContainers[pod.Spec.InitContainers[i].Name] = &pod.Spec.InitContainers[i]
-		if isRestartableInitContainer(&pod.Spec.InitContainers[i]) {
-			totalContainers++
-		}
-	}
-
 	initializing := false
 	for i := range pod.Status.InitContainerStatuses {
 		container := pod.Status.InitContainerStatuses[i]
@@ -862,23 +851,8 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 				lastRestartDate = terminatedDate
 			}
 		}
-		if isRestartableInitContainer(initContainers[container.Name]) {
-			restartableInitContainerRestarts += int(container.RestartCount)
-			if container.LastTerminationState.Terminated != nil {
-				terminatedDate := container.LastTerminationState.Terminated.FinishedAt
-				if lastRestartableInitContainerRestartDate.Before(&terminatedDate) {
-					lastRestartableInitContainerRestartDate = terminatedDate
-				}
-			}
-		}
 		switch {
 		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
-			continue
-		case isRestartableInitContainer(initContainers[container.Name]) &&
-			container.Started != nil && *container.Started:
-			if container.Ready {
-				readyContainers++
-			}
 			continue
 		case container.State.Terminated != nil:
 			// initialization is failed
@@ -901,10 +875,8 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		}
 		break
 	}
-
-	if !initializing || isPodInitializedConditionTrue(&pod.Status) {
-		restarts = restartableInitContainerRestarts
-		lastRestartDate = lastRestartableInitContainerRestartDate
+	if !initializing {
+		restarts = 0
 		hasRunning := false
 		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
 			container := pod.Status.ContainerStatuses[i]
@@ -949,7 +921,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	}
 
 	restartsStr := strconv.Itoa(restarts)
-	if restarts != 0 && !lastRestartDate.IsZero() {
+	if !lastRestartDate.IsZero() {
 		restartsStr = fmt.Sprintf("%d (%s ago)", restarts, translateTimestampSince(lastRestartDate))
 	}
 
@@ -1673,18 +1645,13 @@ func printValidatingAdmissionPolicyBinding(obj *admissionregistration.Validating
 		Object: runtime.RawExtension{Object: obj},
 	}
 	paramName := "<unset>"
-	if pr := obj.Spec.ParamRef; pr != nil {
-		if len(pr.Name) > 0 {
-			if pr.Namespace != "" {
-				paramName = pr.Namespace + "/" + pr.Name
-			} else {
-				// Can't tell from here if param is cluster-scoped, so all
-				// params without names get * namespace
-				paramName = "*/" + pr.Name
-			}
-		} else if pr.Selector != nil {
-			paramName = pr.Selector.String()
+	if obj.Spec.ParamRef != nil {
+		if obj.Spec.ParamRef.Namespace != "" {
+			paramName = obj.Spec.ParamRef.Namespace + "/" + obj.Spec.ParamRef.Name
+		} else {
+			paramName = obj.Spec.ParamRef.Name
 		}
+
 	}
 	row.Cells = append(row.Cells, obj.Name, obj.Spec.PolicyName, paramName, translateTimestampSince(obj.CreationTimestamp))
 	return []metav1.TableRow{row}, nil
@@ -2135,30 +2102,6 @@ func printCertificateSigningRequestList(list *certificates.CertificateSigningReq
 	return rows, nil
 }
 
-func printClusterTrustBundle(obj *certificates.ClusterTrustBundle, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	row := metav1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-	signerName := "<none>"
-	if obj.Spec.SignerName != "" {
-		signerName = obj.Spec.SignerName
-	}
-	row.Cells = append(row.Cells, obj.Name, signerName)
-	return []metav1.TableRow{row}, nil
-}
-
-func printClusterTrustBundleList(list *certificates.ClusterTrustBundleList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	rows := make([]metav1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printClusterTrustBundle(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
 func printComponentStatus(obj *api.ComponentStatus, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
@@ -2375,6 +2318,39 @@ func printConfigMapList(list *api.ConfigMapList, options printers.GenerateOption
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printConfigMap(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printPodSecurityPolicy(obj *policy.PodSecurityPolicy, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	capabilities := make([]string, len(obj.Spec.AllowedCapabilities))
+	for i, c := range obj.Spec.AllowedCapabilities {
+		capabilities[i] = string(c)
+	}
+	volumes := make([]string, len(obj.Spec.Volumes))
+	for i, v := range obj.Spec.Volumes {
+		volumes[i] = string(v)
+	}
+	row.Cells = append(row.Cells, obj.Name, fmt.Sprintf("%v", obj.Spec.Privileged),
+		strings.Join(capabilities, ","), string(obj.Spec.SELinux.Rule),
+		string(obj.Spec.RunAsUser.Rule), string(obj.Spec.FSGroup.Rule),
+		string(obj.Spec.SupplementalGroups.Rule), obj.Spec.ReadOnlyRootFilesystem,
+		strings.Join(volumes, ","))
+	return []metav1.TableRow{row}, nil
+}
+
+func printPodSecurityPolicyList(list *policy.PodSecurityPolicyList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPodSecurityPolicy(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
@@ -2851,41 +2827,6 @@ func printClusterCIDRList(list *networking.ClusterCIDRList, options printers.Gen
 	return rows, nil
 }
 
-func printIPAddress(obj *networking.IPAddress, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	row := metav1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-
-	parentRefName := "<none>"
-	if obj.Spec.ParentRef != nil {
-		gr := schema.GroupResource{
-			Group:    obj.Spec.ParentRef.Group,
-			Resource: obj.Spec.ParentRef.Resource,
-		}
-		parentRefName = strings.ToLower(gr.String())
-		if obj.Spec.ParentRef.Namespace != "" {
-			parentRefName += "/" + obj.Spec.ParentRef.Namespace
-		}
-		parentRefName += "/" + obj.Spec.ParentRef.Name
-	}
-	age := translateTimestampSince(obj.CreationTimestamp)
-	row.Cells = append(row.Cells, obj.Name, parentRefName, age)
-
-	return []metav1.TableRow{row}, nil
-}
-
-func printIPAddressList(list *networking.IPAddressList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	rows := make([]metav1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printIPAddress(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
 func printScale(obj *autoscaling.Scale, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
@@ -2977,7 +2918,7 @@ func printResourceClaimTemplateList(list *resource.ResourceClaimTemplateList, op
 	return rows, nil
 }
 
-func printPodSchedulingContext(obj *resource.PodSchedulingContext, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printPodScheduling(obj *resource.PodScheduling, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -2986,10 +2927,10 @@ func printPodSchedulingContext(obj *resource.PodSchedulingContext, options print
 	return []metav1.TableRow{row}, nil
 }
 
-func printPodSchedulingContextList(list *resource.PodSchedulingContextList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printPodSchedulingList(list *resource.PodSchedulingList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		r, err := printPodSchedulingContext(&list.Items[i], options)
+		r, err := printPodScheduling(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
@@ -3027,23 +2968,4 @@ func (list SortableResourceNames) Swap(i, j int) {
 
 func (list SortableResourceNames) Less(i, j int) bool {
 	return list[i] < list[j]
-}
-
-func isRestartableInitContainer(initContainer *api.Container) bool {
-	if initContainer.RestartPolicy == nil {
-		return false
-	}
-
-	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
-}
-
-func isPodInitializedConditionTrue(status *api.PodStatus) bool {
-	for _, condition := range status.Conditions {
-		if condition.Type != api.PodInitialized {
-			continue
-		}
-
-		return condition.Status == api.ConditionTrue
-	}
-	return false
 }

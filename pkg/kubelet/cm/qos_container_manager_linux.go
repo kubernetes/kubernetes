@@ -31,7 +31,6 @@ import (
 	units "github.com/docker/go-units"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -170,7 +169,6 @@ func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]
 func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
 	pods := m.activePods()
 	burstablePodCPURequest := int64(0)
-	reuseReqs := make(v1.ResourceList, 4)
 	for i := range pods {
 		pod := pods[i]
 		qosClass := v1qos.GetPodQOS(pod)
@@ -178,7 +176,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			// we only care about the burstable qos tier
 			continue
 		}
-		req := resource.PodRequests(pod, resource.PodResourcesOptions{Reuse: reuseReqs})
+		req, _ := resource.PodRequestsAndLimits(pod)
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
 		}
@@ -204,7 +202,6 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 
 	// Sum the pod limits for pods in each QOS class
 	pods := m.activePods()
-	reuseReqs := make(v1.ResourceList, 4)
 	for _, pod := range pods {
 		podMemoryRequest := int64(0)
 		qosClass := v1qos.GetPodQOS(pod)
@@ -212,7 +209,7 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 			// limits are not set for Best Effort pods
 			continue
 		}
-		req := resource.PodRequests(pod, resource.PodResourcesOptions{Reuse: reuseReqs})
+		req, _ := resource.PodRequestsAndLimits(pod)
 		if request, found := req[v1.ResourceMemory]; found {
 			podMemoryRequest += request.Value()
 		}
@@ -292,16 +289,16 @@ func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*Cgrou
 		if configs[v1.PodQOSBurstable].ResourceParameters.Unified == nil {
 			configs[v1.PodQOSBurstable].ResourceParameters.Unified = make(map[string]string)
 		}
-		configs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryMin] = strconv.FormatInt(burstableMin, 10)
-		klog.V(4).InfoS("MemoryQoS config for qos", "qos", v1.PodQOSBurstable, "memoryMin", burstableMin)
+		configs[v1.PodQOSBurstable].ResourceParameters.Unified[MemoryMin] = strconv.FormatInt(burstableMin, 10)
+		klog.V(4).InfoS("MemoryQoS config for qos", "qos", v1.PodQOSBurstable, "memory.min", burstableMin)
 	}
 
 	if guaranteedMin > 0 {
 		if configs[v1.PodQOSGuaranteed].ResourceParameters.Unified == nil {
 			configs[v1.PodQOSGuaranteed].ResourceParameters.Unified = make(map[string]string)
 		}
-		configs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin] = strconv.FormatInt(guaranteedMin, 10)
-		klog.V(4).InfoS("MemoryQoS config for qos", "qos", v1.PodQOSGuaranteed, "memoryMin", guaranteedMin)
+		configs[v1.PodQOSGuaranteed].ResourceParameters.Unified[MemoryMin] = strconv.FormatInt(guaranteedMin, 10)
+		klog.V(4).InfoS("MemoryQoS config for qos", "qos", v1.PodQOSGuaranteed, "memory.min", guaranteedMin)
 	}
 }
 

@@ -43,11 +43,9 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/client-go/util/keyutil"
-	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/pointer"
 )
 
 func TestCSRDuration(t *testing.T) {
@@ -56,8 +54,7 @@ func TestCSRDuration(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	t.Cleanup(s.TearDownFn)
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	t.Cleanup(cancel)
 
 	// assert that the metrics we collect during the test run match expectations
@@ -113,7 +110,7 @@ func TestCSRDuration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err := signer.NewKubeAPIServerClientCSRSigningController(ctx, client, informerFactory.Certificates().V1().CertificateSigningRequests(), caPublicKeyFile, caPrivateKeyFile, 24*time.Hour)
+	c, err := signer.NewKubeAPIServerClientCSRSigningController(client, informerFactory.Certificates().V1().CertificateSigningRequests(), caPublicKeyFile, caPrivateKeyFile, 24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,63 +119,62 @@ func TestCSRDuration(t *testing.T) {
 	go c.Run(ctx, 1)
 
 	tests := []struct {
-		name, csrName string
-		duration      *time.Duration
-		wantDuration  time.Duration
-		wantError     string
+		name, csrName          string
+		duration, wantDuration time.Duration
+		wantError              string
 	}{
 		{
 			name:         "no duration set",
-			duration:     nil,
+			duration:     0,
 			wantDuration: 24 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "same duration set as certTTL",
-			duration:     pointer.Duration(24 * time.Hour),
+			duration:     24 * time.Hour,
 			wantDuration: 24 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "longer duration than certTTL",
-			duration:     pointer.Duration(48 * time.Hour),
+			duration:     48 * time.Hour,
 			wantDuration: 24 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "slightly shorter duration set",
-			duration:     pointer.Duration(20 * time.Hour),
+			duration:     20 * time.Hour,
 			wantDuration: 20 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "even shorter duration set",
-			duration:     pointer.Duration(10 * time.Hour),
+			duration:     10 * time.Hour,
 			wantDuration: 10 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "short duration set",
-			duration:     pointer.Duration(2 * time.Hour),
+			duration:     2 * time.Hour,
 			wantDuration: 2*time.Hour + 5*time.Minute,
 			wantError:    "",
 		},
 		{
 			name:         "very short duration set",
-			duration:     pointer.Duration(30 * time.Minute),
+			duration:     30 * time.Minute,
 			wantDuration: 30*time.Minute + 5*time.Minute,
 			wantError:    "",
 		},
 		{
 			name:         "shortest duration set",
-			duration:     pointer.Duration(10 * time.Minute),
+			duration:     10 * time.Minute,
 			wantDuration: 10*time.Minute + 5*time.Minute,
 			wantError:    "",
 		},
 		{
 			name:         "just too short duration set",
 			csrName:      "invalid-csr-001",
-			duration:     pointer.Duration(10*time.Minute - time.Second),
+			duration:     10*time.Minute - time.Second,
 			wantDuration: 0,
 			wantError: `cannot create certificate signing request: ` +
 				`CertificateSigningRequest.certificates.k8s.io "invalid-csr-001" is invalid: spec.expirationSeconds: Invalid value: 599: may not specify a duration less than 600 seconds (10 minutes)`,
@@ -186,7 +182,7 @@ func TestCSRDuration(t *testing.T) {
 		{
 			name:         "really too short duration set",
 			csrName:      "invalid-csr-002",
-			duration:     pointer.Duration(3 * time.Minute),
+			duration:     3 * time.Minute,
 			wantDuration: 0,
 			wantError: `cannot create certificate signing request: ` +
 				`CertificateSigningRequest.certificates.k8s.io "invalid-csr-002" is invalid: spec.expirationSeconds: Invalid value: 180: may not specify a duration less than 600 seconds (10 minutes)`,
@@ -194,7 +190,7 @@ func TestCSRDuration(t *testing.T) {
 		{
 			name:         "negative duration set",
 			csrName:      "invalid-csr-003",
-			duration:     pointer.Duration(-7 * time.Minute),
+			duration:     -7 * time.Minute,
 			wantDuration: 0,
 			wantError: `cannot create certificate signing request: ` +
 				`CertificateSigningRequest.certificates.k8s.io "invalid-csr-003" is invalid: spec.expirationSeconds: Invalid value: -420: may not specify a duration less than 600 seconds (10 minutes)`,
@@ -215,7 +211,7 @@ func TestCSRDuration(t *testing.T) {
 			}
 
 			csrName, csrUID, errReq := csr.RequestCertificate(client, csrData, tt.csrName, certificatesv1.KubeAPIServerClientSignerName,
-				tt.duration, []certificatesv1.KeyUsage{certificatesv1.UsageClientAuth}, privateKey)
+				durationPtr(tt.duration), []certificatesv1.KeyUsage{certificatesv1.UsageClientAuth}, privateKey)
 
 			if diff := cmp.Diff(tt.wantError, errStr(errReq)); len(diff) > 0 {
 				t.Fatalf("CSR input duration %v err diff (-want, +got):\n%s", tt.duration, diff)
@@ -270,6 +266,13 @@ func TestCSRDuration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func durationPtr(duration time.Duration) *time.Duration {
+	if duration == 0 {
+		return nil
+	}
+	return &duration
 }
 
 func errStr(err error) string {

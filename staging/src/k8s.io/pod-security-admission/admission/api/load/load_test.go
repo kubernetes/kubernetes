@@ -19,11 +19,10 @@ package load
 import (
 	"bytes"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
-
-	utiltesting "k8s.io/client-go/util/testing"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -45,7 +44,7 @@ func writeTempFile(t *testing.T, content string) string {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		utiltesting.CloseAndRemove(t, file)
+		os.Remove(file.Name())
 	})
 	if err := ioutil.WriteFile(file.Name(), []byte(content), 0600); err != nil {
 		t.Fatal(err)

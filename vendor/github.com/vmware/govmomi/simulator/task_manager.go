@@ -19,6 +19,7 @@ package simulator
 import (
 	"sync"
 
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/simulator/esx"
 	"github.com/vmware/govmomi/simulator/vpx"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -32,15 +33,16 @@ type TaskManager struct {
 	sync.Mutex
 }
 
-func (m *TaskManager) init(r *Registry) {
-	if len(m.Description.MethodInfo) == 0 {
-		if r.IsVPX() {
-			m.Description = vpx.Description
-		} else {
-			m.Description = esx.Description
-		}
+func NewTaskManager(ref types.ManagedObjectReference) object.Reference {
+	s := &TaskManager{}
+	s.Self = ref
+	if Map.IsESX() {
+		s.Description = esx.Description
+	} else {
+		s.Description = vpx.Description
 	}
-	r.AddHandler(m)
+	Map.AddHandler(s)
+	return s
 }
 
 func (m *TaskManager) PutObject(obj mo.Reference) {
@@ -59,6 +61,6 @@ func (m *TaskManager) PutObject(obj mo.Reference) {
 	m.Unlock()
 }
 
-func (*TaskManager) RemoveObject(*Context, types.ManagedObjectReference) {}
+func (*TaskManager) RemoveObject(types.ManagedObjectReference) {}
 
 func (*TaskManager) UpdateObject(mo.Reference, []types.PropertyChange) {}

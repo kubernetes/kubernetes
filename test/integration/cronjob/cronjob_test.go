@@ -30,14 +30,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *cronjob.ControllerV2, *job.Controller, informers.SharedInformerFactory, clientset.Interface) {
+func setup(t *testing.T) (kubeapiservertesting.TearDownFunc, *cronjob.ControllerV2, *job.Controller, informers.SharedInformerFactory, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
@@ -48,11 +47,11 @@ func setup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc
 	}
 	resyncPeriod := 12 * time.Hour
 	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "cronjob-informers")), resyncPeriod)
-	cjc, err := cronjob.NewControllerV2(ctx, informerSet.Batch().V1().Jobs(), informerSet.Batch().V1().CronJobs(), clientSet)
+	cjc, err := cronjob.NewControllerV2(informerSet.Batch().V1().Jobs(), informerSet.Batch().V1().CronJobs(), clientSet)
 	if err != nil {
 		t.Fatalf("Error creating CronJob controller: %v", err)
 	}
-	jc := job.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+	jc := job.NewController(informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 
 	return server.TearDownFn, cjc, jc, informerSet, clientSet
 }
@@ -145,16 +144,8 @@ func validateJobAndPod(t *testing.T, clientSet clientset.Interface, namespace st
 }
 
 func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	closeFn, cjc, jc, informerSet, clientSet := setup(ctx, t)
+	closeFn, cjc, jc, informerSet, clientSet := setup(t)
 	defer closeFn()
-
-	// When shutting down, cancel must be called before closeFn.
-	// We simply call it multiple times.
-	defer cancel()
 
 	cronJobName := "foo"
 	namespaceName := "simple-cronjob-test"
@@ -163,6 +154,9 @@ func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
 	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 	cjClient := clientSet.BatchV1().CronJobs(ns.Name)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	informerSet.Start(ctx.Done())
 	go cjc.Run(ctx, 1)

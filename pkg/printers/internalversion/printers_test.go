@@ -24,10 +24,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -49,8 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	utilpointer "k8s.io/utils/pointer"
 )
-
-var containerRestartPolicyAlways = api.ContainerRestartPolicyAlways
 
 func TestFormatResourceName(t *testing.T) {
 	tests := []struct {
@@ -295,7 +293,7 @@ func TestPrintEvent(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -396,7 +394,7 @@ func TestPrintNamespace(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -444,7 +442,7 @@ func TestPrintSecret(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -492,7 +490,7 @@ func TestPrintServiceAccount(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -592,7 +590,7 @@ func TestPrintNodeStatus(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -614,11 +612,11 @@ func TestPrintNodeRole(t *testing.T) {
 			node: api.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo10",
-					Labels: map[string]string{"node-role.kubernetes.io/master": "", "node-role.kubernetes.io/control-plane": "", "node-role.kubernetes.io/proxy": "", "kubernetes.io/role": "node"},
+					Labels: map[string]string{"node-role.kubernetes.io/master": "", "node-role.kubernetes.io/proxy": "", "kubernetes.io/role": "node"},
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1.TableRow{{Cells: []interface{}{"foo10", "Unknown", "control-plane,master,node,proxy", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo10", "Unknown", "master,node,proxy", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -641,7 +639,7 @@ func TestPrintNodeRole(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -693,7 +691,7 @@ func TestPrintNodeOSImage(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -745,7 +743,7 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -797,7 +795,7 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -834,7 +832,7 @@ func TestPrintNodeName(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -895,7 +893,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -957,7 +955,7 @@ func TestPrintNodeInternalIP(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -1000,7 +998,7 @@ func TestPrintIngress(t *testing.T) {
 	}
 	rows[0].Object.Object = nil
 	if !reflect.DeepEqual(expected, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
 	}
 }
 
@@ -1063,7 +1061,7 @@ func TestPrintIngressClass(t *testing.T) {
 				rows[i].Object.Object = nil
 			}
 			if !reflect.DeepEqual(testCase.expected, rows) {
-				t.Errorf("mismatch: %s", cmp.Diff(testCase.expected, rows))
+				t.Errorf("mismatch: %s", diff.ObjectReflectDiff(testCase.expected, rows))
 			}
 		})
 	}
@@ -1173,7 +1171,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -1533,201 +1531,7 @@ func TestPrintPod(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
-		}
-	}
-}
-
-func TestPrintPodWithRestartableInitContainer(t *testing.T) {
-	tests := []struct {
-		pod    api.Pod
-		expect []metav1.TableRow
-	}{
-		{
-			// Test pod has 2 restartable init containers, the first one running but not started.
-			api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
-				Spec: api.PodSpec{
-					InitContainers: []api.Container{
-						{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
-						{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
-					}, Containers: make([]api.Container, 1)},
-				Status: api.PodStatus{
-					Phase: "Pending",
-					InitContainerStatuses: []api.ContainerStatus{
-						{
-							Name:                 "restartable-init-1",
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started:              utilpointer.Bool(false),
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
-						},
-						{
-							Name:    "restartable-init-2",
-							Ready:   false,
-							State:   api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
-							Started: utilpointer.Bool(false),
-						},
-					},
-					ContainerStatuses: []api.ContainerStatus{
-						{
-							Ready:        false,
-							RestartCount: 0,
-							State:        api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
-						},
-					},
-					Conditions: []api.PodCondition{
-						{Type: api.PodInitialized, Status: api.ConditionFalse},
-					},
-				},
-			},
-			[]metav1.TableRow{{Cells: []interface{}{"test1", "0/3", "Init:0/2", "3 (10s ago)", "<unknown>"}}},
-		},
-		{
-			// Test pod has 2 restartable init containers, the first one started and the second one running but not started.
-			api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
-				Spec: api.PodSpec{
-					InitContainers: []api.Container{
-						{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
-						{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
-					}, Containers: make([]api.Container, 1)},
-				Status: api.PodStatus{
-					Phase: "Pending",
-					InitContainerStatuses: []api.ContainerStatus{
-						{
-							Name:                 "restartable-init-1",
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started:              utilpointer.Bool(true),
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
-						},
-						{
-							Name:    "restartable-init-2",
-							Ready:   false,
-							State:   api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started: utilpointer.Bool(false),
-						},
-					},
-					ContainerStatuses: []api.ContainerStatus{
-						{
-							Ready:        false,
-							RestartCount: 0,
-							State:        api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
-						},
-					},
-					Conditions: []api.PodCondition{
-						{Type: api.PodInitialized, Status: api.ConditionFalse},
-					},
-				},
-			},
-			[]metav1.TableRow{{Cells: []interface{}{"test1", "0/3", "Init:1/2", "3 (10s ago)", "<unknown>"}}},
-		},
-		{
-			// Test pod has 2 restartable init containers started and 1 container running
-			api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
-				Spec: api.PodSpec{
-					InitContainers: []api.Container{
-						{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
-						{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
-					}, Containers: make([]api.Container, 1)},
-				Status: api.PodStatus{
-					Phase: "Running",
-					InitContainerStatuses: []api.ContainerStatus{
-						{
-							Name:                 "restartable-init-1",
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started:              utilpointer.Bool(true),
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
-						},
-						{
-							Name:    "restartable-init-2",
-							Ready:   false,
-							State:   api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started: utilpointer.Bool(true),
-						},
-					},
-					ContainerStatuses: []api.ContainerStatus{
-						{
-							Ready:                true,
-							RestartCount:         4,
-							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
-						},
-					},
-					Conditions: []api.PodCondition{
-						{Type: api.PodInitialized, Status: api.ConditionTrue},
-					},
-				},
-			},
-			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/3", "Running", "7 (10s ago)", "<unknown>"}}},
-		},
-		{
-			// Test pod has 2 restartable init containers completed with non-zero and 1 container completed
-			api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test3"},
-				Spec: api.PodSpec{
-					InitContainers: []api.Container{
-						{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
-						{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
-					}, Containers: make([]api.Container, 1)},
-				Status: api.PodStatus{
-					Phase: "Succeeded",
-					InitContainerStatuses: []api.ContainerStatus{
-						{
-							Name:                 "restartable-init-1",
-							Ready:                false,
-							RestartCount:         3,
-							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Error", ExitCode: 137}},
-							Started:              utilpointer.Bool(false),
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
-						},
-						{
-							Name:    "restartable-init-2",
-							Ready:   false,
-							State:   api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Error", ExitCode: 137}},
-							Started: utilpointer.Bool(false),
-						},
-					},
-					ContainerStatuses: []api.ContainerStatus{
-						{
-							Ready:                false,
-							RestartCount:         4,
-							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}},
-							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
-						},
-					},
-					Conditions: []api.PodCondition{
-						{Type: api.PodInitialized, Status: api.ConditionTrue},
-					},
-				},
-			},
-			[]metav1.TableRow{
-				{
-					Cells: []interface{}{"test3", "0/3", "Completed", "7 (10s ago)", "<unknown>"},
-					Conditions: []metav1.TableRowCondition{
-						{Type: metav1.RowCompleted, Status: metav1.ConditionTrue, Reason: "Succeeded", Message: "The pod has completed successfully."},
-					},
-				},
-			},
-		},
-	}
-
-	for i, test := range tests {
-		rows, err := printPod(&test.pod, printers.GenerateOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
 		}
 	}
 }
@@ -1851,7 +1655,7 @@ func TestPrintPodwide(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
 		}
 	}
 }
@@ -1933,7 +1737,7 @@ func TestPrintPodConditions(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
 		}
 	}
 }
@@ -1984,7 +1788,7 @@ func TestPrintPodList(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("mismatch: %s", cmp.Diff(test.expect, rows))
+			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expect, rows))
 		}
 	}
 }
@@ -2095,7 +1899,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
 		}
 	}
 }
@@ -2177,7 +1981,7 @@ func TestPrintPodTemplate(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -2227,7 +2031,7 @@ func TestPrintPodTemplateList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -2344,7 +2148,7 @@ func TestPrintDeployment(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -2412,7 +2216,7 @@ func TestPrintDaemonSet(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -2484,7 +2288,7 @@ func TestPrintDaemonSetList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -2633,7 +2437,7 @@ func TestPrintJob(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -2714,7 +2518,7 @@ func TestPrintJobList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -3486,7 +3290,7 @@ func TestPrintHPA(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -3686,7 +3490,7 @@ func TestPrintService(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -3737,13 +3541,13 @@ func TestPrintServiceList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
 func TestPrintPodDisruptionBudget(t *testing.T) {
-	minAvailable := intstr.FromInt32(22)
-	maxUnavailable := intstr.FromInt32(11)
+	minAvailable := intstr.FromInt(22)
+	maxUnavailable := intstr.FromInt(11)
 	tests := []struct {
 		pdb      policy.PodDisruptionBudget
 		expected []metav1.TableRow
@@ -3794,14 +3598,14 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
 
 func TestPrintPodDisruptionBudgetList(t *testing.T) {
-	minAvailable := intstr.FromInt32(22)
-	maxUnavailable := intstr.FromInt32(11)
+	minAvailable := intstr.FromInt(22)
+	maxUnavailable := intstr.FromInt(11)
 
 	pdbList := policy.PodDisruptionBudgetList{
 		Items: []policy.PodDisruptionBudget{
@@ -3848,7 +3652,7 @@ func TestPrintPodDisruptionBudgetList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -3925,7 +3729,7 @@ func TestPrintControllerRevision(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -3992,7 +3796,7 @@ func TestPrintConfigMap(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -4039,7 +3843,7 @@ func TestPrintNetworkPolicy(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -4114,7 +3918,7 @@ func TestPrintRoleBinding(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -4189,7 +3993,7 @@ func TestPrintClusterRoleBinding(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -4331,7 +4135,7 @@ func TestPrintCertificateSigningRequest(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -4458,7 +4262,7 @@ func TestPrintReplicationController(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -4548,7 +4352,7 @@ func TestPrintReplicaSet(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -4616,7 +4420,7 @@ func TestPrintReplicaSetList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -4703,7 +4507,7 @@ func TestPrintStatefulSet(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -4847,7 +4651,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -4970,7 +4774,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -5038,7 +4842,7 @@ func TestPrintComponentStatus(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -5176,7 +4980,7 @@ func TestPrintCronJob(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -5242,7 +5046,7 @@ func TestPrintCronJobList(t *testing.T) {
 		rows[i].Object.Object = nil
 	}
 	if !reflect.DeepEqual(expectedRows, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expectedRows, rows))
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -5340,7 +5144,7 @@ func TestPrintStorageClass(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -5387,7 +5191,7 @@ func TestPrintLease(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -5429,7 +5233,7 @@ func TestPrintPriorityClass(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -5470,7 +5274,7 @@ func TestPrintRuntimeClass(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -5590,7 +5394,7 @@ func TestPrintEndpoint(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 
@@ -5689,7 +5493,7 @@ func TestPrintEndpointSlice(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -5837,7 +5641,7 @@ func TestPrintFlowSchema(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -5914,7 +5718,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -6036,7 +5840,7 @@ func TestPrintStorageVersion(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -6073,7 +5877,7 @@ func TestPrintScale(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -6291,6 +6095,12 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			name: "ConfigMap",
 			printer: func() ([]metav1.TableRow, error) {
 				return printConfigMap(&api.ConfigMap{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PodSecurityPolicy",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPodSecurityPolicy(&policy.PodSecurityPolicy{}, printers.GenerateOptions{})
 			},
 		},
 		{
@@ -6595,7 +6405,7 @@ func TestPrintClusterCIDR(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }
@@ -6674,87 +6484,7 @@ func TestPrintClusterCIDRList(t *testing.T) {
 			rows[i].Object.Object = nil
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
+			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
-}
-
-func TestPrintIPAddress(t *testing.T) {
-	ip := networking.IPAddress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "192.168.2.2",
-			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-		},
-		Spec: networking.IPAddressSpec{
-			ParentRef: &networking.ParentReference{
-				Group:     "mygroup",
-				Resource:  "myresource",
-				Namespace: "mynamespace",
-				Name:      "myname",
-			},
-		},
-	}
-	// Columns: Name, ParentRef, Age
-	expected := []metav1.TableRow{{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "10y"}}}
-
-	rows, err := printIPAddress(&ip, printers.GenerateOptions{})
-	if err != nil {
-		t.Fatalf("Error generating table rows for IPAddress: %#v", err)
-	}
-	rows[0].Object.Object = nil
-	if !reflect.DeepEqual(expected, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
-	}
-}
-
-func TestPrintIPAddressList(t *testing.T) {
-	ipList := networking.IPAddressList{
-		Items: []networking.IPAddress{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "192.168.2.2",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-				},
-				Spec: networking.IPAddressSpec{
-					ParentRef: &networking.ParentReference{
-						Group:     "mygroup",
-						Resource:  "myresource",
-						Namespace: "mynamespace",
-						Name:      "myname",
-					},
-				},
-			}, {
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "2001:db8::2",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-5, 0, 0)},
-				},
-				Spec: networking.IPAddressSpec{
-					ParentRef: &networking.ParentReference{
-						Group:     "mygroup2",
-						Resource:  "myresource2",
-						Namespace: "mynamespace2",
-						Name:      "myname2",
-					},
-				},
-			},
-		},
-	}
-	// Columns: Name, ParentRef, Age
-	expected := []metav1.TableRow{
-		{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "10y"}},
-		{Cells: []interface{}{"2001:db8::2", "myresource2.mygroup2/mynamespace2/myname2", "5y1d"}},
-	}
-
-	rows, err := printIPAddressList(&ipList, printers.GenerateOptions{})
-	if err != nil {
-		t.Fatalf("Error generating table rows for IPAddress: %#v", err)
-	}
-	for i := range rows {
-		rows[i].Object.Object = nil
-
-	}
-	if !reflect.DeepEqual(expected, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
-	}
-
 }

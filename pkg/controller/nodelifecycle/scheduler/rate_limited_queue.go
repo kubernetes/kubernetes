@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
+
 	"k8s.io/klog/v2"
 )
 
@@ -228,14 +229,14 @@ type ActionFunc func(TimedValue) (bool, time.Duration)
 // function in NodeController when Node becomes Ready again) TODO:
 // figure out a good way to do garbage collection for all Nodes that
 // were removed from the cluster.
-func (q *RateLimitedTimedQueue) Try(logger klog.Logger, fn ActionFunc) {
+func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	val, ok := q.queue.Head()
 	q.limiterLock.Lock()
 	defer q.limiterLock.Unlock()
 	for ok {
 		// rate limit the queue checking
 		if !q.limiter.TryAccept() {
-			logger.V(10).Info("Try rate limited", "value", val)
+			klog.V(10).Infof("Try rate limited for value: %v", val)
 			// Try again later
 			break
 		}

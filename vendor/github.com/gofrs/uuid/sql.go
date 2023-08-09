@@ -22,13 +22,11 @@
 package uuid
 
 import (
-	"database/sql"
+	"bytes"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 )
-
-var _ driver.Valuer = UUID{}
-var _ sql.Scanner = (*UUID)(nil)
 
 // Value implements the driver.Valuer interface.
 func (u UUID) Value() (driver.Value, error) {
@@ -51,9 +49,7 @@ func (u *UUID) Scan(src interface{}) error {
 		return u.UnmarshalText(src)
 
 	case string:
-		uu, err := FromString(src)
-		*u = uu
-		return err
+		return u.UnmarshalText([]byte(src))
 	}
 
 	return fmt.Errorf("uuid: cannot convert %T to UUID", src)
@@ -87,30 +83,27 @@ func (u *NullUUID) Scan(src interface{}) error {
 	return u.UUID.Scan(src)
 }
 
-var nullJSON = []byte("null")
-
 // MarshalJSON marshals the NullUUID as null or the nested UUID
 func (u NullUUID) MarshalJSON() ([]byte, error) {
 	if !u.Valid {
-		return nullJSON, nil
+		return json.Marshal(nil)
 	}
-	var buf [38]byte
-	buf[0] = '"'
-	encodeCanonical(buf[1:37], u.UUID)
-	buf[37] = '"'
-	return buf[:], nil
+
+	return json.Marshal(u.UUID)
 }
 
 // UnmarshalJSON unmarshals a NullUUID
 func (u *NullUUID) UnmarshalJSON(b []byte) error {
-	if string(b) == "null" {
+	if bytes.Equal(b, []byte("null")) {
 		u.UUID, u.Valid = Nil, false
 		return nil
 	}
-	if n := len(b); n >= 2 && b[0] == '"' {
-		b = b[1 : n-1]
+
+	if err := json.Unmarshal(b, &u.UUID); err != nil {
+		return err
 	}
-	err := u.UUID.UnmarshalText(b)
-	u.Valid = (err == nil)
-	return err
+
+	u.Valid = true
+
+	return nil
 }

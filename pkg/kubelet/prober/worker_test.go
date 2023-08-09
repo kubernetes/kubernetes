@@ -19,7 +19,6 @@ package prober
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -153,13 +153,7 @@ func TestDoProbe(t *testing.T) {
 			}
 
 			// Clean up.
-			testRootDir := ""
-			if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
-				t.Fatalf("can't make a temp rootdir: %v", err)
-			} else {
-				testRootDir = tempDir
-			}
-			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker(), testRootDir)
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}
@@ -491,4 +485,51 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
+}
+
+func TestGetPodLabelName(t *testing.T) {
+	testCases := []struct {
+		name   string
+		pod    *v1.Pod
+		result string
+	}{
+		{
+			name: "Static pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "kube-controller-manager-k8s-master-21385161-0",
+				},
+			},
+			result: "kube-controller-manager-k8s-master-21385161-0",
+		},
+		{
+			name: "Deployment pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:         "coredns-845757d86-ccqpf",
+					GenerateName: "coredns-845757d86-",
+					Labels: map[string]string{
+						apps.DefaultDeploymentUniqueLabelKey: "845757d86",
+					},
+				},
+			},
+			result: "coredns",
+		},
+		{
+			name: "ReplicaSet pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:         "kube-proxy-2gmqn",
+					GenerateName: "kube-proxy-",
+				},
+			},
+			result: "kube-proxy",
+		},
+	}
+	for _, test := range testCases {
+		ret := getPodLabelName(test.pod)
+		if ret != test.result {
+			t.Errorf("Expected %s, got %s", test.result, ret)
+		}
+	}
 }

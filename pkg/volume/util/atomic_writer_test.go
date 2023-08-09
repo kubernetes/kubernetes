@@ -22,6 +22,7 @@ package util
 import (
 	"encoding/base64"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -765,7 +766,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 			return nil
 		}
 
-		content, err := os.ReadFile(path)
+		content, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
 		}
@@ -780,7 +781,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 		return nil
 	}
 
-	d, err := os.ReadDir(targetDir)
+	d, err := ioutil.ReadDir(targetDir)
 	if err != nil {
 		t.Errorf("Unable to read dir %v: %v", targetDir, err)
 		return
@@ -789,7 +790,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 		if strings.HasPrefix(info.Name(), "..") {
 			continue
 		}
-		if info.Type()&os.ModeSymlink != 0 {
+		if info.Mode()&os.ModeSymlink != 0 {
 			p := filepath.Join(targetDir, info.Name())
 			actual, err := os.Readlink(p)
 			if err != nil {

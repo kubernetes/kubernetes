@@ -62,25 +62,26 @@ func TestContainerMap(t *testing.T) {
 
 		// Remove all entries from the containerMap, checking proper removal of
 		// each along the way.
-		cm.Visit(func(podUID string, containerName string, containerID string) {
-			cm.RemoveByContainerID(containerID)
-			containerID, err := cm.GetContainerID(podUID, containerName)
+		for i := range tc.containerNames {
+			cm.RemoveByContainerID(tc.containerIDs[i])
+			containerID, err := cm.GetContainerID(tc.podUID, tc.containerNames[i])
 			if err == nil {
 				t.Errorf("unexpected retrieval of containerID after removal: %v", containerID)
 			}
 
-			cm.Add(podUID, containerName, containerID)
+			cm.Add(tc.podUID, tc.containerNames[i], tc.containerIDs[i])
 
-			cm.RemoveByContainerRef(podUID, containerName)
-			id, cn, err := cm.GetContainerRef(containerID)
+			cm.RemoveByContainerRef(tc.podUID, tc.containerNames[i])
+			podUID, containerName, err := cm.GetContainerRef(tc.containerIDs[i])
 			if err == nil {
-				t.Errorf("unexpected retrieval of container reference after removal: (%v, %v)", id, cn)
+				t.Errorf("unexpected retrieval of container reference after removal: (%v, %v)", podUID, containerName)
 			}
-		})
+		}
 
 		// Verify containerMap now empty.
 		if len(cm) != 0 {
 			t.Errorf("unexpected entries still in containerMap: %v", cm)
 		}
+
 	}
 }

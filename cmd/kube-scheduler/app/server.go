@@ -111,7 +111,7 @@ for more information about scheduling and the kube-scheduler component.`,
 	cliflag.SetUsageAndHelpFunc(cmd, *nfs, cols)
 
 	if err := cmd.MarkFlagFilename("config", "yaml", "yml", "json"); err != nil {
-		klog.Background().Error(err, "Failed to mark flag filename")
+		klog.ErrorS(err, "Failed to mark flag filename")
 	}
 
 	return cmd
@@ -148,12 +148,10 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 
 // Run executes the scheduler based on the given configuration. It only returns on error or when context is done.
 func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *scheduler.Scheduler) error {
-	logger := klog.FromContext(ctx)
-
 	// To help debugging, immediately log version
-	logger.Info("Starting Kubernetes Scheduler", "version", version.Get())
+	klog.InfoS("Starting Kubernetes Scheduler", "version", version.Get())
 
-	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
@@ -194,52 +192,36 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		}
 	}
 
-	startInformersAndWaitForSync := func(ctx context.Context) {
-		// Start all informers.
-		cc.InformerFactory.Start(ctx.Done())
-		// DynInformerFactory can be nil in tests.
-		if cc.DynInformerFactory != nil {
-			cc.DynInformerFactory.Start(ctx.Done())
-		}
-
-		// Wait for all caches to sync before scheduling.
-		cc.InformerFactory.WaitForCacheSync(ctx.Done())
-		// DynInformerFactory can be nil in tests.
-		if cc.DynInformerFactory != nil {
-			cc.DynInformerFactory.WaitForCacheSync(ctx.Done())
-		}
-
-		// Wait for all handlers to sync (all items in the initial list delivered) before scheduling.
-		if err := sched.WaitForHandlersSync(ctx); err != nil {
-			logger.Error(err, "waiting for handlers to sync")
-		}
-
-		logger.V(3).Info("Handlers synced")
+	// Start all informers.
+	cc.InformerFactory.Start(ctx.Done())
+	// DynInformerFactory can be nil in tests.
+	if cc.DynInformerFactory != nil {
+		cc.DynInformerFactory.Start(ctx.Done())
 	}
-	if !cc.ComponentConfig.DelayCacheUntilActive || cc.LeaderElection == nil {
-		startInformersAndWaitForSync(ctx)
+
+	// Wait for all caches to sync before scheduling.
+	cc.InformerFactory.WaitForCacheSync(ctx.Done())
+	// DynInformerFactory can be nil in tests.
+	if cc.DynInformerFactory != nil {
+		cc.DynInformerFactory.WaitForCacheSync(ctx.Done())
 	}
+
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				close(waitingForLeader)
-				if cc.ComponentConfig.DelayCacheUntilActive {
-					logger.Info("Starting informers and waiting for sync...")
-					startInformersAndWaitForSync(ctx)
-					logger.Info("Sync completed")
-				}
 				sched.Run(ctx)
 			},
 			OnStoppedLeading: func() {
 				select {
 				case <-ctx.Done():
 					// We were asked to terminate. Exit 0.
-					logger.Info("Requested to terminate, exiting")
+					klog.InfoS("Requested to terminate, exiting")
 					os.Exit(0)
 				default:
 					// We lost the lock.
-					logger.Error(nil, "Leaderelection lost")
+					klog.ErrorS(nil, "Leaderelection lost")
 					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 				}
 			},
@@ -266,7 +248,7 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 	failedHandler := genericapifilters.Unauthorized(scheme.Codecs)
 
 	handler = genericapifilters.WithAuthorization(handler, authz, scheme.Codecs)
-	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil, nil)
+	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHTTPLogging(handler)
@@ -333,7 +315,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		return nil, nil, utilerrors.NewAggregate(errs)
 	}
 
-	c, err := opts.Config(ctx)
+	c, err := opts.Config()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -351,11 +333,11 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	recorderFactory := getRecorderFactory(&cc)
 	completedProfiles := make([]kubeschedulerconfig.KubeSchedulerProfile, 0)
 	// Create the scheduler.
-	sched, err := scheduler.New(ctx,
-		cc.Client,
+	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory,
 		cc.DynInformerFactory,
 		recorderFactory,
+		ctx.Done(),
 		scheduler.WithComponentConfigVersion(cc.ComponentConfig.TypeMeta.APIVersion),
 		scheduler.WithKubeConfig(cc.KubeConfig),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
@@ -374,7 +356,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := options.LogOrWriteConfig(klog.FromContext(ctx), opts.WriteConfigTo, &cc.ComponentConfig, completedProfiles); err != nil {
+	if err := options.LogOrWriteConfig(opts.WriteConfigTo, &cc.ComponentConfig, completedProfiles); err != nil {
 		return nil, nil, err
 	}
 

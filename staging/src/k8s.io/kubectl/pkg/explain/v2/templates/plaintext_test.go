@@ -41,44 +41,15 @@ var (
 	//go:embed apiextensions.k8s.io_v1.json
 	apiextensionsJSON string
 
-	//go:embed batch.k8s.io_v1.json
-	batchJSON string
-
 	apiExtensionsV1OpenAPI map[string]interface{} = func() map[string]interface{} {
 		var res map[string]interface{}
 		utilruntime.Must(json.Unmarshal([]byte(apiextensionsJSON), &res))
 		return res
 	}()
 
-	apiExtensionsV1OpenAPIWithoutListVerb map[string]interface{} = func() map[string]interface{} {
-		var res map[string]interface{}
-		utilruntime.Must(json.Unmarshal([]byte(apiextensionsJSON), &res))
-		paths := res["paths"].(map[string]interface{})
-		delete(paths, "/apis/apiextensions.k8s.io/v1/customresourcedefinitions")
-		return res
-	}()
-
 	apiExtensionsV1OpenAPISpec spec3.OpenAPI = func() spec3.OpenAPI {
 		var res spec3.OpenAPI
 		utilruntime.Must(json.Unmarshal([]byte(apiextensionsJSON), &res))
-		return res
-	}()
-
-	batchV1OpenAPI map[string]interface{} = func() map[string]interface{} {
-		var res map[string]interface{}
-		utilruntime.Must(json.Unmarshal([]byte(batchJSON), &res))
-		return res
-	}()
-
-	batchV1OpenAPIWithoutListVerb map[string]interface{} = func() map[string]interface{} {
-		var res map[string]interface{}
-		utilruntime.Must(json.Unmarshal([]byte(batchJSON), &res))
-		paths := res["paths"].(map[string]interface{})
-		delete(paths, "/apis/batch/v1/jobs")
-		delete(paths, "/apis/batch/v1/namespaces/{namespace}/jobs")
-
-		delete(paths, "/apis/batch/v1/cronjobs")
-		delete(paths, "/apis/batch/v1/namespaces/{namespace}/cronjobs/{name}")
 		return res
 	}()
 )
@@ -95,21 +66,21 @@ type testCase struct {
 }
 
 type check interface {
-	doCheck(output string, err error) error
+	doCheck(output string) error
 }
 
 type checkError string
 
-func (c checkError) doCheck(output string, err error) error {
-	if !strings.Contains(err.Error(), "error: "+string(c)) {
-		return fmt.Errorf("expected error: '%v' in string:\n%v", string(c), err)
+func (c checkError) doCheck(output string) error {
+	if !strings.Contains(output, "error: "+string(c)) {
+		return fmt.Errorf("expected error: '%v' in string:\n%v", string(c), output)
 	}
 	return nil
 }
 
 type checkContains string
 
-func (c checkContains) doCheck(output string, err error) error {
+func (c checkContains) doCheck(output string) error {
 	if !strings.Contains(output, string(c)) {
 		return fmt.Errorf("expected substring: '%v' in string:\n%v", string(c), output)
 	}
@@ -118,7 +89,7 @@ func (c checkContains) doCheck(output string, err error) error {
 
 type checkEquals string
 
-func (c checkEquals) doCheck(output string, err error) error {
+func (c checkEquals) doCheck(output string) error {
 	if output != string(c) {
 		return fmt.Errorf("output is not equal to expectation:\n%v", cmp.Diff(string(c), output))
 	}
@@ -152,7 +123,7 @@ func TestPlaintext(t *testing.T) {
 				Recursive: false,
 			},
 			Checks: []check{
-				checkError("GVR (/, Resource=) not found in OpenAPI schema"),
+				checkError("GVR (/, Resource=) not found in OpenAPI schema\n"),
 			},
 		},
 		{
@@ -173,74 +144,6 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
-			// Test basic ability to find a namespaced GVR and print its description
-			Name: "SchemaFoundNamespaced",
-			Context: v2.TemplateContext{
-				Document: batchV1OpenAPI,
-				GVR: schema.GroupVersionResource{
-					Group:    "batch",
-					Version:  "v1",
-					Resource: "jobs",
-				},
-				FieldPath: nil,
-				Recursive: false,
-			},
-			Checks: []check{
-				checkContains("Job represents the configuration of a single job"),
-			},
-		},
-		{
-			// Test basic ability to find a GVR without a list verb and print its description
-			Name: "SchemaFoundWithoutListVerb",
-			Context: v2.TemplateContext{
-				Document: apiExtensionsV1OpenAPIWithoutListVerb,
-				GVR: schema.GroupVersionResource{
-					Group:    "apiextensions.k8s.io",
-					Version:  "v1",
-					Resource: "customresourcedefinitions",
-				},
-				FieldPath: nil,
-				Recursive: false,
-			},
-			Checks: []check{
-				checkContains("CustomResourceDefinition represents a resource that should be exposed"),
-			},
-		},
-		{
-			// Test basic ability to find a namespaced GVR without a list verb and print its description
-			Name: "SchemaFoundNamespacedWithoutListVerb",
-			Context: v2.TemplateContext{
-				Document: batchV1OpenAPIWithoutListVerb,
-				GVR: schema.GroupVersionResource{
-					Group:    "batch",
-					Version:  "v1",
-					Resource: "jobs",
-				},
-				FieldPath: nil,
-				Recursive: false,
-			},
-			Checks: []check{
-				checkContains("Job represents the configuration of a single job"),
-			},
-		},
-		{
-			// Test basic ability to find a namespaced GVR without a top level list verb and print its description
-			Name: "SchemaFoundNamespacedWithoutTopLevelListVerb",
-			Context: v2.TemplateContext{
-				Document: batchV1OpenAPIWithoutListVerb,
-				GVR: schema.GroupVersionResource{
-					Group:    "batch",
-					Version:  "v1",
-					Resource: "cronjobs",
-				},
-				FieldPath: nil,
-				Recursive: false,
-			},
-			Checks: []check{
-				checkContains("CronJob represents the configuration of a single cron job"),
-			},
-		},
-		{
 			// Test that shows trying to find a non-existent field path of an existing
 			// schema
 			Name: "SchemaFieldPathNotFound",
@@ -255,7 +158,7 @@ func TestPlaintext(t *testing.T) {
 				Recursive: false,
 			},
 			Checks: []check{
-				checkError(`field "exist" does not exist`),
+				checkError(`field "[does not exist]" does not exist`),
 			},
 		},
 		{
@@ -393,30 +296,6 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
-			// Show that a ref to a primitive type uses the referred type's type
-			Name:        "PrimitiveRef",
-			Subtemplate: "typeGuess",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"description": "a cool field",
-					"$ref":        "#/components/schemas/v1.Time",
-				},
-				"Document": map[string]any{
-					"components": map[string]any{
-						"schemas": map[string]any{
-							"v1.Time": map[string]any{
-								"type":   "string",
-								"format": "date-time",
-							},
-						},
-					},
-				},
-			},
-			Checks: []check{
-				checkEquals("string"),
-			},
-		},
-		{
 			// Shows that the typeguess template behaves correctly given an
 			// array with unknown items
 			Name:        "ArrayUnknown",
@@ -429,20 +308,6 @@ func TestPlaintext(t *testing.T) {
 			},
 			Checks: []check{
 				checkEquals("array"),
-			},
-		},
-		{
-			// Shows that the typeguess puts Object tpye in title case
-			Name:        "ObjectTitle",
-			Subtemplate: "typeGuess",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"description": "a cool field",
-					"type":        "object",
-				},
-			},
-			Checks: []check{
-				checkEquals("Object"),
 			},
 		},
 		{
@@ -661,17 +526,16 @@ func TestPlaintext(t *testing.T) {
 
 		t.Run(testName, func(t *testing.T) {
 			buf := bytes.NewBuffer(nil)
-
-			var outputErr error
 			if len(tcase.Subtemplate) == 0 {
-				outputErr = tmpl.Execute(buf, tcase.Context)
+				tmpl.Execute(buf, tcase.Context)
 			} else {
-				outputErr = tmpl.ExecuteTemplate(buf, tcase.Subtemplate, tcase.Context)
+				tmpl.ExecuteTemplate(buf, tcase.Subtemplate, tcase.Context)
 			}
+			require.NoError(t, err)
 
 			output := buf.String()
 			for _, check := range tcase.Checks {
-				err = check.doCheck(output, outputErr)
+				err = check.doCheck(output)
 
 				if err != nil {
 					t.Log("test failed on output:\n" + output)

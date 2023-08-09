@@ -42,8 +42,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) (*REST, error) {
 		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 			return ttl, nil
 		},
-		DefaultQualifiedResource:  api.Resource("events"),
-		SingularQualifiedResource: api.Resource("event"),
+		DefaultQualifiedResource: api.Resource("events"),
 
 		CreateStrategy: event.Strategy,
 		UpdateStrategy: event.Strategy,

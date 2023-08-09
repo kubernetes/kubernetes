@@ -34,7 +34,7 @@ import (
 
 var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 	f := framework.NewDefaultFramework("cloudprovider")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 
 	ginkgo.BeforeEach(func() {

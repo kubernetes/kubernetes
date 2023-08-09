@@ -45,7 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -81,7 +80,7 @@ type EditOptions struct {
 
 	managedFields map[types.UID][]metav1.ManagedFieldsEntry
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 
 	Recorder            genericclioptions.Recorder
 	f                   cmdutil.Factory
@@ -94,7 +93,7 @@ type EditOptions struct {
 }
 
 // NewEditOptions returns an initialized EditOptions instance
-func NewEditOptions(editMode EditMode, ioStreams genericiooptions.IOStreams) *EditOptions {
+func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *EditOptions {
 	return &EditOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 

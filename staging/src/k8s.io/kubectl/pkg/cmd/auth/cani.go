@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	discovery "k8s.io/client-go/discovery"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -62,8 +62,8 @@ type CanIOptions struct {
 	ResourceName   string
 	List           bool
 
-	genericiooptions.IOStreams
-	WarningPrinter *printers.WarningPrinter
+	genericclioptions.IOStreams
+	warningPrinter *printers.WarningPrinter
 }
 
 var (
@@ -82,11 +82,6 @@ var (
 
 		# Check to see if I can list deployments in my current namespace
 		kubectl auth can-i list deployments.apps
-
-		# Check to see if service account "foo" of namespace "dev" can list pods
-		# in the namespace "prod".
-		# You must be allowed to use impersonation for the global option "--as".
-		kubectl auth can-i list pods --as=system:serviceaccount:dev:foo -n prod
 
 		# Check to see if I can do everything in my current namespace ("*" means all)
 		kubectl auth can-i '*' '*'
@@ -110,7 +105,7 @@ var (
 )
 
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command
-func NewCmdCanI(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CanIOptions{
 		IOStreams: streams,
 	}
@@ -150,10 +145,7 @@ func NewCmdCanI(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 
 // Complete completes all the required options
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
-	// Set default WarningPrinter if not already set.
-	if o.WarningPrinter == nil {
-		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
-	}
+	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
 
 	if o.List {
 		if len(args) != 0 {
@@ -214,8 +206,8 @@ func (o *CanIOptions) Validate() error {
 		return nil
 	}
 
-	if o.WarningPrinter == nil {
-		return fmt.Errorf("WarningPrinter can not be used without initialization")
+	if o.warningPrinter == nil {
+		return fmt.Errorf("warningPrinter can not be used without initialization")
 	}
 
 	if o.NonResourceURL != "" {
@@ -226,18 +218,18 @@ func (o *CanIOptions) Validate() error {
 			return fmt.Errorf("NonResourceURL and ResourceName can not specified together")
 		}
 		if !isKnownNonResourceVerb(o.Verb) {
-			o.WarningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
+			o.warningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
 		}
 	} else if !o.Resource.Empty() && !o.AllNamespaces && o.DiscoveryClient != nil {
 		if namespaced, err := isNamespaced(o.Resource, o.DiscoveryClient); err == nil && !namespaced {
 			if len(o.Resource.Group) == 0 {
-				o.WarningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped\n", o.Resource.Resource))
+				o.warningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped\n", o.Resource.Resource))
 			} else {
-				o.WarningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped in group '%s'\n", o.Resource.Resource, o.Resource.Group))
+				o.warningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped in group '%s'\n", o.Resource.Resource, o.Resource.Group))
 			}
 		}
 		if !isKnownResourceVerb(o.Verb) {
-			o.WarningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
+			o.warningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
 		}
 	}
 
@@ -325,9 +317,9 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 		if err != nil {
 			if !nonStandardResourceNames.Has(groupResource.String()) {
 				if len(groupResource.Group) == 0 {
-					o.WarningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s'\n", groupResource.Resource))
+					o.warningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s'\n", groupResource.Resource))
 				} else {
-					o.WarningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group))
+					o.warningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group))
 				}
 			}
 			return schema.GroupVersionResource{Resource: resourceArg}
@@ -339,7 +331,7 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 
 func (o *CanIOptions) printStatus(status authorizationv1.SubjectRulesReviewStatus) error {
 	if status.Incomplete {
-		o.WarningPrinter.Print(fmt.Sprintf("the list may be incomplete: %v", status.EvaluationError))
+		o.warningPrinter.Print(fmt.Sprintf("the list may be incomplete: %v", status.EvaluationError))
 	}
 
 	breakdownRules := []rbacv1.PolicyRule{}

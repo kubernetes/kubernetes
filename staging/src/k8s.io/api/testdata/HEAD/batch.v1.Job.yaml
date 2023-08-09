@@ -35,11 +35,9 @@ metadata:
 spec:
   activeDeadlineSeconds: 3
   backoffLimit: 7
-  backoffLimitPerIndex: 12
   completionMode: completionModeValue
   completions: 2
   manualSelector: true
-  maxFailedIndexes: 13
   parallelism: 1
   podFailurePolicy:
     rules:
@@ -52,7 +50,6 @@ spec:
       onPodConditions:
       - status: statusValue
         type: typeValue
-  podReplacementPolicy: podReplacementPolicyValue
   selector:
     matchExpressions:
     - key: keyValue
@@ -331,9 +328,6 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
-        resizePolicy:
-        - resourceName: resourceNameValue
-          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -341,7 +335,6 @@ spec:
             limitsKey: "0"
           requests:
             requestsKey: "0"
-        restartPolicy: restartPolicyValue
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -538,9 +531,6 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
-        resizePolicy:
-        - resourceName: resourceNameValue
-          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -548,7 +538,6 @@ spec:
             limitsKey: "0"
           requests:
             requestsKey: "0"
-        restartPolicy: restartPolicyValue
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -747,9 +736,6 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
-        resizePolicy:
-        - resourceName: resourceNameValue
-          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -757,7 +743,6 @@ spec:
             limitsKey: "0"
           requests:
             requestsKey: "0"
-        restartPolicy: restartPolicyValue
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
@@ -1185,11 +1170,9 @@ status:
     status: statusValue
     type: typeValue
   failed: 6
-  failedIndexes: failedIndexesValue
   ready: 9
   startTime: "2002-01-01T01:01:01Z"
   succeeded: 5
-  terminating: 11
   uncountedTerminatedPods:
     failed:
     - failedValue

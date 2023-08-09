@@ -156,7 +156,6 @@ func TestDescClearState(t *testing.T) {
 			descA.ClearState()
 
 			// create
-			//nolint:govet // it's okay to compare sync.RWMutex, it's empty
 			if !reflect.DeepEqual(*descA, *descB) {
 				t.Fatal("descriptor state hasn't be cleaned up")
 			}

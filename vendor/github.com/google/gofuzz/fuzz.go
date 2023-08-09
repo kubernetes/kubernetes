@@ -22,9 +22,6 @@ import (
 	"reflect"
 	"regexp"
 	"time"
-
-	"github.com/google/gofuzz/bytesource"
-	"strings"
 )
 
 // fuzzFuncMap is a map from a type to a fuzzFunc that handles that type.
@@ -62,34 +59,6 @@ func NewWithSeed(seed int64) *Fuzzer {
 		maxDepth:    100,
 	}
 	return f
-}
-
-// NewFromGoFuzz is a helper function that enables using gofuzz (this
-// project) with go-fuzz (https://github.com/dvyukov/go-fuzz) for continuous
-// fuzzing. Essentially, it enables translating the fuzzing bytes from
-// go-fuzz to any Go object using this library.
-//
-// This implementation promises a constant translation from a given slice of
-// bytes to the fuzzed objects. This promise will remain over future
-// versions of Go and of this library.
-//
-// Note: the returned Fuzzer should not be shared between multiple goroutines,
-// as its deterministic output will no longer be available.
-//
-// Example: use go-fuzz to test the function `MyFunc(int)` in the package
-// `mypackage`. Add the file: "mypacakge_fuzz.go" with the content:
-//
-// // +build gofuzz
-// package mypacakge
-// import fuzz "github.com/google/gofuzz"
-// func Fuzz(data []byte) int {
-// 	var i int
-// 	fuzz.NewFromGoFuzz(data).Fuzz(&i)
-// 	MyFunc(i)
-// 	return 0
-// }
-func NewFromGoFuzz(data []byte) *Fuzzer {
-	return New().RandSource(bytesource.New(data))
 }
 
 // Funcs adds each entry in fuzzFuncs as a custom fuzzing function.
@@ -172,7 +141,7 @@ func (f *Fuzzer) genElementCount() int {
 }
 
 func (f *Fuzzer) genShouldFill() bool {
-	return f.r.Float64() >= f.nilChance
+	return f.r.Float64() > f.nilChance
 }
 
 // MaxDepth sets the maximum number of recursive fuzz calls that will be made
@@ -271,7 +240,6 @@ func (fc *fuzzerContext) doFuzz(v reflect.Value, flags uint64) {
 		fn(v, fc.fuzzer.r)
 		return
 	}
-
 	switch v.Kind() {
 	case reflect.Map:
 		if fc.fuzzer.genShouldFill() {
@@ -482,10 +450,10 @@ var fillFuncMap = map[reflect.Kind]func(reflect.Value, *rand.Rand){
 		v.SetFloat(r.Float64())
 	},
 	reflect.Complex64: func(v reflect.Value, r *rand.Rand) {
-		v.SetComplex(complex128(complex(r.Float32(), r.Float32())))
+		panic("unimplemented")
 	},
 	reflect.Complex128: func(v reflect.Value, r *rand.Rand) {
-		v.SetComplex(complex(r.Float64(), r.Float64()))
+		panic("unimplemented")
 	},
 	reflect.String: func(v reflect.Value, r *rand.Rand) {
 		v.SetString(randString(r))
@@ -497,105 +465,38 @@ var fillFuncMap = map[reflect.Kind]func(reflect.Value, *rand.Rand){
 
 // randBool returns true or false randomly.
 func randBool(r *rand.Rand) bool {
-	return r.Int31()&(1<<30) == 0
+	if r.Int()&1 == 1 {
+		return true
+	}
+	return false
 }
 
-type int63nPicker interface {
-	Int63n(int64) int64
+type charRange struct {
+	first, last rune
 }
-
-// UnicodeRange describes a sequential range of unicode characters.
-// Last must be numerically greater than First.
-type UnicodeRange struct {
-	First, Last rune
-}
-
-// UnicodeRanges describes an arbitrary number of sequential ranges of unicode characters.
-// To be useful, each range must have at least one character (First <= Last) and
-// there must be at least one range.
-type UnicodeRanges []UnicodeRange
 
 // choose returns a random unicode character from the given range, using the
 // given randomness source.
-func (ur UnicodeRange) choose(r int63nPicker) rune {
-	count := int64(ur.Last - ur.First + 1)
-	return ur.First + rune(r.Int63n(count))
+func (r *charRange) choose(rand *rand.Rand) rune {
+	count := int64(r.last - r.first)
+	return r.first + rune(rand.Int63n(count))
 }
 
-// CustomStringFuzzFunc constructs a FuzzFunc which produces random strings.
-// Each character is selected from the range ur. If there are no characters
-// in the range (cr.Last < cr.First), this will panic.
-func (ur UnicodeRange) CustomStringFuzzFunc() func(s *string, c Continue) {
-	ur.check()
-	return func(s *string, c Continue) {
-		*s = ur.randString(c.Rand)
-	}
-}
-
-// check is a function that used to check whether the first of ur(UnicodeRange)
-// is greater than the last one.
-func (ur UnicodeRange) check() {
-	if ur.Last < ur.First {
-		panic("The last encoding must be greater than the first one.")
-	}
-}
-
-// randString of UnicodeRange makes a random string up to 20 characters long.
-// Each character is selected form ur(UnicodeRange).
-func (ur UnicodeRange) randString(r *rand.Rand) string {
-	n := r.Intn(20)
-	sb := strings.Builder{}
-	sb.Grow(n)
-	for i := 0; i < n; i++ {
-		sb.WriteRune(ur.choose(r))
-	}
-	return sb.String()
-}
-
-// defaultUnicodeRanges sets a default unicode range when user do not set
-// CustomStringFuzzFunc() but wants fuzz string.
-var defaultUnicodeRanges = UnicodeRanges{
+var unicodeRanges = []charRange{
 	{' ', '~'},           // ASCII characters
 	{'\u00a0', '\u02af'}, // Multi-byte encoded characters
 	{'\u4e00', '\u9fff'}, // Common CJK (even longer encodings)
 }
 
-// CustomStringFuzzFunc constructs a FuzzFunc which produces random strings.
-// Each character is selected from one of the ranges of ur(UnicodeRanges).
-// Each range has an equal probability of being chosen. If there are no ranges,
-// or a selected range has no characters (.Last < .First), this will panic.
-// Do not modify any of the ranges in ur after calling this function.
-func (ur UnicodeRanges) CustomStringFuzzFunc() func(s *string, c Continue) {
-	// Check unicode ranges slice is empty.
-	if len(ur) == 0 {
-		panic("UnicodeRanges is empty.")
-	}
-	// if not empty, each range should be checked.
-	for i := range ur {
-		ur[i].check()
-	}
-	return func(s *string, c Continue) {
-		*s = ur.randString(c.Rand)
-	}
-}
-
-// randString of UnicodeRanges makes a random string up to 20 characters long.
-// Each character is selected form one of the ranges of ur(UnicodeRanges),
-// and each range has an equal probability of being chosen.
-func (ur UnicodeRanges) randString(r *rand.Rand) string {
-	n := r.Intn(20)
-	sb := strings.Builder{}
-	sb.Grow(n)
-	for i := 0; i < n; i++ {
-		sb.WriteRune(ur[r.Intn(len(ur))].choose(r))
-	}
-	return sb.String()
-}
-
 // randString makes a random string up to 20 characters long. The returned string
 // may include a variety of (valid) UTF-8 encodings.
 func randString(r *rand.Rand) string {
-	return defaultUnicodeRanges.randString(r)
+	n := r.Intn(20)
+	runes := make([]rune, n)
+	for i := range runes {
+		runes[i] = unicodeRanges[r.Intn(len(unicodeRanges))].choose(r)
+	}
+	return string(runes)
 }
 
 // randUint64 makes random 64 bit numbers.

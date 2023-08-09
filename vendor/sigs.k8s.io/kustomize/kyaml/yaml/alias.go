@@ -87,16 +87,6 @@ var MappingNode yaml.Kind = yaml.MappingNode
 var ScalarNode yaml.Kind = yaml.ScalarNode
 var SequenceNode yaml.Kind = yaml.SequenceNode
 
-func nodeKindString(k yaml.Kind) string {
-	return map[yaml.Kind]string{
-		yaml.SequenceNode: "SequenceNode",
-		yaml.MappingNode:  "MappingNode",
-		yaml.ScalarNode:   "ScalarNode",
-		yaml.DocumentNode: "DocumentNode",
-		yaml.AliasNode:    "AliasNode",
-	}[k]
-}
-
 var DoubleQuotedStyle yaml.Style = yaml.DoubleQuotedStyle
 var FlowStyle yaml.Style = yaml.FlowStyle
 var FoldedStyle yaml.Style = yaml.FoldedStyle

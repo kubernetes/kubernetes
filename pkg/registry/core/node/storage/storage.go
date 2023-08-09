@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -95,11 +96,10 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 // NewStorage returns a NodeStorage object that will work against nodes.
 func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &api.Node{} },
-		NewListFunc:               func() runtime.Object { return &api.NodeList{} },
-		PredicateFunc:             node.MatchNode,
-		DefaultQualifiedResource:  api.Resource("nodes"),
-		SingularQualifiedResource: api.Resource("node"),
+		NewFunc:                  func() runtime.Object { return &api.Node{} },
+		NewListFunc:              func() runtime.Object { return &api.NodeList{} },
+		PredicateFunc:            node.MatchNode,
+		DefaultQualifiedResource: api.Resource("nodes"),
 
 		CreateStrategy:      node.Strategy,
 		UpdateStrategy:      node.Strategy,
@@ -111,6 +111,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
 		AttrFunc:    node.GetAttrs,
+		TriggerFunc: map[string]storage.IndexerFunc{"metadata.name": node.NameTriggerFunc},
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err

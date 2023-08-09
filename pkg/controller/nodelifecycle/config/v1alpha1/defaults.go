@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	"k8s.io/utils/pointer"
 )
 
 // RecommendedDefaultNodeLifecycleControllerConfiguration defaults a pointer to a
@@ -42,5 +43,8 @@ func RecommendedDefaultNodeLifecycleControllerConfiguration(obj *kubectrlmgrconf
 	}
 	if obj.NodeStartupGracePeriod == zero {
 		obj.NodeStartupGracePeriod = metav1.Duration{Duration: 60 * time.Second}
+	}
+	if obj.EnableTaintManager == nil {
+		obj.EnableTaintManager = pointer.Bool(true)
 	}
 }

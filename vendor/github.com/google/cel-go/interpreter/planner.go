@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/cel-go/common/containers"
 	"github.com/google/cel-go/common/operators"
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
 
@@ -188,7 +189,16 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Determine the field type if this is a proto message type.
+	var fieldType *ref.FieldType
 	opType := p.typeMap[sel.GetOperand().GetId()]
+	if opType.GetMessageType() != "" {
+		ft, found := p.provider.FindFieldType(opType.GetMessageType(), sel.GetField())
+		if found && ft.IsSet != nil && ft.GetFrom != nil {
+			fieldType = ft
+		}
+	}
 
 	// If the Select was marked TestOnly, this is a presence test.
 	//
@@ -201,31 +211,37 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 	// If a string named 'a.b.c' is declared in the environment and referenced within `has(a.b.c)`,
 	// it is not clear whether has should error or follow the convention defined for structured
 	// values.
-
-	// Establish the attribute reference.
-	attr, isAttr := op.(InterpretableAttribute)
-	if !isAttr {
-		attr, err = p.relativeAttr(op.ID(), op, false)
-		if err != nil {
-			return nil, err
-		}
+	if sel.TestOnly {
+		// Return the test only eval expression.
+		return &evalTestOnly{
+			id:        expr.GetId(),
+			field:     types.String(sel.GetField()),
+			fieldType: fieldType,
+			op:        op,
+		}, nil
 	}
-
-	// Build a qualifier for the attribute.
-	qual, err := p.attrFactory.NewQualifier(opType, expr.GetId(), sel.GetField(), false)
+	// Build a qualifier.
+	qual, err := p.attrFactory.NewQualifier(
+		opType, expr.GetId(), sel.GetField())
 	if err != nil {
 		return nil, err
 	}
-	// Modify the attribute to be test-only.
-	if sel.GetTestOnly() {
-		attr = &evalTestOnly{
-			id:                     expr.GetId(),
-			InterpretableAttribute: attr,
-		}
+	// Lastly, create a field selection Interpretable.
+	attr, isAttr := op.(InterpretableAttribute)
+	if isAttr {
+		_, err = attr.AddQualifier(qual)
+		return attr, err
 	}
-	// Append the qualifier on the attribute.
-	_, err = attr.AddQualifier(qual)
-	return attr, err
+
+	relAttr, err := p.relativeAttr(op.ID(), op)
+	if err != nil {
+		return nil, err
+	}
+	_, err = relAttr.AddQualifier(qual)
+	if err != nil {
+		return nil, err
+	}
+	return relAttr, nil
 }
 
 // planCall creates a callable Interpretable while specializing for common functions and invocation
@@ -270,9 +286,7 @@ func (p *planner) planCall(expr *exprpb.Expr) (Interpretable, error) {
 	case operators.NotEquals:
 		return p.planCallNotEqual(expr, args)
 	case operators.Index:
-		return p.planCallIndex(expr, args, false)
-	case operators.OptSelect, operators.OptIndex:
-		return p.planCallIndex(expr, args, true)
+		return p.planCallIndex(expr, args)
 	}
 
 	// Otherwise, generate Interpretable calls specialized by argument count.
@@ -409,7 +423,8 @@ func (p *planner) planCallVarArgs(expr *exprpb.Expr,
 }
 
 // planCallEqual generates an equals (==) Interpretable.
-func (p *planner) planCallEqual(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallEqual(expr *exprpb.Expr,
+	args []Interpretable) (Interpretable, error) {
 	return &evalEq{
 		id:  expr.GetId(),
 		lhs: args[0],
@@ -418,7 +433,8 @@ func (p *planner) planCallEqual(expr *exprpb.Expr, args []Interpretable) (Interp
 }
 
 // planCallNotEqual generates a not equals (!=) Interpretable.
-func (p *planner) planCallNotEqual(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallNotEqual(expr *exprpb.Expr,
+	args []Interpretable) (Interpretable, error) {
 	return &evalNe{
 		id:  expr.GetId(),
 		lhs: args[0],
@@ -427,7 +443,8 @@ func (p *planner) planCallNotEqual(expr *exprpb.Expr, args []Interpretable) (Int
 }
 
 // planCallLogicalAnd generates a logical and (&&) Interpretable.
-func (p *planner) planCallLogicalAnd(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallLogicalAnd(expr *exprpb.Expr,
+	args []Interpretable) (Interpretable, error) {
 	return &evalAnd{
 		id:  expr.GetId(),
 		lhs: args[0],
@@ -436,7 +453,8 @@ func (p *planner) planCallLogicalAnd(expr *exprpb.Expr, args []Interpretable) (I
 }
 
 // planCallLogicalOr generates a logical or (||) Interpretable.
-func (p *planner) planCallLogicalOr(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallLogicalOr(expr *exprpb.Expr,
+	args []Interpretable) (Interpretable, error) {
 	return &evalOr{
 		id:  expr.GetId(),
 		lhs: args[0],
@@ -445,8 +463,10 @@ func (p *planner) planCallLogicalOr(expr *exprpb.Expr, args []Interpretable) (In
 }
 
 // planCallConditional generates a conditional / ternary (c ? t : f) Interpretable.
-func (p *planner) planCallConditional(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallConditional(expr *exprpb.Expr,
+	args []Interpretable) (Interpretable, error) {
 	cond := args[0]
+
 	t := args[1]
 	var tAttr Attribute
 	truthyAttr, isTruthyAttr := t.(InterpretableAttribute)
@@ -473,54 +493,48 @@ func (p *planner) planCallConditional(expr *exprpb.Expr, args []Interpretable) (
 
 // planCallIndex either extends an attribute with the argument to the index operation, or creates
 // a relative attribute based on the return of a function call or operation.
-func (p *planner) planCallIndex(expr *exprpb.Expr, args []Interpretable, optional bool) (Interpretable, error) {
+func (p *planner) planCallIndex(expr *exprpb.Expr,
+	args []Interpretable) (Interpretable, error) {
 	op := args[0]
 	ind := args[1]
-	opType := p.typeMap[expr.GetCallExpr().GetTarget().GetId()]
-
-	// Establish the attribute reference.
-	var err error
-	attr, isAttr := op.(InterpretableAttribute)
-	if !isAttr {
-		attr, err = p.relativeAttr(op.ID(), op, false)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Construct the qualifier type.
-	var qual Qualifier
-	switch ind := ind.(type) {
-	case InterpretableConst:
-		qual, err = p.attrFactory.NewQualifier(opType, expr.GetId(), ind.Value(), optional)
-	case InterpretableAttribute:
-		qual, err = p.attrFactory.NewQualifier(opType, expr.GetId(), ind, optional)
-	default:
-		qual, err = p.relativeAttr(expr.GetId(), ind, optional)
-	}
+	opAttr, err := p.relativeAttr(op.ID(), op)
 	if err != nil {
 		return nil, err
 	}
-
-	// Add the qualifier to the attribute
-	_, err = attr.AddQualifier(qual)
-	return attr, err
+	opType := p.typeMap[expr.GetCallExpr().GetTarget().GetId()]
+	indConst, isIndConst := ind.(InterpretableConst)
+	if isIndConst {
+		qual, err := p.attrFactory.NewQualifier(
+			opType, expr.GetId(), indConst.Value())
+		if err != nil {
+			return nil, err
+		}
+		_, err = opAttr.AddQualifier(qual)
+		return opAttr, err
+	}
+	indAttr, isIndAttr := ind.(InterpretableAttribute)
+	if isIndAttr {
+		qual, err := p.attrFactory.NewQualifier(
+			opType, expr.GetId(), indAttr)
+		if err != nil {
+			return nil, err
+		}
+		_, err = opAttr.AddQualifier(qual)
+		return opAttr, err
+	}
+	indQual, err := p.relativeAttr(expr.GetId(), ind)
+	if err != nil {
+		return nil, err
+	}
+	_, err = opAttr.AddQualifier(indQual)
+	return opAttr, err
 }
 
 // planCreateList generates a list construction Interpretable.
 func (p *planner) planCreateList(expr *exprpb.Expr) (Interpretable, error) {
 	list := expr.GetListExpr()
-	optionalIndices := list.GetOptionalIndices()
-	elements := list.GetElements()
-	optionals := make([]bool, len(elements))
-	for _, index := range optionalIndices {
-		if index < 0 || index >= int32(len(elements)) {
-			return nil, fmt.Errorf("optional index %d out of element bounds [0, %d]", index, len(elements))
-		}
-		optionals[index] = true
-	}
-	elems := make([]Interpretable, len(elements))
-	for i, elem := range elements {
+	elems := make([]Interpretable, len(list.GetElements()))
+	for i, elem := range list.GetElements() {
 		elemVal, err := p.Plan(elem)
 		if err != nil {
 			return nil, err
@@ -528,11 +542,9 @@ func (p *planner) planCreateList(expr *exprpb.Expr) (Interpretable, error) {
 		elems[i] = elemVal
 	}
 	return &evalList{
-		id:           expr.GetId(),
-		elems:        elems,
-		optionals:    optionals,
-		hasOptionals: len(optionals) != 0,
-		adapter:      p.adapter,
+		id:      expr.GetId(),
+		elems:   elems,
+		adapter: p.adapter,
 	}, nil
 }
 
@@ -543,7 +555,6 @@ func (p *planner) planCreateStruct(expr *exprpb.Expr) (Interpretable, error) {
 		return p.planCreateObj(expr)
 	}
 	entries := str.GetEntries()
-	optionals := make([]bool, len(entries))
 	keys := make([]Interpretable, len(entries))
 	vals := make([]Interpretable, len(entries))
 	for i, entry := range entries {
@@ -558,27 +569,23 @@ func (p *planner) planCreateStruct(expr *exprpb.Expr) (Interpretable, error) {
 			return nil, err
 		}
 		vals[i] = valVal
-		optionals[i] = entry.GetOptionalEntry()
 	}
 	return &evalMap{
-		id:           expr.GetId(),
-		keys:         keys,
-		vals:         vals,
-		optionals:    optionals,
-		hasOptionals: len(optionals) != 0,
-		adapter:      p.adapter,
+		id:      expr.GetId(),
+		keys:    keys,
+		vals:    vals,
+		adapter: p.adapter,
 	}, nil
 }
 
 // planCreateObj generates an object construction Interpretable.
 func (p *planner) planCreateObj(expr *exprpb.Expr) (Interpretable, error) {
 	obj := expr.GetStructExpr()
-	typeName, defined := p.resolveTypeName(obj.GetMessageName())
+	typeName, defined := p.resolveTypeName(obj.MessageName)
 	if !defined {
-		return nil, fmt.Errorf("unknown type: %s", obj.GetMessageName())
+		return nil, fmt.Errorf("unknown type: %s", typeName)
 	}
 	entries := obj.GetEntries()
-	optionals := make([]bool, len(entries))
 	fields := make([]string, len(entries))
 	vals := make([]Interpretable, len(entries))
 	for i, entry := range entries {
@@ -588,16 +595,13 @@ func (p *planner) planCreateObj(expr *exprpb.Expr) (Interpretable, error) {
 			return nil, err
 		}
 		vals[i] = val
-		optionals[i] = entry.GetOptionalEntry()
 	}
 	return &evalObj{
-		id:           expr.GetId(),
-		typeName:     typeName,
-		fields:       fields,
-		vals:         vals,
-		optionals:    optionals,
-		hasOptionals: len(optionals) != 0,
-		provider:     p.provider,
+		id:       expr.GetId(),
+		typeName: typeName,
+		fields:   fields,
+		vals:     vals,
+		provider: p.provider,
 	}, nil
 }
 
@@ -749,18 +753,14 @@ func (p *planner) resolveFunction(expr *exprpb.Expr) (*exprpb.Expr, string, stri
 	return target, fnName, ""
 }
 
-// relativeAttr indicates that the attribute in this case acts as a qualifier and as such needs to
-// be observed to ensure that it's evaluation value is properly recorded for state tracking.
-func (p *planner) relativeAttr(id int64, eval Interpretable, opt bool) (InterpretableAttribute, error) {
+func (p *planner) relativeAttr(id int64, eval Interpretable) (InterpretableAttribute, error) {
 	eAttr, ok := eval.(InterpretableAttribute)
 	if !ok {
 		eAttr = &evalAttr{
-			adapter:  p.adapter,
-			attr:     p.attrFactory.RelativeAttribute(id, eval),
-			optional: opt,
+			adapter: p.adapter,
+			attr:    p.attrFactory.RelativeAttribute(id, eval),
 		}
 	}
-	// This looks like it should either decorate the new evalAttr node, or early return the InterpretableAttribute
 	decAttr, err := p.decorate(eAttr, nil)
 	if err != nil {
 		return nil, err

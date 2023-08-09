@@ -158,11 +158,10 @@ func (e *Signer) Run(ctx context.Context) {
 		return
 	}
 
-	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Starting workers")
+	klog.V(5).Infof("Starting workers")
 	go wait.UntilWithContext(ctx, e.serviceConfigMapQueue, 0)
 	<-ctx.Done()
-	logger.V(1).Info("Shutting down")
+	klog.V(1).Infof("Shutting down")
 }
 
 func (e *Signer) pokeConfigMapSync() {
@@ -192,12 +191,10 @@ func (e *Signer) signConfigMap(ctx context.Context) {
 
 	newCM := origCM.DeepCopy()
 
-	logger := klog.FromContext(ctx)
-
 	// First capture the config we are signing
 	content, ok := newCM.Data[bootstrapapi.KubeConfigKey]
 	if !ok {
-		logger.V(3).Info("No key in ConfigMap", "key", bootstrapapi.KubeConfigKey, "configMap", klog.KObj(origCM))
+		klog.V(3).Infof("No %s key in %s/%s ConfigMap", bootstrapapi.KubeConfigKey, origCM.Namespace, origCM.Name)
 		return
 	}
 
@@ -212,7 +209,7 @@ func (e *Signer) signConfigMap(ctx context.Context) {
 	}
 
 	// Now recompute signatures and store them on the new map
-	tokens := e.getTokens(ctx)
+	tokens := e.getTokens()
 	for tokenID, tokenValue := range tokens {
 		sig, err := jws.ComputeDetachedSignature(content, tokenID, tokenValue)
 		if err != nil {
@@ -243,7 +240,7 @@ func (e *Signer) signConfigMap(ctx context.Context) {
 func (e *Signer) updateConfigMap(ctx context.Context, cm *v1.ConfigMap) {
 	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(ctx, cm, metav1.UpdateOptions{})
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
-		klog.FromContext(ctx).V(3).Info("Error updating ConfigMap", "err", err)
+		klog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}
 }
 
@@ -281,11 +278,11 @@ func (e *Signer) listSecrets() []*v1.Secret {
 
 // getTokens returns a map of tokenID->tokenSecret. It ensures the token is
 // valid for signing.
-func (e *Signer) getTokens(ctx context.Context) map[string]string {
+func (e *Signer) getTokens() map[string]string {
 	ret := map[string]string{}
 	secretObjs := e.listSecrets()
 	for _, secret := range secretObjs {
-		tokenID, tokenSecret, ok := validateSecretForSigning(ctx, secret)
+		tokenID, tokenSecret, ok := validateSecretForSigning(secret)
 		if !ok {
 			continue
 		}
@@ -294,7 +291,7 @@ func (e *Signer) getTokens(ctx context.Context) map[string]string {
 		if _, ok := ret[tokenID]; ok {
 			// This should never happen as we ensure a consistent secret name.
 			// But leave this in here just in case.
-			klog.FromContext(ctx).V(1).Info("Duplicate bootstrap tokens found for id, ignoring on the duplicate secret", "tokenID", tokenID, "ignoredSecret", klog.KObj(secret))
+			klog.V(1).Infof("Duplicate bootstrap tokens found for id %s, ignoring on in %s/%s", tokenID, secret.Namespace, secret.Name)
 			continue
 		}
 

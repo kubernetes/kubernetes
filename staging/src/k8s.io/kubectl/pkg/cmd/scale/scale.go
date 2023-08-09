@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
@@ -58,7 +57,7 @@ var (
 		kubectl scale --current-replicas=2 --replicas=3 deployment/mysql
 
 		# Scale multiple replication controllers
-		kubectl scale --replicas=5 rc/example1 rc/example2 rc/example3
+		kubectl scale --replicas=5 rc/foo rc/bar rc/baz
 
 		# Scale stateful set named 'web' to 3
 		kubectl scale --replicas=3 statefulset/web`))
@@ -89,10 +88,10 @@ type ScaleOptions struct {
 	parent                       string
 	dryRunStrategy               cmdutil.DryRunStrategy
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
-func NewScaleOptions(ioStreams genericiooptions.IOStreams) *ScaleOptions {
+func NewScaleOptions(ioStreams genericclioptions.IOStreams) *ScaleOptions {
 	return &ScaleOptions{
 		PrintFlags:      genericclioptions.NewPrintFlags("scaled"),
 		RecordFlags:     genericclioptions.NewRecordFlags(),
@@ -103,7 +102,7 @@ func NewScaleOptions(ioStreams genericiooptions.IOStreams) *ScaleOptions {
 }
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
-func NewCmdScale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewScaleOptions(ioStreams)
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}

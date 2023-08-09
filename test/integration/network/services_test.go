@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestServicesFinalizersRepairLoop tests that Services participate in the object
@@ -42,11 +41,7 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 	clusterIP := "10.0.0.20"
 	interval := 5 * time.Second
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = serviceCIDR
 		},
@@ -58,7 +53,7 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 
 	// verify client is working
 	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-		_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
+		_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
@@ -87,20 +82,20 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 	}
 
 	// Create service
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, &svcNodePort, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), &svcNodePort, metav1.CreateOptions{}); err != nil {
 		t.Errorf("unexpected error creating service: %v", err)
 	}
 	t.Logf("Created service: %s", svcNodePort.Name)
 
 	// Check the service has been created correctly
-	svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, svcNodePort.Name, metav1.GetOptions{})
+	svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svcNodePort.Name, metav1.GetOptions{})
 	if err != nil || svc.Spec.ClusterIP != clusterIP {
 		t.Errorf("created service is not correct: %v", err)
 	}
 	t.Logf("Service created successfully: %v", svc)
 
 	// Delete service
-	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(ctx, svcNodePort.Name, metav1.DeleteOptions{}); err != nil {
+	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.TODO(), svcNodePort.Name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unexpected error deleting service: %v", err)
 	}
 	t.Logf("Deleted service: %s", svcNodePort.Name)
@@ -109,77 +104,27 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 	time.Sleep(interval + 1)
 
 	// Check that the service was not deleted and the IP is already allocated
-	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, svcNodePort.Name, metav1.GetOptions{})
+	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svcNodePort.Name, metav1.GetOptions{})
 	if err != nil || svc.Spec.ClusterIP != clusterIP {
 		t.Errorf("created service is not correct: %v", err)
 	}
 	t.Logf("Service after Delete: %v", svc)
 
 	// Remove the finalizer
-	if _, err = client.CoreV1().Services(metav1.NamespaceDefault).Patch(ctx, svcNodePort.Name, types.JSONPatchType, []byte(`[{"op":"remove","path":"/metadata/finalizers"}]`), metav1.PatchOptions{}); err != nil {
+	if _, err = client.CoreV1().Services(metav1.NamespaceDefault).Patch(context.TODO(), svcNodePort.Name, types.JSONPatchType, []byte(`[{"op":"remove","path":"/metadata/finalizers"}]`), metav1.PatchOptions{}); err != nil {
 		t.Errorf("unexpected error removing finalizer: %v", err)
 	}
 	t.Logf("Removed service finalizer: %s", svcNodePort.Name)
 
 	// Check that the service was deleted
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, svcNodePort.Name, metav1.GetOptions{})
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svcNodePort.Name, metav1.GetOptions{})
 	if err == nil {
 		t.Errorf("service was not delete: %v", err)
 	}
 
 	// Try to create service again
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, &svcNodePort, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), &svcNodePort, metav1.CreateOptions{}); err != nil {
 		t.Errorf("unexpected error creating service: %v", err)
 	}
 	t.Logf("Created service: %s", svcNodePort.Name)
-}
-
-// Regresion test for https://issues.k8s.io/115316
-func TestServiceCIDR28bits(t *testing.T) {
-	serviceCIDR := "10.0.0.0/28"
-
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
-		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.ServiceClusterIPRanges = serviceCIDR
-		},
-	})
-	defer tearDownFn()
-
-	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	}); err != nil {
-		t.Fatalf("creating kubernetes service timed out")
-	}
-
-	ns := framework.CreateNamespaceOrDie(client, "test-regression", t)
-	defer framework.DeleteNamespaceOrDie(client, ns, t)
-
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-1234",
-		},
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeClusterIP,
-			Ports: []v1.ServicePort{{
-				Port: int32(80),
-			}},
-			Selector: map[string]string{
-				"foo": "bar",
-			},
-		},
-	}
-
-	_, err := client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error creating test service: %v", err)
-	}
 }

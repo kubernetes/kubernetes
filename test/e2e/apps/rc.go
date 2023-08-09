@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -44,14 +45,11 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
-	"k8s.io/utils/pointer"
 )
 
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	var ns string
 	var dc dynamic.Interface
@@ -166,9 +164,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			if !eventFound {
-				framework.Failf("failed to find RC %v event", watch.Added)
-			}
+			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
 
 			ginkgo.By("waiting for available Replicas")
 			eventFound = false
@@ -191,9 +187,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait for condition with watch events should not return an error")
-			if !eventFound {
-				framework.Failf("RC has not reached ReadyReplicas count of %v", testRcInitialReplicaCount)
-			}
+			framework.ExpectEqual(eventFound, true, "RC has not reached ReadyReplicas count of %v", testRcInitialReplicaCount)
 
 			rcLabelPatchPayload, err := json.Marshal(v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
@@ -219,9 +213,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			if !eventFound {
-				framework.Failf("failed to find RC %v event", watch.Added)
-			}
+			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
 
 			rcStatusPatchPayload, err := json.Marshal(map[string]interface{}{
 				"status": map[string]interface{}{
@@ -249,10 +241,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-
-			if !eventFound {
-				framework.Failf("failed to find RC %v event", watch.Added)
-			}
+			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
 
 			ginkgo.By("waiting for available Replicas")
 			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
@@ -271,9 +260,8 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Failed to find updated ready replica count")
-			if !eventFound {
-				framework.Fail("Failed to find updated ready replica count")
-			}
+			framework.ExpectEqual(eventFound, true, "Failed to find updated ready replica count")
+
 			ginkgo.By("fetching ReplicationController status")
 			rcStatusUnstructured, err := dc.Resource(rcResource).Namespace(testRcNamespace).Get(ctx, testRcName, metav1.GetOptions{}, "status")
 			framework.ExpectNoError(err, "Failed to fetch ReplicationControllerStatus")
@@ -307,9 +295,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			if !eventFound {
-				framework.Failf("Failed to find RC %v event", watch.Added)
-			}
+			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
 
 			ginkgo.By("waiting for ReplicationController's scale to be the max amount")
 			eventFound = false
@@ -330,9 +316,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			if !eventFound {
-				framework.Fail("Failed to find updated ready replica count")
-			}
+			framework.ExpectEqual(eventFound, true, "Failed to find updated ready replica count")
 
 			// Get the ReplicationController
 			ginkgo.By("fetching ReplicationController; ensuring that it's patched")
@@ -362,15 +346,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-
-			if !eventFound {
-				framework.Failf("failed to find RC %v event", watch.Added)
-			}
+			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
 
 			ginkgo.By("listing all ReplicationControllers")
 			rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(ctx, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 			framework.ExpectNoError(err, "failed to list ReplicationController")
-			gomega.Expect(rcs.Items).ToNot(gomega.BeEmpty(), "Expected to find a ReplicationController but none was found")
+			framework.ExpectEqual(len(rcs.Items) > 0, true)
 
 			ginkgo.By("checking that ReplicationController has expected values")
 			foundRc := false
@@ -382,9 +363,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 					foundRc = true
 				}
 			}
-			if !foundRc {
-				framework.Failf("ReplicationController doesn't have expected values.\nValues that are in the ReplicationController list:\n%s", format.Object(rcs.Items, 1))
-			}
+			framework.ExpectEqual(foundRc, true)
 
 			// Delete ReplicationController
 			ginkgo.By("deleting ReplicationControllers by collection")
@@ -404,9 +383,8 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			if !eventFound {
-				framework.Failf("failed to find RC %v event", watch.Added)
-			}
+			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
+
 			return actualWatchEvents
 		}, func() (err error) {
 			_ = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
@@ -459,7 +437,7 @@ func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageNa
 			Name: rsName,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(replicas),
+			Replicas: func(i int32) *int32 { return &i }(replicas),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: rcPodLabels,
@@ -501,7 +479,7 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 	pods, err := e2epod.PodsCreated(ctx, f.ClientSet, f.Namespace.Name, name, replicas)
 	framework.ExpectNoError(err)
 
-	// Wait for the pods to enter the running state and are Ready. Waiting loops until the pods
+	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
 	framework.Logf("Ensuring all pods for ReplicationController %q are running", name)
 	running := int32(0)
@@ -509,26 +487,32 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout)
+		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 		if err != nil {
 			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 			if getErr == nil {
-				err = fmt.Errorf("pod %q never run (phase: %s, conditions: %+v): %w", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
+				err = fmt.Errorf("pod %q never run (phase: %s, conditions: %+v): %v", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
 			} else {
-				err = fmt.Errorf("pod %q never run: %w", pod.Name, err)
+				err = fmt.Errorf("pod %q never run: %v", pod.Name, err)
 			}
 		}
 		framework.ExpectNoError(err)
-		framework.Logf("Pod %q is running and ready(conditions: %+v)", pod.Name, pod.Status.Conditions)
+		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
 
 	// Sanity check
-	framework.ExpectEqual(running, replicas, "unexpected number of running and ready pods: %+v", pods.Items)
+	framework.ExpectEqual(running, replicas, "unexpected number of running pods: %+v", pods.Items)
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
-	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, true, 2*time.Minute, pods))
+	retryTimeout := 2 * time.Minute
+	retryInterval := 5 * time.Second
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+	err = wait.PollWithContext(ctx, retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
+	if err != nil {
+		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
+	}
 }
 
 // 1. Create a quota restricting pods in the current namespace to 2.

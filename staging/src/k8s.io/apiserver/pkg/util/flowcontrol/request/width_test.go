@@ -23,15 +23,12 @@ import (
 	"time"
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestWorkEstimator(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
-
 	defaultCfg := DefaultWorkEstimatorConfig()
+	minimumSeats := defaultCfg.MinimumSeats
+	maximumSeats := defaultCfg.MaximumSeats
 
 	tests := []struct {
 		name                      string
@@ -40,7 +37,6 @@ func TestWorkEstimator(t *testing.T) {
 		counts                    map[string]int64
 		countErr                  error
 		watchCount                int
-		maxSeats                  uint64
 		initialSeatsExpected      uint64
 		finalSeatsExpected        uint64
 		additionalLatencyExpected time.Duration
@@ -49,8 +45,7 @@ func TestWorkEstimator(t *testing.T) {
 			name:                 "request has no RequestInfo",
 			requestURI:           "http://server/apis/",
 			requestInfo:          nil,
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is not list",
@@ -58,8 +53,7 @@ func TestWorkEstimator(t *testing.T) {
 			requestInfo: &apirequest.RequestInfo{
 				Verb: "get",
 			},
-			maxSeats:             10,
-			initialSeatsExpected: 1,
+			initialSeatsExpected: minimumSeats,
 		},
 		{
 			name:       "request verb is list, conversion to ListOptions returns error",
@@ -72,8 +66,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, has limit and resource version is 1",
@@ -86,7 +79,6 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			maxSeats:             10,
 			initialSeatsExpected: 8,
 		},
 		{
@@ -100,7 +92,6 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			maxSeats:             10,
 			initialSeatsExpected: 7,
 		},
 		{
@@ -114,7 +105,6 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			maxSeats:             10,
 			initialSeatsExpected: 8,
 		},
 		{
@@ -128,7 +118,6 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 399,
 			},
-			maxSeats:             10,
 			initialSeatsExpected: 8,
 		},
 		{
@@ -140,8 +129,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			countErr:             ObjectCountNotFoundErr,
-			maxSeats:             10,
-			initialSeatsExpected: 1,
+			initialSeatsExpected: minimumSeats,
 		},
 		{
 			name:       "request verb is list, continuation is set",
@@ -154,7 +142,6 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			maxSeats:             10,
 			initialSeatsExpected: 8,
 		},
 		{
@@ -168,7 +155,6 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 399,
 			},
-			maxSeats:             10,
 			initialSeatsExpected: 4,
 		},
 		{
@@ -195,7 +181,6 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			maxSeats:             10,
 			initialSeatsExpected: 8,
 		},
 		{
@@ -209,7 +194,6 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			maxSeats:             10,
 			initialSeatsExpected: 8,
 		},
 		{
@@ -223,22 +207,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 1999,
 			},
-			maxSeats:             10,
-			initialSeatsExpected: 10,
-		},
-		{
-			name:       "request verb is list, maximum is capped, lower max seats",
-			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=foo",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "list",
-				APIGroup: "foo.bar",
-				Resource: "events",
-			},
-			counts: map[string]int64{
-				"events.foo.bar": 1999,
-			},
-			maxSeats:             5,
-			initialSeatsExpected: 5,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, list from cache, count not known",
@@ -249,8 +218,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			countErr:             ObjectCountNotFoundErr,
-			maxSeats:             10,
-			initialSeatsExpected: 1,
+			initialSeatsExpected: minimumSeats,
 		},
 		{
 			name:       "request verb is list, object count is stale",
@@ -264,8 +232,7 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 799,
 			},
 			countErr:             ObjectCountStaleErr,
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, object count is not found",
@@ -276,8 +243,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			countErr:             ObjectCountNotFoundErr,
-			maxSeats:             10,
-			initialSeatsExpected: 1,
+			initialSeatsExpected: minimumSeats,
 		},
 		{
 			name:       "request verb is list, count getter throws unknown error",
@@ -288,8 +254,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			countErr:             errors.New("unknown error"),
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, metadata.name specified",
@@ -303,8 +268,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			maxSeats:             10,
-			initialSeatsExpected: 1,
+			initialSeatsExpected: minimumSeats,
 		},
 		{
 			name:       "request verb is list, metadata.name, resourceVersion and limit specified",
@@ -318,47 +282,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			maxSeats:             10,
-			initialSeatsExpected: 1,
-		},
-		{
-			name:       "request verb is watch, sendInitialEvents is nil",
-			requestURI: "http://server/apis/foo.bar/v1/events?watch=true",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "watch",
-				APIGroup: "foo.bar",
-				Resource: "events",
-			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
 			initialSeatsExpected: minimumSeats,
-		},
-		{
-			name:       "request verb is watch, sendInitialEvents is false",
-			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=false",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "watch",
-				APIGroup: "foo.bar",
-				Resource: "events",
-			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			initialSeatsExpected: minimumSeats,
-		},
-		{
-			name:       "request verb is watch, sendInitialEvents is true",
-			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=true",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "watch",
-				APIGroup: "foo.bar",
-				Resource: "events",
-			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			initialSeatsExpected: 8,
 		},
 		{
 			name:       "request verb is create, no watches",
@@ -368,7 +292,6 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "foos",
 			},
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        0,
 			additionalLatencyExpected: 0,
@@ -382,7 +305,6 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "foos",
 			},
 			watchCount:                29,
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        3,
 			additionalLatencyExpected: 5 * time.Millisecond,
@@ -396,7 +318,6 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "foos",
 			},
 			watchCount:                5,
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        0,
 			additionalLatencyExpected: 0,
@@ -410,7 +331,6 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "foos",
 			},
 			watchCount:                199,
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        10,
 			additionalLatencyExpected: 10 * time.Millisecond,
@@ -423,7 +343,6 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "foos",
 			},
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        0,
 			additionalLatencyExpected: 0,
@@ -437,7 +356,6 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "foos",
 			},
 			watchCount:                29,
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        3,
 			additionalLatencyExpected: 5 * time.Millisecond,
@@ -450,7 +368,6 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "foos",
 			},
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        0,
 			additionalLatencyExpected: 0,
@@ -464,24 +381,9 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "foos",
 			},
 			watchCount:                29,
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        3,
 			additionalLatencyExpected: 5 * time.Millisecond,
-		},
-		{
-			name:       "request verb is patch, watches registered, lower max seats",
-			requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "patch",
-				APIGroup: "foo.bar",
-				Resource: "foos",
-			},
-			watchCount:                100,
-			maxSeats:                  5,
-			initialSeatsExpected:      1,
-			finalSeatsExpected:        5,
-			additionalLatencyExpected: 10 * time.Millisecond,
 		},
 		{
 			name:       "request verb is delete, no watches",
@@ -491,7 +393,6 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "foos",
 			},
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        0,
 			additionalLatencyExpected: 0,
@@ -505,7 +406,6 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "foos",
 			},
 			watchCount:                29,
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        3,
 			additionalLatencyExpected: 5 * time.Millisecond,
@@ -520,8 +420,7 @@ func TestWorkEstimator(t *testing.T) {
 				Subresource: "token",
 			},
 			watchCount:                5777,
-			maxSeats:                  10,
-			initialSeatsExpected:      1,
+			initialSeatsExpected:      minimumSeats,
 			finalSeatsExpected:        0,
 			additionalLatencyExpected: 0,
 		},
@@ -534,9 +433,8 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "serviceaccounts",
 			},
 			watchCount:                1000,
-			maxSeats:                  10,
 			initialSeatsExpected:      1,
-			finalSeatsExpected:        10,
+			finalSeatsExpected:        maximumSeats,
 			additionalLatencyExpected: 50 * time.Millisecond,
 		},
 	}
@@ -553,11 +451,8 @@ func TestWorkEstimator(t *testing.T) {
 			watchCountsFn := func(_ *apirequest.RequestInfo) int {
 				return test.watchCount
 			}
-			maxSeatsFn := func(_ string) uint64 {
-				return test.maxSeats
-			}
 
-			estimator := NewWorkEstimator(countsFn, watchCountsFn, defaultCfg, maxSeatsFn)
+			estimator := NewWorkEstimator(countsFn, watchCountsFn, defaultCfg)
 
 			req, err := http.NewRequest("GET", test.requestURI, nil)
 			if err != nil {

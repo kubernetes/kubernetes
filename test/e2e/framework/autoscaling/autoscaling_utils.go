@@ -29,7 +29,6 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -354,7 +353,10 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric(ctx context.Context) {
 }
 
 func (rc *ResourceConsumer) sendConsumeCPURequest(ctx context.Context, millicores int) {
-	err := wait.PollUntilContextTimeout(ctx, serviceInitializationInterval, serviceInitializationTimeout, true, func(ctx context.Context) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
+	defer cancel()
+
+	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
@@ -372,18 +374,15 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(ctx context.Context, millicore
 		return true, nil
 	})
 
-	// Test has already finished (ctx got canceled), so don't fail on err from PollUntilContextTimeout
-	// which is a side-effect to context cancelling from the cleanup task.
-	if ctx.Err() != nil {
-		return
-	}
-
 	framework.ExpectNoError(err)
 }
 
 // sendConsumeMemRequest sends POST request for memory consumption
 func (rc *ResourceConsumer) sendConsumeMemRequest(ctx context.Context, megabytes int) {
-	err := wait.PollUntilContextTimeout(ctx, serviceInitializationInterval, serviceInitializationTimeout, true, func(ctx context.Context) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
+	defer cancel()
+
+	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
@@ -401,18 +400,15 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(ctx context.Context, megabytes
 		return true, nil
 	})
 
-	// Test has already finished (ctx got canceled), so don't fail on err from PollUntilContextTimeout
-	// which is a side-effect to context cancelling from the cleanup task.
-	if ctx.Err() != nil {
-		return
-	}
-
 	framework.ExpectNoError(err)
 }
 
 // sendConsumeCustomMetric sends POST request for custom metric consumption
 func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta int) {
-	err := wait.PollUntilContextTimeout(ctx, serviceInitializationInterval, serviceInitializationTimeout, true, func(ctx context.Context) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
+	defer cancel()
+
+	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
@@ -430,13 +426,6 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta i
 		}
 		return true, nil
 	})
-
-	// Test has already finished (ctx got canceled), so don't fail on err from PollUntilContextTimeout
-	// which is a side-effect to context cancelling from the cleanup task.
-	if ctx.Err() != nil {
-		return
-	}
-
 	framework.ExpectNoError(err)
 }
 
@@ -976,10 +965,6 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 func ExistsInDiscovery(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient crdclientset.Interface, version string) (bool, error) {
 	groupResource, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
 	if err != nil {
-		// Ignore 404 errors as it means the resources doesn't exist
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
 		return false, err
 	}
 	for _, g := range groupResource.APIResources {
@@ -1016,7 +1001,7 @@ func CreateCustomSubresourceInstance(ctx context.Context, namespace, name string
 	}
 	createdObjectMeta, err := meta.Accessor(instance)
 	if err != nil {
-		return nil, fmt.Errorf("Error while creating object meta: %w", err)
+		return nil, fmt.Errorf("Error while creating object meta: %v", err)
 	}
 	if len(createdObjectMeta.GetUID()) == 0 {
 		return nil, fmt.Errorf("Missing UUID: %v", instance)

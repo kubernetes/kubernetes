@@ -1,4 +1,3 @@
-//go:build !windows && !plan9 && !solaris && !aix
 // +build !windows,!plan9,!solaris,!aix
 
 package bbolt

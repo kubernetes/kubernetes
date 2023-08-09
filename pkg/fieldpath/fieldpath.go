@@ -18,36 +18,26 @@ package fieldpath
 
 import (
 	"fmt"
-	"sort"
-	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // FormatMap formats map[string]string to a string.
 func FormatMap(m map[string]string) (fmtStr string) {
 	// output with keys in sorted order to provide stable output
-	keys := make([]string, 0, len(m))
-	var grow int
-	for k, v := range m {
-		keys = append(keys, k)
-		// why add 4: (for =, \n, " and ")
-		grow += len(k) + len(v) + 4
+	keys := sets.NewString()
+	for key := range m {
+		keys.Insert(key)
 	}
-	sort.Strings(keys)
-	// allocate space to avoid expansion
-	dst := make([]byte, 0, grow)
-	for _, key := range keys {
-		if len(dst) > 0 {
-			dst = append(dst, '\n')
-		}
-		dst = append(dst, key...)
-		dst = append(dst, '=')
-		dst = strconv.AppendQuote(dst, m[key])
+	for _, key := range keys.List() {
+		fmtStr += fmt.Sprintf("%v=%q\n", key, m[key])
 	}
-	return string(dst)
+	fmtStr = strings.TrimSuffix(fmtStr, "\n")
+
+	return
 }
 
 // ExtractFieldPathAsString extracts the field from the given object

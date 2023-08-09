@@ -18,9 +18,7 @@ package staticpod
 
 import (
 	"bytes"
-	"crypto/md5"
 	"fmt"
-	"hash"
 	"io"
 	"math"
 	"net/url"
@@ -34,7 +32,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -93,7 +90,7 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotati
 func ComponentResources(cpu string) v1.ResourceRequirements {
 	return v1.ResourceRequirements{
 		Requests: v1.ResourceList{
-			v1.ResourceCPU: resource.MustParse(cpu),
+			v1.ResourceName(v1.ResourceCPU): resource.MustParse(cpu),
 		},
 	}
 }
@@ -353,22 +350,16 @@ func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd, isIPv6 bool) (string, int, v1.UR
 
 // ManifestFilesAreEqual compares 2 files. It returns true if their contents are equal, false otherwise
 func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
-	pod1, err := ReadStaticPodFromDisk(path1)
+	content1, err := os.ReadFile(path1)
 	if err != nil {
 		return false, err
 	}
-	pod2, err := ReadStaticPodFromDisk(path2)
+	content2, err := os.ReadFile(path2)
 	if err != nil {
 		return false, err
 	}
 
-	hasher := md5.New()
-	DeepHashObject(hasher, pod1)
-	hash1 := hasher.Sum(nil)[0:]
-	DeepHashObject(hasher, pod2)
-	hash2 := hasher.Sum(nil)[0:]
-
-	return bytes.Equal(hash1, hash2), nil
+	return bytes.Equal(content1, content2), nil
 }
 
 // getProbeAddress returns a valid probe address.
@@ -390,13 +381,4 @@ func GetUsersAndGroups() (*users.UsersAndGroups, error) {
 		usersAndGroups, err = users.AddUsersAndGroups()
 	})
 	return usersAndGroups, err
-}
-
-// DeepHashObject writes specified object to hash using the spew library
-// which follows pointers and prints actual values of the nested objects
-// ensuring the hash does not change when a pointer changes.
-// Copied from k8s.io/kubernetes/pkg/util/hash/hash.go#DeepHashObject
-func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
-	hasher.Reset()
-	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
 }

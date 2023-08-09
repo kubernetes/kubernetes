@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/discovery"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -75,7 +74,7 @@ type APIResourceOptions struct {
 
 	discoveryClient discovery.CachedDiscoveryInterface
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // groupResource contains the APIGroup and APIResource
@@ -86,7 +85,7 @@ type groupResource struct {
 }
 
 // NewAPIResourceOptions creates the options for APIResource
-func NewAPIResourceOptions(ioStreams genericiooptions.IOStreams) *APIResourceOptions {
+func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *APIResourceOptions {
 	return &APIResourceOptions{
 		IOStreams:  ioStreams,
 		Namespaced: true,
@@ -94,7 +93,7 @@ func NewAPIResourceOptions(ioStreams genericiooptions.IOStreams) *APIResourceOpt
 }
 
 // NewCmdAPIResources creates the `api-resources` command
-func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAPIResourceOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -117,7 +116,7 @@ func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioS
 	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort list of resources using specified field. The field can be either 'name' or 'kind'.")
 	cmd.Flags().BoolVar(&o.Cached, "cached", o.Cached, "Use the cached list of resources if available.")
-	cmd.Flags().StringSliceVar(&o.Categories, "categories", o.Categories, "Limit to resources that belong to the specified categories.")
+	cmd.Flags().StringSliceVar(&o.Categories, "categories", o.Categories, "Limit to resources that belong the the specified categories.")
 	return cmd
 }
 

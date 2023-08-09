@@ -348,18 +348,6 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 	// Simulate a connection loss (or even just a too-old-watch)
 	source.ResetWatch()
 
-	// Wait long enough for the reflector to exit and the backoff function to start waiting
-	// on the fake clock, otherwise advancing the fake clock will have no effect.
-	// TODO: Make this deterministic by counting the number of waiters on FakeClock
-	time.Sleep(10 * time.Millisecond)
-
-	// Advance the clock to cause the backoff wait to expire.
-	clock.Step(1601 * time.Millisecond)
-
-	// Wait long enough for backoff to invoke ListWatch a second time and distribute events
-	// to listeners.
-	time.Sleep(10 * time.Millisecond)
-
 	for _, listener := range listeners {
 		if !listener.ok() {
 			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)
@@ -393,33 +381,6 @@ func TestSharedInformerErrorHandling(t *testing.T) {
 	close(stop)
 }
 
-// TestSharedInformerStartRace is a regression test to ensure there is no race between
-// Run and SetWatchErrorHandler, and Run and SetTransform.
-func TestSharedInformerStartRace(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
-	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
-	stop := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-			}
-			// Set dummy functions, just to test for race
-			informer.SetTransform(func(i interface{}) (interface{}, error) {
-				return i, nil
-			})
-			informer.SetWatchErrorHandler(func(r *Reflector, err error) {
-			})
-		}
-	}()
-
-	go informer.Run(stop)
-
-	close(stop)
-}
-
 func TestSharedInformerTransformer(t *testing.T) {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
@@ -433,8 +394,9 @@ func TestSharedInformerTransformer(t *testing.T) {
 			name := pod.GetName()
 
 			if upper := strings.ToUpper(name); upper != name {
-				pod.SetName(upper)
-				return pod, nil
+				copied := pod.DeepCopyObject().(*v1.Pod)
+				copied.SetName(upper)
+				return copied, nil
 			}
 		}
 		return obj, nil

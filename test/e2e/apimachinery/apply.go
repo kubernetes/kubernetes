@@ -46,7 +46,7 @@ import (
 
 var _ = SIGDescribe("ServerSideApply", func() {
 	f := framework.NewDefaultFramework("apply")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	var client clientset.Interface
 	var ns string

@@ -19,9 +19,9 @@ package images
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
+	dockerref "github.com/docker/distribution/reference"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -29,10 +29,8 @@ import (
 	"k8s.io/klog/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	crierrors "k8s.io/cri-api/pkg/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 type ImagePodPullingTimeRecorder interface {
@@ -54,14 +52,14 @@ type imageManager struct {
 var _ ImageManager = &imageManager{}
 
 // NewImageManager instantiates a new ImageManager object.
-func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, maxParallelImagePulls *int32, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder) ImageManager {
+func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder) ImageManager {
 	imageService = throttleImagePulling(imageService, qps, burst)
 
 	var puller imagePuller
 	if serialized {
 		puller = newSerialImagePuller(imageService)
 	} else {
-		puller = newParallelImagePuller(imageService, maxParallelImagePulls)
+		puller = newParallelImagePuller(imageService)
 	}
 	return &imageManager{
 		recorder:               recorder,
@@ -159,63 +157,34 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 	if imagePullResult.err != nil {
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
+		if imagePullResult.err == ErrRegistryUnavailable {
+			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
+			return "", msg, imagePullResult.err
+		}
 
-		msg, err := evalCRIPullErr(container, imagePullResult.err)
-		return "", msg, err
+		return "", imagePullResult.err.Error(), ErrImagePull
 	}
-	m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
-	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting)",
-		container.Image, imagePullResult.pullDuration.Truncate(time.Millisecond), time.Since(startTime).Truncate(time.Millisecond)), klog.Info)
+	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting)", container.Image, imagePullResult.pullDuration, time.Since(startTime)), klog.Info)
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
-}
-
-func evalCRIPullErr(container *v1.Container, err error) (errMsg string, errRes error) {
-	// Error assertions via errors.Is is not supported by gRPC (remote runtime) errors right now.
-	// See https://github.com/grpc/grpc-go/issues/3616
-	if strings.HasPrefix(err.Error(), crierrors.ErrRegistryUnavailable.Error()) {
-		errMsg = fmt.Sprintf(
-			"image pull failed for %s because the registry is unavailable%s",
-			container.Image,
-			// Trim the error name from the message to convert errors like:
-			// "RegistryUnavailable: a more detailed explanation" to:
-			// "...because the registry is unavailable: a more detailed explanation"
-			strings.TrimPrefix(err.Error(), crierrors.ErrRegistryUnavailable.Error()),
-		)
-		return errMsg, crierrors.ErrRegistryUnavailable
-	}
-
-	if strings.HasPrefix(err.Error(), crierrors.ErrSignatureValidationFailed.Error()) {
-		errMsg = fmt.Sprintf(
-			"image pull failed for %s because the signature validation failed%s",
-			container.Image,
-			// Trim the error name from the message to convert errors like:
-			// "SignatureValidationFailed: a more detailed explanation" to:
-			// "...because the signature validation failed: a more detailed explanation"
-			strings.TrimPrefix(err.Error(), crierrors.ErrSignatureValidationFailed.Error()),
-		)
-		return errMsg, crierrors.ErrSignatureValidationFailed
-	}
-
-	// Fallback for no specific error
-	return err.Error(), ErrImagePull
 }
 
 // applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
 // a default tag will be applied.
 func applyDefaultImageTag(image string) (string, error) {
-	_, tag, digest, err := parsers.ParseImageName(image)
+	named, err := dockerref.ParseNormalizedNamed(image)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("couldn't parse image reference %q: %v", image, err)
 	}
-	// we just concatenate the image name with the default tag here instead
-	if len(digest) == 0 && len(tag) > 0 && !strings.HasSuffix(image, ":"+tag) {
+	_, isTagged := named.(dockerref.Tagged)
+	_, isDigested := named.(dockerref.Digested)
+	if !isTagged && !isDigested {
 		// we just concatenate the image name with the default tag here instead
 		// of using dockerref.WithTag(named, ...) because that would cause the
 		// image to be fully qualified as docker.io/$name if it's a short name
 		// (e.g. just busybox). We don't want that to happen to keep the CRI
 		// agnostic wrt image names and default hostnames.
-		image = image + ":" + tag
+		image = image + ":latest"
 	}
 	return image, nil
 }

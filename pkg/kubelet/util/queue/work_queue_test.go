@@ -20,10 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -64,20 +62,4 @@ func TestGetWork(t *testing.T) {
 	expected = []types.UID{types.UID("foo3"), types.UID("foo4")}
 	compareResults(t, expected, q.GetWork())
 	compareResults(t, []types.UID{}, q.GetWork())
-}
-
-func TestNewBasicWorkQueue(t *testing.T) {
-	tests := []struct {
-		clock             clock.Clock
-		expectedWorkQueue WorkQueue
-	}{
-		{
-			clock:             clock.RealClock{},
-			expectedWorkQueue: &basicWorkQueue{queue: make(map[types.UID]time.Time), clock: clock.RealClock{}},
-		},
-	}
-	for _, test := range tests {
-		workQueue := NewBasicWorkQueue(test.clock)
-		assert.Equal(t, test.expectedWorkQueue, workQueue)
-	}
 }

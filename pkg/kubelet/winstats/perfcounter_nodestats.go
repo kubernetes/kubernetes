@@ -157,7 +157,7 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 	}
 
 	return &cadvisorapi.MachineInfo{
-		NumCores:       ProcessorCount(),
+		NumCores:       processorCount(),
 		MemoryCapacity: p.nodeInfo.memoryPhysicalCapacityBytes,
 		MachineID:      hostname,
 		SystemUUID:     systemUUID,
@@ -173,7 +173,7 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 // more notes for this issue:
 // same issue in moby: https://github.com/moby/moby/issues/38935#issuecomment-744638345
 // solution in hcsshim: https://github.com/microsoft/hcsshim/blob/master/internal/processorinfo/processor_count.go
-func ProcessorCount() int {
+func processorCount() int {
 	if amount := getActiveProcessorCount(allProcessorGroups); amount != 0 {
 		return int(amount)
 	}
@@ -202,9 +202,9 @@ func (p *perfCounterNodeStatsClient) getNodeInfo() nodeInfo {
 	return p.nodeInfo
 }
 
-func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter perfCounter, networkAdapterCounter *networkCounter) {
+func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter *perfCounter, networkAdapterCounter *networkCounter) {
 	cpuValue, err := cpuCounter.getData()
-	cpuCores := ProcessorCount()
+	cpuCores := runtime.NumCPU()
 	if err != nil {
 		klog.ErrorS(err, "Unable to get cpu perf counter data")
 		return

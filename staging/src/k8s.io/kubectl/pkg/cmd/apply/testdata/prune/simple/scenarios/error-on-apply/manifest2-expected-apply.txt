@@ -1,2 +1,0 @@
-namespace/foo unchanged
-error: pruning Namespace bar: an error on the server ("") has prevented the request from succeeding

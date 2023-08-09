@@ -30,14 +30,3 @@ func IsFileNotFound(err error) bool {
 
 	return false
 }
-
-func IsAlreadyExists(err error) bool {
-	if f, ok := err.(HasFault); ok {
-		switch f.Fault().(type) {
-		case *AlreadyExists:
-			return true
-		}
-	}
-
-	return false
-}

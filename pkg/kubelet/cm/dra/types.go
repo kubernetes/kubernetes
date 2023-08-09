@@ -24,29 +24,21 @@ import (
 
 // Manager manages all the DRA resource plugins running on a node.
 type Manager interface {
-	// PrepareResources prepares resources for a pod.
-	// It communicates with the DRA resource plugin to prepare resources.
-	PrepareResources(pod *v1.Pod) error
+	// PrepareResources prepares resources for a container in a pod.
+	// It communicates with the DRA resource plugin to prepare resources and
+	// returns resource info to trigger CDI injection by the runtime.
+	PrepareResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error)
 
 	// UnprepareResources calls NodeUnprepareResource GRPC from DRA plugin to unprepare pod resources
 	UnprepareResources(pod *v1.Pod) error
 
-	// GetResources gets a ContainerInfo object from the claimInfo cache.
-	// This information is used by the caller to update a container config.
-	GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error)
-
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
-
-	// GetContainerClaimInfos gets Container ClaimInfo objects
-	GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error)
 }
 
 // ContainerInfo contains information required by the runtime to consume prepared resources.
 type ContainerInfo struct {
 	// The Annotations for the container
 	Annotations []kubecontainer.Annotation
-	// CDI Devices for the container
-	CDIDevices []kubecontainer.CDIDevice
 }

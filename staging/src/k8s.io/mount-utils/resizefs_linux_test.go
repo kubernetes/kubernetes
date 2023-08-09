@@ -28,7 +28,8 @@ import (
 )
 
 func TestGetFileSystemSize(t *testing.T) {
-	cmdOutputSuccessXfs := `
+	cmdOutputSuccessXfs :=
+		`
 	statfs.f_bsize = 4096
 	statfs.f_blocks = 1832448
 	statfs.f_bavail = 1822366
@@ -49,7 +50,8 @@ func TestGetFileSystemSize(t *testing.T) {
 	counts.freeino = 61
 	counts.allocino = 64
 `
-	cmdOutputNoDataXfs := `
+	cmdOutputNoDataXfs :=
+		`
 	statfs.f_bsize = 4096
 	statfs.f_blocks = 1832448
 	statfs.f_bavail = 1822366
@@ -68,7 +70,8 @@ func TestGetFileSystemSize(t *testing.T) {
 	counts.freeino = 61
 	counts.allocino = 64
 `
-	cmdOutputSuccessExt4 := `
+	cmdOutputSuccessExt4 :=
+		`
 Filesystem volume name:   cloudimg-rootfs
 Last mounted on:          /
 Filesystem UUID:          testUUID
@@ -118,7 +121,8 @@ Journal start:            1
 Journal checksum type:    crc32c
 Journal checksum:         0xb7df3c6e
 `
-	cmdOutputNoDataExt4 := `Filesystem volume name:   cloudimg-rootfs
+	cmdOutputNoDataExt4 :=
+		`Filesystem volume name:   cloudimg-rootfs
 Last mounted on:          /
 Filesystem UUID:          testUUID
 Filesystem magic number:  0xEF53
@@ -165,7 +169,8 @@ Journal start:            1
 Journal checksum type:    crc32c
 Journal checksum:         0xb7df3c6e
 `
-	cmdOutputSuccessBtrfs := `superblock: bytenr=65536, device=/dev/loop0
+	cmdOutputSuccessBtrfs :=
+		`superblock: bytenr=65536, device=/dev/loop0
 ---------------------------------------------------------
 csum_type               0 (crc32c)
 csum_size               4
@@ -274,7 +279,8 @@ backup_roots[4]:
                 backup_num_devices:     1
 
 `
-	cmdOutputNoDataBtrfs := `superblock: bytenr=65536, device=/dev/loop0
+	cmdOutputNoDataBtrfs :=
+		`superblock: bytenr=65536, device=/dev/loop0
 ---------------------------------------------------------
 csum_type               0 (crc32c)
 csum_size               4
@@ -453,14 +459,14 @@ backup_roots[4]:
 					func() ([]byte, []byte, error) { return []byte(test.cmdOutput), nil, nil },
 				},
 			}
-			fexec := &fakeexec.FakeExec{
+			fexec := fakeexec.FakeExec{
 				CommandScript: []fakeexec.FakeCommandAction{
 					func(cmd string, args ...string) exec.Cmd {
 						return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
 					},
 				},
 			}
-			resizefs := ResizeFs{exec: fexec}
+			resizefs := ResizeFs{exec: &fexec}
 
 			var blockSize uint64
 			var fsSize uint64
@@ -557,7 +563,7 @@ func TestNeedResize(t *testing.T) {
 					},
 				},
 			}
-			fexec := &fakeexec.FakeExec{
+			fexec := fakeexec.FakeExec{
 				CommandScript: []fakeexec.FakeCommandAction{
 					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -565,7 +571,7 @@ func TestNeedResize(t *testing.T) {
 					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 				},
 			}
-			resizefs := ResizeFs{exec: fexec}
+			resizefs := ResizeFs{exec: &fexec}
 
 			needResize, err := resizefs.NeedResize(test.devicePath, test.deviceMountPath)
 			if !test.expectError && err != nil {

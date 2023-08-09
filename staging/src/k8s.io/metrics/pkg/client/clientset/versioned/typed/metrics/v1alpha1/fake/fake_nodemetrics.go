@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	v1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
@@ -33,9 +34,9 @@ type FakeNodeMetricses struct {
 	Fake *FakeMetricsV1alpha1
 }
 
-var nodemetricsesResource = v1alpha1.SchemeGroupVersion.WithResource("nodes")
+var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics.k8s.io", Version: "v1alpha1", Resource: "nodes"}
 
-var nodemetricsesKind = v1alpha1.SchemeGroupVersion.WithKind("NodeMetrics")
+var nodemetricsesKind = schema.GroupVersionKind{Group: "metrics.k8s.io", Version: "v1alpha1", Kind: "NodeMetrics"}
 
 // Get takes name of the nodeMetrics, and returns the corresponding nodeMetrics object, and an error if there is any.
 func (c *FakeNodeMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NodeMetrics, err error) {

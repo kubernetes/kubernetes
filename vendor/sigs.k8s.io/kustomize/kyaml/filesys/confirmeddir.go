@@ -4,7 +4,7 @@
 package filesys
 
 import (
-	"os"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 )
@@ -17,12 +17,12 @@ type ConfirmedDir string
 // The directory is cleaned, no symlinks, etc. so it's
 // returned as a ConfirmedDir.
 func NewTmpConfirmedDir() (ConfirmedDir, error) {
-	n, err := os.MkdirTemp("", "kustomize-")
+	n, err := ioutil.TempDir("", "kustomize-")
 	if err != nil {
 		return "", err
 	}
 
-	// In MacOs `os.MkdirTemp` creates a directory
+	// In MacOs `ioutil.TempDir` creates a directory
 	// with root in the `/var` folder, which is in turn
 	// a symlinked path to `/private/var`.
 	// Function `filepath.EvalSymlinks`is used to

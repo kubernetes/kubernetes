@@ -27,8 +27,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 // SetupPluginCompletion adds a Cobra command to the command tree for each
@@ -82,7 +81,7 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 // for each plugin so that the completion logic knows about the plugins
 func addPluginCommands(cmd *cobra.Command) {
 	kubectl := cmd.Root()
-	streams := genericiooptions.IOStreams{
+	streams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
 		Out:    io.Discard,
 		ErrOut: io.Discard,

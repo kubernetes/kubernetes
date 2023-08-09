@@ -1,7 +1,7 @@
 // Copyright 2019 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package merge2 contains libraries for merging fields from one RNode to another
+// Package merge contains libraries for merging fields from one RNode to another
 // RNode
 package merge2
 
@@ -20,7 +20,7 @@ func Merge(src, dest *yaml.RNode, mergeOptions yaml.MergeOptions) (*yaml.RNode, 
 	}.Walk()
 }
 
-// MergeStrings parses the arguments, and merges fields from srcStr into destStr.
+// Merge parses the arguments, and merges fields from srcStr into destStr.
 func MergeStrings(srcStr, destStr string, infer bool, mergeOptions yaml.MergeOptions) (string, error) {
 	src, err := yaml.Parse(srcStr)
 	if err != nil {
@@ -62,12 +62,6 @@ func (m Merger) VisitMap(nodes walk.Sources, s *openapi.ResourceSchema) (*yaml.R
 		ps, _ := determineSmpDirective(nodes.Origin())
 		if ps == smpDelete {
 			return walk.ClearNode, nil
-		}
-
-		// If Origin is missing, preserve explicitly set null in Dest ("null", "~", etc)
-		if nodes.Origin().IsNil() && !nodes.Dest().IsNil() && len(nodes.Dest().YNode().Value) > 0 {
-			// Return a new node so that it won't have a "!!null" tag and therefore won't be cleared.
-			return yaml.NewScalarRNode(nodes.Dest().YNode().Value), nil
 		}
 
 		return nodes.Origin(), nil

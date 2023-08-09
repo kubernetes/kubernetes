@@ -30,8 +30,8 @@ import (
 // It returns one of the following:
 // (0, nil) - watchdog isn't enabled or we aren't the watched PID.
 // (0, err) - an error happened (e.g. error converting time).
-// (time, nil) - watchdog is enabled and we can send ping.  time is delay
-// before inactive service will be killed.
+// (time, nil) - watchdog is enabled and we can send ping.
+//   time is delay before inactive service will be killed.
 func SdWatchdogEnabled(unsetEnvironment bool) (time.Duration, error) {
 	wusec := os.Getenv("WATCHDOG_USEC")
 	wpid := os.Getenv("WATCHDOG_PID")

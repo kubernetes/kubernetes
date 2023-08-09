@@ -41,13 +41,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
 			}
 			if s.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-				s.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{}
-			}
-			if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
-				s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = apps.RetainPersistentVolumeClaimRetentionPolicyType
-			}
-			if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
-				s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = apps.RetainPersistentVolumeClaimRetentionPolicyType
+				policies := []apps.PersistentVolumeClaimRetentionPolicyType{
+					apps.RetainPersistentVolumeClaimRetentionPolicyType,
+					apps.DeletePersistentVolumeClaimRetentionPolicyType,
+				}
+				choice := int32(c.Rand.Int31())
+				s.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: policies[choice&1],
+					WhenScaled:  policies[(choice>>1)&1],
+				}
 			}
 			if s.Spec.RevisionHistoryLimit == nil {
 				s.Spec.RevisionHistoryLimit = new(int32)
@@ -94,8 +96,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				rollingUpdate := apps.RollingUpdateDeployment{}
 				if c.RandBool() {
-					rollingUpdate.MaxUnavailable = intstr.FromInt32(c.Rand.Int31())
-					rollingUpdate.MaxSurge = intstr.FromInt32(c.Rand.Int31())
+					rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.Rand.Int31()))
+					rollingUpdate.MaxSurge = intstr.FromInt(int(c.Rand.Int31()))
 				} else {
 					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
 				}
@@ -127,8 +129,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				rollingUpdate := apps.RollingUpdateDaemonSet{}
 				if c.RandBool() {
 					if c.RandBool() {
-						rollingUpdate.MaxUnavailable = intstr.FromInt32(c.Rand.Int31())
-						rollingUpdate.MaxSurge = intstr.FromInt32(c.Rand.Int31())
+						rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.Rand.Int31()))
+						rollingUpdate.MaxSurge = intstr.FromInt(int(c.Rand.Int31()))
 					} else {
 						rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
 					}

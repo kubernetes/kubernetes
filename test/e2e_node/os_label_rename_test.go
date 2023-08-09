@@ -1,5 +1,5 @@
-//go:build linux
-// +build linux
+//go:build cgo && linux
+// +build cgo,linux
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -40,7 +40,7 @@ import (
 
 var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-label-reconciliation")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reconcile the OS and Arch labels when restarted", func(ctx context.Context) {
 			node := getLocalNode(ctx, f)

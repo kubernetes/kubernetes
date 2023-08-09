@@ -24,18 +24,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
@@ -49,12 +42,12 @@ discovery:
 controlPlane:
   certificateKey: c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd
 nodeRegistration:
-  criSocket: %s
+  criSocket: /run/containerd/containerd.sock
   name: someName
   ignorePreflightErrors:
     - c
     - d
-`, kubeadmapiv1.SchemeGroupVersion.String(), expectedCRISocket)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 func TestNewJoinData(t *testing.T) {
 	// create temp directory
@@ -111,7 +104,7 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that file discovery settings are set into join data
 				if data.cfg.Discovery.File == nil || data.cfg.Discovery.File.KubeConfigPath != "https://foo" {
-					t.Error("Invalid data.cfg.Discovery.File")
+					t.Errorf("Invalid data.cfg.Discovery.File")
 				}
 			},
 		},
@@ -128,7 +121,7 @@ func TestNewJoinData(t *testing.T) {
 					data.cfg.Discovery.BootstrapToken.APIServerEndpoint != "1.2.3.4:6443" || //only first arg should be kept as APIServerEndpoint
 					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken.UnsafeSkipCAVerification != true {
-					t.Error("Invalid data.cfg.Discovery.BootstrapToken")
+					t.Errorf("Invalid data.cfg.Discovery.BootstrapToken")
 				}
 			},
 		},
@@ -144,7 +137,7 @@ func TestNewJoinData(t *testing.T) {
 				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken == nil ||
 					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" {
-					t.Error("Invalid TLSBootstrapToken or BootstrapToken.Token")
+					t.Errorf("Invalid TLSBootstrapToken or BootstrapToken.Token")
 				}
 			},
 		},
@@ -162,7 +155,7 @@ func TestNewJoinData(t *testing.T) {
 				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken == nil ||
 					data.cfg.Discovery.BootstrapToken.Token != "defghi.0123456789defghi" {
-					t.Error("Invalid TLSBootstrapToken or BootstrapToken.Token")
+					t.Errorf("Invalid TLSBootstrapToken or BootstrapToken.Token")
 				}
 			},
 		},
@@ -179,7 +172,7 @@ func TestNewJoinData(t *testing.T) {
 				if data.cfg.ControlPlane == nil ||
 					data.cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" ||
 					data.cfg.ControlPlane.LocalAPIEndpoint.BindPort != 1234 {
-					t.Error("Invalid ControlPlane")
+					t.Errorf("Invalid ControlPlane")
 				}
 			},
 		},
@@ -194,7 +187,7 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that control plane attributes are unset in join data
 				if data.cfg.ControlPlane != nil {
-					t.Error("Invalid ControlPlane")
+					t.Errorf("Invalid ControlPlane")
 				}
 			},
 			expectWarn: true,
@@ -213,40 +206,9 @@ func TestNewJoinData(t *testing.T) {
 			flags: map[string]string{
 				options.CfgPath: configFilePath,
 			},
-			validate: func(t *testing.T, data *joinData) {
-				validData := &joinData{
-					cfg: &kubeadmapi.JoinConfiguration{
-						TypeMeta: metav1.TypeMeta{Kind: "", APIVersion: ""},
-						NodeRegistration: kubeadmapi.NodeRegistrationOptions{
-							Name:                  "somename",
-							CRISocket:             expectedCRISocket,
-							IgnorePreflightErrors: []string{"c", "d"},
-							ImagePullPolicy:       "IfNotPresent",
-							Taints:                []v1.Taint{{Key: "node-role.kubernetes.io/control-plane", Effect: "NoSchedule"}},
-						},
-						CACertPath: kubeadmapiv1.DefaultCACertPath,
-						Discovery: kubeadmapi.Discovery{
-							BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-								Token:                    "abcdef.0123456789abcdef",
-								APIServerEndpoint:        "1.2.3.4:6443",
-								UnsafeSkipCAVerification: true,
-							},
-							TLSBootstrapToken: "abcdef.0123456789abcdef",
-							Timeout:           &metav1.Duration{Duration: kubeadmapiv1.DefaultDiscoveryTimeout},
-						},
-						ControlPlane: &kubeadmapi.JoinControlPlane{
-							CertificateKey: "c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd",
-						},
-					},
-					ignorePreflightErrors: sets.New("c", "d"),
-				}
-				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(joinData{}), cmpopts.IgnoreFields(joinData{}, "client", "initCfg", "cfg.ControlPlane.LocalAPIEndpoint")); diff != "" {
-					t.Fatalf("newJoinData returned data (-want,+got):\n%s", diff)
-				}
-			},
 		},
 		{
-			name: "--node-name flags override config from file",
+			name: "--cri-socket and --node-name flags override config from file",
 			flags: map[string]string{
 				options.CfgPath:  configFilePath,
 				options.NodeName: "anotherName",
@@ -254,7 +216,7 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that node-name is overwritten
 				if data.cfg.NodeRegistration.Name != "anotherName" {
-					t.Error("Invalid NodeRegistration.Name")
+					t.Errorf("Invalid NodeRegistration.Name")
 				}
 			},
 		},
@@ -320,15 +282,6 @@ func TestNewJoinData(t *testing.T) {
 			klog.LogToStderr(false)
 			defer klog.LogToStderr(true)
 
-			// set the cri socket here, otherwise the testcase might fail if is run on the node with multiple
-			// cri endpoints configured, the failure caused by this is normally not an expected failure.
-			if tc.flags == nil {
-				tc.flags = make(map[string]string)
-			}
-			// set `cri-socket` only if `CfgPath` is not set
-			if _, okay := tc.flags[options.CfgPath]; !okay {
-				tc.flags[options.NodeCRISocket] = constants.UnknownCRISocket
-			}
 			// sets cmd flags (that will be reflected on the join options)
 			for f, v := range tc.flags {
 				cmd.Flags().Set(f, v)
@@ -351,7 +304,7 @@ func TestNewJoinData(t *testing.T) {
 				t.Fatalf("newJoinData returned unexpected error: %v", err)
 			}
 			if err == nil && tc.expectError {
-				t.Fatal("newJoinData didn't return error when expected")
+				t.Fatalf("newJoinData didn't return error when expected")
 			}
 
 			// exec additional validation on the returned value

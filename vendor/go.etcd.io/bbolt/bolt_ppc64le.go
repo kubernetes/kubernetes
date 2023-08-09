@@ -1,4 +1,3 @@
-//go:build ppc64le
 // +build ppc64le
 
 package bbolt

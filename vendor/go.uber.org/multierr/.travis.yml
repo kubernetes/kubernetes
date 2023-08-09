@@ -1,0 +1,23 @@
+sudo: false
+language: go
+go_import_path: go.uber.org/multierr
+
+env:
+  global:
+    - GO111MODULE=on
+
+go:
+  - oldstable
+  - stable
+
+before_install:
+- go version
+
+script:
+- |
+  set -e
+  make lint
+  make cover
+
+after_success:
+- bash <(curl -s https://codecov.io/bash)

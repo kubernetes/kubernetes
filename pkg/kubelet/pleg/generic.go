@@ -76,8 +76,6 @@ type GenericPLEG struct {
 	runningMu sync.Mutex
 	// Indicates relisting related parameters
 	relistDuration *RelistDuration
-	// Mutex to serialize updateCache called by relist vs UpdateCache interface
-	podCacheMutex sync.Mutex
 }
 
 // plegContainerState has a one-to-one mapping to the
@@ -438,8 +436,6 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 		return nil, true
 	}
 
-	g.podCacheMutex.Lock()
-	defer g.podCacheMutex.Unlock()
 	timestamp := g.clock.Now()
 
 	status, err := g.runtime.GetPodStatus(ctx, pod.ID, pod.Name, pod.Namespace)
@@ -480,17 +476,6 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 	}
 
 	return err, g.cache.Set(pod.ID, status, err, timestamp)
-}
-
-func (g *GenericPLEG) UpdateCache(pod *kubecontainer.Pod, pid types.UID) (error, bool) {
-	ctx := context.Background()
-	if !g.cacheEnabled() {
-		return fmt.Errorf("pod cache disabled"), false
-	}
-	if pod == nil {
-		return fmt.Errorf("pod cannot be nil"), false
-	}
-	return g.updateCache(ctx, pod, pid)
 }
 
 func updateEvents(eventsByPodID map[types.UID][]*PodLifecycleEvent, e *PodLifecycleEvent) {

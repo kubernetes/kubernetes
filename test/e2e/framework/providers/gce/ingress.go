@@ -641,12 +641,12 @@ func (cont *IngressController) verifyBackendMode(svcPorts map[string]v1.ServiceP
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	beList, err := gceCloud.ListGlobalBackendServices()
 	if err != nil {
-		return fmt.Errorf("failed to list backend services: %w", err)
+		return fmt.Errorf("failed to list backend services: %v", err)
 	}
 
 	hcList, err := gceCloud.ListHealthChecks()
 	if err != nil {
-		return fmt.Errorf("failed to list health checks: %w", err)
+		return fmt.Errorf("failed to list health checks: %v", err)
 	}
 
 	// Generate short UID

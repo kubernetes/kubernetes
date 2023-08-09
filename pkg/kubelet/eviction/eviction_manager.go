@@ -29,12 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	"k8s.io/utils/clock"
-
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
+	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -42,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -66,6 +65,8 @@ type managerImpl struct {
 	config Config
 	// the function to invoke to kill a pod
 	killPodFunc KillPodFunc
+	// the function to get the mirror pod by a given static pod
+	mirrorPodFunc MirrorPodFunc
 	// the interface that knows how to do image gc
 	imageGC ImageGC
 	// the interface that knows how to do container gc
@@ -110,6 +111,7 @@ func NewManager(
 	summaryProvider stats.SummaryProvider,
 	config Config,
 	killPodFunc KillPodFunc,
+	mirrorPodFunc MirrorPodFunc,
 	imageGC ImageGC,
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
@@ -120,6 +122,7 @@ func NewManager(
 	manager := &managerImpl{
 		clock:                         clock,
 		killPodFunc:                   killPodFunc,
+		mirrorPodFunc:                 mirrorPodFunc,
 		imageGC:                       imageGC,
 		containerGC:                   containerGC,
 		config:                        config,
@@ -158,7 +161,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 
 		// When node has memory pressure, check BestEffort Pod's toleration:
 		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. DiskPressure.
-		if corev1helpers.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
+		if v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
 			Key:    v1.TaintNodeMemoryPressure,
 			Effect: v1.TaintEffectNoSchedule,
 		}) {
@@ -514,7 +517,7 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 }
 
 func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStats, pod *v1.Pod) bool {
-	podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	_, podLimits := apiv1resource.PodRequestsAndLimits(pod)
 	_, found := podLimits[v1.ResourceEphemeralStorage]
 	if !found {
 		return false

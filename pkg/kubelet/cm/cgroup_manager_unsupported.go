@@ -19,11 +19,7 @@ limitations under the License.
 
 package cm
 
-import (
-	"errors"
-
-	v1 "k8s.io/api/core/v1"
-)
+import "errors"
 
 type unsupportedCgroupManager struct{}
 
@@ -79,14 +75,6 @@ func (m *unsupportedCgroupManager) CgroupName(name string) CgroupName {
 
 func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName CgroupName) error {
 	return nil
-}
-
-func (m *unsupportedCgroupManager) GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error) {
-	return nil, errNotSupported
-}
-
-func (m *unsupportedCgroupManager) SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
-	return errNotSupported
 }
 
 var RootCgroupName = CgroupName([]string{})

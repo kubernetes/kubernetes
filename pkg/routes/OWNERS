@@ -2,11 +2,10 @@
 
 reviewers:
   - deads2k
+  - lavalamp
   - sttts
   - caesarxuchao
-  - jpbetz
 approvers:
   - deads2k
-  - sttts
-emeritus_approvers:
   - lavalamp
+  - sttts

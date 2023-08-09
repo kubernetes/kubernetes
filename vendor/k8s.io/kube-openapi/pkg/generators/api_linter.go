@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"sort"
 
@@ -63,7 +64,7 @@ func (a apiViolationFile) VerifyFile(f *generator.File, path string) error {
 	path = a.unmangledPath
 
 	formatted := f.Body.Bytes()
-	existing, err := os.ReadFile(path)
+	existing, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("unable to read file %q for comparison: %v", path, err)
 	}

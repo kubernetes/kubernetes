@@ -112,7 +112,6 @@ type Server struct {
 
 func (s *Server) Start(ctx context.Context) error {
 	s.informerFactory.Start(ctx.Done())
-	logger := klog.FromContext(ctx)
 
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux, healthz.PingHealthz)
@@ -142,11 +141,11 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	<-listenerStoppedCh
-	logger.V(1).Info("[graceful-termination] HTTP Server has stopped listening")
+	klog.V(1).InfoS("[graceful-termination] HTTP Server has stopped listening")
 
 	// Wait for graceful shutdown.
 	<-shutdownCh
-	logger.V(1).Info("[graceful-termination] HTTP Server is exiting")
+	klog.V(1).Info("[graceful-termination] HTTP Server is exiting")
 
 	return nil
 }
@@ -158,24 +157,23 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	})
 
 	var (
-		body   []byte
-		err    error
-		ctx    = r.Context()
-		logger = klog.FromContext(ctx)
+		body []byte
+		err  error
+		ctx  = r.Context()
 	)
 
 	if timeout, ok, err := parseTimeout(r); err != nil {
 		// Ignore an invalid timeout.
-		logger.V(2).Info("Invalid timeout", "error", err)
+		klog.V(2).InfoS("Invalid timeout", "error", err)
 	} else if ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
-	if r.Body == nil || r.Body == http.NoBody {
+	if r.Body == nil {
 		err = errors.New("request body is empty")
-		logger.Error(err, "bad request")
+		klog.ErrorS(err, "bad request")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -183,12 +181,12 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	limitedReader := &io.LimitedReader{R: r.Body, N: maxRequestSize}
 	if body, err = ioutil.ReadAll(limitedReader); err != nil {
-		logger.Error(err, "unable to read the body from the incoming request")
+		klog.ErrorS(err, "unable to read the body from the incoming request")
 		http.Error(w, "unable to read the body from the incoming request", http.StatusBadRequest)
 		return
 	}
 	if limitedReader.N <= 0 {
-		logger.Error(err, "unable to read the body from the incoming request; limit reached")
+		klog.ErrorS(err, "unable to read the body from the incoming request; limit reached")
 		http.Error(w, fmt.Sprintf("request entity is too large; limit is %d bytes", maxRequestSize), http.StatusRequestEntityTooLarge)
 		return
 	}
@@ -196,7 +194,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	// verify the content type is accurate
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
 		err = fmt.Errorf("contentType=%s, expected application/json", contentType)
-		logger.Error(err, "unable to process a request with an unknown content type", "type", contentType)
+		klog.ErrorS(err, "unable to process a request with an unknown content type", "content type", contentType)
 		http.Error(w, "unable to process a request with a non-json content type", http.StatusBadRequest)
 		return
 	}
@@ -204,21 +202,21 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	v1AdmissionReviewKind := admissionv1.SchemeGroupVersion.WithKind("AdmissionReview")
 	reviewObject, gvk, err := codecs.UniversalDeserializer().Decode(body, &v1AdmissionReviewKind, nil)
 	if err != nil {
-		logger.Error(err, "unable to decode the request")
+		klog.ErrorS(err, "unable to decode the request")
 		http.Error(w, "unable to decode the request", http.StatusBadRequest)
 		return
 	}
 	if *gvk != v1AdmissionReviewKind {
-		logger.Info("Unexpected AdmissionReview kind", "kind", gvk.String())
+		klog.InfoS("Unexpected AdmissionReview kind", "kind", gvk.String())
 		http.Error(w, fmt.Sprintf("unexpected AdmissionReview kind: %s", gvk.String()), http.StatusBadRequest)
 		return
 	}
 	review, ok := reviewObject.(*admissionv1.AdmissionReview)
 	if !ok {
-		logger.Info("Failed admissionv1.AdmissionReview type assertion")
+		klog.InfoS("Failed admissionv1.AdmissionReview type assertion")
 		http.Error(w, "unexpected AdmissionReview type", http.StatusBadRequest)
 	}
-	logger.V(1).Info("received request", "UID", review.Request.UID, "kind", review.Request.Kind, "resource", review.Request.Resource)
+	klog.V(1).InfoS("received request", "UID", review.Request.UID, "kind", review.Request.Kind, "resource", review.Request.Resource)
 
 	attributes := api.RequestAttributes(review.Request, codecs.UniversalDeserializer())
 	response := s.delegate.Validate(ctx, attributes)

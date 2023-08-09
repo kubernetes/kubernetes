@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -37,10 +38,14 @@ import (
 func TestConditionIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
-	ctx, kubeConfig, closeFn := setup(t, 10, 10)
+	kubeConfig, closeFn := setup(t, 10, 10)
 	defer closeFn()
 
 	loopbackClient := clientset.NewForConfigOrDie(kubeConfig)
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	ctx := context.Background()
 
 	fsOrig := fcboot.SuggestedFlowSchemas[0]
 	t.Logf("Testing Status Condition isolation in FlowSchema %q", fsOrig.Name)
@@ -55,7 +60,7 @@ func TestConditionIsolation(t *testing.T) {
 		}
 		dangleOrig = getCondition(fsGot.Status.Conditions, flowcontrol.FlowSchemaConditionDangling)
 		return dangleOrig != nil, nil
-	}, ctx.Done())
+	}, stopCh)
 
 	ssaType := flowcontrol.FlowSchemaConditionType("test-ssa")
 	patchSSA := flowcontrolapply.FlowSchema(fsOrig.Name).

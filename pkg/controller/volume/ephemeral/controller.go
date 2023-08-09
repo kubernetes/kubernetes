@@ -165,9 +165,9 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 func (ec *ephemeralController) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer ec.queue.ShutDown()
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting ephemeral volume controller")
-	defer logger.Info("Shutting down ephemeral volume controller")
+
+	klog.Infof("Starting ephemeral volume controller")
+	defer klog.Infof("Shutting down ephemeral volume controller")
 
 	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.pvcsSynced) {
 		return
@@ -212,19 +212,18 @@ func (ec *ephemeralController) syncHandler(ctx context.Context, key string) erro
 		return err
 	}
 	pod, err := ec.podLister.Pods(namespace).Get(name)
-	logger := klog.FromContext(ctx)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.V(5).Info("Ephemeral: nothing to do for pod, it is gone", "podKey", key)
+			klog.V(5).Infof("ephemeral: nothing to do for pod %s, it is gone", key)
 			return nil
 		}
-		logger.V(5).Info("Error getting pod from informer", "pod", klog.KObj(pod), "podUID", pod.UID, "err", err)
+		klog.V(5).Infof("Error getting pod %s/%s (uid: %q) from informer : %v", pod.Namespace, pod.Name, pod.UID, err)
 		return err
 	}
 
 	// Ignore pods which are already getting deleted.
 	if pod.DeletionTimestamp != nil {
-		logger.V(5).Info("Ephemeral: nothing to do for pod, it is marked for deletion", "podKey", key)
+		klog.V(5).Infof("ephemeral: nothing to do for pod %s, it is marked for deletion", key)
 		return nil
 	}
 
@@ -240,8 +239,7 @@ func (ec *ephemeralController) syncHandler(ctx context.Context, key string) erro
 
 // handleEphemeralVolume is invoked for each volume of a pod.
 func (ec *ephemeralController) handleVolume(ctx context.Context, pod *v1.Pod, vol v1.Volume) error {
-	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Ephemeral: checking volume", "volumeName", vol.Name)
+	klog.V(5).Infof("ephemeral: checking volume %s", vol.Name)
 	if vol.Ephemeral == nil {
 		return nil
 	}
@@ -256,7 +254,7 @@ func (ec *ephemeralController) handleVolume(ctx context.Context, pod *v1.Pod, vo
 			return err
 		}
 		// Already created, nothing more to do.
-		logger.V(5).Info("Ephemeral: PVC already created", "volumeName", vol.Name, "PVC", klog.KObj(pvc))
+		klog.V(5).Infof("ephemeral: volume %s: PVC %s already created", vol.Name, pvcName)
 		return nil
 	}
 

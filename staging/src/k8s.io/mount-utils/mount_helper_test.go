@@ -18,6 +18,7 @@ package mount
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,12 +27,13 @@ import (
 )
 
 func TestDoCleanupMountPoint(t *testing.T) {
+
 	if runtime.GOOS == "darwin" {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
 
 	const testMount = "test-mount"
-	const defaultPerm = 0o750
+	const defaultPerm = 0750
 
 	tests := map[string]struct {
 		corruptedMnt bool
@@ -41,7 +43,8 @@ func TestDoCleanupMountPoint(t *testing.T) {
 		// and error if the prepare function encountered a fatal error.
 		prepareMnt func(base string) (MountPoint, error, error)
 		// Function that prepares the FakeMounter for the test.
-		prepareMntr func(mntr *FakeMounter)
+		// Returns error if prepareMntr function encountered a fatal error.
+		prepareMntr func(mntr *FakeMounter) error
 		expectErr   bool
 	}{
 		"mount-ok": {
@@ -93,8 +96,9 @@ func TestDoCleanupMountPoint(t *testing.T) {
 				}
 				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
 			},
-			prepareMntr: func(mntr *FakeMounter) {
+			prepareMntr: func(mntr *FakeMounter) error {
 				mntr.WithSkipMountPointCheck()
+				return nil
 			},
 			expectErr: false,
 		},
@@ -102,7 +106,12 @@ func TestDoCleanupMountPoint(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tmpDir := t.TempDir()
+
+			tmpDir, err := ioutil.TempDir("", "unmount-mount-point-test")
+			if err != nil {
+				t.Fatalf("failed to create tmpdir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
 
 			if tt.prepareMnt == nil {
 				t.Fatalf("prepareMnt function required")
@@ -143,12 +152,15 @@ func TestDoCleanupMountPoint(t *testing.T) {
 }
 
 func validateDirExists(dir string) error {
-	_, err := os.ReadDir(dir)
-	return err
+	_, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func validateDirNotExists(dir string) error {
-	_, err := os.ReadDir(dir)
+	_, err := ioutil.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil
 	}

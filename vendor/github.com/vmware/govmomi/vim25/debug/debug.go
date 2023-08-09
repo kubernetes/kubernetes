@@ -18,7 +18,8 @@ package debug
 
 import (
 	"io"
-	"regexp"
+	"os"
+	"path"
 )
 
 // Provider specified the interface types must implement to be used as a
@@ -29,22 +30,7 @@ type Provider interface {
 	Flush()
 }
 
-// ReadCloser is a struct that satisfies the io.ReadCloser interface
-type ReadCloser struct {
-	io.Reader
-	io.Closer
-}
-
-// NewTeeReader wraps io.TeeReader and patches through the Close() function.
-func NewTeeReader(rc io.ReadCloser, w io.Writer) io.ReadCloser {
-	return ReadCloser{
-		Reader: io.TeeReader(rc, w),
-		Closer: rc,
-	}
-}
-
 var currentProvider Provider = nil
-var scrubPassword = regexp.MustCompile(`<password>(.*)</password>`)
 
 func SetProvider(p Provider) {
 	if currentProvider != nil {
@@ -68,6 +54,28 @@ func Flush() {
 	currentProvider.Flush()
 }
 
-func Scrub(in []byte) []byte {
-	return scrubPassword.ReplaceAll(in, []byte(`<password>********</password>`))
+// FileProvider implements a debugging provider that creates a real file for
+// every call to NewFile. It maintains a list of all files that it creates,
+// such that it can close them when its Flush function is called.
+type FileProvider struct {
+	Path string
+
+	files []*os.File
+}
+
+func (fp *FileProvider) NewFile(p string) io.WriteCloser {
+	f, err := os.Create(path.Join(fp.Path, p))
+	if err != nil {
+		panic(err)
+	}
+
+	fp.files = append(fp.files, f)
+
+	return f
+}
+
+func (fp *FileProvider) Flush() {
+	for _, f := range fp.files {
+		f.Close()
+	}
 }

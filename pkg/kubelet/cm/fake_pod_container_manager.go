@@ -104,24 +104,3 @@ func (m *FakePodContainerManager) IsPodCgroup(cgroupfs string) (bool, types.UID)
 	m.CalledFunctions = append(m.CalledFunctions, "IsPodCgroup")
 	return false, types.UID("")
 }
-
-func (cm *FakePodContainerManager) GetPodCgroupMemoryUsage(_ *v1.Pod) (uint64, error) {
-	cm.Lock()
-	defer cm.Unlock()
-	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodCgroupMemoryUsage")
-	return 0, nil
-}
-
-func (cm *FakePodContainerManager) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*ResourceConfig, error) {
-	cm.Lock()
-	defer cm.Unlock()
-	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodCgroupConfig")
-	return nil, nil
-}
-
-func (cm *FakePodContainerManager) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
-	cm.Lock()
-	defer cm.Unlock()
-	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupConfig")
-	return nil
-}

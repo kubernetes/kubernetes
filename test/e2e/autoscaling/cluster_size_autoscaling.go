@@ -57,7 +57,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -95,7 +94,7 @@ const (
 
 var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	f := framework.NewDefaultFramework("autoscaling")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var nodeCount int
 	var memAllocatableMb int
@@ -364,7 +363,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		if status.target != target {
 			klog.Warningf("Final number of nodes (%v) does not match initial scale-up target (%v).", status.target, target)
 		}
-		gomega.Expect(status.timestamp.Add(freshStatusLimit)).To(gomega.BeTemporally(">=", time.Now()))
+		framework.ExpectEqual(status.timestamp.Add(freshStatusLimit).Before(time.Now()), false)
 		framework.ExpectEqual(status.status, caNoScaleUpStatus)
 		framework.ExpectEqual(status.ready, status.target)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
@@ -1166,7 +1165,7 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 
 	if err != nil {
 		klog.Errorf("Failed config update result: %s", output)
-		return fmt.Errorf("Failed to enable autoscaling: %w", err)
+		return fmt.Errorf("Failed to enable autoscaling: %v", err)
 	}
 	klog.Infof("Config update result: %s", output)
 
@@ -1190,7 +1189,7 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 
 	if err != nil {
 		klog.Errorf("Failed config update result: %s", output)
-		return fmt.Errorf("Failed to disable autoscaling: %w", err)
+		return fmt.Errorf("Failed to disable autoscaling: %v", err)
 	}
 	klog.Infof("Config update result: %s", output)
 
@@ -1384,7 +1383,7 @@ func waitForCaPodsReadyInNamespace(ctx context.Context, f *framework.Framework, 
 	for start := time.Now(); time.Now().Before(start.Add(scaleUpTimeout)) && ctx.Err() == nil; time.Sleep(20 * time.Second) {
 		pods, err := c.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to get pods: %w", err)
+			return fmt.Errorf("failed to get pods: %v", err)
 		}
 		notready = make([]string, 0)
 		for _, pod := range pods.Items {

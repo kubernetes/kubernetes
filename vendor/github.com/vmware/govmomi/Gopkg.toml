@@ -1,0 +1,19 @@
+# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# for detailed Gopkg.toml documentation.
+#
+# Refer to https://github.com/toml-lang/toml for detailed TOML docs.
+
+[prune]
+  non-go = true
+  go-tests = true
+  unused-packages = true
+
+[[constraint]]
+  branch = "improvements"
+  name = "github.com/davecgh/go-xdr"
+  source = "https://github.com/rasky/go-xdr"
+
+[[constraint]]
+  branch = "govmomi"
+  name = "github.com/kr/pretty"
+  source = "https://github.com/dougm/pretty"

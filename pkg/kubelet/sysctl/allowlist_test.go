@@ -17,8 +17,6 @@ limitations under the License.
 package sysctl
 
 import (
-	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"testing"
 )
 
@@ -36,7 +34,6 @@ func TestNewAllowlist(t *testing.T) {
 		{sysctls: []string{"net.*.foo"}, err: true},
 		{sysctls: []string{"net.*/foo"}, err: true},
 		{sysctls: []string{"foo"}, err: true},
-		{sysctls: []string{"foo*"}, err: true},
 	} {
 		_, err := NewAllowlist(append(SafeSysctlAllowlist(), test.sysctls...))
 		if test.err && err == nil {
@@ -68,13 +65,9 @@ func TestAllowlist(t *testing.T) {
 		{sysctl: "net.ipv4.ip_local_port_range.a.b.c", hostNet: false},
 		{sysctl: "kernel.msgmax", hostIPC: true},
 		{sysctl: "kernel.sem", hostIPC: true},
-		{sysctl: "net.b.c", hostNet: true},
 	}
-	pod := &v1.Pod{}
-	pod.Spec.SecurityContext = &v1.PodSecurityContext{}
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod}
 
-	w, err := NewAllowlist(append(SafeSysctlAllowlist(), "kernel.msg*", "kernel.sem", "net.b.*"))
+	w, err := NewAllowlist(append(SafeSysctlAllowlist(), "kernel.msg*", "kernel.sem"))
 	if err != nil {
 		t.Fatalf("failed to create allowlist: %v", err)
 	}
@@ -83,30 +76,11 @@ func TestAllowlist(t *testing.T) {
 		if err := w.validateSysctl(test.sysctl, test.hostNet, test.hostIPC); err != nil {
 			t.Errorf("expected to be allowlisted: %+v, got: %v", test, err)
 		}
-		pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{{Name: test.sysctl, Value: test.sysctl}}
-		status := w.Admit(attrs)
-		if !status.Admit {
-			t.Errorf("expected to be allowlisted: %+v, got: %+v", test, status)
-		}
 	}
 
 	for _, test := range invalid {
 		if err := w.validateSysctl(test.sysctl, test.hostNet, test.hostIPC); err == nil {
 			t.Errorf("expected to be rejected: %+v", test)
 		}
-		pod.Spec.HostNetwork = test.hostNet
-		pod.Spec.HostIPC = test.hostIPC
-		pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{{Name: test.sysctl, Value: test.sysctl}}
-		status := w.Admit(attrs)
-		if status.Admit {
-			t.Errorf("expected to be rejected: %+v", test)
-		}
-	}
-
-	// test for: len(pod.Spec.SecurityContext.Sysctls) == 0
-	pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{}
-	status := w.Admit(attrs)
-	if !status.Admit {
-		t.Errorf("expected to be allowlisted,got %+v", status)
 	}
 }

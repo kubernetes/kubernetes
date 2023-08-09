@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/klog/v2/ktesting"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	"k8s.io/pod-security-admission/admission/api/load"
 	"k8s.io/pod-security-admission/api"
@@ -505,7 +504,6 @@ func TestValidateNamespace(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			newObject := &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "test",
@@ -589,7 +587,7 @@ func TestValidateNamespace(t *testing.T) {
 				namespacePodCheckTimeout: time.Second,
 				namespaceMaxPodsToCheck:  4,
 			}
-			result := a.ValidateNamespace(ctx, attrs)
+			result := a.ValidateNamespace(context.TODO(), attrs)
 			if result.Allowed != tc.expectAllowed {
 				t.Errorf("expected allowed=%v, got %v", tc.expectAllowed, result.Allowed)
 			}
@@ -962,7 +960,6 @@ func TestValidatePodAndController(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			if tc.obj != nil {
 				tc.obj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetNamespace(tc.namespace)
 			}
@@ -1002,7 +999,7 @@ func TestValidatePodAndController(t *testing.T) {
 			require.NoError(t, a.CompleteConfiguration(), "CompleteConfiguration()")
 			require.NoError(t, a.ValidateConfiguration(), "ValidateConfiguration()")
 
-			response := a.Validate(ctx, attrs)
+			response := a.Validate(context.TODO(), attrs)
 
 			var expectedEvaluations []MetricsRecord
 			var expectedAuditAnnotationKeys []string

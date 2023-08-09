@@ -5,13 +5,16 @@
 // Package proto provides functions operating on protocol buffer messages.
 //
 // For documentation on protocol buffers in general, see:
-// https://protobuf.dev.
+//
+//	https://developers.google.com/protocol-buffers
 //
 // For a tutorial on using protocol buffers with Go, see:
-// https://protobuf.dev/getting-started/gotutorial.
+//
+//	https://developers.google.com/protocol-buffers/docs/gotutorial
 //
 // For a guide to generated Go protocol buffer code, see:
-// https://protobuf.dev/reference/go/go-generated.
+//
+//	https://developers.google.com/protocol-buffers/docs/reference/go-generated
 //
 // # Binary serialization
 //

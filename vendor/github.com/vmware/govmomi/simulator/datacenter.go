@@ -17,7 +17,6 @@ limitations under the License.
 package simulator
 
 import (
-	"log"
 	"strings"
 
 	"github.com/vmware/govmomi/simulator/esx"
@@ -34,7 +33,7 @@ type Datacenter struct {
 }
 
 // NewDatacenter creates a Datacenter and its child folders.
-func NewDatacenter(ctx *Context, f *mo.Folder) *Datacenter {
+func NewDatacenter(f *Folder) *Datacenter {
 	dc := &Datacenter{
 		isESX: f.Self == esx.RootFolder.Self,
 	}
@@ -43,22 +42,18 @@ func NewDatacenter(ctx *Context, f *mo.Folder) *Datacenter {
 		dc.Datacenter = esx.Datacenter
 	}
 
-	folderPutChild(ctx, f, dc)
+	f.putChild(dc)
 
-	dc.createFolders(ctx)
+	dc.createFolders()
 
 	return dc
-}
-
-func (dc *Datacenter) RenameTask(ctx *Context, r *types.Rename_Task) soap.HasFault {
-	return RenameTask(ctx, dc, r)
 }
 
 // Create Datacenter Folders.
 // Every Datacenter has 4 inventory Folders: Vm, Host, Datastore and Network.
 // The ESX folder child types are limited to 1 type.
 // The VC folders have additional child types, including nested folders.
-func (dc *Datacenter) createFolders(ctx *Context) {
+func (dc *Datacenter) createFolders() {
 	folders := []struct {
 		ref   *types.ManagedObjectReference
 		name  string
@@ -77,10 +72,10 @@ func (dc *Datacenter) createFolders(ctx *Context) {
 		if dc.isESX {
 			folder.ChildType = f.types[:1]
 			folder.Self = *f.ref
-			ctx.Map.PutEntity(dc, folder)
+			Map.PutEntity(dc, folder)
 		} else {
 			folder.ChildType = f.types
-			e := ctx.Map.PutEntity(dc, folder)
+			e := Map.PutEntity(dc, folder)
 
 			// propagate the generated morefs to Datacenter
 			ref := e.Reference()
@@ -89,7 +84,7 @@ func (dc *Datacenter) createFolders(ctx *Context) {
 		}
 	}
 
-	net := ctx.Map.Get(dc.NetworkFolder).(*Folder)
+	net := Map.Get(dc.NetworkFolder).(*Folder)
 
 	for _, ref := range esx.Datacenter.Network {
 		// Add VM Network by default to each Datacenter
@@ -101,39 +96,8 @@ func (dc *Datacenter) createFolders(ctx *Context) {
 			network.Self.Value = "" // we want a different moid per-DC
 		}
 
-		folderPutChild(ctx, &net.Folder, network)
+		net.putChild(network)
 	}
-}
-
-func (dc *Datacenter) defaultNetwork() []types.ManagedObjectReference {
-	return dc.Network[:1] // VM Network
-}
-
-// folder returns the Datacenter folder that can contain the given object type
-func (dc *Datacenter) folder(obj mo.Entity) *mo.Folder {
-	folders := []types.ManagedObjectReference{
-		dc.VmFolder,
-		dc.HostFolder,
-		dc.DatastoreFolder,
-		dc.NetworkFolder,
-	}
-	otype := getManagedObject(obj).Type()
-	rtype := obj.Reference().Type
-
-	for i := range folders {
-		folder, _ := asFolderMO(Map.Get(folders[i]))
-		for _, kind := range folder.ChildType {
-			if rtype == kind {
-				return folder
-			}
-			if f, ok := otype.FieldByName(kind); ok && f.Anonymous {
-				return folder
-			}
-		}
-	}
-
-	log.Panicf("failed to find folder for type=%s", rtype)
-	return nil
 }
 
 func datacenterEventArgument(obj mo.Entity) *types.DatacenterEventArgument {
@@ -153,46 +117,24 @@ func (dc *Datacenter) PowerOnMultiVMTask(ctx *Context, req *types.PowerOnMultiVM
 			return nil, new(types.NotImplemented)
 		}
 
-		// Return per-VM tasks, structured as:
-		// thisTask.result - DC level task
-		//    +- []Attempted
-		//        +- subTask.result - VM level powerOn task result
-		//        +- ...
-		res := types.ClusterPowerOnVmResult{}
-		res.Attempted = []types.ClusterAttemptedVmInfo{}
-
 		for _, ref := range req.Vm {
-			vm := ctx.Map.Get(ref).(*VirtualMachine)
-
-			// This task creates multiple subtasks which violates the assumption
-			// of 1:1 Context:Task, which results in data races in objects
-			// like the Simulator.Event manager. This is the minimum context
-			// required for the PowerOnVMTask to complete.
-			taskCtx := &Context{
-				Context: ctx.Context,
-				Session: ctx.Session,
-				Map:     ctx.Map,
-			}
-
-			// NOTE: Simulator does not actually perform any specific host-level placement
-			// (equivalent to vSphere DRS).
-			taskCtx.WithLock(vm, func() {
-				vmTaskBody := vm.PowerOnVMTask(taskCtx, &types.PowerOnVM_Task{}).(*methods.PowerOnVM_TaskBody)
-				res.Attempted = append(res.Attempted, types.ClusterAttemptedVmInfo{Vm: ref, Task: &vmTaskBody.Res.Returnval})
+			vm := Map.Get(ref).(*VirtualMachine)
+			Map.WithLock(vm, func() {
+				vm.PowerOnVMTask(ctx, &types.PowerOnVM_Task{})
 			})
 		}
 
-		return res, nil
+		return nil, nil
 	})
 
 	return &methods.PowerOnMultiVM_TaskBody{
 		Res: &types.PowerOnMultiVM_TaskResponse{
-			Returnval: task.Run(ctx),
+			Returnval: task.Run(),
 		},
 	}
 }
 
-func (d *Datacenter) DestroyTask(ctx *Context, req *types.Destroy_Task) soap.HasFault {
+func (d *Datacenter) DestroyTask(req *types.Destroy_Task) soap.HasFault {
 	task := CreateTask(d, "destroy", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		folders := []types.ManagedObjectReference{
 			d.VmFolder,
@@ -200,21 +142,19 @@ func (d *Datacenter) DestroyTask(ctx *Context, req *types.Destroy_Task) soap.Has
 		}
 
 		for _, ref := range folders {
-			f, _ := asFolderMO(ctx.Map.Get(ref))
-			if len(f.ChildEntity) != 0 {
+			if len(Map.Get(ref).(*Folder).ChildEntity) != 0 {
 				return nil, &types.ResourceInUse{}
 			}
 		}
 
-		p, _ := asFolderMO(ctx.Map.Get(*d.Parent))
-		folderRemoveChild(ctx, p, d.Self)
+		Map.Get(*d.Parent).(*Folder).removeChild(d.Self)
 
 		return nil, nil
 	})
 
 	return &methods.Destroy_TaskBody{
 		Res: &types.Destroy_TaskResponse{
-			Returnval: task.Run(ctx),
+			Returnval: task.Run(),
 		},
 	}
 }

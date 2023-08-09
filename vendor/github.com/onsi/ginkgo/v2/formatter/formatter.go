@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -51,35 +50,13 @@ func NewWithNoColorBool(noColor bool) Formatter {
 }
 
 func New(colorMode ColorMode) Formatter {
-	colorAliases := map[string]int{
-		"black":   0,
-		"red":     1,
-		"green":   2,
-		"yellow":  3,
-		"blue":    4,
-		"magenta": 5,
-		"cyan":    6,
-		"white":   7,
-	}
-	for colorAlias, n := range colorAliases {
-		colorAliases[fmt.Sprintf("bright-%s", colorAlias)] = n + 8
-	}
-
 	getColor := func(color, defaultEscapeCode string) string {
 		color = strings.ToUpper(strings.ReplaceAll(color, "-", "_"))
 		envVar := fmt.Sprintf("GINKGO_CLI_COLOR_%s", color)
-		envVarColor := os.Getenv(envVar)
-		if envVarColor == "" {
-			return defaultEscapeCode
+		if escapeCode := os.Getenv(envVar); escapeCode != "" {
+			return escapeCode
 		}
-		if colorCode, ok := colorAliases[envVarColor]; ok {
-			return fmt.Sprintf("\x1b[38;5;%dm", colorCode)
-		}
-		colorCode, err := strconv.Atoi(envVarColor)
-		if err != nil || colorCode < 0 || colorCode > 255 {
-			return defaultEscapeCode
-		}
-		return fmt.Sprintf("\x1b[38;5;%dm", colorCode)
+		return defaultEscapeCode
 	}
 
 	f := Formatter{
@@ -120,10 +97,7 @@ func (f Formatter) Fi(indentation uint, format string, args ...interface{}) stri
 }
 
 func (f Formatter) Fiw(indentation uint, maxWidth uint, format string, args ...interface{}) string {
-	out := f.style(format)
-	if len(args) > 0 {
-		out = fmt.Sprintf(out, args...)
-	}
+	out := fmt.Sprintf(f.style(format), args...)
 
 	if indentation == 0 && maxWidth == 0 {
 		return out

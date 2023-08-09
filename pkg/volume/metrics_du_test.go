@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -17,14 +20,26 @@ limitations under the License.
 package volume_test
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"golang.org/x/sys/unix"
 	utiltesting "k8s.io/client-go/util/testing"
 	. "k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
+
+func getExpectedBlockSize(path string) int64 {
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
+	if err != nil {
+		return 0
+	}
+
+	return int64(statfs.Bsize)
+}
 
 // TestMetricsDuGetCapacity tests that MetricsDu can read disk usage
 // for path
@@ -59,7 +74,7 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	}
 
 	// Write a file and expect Used to increase
-	os.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
+	ioutil.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
 	actual, err = metrics.GetMetrics()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)

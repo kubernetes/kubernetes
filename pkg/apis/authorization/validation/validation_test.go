@@ -40,25 +40,29 @@ func TestValidateSARSpec(t *testing.T) {
 		name string
 		obj  authorizationapi.SubjectAccessReviewSpec
 		msg  string
-	}{{
-		name: "neither request",
-		obj:  authorizationapi.SubjectAccessReviewSpec{User: "me"},
-		msg:  "exactly one of nonResourceAttributes or resourceAttributes must be specified",
-	}, {
-		name: "both requests",
-		obj: authorizationapi.SubjectAccessReviewSpec{
-			ResourceAttributes:    &authorizationapi.ResourceAttributes{},
-			NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
-			User:                  "me",
+	}{
+		{
+			name: "neither request",
+			obj:  authorizationapi.SubjectAccessReviewSpec{User: "me"},
+			msg:  "exactly one of nonResourceAttributes or resourceAttributes must be specified",
 		},
-		msg: "cannot be specified in combination with resourceAttributes",
-	}, {
-		name: "no subject",
-		obj: authorizationapi.SubjectAccessReviewSpec{
-			ResourceAttributes: &authorizationapi.ResourceAttributes{},
+		{
+			name: "both requests",
+			obj: authorizationapi.SubjectAccessReviewSpec{
+				ResourceAttributes:    &authorizationapi.ResourceAttributes{},
+				NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
+				User:                  "me",
+			},
+			msg: "cannot be specified in combination with resourceAttributes",
 		},
-		msg: `spec.user: Invalid value: "": at least one of user or group must be specified`,
-	}}
+		{
+			name: "no subject",
+			obj: authorizationapi.SubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationapi.ResourceAttributes{},
+			},
+			msg: `spec.user: Invalid value: "": at least one of user or group must be specified`,
+		},
+	}
 
 	for _, c := range errorCases {
 		errs := ValidateSubjectAccessReviewSpec(c.obj, field.NewPath("spec"))
@@ -98,18 +102,21 @@ func TestValidateSelfSAR(t *testing.T) {
 		name string
 		obj  authorizationapi.SelfSubjectAccessReviewSpec
 		msg  string
-	}{{
-		name: "neither request",
-		obj:  authorizationapi.SelfSubjectAccessReviewSpec{},
-		msg:  "exactly one of nonResourceAttributes or resourceAttributes must be specified",
-	}, {
-		name: "both requests",
-		obj: authorizationapi.SelfSubjectAccessReviewSpec{
-			ResourceAttributes:    &authorizationapi.ResourceAttributes{},
-			NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
+	}{
+		{
+			name: "neither request",
+			obj:  authorizationapi.SelfSubjectAccessReviewSpec{},
+			msg:  "exactly one of nonResourceAttributes or resourceAttributes must be specified",
 		},
-		msg: "cannot be specified in combination with resourceAttributes",
-	}}
+		{
+			name: "both requests",
+			obj: authorizationapi.SelfSubjectAccessReviewSpec{
+				ResourceAttributes:    &authorizationapi.ResourceAttributes{},
+				NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
+			},
+			msg: "cannot be specified in combination with resourceAttributes",
+		},
+	}
 
 	for _, c := range errorCases {
 		errs := ValidateSelfSubjectAccessReviewSpec(c.obj, field.NewPath("spec"))
@@ -129,12 +136,14 @@ func TestValidateSelfSAR(t *testing.T) {
 }
 
 func TestValidateLocalSAR(t *testing.T) {
-	successCases := []authorizationapi.LocalSubjectAccessReview{{
-		Spec: authorizationapi.SubjectAccessReviewSpec{
-			ResourceAttributes: &authorizationapi.ResourceAttributes{},
-			User:               "user",
+	successCases := []authorizationapi.LocalSubjectAccessReview{
+		{
+			Spec: authorizationapi.SubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationapi.ResourceAttributes{},
+				User:               "user",
+			},
 		},
-	}}
+	}
 	for _, successCase := range successCases {
 		if errs := ValidateLocalSubjectAccessReview(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
@@ -145,37 +154,41 @@ func TestValidateLocalSAR(t *testing.T) {
 		name string
 		obj  *authorizationapi.LocalSubjectAccessReview
 		msg  string
-	}{{
-		name: "name",
-		obj: &authorizationapi.LocalSubjectAccessReview{
-			ObjectMeta: metav1.ObjectMeta{Name: "a"},
-			Spec: authorizationapi.SubjectAccessReviewSpec{
-				ResourceAttributes: &authorizationapi.ResourceAttributes{},
-				User:               "user",
+	}{
+		{
+			name: "name",
+			obj: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: metav1.ObjectMeta{Name: "a"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationapi.ResourceAttributes{},
+					User:               "user",
+				},
 			},
+			msg: "must be empty except for namespace",
 		},
-		msg: "must be empty except for namespace",
-	}, {
-		name: "namespace conflict",
-		obj: &authorizationapi.LocalSubjectAccessReview{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "a"},
-			Spec: authorizationapi.SubjectAccessReviewSpec{
-				ResourceAttributes: &authorizationapi.ResourceAttributes{},
-				User:               "user",
+		{
+			name: "namespace conflict",
+			obj: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "a"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationapi.ResourceAttributes{},
+					User:               "user",
+				},
 			},
+			msg: "must match metadata.namespace",
 		},
-		msg: "must match metadata.namespace",
-	}, {
-		name: "nonresource",
-		obj: &authorizationapi.LocalSubjectAccessReview{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "a"},
-			Spec: authorizationapi.SubjectAccessReviewSpec{
-				NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
-				User:                  "user",
+		{
+			name: "nonresource",
+			obj: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "a"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
+					User:                  "user",
+				},
 			},
+			msg: "disallowed on this kind of request",
 		},
-		msg: "disallowed on this kind of request",
-	}}
+	}
 
 	for _, c := range errorCases {
 		errs := ValidateLocalSubjectAccessReview(c.obj)

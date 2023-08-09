@@ -58,9 +58,7 @@ func (r *ASCIIRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering
 		lines := []string{}
 		for _, line := range strings.Split(string(node.Literal), linebreak) {
 			trimmed := strings.Trim(line, " \t")
-			// Adding 4 times of indentation will let blackfriday to accept
-			// this literal as Code or CodeBlock again in next invocation
-			indented := strings.Repeat(r.Indentation, 4) + trimmed
+			indented := r.Indentation + trimmed
 			lines = append(lines, indented)
 		}
 		w.Write([]byte(strings.Join(lines, linebreak)))

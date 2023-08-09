@@ -57,10 +57,6 @@
       },
       "lendablePercent": 3,
       "borrowingLimitPercent": 4
-    },
-    "exempt": {
-      "nominalConcurrencyShares": 1,
-      "lendablePercent": 2
     }
   },
   "status": {

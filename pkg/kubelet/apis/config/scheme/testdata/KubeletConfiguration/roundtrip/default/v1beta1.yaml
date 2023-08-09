@@ -17,7 +17,6 @@ cgroupsPerQOS: true
 configMapAndSecretChangeDetectionStrategy: Watch
 containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
-containerRuntimeEndpoint: unix:///run/containerd/containerd.sock
 contentType: application/vnd.kubernetes.protobuf
 cpuCFSQuota: true
 cpuCFSQuotaPeriod: 100ms
@@ -29,7 +28,6 @@ enableDebuggingHandlers: true
 enableProfilingHandler: true
 enableServer: true
 enableSystemLogHandler: true
-enableSystemLogQuery: false
 enforceNodeAllocatable:
 - pods
 eventBurst: 10
@@ -47,11 +45,11 @@ imageMinimumGCAge: 2m0s
 iptablesDropBit: 15
 iptablesMasqueradeBit: 14
 kind: KubeletConfiguration
-kubeAPIBurst: 100
-kubeAPIQPS: 50
+kubeAPIBurst: 10
+kubeAPIQPS: 5
 localStorageCapacityIsolation: true
 logging:
-  flushFrequency: 5s
+  flushFrequency: 5000000000
   format: text
   options:
     json:
@@ -62,7 +60,7 @@ maxOpenFiles: 1000000
 maxPods: 110
 memoryManagerPolicy: None
 memorySwap: {}
-memoryThrottlingFactor: 0.9
+memoryThrottlingFactor: 0.8
 nodeLeaseDurationSeconds: 40
 nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s

@@ -17,13 +17,11 @@ package types
 import (
 	"fmt"
 	"reflect"
-	"strings"
-
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -42,13 +40,13 @@ var (
 // NewDynamicList returns a traits.Lister with heterogenous elements.
 // value should be an array of "native" types, i.e. any type that
 // NativeToValue() can convert to a ref.Val.
-func NewDynamicList(adapter ref.TypeAdapter, value any) traits.Lister {
+func NewDynamicList(adapter ref.TypeAdapter, value interface{}) traits.Lister {
 	refValue := reflect.ValueOf(value)
 	return &baseList{
 		TypeAdapter: adapter,
 		value:       value,
 		size:        refValue.Len(),
-		get: func(i int) any {
+		get: func(i int) interface{} {
 			return refValue.Index(i).Interface()
 		},
 	}
@@ -60,7 +58,7 @@ func NewStringList(adapter ref.TypeAdapter, elems []string) traits.Lister {
 		TypeAdapter: adapter,
 		value:       elems,
 		size:        len(elems),
-		get:         func(i int) any { return elems[i] },
+		get:         func(i int) interface{} { return elems[i] },
 	}
 }
 
@@ -72,7 +70,7 @@ func NewRefValList(adapter ref.TypeAdapter, elems []ref.Val) traits.Lister {
 		TypeAdapter: adapter,
 		value:       elems,
 		size:        len(elems),
-		get:         func(i int) any { return elems[i] },
+		get:         func(i int) interface{} { return elems[i] },
 	}
 }
 
@@ -82,7 +80,7 @@ func NewProtoList(adapter ref.TypeAdapter, list protoreflect.List) traits.Lister
 		TypeAdapter: adapter,
 		value:       list,
 		size:        list.Len(),
-		get:         func(i int) any { return list.Get(i).Interface() },
+		get:         func(i int) interface{} { return list.Get(i).Interface() },
 	}
 }
 
@@ -93,25 +91,22 @@ func NewJSONList(adapter ref.TypeAdapter, l *structpb.ListValue) traits.Lister {
 		TypeAdapter: adapter,
 		value:       l,
 		size:        len(vals),
-		get:         func(i int) any { return vals[i] },
+		get:         func(i int) interface{} { return vals[i] },
 	}
 }
 
 // NewMutableList creates a new mutable list whose internal state can be modified.
 func NewMutableList(adapter ref.TypeAdapter) traits.MutableLister {
 	var mutableValues []ref.Val
-	l := &mutableList{
+	return &mutableList{
 		baseList: &baseList{
 			TypeAdapter: adapter,
 			value:       mutableValues,
 			size:        0,
+			get:         func(i int) interface{} { return mutableValues[i] },
 		},
 		mutableValues: mutableValues,
 	}
-	l.get = func(i int) any {
-		return l.mutableValues[i]
-	}
-	return l
 }
 
 // baseList points to a list containing elements of any type.
@@ -119,7 +114,7 @@ func NewMutableList(adapter ref.TypeAdapter) traits.MutableLister {
 // The `ref.TypeAdapter` enables native type to CEL type conversions.
 type baseList struct {
 	ref.TypeAdapter
-	value any
+	value interface{}
 
 	// size indicates the number of elements within the list.
 	// Since objects are immutable the size of a list is static.
@@ -127,7 +122,7 @@ type baseList struct {
 
 	// get returns a value at the specified integer index.
 	// The index is guaranteed to be checked against the list index range.
-	get func(int) any
+	get func(int) interface{}
 }
 
 // Add implements the traits.Adder interface method.
@@ -162,7 +157,7 @@ func (l *baseList) Contains(elem ref.Val) ref.Val {
 }
 
 // ConvertToNative implements the ref.Val interface method.
-func (l *baseList) ConvertToNative(typeDesc reflect.Type) (any, error) {
+func (l *baseList) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	// If the underlying list value is assignable to the reflected type return it.
 	if reflect.TypeOf(l.value).AssignableTo(typeDesc) {
 		return l.value, nil
@@ -245,7 +240,7 @@ func (l *baseList) Equal(other ref.Val) ref.Val {
 
 // Get implements the traits.Indexer interface method.
 func (l *baseList) Get(index ref.Val) ref.Val {
-	ind, err := IndexOrError(index)
+	ind, err := indexOrError(index)
 	if err != nil {
 		return ValOrErr(index, err.Error())
 	}
@@ -253,11 +248,6 @@ func (l *baseList) Get(index ref.Val) ref.Val {
 		return NewErr("index '%d' out of range in list size '%d'", ind, l.Size())
 	}
 	return l.NativeToValue(l.get(ind))
-}
-
-// IsZeroValue returns true if the list is empty.
-func (l *baseList) IsZeroValue() bool {
-	return l.size == 0
 }
 
 // Iterator implements the traits.Iterable interface method.
@@ -276,22 +266,8 @@ func (l *baseList) Type() ref.Type {
 }
 
 // Value implements the ref.Val interface method.
-func (l *baseList) Value() any {
+func (l *baseList) Value() interface{} {
 	return l.value
-}
-
-// String converts the list to a human readable string form.
-func (l *baseList) String() string {
-	var sb strings.Builder
-	sb.WriteString("[")
-	for i := 0; i < l.size; i++ {
-		sb.WriteString(fmt.Sprintf("%v", l.get(i)))
-		if i != l.size-1 {
-			sb.WriteString(", ")
-		}
-	}
-	sb.WriteString("]")
-	return sb.String()
 }
 
 // mutableList aggregates values into its internal storage. For use with internal CEL variables only.
@@ -329,7 +305,7 @@ func (l *mutableList) ToImmutableList() traits.Lister {
 // The `ref.TypeAdapter` enables native type to CEL type conversions.
 type concatList struct {
 	ref.TypeAdapter
-	value    any
+	value    interface{}
 	prevList traits.Lister
 	nextList traits.Lister
 }
@@ -375,8 +351,8 @@ func (l *concatList) Contains(elem ref.Val) ref.Val {
 }
 
 // ConvertToNative implements the ref.Val interface method.
-func (l *concatList) ConvertToNative(typeDesc reflect.Type) (any, error) {
-	combined := NewDynamicList(l.TypeAdapter, l.Value().([]any))
+func (l *concatList) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+	combined := NewDynamicList(l.TypeAdapter, l.Value().([]interface{}))
 	return combined.ConvertToNative(typeDesc)
 }
 
@@ -420,7 +396,7 @@ func (l *concatList) Equal(other ref.Val) ref.Val {
 
 // Get implements the traits.Indexer interface method.
 func (l *concatList) Get(index ref.Val) ref.Val {
-	ind, err := IndexOrError(index)
+	ind, err := indexOrError(index)
 	if err != nil {
 		return ValOrErr(index, err.Error())
 	}
@@ -430,11 +406,6 @@ func (l *concatList) Get(index ref.Val) ref.Val {
 	}
 	offset := i - l.prevList.Size().(Int)
 	return l.nextList.Get(offset)
-}
-
-// IsZeroValue returns true if the list is empty.
-func (l *concatList) IsZeroValue() bool {
-	return l.Size().(Int) == 0
 }
 
 // Iterator implements the traits.Iterable interface method.
@@ -447,29 +418,15 @@ func (l *concatList) Size() ref.Val {
 	return l.prevList.Size().(Int).Add(l.nextList.Size())
 }
 
-// String converts the concatenated list to a human-readable string.
-func (l *concatList) String() string {
-	var sb strings.Builder
-	sb.WriteString("[")
-	for i := Int(0); i < l.Size().(Int); i++ {
-		sb.WriteString(fmt.Sprintf("%v", l.Get(i)))
-		if i != l.Size().(Int)-1 {
-			sb.WriteString(", ")
-		}
-	}
-	sb.WriteString("]")
-	return sb.String()
-}
-
 // Type implements the ref.Val interface method.
 func (l *concatList) Type() ref.Type {
 	return ListType
 }
 
 // Value implements the ref.Val interface method.
-func (l *concatList) Value() any {
+func (l *concatList) Value() interface{} {
 	if l.value == nil {
-		merged := make([]any, l.Size().(Int))
+		merged := make([]interface{}, l.Size().(Int))
 		prevLen := l.prevList.Size().(Int)
 		for i := Int(0); i < prevLen; i++ {
 			merged[i] = l.prevList.Get(i).Value()
@@ -512,8 +469,7 @@ func (it *listIterator) Next() ref.Val {
 	return nil
 }
 
-// IndexOrError converts an input index value into either a lossless integer index or an error.
-func IndexOrError(index ref.Val) (int, error) {
+func indexOrError(index ref.Val) (int, error) {
 	switch iv := index.(type) {
 	case Int:
 		return int(iv), nil

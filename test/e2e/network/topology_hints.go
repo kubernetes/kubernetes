@@ -42,7 +42,7 @@ import (
 
 var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 	f := framework.NewDefaultFramework("topology-hints")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// filled in BeforeEach
 	var c clientset.Interface
@@ -65,7 +65,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "topology-hints",
 				Annotations: map[string]string{
-					v1.AnnotationTopologyMode: "Auto",
+					v1.AnnotationTopologyAwareHints: "Auto",
 				},
 			},
 			Spec: v1.ServiceSpec{

@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubectl/pkg/util"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -61,11 +60,11 @@ type NamespaceOptions struct {
 
 	PrintObj func(obj runtime.Object) error
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewNamespaceOptions creates a new *NamespaceOptions with sane defaults
-func NewNamespaceOptions(ioStreams genericiooptions.IOStreams) *NamespaceOptions {
+func NewNamespaceOptions(ioStreams genericclioptions.IOStreams) *NamespaceOptions {
 	return &NamespaceOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -73,7 +72,7 @@ func NewNamespaceOptions(ioStreams genericiooptions.IOStreams) *NamespaceOptions
 }
 
 // NewCmdCreateNamespace is a macro command to create a new namespace
-func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 
 	o := NewNamespaceOptions(ioStreams)
 

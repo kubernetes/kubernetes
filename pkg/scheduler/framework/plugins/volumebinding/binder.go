@@ -125,7 +125,7 @@ type InTreeToCSITranslator interface {
 //
 // This integrates into the existing scheduler workflow as follows:
 //  1. The scheduler takes a Pod off the scheduler queue and processes it serially:
-//     a. Invokes all pre-filter plugins for the pod. GetPodVolumeClaims() is invoked
+//     a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
 //     here, pod volume information will be saved in current scheduling cycle state for later use.
 //     If pod has bound immediate PVCs, GetEligibleNodes() is invoked to potentially reduce
 //     down the list of eligible nodes based on the bound PV's NodeAffinity (if any).
@@ -157,7 +157,7 @@ type SchedulerVolumeBinder interface {
 	//
 	// If eligibleNodes is 'nil', then it indicates that such eligible node reduction cannot be made
 	// and all nodes should be considered.
-	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.Set[string])
+	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String)
 
 	// FindPodVolumes checks if all of a Pod's PVCs can be satisfied by the
 	// node and returns pod's volumes information.
@@ -386,7 +386,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, podVolumeClaims *PodVolumeCla
 //
 // Returning 'nil' for eligibleNodes indicates that such eligible node reduction cannot be made and all nodes
 // should be considered.
-func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.Set[string]) {
+func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
 	if len(boundClaims) == 0 {
 		return
 	}
@@ -407,13 +407,13 @@ func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim)
 			// on the first found list of eligible nodes for the local PersistentVolume,
 			// insert to the eligible node set.
 			if eligibleNodes == nil {
-				eligibleNodes = sets.New(nodeNames...)
+				eligibleNodes = sets.NewString(nodeNames...)
 			} else {
 				// for subsequent finding of eligible nodes for the local PersistentVolume,
 				// take the intersection of the nodes with the existing eligible nodes
 				// for cases if PV1 has node affinity to node1 and PV2 has node affinity to node2,
 				// then the eligible node list should be empty.
-				eligibleNodes = eligibleNodes.Intersection(sets.New(nodeNames...))
+				eligibleNodes = eligibleNodes.Intersection(sets.NewString(nodeNames...))
 			}
 		}
 	}
@@ -573,15 +573,16 @@ func (b *volumeBinder) bindAPIUpdate(ctx context.Context, pod *v1.Pod, bindings 
 	// Do the actual prebinding. Let the PV controller take care of the rest
 	// There is no API rollback if the actual binding fails
 	for _, binding = range bindings {
+		klog.V(5).InfoS("bindAPIUpdate: binding PV to PVC", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
 		// TODO: does it hurt if we make an api call and nothing needs to be updated?
-		klog.V(5).InfoS("Updating PersistentVolume: binding to claim", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
+		klog.V(2).InfoS("Claim bound to volume", "PVC", klog.KObj(binding.pvc), "PV", klog.KObj(binding.pv))
 		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(ctx, binding.pv, metav1.UpdateOptions{})
 		if err != nil {
-			klog.V(4).InfoS("Updating PersistentVolume: binding to claim failed", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc), "err", err)
+			klog.V(4).InfoS("Updating PersistentVolume: binding to claim failed", "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc), "err", err)
 			return err
 		}
 
-		klog.V(2).InfoS("Updated PersistentVolume with claim. Waiting for binding to complete", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
+		klog.V(4).InfoS("Updating PersistentVolume: bound to claim", "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
 		// Save updated object from apiserver for later checking.
 		binding.pv = newPV
 		lastProcessedBinding++
@@ -744,7 +745,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	}
 
 	// All pvs and pvcs that we operated on are bound
-	klog.V(2).InfoS("All PVCs for pod are bound", "pod", klog.KObj(pod))
+	klog.V(4).InfoS("All PVCs for pod are bound", "pod", klog.KObj(pod))
 	return true, nil
 }
 
@@ -1086,11 +1087,11 @@ func (a byPVCSize) Less(i, j int) bool {
 func isCSIMigrationOnForPlugin(pluginName string) bool {
 	switch pluginName {
 	case csiplugins.AWSEBSInTreePluginName:
-		return true
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
 	case csiplugins.GCEPDInTreePluginName:
-		return true
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 	case csiplugins.AzureDiskInTreePluginName:
-		return true
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
 	case csiplugins.CinderInTreePluginName:
 		return true
 	case csiplugins.PortworxVolumePluginName:
@@ -1112,13 +1113,13 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) 
 		return false
 	}
 
-	var mpaSet sets.Set[string]
+	var mpaSet sets.String
 	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
 	if len(mpa) == 0 {
-		mpaSet = sets.New[string]()
+		mpaSet = sets.NewString()
 	} else {
 		tok := strings.Split(mpa, ",")
-		mpaSet = sets.New(tok...)
+		mpaSet = sets.NewString(tok...)
 	}
 
 	return mpaSet.Has(pluginName)

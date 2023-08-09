@@ -217,7 +217,7 @@ func (l *Walker) setAssociativeSequenceElements(valuesList [][]string, keys []st
 
 		// Add the val to the sequence. val will replace the item in the sequence if
 		// there is an item that matches all key-value pairs. Otherwise val will be appended
-		// the sequence.
+		// the the sequence.
 		_, err = itemsToBeAdded.Pipe(yaml.ElementSetter{
 			Element: val.YNode(),
 			Keys:    validKeys,

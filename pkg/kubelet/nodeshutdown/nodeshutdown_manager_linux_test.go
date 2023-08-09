@@ -789,11 +789,8 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := ktesting.NewLogger(t,
-				ktesting.NewConfig(
-					ktesting.BufferLogs(true),
-				),
-			)
+			logger, _ := ktesting.NewTestContext(t)
+
 			m := &managerImpl{
 				logger:                           logger,
 				recorder:                         tt.fields.recorder,

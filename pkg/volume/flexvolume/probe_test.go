@@ -72,11 +72,6 @@ func TestProberExistingDriverBeforeInit(t *testing.T) {
 
 // Probes newly added drivers after prober is running.
 func TestProberAddRemoveDriver(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
 	// Arrange
 	_, fs, watcher, prober := initTestEnvironment(t)
 	prober.Probe()
@@ -210,11 +205,6 @@ func TestEmptyPluginDir(t *testing.T) {
 
 // Issue an event to remove plugindir. New directory should still be watched.
 func TestRemovePluginDir(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
 	// Arrange
 	driverPath, fs, watcher, _ := initTestEnvironment(t)
 	err := fs.RemoveAll(pluginDir)
@@ -236,11 +226,6 @@ func TestRemovePluginDir(t *testing.T) {
 
 // Issue an event to remove plugindir. New directory should still be watched.
 func TestNestedDriverDir(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
 	// Arrange
 	_, fs, watcher, _ := initTestEnvironment(t)
 	// Assert

@@ -183,12 +183,10 @@ func writeCerts(t *testing.T, clientSigningCert *x509.Certificate, clientSigning
 		t.Fatal(err)
 	}
 
-	// returns a uniform random value in [0, max-1), then add 1 to serial to make it a uniform random value in [1, max).
-	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
+	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
 	if err != nil {
 		t.Fatal(err)
 	}
-	serial = new(big.Int).Add(serial, big.NewInt(1))
 
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{

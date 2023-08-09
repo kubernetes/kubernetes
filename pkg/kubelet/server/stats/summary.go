@@ -105,7 +105,6 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 		NodeName:         node.Name,
 		CPU:              rootStats.CPU,
 		Memory:           rootStats.Memory,
-		Swap:             rootStats.Swap,
 		Network:          networkStats,
 		StartTime:        sp.systemBootTime,
 		Fs:               rootFsStats,
@@ -142,7 +141,6 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 		NodeName:         node.Name,
 		CPU:              rootStats.CPU,
 		Memory:           rootStats.Memory,
-		Swap:             rootStats.Swap,
 		StartTime:        rootStats.StartTime,
 		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, false),
 	}

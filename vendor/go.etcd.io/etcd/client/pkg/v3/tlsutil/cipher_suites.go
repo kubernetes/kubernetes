@@ -14,10 +14,7 @@
 
 package tlsutil
 
-import (
-	"crypto/tls"
-	"fmt"
-)
+import "crypto/tls"
 
 // GetCipherSuite returns the corresponding cipher suite,
 // and boolean value if it is supported.
@@ -39,18 +36,4 @@ func GetCipherSuite(s string) (uint16, bool) {
 		return tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, true
 	}
 	return 0, false
-}
-
-// GetCipherSuites returns list of corresponding cipher suite IDs.
-func GetCipherSuites(ss []string) ([]uint16, error) {
-	cs := make([]uint16, len(ss))
-	for i, s := range ss {
-		var ok bool
-		cs[i], ok = GetCipherSuite(s)
-		if !ok {
-			return nil, fmt.Errorf("unexpected TLS cipher suite %q", s)
-		}
-	}
-
-	return cs, nil
 }

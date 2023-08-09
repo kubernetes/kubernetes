@@ -19,7 +19,7 @@ package ipvs
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
-	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
+	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 
 	"fmt"
 	"strings"
@@ -93,7 +93,7 @@ type IPSetVersioner interface {
 type IPSet struct {
 	utilipset.IPSet
 	// activeEntries is the current active entries of the ipset.
-	activeEntries sets.Set[string]
+	activeEntries sets.String
 	// handle is the util ipset interface handle.
 	handle utilipset.Interface
 }
@@ -125,7 +125,7 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 			HashFamily: hashFamily,
 			Comment:    comment,
 		},
-		activeEntries: sets.New[string](),
+		activeEntries: sets.NewString(),
 		handle:        handle,
 	}
 	return set
@@ -144,7 +144,7 @@ func (set *IPSet) getComment() string {
 }
 
 func (set *IPSet) resetEntries() {
-	set.activeEntries = sets.New[string]()
+	set.activeEntries = sets.NewString()
 }
 
 func (set *IPSet) syncIPSetEntries() {
@@ -155,14 +155,14 @@ func (set *IPSet) syncIPSetEntries() {
 	}
 
 	// currentIPSetEntries represents Endpoints watched from API Server.
-	currentIPSetEntries := sets.New[string]()
+	currentIPSetEntries := sets.NewString()
 	for _, appliedEntry := range appliedEntries {
 		currentIPSetEntries.Insert(appliedEntry)
 	}
 
 	if !set.activeEntries.Equal(currentIPSetEntries) {
 		// Clean legacy entries
-		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).UnsortedList() {
+		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
 			if err := set.handle.DelEntry(entry, set.Name); err != nil {
 				if !utilipset.IsNotFoundError(err) {
 					klog.ErrorS(err, "Failed to delete ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name)
@@ -172,7 +172,7 @@ func (set *IPSet) syncIPSetEntries() {
 			}
 		}
 		// Create active entries
-		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).UnsortedList() {
+		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
 			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
 				klog.ErrorS(err, "Failed to add ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name)
 			} else {

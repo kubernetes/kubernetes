@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -75,7 +74,7 @@ type PatchOptions struct {
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	fieldManager                 string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 var (
@@ -101,14 +100,14 @@ var (
 
 		# Update a container's image using a JSON patch with positional arrays
 		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
-
-		# Update a deployment's replicas through the 'scale' subresource using a merge patch
+		
+		# Update a deployment's replicas through the scale subresource using a merge patch.
 		kubectl patch deployment nginx-deployment --subresource='scale' --type='merge' -p '{"spec":{"replicas":2}}'`))
 )
 
 var supportedSubresources = []string{"status", "scale"}
 
-func NewPatchOptions(ioStreams genericiooptions.IOStreams) *PatchOptions {
+func NewPatchOptions(ioStreams genericclioptions.IOStreams) *PatchOptions {
 	return &PatchOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		Recorder:    genericclioptions.NoopRecorder{},
@@ -117,7 +116,7 @@ func NewPatchOptions(ioStreams genericiooptions.IOStreams) *PatchOptions {
 	}
 }
 
-func NewCmdPatch(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewPatchOptions(ioStreams)
 
 	cmd := &cobra.Command{

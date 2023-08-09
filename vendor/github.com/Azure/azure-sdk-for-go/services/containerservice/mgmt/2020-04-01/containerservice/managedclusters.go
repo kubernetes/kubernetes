@@ -105,7 +105,7 @@ func (client ManagedClustersClient) CreateOrUpdate(ctx context.Context, resource
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "CreateOrUpdate", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "CreateOrUpdate", nil, "Failure sending request")
 		return
 	}
 
@@ -139,7 +139,6 @@ func (client ManagedClustersClient) CreateOrUpdatePreparer(ctx context.Context, 
 // http.Response Body if it receives an error.
 func (client ManagedClustersClient) CreateOrUpdateSender(req *http.Request) (future ManagedClustersCreateOrUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -196,7 +195,7 @@ func (client ManagedClustersClient) Delete(ctx context.Context, resourceGroupNam
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "Delete", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "Delete", nil, "Failure sending request")
 		return
 	}
 
@@ -228,7 +227,6 @@ func (client ManagedClustersClient) DeletePreparer(ctx context.Context, resource
 // http.Response Body if it receives an error.
 func (client ManagedClustersClient) DeleteSender(req *http.Request) (future ManagedClustersDeleteFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -1049,7 +1047,7 @@ func (client ManagedClustersClient) ResetAADProfile(ctx context.Context, resourc
 
 	result, err = client.ResetAADProfileSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "ResetAADProfile", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "ResetAADProfile", nil, "Failure sending request")
 		return
 	}
 
@@ -1083,7 +1081,6 @@ func (client ManagedClustersClient) ResetAADProfilePreparer(ctx context.Context,
 // http.Response Body if it receives an error.
 func (client ManagedClustersClient) ResetAADProfileSender(req *http.Request) (future ManagedClustersResetAADProfileFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -1142,7 +1139,7 @@ func (client ManagedClustersClient) ResetServicePrincipalProfile(ctx context.Con
 
 	result, err = client.ResetServicePrincipalProfileSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "ResetServicePrincipalProfile", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "ResetServicePrincipalProfile", nil, "Failure sending request")
 		return
 	}
 
@@ -1176,7 +1173,6 @@ func (client ManagedClustersClient) ResetServicePrincipalProfilePreparer(ctx con
 // http.Response Body if it receives an error.
 func (client ManagedClustersClient) ResetServicePrincipalProfileSender(req *http.Request) (future ManagedClustersResetServicePrincipalProfileFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -1232,7 +1228,7 @@ func (client ManagedClustersClient) RotateClusterCertificates(ctx context.Contex
 
 	result, err = client.RotateClusterCertificatesSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "RotateClusterCertificates", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "RotateClusterCertificates", nil, "Failure sending request")
 		return
 	}
 
@@ -1264,7 +1260,6 @@ func (client ManagedClustersClient) RotateClusterCertificatesPreparer(ctx contex
 // http.Response Body if it receives an error.
 func (client ManagedClustersClient) RotateClusterCertificatesSender(req *http.Request) (future ManagedClustersRotateClusterCertificatesFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -1321,7 +1316,7 @@ func (client ManagedClustersClient) UpdateTags(ctx context.Context, resourceGrou
 
 	result, err = client.UpdateTagsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "UpdateTags", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerservice.ManagedClustersClient", "UpdateTags", nil, "Failure sending request")
 		return
 	}
 
@@ -1355,7 +1350,6 @@ func (client ManagedClustersClient) UpdateTagsPreparer(ctx context.Context, reso
 // http.Response Body if it receives an error.
 func (client ManagedClustersClient) UpdateTagsSender(req *http.Request) (future ManagedClustersUpdateTagsFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

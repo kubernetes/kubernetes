@@ -68,7 +68,7 @@ func (y *YFilter) UnmarshalYAML(unmarshal func(interface{}) error) error {
 type YFilters []YFilter
 
 func (y YFilters) Filters() []Filter {
-	f := make([]Filter, 0, len(y))
+	var f []Filter
 	for i := range y {
 		f = append(f, y[i].Filter)
 	}

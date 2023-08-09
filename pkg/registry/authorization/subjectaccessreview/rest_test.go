@@ -19,9 +19,10 @@ package subjectaccessreview
 import (
 	"context"
 	"errors"
-	"reflect"
 	"strings"
 	"testing"
+
+	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -180,7 +181,6 @@ func TestCreate(t *testing.T) {
 			expectedAttrs: authorizer.AttributesRecord{
 				User:            &user.DefaultInfo{Name: "bob"},
 				ResourceRequest: true,
-				APIVersion:      "*",
 			},
 			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
 				Allowed: false,

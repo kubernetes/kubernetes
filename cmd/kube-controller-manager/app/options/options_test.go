@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 
 	eventv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cpconfig "k8s.io/cloud-provider/config"
@@ -63,7 +63,6 @@ import (
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
-	validatingadmissionpolicystatusconfig "k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus/config"
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
@@ -95,14 +94,11 @@ var args = []string{
 	"--concurrent-service-endpoint-syncs=10",
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
-	"--concurrent-job-syncs=10",
-	"--concurrent-cron-job-syncs=10",
 	"--concurrent-replicaset-syncs=10",
 	"--concurrent-resource-quota-syncs=10",
 	"--concurrent-service-syncs=2",
 	"--concurrent-serviceaccount-token-syncs=10",
 	"--concurrent_rc_syncs=10",
-	"--concurrent-validating-admission-policy-status-syncs=9",
 	"--configure-cloud-routes=false",
 	"--contention-profiling=true",
 	"--controller-start-interval=2m",
@@ -111,6 +107,7 @@ var args = []string{
 	"--enable-dynamic-provisioning=false",
 	"--enable-garbage-collector=false",
 	"--enable-hostpath-provisioner=true",
+	"--enable-taint-manager=false",
 	"--cluster-signing-duration=10h",
 	"--flex-volume-plugin-dir=/flex-volume-plugin",
 	"--volume-host-cidr-denylist=127.0.0.1/28,feed::/16",
@@ -132,7 +129,6 @@ var args = []string{
 	"--leader-elect-renew-deadline=15s",
 	"--leader-elect-resource-lock=configmap",
 	"--leader-elect-retry-period=5s",
-	"--legacy-service-account-token-clean-up-period=8760h",
 	"--master=192.168.4.20",
 	"--max-endpoints-per-slice=200",
 	"--min-resync-period=8h",
@@ -146,6 +142,7 @@ var args = []string{
 	"--node-monitor-grace-period=30s",
 	"--node-monitor-period=10s",
 	"--node-startup-grace-period=30s",
+	"--pod-eviction-timeout=2m",
 	"--profiling=false",
 	"--pv-recycler-increment-timeout-nfs=45",
 	"--pv-recycler-minimum-timeout-hostpath=45",
@@ -168,7 +165,7 @@ var args = []string{
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
-	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
+	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -183,7 +180,6 @@ func TestAddFlags(t *testing.T) {
 				Address:         "0.0.0.0", // Note: This field should have no effect in CM now, and "0.0.0.0" is the default value.
 				MinResyncPeriod: metav1.Duration{Duration: 8 * time.Hour},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-					Kubeconfig:  "/kubeconfig",
 					ContentType: "application/json",
 					QPS:         50.0,
 					Burst:       100,
@@ -324,12 +320,12 @@ func TestAddFlags(t *testing.T) {
 		},
 		JobController: &JobControllerOptions{
 			&jobconfig.JobControllerConfiguration{
-				ConcurrentJobSyncs: 10,
+				ConcurrentJobSyncs: 5,
 			},
 		},
 		CronJobController: &CronJobControllerOptions{
 			&cronjobconfig.CronJobControllerConfiguration{
-				ConcurrentCronJobSyncs: 10,
+				ConcurrentCronJobSyncs: 5,
 			},
 		},
 		NamespaceController: &NamespaceControllerOptions{
@@ -347,10 +343,12 @@ func TestAddFlags(t *testing.T) {
 		},
 		NodeLifecycleController: &NodeLifecycleControllerOptions{
 			&nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				EnableTaintManager:        false,
 				NodeEvictionRate:          0.2,
 				SecondaryNodeEvictionRate: 0.05,
 				NodeMonitorGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
 				NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
+				PodEvictionTimeout:        metav1.Duration{Duration: 2 * time.Minute},
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
 			},
@@ -401,19 +399,9 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentSATokenSyncs: 10,
 			},
 		},
-		LegacySATokenCleaner: &LegacySATokenCleanerOptions{
-			&serviceaccountconfig.LegacySATokenCleanerConfiguration{
-				CleanUpPeriod: metav1.Duration{Duration: 365 * 24 * time.Hour},
-			},
-		},
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
 			&ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
 				ConcurrentTTLSyncs: 8,
-			},
-		},
-		ValidatingAdmissionPolicyStatusController: &ValidatingAdmissionPolicyStatusControllerOptions{
-			&validatingadmissionpolicystatusconfig.ValidatingAdmissionPolicyStatusControllerConfiguration{
-				ConcurrentPolicySyncs: 9,
 			},
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
@@ -446,9 +434,10 @@ func TestAddFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Master:  "192.168.4.20",
-		Metrics: &metrics.Options{},
-		Logs:    logs.NewOptions(),
+		Kubeconfig: "/kubeconfig",
+		Master:     "192.168.4.20",
+		Metrics:    &metrics.Options{},
+		Logs:       logs.NewOptions(),
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -456,7 +445,7 @@ func TestAddFlags(t *testing.T) {
 	sort.Sort(sortedGCIgnoredResources(expected.GarbageCollectorController.GCIgnoredResources))
 
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))
 	}
 }
 
@@ -464,7 +453,7 @@ func TestApplyTo(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
 	// flag set to parse the args that are required to start the kube controller manager
-	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
+	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -479,7 +468,6 @@ func TestApplyTo(t *testing.T) {
 				Address:         "0.0.0.0", // Note: This field should have no effect in CM now, and "0.0.0.0" is the default value.
 				MinResyncPeriod: metav1.Duration{Duration: 8 * time.Hour},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-					Kubeconfig:  "/kubeconfig",
 					ContentType: "application/json",
 					QPS:         50.0,
 					Burst:       100,
@@ -585,10 +573,10 @@ func TestApplyTo(t *testing.T) {
 				HorizontalPodAutoscalerTolerance:                    0.1,
 			},
 			JobController: jobconfig.JobControllerConfiguration{
-				ConcurrentJobSyncs: 10,
+				ConcurrentJobSyncs: 5,
 			},
 			CronJobController: cronjobconfig.CronJobControllerConfiguration{
-				ConcurrentCronJobSyncs: 10,
+				ConcurrentCronJobSyncs: 5,
 			},
 			NamespaceController: namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
@@ -600,10 +588,12 @@ func TestApplyTo(t *testing.T) {
 				NodeCIDRMaskSizeIPv6: 108,
 			},
 			NodeLifecycleController: nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				EnableTaintManager:        false,
 				NodeEvictionRate:          0.2,
 				SecondaryNodeEvictionRate: 0.05,
 				NodeMonitorGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
 				NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
+				PodEvictionTimeout:        metav1.Duration{Duration: 2 * time.Minute},
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
 			},
@@ -641,14 +631,8 @@ func TestApplyTo(t *testing.T) {
 				ServiceAccountKeyFile:  "/service-account-private-key",
 				ConcurrentSATokenSyncs: 10,
 			},
-			LegacySATokenCleaner: serviceaccountconfig.LegacySATokenCleanerConfiguration{
-				CleanUpPeriod: metav1.Duration{Duration: 365 * 24 * time.Hour},
-			},
 			TTLAfterFinishedController: ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
 				ConcurrentTTLSyncs: 8,
-			},
-			ValidatingAdmissionPolicyStatusController: validatingadmissionpolicystatusconfig.ValidatingAdmissionPolicyStatusControllerConfiguration{
-				ConcurrentPolicySyncs: 9,
 			},
 		},
 	}
@@ -658,10 +642,10 @@ func TestApplyTo(t *testing.T) {
 	sort.Sort(sortedGCIgnoredResources(expected.ComponentConfig.GarbageCollectorController.GCIgnoredResources))
 
 	c := &kubecontrollerconfig.Config{}
-	s.ApplyTo(c, []string{""}, []string{""}, nil)
+	s.ApplyTo(c)
 
 	if !reflect.DeepEqual(expected.ComponentConfig, c.ComponentConfig) {
-		t.Errorf("Got different configuration than expected.\nDifference detected on:\n%s", cmp.Diff(expected.ComponentConfig, c.ComponentConfig))
+		t.Errorf("Got different configuration than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected.ComponentConfig, c.ComponentConfig))
 	}
 }
 
@@ -670,26 +654,24 @@ func TestValidateControllersOptions(t *testing.T) {
 		name                   string
 		expectErrors           bool
 		expectedErrorSubString string
-		options                interface {
-			Validate() []error
-		}
+		validate               func() []error
 	}{
 		{
 			name:                   "AttachDetachControllerOptions reconciler sync loop period less than one second",
 			expectErrors:           true,
 			expectedErrorSubString: "duration time must be greater than one second",
-			options: &AttachDetachControllerOptions{
+			validate: (&AttachDetachControllerOptions{
 				&attachdetachconfig.AttachDetachControllerConfiguration{
 					ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: time.Second / 2},
 					DisableAttachDetachReconcilerSync: true,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "CSRSigningControllerOptions KubeletServingSignerConfiguration no cert file",
 			expectErrors:           true,
 			expectedErrorSubString: "cannot specify key without cert",
-			options: &CSRSigningControllerOptions{
+			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
 					ClusterSigningKeyFile:  "",
@@ -711,13 +693,13 @@ func TestValidateControllersOptions(t *testing.T) {
 						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
 					},
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "CSRSigningControllerOptions KubeletServingSignerConfiguration no key file",
 			expectErrors:           true,
 			expectedErrorSubString: "cannot specify cert without key",
-			options: &CSRSigningControllerOptions{
+			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
 					ClusterSigningKeyFile:  "",
@@ -739,13 +721,13 @@ func TestValidateControllersOptions(t *testing.T) {
 						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
 					},
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "CSRSigningControllerOptions KubeletClientSignerConfiguration no cert file",
 			expectErrors:           true,
 			expectedErrorSubString: "cannot specify key without cert",
-			options: &CSRSigningControllerOptions{
+			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
 					ClusterSigningKeyFile:  "",
@@ -767,13 +749,13 @@ func TestValidateControllersOptions(t *testing.T) {
 						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
 					},
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "CSRSigningControllerOptions KubeletClientSignerConfiguration no key file",
 			expectErrors:           true,
 			expectedErrorSubString: "cannot specify cert without key",
-			options: &CSRSigningControllerOptions{
+			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
 					ClusterSigningKeyFile:  "",
@@ -795,13 +777,13 @@ func TestValidateControllersOptions(t *testing.T) {
 						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
 					},
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "CSRSigningControllerOptions KubeAPIServerClientSignerConfiguration no cert file",
 			expectErrors:           true,
 			expectedErrorSubString: "cannot specify key without cert",
-			options: &CSRSigningControllerOptions{
+			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
 					ClusterSigningKeyFile:  "",
@@ -823,13 +805,13 @@ func TestValidateControllersOptions(t *testing.T) {
 						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
 					},
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "CSRSigningControllerOptions KubeAPIServerClientSignerConfiguration no key file",
 			expectErrors:           true,
 			expectedErrorSubString: "cannot specify cert without key",
-			options: &CSRSigningControllerOptions{
+			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
 					ClusterSigningKeyFile:  "",
@@ -851,13 +833,13 @@ func TestValidateControllersOptions(t *testing.T) {
 						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
 					},
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "CSRSigningControllerOptions LegacyUnknownSignerConfiguration no cert file",
 			expectErrors:           true,
 			expectedErrorSubString: "cannot specify key without cert",
-			options: &CSRSigningControllerOptions{
+			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
 					ClusterSigningKeyFile:  "",
@@ -879,13 +861,13 @@ func TestValidateControllersOptions(t *testing.T) {
 						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
 					},
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "CSRSigningControllerOptions LegacyUnknownSignerConfiguration no key file",
 			expectErrors:           true,
 			expectedErrorSubString: "cannot specify cert without key",
-			options: &CSRSigningControllerOptions{
+			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
 					ClusterSigningKeyFile:  "",
@@ -907,13 +889,13 @@ func TestValidateControllersOptions(t *testing.T) {
 						KeyFile:  "",
 					},
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "CSRSigningControllerOptions specific file set along with cluster single signing file",
 			expectErrors:           true,
 			expectedErrorSubString: "cannot specify --cluster-signing-{cert,key}-file and other --cluster-signing-*-file flags at the same time",
-			options: &CSRSigningControllerOptions{
+			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "/cluster-signing-cert-file",
 					ClusterSigningKeyFile:  "/cluster-signing-key-file",
@@ -935,111 +917,111 @@ func TestValidateControllersOptions(t *testing.T) {
 						KeyFile:  "",
 					},
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "EndpointSliceControllerOptions ConcurrentServiceEndpointSyncs lower than minConcurrentServiceEndpointSyncs (1)",
 			expectErrors:           true,
 			expectedErrorSubString: "concurrent-service-endpoint-syncs must not be less than 1",
-			options: &EndpointSliceControllerOptions{
+			validate: (&EndpointSliceControllerOptions{
 				&endpointsliceconfig.EndpointSliceControllerConfiguration{
 					ConcurrentServiceEndpointSyncs: 0,
 					MaxEndpointsPerSlice:           200,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "EndpointSliceControllerOptions ConcurrentServiceEndpointSyncs greater than maxConcurrentServiceEndpointSyncs (50)",
 			expectErrors:           true,
 			expectedErrorSubString: "concurrent-service-endpoint-syncs must not be more than 50",
-			options: &EndpointSliceControllerOptions{
+			validate: (&EndpointSliceControllerOptions{
 				&endpointsliceconfig.EndpointSliceControllerConfiguration{
 					ConcurrentServiceEndpointSyncs: 51,
 					MaxEndpointsPerSlice:           200,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "EndpointSliceControllerOptions MaxEndpointsPerSlice lower than minMaxEndpointsPerSlice (1)",
 			expectErrors:           true,
 			expectedErrorSubString: "max-endpoints-per-slice must not be less than 1",
-			options: &EndpointSliceControllerOptions{
+			validate: (&EndpointSliceControllerOptions{
 				&endpointsliceconfig.EndpointSliceControllerConfiguration{
 					ConcurrentServiceEndpointSyncs: 10,
 					MaxEndpointsPerSlice:           0,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "EndpointSliceControllerOptions MaxEndpointsPerSlice greater than maxMaxEndpointsPerSlice (1000)",
 			expectErrors:           true,
 			expectedErrorSubString: "max-endpoints-per-slice must not be more than 1000",
-			options: &EndpointSliceControllerOptions{
+			validate: (&EndpointSliceControllerOptions{
 				&endpointsliceconfig.EndpointSliceControllerConfiguration{
 					ConcurrentServiceEndpointSyncs: 10,
 					MaxEndpointsPerSlice:           1001,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "EndpointSliceMirroringControllerOptions MirroringConcurrentServiceEndpointSyncs lower than mirroringMinConcurrentServiceEndpointSyncs (1)",
 			expectErrors:           true,
 			expectedErrorSubString: "mirroring-concurrent-service-endpoint-syncs must not be less than 1",
-			options: &EndpointSliceMirroringControllerOptions{
+			validate: (&EndpointSliceMirroringControllerOptions{
 				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 					MirroringConcurrentServiceEndpointSyncs: 0,
 					MirroringMaxEndpointsPerSubset:          100,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "EndpointSliceMirroringControllerOptions MirroringConcurrentServiceEndpointSyncs greater than mirroringMaxConcurrentServiceEndpointSyncs (50)",
 			expectErrors:           true,
 			expectedErrorSubString: "mirroring-concurrent-service-endpoint-syncs must not be more than 50",
-			options: &EndpointSliceMirroringControllerOptions{
+			validate: (&EndpointSliceMirroringControllerOptions{
 				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 					MirroringConcurrentServiceEndpointSyncs: 51,
 					MirroringMaxEndpointsPerSubset:          100,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "EndpointSliceMirroringControllerOptions MirroringMaxEndpointsPerSubset lower than mirroringMinMaxEndpointsPerSubset (1)",
 			expectErrors:           true,
 			expectedErrorSubString: "mirroring-max-endpoints-per-subset must not be less than 1",
-			options: &EndpointSliceMirroringControllerOptions{
+			validate: (&EndpointSliceMirroringControllerOptions{
 				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 					MirroringConcurrentServiceEndpointSyncs: 10,
 					MirroringMaxEndpointsPerSubset:          0,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "EndpointSliceMirroringControllerOptions MirroringMaxEndpointsPerSubset greater than mirroringMaxMaxEndpointsPerSubset (1000)",
 			expectErrors:           true,
 			expectedErrorSubString: "mirroring-max-endpoints-per-subset must not be more than 1000",
-			options: &EndpointSliceMirroringControllerOptions{
+			validate: (&EndpointSliceMirroringControllerOptions{
 				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 					MirroringConcurrentServiceEndpointSyncs: 10,
 					MirroringMaxEndpointsPerSubset:          1001,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "EphemeralVolumeControllerOptions ConcurrentEphemeralVolumeSyncs equal 0",
 			expectErrors:           true,
 			expectedErrorSubString: "concurrent-ephemeralvolume-syncs must be greater than 0",
-			options: &EphemeralVolumeControllerOptions{
+			validate: (&EphemeralVolumeControllerOptions{
 				&ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 					ConcurrentEphemeralVolumeSyncs: 0,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "HPAControllerOptions ConcurrentHorizontalPodAutoscalerSyncs equal 0",
 			expectErrors:           true,
 			expectedErrorSubString: "concurrent-horizontal-pod-autoscaler-syncs must be greater than 0",
-			options: &HPAControllerOptions{
+			validate: (&HPAControllerOptions{
 				&poautosclerconfig.HPAControllerConfiguration{
 					ConcurrentHorizontalPodAutoscalerSyncs:              0,
 					HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
@@ -1050,99 +1032,103 @@ func TestValidateControllersOptions(t *testing.T) {
 					HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 					HorizontalPodAutoscalerTolerance:                    0.1,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:                   "NodeIPAMControllerOptions service cluster ip range more than two entries",
 			expectErrors:           true,
 			expectedErrorSubString: "--service-cluster-ip-range can not contain more than two entries",
-			options: &NodeIPAMControllerOptions{
+			validate: (&NodeIPAMControllerOptions{
 				&nodeipamconfig.NodeIPAMControllerConfiguration{
 					ServiceCIDR:          "10.0.0.0/16,244.0.0.0/16,3000::/108",
 					NodeCIDRMaskSize:     48,
 					NodeCIDRMaskSizeIPv4: 48,
 					NodeCIDRMaskSizeIPv6: 108,
 				},
-			},
+			}).Validate,
+		},
+		{
+			name:                   "PersistentVolumeBinderControllerOptions bad cidr deny list",
+			expectErrors:           true,
+			expectedErrorSubString: "bad --volume-host-ip-denylist/--volume-host-allow-local-loopback failed to parse cidr",
+			validate: (&PersistentVolumeBinderControllerOptions{
+				&persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
+					PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+					VolumeConfiguration: persistentvolumeconfig.VolumeConfiguration{
+						EnableDynamicProvisioning:  false,
+						EnableHostPathProvisioning: true,
+						FlexVolumePluginDir:        "/flex-volume-plugin",
+						PersistentVolumeRecyclerConfiguration: persistentvolumeconfig.PersistentVolumeRecyclerConfiguration{
+							MaximumRetry:             3,
+							MinimumTimeoutNFS:        200,
+							IncrementTimeoutNFS:      45,
+							MinimumTimeoutHostPath:   45,
+							IncrementTimeoutHostPath: 45,
+						},
+					},
+					VolumeHostCIDRDenylist:       []string{"127.0.0.1"},
+					VolumeHostAllowLocalLoopback: false,
+				},
+			}).Validate,
 		},
 		{
 			name:                   "StatefulSetControllerOptions ConcurrentStatefulSetSyncs equal 0",
 			expectErrors:           true,
 			expectedErrorSubString: "concurrent-statefulset-syncs must be greater than 0",
-			options: &StatefulSetControllerOptions{
+			validate: (&StatefulSetControllerOptions{
 				&statefulsetconfig.StatefulSetControllerConfiguration{
 					ConcurrentStatefulSetSyncs: 0,
 				},
-			},
-		},
-		{
-			name:                   "JobControllerOptions ConcurrentJobSyncs equal 0",
-			expectErrors:           true,
-			expectedErrorSubString: "concurrent-job-syncs must be greater than 0",
-			options: &JobControllerOptions{
-				&jobconfig.JobControllerConfiguration{
-					ConcurrentJobSyncs: 0,
-				},
-			},
-		},
-		{
-			name:                   "CronJobControllerOptions ConcurrentCronJobSyncs equal 0",
-			expectErrors:           true,
-			expectedErrorSubString: "concurrent-cron-job-syncs must be greater than 0",
-			options: &CronJobControllerOptions{
-				&cronjobconfig.CronJobControllerConfiguration{
-					ConcurrentCronJobSyncs: 0,
-				},
-			},
+			}).Validate,
 		},
 		/* empty errs */
 		{
 			name:         "CronJobControllerOptions",
 			expectErrors: false,
-			options: &CronJobControllerOptions{
+			validate: (&CronJobControllerOptions{
 				&cronjobconfig.CronJobControllerConfiguration{
-					ConcurrentCronJobSyncs: 10,
+					ConcurrentCronJobSyncs: 5,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "DaemonSetControllerOptions",
 			expectErrors: false,
-			options: &DaemonSetControllerOptions{
+			validate: (&DaemonSetControllerOptions{
 				&daemonconfig.DaemonSetControllerConfiguration{
 					ConcurrentDaemonSetSyncs: 2,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "DeploymentControllerOptions",
 			expectErrors: false,
-			options: &DeploymentControllerOptions{
+			validate: (&DeploymentControllerOptions{
 				&deploymentconfig.DeploymentControllerConfiguration{
 					ConcurrentDeploymentSyncs: 10,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "DeprecatedControllerOptions",
 			expectErrors: false,
-			options: &DeprecatedControllerOptions{
+			validate: (&DeprecatedControllerOptions{
 				&kubectrlmgrconfig.DeprecatedControllerConfiguration{},
-			},
+			}).Validate,
 		},
 		{
 			name:         "EndpointControllerOptions",
 			expectErrors: false,
-			options: &EndpointControllerOptions{
+			validate: (&EndpointControllerOptions{
 				&endpointconfig.EndpointControllerConfiguration{
 					ConcurrentEndpointSyncs: 10,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "GarbageCollectorControllerOptions",
 			expectErrors: false,
-			options: &GarbageCollectorControllerOptions{
+			validate: (&GarbageCollectorControllerOptions{
 				&garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 					ConcurrentGCSyncs: 30,
 					GCIgnoredResources: []garbagecollectorconfig.GroupResource{
@@ -1151,111 +1137,104 @@ func TestValidateControllersOptions(t *testing.T) {
 					},
 					EnableGarbageCollector: false,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "JobControllerOptions",
 			expectErrors: false,
-			options: &JobControllerOptions{
+			validate: (&JobControllerOptions{
 				&jobconfig.JobControllerConfiguration{
-					ConcurrentJobSyncs: 10,
+					ConcurrentJobSyncs: 5,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "NamespaceControllerOptions",
 			expectErrors: false,
-			options: &NamespaceControllerOptions{
+			validate: (&NamespaceControllerOptions{
 				&namespaceconfig.NamespaceControllerConfiguration{
 					NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
 					ConcurrentNamespaceSyncs: 20,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "NodeLifecycleControllerOptions",
 			expectErrors: false,
-			options: &NodeLifecycleControllerOptions{
+			validate: (&NodeLifecycleControllerOptions{
 				&nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+					EnableTaintManager:        false,
 					NodeEvictionRate:          0.2,
 					SecondaryNodeEvictionRate: 0.05,
 					NodeMonitorGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
 					NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
+					PodEvictionTimeout:        metav1.Duration{Duration: 2 * time.Minute},
 					LargeClusterSizeThreshold: 100,
 					UnhealthyZoneThreshold:    0.6,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "PodGCControllerOptions",
 			expectErrors: false,
-			options: &PodGCControllerOptions{
+			validate: (&PodGCControllerOptions{
 				&podgcconfig.PodGCControllerConfiguration{
 					TerminatedPodGCThreshold: 12000,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "ReplicaSetControllerOptions",
 			expectErrors: false,
-			options: &ReplicaSetControllerOptions{
+			validate: (&ReplicaSetControllerOptions{
 				&replicasetconfig.ReplicaSetControllerConfiguration{
 					ConcurrentRSSyncs: 10,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "ReplicationControllerOptions",
 			expectErrors: false,
-			options: &ReplicationControllerOptions{
+			validate: (&ReplicationControllerOptions{
 				&replicationconfig.ReplicationControllerConfiguration{
 					ConcurrentRCSyncs: 10,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "ResourceQuotaControllerOptions",
 			expectErrors: false,
-			options: &ResourceQuotaControllerOptions{
+			validate: (&ResourceQuotaControllerOptions{
 				&resourcequotaconfig.ResourceQuotaControllerConfiguration{
 					ResourceQuotaSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
 					ConcurrentResourceQuotaSyncs: 10,
 				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "SAControllerOptions",
 			expectErrors: false,
-			options: &SAControllerOptions{
+			validate: (&SAControllerOptions{
 				&serviceaccountconfig.SAControllerConfiguration{
 					ServiceAccountKeyFile:  "/service-account-private-key",
 					ConcurrentSATokenSyncs: 10,
 				},
-			},
-		},
-		{
-			name:         "LegacySATokenCleanerOptions",
-			expectErrors: false,
-			options: &LegacySATokenCleanerOptions{
-				&serviceaccountconfig.LegacySATokenCleanerConfiguration{
-					CleanUpPeriod: metav1.Duration{Duration: 24 * 365 * time.Hour},
-				},
-			},
+			}).Validate,
 		},
 		{
 			name:         "TTLAfterFinishedControllerOptions",
 			expectErrors: false,
-			options: &TTLAfterFinishedControllerOptions{
+			validate: (&TTLAfterFinishedControllerOptions{
 				&ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
 					ConcurrentTTLSyncs: 8,
 				},
-			},
+			}).Validate,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := tc.options.Validate()
+			errs := tc.validate()
 			if len(errs) > 0 && !tc.expectErrors {
 				t.Errorf("expected no errors, errors found %+v", errs)
 			}
@@ -1265,9 +1244,8 @@ func TestValidateControllersOptions(t *testing.T) {
 			}
 
 			if len(errs) > 0 && tc.expectErrors {
-				gotErr := utilerrors.NewAggregate(errs).Error()
-				if !strings.Contains(gotErr, tc.expectedErrorSubString) {
-					t.Errorf("expected error: %s, got err: %v", tc.expectedErrorSubString, gotErr)
+				if !strings.Contains(utilerrors.NewAggregate(errs).Error(), tc.expectedErrorSubString) {
+					t.Errorf("expected error: %s, but no error found", tc.expectedErrorSubString)
 				}
 			}
 		})
@@ -1282,52 +1260,8 @@ func TestValidateControllerManagerOptions(t *testing.T) {
 
 	opts.EndpointSliceController.MaxEndpointsPerSlice = 1001 // max endpoints per slice should be a positive integer <= 1000
 
-	if err := opts.Validate([]string{"*"}, []string{""}, nil); err == nil {
+	if err := opts.Validate([]string{"*"}, []string{""}); err == nil {
 		t.Error("expected error, no error found")
-	}
-}
-
-func TestControllerManagerAliases(t *testing.T) {
-	opts, err := NewKubeControllerManagerOptions()
-	if err != nil {
-		t.Errorf("expected no error, error found %+v", err)
-	}
-	opts.Generic.Controllers = []string{"deployment", "-job", "-cronjob-controller", "podgc", "token-cleaner-controller"}
-	expectedControllers := []string{"deployment-controller", "-job-controller", "-cronjob-controller", "pod-garbage-collector-controller", "token-cleaner-controller"}
-
-	allControllers := []string{
-		"bootstrap-signer-controller",
-		"job-controller",
-		"deployment-controller",
-		"cronjob-controller",
-		"namespace-controller",
-		"pod-garbage-collector-controller",
-		"token-cleaner-controller",
-	}
-	disabledByDefaultControllers := []string{
-		"bootstrap-signer-controller",
-		"token-cleaner-controller",
-	}
-	controllerAliases := map[string]string{
-		"bootstrapsigner": "bootstrap-signer-controller",
-		"job":             "job-controller",
-		"deployment":      "deployment-controller",
-		"cronjob":         "cronjob-controller",
-		"namespace":       "namespace-controller",
-		"podgc":           "pod-garbage-collector-controller",
-		"tokencleaner":    "token-cleaner-controller",
-	}
-
-	if err := opts.Validate(allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
-		t.Errorf("expected no error, error found %v", err)
-	}
-
-	cfg := &kubecontrollerconfig.Config{}
-	if err := opts.ApplyTo(cfg, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
-		t.Errorf("expected no error, error found %v", err)
-	}
-	if !reflect.DeepEqual(cfg.ComponentConfig.Generic.Controllers, expectedControllers) {
-		t.Errorf("controller aliases not resolved correctly, expected %+v, got %+v", expectedControllers, cfg.ComponentConfig.Generic.Controllers)
 	}
 }
 

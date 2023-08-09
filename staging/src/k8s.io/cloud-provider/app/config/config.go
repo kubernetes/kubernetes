@@ -37,10 +37,6 @@ type Config struct {
 	Authentication apiserver.AuthenticationInfo
 	Authorization  apiserver.AuthorizationInfo
 
-	// WebhookSecureServing is a separate SecureServing configuration from
-	// healthz, configz, and metrics.
-	WebhookSecureServing *apiserver.SecureServingInfo
-
 	// the general kube client
 	Client *clientset.Clientset
 

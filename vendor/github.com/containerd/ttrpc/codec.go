@@ -19,7 +19,7 @@ package ttrpc
 import (
 	"fmt"
 
-	"google.golang.org/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 )
 
 type codec struct{}

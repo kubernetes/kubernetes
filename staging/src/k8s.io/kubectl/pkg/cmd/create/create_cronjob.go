@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -70,11 +69,11 @@ type CreateCronJobOptions struct {
 	FieldManager        string
 	CreateAnnotation    bool
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewCreateCronJobOptions returns an initialized CreateCronJobOptions instance
-func NewCreateCronJobOptions(ioStreams genericiooptions.IOStreams) *CreateCronJobOptions {
+func NewCreateCronJobOptions(ioStreams genericclioptions.IOStreams) *CreateCronJobOptions {
 	return &CreateCronJobOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -82,7 +81,7 @@ func NewCreateCronJobOptions(ioStreams genericiooptions.IOStreams) *CreateCronJo
 }
 
 // NewCmdCreateCronJob is a command to create CronJobs.
-func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateCronJobOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "cronjob NAME --image=image --schedule='0/5 * * * ?' -- [COMMAND] [args...]",

@@ -25,30 +25,28 @@ import (
 // EphemeralContainerCommonApplyConfiguration represents an declarative configuration of the EphemeralContainerCommon type for use
 // with apply.
 type EphemeralContainerCommonApplyConfiguration struct {
-	Name                     *string                                   `json:"name,omitempty"`
-	Image                    *string                                   `json:"image,omitempty"`
-	Command                  []string                                  `json:"command,omitempty"`
-	Args                     []string                                  `json:"args,omitempty"`
-	WorkingDir               *string                                   `json:"workingDir,omitempty"`
-	Ports                    []ContainerPortApplyConfiguration         `json:"ports,omitempty"`
-	EnvFrom                  []EnvFromSourceApplyConfiguration         `json:"envFrom,omitempty"`
-	Env                      []EnvVarApplyConfiguration                `json:"env,omitempty"`
-	Resources                *ResourceRequirementsApplyConfiguration   `json:"resources,omitempty"`
-	ResizePolicy             []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
-	RestartPolicy            *corev1.ContainerRestartPolicy            `json:"restartPolicy,omitempty"`
-	VolumeMounts             []VolumeMountApplyConfiguration           `json:"volumeMounts,omitempty"`
-	VolumeDevices            []VolumeDeviceApplyConfiguration          `json:"volumeDevices,omitempty"`
-	LivenessProbe            *ProbeApplyConfiguration                  `json:"livenessProbe,omitempty"`
-	ReadinessProbe           *ProbeApplyConfiguration                  `json:"readinessProbe,omitempty"`
-	StartupProbe             *ProbeApplyConfiguration                  `json:"startupProbe,omitempty"`
-	Lifecycle                *LifecycleApplyConfiguration              `json:"lifecycle,omitempty"`
-	TerminationMessagePath   *string                                   `json:"terminationMessagePath,omitempty"`
-	TerminationMessagePolicy *corev1.TerminationMessagePolicy          `json:"terminationMessagePolicy,omitempty"`
-	ImagePullPolicy          *corev1.PullPolicy                        `json:"imagePullPolicy,omitempty"`
-	SecurityContext          *SecurityContextApplyConfiguration        `json:"securityContext,omitempty"`
-	Stdin                    *bool                                     `json:"stdin,omitempty"`
-	StdinOnce                *bool                                     `json:"stdinOnce,omitempty"`
-	TTY                      *bool                                     `json:"tty,omitempty"`
+	Name                     *string                                 `json:"name,omitempty"`
+	Image                    *string                                 `json:"image,omitempty"`
+	Command                  []string                                `json:"command,omitempty"`
+	Args                     []string                                `json:"args,omitempty"`
+	WorkingDir               *string                                 `json:"workingDir,omitempty"`
+	Ports                    []ContainerPortApplyConfiguration       `json:"ports,omitempty"`
+	EnvFrom                  []EnvFromSourceApplyConfiguration       `json:"envFrom,omitempty"`
+	Env                      []EnvVarApplyConfiguration              `json:"env,omitempty"`
+	Resources                *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
+	VolumeMounts             []VolumeMountApplyConfiguration         `json:"volumeMounts,omitempty"`
+	VolumeDevices            []VolumeDeviceApplyConfiguration        `json:"volumeDevices,omitempty"`
+	LivenessProbe            *ProbeApplyConfiguration                `json:"livenessProbe,omitempty"`
+	ReadinessProbe           *ProbeApplyConfiguration                `json:"readinessProbe,omitempty"`
+	StartupProbe             *ProbeApplyConfiguration                `json:"startupProbe,omitempty"`
+	Lifecycle                *LifecycleApplyConfiguration            `json:"lifecycle,omitempty"`
+	TerminationMessagePath   *string                                 `json:"terminationMessagePath,omitempty"`
+	TerminationMessagePolicy *corev1.TerminationMessagePolicy        `json:"terminationMessagePolicy,omitempty"`
+	ImagePullPolicy          *corev1.PullPolicy                      `json:"imagePullPolicy,omitempty"`
+	SecurityContext          *SecurityContextApplyConfiguration      `json:"securityContext,omitempty"`
+	Stdin                    *bool                                   `json:"stdin,omitempty"`
+	StdinOnce                *bool                                   `json:"stdinOnce,omitempty"`
+	TTY                      *bool                                   `json:"tty,omitempty"`
 }
 
 // EphemeralContainerCommonApplyConfiguration constructs an declarative configuration of the EphemeralContainerCommon type for use with
@@ -145,27 +143,6 @@ func (b *EphemeralContainerCommonApplyConfiguration) WithEnv(values ...*EnvVarAp
 // If called multiple times, the Resources field is set to the value of the last call.
 func (b *EphemeralContainerCommonApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *EphemeralContainerCommonApplyConfiguration {
 	b.Resources = value
-	return b
-}
-
-// WithResizePolicy adds the given value to the ResizePolicy field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the ResizePolicy field.
-func (b *EphemeralContainerCommonApplyConfiguration) WithResizePolicy(values ...*ContainerResizePolicyApplyConfiguration) *EphemeralContainerCommonApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithResizePolicy")
-		}
-		b.ResizePolicy = append(b.ResizePolicy, *values[i])
-	}
-	return b
-}
-
-// WithRestartPolicy sets the RestartPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RestartPolicy field is set to the value of the last call.
-func (b *EphemeralContainerCommonApplyConfiguration) WithRestartPolicy(value corev1.ContainerRestartPolicy) *EphemeralContainerCommonApplyConfiguration {
-	b.RestartPolicy = &value
 	return b
 }
 

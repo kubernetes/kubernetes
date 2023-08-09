@@ -35,10 +35,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against pod templates.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &api.PodTemplate{} },
-		NewListFunc:               func() runtime.Object { return &api.PodTemplateList{} },
-		DefaultQualifiedResource:  api.Resource("podtemplates"),
-		SingularQualifiedResource: api.Resource("podtemplate"),
+		NewFunc:                  func() runtime.Object { return &api.PodTemplate{} },
+		NewListFunc:              func() runtime.Object { return &api.PodTemplateList{} },
+		DefaultQualifiedResource: api.Resource("podtemplates"),
 
 		CreateStrategy: podtemplate.Strategy,
 		UpdateStrategy: podtemplate.Strategy,

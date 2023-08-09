@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -58,12 +58,12 @@ type DeploymentStorage struct {
 }
 
 // ReplicasPathMappings returns the mappings between each group version and a replicas path
-func ReplicasPathMappings() managedfields.ResourcePathMappings {
+func ReplicasPathMappings() fieldmanager.ResourcePathMappings {
 	return replicasPathInDeployment
 }
 
 // maps a group version to the replicas path in a deployment object
-var replicasPathInDeployment = managedfields.ResourcePathMappings{
+var replicasPathInDeployment = fieldmanager.ResourcePathMappings{
 	schema.GroupVersion{Group: "apps", Version: "v1beta1"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
 	schema.GroupVersion{Group: "apps", Version: "v1beta2"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
 	schema.GroupVersion{Group: "apps", Version: "v1"}.String():      fieldpath.MakePathOrDie("spec", "replicas"),
@@ -92,10 +92,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &apps.Deployment{} },
-		NewListFunc:               func() runtime.Object { return &apps.DeploymentList{} },
-		DefaultQualifiedResource:  apps.Resource("deployments"),
-		SingularQualifiedResource: apps.Resource("deployment"),
+		NewFunc:                  func() runtime.Object { return &apps.Deployment{} },
+		NewListFunc:              func() runtime.Object { return &apps.DeploymentList{} },
+		DefaultQualifiedResource: apps.Resource("deployments"),
 
 		CreateStrategy:      deployment.Strategy,
 		UpdateStrategy:      deployment.Strategy,
@@ -422,7 +421,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		}
 	}
 
-	managedFieldsHandler := managedfields.NewScaleHandler(
+	managedFieldsHandler := fieldmanager.NewScaleHandler(
 		deployment.ManagedFields,
 		groupVersion,
 		replicasPathInDeployment,

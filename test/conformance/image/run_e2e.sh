@@ -67,7 +67,7 @@ esac
 ginkgo_args+=(
     "--focus=${E2E_FOCUS}"
     "--skip=${E2E_SKIP}"
-    "--no-color=true"
+    "--noColor=true"
 )
 
 set -x

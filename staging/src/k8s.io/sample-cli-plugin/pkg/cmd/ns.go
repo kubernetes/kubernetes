@@ -26,7 +26,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
 
 var (
@@ -61,11 +60,11 @@ type NamespaceOptions struct {
 	listNamespaces bool
 	args           []string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewNamespaceOptions provides an instance of NamespaceOptions with default values
-func NewNamespaceOptions(streams genericiooptions.IOStreams) *NamespaceOptions {
+func NewNamespaceOptions(streams genericclioptions.IOStreams) *NamespaceOptions {
 	return &NamespaceOptions{
 		configFlags: genericclioptions.NewConfigFlags(true),
 
@@ -74,7 +73,7 @@ func NewNamespaceOptions(streams genericiooptions.IOStreams) *NamespaceOptions {
 }
 
 // NewCmdNamespace provides a cobra command wrapping NamespaceOptions
-func NewCmdNamespace(streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdNamespace(streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewNamespaceOptions(streams)
 
 	cmd := &cobra.Command{

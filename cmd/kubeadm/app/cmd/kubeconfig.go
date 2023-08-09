@@ -20,6 +20,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"k8s.io/klog/v2"
@@ -42,9 +43,6 @@ var (
 	`)
 
 	userKubeconfigExample = cmdutil.Examples(`
-	# Output a kubeconfig file for an additional user named foo
-	kubeadm kubeconfig user --client-name=foo
-
 	# Output a kubeconfig file for an additional user named foo using a kubeadm config file bar
 	kubeadm kubeconfig user --client-name=foo --config=bar
 	`)
@@ -81,6 +79,9 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 		Long:    userKubeconfigLongDesc,
 		Example: userKubeconfigExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(cfgPath) == 0 {
+				return errors.New("the kubeadm configuration path cannot be empty")
+			}
 			// This call returns the ready-to-use configuration based on the defaults populated by flags
 			internalCfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
 			if err != nil {
@@ -113,6 +114,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 	cmd.Flags().StringSliceVar(&organizations, "org", organizations, "The organizations of the client certificate. It will be used as the O if client certificates are created")
 	cmd.Flags().DurationVar(&validityPeriod, "validity-period", kubeadmconstants.CertificateValidity, "The validity period of the client certificate. It is an offset from the current time.")
 
+	cmd.MarkFlagRequired(options.CfgPath)
 	cmd.MarkFlagRequired("client-name")
 	return cmd
 }

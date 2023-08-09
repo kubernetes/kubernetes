@@ -64,11 +64,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against Jobs.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &batch.Job{} },
-		NewListFunc:               func() runtime.Object { return &batch.JobList{} },
-		PredicateFunc:             job.MatchJob,
-		DefaultQualifiedResource:  batch.Resource("jobs"),
-		SingularQualifiedResource: batch.Resource("job"),
+		NewFunc:                  func() runtime.Object { return &batch.Job{} },
+		NewListFunc:              func() runtime.Object { return &batch.JobList{} },
+		PredicateFunc:            job.MatchJob,
+		DefaultQualifiedResource: batch.Resource("jobs"),
 
 		CreateStrategy:      job.Strategy,
 		UpdateStrategy:      job.Strategy,

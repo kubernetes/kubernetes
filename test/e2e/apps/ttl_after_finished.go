@@ -43,7 +43,7 @@ const (
 
 var _ = SIGDescribe("TTLAfterFinished", func() {
 	f := framework.NewDefaultFramework("ttlafterfinished")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("job should be deleted once it finishes after TTL seconds", func(ctx context.Context) {
 		testFinishedJob(ctx, f)
@@ -97,17 +97,13 @@ func testFinishedJob(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 	jobFinishTime := finishTime(job)
 	finishTimeUTC := jobFinishTime.UTC()
-	if jobFinishTime.IsZero() {
-		framework.Fail("Expected job finish time not to be zero.")
-	}
+	framework.ExpectNotEqual(jobFinishTime.IsZero(), true)
 
 	deleteAtUTC := job.ObjectMeta.DeletionTimestamp.UTC()
 	framework.ExpectNotEqual(deleteAtUTC, nil)
 
 	expireAtUTC := finishTimeUTC.Add(time.Duration(ttl) * time.Second)
-	if deleteAtUTC.Before(expireAtUTC) {
-		framework.Fail("Expected job's deletion time to be after expiration time.")
-	}
+	framework.ExpectEqual(deleteAtUTC.Before(expireAtUTC), false)
 }
 
 // finishTime returns finish time of the specified job.

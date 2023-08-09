@@ -22,23 +22,12 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strings"
 	"time"
 
-	"github.com/vmware/govmomi/simulator"
 	"github.com/vmware/govmomi/sts/internal"
 	"github.com/vmware/govmomi/vim25/soap"
 	vim "github.com/vmware/govmomi/vim25/types"
 )
-
-func init() {
-	simulator.RegisterEndpoint(func(s *simulator.Service, r *simulator.Registry) {
-		if r.IsVPX() {
-			path, handler := New(s.Listen, r.OptionManager().Setting)
-			s.Handle(path, handler)
-		}
-	})
-}
 
 // New creates an STS simulator and configures the simulator endpoint in the given settings.
 // The path returned is that of the settings "config.vpxd.sso.sts.uri" property.
@@ -47,6 +36,9 @@ func New(u *url.URL, settings []vim.BaseOptionValue) (string, http.Handler) {
 		setting := settings[i].GetOptionValue()
 		if setting.Key == "config.vpxd.sso.sts.uri" {
 			endpoint, _ := url.Parse(setting.Value.(string))
+			endpoint.Host = u.Host
+			setting.Value = endpoint.String()
+			settings[i] = setting
 			return endpoint.Path, new(handler)
 		}
 	}
@@ -58,8 +50,6 @@ type handler struct{}
 // ServeHTTP handles STS requests.
 func (s *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	action := r.Header.Get("SOAPAction")
-	action = strings.TrimSuffix(action, `"`) // PowerCLI sts client quotes the header value
-
 	env := soap.Envelope{}
 	now := time.Now()
 	lifetime := &internal.Lifetime{

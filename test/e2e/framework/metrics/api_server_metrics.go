@@ -17,6 +17,8 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
+
 	"k8s.io/component-base/metrics/testutil"
 )
 
@@ -39,4 +41,12 @@ func parseAPIServerMetrics(data string) (APIServerMetrics, error) {
 		return APIServerMetrics{}, err
 	}
 	return result, nil
+}
+
+func (g *Grabber) getMetricsFromAPIServer(ctx context.Context) (string, error) {
+	rawOutput, err := g.client.CoreV1().RESTClient().Get().RequestURI("/metrics").Do(ctx).Raw()
+	if err != nil {
+		return "", err
+	}
+	return string(rawOutput), nil
 }

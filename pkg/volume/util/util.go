@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -172,7 +173,7 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("file path not specified")
 	}
-	podDef, err := os.ReadFile(filePath)
+	podDef, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file path %s: %+v", filePath, err)
 	}
@@ -687,9 +688,9 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 	// Neither of the above should be counted as a mount ref as those are handled
 	// by the kubelet. What we're concerned about is a path like
 	//   /data/local/some/manual/mount
-	// As unmounting could interrupt usage from that mountpoint.
+	// As unmonting could interrupt usage from that mountpoint.
 	//
-	// So instead of looking for the entire /var/lib/... path, the plugins/kubernetes.io/
+	// So instead of looking for the entire /var/lib/... path, the plugins/kuberentes.io/
 	// suffix is trimmed off and searched for.
 	//
 	// If there isn't a /plugins/... path, the whole mountPath is used instead.
@@ -705,7 +706,7 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 	return false
 }
 
-// WriteVolumeCache flush disk data given the specified mount path
+// WriteVolumeCache flush disk data given the spcified mount path
 func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
 	if runtime.GOOS == "windows" {

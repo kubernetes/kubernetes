@@ -21,6 +21,7 @@ package mount
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -146,7 +147,7 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 			"Dir",
 			"",
 			func(base, fileName, targetLinkName string) error {
-				return os.Mkdir(filepath.Join(base, fileName), 0o750)
+				return os.Mkdir(filepath.Join(base, fileName), 0750)
 			},
 			true,
 			false,
@@ -165,7 +166,7 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 			"targetSymLink",
 			func(base, fileName, targetLinkName string) error {
 				targeLinkPath := filepath.Join(base, targetLinkName)
-				if err := os.Mkdir(targeLinkPath, 0o750); err != nil {
+				if err := os.Mkdir(targeLinkPath, 0750); err != nil {
 					return err
 				}
 
@@ -183,7 +184,7 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 			"targetSymLink2",
 			func(base, fileName, targetLinkName string) error {
 				targeLinkPath := filepath.Join(base, targetLinkName)
-				if err := os.Mkdir(targeLinkPath, 0o750); err != nil {
+				if err := os.Mkdir(targeLinkPath, 0750); err != nil {
 					return err
 				}
 
@@ -199,7 +200,12 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		base := t.TempDir()
+		base, err := ioutil.TempDir("", test.fileName)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		defer os.RemoveAll(base)
 
 		if err := test.setUp(base, test.fileName, test.targetLinkName); err != nil {
 			t.Fatalf("unexpected error in setUp(%s, %s): %v", test.fileName, test.targetLinkName, err)
@@ -274,7 +280,13 @@ func TestFormatAndMount(t *testing.T) {
 			Interface: &fakeMounter,
 			Exec:      fakeExec,
 		}
-		target := filepath.Join(t.TempDir(), test.target)
+		base, err := ioutil.TempDir("", test.device)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		defer os.RemoveAll(base)
+
+		target := filepath.Join(base, test.target)
 		err = mounter.FormatAndMount(test.device, target, test.fstype, test.mountOptions)
 		if test.expectError {
 			assert.NotNil(t, err, "Expect error during FormatAndMount(%s, %s, %s, %v)", test.device, test.target, test.fstype, test.mountOptions)

@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 )
 
 func TestMarshalJSON(t *testing.T) {
@@ -276,7 +275,7 @@ func TestBootstrapTokenToSecret(t *testing.T) {
 					Name:      "bootstrap-token-abcdef",
 					Namespace: "kube-system",
 				},
-				Type: bootstrapapi.SecretTypeBootstrapToken,
+				Type: v1.SecretType("bootstrap.kubernetes.io/token"),
 				Data: map[string][]byte{
 					"token-id":                       []byte("abcdef"),
 					"token-secret":                   []byte("abcdef0123456789"),
@@ -649,7 +648,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 					Name:      rt.name,
 					Namespace: "kube-system",
 				},
-				Type: bootstrapapi.SecretTypeBootstrapToken,
+				Type: v1.SecretType("bootstrap.kubernetes.io/token"),
 				Data: rt.data,
 			})
 			if (err != nil) != rt.expectedError {

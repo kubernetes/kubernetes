@@ -60,7 +60,7 @@ type LeaderElectionConfiguration struct {
 type DebuggingConfiguration struct {
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling *bool `json:"enableProfiling,omitempty"`
-	// enableContentionProfiling enables block profiling, if
+	// enableContentionProfiling enables lock contention profiling, if
 	// enableProfiling is true.
 	EnableContentionProfiling *bool `json:"enableContentionProfiling,omitempty"`
 }

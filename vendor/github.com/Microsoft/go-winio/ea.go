@@ -33,7 +33,7 @@ func parseEa(b []byte) (ea ExtendedAttribute, nb []byte, err error) {
 	err = binary.Read(bytes.NewReader(b), binary.LittleEndian, &info)
 	if err != nil {
 		err = errInvalidEaBuffer
-		return ea, nb, err
+		return
 	}
 
 	nameOffset := fileFullEaInformationSize
@@ -43,7 +43,7 @@ func parseEa(b []byte) (ea ExtendedAttribute, nb []byte, err error) {
 	nextOffset := int(info.NextEntryOffset)
 	if valueLen+valueOffset > len(b) || nextOffset < 0 || nextOffset > len(b) {
 		err = errInvalidEaBuffer
-		return ea, nb, err
+		return
 	}
 
 	ea.Name = string(b[nameOffset : nameOffset+nameLen])
@@ -52,7 +52,7 @@ func parseEa(b []byte) (ea ExtendedAttribute, nb []byte, err error) {
 	if info.NextEntryOffset != 0 {
 		nb = b[info.NextEntryOffset:]
 	}
-	return ea, nb, err
+	return
 }
 
 // DecodeExtendedAttributes decodes a list of EAs from a FILE_FULL_EA_INFORMATION
@@ -67,7 +67,7 @@ func DecodeExtendedAttributes(b []byte) (eas []ExtendedAttribute, err error) {
 		eas = append(eas, ea)
 		b = nb
 	}
-	return eas, err
+	return
 }
 
 func writeEa(buf *bytes.Buffer, ea *ExtendedAttribute, last bool) error {

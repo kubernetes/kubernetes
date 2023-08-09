@@ -125,13 +125,8 @@ func NewBackendQuota(s *EtcdServer, name string) Quota {
 }
 
 func (b *backendQuota) Available(v interface{}) bool {
-	cost := b.Cost(v)
-	// if there are no mutating requests, it's safe to pass through
-	if cost == 0 {
-		return true
-	}
 	// TODO: maybe optimize backend.Size()
-	return b.s.Backend().Size()+int64(cost) < b.maxBackendBytes
+	return b.s.Backend().Size()+int64(b.Cost(v)) < b.maxBackendBytes
 }
 
 func (b *backendQuota) Cost(v interface{}) int {

@@ -368,12 +368,14 @@ type RtMetrics struct {
 	Pad      uint32
 }
 
+type Mclpool struct{}
+
 const (
 	SizeofBpfVersion = 0x4
 	SizeofBpfStat    = 0x8
 	SizeofBpfProgram = 0x10
 	SizeofBpfInsn    = 0x8
-	SizeofBpfHdr     = 0x18
+	SizeofBpfHdr     = 0x14
 )
 
 type BpfVersion struct {
@@ -403,10 +405,7 @@ type BpfHdr struct {
 	Caplen  uint32
 	Datalen uint32
 	Hdrlen  uint16
-	Ifidx   uint16
-	Flowid  uint16
-	Flags   uint8
-	Drops   uint8
+	_       [2]byte
 }
 
 type BpfTimeval struct {

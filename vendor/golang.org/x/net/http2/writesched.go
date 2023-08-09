@@ -184,8 +184,7 @@ func (wr *FrameWriteRequest) replyToWriter(err error) {
 
 // writeQueue is used by implementations of WriteScheduler.
 type writeQueue struct {
-	s          []FrameWriteRequest
-	prev, next *writeQueue
+	s []FrameWriteRequest
 }
 
 func (q *writeQueue) empty() bool { return len(q.s) == 0 }

@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	internal "k8s.io/controller-manager/config"
 )
@@ -119,7 +117,7 @@ controllerLeaders:
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer utiltesting.CloseAndRemove(t, configFile)
+			defer os.Remove(configFile.Name())
 			err = os.WriteFile(configFile.Name(), []byte(tc.content), os.FileMode(0755))
 			if err != nil {
 				t.Fatal(err)

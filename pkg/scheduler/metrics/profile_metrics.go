@@ -19,30 +19,31 @@ package metrics
 // This file contains helpers for metrics that are associated to a profile.
 
 var (
-	ScheduledResult     = "scheduled"
-	UnschedulableResult = "unschedulable"
-	ErrorResult         = "error"
+	scheduledResult     = "scheduled"
+	unschedulableResult = "unschedulable"
+	errorResult         = "error"
 )
 
 // PodScheduled can records a successful scheduling attempt and the duration
 // since `start`.
 func PodScheduled(profile string, duration float64) {
-	observeScheduleAttemptAndLatency(ScheduledResult, profile, duration)
+	observeScheduleAttemptAndLatency(scheduledResult, profile, duration)
 }
 
 // PodUnschedulable can records a scheduling attempt for an unschedulable pod
 // and the duration since `start`.
 func PodUnschedulable(profile string, duration float64) {
-	observeScheduleAttemptAndLatency(UnschedulableResult, profile, duration)
+	observeScheduleAttemptAndLatency(unschedulableResult, profile, duration)
 }
 
 // PodScheduleError can records a scheduling attempt that had an error and the
 // duration since `start`.
 func PodScheduleError(profile string, duration float64) {
-	observeScheduleAttemptAndLatency(ErrorResult, profile, duration)
+	observeScheduleAttemptAndLatency(errorResult, profile, duration)
 }
 
 func observeScheduleAttemptAndLatency(result, profile string, duration float64) {
+	e2eSchedulingLatency.WithLabelValues(result, profile).Observe(duration)
 	schedulingLatency.WithLabelValues(result, profile).Observe(duration)
 	scheduleAttempts.WithLabelValues(result, profile).Inc()
 }

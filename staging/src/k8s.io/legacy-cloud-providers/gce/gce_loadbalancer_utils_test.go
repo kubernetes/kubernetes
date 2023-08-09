@@ -114,6 +114,11 @@ func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v
 						v1.LabelFailureDomainBetaZone: zoneName,
 					},
 				},
+				Status: v1.NodeStatus{
+					NodeInfo: v1.NodeSystemInfo{
+						KubeProxyVersion: "v1.7.2",
+					},
+				},
 			},
 		)
 

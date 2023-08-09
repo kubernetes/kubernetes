@@ -18,9 +18,9 @@ package object
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -34,138 +34,163 @@ func NewHostConfigManager(c *vim25.Client, ref types.ManagedObjectReference) *Ho
 	}
 }
 
-// reference returns the ManagedObjectReference for the given HostConfigManager property name.
-// An error is returned if the field is nil, of type ErrNotSupported if versioned is true.
-func (m HostConfigManager) reference(ctx context.Context, name string, versioned ...bool) (types.ManagedObjectReference, error) {
-	prop := "configManager." + name
-	var content []types.ObjectContent
-
-	err := m.Properties(ctx, m.Reference(), []string{prop}, &content)
-	if err != nil {
-		return types.ManagedObjectReference{}, err
-	}
-
-	for _, c := range content {
-		for _, p := range c.PropSet {
-			if p.Name != prop {
-				continue
-			}
-			if ref, ok := p.Val.(types.ManagedObjectReference); ok {
-				return ref, nil
-			}
-		}
-	}
-
-	err = fmt.Errorf("%s %s is nil", m.Reference(), prop)
-	if len(versioned) == 1 && versioned[0] {
-		err = ErrNotSupported
-	}
-	return types.ManagedObjectReference{}, err
-}
-
 func (m HostConfigManager) DatastoreSystem(ctx context.Context) (*HostDatastoreSystem, error) {
-	ref, err := m.reference(ctx, "datastoreSystem")
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.datastoreSystem"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewHostDatastoreSystem(m.c, ref), nil
+
+	return NewHostDatastoreSystem(m.c, *h.ConfigManager.DatastoreSystem), nil
 }
 
 func (m HostConfigManager) NetworkSystem(ctx context.Context) (*HostNetworkSystem, error) {
-	ref, err := m.reference(ctx, "networkSystem")
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.networkSystem"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewHostNetworkSystem(m.c, ref), nil
+
+	return NewHostNetworkSystem(m.c, *h.ConfigManager.NetworkSystem), nil
 }
 
 func (m HostConfigManager) FirewallSystem(ctx context.Context) (*HostFirewallSystem, error) {
-	ref, err := m.reference(ctx, "firewallSystem")
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.firewallSystem"}, &h)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewHostFirewallSystem(m.c, ref), nil
+	return NewHostFirewallSystem(m.c, *h.ConfigManager.FirewallSystem), nil
 }
 
 func (m HostConfigManager) StorageSystem(ctx context.Context) (*HostStorageSystem, error) {
-	ref, err := m.reference(ctx, "storageSystem")
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.storageSystem"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewHostStorageSystem(m.c, ref), nil
+
+	return NewHostStorageSystem(m.c, *h.ConfigManager.StorageSystem), nil
 }
 
 func (m HostConfigManager) VirtualNicManager(ctx context.Context) (*HostVirtualNicManager, error) {
-	ref, err := m.reference(ctx, "virtualNicManager")
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.virtualNicManager"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewHostVirtualNicManager(m.c, ref, m.Reference()), nil
+
+	return NewHostVirtualNicManager(m.c, *h.ConfigManager.VirtualNicManager, m.Reference()), nil
 }
 
 func (m HostConfigManager) VsanSystem(ctx context.Context) (*HostVsanSystem, error) {
-	ref, err := m.reference(ctx, "vsanSystem", true) // Added in 5.5
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.vsanSystem"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewHostVsanSystem(m.c, ref), nil
+
+	// Added in 5.5
+	if h.ConfigManager.VsanSystem == nil {
+		return nil, ErrNotSupported
+	}
+
+	return NewHostVsanSystem(m.c, *h.ConfigManager.VsanSystem), nil
 }
 
 func (m HostConfigManager) VsanInternalSystem(ctx context.Context) (*HostVsanInternalSystem, error) {
-	ref, err := m.reference(ctx, "vsanInternalSystem", true) // Added in 5.5
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.vsanInternalSystem"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewHostVsanInternalSystem(m.c, ref), nil
+
+	// Added in 5.5
+	if h.ConfigManager.VsanInternalSystem == nil {
+		return nil, ErrNotSupported
+	}
+
+	return NewHostVsanInternalSystem(m.c, *h.ConfigManager.VsanInternalSystem), nil
 }
 
 func (m HostConfigManager) AccountManager(ctx context.Context) (*HostAccountManager, error) {
-	ref, err := m.reference(ctx, "accountManager", true) // Added in 5.5
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.accountManager"}, &h)
 	if err != nil {
-		if err == ErrNotSupported {
-			// Versions < 5.5 can use the ServiceContent ref,
-			// but only when connected directly to ESX.
-			if m.c.ServiceContent.AccountManager == nil {
-				return nil, err
-			}
-			ref = *m.c.ServiceContent.AccountManager
-		} else {
-			return nil, err
+		return nil, err
+	}
+
+	ref := h.ConfigManager.AccountManager // Added in 6.0
+	if ref == nil {
+		// Versions < 5.5 can use the ServiceContent ref,
+		// but we can only use it when connected directly to ESX.
+		c := m.Client()
+		if !c.IsVC() {
+			ref = c.ServiceContent.AccountManager
+		}
+
+		if ref == nil {
+			return nil, ErrNotSupported
 		}
 	}
 
-	return NewHostAccountManager(m.c, ref), nil
+	return NewHostAccountManager(m.c, *ref), nil
 }
 
 func (m HostConfigManager) OptionManager(ctx context.Context) (*OptionManager, error) {
-	ref, err := m.reference(ctx, "advancedOption")
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.advancedOption"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewOptionManager(m.c, ref), nil
+
+	return NewOptionManager(m.c, *h.ConfigManager.AdvancedOption), nil
 }
 
 func (m HostConfigManager) ServiceSystem(ctx context.Context) (*HostServiceSystem, error) {
-	ref, err := m.reference(ctx, "serviceSystem")
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.serviceSystem"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewHostServiceSystem(m.c, ref), nil
+
+	return NewHostServiceSystem(m.c, *h.ConfigManager.ServiceSystem), nil
 }
 
 func (m HostConfigManager) CertificateManager(ctx context.Context) (*HostCertificateManager, error) {
-	ref, err := m.reference(ctx, "certificateManager", true) // Added in 6.0
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.certificateManager"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewHostCertificateManager(m.c, ref, m.Reference()), nil
+
+	// Added in 6.0
+	if h.ConfigManager.CertificateManager == nil {
+		return nil, ErrNotSupported
+	}
+
+	return NewHostCertificateManager(m.c, *h.ConfigManager.CertificateManager, m.Reference()), nil
 }
 
 func (m HostConfigManager) DateTimeSystem(ctx context.Context) (*HostDateTimeSystem, error) {
-	ref, err := m.reference(ctx, "dateTimeSystem")
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.dateTimeSystem"}, &h)
 	if err != nil {
 		return nil, err
 	}
-	return NewHostDateTimeSystem(m.c, ref), nil
+
+	return NewHostDateTimeSystem(m.c, *h.ConfigManager.DateTimeSystem), nil
 }

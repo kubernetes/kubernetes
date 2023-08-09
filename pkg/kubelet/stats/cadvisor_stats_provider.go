@@ -152,7 +152,6 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
 			podStats.CPU = cpu
 			podStats.Memory = memory
-			podStats.Swap = cadvisorInfoToSwapStats(podInfo)
 			podStats.ProcessStats = cadvisorInfoToProcessStats(podInfo)
 		}
 
@@ -228,7 +227,6 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]s
 			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
 			podStats.CPU = cpu
 			podStats.Memory = memory
-			podStats.Swap = cadvisorInfoToSwapStats(podInfo)
 		}
 		result = append(result, *podStats)
 	}

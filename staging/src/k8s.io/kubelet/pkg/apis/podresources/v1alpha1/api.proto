@@ -1,8 +1,7 @@
-// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+// To regenerate api.pb.go run hack/update-generated-pod-resources.sh
 syntax = "proto3";
 
 package v1alpha1;
-option go_package = "k8s.io/kubelet/pkg/apis/podresources/v1alpha1";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 

@@ -365,9 +365,4 @@ type Unstructured interface {
 	// error should terminate the iteration. If IsList() returns false, this method should return an error
 	// instead of calling the provided function.
 	EachListItem(func(Object) error) error
-	// EachListItemWithAlloc works like EachListItem, but avoids retaining references to a slice of items.
-	// It does this by making a shallow copy of non-pointer items before passing them to fn.
-	//
-	// If the items passed to fn are not retained, or are retained for the same duration, use EachListItem instead for memory efficiency.
-	EachListItemWithAlloc(func(Object) error) error
 }

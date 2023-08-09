@@ -17,22 +17,20 @@ package types
 import (
 	"fmt"
 	"reflect"
-	"strings"
-
-	"github.com/stoewer/go-strcase"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/google/cel-go/common/types/pb"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"github.com/stoewer/go-strcase"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
 // NewDynamicMap returns a traits.Mapper value with dynamic key, value pairs.
-func NewDynamicMap(adapter ref.TypeAdapter, value any) traits.Mapper {
+func NewDynamicMap(adapter ref.TypeAdapter, value interface{}) traits.Mapper {
 	refValue := reflect.ValueOf(value)
 	return &baseMap{
 		TypeAdapter: adapter,
@@ -67,7 +65,7 @@ func NewRefValMap(adapter ref.TypeAdapter, value map[ref.Val]ref.Val) traits.Map
 }
 
 // NewStringInterfaceMap returns a specialized traits.Mapper with string keys and interface values.
-func NewStringInterfaceMap(adapter ref.TypeAdapter, value map[string]any) traits.Mapper {
+func NewStringInterfaceMap(adapter ref.TypeAdapter, value map[string]interface{}) traits.Mapper {
 	return &baseMap{
 		TypeAdapter: adapter,
 		mapAccessor: newStringIfaceMapAccessor(adapter, value),
@@ -127,7 +125,7 @@ type baseMap struct {
 	mapAccessor
 
 	// value is the native Go value upon which the map type operators.
-	value any
+	value interface{}
 
 	// size is the number of entries in the map.
 	size int
@@ -140,7 +138,7 @@ func (m *baseMap) Contains(index ref.Val) ref.Val {
 }
 
 // ConvertToNative implements the ref.Val interface method.
-func (m *baseMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
+func (m *baseMap) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	// If the map is already assignable to the desired type return it, e.g. interfaces and
 	// maps with the same key value types.
 	if reflect.TypeOf(m.value).AssignableTo(typeDesc) {
@@ -277,33 +275,9 @@ func (m *baseMap) Get(key ref.Val) ref.Val {
 	return v
 }
 
-// IsZeroValue returns true if the map is empty.
-func (m *baseMap) IsZeroValue() bool {
-	return m.size == 0
-}
-
 // Size implements the traits.Sizer interface method.
 func (m *baseMap) Size() ref.Val {
 	return Int(m.size)
-}
-
-// String converts the map into a human-readable string.
-func (m *baseMap) String() string {
-	var sb strings.Builder
-	sb.WriteString("{")
-	it := m.Iterator()
-	i := 0
-	for it.HasNext() == True {
-		k := it.Next()
-		v, _ := m.Find(k)
-		sb.WriteString(fmt.Sprintf("%v: %v", k, v))
-		if i != m.size-1 {
-			sb.WriteString(", ")
-		}
-		i++
-	}
-	sb.WriteString("}")
-	return sb.String()
 }
 
 // Type implements the ref.Val interface method.
@@ -312,7 +286,7 @@ func (m *baseMap) Type() ref.Type {
 }
 
 // Value implements the ref.Val interface method.
-func (m *baseMap) Value() any {
+func (m *baseMap) Value() interface{} {
 	return m.value
 }
 
@@ -524,7 +498,7 @@ func (a *stringMapAccessor) Iterator() traits.Iterator {
 	}
 }
 
-func newStringIfaceMapAccessor(adapter ref.TypeAdapter, mapVal map[string]any) mapAccessor {
+func newStringIfaceMapAccessor(adapter ref.TypeAdapter, mapVal map[string]interface{}) mapAccessor {
 	return &stringIfaceMapAccessor{
 		TypeAdapter: adapter,
 		mapVal:      mapVal,
@@ -533,7 +507,7 @@ func newStringIfaceMapAccessor(adapter ref.TypeAdapter, mapVal map[string]any) m
 
 type stringIfaceMapAccessor struct {
 	ref.TypeAdapter
-	mapVal map[string]any
+	mapVal map[string]interface{}
 }
 
 // Find uses native map accesses to find the key, returning (value, true) if present.
@@ -582,7 +556,7 @@ func (m *protoMap) Contains(key ref.Val) ref.Val {
 // ConvertToNative implements the ref.Val interface method.
 //
 // Note, assignment to Golang struct types is not yet supported.
-func (m *protoMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
+func (m *protoMap) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	// If the map is already assignable to the desired type return it, e.g. interfaces and
 	// maps with the same key value types.
 	switch typeDesc {
@@ -627,9 +601,9 @@ func (m *protoMap) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	m.value.Range(func(key protoreflect.MapKey, val protoreflect.Value) bool {
 		ntvKey := key.Interface()
 		ntvVal := val.Interface()
-		switch pv := ntvVal.(type) {
+		switch ntvVal.(type) {
 		case protoreflect.Message:
-			ntvVal = pv.Interface()
+			ntvVal = ntvVal.(protoreflect.Message).Interface()
 		}
 		if keyType == otherKeyType && valType == otherValType {
 			mapVal.SetMapIndex(reflect.ValueOf(ntvKey), reflect.ValueOf(ntvVal))
@@ -758,11 +732,6 @@ func (m *protoMap) Get(key ref.Val) ref.Val {
 	return v
 }
 
-// IsZeroValue returns true if the map is empty.
-func (m *protoMap) IsZeroValue() bool {
-	return m.value.Len() == 0
-}
-
 // Iterator implements the traits.Iterable interface method.
 func (m *protoMap) Iterator() traits.Iterator {
 	// Copy the keys to make their order stable.
@@ -789,7 +758,7 @@ func (m *protoMap) Type() ref.Type {
 }
 
 // Value implements the ref.Val interface method.
-func (m *protoMap) Value() any {
+func (m *protoMap) Value() interface{} {
 	return m.value
 }
 

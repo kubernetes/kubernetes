@@ -38,7 +38,7 @@ func NewIOHandler() IoUtil {
 }
 
 func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
-	return os.ReadFile(filename)
+	return ioutil.ReadFile(filename)
 }
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)

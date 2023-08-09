@@ -214,7 +214,7 @@ func CreateAggregateFromMessageCountMap(m MessageCountMap) Aggregate {
 	return NewAggregate(result)
 }
 
-// Reduce will return err or nil, if err is an Aggregate and only has one item,
+// Reduce will return err or, if err is an Aggregate and only has one item,
 // the first item in the aggregate.
 func Reduce(err error) error {
 	if agg, ok := err.(Aggregate); ok && err != nil {

@@ -46,16 +46,16 @@ var (
 // e.g. Streaming data issues from the runtime or the runtime does not implement the
 // container events stream.
 func isEventedPLEGInUse() bool {
-	eventedPLEGUsageMu.RLock()
-	defer eventedPLEGUsageMu.RUnlock()
+	eventedPLEGUsageMu.Lock()
+	defer eventedPLEGUsageMu.Unlock()
 	return eventedPLEGUsage
 }
 
 // setEventedPLEGUsage should only be accessed from
 // Start/Stop of Evented PLEG.
 func setEventedPLEGUsage(enable bool) {
-	eventedPLEGUsageMu.Lock()
-	defer eventedPLEGUsageMu.Unlock()
+	eventedPLEGUsageMu.RLock()
+	defer eventedPLEGUsageMu.RUnlock()
 	eventedPLEGUsage = enable
 }
 
@@ -190,7 +190,6 @@ func (e *EventedPLEG) watchEventsChannel() {
 
 			err := e.runtimeService.GetContainerEvents(containerEventsResponseCh)
 			if err != nil {
-				metrics.EventedPLEGConnErr.Inc()
 				numAttempts++
 				e.Relist() // Force a relist to get the latest container and pods running metric.
 				klog.V(4).InfoS("Evented PLEG: Failed to get container events, retrying: ", "err", err)
@@ -205,19 +204,6 @@ func (e *EventedPLEG) watchEventsChannel() {
 
 func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeapi.ContainerEventResponse) {
 	for event := range containerEventsResponseCh {
-		// Ignore the event if PodSandboxStatus is nil.
-		// This might happen under some race condition where the podSandbox has
-		// been deleted, and therefore container runtime couldn't find the
-		// podSandbox for the container when generating the event.
-		// It is safe to ignore because
-		// a) a event would have been received for the sandbox deletion,
-		// b) in worst case, a relist will eventually sync the pod status.
-		// TODO(#114371): Figure out a way to handle this case instead of ignoring.
-		if event.PodSandboxStatus == nil || event.PodSandboxStatus.Metadata == nil {
-			klog.ErrorS(nil, "Evented PLEG: received ContainerEventResponse with nil PodSandboxStatus or PodSandboxStatus.Metadata", "containerEventResponse", event)
-			continue
-		}
-
 		podID := types.UID(event.PodSandboxStatus.Metadata.Uid)
 		shouldSendPLEGEvent := false
 
@@ -229,7 +215,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 			if klog.V(6).Enabled() {
 				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID, "podStatus", status)
 			} else {
-				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID)
+				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID, "podStatus", status)
 			}
 		} else {
 			if klogV := klog.V(6); klogV.Enabled() {
@@ -246,7 +232,6 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 
 		e.updateRunningPodMetric(status)
 		e.updateRunningContainerMetric(status)
-		e.updateLatencyMetric(event)
 
 		if event.ContainerEventType == runtimeapi.ContainerEventType_CONTAINER_DELETED_EVENT {
 			for _, sandbox := range status.SandboxStatuses {
@@ -410,13 +395,4 @@ func (e *EventedPLEG) updateRunningContainerMetric(podStatus *kubecontainer.PodS
 			metrics.RunningContainerCount.WithLabelValues(string(state)).Add(float64(diff))
 		}
 	}
-}
-
-func (e *EventedPLEG) updateLatencyMetric(event *runtimeapi.ContainerEventResponse) {
-	duration := time.Duration(time.Now().UnixNano()-event.CreatedAt) * time.Nanosecond
-	metrics.EventedPLEGConnLatency.Observe(duration.Seconds())
-}
-
-func (e *EventedPLEG) UpdateCache(pod *kubecontainer.Pod, pid types.UID) (error, bool) {
-	return fmt.Errorf("not implemented"), false
 }

@@ -24,7 +24,7 @@ import (
 
 const (
 	minimumSeats                = 1
-	maximumSeatsLimit           = 10
+	maximumSeats                = 10
 	objectsPerSeat              = 100.0
 	watchesPerSeat              = 10.0
 	enableMutatingWorkEstimator = true
@@ -39,13 +39,12 @@ type WorkEstimatorConfig struct {
 
 	// MinimumSeats is the minimum number of seats a request must occupy.
 	MinimumSeats uint64 `json:"minimumSeats,omitempty"`
-
-	// MaximumSeatsLimit is an upper limit on the max seats a request can occupy.
+	// MaximumSeats is the maximum number of seats a request can occupy
 	//
 	// NOTE: work_estimate_seats_samples metric uses the value of maximumSeats
 	// as the upper bound, so when we change maximumSeats we should also
 	// update the buckets of the metric.
-	MaximumSeatsLimit uint64 `json:"maximumSeatsLimit,omitempty"`
+	MaximumSeats uint64 `json:"maximumSeats,omitempty"`
 }
 
 // ListWorkEstimatorConfig holds work estimator parameters related to list requests.
@@ -67,7 +66,7 @@ type MutatingWorkEstimatorConfig struct {
 func DefaultWorkEstimatorConfig() *WorkEstimatorConfig {
 	return &WorkEstimatorConfig{
 		MinimumSeats:                minimumSeats,
-		MaximumSeatsLimit:           maximumSeatsLimit,
+		MaximumSeats:                maximumSeats,
 		ListWorkEstimatorConfig:     defaultListWorkEstimatorConfig(),
 		MutatingWorkEstimatorConfig: defaultMutatingWorkEstimatorConfig(),
 	}

@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -41,7 +41,7 @@ type CustomResourceStorage struct {
 	Scale          *ScaleREST
 }
 
-func NewStorage(resource schema.GroupResource, singularResource schema.GroupResource, kind, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor, replicasPathMapping managedfields.ResourcePathMappings) CustomResourceStorage {
+func NewStorage(resource schema.GroupResource, kind, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor, replicasPathMapping fieldmanager.ResourcePathMappings) CustomResourceStorage {
 	var storage CustomResourceStorage
 	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object {
@@ -56,9 +56,8 @@ func NewStorage(resource schema.GroupResource, singularResource schema.GroupReso
 			ret.SetGroupVersionKind(listKind)
 			return ret
 		},
-		PredicateFunc:             strategy.MatchCustomResourceDefinitionStorage,
-		DefaultQualifiedResource:  resource,
-		SingularQualifiedResource: singularResource,
+		PredicateFunc:            strategy.MatchCustomResourceDefinitionStorage,
+		DefaultQualifiedResource: resource,
 
 		CreateStrategy:      strategy,
 		UpdateStrategy:      strategy,
@@ -152,7 +151,7 @@ type ScaleREST struct {
 	statusReplicasPath  string
 	labelSelectorPath   string
 	parentGV            schema.GroupVersion
-	replicasPathMapping managedfields.ResourcePathMappings
+	replicasPathMapping fieldmanager.ResourcePathMappings
 }
 
 // ScaleREST implements Patcher
@@ -302,7 +301,7 @@ type scaleUpdatedObjectInfo struct {
 	statusReplicasPath  string
 	labelSelectorPath   string
 	parentGV            schema.GroupVersion
-	replicasPathMapping managedfields.ResourcePathMappings
+	replicasPathMapping fieldmanager.ResourcePathMappings
 }
 
 func (i *scaleUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
@@ -313,7 +312,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	cr := oldObj.DeepCopyObject().(*unstructured.Unstructured)
 	const invalidSpecReplicas = -2147483648 // smallest int32
 
-	managedFieldsHandler := managedfields.NewScaleHandler(
+	managedFieldsHandler := fieldmanager.NewScaleHandler(
 		cr.GetManagedFields(),
 		i.parentGV,
 		i.replicasPathMapping,

@@ -123,7 +123,7 @@ func InteractivelyConfirmAction(action, question string, r io.Reader) error {
 		return errors.Wrap(err, "couldn't read from standard input")
 	}
 	answer := scanner.Text()
-	if strings.EqualFold(answer, "y") || strings.EqualFold(answer, "yes") {
+	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
 		return nil
 	}
 
@@ -140,13 +140,4 @@ func GetClientSet(file string, dryRun bool) (clientset.Interface, error) {
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
-}
-
-// ValueFromFlagsOrConfig checks if the "name" flag has been set. If yes, it returns the value of the flag, otherwise it returns the value from config.
-func ValueFromFlagsOrConfig(flagSet *pflag.FlagSet, name string, cfgValue interface{}, flagValue interface{}) interface{} {
-	if flagSet.Changed(name) {
-		return flagValue
-	}
-	// assume config has all the defaults set correctly.
-	return cfgValue
 }

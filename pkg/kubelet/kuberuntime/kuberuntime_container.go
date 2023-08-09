@@ -46,13 +46,10 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/tail"
@@ -119,6 +116,7 @@ func ephemeralContainerStartSpec(ec *v1.EphemeralContainer) *startSpec {
 // targeting. The target is stored as EphemeralContainer.TargetContainerName, which must be
 // resolved to a ContainerID using podStatus. The target container must already exist, which
 // usually isn't a problem since ephemeral containers aren't allowed at pod creation time.
+// This always returns nil when the EphemeralContainers feature is disabled.
 func (s *startSpec) getTargetID(podStatus *kubecontainer.PodStatus) (*kubecontainer.ContainerID, error) {
 	if s.ephemeralContainer == nil || s.ephemeralContainer.TargetContainerName == "" {
 		return nil, nil
@@ -137,15 +135,15 @@ func calcRestartCountByLogDir(path string) (int, error) {
 	if _, err := os.Stat(path); err != nil {
 		return 0, nil
 	}
+	restartCount := int(0)
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return 0, err
 	}
 	if len(files) == 0 {
-		return 0, nil
+		return 0, err
 	}
-	restartCount := 0
-	restartCountLogFileRegex := regexp.MustCompile(`^(\d+)\.log(\..*)?`)
+	restartCountLogFileRegex := regexp.MustCompile(`(\d+).log(\..*)?`)
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -156,9 +154,7 @@ func calcRestartCountByLogDir(path string) (int, error) {
 		}
 		count, err := strconv.Atoi(matches[1])
 		if err != nil {
-			// unlikely kubelet created this file,
-			// likely custom file with random numbers as a name
-			continue
+			return restartCount, err
 		}
 		count++
 		if count > restartCount {
@@ -205,8 +201,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		logDir := BuildContainerLogsDirectory(pod.Namespace, pod.Name, pod.UID, container.Name)
 		restartCount, err = calcRestartCountByLogDir(logDir)
 		if err != nil {
-			klog.InfoS("Cannot calculate restartCount from the log directory", "logDir", logDir, "err", err)
-			restartCount = 0
+			klog.InfoS("Log directory exists but could not calculate restartCount", "logDir", logDir, "err", err)
 		}
 	}
 
@@ -329,14 +324,13 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 			Name:    container.Name,
 			Attempt: restartCountUint32,
 		},
-		Image:       &runtimeapi.ImageSpec{Image: imageRef, UserSpecifiedImage: container.Image},
+		Image:       &runtimeapi.ImageSpec{Image: imageRef},
 		Command:     command,
 		Args:        args,
 		WorkingDir:  container.WorkingDir,
 		Labels:      newContainerLabels(container, pod),
 		Annotations: newContainerAnnotations(container, pod, restartCount, opts),
 		Devices:     makeDevices(opts),
-		CDIDevices:  makeCDIDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
 		LogPath:     containerLogsPath,
 		Stdin:       container.Stdin,
@@ -363,19 +357,6 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 	return config, cleanupAction, nil
 }
 
-func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
-	containerResources := m.generateContainerResources(pod, container)
-	if containerResources == nil {
-		return fmt.Errorf("container %q updateContainerResources failed: cannot generate resources config", containerID.String())
-	}
-	ctx := context.Background()
-	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
-	if err != nil {
-		klog.ErrorS(err, "UpdateContainerResources failed", "container", containerID.String())
-	}
-	return err
-}
-
 // makeDevices generates container devices for kubelet runtime v1.
 func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.Device {
 	devices := make([]*runtimeapi.Device, len(opts.Devices))
@@ -386,19 +367,6 @@ func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.Device {
 			HostPath:      device.PathOnHost,
 			ContainerPath: device.PathInContainer,
 			Permissions:   device.Permissions,
-		}
-	}
-
-	return devices
-}
-
-// makeCDIDevices generates container CDIDevices for kubelet runtime v1.
-func makeCDIDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.CDIDevice {
-	devices := make([]*runtimeapi.CDIDevice, len(opts.CDIDevices))
-
-	for i, device := range opts.CDIDevices {
-		devices[i] = &runtimeapi.CDIDevice{
-			Name: device.Name,
 		}
 	}
 
@@ -587,25 +555,18 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
-	var cStatusResources *kubecontainer.ContainerResources
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// If runtime reports cpu & memory resources info, add it to container status
-		cStatusResources = toKubeContainerResources(status.Resources)
-	}
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
 			ID:   status.Id,
 		},
-		Name:                 labeledInfo.ContainerName,
-		Image:                status.Image.Image,
-		ImageID:              status.ImageRef,
-		Hash:                 annotatedInfo.Hash,
-		HashWithoutResources: annotatedInfo.HashWithoutResources,
-		RestartCount:         annotatedInfo.RestartCount,
-		State:                toKubeContainerState(status.State),
-		CreatedAt:            time.Unix(0, status.CreatedAt),
-		Resources:            cStatusResources,
+		Name:         labeledInfo.ContainerName,
+		Image:        status.Image.Image,
+		ImageID:      status.ImageRef,
+		Hash:         annotatedInfo.Hash,
+		RestartCount: annotatedInfo.RestartCount,
+		State:        toKubeContainerState(status.State),
+		CreatedAt:    time.Unix(0, status.CreatedAt),
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
@@ -726,20 +687,23 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	}
 	m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, message)
 
-	if gracePeriodOverride != nil {
-		gracePeriod = *gracePeriodOverride
-		klog.V(3).InfoS("Killing container with a grace period override", "pod", klog.KObj(pod), "podUID", pod.UID,
-			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
+	// Run internal pre-stop lifecycle hook
+	if err := m.internalLifecycle.PreStopContainer(containerID.ID); err != nil {
+		return err
 	}
 
 	// Run the pre-stop lifecycle hooks if applicable and if there is enough time to run it
 	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil && gracePeriod > 0 {
 		gracePeriod = gracePeriod - m.executePreStopHook(ctx, pod, containerID, containerSpec, gracePeriod)
 	}
-
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
 	if gracePeriod < minimumGracePeriodInSeconds {
 		gracePeriod = minimumGracePeriodInSeconds
+	}
+	if gracePeriodOverride != nil {
+		gracePeriod = *gracePeriodOverride
+		klog.V(3).InfoS("Killing container with a grace period override", "pod", klog.KObj(pod), "podUID", pod.UID,
+			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 	}
 
 	klog.V(2).InfoS("Killing container with a grace period", "pod", klog.KObj(pod), "podUID", pod.UID,
@@ -849,224 +813,61 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 	}
 }
 
-// hasAnyRegularContainerCreated returns true if any regular container has been
-// created, which indicates all init containers have been initialized.
-func hasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
-	for _, container := range pod.Spec.Containers {
-		status := podStatus.FindContainerStatusByName(container.Name)
-		if status == nil {
-			continue
-		}
-		switch status.State {
-		case kubecontainer.ContainerStateCreated,
-			kubecontainer.ContainerStateRunning,
-			kubecontainer.ContainerStateExited:
-			return true
-		default:
-			// Ignore other states
-		}
-	}
-	return false
-}
-
-// computeInitContainerActions sets the actions on the given changes that need
-// to be taken for the init containers. This includes actions to initialize the
-// init containers and actions to keep restartable init containers running.
-// computeInitContainerActions returns true if pod has been initialized.
-//
-// The actions include:
-// - Start the first init container that has not been started.
-// - Restart all restartable init containers that have started but are not running.
-// - Kill the restartable init containers that are not alive or started.
-func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus, changes *podActions) bool {
+// findNextInitContainerToRun returns the status of the last failed container, the
+// index of next init container to start, or done if there are no further init containers.
+// Status is only returned if an init container is failed, in which case next will
+// point to the current container.
+func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
 	if len(pod.Spec.InitContainers) == 0 {
-		return true
+		return nil, nil, true
 	}
 
 	// If any of the main containers have status and are Running, then all init containers must
 	// have been executed at some point in the past.  However, they could have been removed
 	// from the container runtime now, and if we proceed, it would appear as if they
-	// never ran and will re-execute improperly except for the restartable init containers.
-	podHasInitialized := hasAnyRegularContainerCreated(pod, podStatus)
+	// never ran and will re-execute improperly.
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status != nil && status.State == kubecontainer.ContainerStateRunning {
+			return nil, nil, true
+		}
+	}
 
-	// isPreviouslyInitialized indicates if the current init container is
-	// previously initialized.
-	isPreviouslyInitialized := podHasInitialized
-	restartOnFailure := shouldRestartOnFailure(pod)
-
-	// Note that we iterate through the init containers in reverse order to find
-	// the next init container to run, as the completed init containers may get
-	// removed from container runtime for various reasons. Therefore the kubelet
-	// should rely on the minimal number of init containers - the last one.
-	//
-	// Once we find the next init container to run, iterate through the rest to
-	// find the restartable init containers to restart.
+	// If there are failed containers, return the status of the last failed one.
 	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
 		container := &pod.Spec.InitContainers[i]
 		status := podStatus.FindContainerStatusByName(container.Name)
-		klog.V(4).InfoS("Computing init container action", "pod", klog.KObj(pod), "container", container.Name, "status", status)
+		if status != nil && isInitContainerFailed(status) {
+			return status, container, false
+		}
+	}
+
+	// There are no failed containers now.
+	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+		container := &pod.Spec.InitContainers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
 		if status == nil {
-			// If the container is previously initialized but its status is not
-			// found, it means its last status is removed for some reason.
-			// Restart it if it is a restartable init container.
-			if isPreviouslyInitialized && types.IsRestartableInitContainer(container) {
-				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-			}
 			continue
 		}
 
-		if isPreviouslyInitialized && !types.IsRestartableInitContainer(container) {
-			// after initialization, only restartable init containers need to be kept
-			// running
-			continue
+		// container is still running, return not done.
+		if status.State == kubecontainer.ContainerStateRunning {
+			return nil, nil, false
 		}
 
-		switch status.State {
-		case kubecontainer.ContainerStateCreated:
-			// nothing to do but wait for it to start
-
-		case kubecontainer.ContainerStateRunning:
-			if !types.IsRestartableInitContainer(container) {
-				break
+		if status.State == kubecontainer.ContainerStateExited {
+			// all init containers successful
+			if i == (len(pod.Spec.InitContainers) - 1) {
+				return nil, nil, true
 			}
 
-			if types.IsRestartableInitContainer(container) {
-				if container.StartupProbe != nil {
-					startup, found := m.startupManager.Get(status.ID)
-					if !found {
-						// If the startup probe has not been run, wait for it.
-						break
-					}
-					if startup != proberesults.Success {
-						if startup == proberesults.Failure {
-							// If the restartable init container failed the startup probe,
-							// restart it.
-							changes.ContainersToKill[status.ID] = containerToKillInfo{
-								name:      container.Name,
-								container: container,
-								message:   fmt.Sprintf("Init container %s failed startup probe", container.Name),
-								reason:    reasonStartupProbe,
-							}
-							changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-						}
-						break
-					}
-				}
-
-				klog.V(4).InfoS("Init container has been initialized", "pod", klog.KObj(pod), "container", container.Name)
-				if i == (len(pod.Spec.InitContainers) - 1) {
-					podHasInitialized = true
-				} else if !isPreviouslyInitialized {
-					// this init container is initialized for the first time, start the next one
-					changes.InitContainersToStart = append(changes.InitContainersToStart, i+1)
-				}
-
-				// A restartable init container does not have to take into account its
-				// liveness probe when it determines to start the next init container.
-				if container.LivenessProbe != nil {
-					liveness, found := m.livenessManager.Get(status.ID)
-					if !found {
-						// If the liveness probe has not been run, wait for it.
-						break
-					}
-					if liveness == proberesults.Failure {
-						// If the restartable init container failed the liveness probe,
-						// restart it.
-						changes.ContainersToKill[status.ID] = containerToKillInfo{
-							name:      container.Name,
-							container: container,
-							message:   fmt.Sprintf("Init container %s failed liveness probe", container.Name),
-							reason:    reasonLivenessProbe,
-						}
-						changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-					}
-				}
-			} else { // init container
-				// nothing do to but wait for it to finish
-				break
-			}
-
-		// If the init container failed and the restart policy is Never, the pod is terminal.
-		// Otherwise, restart the init container.
-		case kubecontainer.ContainerStateExited:
-			if types.IsRestartableInitContainer(container) {
-				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-			} else { // init container
-				if isInitContainerFailed(status) {
-					if !restartOnFailure {
-						changes.KillPod = true
-						changes.InitContainersToStart = nil
-						return false
-					}
-					changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-					break
-				}
-
-				klog.V(4).InfoS("Init container has been initialized", "pod", klog.KObj(pod), "container", container.Name)
-				if i == (len(pod.Spec.InitContainers) - 1) {
-					podHasInitialized = true
-				} else {
-					// this init container is initialized for the first time, start the next one
-					changes.InitContainersToStart = append(changes.InitContainersToStart, i+1)
-				}
-			}
-
-		default: // kubecontainer.ContainerStatusUnknown or other unknown states
-			if types.IsRestartableInitContainer(container) {
-				// If the restartable init container is in unknown state, restart it.
-				changes.ContainersToKill[status.ID] = containerToKillInfo{
-					name:      container.Name,
-					container: container,
-					message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
-						status.State),
-					reason: reasonUnknown,
-				}
-				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-			} else { // init container
-				if !isInitContainerFailed(status) {
-					klog.V(4).InfoS("This should not happen, init container is in unknown state but not failed", "pod", klog.KObj(pod), "containerStatus", status)
-				}
-
-				if !restartOnFailure {
-					changes.KillPod = true
-					changes.InitContainersToStart = nil
-					return false
-				}
-
-				// If the init container is in unknown state, restart it.
-				changes.ContainersToKill[status.ID] = containerToKillInfo{
-					name:      container.Name,
-					container: container,
-					message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
-						status.State),
-					reason: reasonUnknown,
-				}
-				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-			}
-		}
-
-		if !isPreviouslyInitialized {
-			// the one before this init container has been initialized
-			isPreviouslyInitialized = true
+			// all containers up to i successful, go to i+1
+			return nil, &pod.Spec.InitContainers[i+1], false
 		}
 	}
 
-	// this means no init containers have been started,
-	// start the first one
-	if !isPreviouslyInitialized {
-		changes.InitContainersToStart = append(changes.InitContainersToStart, 0)
-	}
-
-	// reverse the InitContainersToStart, as the above loop iterated through the
-	// init containers backwards, but we want to start them as per the order in
-	// the pod spec.
-	l := len(changes.InitContainersToStart)
-	for i := 0; i < l/2; i++ {
-		changes.InitContainersToStart[i], changes.InitContainersToStart[l-1-i] =
-			changes.InitContainersToStart[l-1-i], changes.InitContainersToStart[i]
-	}
-
-	return podHasInitialized
+	return nil, &pod.Spec.InitContainers[0], false
 }
 
 // GetContainerLogs returns logs of a specific container.
@@ -1206,7 +1007,7 @@ func setTerminationGracePeriod(pod *v1.Pod, containerSpec *v1.Container, contain
 func isProbeTerminationGracePeriodSecondsSet(pod *v1.Pod, containerSpec *v1.Container, probe *v1.Probe, containerName string, containerID kubecontainer.ContainerID, probeType string) bool {
 	if probe != nil && probe.TerminationGracePeriodSeconds != nil {
 		if *probe.TerminationGracePeriodSeconds > *pod.Spec.TerminationGracePeriodSeconds {
-			klog.V(4).InfoS("Using probe-level grace period that is greater than the pod-level grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", containerName, "containerID", containerID.String(), "probeType", probeType, "probeGracePeriod", *probe.TerminationGracePeriodSeconds, "podGracePeriod", *pod.Spec.TerminationGracePeriodSeconds)
+			klog.V(4).InfoS("Using probe-level grace period that is greater than the pod-level grace period", "pod", klog.KObj(pod), "pod-uid", pod.UID, "containerName", containerName, "containerID", containerID.String(), "probe-type", probeType, "probe-grace-period", *probe.TerminationGracePeriodSeconds, "pod-grace-period", *pod.Spec.TerminationGracePeriodSeconds)
 		}
 		return true
 	}

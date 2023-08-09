@@ -38,12 +38,12 @@ import (
 )
 
 type REST struct {
-	GetServersToValidate func() map[string]Server
+	GetServersToValidate func() map[string]*Server
 	rest.TableConvertor
 }
 
 // NewStorage returns a new REST.
-func NewStorage(serverRetriever func() map[string]Server) *REST {
+func NewStorage(serverRetriever func() map[string]*Server) *REST {
 	return &REST{
 		GetServersToValidate: serverRetriever,
 		TableConvertor:       printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
@@ -56,12 +56,6 @@ func (*REST) NamespaceScoped() bool {
 
 func (rs *REST) New() runtime.Object {
 	return &api.ComponentStatus{}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-func (rs *REST) GetSingularName() string {
-	return "componentstatus"
 }
 
 // Destroy cleans up resources on shutdown.
@@ -83,7 +77,7 @@ func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptio
 	wait.Add(len(servers))
 	statuses := make(chan api.ComponentStatus, len(servers))
 	for k, v := range servers {
-		go func(name string, server Server) {
+		go func(name string, server *Server) {
 			defer wait.Done()
 			status := rs.getComponentStatus(name, server)
 			statuses <- *status
@@ -108,9 +102,10 @@ func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptio
 
 func componentStatusPredicate(options *metainternalversion.ListOptions) storage.SelectionPredicate {
 	pred := storage.SelectionPredicate{
-		Label:    labels.Everything(),
-		Field:    fields.Everything(),
-		GetAttrs: nil,
+		Label:       labels.Everything(),
+		Field:       fields.Everything(),
+		GetAttrs:    nil,
+		IndexFields: []string{},
 	}
 	if options != nil {
 		if options.LabelSelector != nil {
@@ -153,7 +148,7 @@ func ToConditionStatus(s probe.Result) api.ConditionStatus {
 	}
 }
 
-func (rs *REST) getComponentStatus(name string, server Server) *api.ComponentStatus {
+func (rs *REST) getComponentStatus(name string, server *Server) *api.ComponentStatus {
 	status, msg, err := server.DoServerCheck()
 	errorMsg := ""
 	if err != nil {

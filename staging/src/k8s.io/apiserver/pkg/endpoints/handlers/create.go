@@ -162,13 +162,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		userInfo, _ := request.UserFrom(ctx)
 
 		if objectMeta, err := meta.Accessor(obj); err == nil {
-			preserveObjectMetaSystemFields := false
-			if c, ok := r.(rest.SubresourceObjectMetaPreserver); ok && len(scope.Subresource) > 0 {
-				preserveObjectMetaSystemFields = c.PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate()
-			}
-			if !preserveObjectMetaSystemFields {
-				rest.WipeObjectMetaSystemFields(objectMeta)
-			}
+			// Wipe fields which cannot take user-provided values
+			rest.WipeObjectMetaSystemFields(objectMeta)
 
 			// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
 			if err := rest.EnsureObjectNamespaceMatchesRequestNamespace(rest.ExpectedNamespaceForResource(namespace, scope.Resource), objectMeta); err != nil {
@@ -191,13 +186,14 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		// Dedup owner references before updating managed fields
 		dedupOwnerReferencesAndAddWarning(obj, req.Context(), false)
 		result, err := finisher.FinishRequest(ctx, func() (runtime.Object, error) {
-			liveObj, err := scope.Creater.New(scope.Kind)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
+			if scope.FieldManager != nil {
+				liveObj, err := scope.Creater.New(scope.Kind)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
+				}
+				obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+				admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
 			}
-			obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
-			admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
-
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {
 					return nil, err

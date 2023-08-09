@@ -38,8 +38,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
-	openapiclient "k8s.io/client-go/openapi"
-	"k8s.io/client-go/openapi/openapitest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/restmapper"
@@ -420,7 +418,6 @@ type TestFactory struct {
 
 	UnstructuredClientForMappingFunc resource.FakeClientFunc
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
-	OpenAPIV3ClientFunc              func() (openapiclient.Client, error)
 }
 
 // NewTestFactory returns an initialized TestFactory instance
@@ -483,7 +480,6 @@ func (f *TestFactory) Cleanup() {
 		return
 	}
 
-	f.tempConfigFile.Close()
 	os.Remove(f.tempConfigFile.Name())
 }
 
@@ -537,13 +533,6 @@ func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 	return openapitesting.EmptyResources{}, nil
 }
 
-func (f *TestFactory) OpenAPIV3Client() (openapiclient.Client, error) {
-	if f.OpenAPIV3ClientFunc != nil {
-		return f.OpenAPIV3ClientFunc()
-	}
-	return openapitest.NewFakeClient(), nil
-}
-
 // NewBuilder returns an initialized resource.Builder instance
 func (f *TestFactory) NewBuilder() *resource.Builder {
 	return resource.NewFakeBuilder(
@@ -575,7 +564,7 @@ func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AuthenticationV1alpha1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AutoscalingV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AutoscalingV2().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AutoscalingV2beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.BatchV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.CertificatesV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.CertificatesV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
@@ -736,15 +725,15 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				Name: "autoscaling",
 				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1"},
-					{Version: "v2"},
+					{Version: "v2beta1"},
 				},
-				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v2"},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v2beta1"},
 			},
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
 				},
-				"v2": {
+				"v2beta1": {
 					{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
 				},
 			},
@@ -797,7 +786,6 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "bars", Namespaced: true, Kind: "Bar"},
-					{Name: "applysets", Namespaced: false, Kind: "ApplySet"},
 				},
 			},
 		},

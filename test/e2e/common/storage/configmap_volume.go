@@ -37,7 +37,7 @@ import (
 
 var _ = SIGDescribe("ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -556,9 +556,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
-		pod := createNonOptionalConfigMapPod(ctx, f, volumeMountPath)
-		getPod := e2epod.Get(f.ClientSet, pod)
-		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
+		pod, err := createNonOptionalConfigMapPod(ctx, f, volumeMountPath)
+		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
 	})
 
 	// ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
@@ -566,9 +565,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
-		pod := createNonOptionalConfigMapPodWithConfig(ctx, f, volumeMountPath)
-		getPod := e2epod.Get(f.ClientSet, pod)
-		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
+		pod, err := createNonOptionalConfigMapPodWithConfig(ctx, f, volumeMountPath)
+		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
 	})
 })
 
@@ -679,7 +677,7 @@ func doConfigMapE2EWithMappings(ctx context.Context, f *framework.Framework, asU
 	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume configMaps", pod, 0, output)
 }
 
-func createNonOptionalConfigMapPod(ctx context.Context, f *framework.Framework, volumeMountPath string) *v1.Pod {
+func createNonOptionalConfigMapPod(ctx context.Context, f *framework.Framework, volumeMountPath string) (*v1.Pod, error) {
 	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
@@ -694,10 +692,10 @@ func createNonOptionalConfigMapPod(ctx context.Context, f *framework.Framework, 
 
 	ginkgo.By("Creating the pod")
 	pod = e2epod.NewPodClient(f).Create(ctx, pod)
-	return pod
+	return pod, e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 }
 
-func createNonOptionalConfigMapPodWithConfig(ctx context.Context, f *framework.Framework, volumeMountPath string) *v1.Pod {
+func createNonOptionalConfigMapPodWithConfig(ctx context.Context, f *framework.Framework, volumeMountPath string) (*v1.Pod, error) {
 	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
@@ -724,7 +722,7 @@ func createNonOptionalConfigMapPodWithConfig(ctx context.Context, f *framework.F
 
 	ginkgo.By("Creating the pod")
 	pod = e2epod.NewPodClient(f).Create(ctx, pod)
-	return pod
+	return pod, e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 }
 
 func createConfigMapVolumeMounttestPod(namespace, volumeName, referenceName, mountPath string, mounttestArgs ...string) *v1.Pod {

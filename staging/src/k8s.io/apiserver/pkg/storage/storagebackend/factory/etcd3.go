@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"net/url"
 	"os"
@@ -38,7 +37,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -54,6 +52,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/legacyregistry"
 	tracing "k8s.io/component-base/tracing"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -154,18 +153,18 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
 
 	lock := sync.RWMutex{}
-	var prober *etcd3ProberMonitor
+	var client *clientv3.Client
 	clientErr := fmt.Errorf("etcd client connection not yet established")
 
 	go wait.PollUntil(time.Second, func() (bool, error) {
-		newProber, err := newETCD3ProberMonitor(c)
+		newClient, err := newETCD3Client(c.Transport)
 		lock.Lock()
 		defer lock.Unlock()
 		// Ensure that server is already not shutting down.
 		select {
 		case <-stopCh:
 			if err == nil {
-				newProber.Close()
+				newClient.Close()
 			}
 			return true, nil
 		default:
@@ -174,7 +173,7 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 			clientErr = err
 			return false, nil
 		}
-		prober = newProber
+		client = newClient
 		clientErr = nil
 		return true, nil
 	}, stopCh)
@@ -186,8 +185,8 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 
 		lock.Lock()
 		defer lock.Unlock()
-		if prober != nil {
-			prober.Close()
+		if client != nil {
+			client.Close()
 			clientErr = fmt.Errorf("server is shutting down")
 		}
 	}()
@@ -215,70 +214,14 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
+		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
 		now := time.Now()
-		err := prober.Probe(ctx)
+		_, err := client.Get(ctx, path.Join("/", c.Prefix, "health"))
+		if err != nil {
+			err = fmt.Errorf("error getting data from etcd: %w", err)
+		}
 		lastError.Store(err, now)
 		return err
-	}, nil
-}
-
-func newETCD3ProberMonitor(c storagebackend.Config) (*etcd3ProberMonitor, error) {
-	client, err := newETCD3Client(c.Transport)
-	if err != nil {
-		return nil, err
-	}
-	return &etcd3ProberMonitor{
-		client:    client,
-		prefix:    c.Prefix,
-		endpoints: c.Transport.ServerList,
-	}, nil
-}
-
-type etcd3ProberMonitor struct {
-	prefix    string
-	endpoints []string
-
-	mux    sync.RWMutex
-	client *clientv3.Client
-	closed bool
-}
-
-func (t *etcd3ProberMonitor) Close() error {
-	t.mux.Lock()
-	defer t.mux.Unlock()
-	if !t.closed {
-		t.closed = true
-		return t.client.Close()
-	}
-	return fmt.Errorf("closed")
-}
-
-func (t *etcd3ProberMonitor) Probe(ctx context.Context) error {
-	t.mux.RLock()
-	defer t.mux.RUnlock()
-	if t.closed {
-		return fmt.Errorf("closed")
-	}
-	// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
-	_, err := t.client.Get(ctx, path.Join("/", t.prefix, "health"))
-	if err != nil {
-		return fmt.Errorf("error getting data from etcd: %w", err)
-	}
-	return nil
-}
-
-func (t *etcd3ProberMonitor) Monitor(ctx context.Context) (metrics.StorageMetrics, error) {
-	t.mux.RLock()
-	defer t.mux.RUnlock()
-	if t.closed {
-		return metrics.StorageMetrics{}, fmt.Errorf("closed")
-	}
-	status, err := t.client.Status(ctx, t.endpoints[rand.Int()%len(t.endpoints)])
-	if err != nil {
-		return metrics.StorageMetrics{}, err
-	}
-	return metrics.StorageMetrics{
-		Size: status.DbSize,
 	}, nil
 }
 
@@ -459,7 +402,6 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 
 // startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the
 // corresponding metric etcd_db_total_size_in_bytes for each etcd server endpoint.
-// Deprecated: Will be replaced with newETCD3ProberMonitor
 func startDBSizeMonitorPerEndpoint(client *clientv3.Client, interval time.Duration) (func(), error) {
 	if interval == 0 {
 		return func() {}, nil

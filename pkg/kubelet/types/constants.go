@@ -25,6 +25,11 @@ const (
 	RFC3339NanoLenient = "2006-01-02T15:04:05.999999999Z07:00"
 )
 
+// Different container runtimes.
+const (
+	RemoteContainerRuntime = "remote"
+)
+
 // User visible keys for managing node allocatable enforcement on the node.
 const (
 	NodeAllocatableEnforcementKey = "pods"
@@ -43,7 +48,8 @@ const (
 // entries here should be moved to staging/src/k8s.io.api/core/v1/types.go
 // once the feature managing the condition graduates to Beta.
 const (
-	// PodReadyToStartContainers pod sandbox is successfully configured and
-	// the pod is ready to launch containers.
-	PodReadyToStartContainers = "PodReadyToStartContainers"
+	// PodHasNetwork indicates networking has been configured successfully for the
+	// pod and IP address(es) assigned. Images for containers specified in the pod
+	// spec can be pulled and containers launched after this condition is true.
+	PodHasNetwork = "PodHasNetwork"
 )

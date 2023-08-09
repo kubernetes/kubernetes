@@ -26,6 +26,7 @@ import (
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
@@ -38,9 +39,9 @@ type FakeRoleBindings struct {
 	ns   string
 }
 
-var rolebindingsResource = v1beta1.SchemeGroupVersion.WithResource("rolebindings")
+var rolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "rolebindings"}
 
-var rolebindingsKind = v1beta1.SchemeGroupVersion.WithKind("RoleBinding")
+var rolebindingsKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}
 
 // Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
 func (c *FakeRoleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.RoleBinding, err error) {

@@ -47,22 +47,7 @@
     "policyName": "policyNameValue",
     "paramRef": {
       "name": "nameValue",
-      "namespace": "namespaceValue",
-      "selector": {
-        "matchLabels": {
-          "matchLabelsKey": "matchLabelsValue"
-        },
-        "matchExpressions": [
-          {
-            "key": "keyValue",
-            "operator": "operatorValue",
-            "values": [
-              "valuesValue"
-            ]
-          }
-        ]
-      },
-      "parameterNotFoundAction": "parameterNotFoundActionValue"
+      "namespace": "namespaceValue"
     },
     "matchResources": {
       "namespaceSelector": {
@@ -134,9 +119,6 @@
         }
       ],
       "matchPolicy": "matchPolicyValue"
-    },
-    "validationActions": [
-      "validationActionsValue"
-    ]
+    }
   }
 }

@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
+	"io/ioutil"
 	"path"
 	"strings"
 
@@ -268,7 +268,7 @@ func (c *FunctionFilter) doResults(r *kio.ByteReader) error {
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(c.ResultsFile, []byte(results), 0600)
+		err = ioutil.WriteFile(c.ResultsFile, []byte(results), 0600)
 		if err != nil {
 			return err
 		}

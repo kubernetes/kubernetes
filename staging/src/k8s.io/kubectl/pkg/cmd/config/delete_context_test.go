@@ -19,7 +19,6 @@ package config
 import (
 	"bytes"
 	"fmt"
-	utiltesting "k8s.io/client-go/util/testing"
 	"os"
 	"reflect"
 	"testing"
@@ -57,7 +56,7 @@ func (test deleteContextTest) run(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
+	defer os.Remove(fakeKubeFile.Name())
 	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

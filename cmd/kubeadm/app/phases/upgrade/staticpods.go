@@ -280,9 +280,8 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// Backing up etcd data store
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
-	output, err := kubeadmutil.CopyDir(runningEtcdDir, backupEtcdDir)
-	if err != nil {
-		return true, errors.Wrapf(err, "failed to back up etcd data, output: %q", output)
+	if err := kubeadmutil.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
+		return true, errors.Wrap(err, "failed to back up etcd data")
 	}
 
 	// Get the desired etcd version. That's either the one specified by the user in cfg.Etcd.Local.ImageTag
@@ -302,7 +301,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 			return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
 		}
 		if warning != nil {
-			klog.V(1).Infof("[upgrade/etcd] WARNING: %v", warning)
+			klog.Warningf("[upgrade/etcd] %v", warning)
 		}
 	}
 
@@ -532,10 +531,9 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 
-	output, err := kubeadmutil.CopyDir(backupEtcdDir, runningEtcdDir)
-	if err != nil {
+	if err := kubeadmutil.CopyDir(backupEtcdDir, runningEtcdDir); err != nil {
 		// Let the user know there we're problems, but we tried to reçover
-		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s, output: %q", backupEtcdDir, output)
+		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s ", backupEtcdDir)
 	}
 
 	return nil

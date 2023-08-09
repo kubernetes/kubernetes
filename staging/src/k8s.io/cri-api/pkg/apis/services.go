@@ -115,8 +115,6 @@ type RuntimeService interface {
 	UpdateRuntimeConfig(ctx context.Context, runtimeConfig *runtimeapi.RuntimeConfig) error
 	// Status returns the status of the runtime.
 	Status(ctx context.Context, verbose bool) (*runtimeapi.StatusResponse, error)
-	// RuntimeConfig returns the configuration information of the runtime.
-	RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error)
 }
 
 // ImageManagerService interface should be implemented by a container image

@@ -34,11 +34,9 @@ import (
 	"text/template"
 	"time"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
-	"github.com/google/go-cmp/cmp"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -187,7 +185,7 @@ current-context: default
 				return err
 			}
 			p := tempfile.Name()
-			defer utiltesting.CloseAndRemove(t, tempfile)
+			defer os.Remove(p)
 
 			tmpl, err := template.New("test").Parse(tt.configTmpl)
 			if err != nil {
@@ -558,7 +556,7 @@ func TestV1Webhook(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(gotAttr, tt.want) {
-			t.Errorf("case %d: got != want:\n%s", i, cmp.Diff(gotAttr, tt.want))
+			t.Errorf("case %d: got != want:\n%s", i, diff.ObjectGoPrintDiff(gotAttr, tt.want))
 		}
 	}
 }

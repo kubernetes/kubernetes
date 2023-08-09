@@ -54,7 +54,6 @@ var MetricsGrabbingDisabledError = errors.New("metrics grabbing disabled")
 // Collection is metrics collection of components
 type Collection struct {
 	APIServerMetrics          APIServerMetrics
-	APIServerMetricsSLIs      APIServerMetrics
 	ControllerManagerMetrics  ControllerManagerMetrics
 	SnapshotControllerMetrics SnapshotControllerMetrics
 	KubeletMetrics            map[string]KubeletMetrics
@@ -195,31 +194,6 @@ func (g *Grabber) grabFromKubeletInternal(ctx context.Context, nodeName string, 
 	return parseKubeletMetrics(output)
 }
 
-func (g *Grabber) getMetricsFromNode(ctx context.Context, nodeName string, kubeletPort int) (string, error) {
-	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
-	finished := make(chan struct{}, 1)
-	var err error
-	var rawOutput []byte
-	go func() {
-		rawOutput, err = g.client.CoreV1().RESTClient().Get().
-			Resource("nodes").
-			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", nodeName, kubeletPort)).
-			Suffix("metrics").
-			Do(ctx).Raw()
-		finished <- struct{}{}
-	}()
-	select {
-	case <-time.After(proxyTimeout):
-		return "", fmt.Errorf("Timed out when waiting for proxy to gather metrics from %v", nodeName)
-	case <-finished:
-		if err != nil {
-			return "", err
-		}
-		return string(rawOutput), nil
-	}
-}
-
 // GrabFromScheduler returns metrics from scheduler
 func (g *Grabber) GrabFromScheduler(ctx context.Context) (SchedulerMetrics, error) {
 	if !g.grabFromScheduler {
@@ -349,31 +323,6 @@ func (g *Grabber) GrabFromAPIServer(ctx context.Context) (APIServerMetrics, erro
 	return parseAPIServerMetrics(output)
 }
 
-// GrabMetricsSLIsFromAPIServer returns metrics from API server
-func (g *Grabber) GrabMetricsSLIsFromAPIServer(ctx context.Context) (APIServerMetrics, error) {
-	output, err := g.getMetricsSLIsFromAPIServer(ctx)
-	if err != nil {
-		return APIServerMetrics{}, err
-	}
-	return parseAPIServerMetrics(output)
-}
-
-func (g *Grabber) getMetricsFromAPIServer(ctx context.Context) (string, error) {
-	rawOutput, err := g.client.CoreV1().RESTClient().Get().RequestURI("/metrics").Do(ctx).Raw()
-	if err != nil {
-		return "", err
-	}
-	return string(rawOutput), nil
-}
-
-func (g *Grabber) getMetricsSLIsFromAPIServer(ctx context.Context) (string, error) {
-	rawOutput, err := g.client.CoreV1().RESTClient().Get().RequestURI("/metrics/slis").Do(ctx).Raw()
-	if err != nil {
-		return "", err
-	}
-	return string(rawOutput), nil
-}
-
 // Grab returns metrics from corresponding component
 func (g *Grabber) Grab(ctx context.Context) (Collection, error) {
 	result := Collection{}
@@ -384,12 +333,6 @@ func (g *Grabber) Grab(ctx context.Context) (Collection, error) {
 			errs = append(errs, err)
 		} else {
 			result.APIServerMetrics = metrics
-		}
-		metrics, err = g.GrabMetricsSLIsFromAPIServer(ctx)
-		if err != nil {
-			errs = append(errs, err)
-		} else {
-			result.APIServerMetricsSLIs = metrics
 		}
 	}
 	if g.grabFromScheduler {

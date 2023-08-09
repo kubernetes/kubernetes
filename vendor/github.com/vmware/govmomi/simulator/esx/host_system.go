@@ -1740,19 +1740,9 @@ var HostSystem = mo.HostSystem{
 		CurrentEVCModeKey:  "",
 		Gateway:            (*types.HostListSummaryGatewaySummary)(nil),
 	},
-	Hardware:   (*types.HostHardwareInfo)(nil),
-	Capability: (*types.HostCapability)(nil),
-	LicensableResource: types.HostLicensableResourceInfo{
-		Resource: []types.KeyAnyValue{
-			{
-				Key: "numCpuPackages",
-				Value: types.KeyValue{
-					Key:   "numCpuPackages",
-					Value: "2",
-				},
-			},
-		},
-	},
+	Hardware:           (*types.HostHardwareInfo)(nil),
+	Capability:         (*types.HostCapability)(nil),
+	LicensableResource: types.HostLicensableResourceInfo{},
 	ConfigManager: types.HostConfigManager{
 		DynamicData:               types.DynamicData{},
 		CpuScheduler:              &types.ManagedObjectReference{Type: "HostCpuSchedulerSystem", Value: "cpuSchedulerSystem"},

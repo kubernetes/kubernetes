@@ -35,7 +35,7 @@ import (
 
 var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 	f := framework.NewDefaultFramework("generic-disruptive-pv")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		c  clientset.Interface
 		ns string

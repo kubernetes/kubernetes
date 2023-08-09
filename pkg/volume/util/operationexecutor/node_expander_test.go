@@ -17,8 +17,6 @@ limitations under the License.
 package operationexecutor
 
 import (
-	"testing"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -26,12 +24,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+	"testing"
 )
 
 func TestNodeExpander(t *testing.T) {
-	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeFailed
-
-	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
 	var tests = []struct {
 		name string
 		pvc  *v1.PersistentVolumeClaim
@@ -43,7 +39,7 @@ func TestNodeExpander(t *testing.T) {
 		actualSize *resource.Quantity
 
 		// expectations of test
-		expectedResizeStatus     v1.ClaimResourceStatus
+		expectedResizeStatus     v1.PersistentVolumeClaimResizeStatus
 		expectedStatusSize       resource.Quantity
 		expectResizeCall         bool
 		assumeResizeOpAsFinished bool
@@ -51,39 +47,39 @@ func TestNodeExpander(t *testing.T) {
 	}{
 		{
 			name: "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_failed",
-			pvc:  getTestPVC("test-vol0", "2G", "1G", "", &nodeResizeFailed),
+			pvc:  getTestPVC("test-vol0", "2G", "1G", "", v1.PersistentVolumeClaimNodeExpansionFailed),
 			pv:   getTestPV("test-vol0", "2G"),
 
-			expectedResizeStatus:     nodeResizeFailed,
+			expectedResizeStatus:     v1.PersistentVolumeClaimNodeExpansionFailed,
 			expectResizeCall:         false,
 			assumeResizeOpAsFinished: true,
 			expectedStatusSize:       resource.MustParse("1G"),
 		},
 		{
 			name:                     "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending",
-			pvc:                      getTestPVC("test-vol0", "2G", "1G", "2G", &nodeResizePending),
+			pvc:                      getTestPVC("test-vol0", "2G", "1G", "2G", v1.PersistentVolumeClaimNodeExpansionPending),
 			pv:                       getTestPV("test-vol0", "2G"),
-			expectedResizeStatus:     "",
+			expectedResizeStatus:     v1.PersistentVolumeClaimNoExpansionInProgress,
 			expectResizeCall:         true,
 			assumeResizeOpAsFinished: true,
 			expectedStatusSize:       resource.MustParse("2G"),
 		},
 		{
 			name:                     "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, reize_op=failing",
-			pvc:                      getTestPVC(volumetesting.AlwaysFailNodeExpansion, "2G", "1G", "2G", &nodeResizePending),
+			pvc:                      getTestPVC(volumetesting.AlwaysFailNodeExpansion, "2G", "1G", "2G", v1.PersistentVolumeClaimNodeExpansionPending),
 			pv:                       getTestPV(volumetesting.AlwaysFailNodeExpansion, "2G"),
 			expectError:              true,
-			expectedResizeStatus:     nodeResizeFailed,
+			expectedResizeStatus:     v1.PersistentVolumeClaimNodeExpansionFailed,
 			expectResizeCall:         true,
 			assumeResizeOpAsFinished: true,
 			expectedStatusSize:       resource.MustParse("1G"),
 		},
 		{
 			name: "pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
-			pvc:  getTestPVC("test-vol0", "2G", "2G", "2G", nil),
+			pvc:  getTestPVC("test-vol0", "2G", "2G", "2G", v1.PersistentVolumeClaimNoExpansionInProgress),
 			pv:   getTestPV("test-vol0", "2G"),
 
-			expectedResizeStatus:     "",
+			expectedResizeStatus:     v1.PersistentVolumeClaimNoExpansionInProgress,
 			expectResizeCall:         true,
 			assumeResizeOpAsFinished: true,
 			expectedStatusSize:       resource.MustParse("2G"),
@@ -147,11 +143,8 @@ func TestNodeExpander(t *testing.T) {
 			if test.assumeResizeOpAsFinished != expansionResponse.assumeResizeFinished {
 				t.Errorf("For test %s, expected assumeResizeOpAsFinished %t, got %t", test.name, test.assumeResizeOpAsFinished, expansionResponse.assumeResizeFinished)
 			}
-			allocatedResourceStatus := pvc.Status.AllocatedResourceStatuses
-			resizeStatus := allocatedResourceStatus[v1.ResourceStorage]
-
-			if test.expectedResizeStatus != resizeStatus {
-				t.Errorf("For test %s, expected resizeStatus %v, got %v", test.name, test.expectedResizeStatus, resizeStatus)
+			if test.expectedResizeStatus != *pvc.Status.ResizeStatus {
+				t.Errorf("For test %s, expected resizeStatus %v, got %v", test.name, test.expectedResizeStatus, *pvc.Status.ResizeStatus)
 			}
 			if pvcStatusCap.Cmp(test.expectedStatusSize) != 0 {
 				t.Errorf("For test %s, expected status size %s, got %s", test.name, test.expectedStatusSize.String(), pvcStatusCap.String())

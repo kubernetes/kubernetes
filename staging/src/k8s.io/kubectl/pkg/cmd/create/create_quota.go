@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -69,11 +68,11 @@ type QuotaOpts struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewQuotaOpts creates a new *QuotaOpts with sane defaults
-func NewQuotaOpts(ioStreams genericiooptions.IOStreams) *QuotaOpts {
+func NewQuotaOpts(ioStreams genericclioptions.IOStreams) *QuotaOpts {
 	return &QuotaOpts{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -81,7 +80,7 @@ func NewQuotaOpts(ioStreams genericiooptions.IOStreams) *QuotaOpts {
 }
 
 // NewCmdCreateQuota is a macro command to create a new quota
-func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewQuotaOpts(ioStreams)
 
 	cmd := &cobra.Command{

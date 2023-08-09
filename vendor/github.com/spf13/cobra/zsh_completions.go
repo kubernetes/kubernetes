@@ -1,4 +1,4 @@
-// Copyright 2013-2023 The Cobra Authors
+// Copyright 2013-2022 The Cobra Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -90,7 +90,6 @@ func genZshComp(buf io.StringWriter, name string, includeDesc bool) {
 		compCmd = ShellCompNoDescRequestCmd
 	}
 	WriteStringAndCheck(buf, fmt.Sprintf(`#compdef %[1]s
-compdef _%[1]s %[1]s
 
 # zsh completion for %-36[1]s -*- shell-script -*-
 
@@ -109,9 +108,8 @@ _%[1]s()
     local shellCompDirectiveNoFileComp=%[5]d
     local shellCompDirectiveFilterFileExt=%[6]d
     local shellCompDirectiveFilterDirs=%[7]d
-    local shellCompDirectiveKeepOrder=%[8]d
 
-    local lastParam lastChar flagPrefix requestComp out directive comp lastComp noSpace keepOrder
+    local lastParam lastChar flagPrefix requestComp out directive comp lastComp noSpace
     local -a completions
 
     __%[1]s_debug "\n========= starting completion logic =========="
@@ -179,7 +177,7 @@ _%[1]s()
         return
     fi
 
-    local activeHelpMarker="%[9]s"
+    local activeHelpMarker="%[8]s"
     local endIndex=${#activeHelpMarker}
     local startIndex=$((${#activeHelpMarker}+1))
     local hasActiveHelp=0
@@ -229,11 +227,6 @@ _%[1]s()
         noSpace="-S ''"
     fi
 
-    if [ $((directive & shellCompDirectiveKeepOrder)) -ne 0 ]; then
-        __%[1]s_debug "Activating keep order."
-        keepOrder="-V"
-    fi
-
     if [ $((directive & shellCompDirectiveFilterFileExt)) -ne 0 ]; then
         # File extension filtering
         local filteringCmd
@@ -269,7 +262,7 @@ _%[1]s()
         return $result
     else
         __%[1]s_debug "Calling _describe"
-        if eval _describe $keepOrder "completions" completions $flagPrefix $noSpace; then
+        if eval _describe "completions" completions $flagPrefix $noSpace; then
             __%[1]s_debug "_describe found some completions"
 
             # Return the success of having called _describe
@@ -303,6 +296,6 @@ if [ "$funcstack[1]" = "_%[1]s" ]; then
 fi
 `, name, compCmd,
 		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
-		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, ShellCompDirectiveKeepOrder,
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs,
 		activeHelpMarker))
 }

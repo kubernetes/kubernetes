@@ -122,24 +122,8 @@ const (
 	// This annotation is beta-level and is only honored when PodDeletionCost feature is enabled.
 	PodDeletionCost = "controller.kubernetes.io/pod-deletion-cost"
 
-	// DeprecatedAnnotationTopologyAwareHints can be used to enable or disable
-	// Topology Aware Hints for a Service. This may be set to "Auto" or
-	// "Disabled". Any other value is treated as "Disabled". This annotation has
-	// been deprecated in favor of the `service.kubernetes.io/topology-mode`
-	// annotation which also allows "Auto" and "Disabled", but is not limited to
-	// those (it's open ended to provide room for experimentation while we
-	// pursue configuration for topology via specification). When both
-	// `service.kubernetes.io/topology-aware-hints` and
-	// `service.kubernetes.io/topology-mode` annotations are set, the value of
-	// `service.kubernetes.io/topology-aware-hints` has precedence.
-	DeprecatedAnnotationTopologyAwareHints = "service.kubernetes.io/topology-aware-hints"
-
-	// AnnotationTopologyMode can be used to enable or disable Topology Aware
-	// Routing for a Service. Well known values are "Auto" and "Disabled".
-	// Implementations may choose to develop new topology approaches, exposing
-	// them with domain-prefixed values. For example, "example.com/lowest-rtt"
-	// could be a valid implementation-specific value for this annotation. These
-	// heuristics will often populate topology hints on EndpointSlices, but that
-	// is not a requirement.
-	AnnotationTopologyMode = "service.kubernetes.io/topology-mode"
+	// AnnotationTopologyAwareHints can be used to enable or disable Topology
+	// Aware Hints for a Service. This may be set to "Auto" or "Disabled". Any
+	// other value is treated as "Disabled".
+	AnnotationTopologyAwareHints = "service.kubernetes.io/topology-aware-hints"
 )

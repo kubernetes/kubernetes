@@ -34,7 +34,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
 		ns string
 	)
 	f := framework.NewDefaultFramework("ingress-scale")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		ns = f.Namespace.Name

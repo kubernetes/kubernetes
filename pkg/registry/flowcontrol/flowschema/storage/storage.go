@@ -46,10 +46,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against flow schemas.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &flowcontrol.FlowSchema{} },
-		NewListFunc:               func() runtime.Object { return &flowcontrol.FlowSchemaList{} },
-		DefaultQualifiedResource:  flowcontrol.Resource("flowschemas"),
-		SingularQualifiedResource: flowcontrol.Resource("flowschema"),
+		NewFunc:                  func() runtime.Object { return &flowcontrol.FlowSchema{} },
+		NewListFunc:              func() runtime.Object { return &flowcontrol.FlowSchemaList{} },
+		DefaultQualifiedResource: flowcontrol.Resource("flowschemas"),
 
 		CreateStrategy:      flowschema.Strategy,
 		UpdateStrategy:      flowschema.Strategy,

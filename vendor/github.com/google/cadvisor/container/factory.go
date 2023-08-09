@@ -57,6 +57,7 @@ const (
 	NetworkTcpUsageMetrics         MetricKind = "tcp"
 	NetworkAdvancedTcpUsageMetrics MetricKind = "advtcp"
 	NetworkUdpUsageMetrics         MetricKind = "udp"
+	AcceleratorUsageMetrics        MetricKind = "accelerator"
 	AppMetrics                     MetricKind = "app"
 	ProcessMetrics                 MetricKind = "process"
 	HugetlbUsageMetrics            MetricKind = "hugetlb"
@@ -77,6 +78,7 @@ var AllMetrics = MetricSet{
 	MemoryNumaMetrics:              struct{}{},
 	CpuLoadMetrics:                 struct{}{},
 	DiskIOMetrics:                  struct{}{},
+	AcceleratorUsageMetrics:        struct{}{},
 	DiskUsageMetrics:               struct{}{},
 	NetworkUsageMetrics:            struct{}{},
 	NetworkTcpUsageMetrics:         struct{}{},

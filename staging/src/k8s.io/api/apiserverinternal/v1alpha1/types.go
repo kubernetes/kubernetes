@@ -77,11 +77,6 @@ type ServerStorageVersion struct {
 	// The encodingVersion must be included in the decodableVersions.
 	// +listType=set
 	DecodableVersions []string `json:"decodableVersions,omitempty" protobuf:"bytes,3,opt,name=decodableVersions"`
-
-	// The API server can serve these versions.
-	// DecodableVersions must include all ServedVersions.
-	// +listType=set
-	ServedVersions []string `json:"servedVersions,omitempty" protobuf:"bytes,4,opt,name=servedVersions"`
 }
 
 type StorageVersionConditionType string

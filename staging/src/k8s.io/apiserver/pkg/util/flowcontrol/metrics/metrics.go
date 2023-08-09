@@ -47,7 +47,7 @@ const (
 
 var (
 	queueLengthBuckets            = []float64{0, 10, 25, 50, 100, 250, 500, 1000}
-	requestDurationSecondsBuckets = []float64{0, 0.005, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30}
+	requestDurationSecondsBuckets = []float64{0, 0.005, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 30}
 )
 
 var registerMetrics sync.Once
@@ -94,7 +94,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "rejected_requests_total",
 			Help:           "Number of requests rejected by API Priority and Fairness subsystem",
-			StabilityLevel: compbasemetrics.BETA,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema, "reason"},
 	)
@@ -104,7 +104,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "dispatched_requests_total",
 			Help:           "Number of requests executed by API Priority and Fairness subsystem",
-			StabilityLevel: compbasemetrics.BETA,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
@@ -206,7 +206,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "current_inqueue_requests",
 			Help:           "Number of requests currently pending in queues of the API Priority and Fairness subsystem",
-			StabilityLevel: compbasemetrics.BETA,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
@@ -223,13 +223,11 @@ var (
 	)
 	apiserverRequestConcurrencyLimit = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "request_concurrency_limit",
-			Help:      "Nominal number of execution seats configured for each priority level",
-			// Remove this metric once all suppported releases have the equal nominal_limit_seats metric
-			DeprecatedVersion: "1.30.0",
-			StabilityLevel:    compbasemetrics.ALPHA,
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "request_concurrency_limit",
+			Help:           "Shared concurrency limit in the API Priority and Fairness subsystem",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel},
 	)
@@ -239,29 +237,17 @@ var (
 			Subsystem:      subsystem,
 			Name:           "current_executing_requests",
 			Help:           "Number of requests in initial (for a WATCH) or any (for a non-WATCH) execution stage in the API Priority and Fairness subsystem",
-			StabilityLevel: compbasemetrics.BETA,
-		},
-		[]string{priorityLevel, flowSchema},
-	)
-	apiserverCurrentExecutingSeats = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "current_executing_seats",
-			Help:           "Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem",
-			StabilityLevel: compbasemetrics.BETA,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
 	apiserverRequestConcurrencyInUse = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "request_concurrency_in_use",
-			Help:      "Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem",
-			// Remove this metric once all suppported releases have the equal current_executing_seats metric
-			DeprecatedVersion: "1.31.0",
-			StabilityLevel:    compbasemetrics.ALPHA,
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "request_concurrency_in_use",
+			Help:           "Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
@@ -272,7 +258,7 @@ var (
 			Name:           "request_wait_duration_seconds",
 			Help:           "Length of time a request spent waiting in its queue",
 			Buckets:        requestDurationSecondsBuckets,
-			StabilityLevel: compbasemetrics.BETA,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema, "execute"},
 	)
@@ -337,7 +323,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "nominal_limit_seats",
 			Help:           "Nominal number of execution seats configured for each priority level",
-			StabilityLevel: compbasemetrics.BETA,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel},
 	)
@@ -458,7 +444,6 @@ var (
 		apiserverRequestQueueLength,
 		apiserverRequestConcurrencyLimit,
 		apiserverRequestConcurrencyInUse,
-		apiserverCurrentExecutingSeats,
 		apiserverCurrentExecutingRequests,
 		apiserverRequestWaitingSeconds,
 		apiserverRequestExecutionSeconds,
@@ -538,10 +523,9 @@ func SetDispatchMetrics(priorityLevel string, r, s, sMin, sMax, discountedSMin, 
 	apiserverNextDiscountedSBounds.WithLabelValues(priorityLevel, "max").Set(discountedSMax)
 }
 
-// AddSeatConcurrencyInUse adds the given delta to the gauge of seats in use by
+// AddRequestConcurrencyInUse adds the given delta to the gauge of concurrency in use by
 // the currently executing requests of the given flowSchema and priorityLevel
-func AddSeatConcurrencyInUse(priorityLevel, flowSchema string, delta int) {
-	apiserverCurrentExecutingSeats.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
+func AddRequestConcurrencyInUse(priorityLevel, flowSchema string, delta int) {
 	apiserverRequestConcurrencyInUse.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 

@@ -27,7 +27,6 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2/ktesting"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -236,8 +235,7 @@ func TestDesiredTTL(t *testing.T) {
 			boundaryStep:      testCase.boundaryStep,
 		}
 		if testCase.addNode {
-			logger, _ := ktesting.NewTestContext(t)
-			ttlController.addNode(logger, &v1.Node{})
+			ttlController.addNode(&v1.Node{})
 		}
 		if testCase.deleteNode {
 			ttlController.deleteNode(&v1.Node{})

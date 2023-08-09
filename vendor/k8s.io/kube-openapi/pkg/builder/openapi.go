@@ -152,7 +152,7 @@ func (o *openAPI) finalizeSwagger() (*spec.Swagger, error) {
 		}
 	}
 
-	return deduplicateParameters(o.swagger)
+	return o.swagger, nil
 }
 
 func (o *openAPI) buildDefinitionRecursively(name string) error {

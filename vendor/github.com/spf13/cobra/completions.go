@@ -1,4 +1,4 @@
-// Copyright 2013-2023 The Cobra Authors
+// Copyright 2013-2022 The Cobra Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -76,10 +76,6 @@ const (
 	// which to search.  The BashCompSubdirsInDir annotation can be used to
 	// obtain the same behavior but only for flags.
 	ShellCompDirectiveFilterDirs
-
-	// ShellCompDirectiveKeepOrder indicates that the shell should preserve the order
-	// in which the completions are provided
-	ShellCompDirectiveKeepOrder
 
 	// ===========================================================================
 
@@ -163,9 +159,6 @@ func (d ShellCompDirective) string() string {
 	if d&ShellCompDirectiveFilterDirs != 0 {
 		directives = append(directives, "ShellCompDirectiveFilterDirs")
 	}
-	if d&ShellCompDirectiveKeepOrder != 0 {
-		directives = append(directives, "ShellCompDirectiveKeepOrder")
-	}
 	if len(directives) == 0 {
 		directives = append(directives, "ShellCompDirectiveDefault")
 	}
@@ -176,7 +169,7 @@ func (d ShellCompDirective) string() string {
 	return strings.Join(directives, ", ")
 }
 
-// initCompleteCmd adds a special hidden command that can be used to request custom completions.
+// Adds a special hidden command that can be used to request custom completions.
 func (c *Command) initCompleteCmd(args []string) {
 	completeCmd := &Command{
 		Use:                   fmt.Sprintf("%s [command-line]", ShellCompRequestCmd),
@@ -734,7 +727,7 @@ to enable it.  You can execute the following once:
 
 To load completions in your current shell session:
 
-	source <(%[1]s completion zsh)
+	source <(%[1]s completion zsh); compdef _%[1]s %[1]s
 
 To load completions for every new session, execute once:
 

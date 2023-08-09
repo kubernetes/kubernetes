@@ -18,11 +18,11 @@ package testing
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -39,28 +39,16 @@ import (
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
-	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/features"
-
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/test/utils"
 )
-
-func init() {
-	// If instantiated more than once or together with other servers, the
-	// servers would try to modify the global logging state. This must get
-	// ignored during testing.
-	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
-}
 
 // This key is for testing purposes only and is not considered secure.
 const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
@@ -74,21 +62,10 @@ type TearDownFunc func()
 
 // TestServerInstanceOptions Instance options the TestServer
 type TestServerInstanceOptions struct {
-	// SkipHealthzCheck returns without waiting for the server to become healthy.
-	// Useful for testing server configurations expected to prevent /healthz from completing.
-	SkipHealthzCheck bool
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
 	// Wrap the storage version interface of the created server's generic server.
 	StorageVersionWrapFunc func(storageversion.Manager) storageversion.Manager
-	// CA file used for requestheader authn during communication between:
-	// 1. kube-apiserver and peer when the local apiserver is not able to serve the request due
-	// to version skew
-	// 2. kube-apiserver and aggregated apiserver
-
-	// We specify this as on option to pass a common proxyCA to multiple apiservers to simulate
-	// an apiserver version skew scenario where all apiservers use the same proxyCA to verify client connections.
-	ProxyCA *ProxyCA
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -107,16 +84,6 @@ type Logger interface {
 	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
 	Logf(format string, args ...interface{})
-	Cleanup(func())
-}
-
-// ProxyCA contains the certificate authority certificate and key which is used to verify client connections
-// to kube-apiservers. The clients can be :
-// 1. aggregated apiservers
-// 2. peer kube-apiservers
-type ProxyCA struct {
-	ProxySigningCert *x509.Certificate
-	ProxySigningKey  *rsa.PrivateKey
 }
 
 // NewDefaultTestServerOptions Default options for TestServer instances
@@ -183,26 +150,16 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		reqHeaders := serveroptions.NewDelegatingAuthenticationOptions()
 		s.Authentication.RequestHeader = &reqHeaders.RequestHeader
 
-		var proxySigningKey *rsa.PrivateKey
-		var proxySigningCert *x509.Certificate
-
-		if instanceOptions.ProxyCA != nil {
-			// use provided proxyCA
-			proxySigningKey = instanceOptions.ProxyCA.ProxySigningKey
-			proxySigningCert = instanceOptions.ProxyCA.ProxySigningCert
-
-		} else {
-			// create certificates for aggregation and client-cert auth
-			proxySigningKey, err = testutil.NewPrivateKey()
-			if err != nil {
-				return result, err
-			}
-			proxySigningCert, err = cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
-			if err != nil {
-				return result, err
-			}
+		// create certificates for aggregation and client-cert auth
+		proxySigningKey, err := testutil.NewPrivateKey()
+		if err != nil {
+			return result, err
 		}
-		proxyCACertFile := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
+		proxySigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
+		if err != nil {
+			return result, err
+		}
+		proxyCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
 		if err := os.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 			return result, err
 		}
@@ -229,8 +186,8 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		if err := pkiutil.WriteCertAndKey(s.SecureServing.ServerCert.CertDirectory, "misty-crt", clientCrtOfAPIServer, signer); err != nil {
 			return result, err
 		}
-		s.ProxyClientKeyFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
-		s.ProxyClientCertFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
+		s.ProxyClientKeyFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
+		s.ProxyClientCertFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
 
 		clientSigningKey, err := testutil.NewPrivateKey()
 		if err != nil {
@@ -240,20 +197,11 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		if err != nil {
 			return result, err
 		}
-		clientCACertFile := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
+		clientCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
 		if err := os.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 			return result, err
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
-		if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-			// TODO: set up a general clean up for testserver
-			if clientgotransport.DialerStopCh == wait.NeverStop {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-				t.Cleanup(cancel)
-				clientgotransport.DialerStopCh = ctx.Done()
-			}
-			s.PeerCAFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, s.SecureServing.ServerCert.PairName+".crt")
-		}
 	}
 
 	s.SecureServing.ExternalAddress = s.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
@@ -284,7 +232,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	s.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
 	s.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 
-	completedOptions, err := s.Complete()
+	completedOptions, err := app.Complete(s)
 	if err != nil {
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
 	}
@@ -295,16 +243,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
-
-	config, err := app.NewConfig(completedOptions)
-	if err != nil {
-		return result, err
-	}
-	completed, err := config.Complete()
-	if err != nil {
-		return result, err
-	}
-	server, err := app.CreateServerChain(completed)
+	server, err := app.CreateServerChain(completedOptions)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}
@@ -323,42 +262,40 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 	}(stopCh)
 
+	t.Logf("Waiting for /healthz to be ok...")
+
 	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
 
-	if !instanceOptions.SkipHealthzCheck {
-		t.Logf("Waiting for /healthz to be ok...")
-
-		// wait until healthz endpoint returns ok
-		err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
-			select {
-			case err := <-errCh:
-				return false, err
-			default:
-			}
-
-			req := client.CoreV1().RESTClient().Get().AbsPath("/healthz")
-			// The storage version bootstrap test wraps the storage version post-start
-			// hook, so the hook won't become health when the server bootstraps
-			if instanceOptions.StorageVersionWrapFunc != nil {
-				// We hardcode the param instead of having a new instanceOptions field
-				// to avoid confusing users with more options.
-				storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
-				req.Param("exclude", storageVersionCheck)
-			}
-			result := req.Do(context.TODO())
-			status := 0
-			result.StatusCode(&status)
-			if status == 200 {
-				return true, nil
-			}
-			return false, nil
-		})
-		if err != nil {
-			return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
+	// wait until healthz endpoint returns ok
+	err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
+		select {
+		case err := <-errCh:
+			return false, err
+		default:
 		}
+
+		req := client.CoreV1().RESTClient().Get().AbsPath("/healthz")
+		// The storage version bootstrap test wraps the storage version post-start
+		// hook, so the hook won't become health when the server bootstraps
+		if instanceOptions.StorageVersionWrapFunc != nil {
+			// We hardcode the param instead of having a new instanceOptions field
+			// to avoid confusing users with more options.
+			storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
+			req.Param("exclude", storageVersionCheck)
+		}
+		result := req.Do(context.TODO())
+		status := 0
+		result.StatusCode(&status)
+		if status == 200 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 	}
 
 	// wait until default namespace is created

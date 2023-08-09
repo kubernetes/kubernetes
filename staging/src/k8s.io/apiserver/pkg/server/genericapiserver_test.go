@@ -139,8 +139,6 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 
 	config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
 	config.OpenAPIConfig.Info.Version = "unversioned"
-	config.OpenAPIV3Config = DefaultOpenAPIV3Config(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
-	config.OpenAPIV3Config.Info.Version = "unversioned"
 	sharedInformers := informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
 	config.Complete(sharedInformers)
 
@@ -553,10 +551,6 @@ func (p *testGetterStorage) Get(ctx context.Context, name string, options *metav
 	return nil, nil
 }
 
-func (p *testGetterStorage) GetSingularName() string {
-	return "getter"
-}
-
 type testNoVerbsStorage struct {
 	Version string
 }
@@ -575,10 +569,6 @@ func (p *testNoVerbsStorage) New() runtime.Object {
 }
 
 func (p *testNoVerbsStorage) Destroy() {
-}
-
-func (p *testNoVerbsStorage) GetSingularName() string {
-	return "noverb"
 }
 
 func fakeVersion() version.Info {
@@ -604,7 +594,7 @@ func TestGracefulShutdown(t *testing.T) {
 	wg.Add(1)
 
 	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
-		handler := genericfilters.WithWaitGroup(apiHandler, c.LongRunningFunc, c.NonLongRunningRequestWaitGroup)
+		handler := genericfilters.WithWaitGroup(apiHandler, c.LongRunningFunc, c.HandlerChainWaitGroup)
 		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 		return handler
 	}
@@ -668,7 +658,7 @@ func TestGracefulShutdown(t *testing.T) {
 	}
 
 	// wait for wait group handler finish
-	s.NonLongRunningRequestWaitGroup.Wait()
+	s.HandlerChainWaitGroup.Wait()
 	<-stoppedCh
 
 	// check server all handlers finished.

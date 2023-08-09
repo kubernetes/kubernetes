@@ -108,9 +108,8 @@ func (tc *TokenCleaner) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer tc.queue.ShutDown()
 
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting token cleaner controller")
-	defer logger.Info("Shutting down token cleaner controller")
+	klog.Infof("Starting token cleaner controller")
+	defer klog.Infof("Shutting down token cleaner controller")
 
 	if !cache.WaitForNamedCacheSync("token_cleaner", ctx.Done(), tc.secretSynced) {
 		return
@@ -155,10 +154,9 @@ func (tc *TokenCleaner) processNextWorkItem(ctx context.Context) bool {
 }
 
 func (tc *TokenCleaner) syncFunc(ctx context.Context, key string) error {
-	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
-		logger.V(4).Info("Finished syncing secret", "secret", key, "elapsedTime", time.Since(startTime))
+		klog.V(4).Infof("Finished syncing secret %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -168,7 +166,7 @@ func (tc *TokenCleaner) syncFunc(ctx context.Context, key string) error {
 
 	ret, err := tc.secretLister.Secrets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		logger.V(3).Info("Secret has been deleted", "secret", key)
+		klog.V(3).Infof("secret has been deleted: %v", key)
 		return nil
 	}
 
@@ -183,11 +181,10 @@ func (tc *TokenCleaner) syncFunc(ctx context.Context, key string) error {
 }
 
 func (tc *TokenCleaner) evalSecret(ctx context.Context, o interface{}) {
-	logger := klog.FromContext(ctx)
 	secret := o.(*v1.Secret)
 	ttl, alreadyExpired := bootstrapsecretutil.GetExpiration(secret, time.Now())
 	if alreadyExpired {
-		logger.V(3).Info("Deleting expired secret", "secret", klog.KObj(secret))
+		klog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
 		var options metav1.DeleteOptions
 		if len(secret.UID) > 0 {
 			options.Preconditions = &metav1.Preconditions{UID: &secret.UID}
@@ -196,7 +193,7 @@ func (tc *TokenCleaner) evalSecret(ctx context.Context, o interface{}) {
 		// NotFound isn't a real error (it's already been deleted)
 		// Conflict isn't a real error (the UID precondition failed)
 		if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
-			logger.V(3).Info("Error deleting secret", "err", err)
+			klog.V(3).Infof("Error deleting Secret: %v", err)
 		}
 	} else if ttl > 0 {
 		key, err := controller.KeyFunc(o)

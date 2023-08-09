@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/version"
@@ -36,7 +36,7 @@ import (
 )
 
 // TODO(knverey): remove this hardcoding once kubectl being built with module support makes BuildInfo available.
-const kustomizeVersion = "v5.0.1"
+const kustomizeVersion = "v4.5.7"
 
 // Version is a struct for version information
 type Version struct {
@@ -54,17 +54,18 @@ var (
 // Options is a struct to support version command
 type Options struct {
 	ClientOnly bool
+	Short      bool
 	Output     string
 
 	args []string
 
 	discoveryClient discovery.CachedDiscoveryInterface
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewOptions returns initialized Options
-func NewOptions(ioStreams genericiooptions.IOStreams) *Options {
+func NewOptions(ioStreams genericclioptions.IOStreams) *Options {
 	return &Options{
 		IOStreams: ioStreams,
 	}
@@ -72,7 +73,7 @@ func NewOptions(ioStreams genericiooptions.IOStreams) *Options {
 }
 
 // NewCmdVersion returns a cobra command for fetching versions
-func NewCmdVersion(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:     "version",
@@ -86,6 +87,8 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cob
 		},
 	}
 	cmd.Flags().BoolVar(&o.ClientOnly, "client", o.ClientOnly, "If true, shows client version only (no server required).")
+	cmd.Flags().BoolVar(&o.Short, "short", o.Short, "If true, print just the version number.")
+	cmd.Flags().MarkDeprecated("short", "and will be removed in the future. The --short output will become the default.")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "One of 'yaml' or 'json'.")
 	return cmd
 }
@@ -138,10 +141,19 @@ func (o *Options) Run() error {
 
 	switch o.Output {
 	case "":
-		fmt.Fprintf(o.Out, "Client Version: %s\n", versionInfo.ClientVersion.GitVersion)
-		fmt.Fprintf(o.Out, "Kustomize Version: %s\n", versionInfo.KustomizeVersion)
-		if versionInfo.ServerVersion != nil {
-			fmt.Fprintf(o.Out, "Server Version: %s\n", versionInfo.ServerVersion.GitVersion)
+		if o.Short {
+			fmt.Fprintf(o.Out, "Client Version: %s\n", versionInfo.ClientVersion.GitVersion)
+			fmt.Fprintf(o.Out, "Kustomize Version: %s\n", versionInfo.KustomizeVersion)
+			if versionInfo.ServerVersion != nil {
+				fmt.Fprintf(o.Out, "Server Version: %s\n", versionInfo.ServerVersion.GitVersion)
+			}
+		} else {
+			fmt.Fprintf(o.ErrOut, "WARNING: This version information is deprecated and will be replaced with the output from kubectl version --short.  Use --output=yaml|json to get the full version.\n")
+			fmt.Fprintf(o.Out, "Client Version: %#v\n", *versionInfo.ClientVersion)
+			fmt.Fprintf(o.Out, "Kustomize Version: %s\n", versionInfo.KustomizeVersion)
+			if versionInfo.ServerVersion != nil {
+				fmt.Fprintf(o.Out, "Server Version: %#v\n", *versionInfo.ServerVersion)
+			}
 		}
 	case "yaml":
 		marshalled, err := yaml.Marshal(&versionInfo)
@@ -183,7 +195,7 @@ func GetKustomizeModVersion() (string, bool) {
 		return "", false
 	}
 	for _, dep := range info.Deps {
-		if dep.Path == "sigs.k8s.io/kustomize/kustomize/v4" || dep.Path == "sigs.k8s.io/kustomize/kustomize/v5" {
+		if dep.Path == "sigs.k8s.io/kustomize/kustomize/v4" {
 			return dep.Version, true
 		}
 	}

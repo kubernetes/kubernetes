@@ -19,22 +19,20 @@ type Format string
 
 // Constants to assemble the Content-Type values for the different wire protocols.
 const (
-	TextVersion              = "0.0.4"
-	ProtoType                = `application/vnd.google.protobuf`
-	ProtoProtocol            = `io.prometheus.client.MetricFamily`
-	ProtoFmt                 = ProtoType + "; proto=" + ProtoProtocol + ";"
-	OpenMetricsType          = `application/openmetrics-text`
-	OpenMetricsVersion_0_0_1 = "0.0.1"
-	OpenMetricsVersion_1_0_0 = "1.0.0"
+	TextVersion        = "0.0.4"
+	ProtoType          = `application/vnd.google.protobuf`
+	ProtoProtocol      = `io.prometheus.client.MetricFamily`
+	ProtoFmt           = ProtoType + "; proto=" + ProtoProtocol + ";"
+	OpenMetricsType    = `application/openmetrics-text`
+	OpenMetricsVersion = "0.0.1"
 
 	// The Content-Type values for the different wire protocols.
-	FmtUnknown           Format = `<unknown>`
-	FmtText              Format = `text/plain; version=` + TextVersion + `; charset=utf-8`
-	FmtProtoDelim        Format = ProtoFmt + ` encoding=delimited`
-	FmtProtoText         Format = ProtoFmt + ` encoding=text`
-	FmtProtoCompact      Format = ProtoFmt + ` encoding=compact-text`
-	FmtOpenMetrics_1_0_0 Format = OpenMetricsType + `; version=` + OpenMetricsVersion_1_0_0 + `; charset=utf-8`
-	FmtOpenMetrics_0_0_1 Format = OpenMetricsType + `; version=` + OpenMetricsVersion_0_0_1 + `; charset=utf-8`
+	FmtUnknown      Format = `<unknown>`
+	FmtText         Format = `text/plain; version=` + TextVersion + `; charset=utf-8`
+	FmtProtoDelim   Format = ProtoFmt + ` encoding=delimited`
+	FmtProtoText    Format = ProtoFmt + ` encoding=text`
+	FmtProtoCompact Format = ProtoFmt + ` encoding=compact-text`
+	FmtOpenMetrics  Format = OpenMetricsType + `; version=` + OpenMetricsVersion + `; charset=utf-8`
 )
 
 const (

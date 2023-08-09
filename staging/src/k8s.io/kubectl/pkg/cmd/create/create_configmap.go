@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -99,11 +98,11 @@ type ConfigMapOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewConfigMapOptions creates a new *ConfigMapOptions with default value
-func NewConfigMapOptions(ioStreams genericiooptions.IOStreams) *ConfigMapOptions {
+func NewConfigMapOptions(ioStreams genericclioptions.IOStreams) *ConfigMapOptions {
 	return &ConfigMapOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -111,7 +110,7 @@ func NewConfigMapOptions(ioStreams genericiooptions.IOStreams) *ConfigMapOptions
 }
 
 // NewCmdCreateConfigMap creates the `create configmap` Cobra command
-func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewConfigMapOptions(ioStreams)
 
 	cmd := &cobra.Command{

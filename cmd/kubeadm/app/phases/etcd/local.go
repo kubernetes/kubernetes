@@ -118,10 +118,6 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 	klog.V(2).Infof("[etcd] get the member id from peer: %s", etcdPeerAddress)
 	id, err := etcdClient.GetMemberID(etcdPeerAddress)
 	if err != nil {
-		if errors.Is(etcdutil.ErrNoMemberIDForPeerURL, err) {
-			klog.V(5).Infof("[etcd] member was already removed, because no member id exists for peer %s", etcdPeerAddress)
-			return nil
-		}
 		return err
 	}
 
@@ -154,7 +150,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	} else {
 		klog.V(1).Infof("[etcd] Adding etcd member: %s", etcdPeerAddress)
 		if features.Enabled(cfg.FeatureGates, features.EtcdLearnerMode) {
-			cluster, err = etcdClient.AddMemberAsLearner(nodeName, etcdPeerAddress)
+			cluster, err = etcdClient.AddMemberAsLeanerAndPromote(nodeName, etcdPeerAddress)
 		} else {
 			cluster, err = etcdClient.AddMember(nodeName, etcdPeerAddress)
 		}
@@ -174,17 +170,6 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	if isDryRun {
 		fmt.Println("[etcd] Would wait for the new etcd member to join the cluster")
 		return nil
-	}
-
-	if features.Enabled(cfg.FeatureGates, features.EtcdLearnerMode) {
-		learnerID, err := etcdClient.GetMemberID(etcdPeerAddress)
-		if err != nil {
-			return err
-		}
-		err = etcdClient.MemberPromote(learnerID)
-		if err != nil {
-			return err
-		}
 	}
 
 	fmt.Printf("[etcd] Waiting for the new etcd member to join the cluster. This can take up to %v\n", etcdHealthyCheckInterval*etcdHealthyCheckRetries)
@@ -224,7 +209,6 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 			},
 			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health?exclude=NOSPACE&serializable=true", probePort, probeScheme),
 			StartupProbe:  staticpodutil.StartupProbe(probeHostname, "/health?serializable=false", probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
-			Env:           cfg.Etcd.Local.ExtraEnvs,
 		},
 		etcdMounts,
 		// etcd will listen on the advertise address of the API server, in a different port (2379)

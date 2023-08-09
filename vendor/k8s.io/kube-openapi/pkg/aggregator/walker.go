@@ -24,7 +24,6 @@ import (
 
 const (
 	definitionPrefix = "#/definitions/"
-	parameterPrefix  = "#/parameters/"
 )
 
 // Run a readonlyReferenceWalker method on all references of an OpenAPI spec

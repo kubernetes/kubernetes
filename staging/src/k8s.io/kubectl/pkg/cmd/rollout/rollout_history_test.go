@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -125,7 +124,7 @@ Fake ViewHistory Output
 				return "Fake ViewHistory Output\n", nil
 			}
 
-			streams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
+			streams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdRolloutHistory(tf, streams)
 			for k, v := range tc.flags {
 				cmd.Flags().Set(k, v)
@@ -224,7 +223,7 @@ Fake ViewHistory Output
 				return "Fake ViewHistory Output\n", nil
 			}
 
-			streams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
+			streams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdRolloutHistory(tf, streams)
 			for k, v := range tc.flags {
 				cmd.Flags().Set(k, v)
@@ -372,7 +371,7 @@ replicaset.apps/rev2
 				}, nil
 			}
 
-			streams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
+			streams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdRolloutHistory(tf, streams)
 			for k, v := range tc.flags {
 				cmd.Flags().Set(k, v)

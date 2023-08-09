@@ -6,7 +6,7 @@ import (
 	"unsafe"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/internal/sys"
+	"github.com/cilium/ebpf/internal"
 )
 
 type IterOptions struct {
@@ -31,31 +31,41 @@ func AttachIter(opts IterOptions) (*Iter, error) {
 
 	progFd := opts.Program.FD()
 	if progFd < 0 {
-		return nil, fmt.Errorf("invalid program: %s", sys.ErrClosedFd)
+		return nil, fmt.Errorf("invalid program: %s", internal.ErrClosedFd)
 	}
 
 	var info bpfIterLinkInfoMap
 	if opts.Map != nil {
 		mapFd := opts.Map.FD()
 		if mapFd < 0 {
-			return nil, fmt.Errorf("invalid map: %w", sys.ErrClosedFd)
+			return nil, fmt.Errorf("invalid map: %w", internal.ErrClosedFd)
 		}
 		info.map_fd = uint32(mapFd)
 	}
 
-	attr := sys.LinkCreateIterAttr{
-		ProgFd:      uint32(progFd),
-		AttachType:  sys.AttachType(ebpf.AttachTraceIter),
-		IterInfo:    sys.NewPointer(unsafe.Pointer(&info)),
-		IterInfoLen: uint32(unsafe.Sizeof(info)),
+	attr := bpfLinkCreateIterAttr{
+		prog_fd:       uint32(progFd),
+		attach_type:   ebpf.AttachTraceIter,
+		iter_info:     internal.NewPointer(unsafe.Pointer(&info)),
+		iter_info_len: uint32(unsafe.Sizeof(info)),
 	}
 
-	fd, err := sys.LinkCreateIter(&attr)
+	fd, err := bpfLinkCreateIter(&attr)
 	if err != nil {
 		return nil, fmt.Errorf("can't link iterator: %w", err)
 	}
 
 	return &Iter{RawLink{fd, ""}}, err
+}
+
+// LoadPinnedIter loads a pinned iterator from a bpffs.
+func LoadPinnedIter(fileName string, opts *ebpf.LoadPinOptions) (*Iter, error) {
+	link, err := LoadPinnedRawLink(fileName, IterType, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Iter{*link}, err
 }
 
 // Iter represents an attached bpf_iter.
@@ -67,11 +77,16 @@ type Iter struct {
 //
 // Reading from the returned reader triggers the BPF program.
 func (it *Iter) Open() (io.ReadCloser, error) {
-	attr := &sys.IterCreateAttr{
-		LinkFd: it.fd.Uint(),
+	linkFd, err := it.fd.Value()
+	if err != nil {
+		return nil, err
 	}
 
-	fd, err := sys.IterCreate(attr)
+	attr := &bpfIterCreateAttr{
+		linkFd: linkFd,
+	}
+
+	fd, err := bpfIterCreate(attr)
 	if err != nil {
 		return nil, fmt.Errorf("can't create iterator: %w", err)
 	}

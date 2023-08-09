@@ -1,4 +1,3 @@
-//go:build appengine
 // +build appengine
 
 // This file contains the safe implementations of otherwise unsafe-using code.

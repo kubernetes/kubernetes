@@ -19,12 +19,11 @@ import (
 	"reflect"
 	"time"
 
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
-
 	"github.com/google/cel-go/common/types/pb"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -196,7 +195,7 @@ func (p *protoTypeRegistry) RegisterType(types ...ref.Type) error {
 // providing support for custom proto-based types.
 //
 // This method should be the inverse of ref.Val.ConvertToNative.
-func (p *protoTypeRegistry) NativeToValue(value any) ref.Val {
+func (p *protoTypeRegistry) NativeToValue(value interface{}) ref.Val {
 	if val, found := nativeToValue(p, value); found {
 		return val
 	}
@@ -250,7 +249,7 @@ var (
 )
 
 // NativeToValue implements the ref.TypeAdapter interface.
-func (a *defaultTypeAdapter) NativeToValue(value any) ref.Val {
+func (a *defaultTypeAdapter) NativeToValue(value interface{}) ref.Val {
 	if val, found := nativeToValue(a, value); found {
 		return val
 	}
@@ -259,7 +258,7 @@ func (a *defaultTypeAdapter) NativeToValue(value any) ref.Val {
 
 // nativeToValue returns the converted (ref.Val, true) of a conversion is found,
 // otherwise (nil, false)
-func nativeToValue(a ref.TypeAdapter, value any) (ref.Val, bool) {
+func nativeToValue(a ref.TypeAdapter, value interface{}) (ref.Val, bool) {
 	switch v := value.(type) {
 	case nil:
 		return NullValue, true
@@ -365,7 +364,7 @@ func nativeToValue(a ref.TypeAdapter, value any) (ref.Val, bool) {
 	// specializations for common map types.
 	case map[string]string:
 		return NewStringStringMap(a, v), true
-	case map[string]any:
+	case map[string]interface{}:
 		return NewStringInterfaceMap(a, v), true
 	case map[ref.Val]ref.Val:
 		return NewRefValMap(a, v), true
@@ -480,12 +479,9 @@ func msgSetField(target protoreflect.Message, field *pb.FieldDescription, val re
 	if err != nil {
 		return fieldTypeConversionError(field, err)
 	}
-	if v == nil {
-		return nil
-	}
-	switch pv := v.(type) {
+	switch v.(type) {
 	case proto.Message:
-		v = pv.ProtoReflect()
+		v = v.(proto.Message).ProtoReflect()
 	}
 	target.Set(field.Descriptor(), protoreflect.ValueOf(v))
 	return nil
@@ -498,9 +494,6 @@ func msgSetListField(target protoreflect.List, listField *pb.FieldDescription, l
 		elemVal, err := elem.ConvertToNative(elemReflectType)
 		if err != nil {
 			return fieldTypeConversionError(listField, err)
-		}
-		if elemVal == nil {
-			continue
 		}
 		switch ev := elemVal.(type) {
 		case proto.Message:
@@ -526,12 +519,9 @@ func msgSetMapField(target protoreflect.Map, mapField *pb.FieldDescription, mapV
 		if err != nil {
 			return fieldTypeConversionError(mapField, err)
 		}
-		if v == nil {
-			continue
-		}
-		switch pv := v.(type) {
+		switch v.(type) {
 		case proto.Message:
-			v = pv.ProtoReflect()
+			v = v.(proto.Message).ProtoReflect()
 		}
 		target.Set(protoreflect.ValueOf(k).MapKey(), protoreflect.ValueOf(v))
 	}

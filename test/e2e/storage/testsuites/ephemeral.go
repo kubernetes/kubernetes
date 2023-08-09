@@ -109,7 +109,6 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		resource *storageframework.VolumeResource
 	}
 	var (
-		dInfo   = driver.GetDriverInfo()
 		eDriver storageframework.EphemeralTestDriver
 		l       local
 	)
@@ -117,7 +116,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("ephemeral", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
 		if pattern.VolType == storageframework.CSIInlineVolume {
@@ -132,11 +131,6 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			if !enabled {
 				e2eskipper.Skipf("Cluster doesn't support %q volumes -- skipping", pattern.VolType)
 			}
-		}
-		// A driver might support the Topology capability which is incompatible with the VolumeBindingMode immediate because
-		// volumes might be provisioned immediately in a different zone to where the workload is located.
-		if pattern.BindingMode == storagev1.VolumeBindingImmediate && len(dInfo.TopologyKeys) > 0 {
-			e2eskipper.Skipf("VolumeBindingMode immediate is not compatible with a multi-topology environment.")
 		}
 
 		l = local{}

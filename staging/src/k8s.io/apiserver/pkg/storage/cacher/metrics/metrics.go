@@ -74,17 +74,6 @@ var (
 		[]string{"resource"},
 	)
 
-	EventsReceivedCounter = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "events_received_total",
-			Help:           "Counter of events received in watch cache broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"resource"},
-	)
-
 	EventsCounter = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -158,7 +147,6 @@ func Register() {
 		legacyregistry.MustRegister(listCacheNumFetched)
 		legacyregistry.MustRegister(listCacheNumReturned)
 		legacyregistry.MustRegister(InitCounter)
-		legacyregistry.MustRegister(EventsReceivedCounter)
 		legacyregistry.MustRegister(EventsCounter)
 		legacyregistry.MustRegister(TerminatedWatchersCounter)
 		legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
@@ -179,7 +167,7 @@ func RecordListCacheMetrics(resourcePrefix, indexName string, numFetched, numRet
 func RecordsWatchCacheCapacityChange(objType string, old, new int) {
 	WatchCacheCapacity.WithLabelValues(objType).Set(float64(new))
 	if old < new {
-		watchCacheCapacityIncreaseTotal.WithLabelValues(objType).Inc()
+		WatchCacheCapacity.WithLabelValues(objType).Inc()
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(objType).Inc()

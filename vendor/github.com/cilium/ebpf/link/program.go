@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/internal/sys"
+	"github.com/cilium/ebpf/internal"
 )
 
 type RawAttachProgramOptions struct {
@@ -34,7 +34,7 @@ func RawAttachProgram(opts RawAttachProgramOptions) error {
 		replaceFd = uint32(opts.Replace.FD())
 	}
 
-	attr := sys.ProgAttachAttr{
+	attr := internal.BPFProgAttachAttr{
 		TargetFd:     uint32(opts.Target),
 		AttachBpfFd:  uint32(opts.Program.FD()),
 		ReplaceBpfFd: replaceFd,
@@ -42,7 +42,7 @@ func RawAttachProgram(opts RawAttachProgramOptions) error {
 		AttachFlags:  uint32(opts.Flags),
 	}
 
-	if err := sys.ProgAttach(&attr); err != nil {
+	if err := internal.BPFProgAttach(&attr); err != nil {
 		return fmt.Errorf("can't attach program: %w", err)
 	}
 	return nil
@@ -63,12 +63,12 @@ func RawDetachProgram(opts RawDetachProgramOptions) error {
 		return err
 	}
 
-	attr := sys.ProgDetachAttr{
+	attr := internal.BPFProgDetachAttr{
 		TargetFd:    uint32(opts.Target),
 		AttachBpfFd: uint32(opts.Program.FD()),
 		AttachType:  uint32(opts.Attach),
 	}
-	if err := sys.ProgDetach(&attr); err != nil {
+	if err := internal.BPFProgDetach(&attr); err != nil {
 		return fmt.Errorf("can't detach program: %w", err)
 	}
 

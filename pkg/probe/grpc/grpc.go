@@ -57,9 +57,6 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration)
 		grpc.WithUserAgent(fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor)),
 		grpc.WithBlock(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()), //credentials are currently not supported
-		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			return probe.ProbeDialer().DialContext(ctx, "tcp", addr)
-		}),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)

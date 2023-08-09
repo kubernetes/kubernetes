@@ -22,8 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/imdario/mergo"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -179,7 +177,7 @@ func TestCAOverridesCAData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create tempfile: %v", err)
 	}
-	defer utiltesting.CloseAndRemove(t, file)
+	defer os.Remove(file.Name())
 
 	config := createCAValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
@@ -314,7 +312,8 @@ func TestModifyContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer utiltesting.CloseAndRemove(t, tempPath)
+	defer os.Remove(tempPath.Name())
+
 	pathOptions := NewDefaultPathOptions()
 	config := createValidTestConfig()
 
@@ -499,7 +498,7 @@ func TestBasicTokenFile(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer utiltesting.CloseAndRemove(t, f)
+	defer os.Remove(f.Name())
 	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
@@ -535,7 +534,7 @@ func TestPrecedenceTokenFile(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer utiltesting.CloseAndRemove(t, f)
+	defer os.Remove(f.Name())
 	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
@@ -924,7 +923,7 @@ users:
 	if err != nil {
 		t.Error(err)
 	}
-	defer utiltesting.CloseAndRemove(t, tmpfile)
+	defer os.Remove(tmpfile.Name())
 	if err := os.WriteFile(tmpfile.Name(), []byte(content), 0666); err != nil {
 		t.Error(err)
 	}

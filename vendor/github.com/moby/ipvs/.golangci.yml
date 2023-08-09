@@ -1,8 +1,0 @@
-linters:
-  disable-all: true
-  enable:
-    - gofmt
-    - govet
-    - ineffassign
-    - misspell
-    - revive

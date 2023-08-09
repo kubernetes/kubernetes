@@ -91,10 +91,6 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.EnableServiceLinks = &enableServiceLinks
 			}
 		},
-		func(s *core.PodStatus, c fuzz.Continue) {
-			c.Fuzz(&s)
-			s.HostIPs = []core.HostIP{{IP: s.HostIP}}
-		},
 		func(j *core.PodPhase, c fuzz.Continue) {
 			statuses := []core.PodPhase{core.PodPending, core.PodRunning, core.PodFailed, core.PodUnknown}
 			*j = statuses[c.Rand.Intn(len(statuses))]
@@ -528,7 +524,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				ss.SessionAffinityConfig = nil
 			}
 			if ss.AllocateLoadBalancerNodePorts == nil {
-				ss.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				ss.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			}
 		},
 		func(s *core.NodeStatus, c fuzz.Continue) {

@@ -38,7 +38,7 @@ func NewErrors(source Source) *Errors {
 }
 
 // ReportError records an error at a source location.
-func (e *Errors) ReportError(l Location, format string, args ...any) {
+func (e *Errors) ReportError(l Location, format string, args ...interface{}) {
 	e.numErrors++
 	if e.numErrors > e.maxErrorsToReport {
 		return

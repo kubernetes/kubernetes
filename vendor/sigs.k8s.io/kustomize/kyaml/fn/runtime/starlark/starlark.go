@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
-	"os"
 
 	"go.starlark.net/starlark"
 	"sigs.k8s.io/kustomize/kyaml/errors"
@@ -57,7 +57,7 @@ func (sf *Filter) setup() error {
 
 	// read the program from a file
 	if sf.Path != "" {
-		b, err := os.ReadFile(sf.Path)
+		b, err := ioutil.ReadFile(sf.Path)
 		if err != nil {
 			return err
 		}
@@ -72,7 +72,7 @@ func (sf *Filter) setup() error {
 				return err
 			}
 			defer resp.Body.Close()
-			b, err := io.ReadAll(resp.Body)
+			b, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				return err
 			}

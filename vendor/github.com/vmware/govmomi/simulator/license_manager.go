@@ -30,6 +30,7 @@ limitations under the License.
 package simulator
 
 import (
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -63,13 +64,17 @@ type LicenseManager struct {
 	mo.LicenseManager
 }
 
-func (m *LicenseManager) init(r *Registry) {
+func NewLicenseManager(ref types.ManagedObjectReference) object.Reference {
+	m := &LicenseManager{}
+	m.Self = ref
 	m.Licenses = []types.LicenseManagerLicenseInfo{EvalLicense}
 
-	if r.IsVPX() {
+	if Map.IsVPX() {
 		am := Map.Put(&LicenseAssignmentManager{}).Reference()
 		m.LicenseAssignmentManager = &am
 	}
+
+	return m
 }
 
 func (m *LicenseManager) AddLicense(req *types.AddLicense) soap.HasFault {

@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 // ValidateDefaults checks that default values validate and are properly pruned.
@@ -51,7 +50,7 @@ func ValidateDefaults(ctx context.Context, pth *field.Path, s *structuralschema.
 		}
 	}
 
-	allErr, error, _ := validate(ctx, pth, s, s, f, false, requirePrunedDefaults, celconfig.RuntimeCELCostBudget)
+	allErr, error, _ := validate(ctx, pth, s, s, f, false, requirePrunedDefaults, cel.RuntimeCELCostBudget)
 	return allErr, error
 }
 
@@ -92,7 +91,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 				allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, fmt.Sprintf("must result in valid metadata: %v", errs.ToAggregate())))
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
-			} else if celValidator := cel.NewValidator(s, isResourceRoot, celconfig.PerCallLimit); celValidator != nil {
+			} else if celValidator := cel.NewValidator(s, isResourceRoot, cel.PerCallLimit); celValidator != nil {
 				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				remainingCost = rmCost
 				allErrs = append(allErrs, celErrs...)
@@ -117,7 +116,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 				allErrs = append(allErrs, errs...)
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
-			} else if celValidator := cel.NewValidator(s, isResourceRoot, celconfig.PerCallLimit); celValidator != nil {
+			} else if celValidator := cel.NewValidator(s, isResourceRoot, cel.PerCallLimit); celValidator != nil {
 				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				remainingCost = rmCost
 				allErrs = append(allErrs, celErrs...)

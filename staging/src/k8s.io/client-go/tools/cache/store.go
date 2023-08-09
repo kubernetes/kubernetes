@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Store is a generic object storage and processing interface.  A
@@ -100,38 +99,20 @@ type ExplicitKey string
 // The key uses the format <namespace>/<name> unless <namespace> is empty, then
 // it's just <name>.
 //
-// Clients that want a structured alternative can use ObjectToName or MetaObjectToName.
-// Note: this would not be a client that wants a key for a Store because those are
-// necessarily strings.
-//
-// TODO maybe some day?: change Store to be keyed differently
+// TODO: replace key-as-string with a key-as-struct so that this
+// packing/unpacking won't be necessary.
 func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	if key, ok := obj.(ExplicitKey); ok {
 		return string(key), nil
 	}
-	objName, err := ObjectToName(obj)
-	if err != nil {
-		return "", err
-	}
-	return objName.String(), nil
-}
-
-// ObjectToName returns the structured name for the given object,
-// if indeed it can be viewed as a metav1.Object.
-func ObjectToName(obj interface{}) (ObjectName, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
-		return ObjectName{}, fmt.Errorf("object has no meta: %v", err)
+		return "", fmt.Errorf("object has no meta: %v", err)
 	}
-	return MetaObjectToName(meta), nil
-}
-
-// MetaObjectToName returns the structured name for the given object
-func MetaObjectToName(obj metav1.Object) ObjectName {
-	if len(obj.GetNamespace()) > 0 {
-		return ObjectName{Namespace: obj.GetNamespace(), Name: obj.GetName()}
+	if len(meta.GetNamespace()) > 0 {
+		return meta.GetNamespace() + "/" + meta.GetName(), nil
 	}
-	return ObjectName{Namespace: "", Name: obj.GetName()}
+	return meta.GetName(), nil
 }
 
 // SplitMetaNamespaceKey returns the namespace and name that

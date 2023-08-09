@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -63,11 +62,11 @@ type ClusterRoleBindingOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewClusterRoleBindingOptions creates a new *ClusterRoleBindingOptions with sane defaults
-func NewClusterRoleBindingOptions(ioStreams genericiooptions.IOStreams) *ClusterRoleBindingOptions {
+func NewClusterRoleBindingOptions(ioStreams genericclioptions.IOStreams) *ClusterRoleBindingOptions {
 	return &ClusterRoleBindingOptions{
 		Users:           []string{},
 		Groups:          []string{},
@@ -78,7 +77,7 @@ func NewClusterRoleBindingOptions(ioStreams genericiooptions.IOStreams) *Cluster
 }
 
 // NewCmdCreateClusterRoleBinding returns an initialized command instance of ClusterRoleBinding
-func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewClusterRoleBindingOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -109,7 +108,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericiooption
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"clusterrole",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.CompGetResource(f, "clusterrole", toComplete), cobra.ShellCompDirectiveNoFileComp
+			return completion.CompGetResource(f, cmd, "clusterrole", toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 
 	return cmd

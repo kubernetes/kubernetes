@@ -234,7 +234,7 @@ func (client Client) CreateOrUpdate(ctx context.Context, resourceGroupName strin
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "resources.Client", "CreateOrUpdate", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "resources.Client", "CreateOrUpdate", nil, "Failure sending request")
 		return
 	}
 
@@ -270,7 +270,6 @@ func (client Client) CreateOrUpdatePreparer(ctx context.Context, resourceGroupNa
 // http.Response Body if it receives an error.
 func (client Client) CreateOrUpdateSender(req *http.Request) (future CreateOrUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -327,7 +326,7 @@ func (client Client) CreateOrUpdateByID(ctx context.Context, resourceID string, 
 
 	result, err = client.CreateOrUpdateByIDSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "resources.Client", "CreateOrUpdateByID", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "resources.Client", "CreateOrUpdateByID", nil, "Failure sending request")
 		return
 	}
 
@@ -358,7 +357,6 @@ func (client Client) CreateOrUpdateByIDPreparer(ctx context.Context, resourceID 
 // http.Response Body if it receives an error.
 func (client Client) CreateOrUpdateByIDSender(req *http.Request) (future CreateOrUpdateByIDFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 	if err != nil {
 		return
@@ -418,7 +416,7 @@ func (client Client) Delete(ctx context.Context, resourceGroupName string, resou
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "resources.Client", "Delete", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "resources.Client", "Delete", nil, "Failure sending request")
 		return
 	}
 
@@ -452,7 +450,6 @@ func (client Client) DeletePreparer(ctx context.Context, resourceGroupName strin
 // http.Response Body if it receives an error.
 func (client Client) DeleteSender(req *http.Request) (future DeleteFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -500,7 +497,7 @@ func (client Client) DeleteByID(ctx context.Context, resourceID string, APIVersi
 
 	result, err = client.DeleteByIDSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "resources.Client", "DeleteByID", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "resources.Client", "DeleteByID", nil, "Failure sending request")
 		return
 	}
 
@@ -529,7 +526,6 @@ func (client Client) DeleteByIDPreparer(ctx context.Context, resourceID string, 
 // http.Response Body if it receives an error.
 func (client Client) DeleteByIDSender(req *http.Request) (future DeleteByIDFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 	if err != nil {
 		return
@@ -1015,7 +1011,7 @@ func (client Client) MoveResources(ctx context.Context, sourceResourceGroupName 
 
 	result, err = client.MoveResourcesSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "resources.Client", "MoveResources", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "resources.Client", "MoveResources", nil, "Failure sending request")
 		return
 	}
 
@@ -1048,7 +1044,6 @@ func (client Client) MoveResourcesPreparer(ctx context.Context, sourceResourceGr
 // http.Response Body if it receives an error.
 func (client Client) MoveResourcesSender(req *http.Request) (future MoveResourcesFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -1107,7 +1102,7 @@ func (client Client) Update(ctx context.Context, resourceGroupName string, resou
 
 	result, err = client.UpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "resources.Client", "Update", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "resources.Client", "Update", nil, "Failure sending request")
 		return
 	}
 
@@ -1143,7 +1138,6 @@ func (client Client) UpdatePreparer(ctx context.Context, resourceGroupName strin
 // http.Response Body if it receives an error.
 func (client Client) UpdateSender(req *http.Request) (future UpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -1193,7 +1187,7 @@ func (client Client) UpdateByID(ctx context.Context, resourceID string, APIVersi
 
 	result, err = client.UpdateByIDSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "resources.Client", "UpdateByID", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "resources.Client", "UpdateByID", nil, "Failure sending request")
 		return
 	}
 
@@ -1224,7 +1218,6 @@ func (client Client) UpdateByIDPreparer(ctx context.Context, resourceID string, 
 // http.Response Body if it receives an error.
 func (client Client) UpdateByIDSender(req *http.Request) (future UpdateByIDFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 	if err != nil {
 		return
@@ -1283,7 +1276,7 @@ func (client Client) ValidateMoveResources(ctx context.Context, sourceResourceGr
 
 	result, err = client.ValidateMoveResourcesSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "resources.Client", "ValidateMoveResources", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "resources.Client", "ValidateMoveResources", nil, "Failure sending request")
 		return
 	}
 
@@ -1316,7 +1309,6 @@ func (client Client) ValidateMoveResourcesPreparer(ctx context.Context, sourceRe
 // http.Response Body if it receives an error.
 func (client Client) ValidateMoveResourcesSender(req *http.Request) (future ValidateMoveResourcesFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

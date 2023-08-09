@@ -63,6 +63,7 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 	}
 
 	hostNames := nodeNames(nodes)
+	supportsNodesHealthCheck := supportsNodesHealthCheck(nodes)
 	hosts, err := g.getInstancesByNames(hostNames)
 	if err != nil {
 		return nil, err
@@ -228,7 +229,9 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 			// turn on the tpNeedsRecreation flag to delete/recreate fwdrule/tpool updating the
 			// target pool to use local traffic health check.
 			klog.V(2).Infof("ensureExternalLoadBalancer(%s): Updating from nodes health checks to local traffic health checks.", lbRefStr)
-			hcToDelete = makeHTTPHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+			if supportsNodesHealthCheck {
+				hcToDelete = makeHTTPHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+			}
 			tpNeedsRecreation = true
 		}
 		hcToCreate = makeHTTPHealthCheck(loadBalancerName, path, healthCheckNodePort)
@@ -242,7 +245,9 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 			hcToDelete = hcLocalTrafficExisting
 			tpNeedsRecreation = true
 		}
-		hcToCreate = makeHTTPHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+		if supportsNodesHealthCheck {
+			hcToCreate = makeHTTPHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+		}
 	}
 	// Now we get to some slightly more interesting logic.
 	// First, neither target pools nor forwarding rules can be updated in place -

@@ -38,11 +38,26 @@ import (
 
 const FailureCode int = -1
 
-func unsetEnv(t testing.TB, key string) {
-	if originalValue, ok := os.LookupEnv(key); ok {
-		t.Cleanup(func() { os.Setenv(key, originalValue) })
-		os.Unsetenv(key)
+func setEnv(key, value string) func() {
+	originalValue := os.Getenv(key)
+	os.Setenv(key, value)
+	if len(originalValue) > 0 {
+		return func() {
+			os.Setenv(key, originalValue)
+		}
 	}
+	return func() {}
+}
+
+func unsetEnv(key string) func() {
+	originalValue := os.Getenv(key)
+	os.Unsetenv(key)
+	if len(originalValue) > 0 {
+		return func() {
+			os.Setenv(key, originalValue)
+		}
+	}
+	return func() {}
 }
 
 func TestHTTPProbeProxy(t *testing.T) {
@@ -55,10 +70,10 @@ func TestHTTPProbeProxy(t *testing.T) {
 
 	localProxy := server.URL
 
-	t.Setenv("http_proxy", localProxy)
-	t.Setenv("HTTP_PROXY", localProxy)
-	unsetEnv(t, "no_proxy")
-	unsetEnv(t, "NO_PROXY")
+	defer setEnv("http_proxy", localProxy)()
+	defer setEnv("HTTP_PROXY", localProxy)()
+	defer unsetEnv("no_proxy")()
+	defer unsetEnv("NO_PROXY")()
 
 	followNonLocalRedirects := true
 	prober := New(followNonLocalRedirects)

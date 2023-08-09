@@ -18,7 +18,6 @@ package legacyregistry
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -43,25 +42,19 @@ var (
 
 	// Register registers a collectable metric but uses the global registry
 	Register = defaultRegistry.Register
-
-	// Registerer exposes the global registerer
-	Registerer = defaultRegistry.Registerer
-
-	processStart time.Time
 )
 
 func init() {
 	RawMustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	RawMustRegister(collectors.NewGoCollector(collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll)))
 	defaultRegistry.RegisterMetaMetrics()
-	processStart = time.Now()
 }
 
 // Handler returns an HTTP handler for the DefaultGatherer. It is
 // already instrumented with InstrumentHandler (using "prometheus" as handler
 // name).
 func Handler() http.Handler {
-	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{ProcessStartTime: processStart}))
+	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
 }
 
 // HandlerWithReset returns an HTTP handler for the DefaultGatherer but invokes
@@ -69,7 +62,7 @@ func Handler() http.Handler {
 func HandlerWithReset() http.Handler {
 	return promhttp.InstrumentMetricHandler(
 		prometheus.DefaultRegisterer,
-		metrics.HandlerWithReset(defaultRegistry, metrics.HandlerOpts{ProcessStartTime: processStart}))
+		metrics.HandlerWithReset(defaultRegistry, metrics.HandlerOpts{}))
 }
 
 // CustomRegister registers a custom collector but uses the global registry.

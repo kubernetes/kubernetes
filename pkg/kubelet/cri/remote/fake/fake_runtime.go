@@ -356,13 +356,3 @@ func (f *RemoteRuntime) ListPodSandboxMetrics(ctx context.Context, req *kubeapi.
 
 	return &kubeapi.ListPodSandboxMetricsResponse{PodMetrics: podMetrics}, nil
 }
-
-// RuntimeConfig returns the configuration information of the runtime.
-func (f *RemoteRuntime) RuntimeConfig(ctx context.Context, req *kubeapi.RuntimeConfigRequest) (*kubeapi.RuntimeConfigResponse, error) {
-	resp, err := f.RuntimeService.RuntimeConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}

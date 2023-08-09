@@ -74,6 +74,27 @@ func TestIsMigratable(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                 "AWS EBS PV with CSIMigrationAWS enabled",
+			pluginFeature:        features.CSIMigrationAWS,
+			pluginFeatureEnabled: true,
+			isMigratable:         true,
+			csiMigrationEnabled:  true,
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+								VolumeID:  "vol01",
+								FSType:    "ext3",
+								Partition: 1,
+								ReadOnly:  true,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
@@ -104,8 +125,9 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		csiMigrationCompleteResult    bool
 	}{
 		{
-			name:                          "gce-pd migration flag enabled and migration-complete flag disabled with CSI migration flag",
+			name:                          "gce-pd migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
 			pluginName:                    "kubernetes.io/gce-pd",
+			pluginFeature:                 features.CSIMigrationGCE,
 			pluginFeatureEnabled:          true,
 			csiMigrationEnabled:           true,
 			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
@@ -114,11 +136,34 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 			csiMigrationCompleteResult:    false,
 		},
 		{
-			name:                          "gce-pd migration flag enabled and migration-complete flag enabled with CSI migration flag",
+			name:                          "gce-pd migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
 			pluginName:                    "kubernetes.io/gce-pd",
+			pluginFeature:                 features.CSIMigrationGCE,
 			pluginFeatureEnabled:          true,
 			csiMigrationEnabled:           true,
 			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
+			inTreePluginUnregisterEnabled: true,
+			csiMigrationResult:            true,
+			csiMigrationCompleteResult:    true,
+		},
+		{
+			name:                          "aws-ebs migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/aws-ebs",
+			pluginFeature:                 features.CSIMigrationAWS,
+			pluginFeatureEnabled:          true,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginAWSUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            true,
+			csiMigrationCompleteResult:    false,
+		},
+		{
+			name:                          "aws-ebs migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/aws-ebs",
+			pluginFeature:                 features.CSIMigrationAWS,
+			pluginFeatureEnabled:          true,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginAWSUnregister,
 			inTreePluginUnregisterEnabled: true,
 			csiMigrationResult:            true,
 			csiMigrationCompleteResult:    true,
@@ -153,7 +198,7 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 			// CSIMigrationGCE is locked to on, so it cannot be enabled or disabled. There are a couple
 			// of test cases that check correct behavior when CSIMigrationGCE is enabled, but there are
 			// no longer any tests cases for CSIMigrationGCE being disabled as that is not possible.
-			if len(test.pluginFeature) > 0 {
+			if test.pluginFeature != features.CSIMigrationGCE {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.inTreePluginUnregister, test.inTreePluginUnregisterEnabled)()

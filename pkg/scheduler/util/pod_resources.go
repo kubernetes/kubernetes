@@ -18,10 +18,9 @@ package util
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// For each of these resources, a container that doesn't request the resource explicitly
+// For each of these resources, a pod that doesn't request the resource explicitly
 // will be treated as having requested the amount indicated below, for the purpose
 // of computing priority only. This ensures that when scheduling zero-request pods, such
 // pods will not all be scheduled to the node with the smallest in-use request,
@@ -36,46 +35,44 @@ const (
 	DefaultMemoryRequest int64 = 200 * 1024 * 1024 // 200 MB
 )
 
-// GetNonzeroRequests returns the default cpu in milli-cpu and memory in bytes resource requests if none is found or
+// GetNonzeroRequests returns the default cpu and memory resource request if none is found or
 // what is provided on the request.
 func GetNonzeroRequests(requests *v1.ResourceList) (int64, int64) {
-	cpu := GetRequestForResource(v1.ResourceCPU, requests, true)
-	mem := GetRequestForResource(v1.ResourceMemory, requests, true)
-	return cpu.MilliValue(), mem.Value()
-
+	return GetRequestForResource(v1.ResourceCPU, requests, true),
+		GetRequestForResource(v1.ResourceMemory, requests, true)
 }
 
 // GetRequestForResource returns the requested values unless nonZero is true and there is no defined request
 // for CPU and memory.
 // If nonZero is true and the resource has no defined request for CPU or memory, it returns a default value.
-func GetRequestForResource(resourceName v1.ResourceName, requests *v1.ResourceList, nonZero bool) resource.Quantity {
+func GetRequestForResource(resource v1.ResourceName, requests *v1.ResourceList, nonZero bool) int64 {
 	if requests == nil {
-		return resource.Quantity{}
+		return 0
 	}
-	switch resourceName {
+	switch resource {
 	case v1.ResourceCPU:
 		// Override if un-set, but not if explicitly set to zero
 		if _, found := (*requests)[v1.ResourceCPU]; !found && nonZero {
-			return *resource.NewMilliQuantity(DefaultMilliCPURequest, resource.DecimalSI)
+			return DefaultMilliCPURequest
 		}
-		return requests.Cpu().DeepCopy()
+		return requests.Cpu().MilliValue()
 	case v1.ResourceMemory:
 		// Override if un-set, but not if explicitly set to zero
 		if _, found := (*requests)[v1.ResourceMemory]; !found && nonZero {
-			return *resource.NewQuantity(DefaultMemoryRequest, resource.DecimalSI)
+			return DefaultMemoryRequest
 		}
-		return requests.Memory().DeepCopy()
+		return requests.Memory().Value()
 	case v1.ResourceEphemeralStorage:
 		quantity, found := (*requests)[v1.ResourceEphemeralStorage]
 		if !found {
-			return resource.Quantity{}
+			return 0
 		}
-		return quantity.DeepCopy()
+		return quantity.Value()
 	default:
-		quantity, found := (*requests)[resourceName]
+		quantity, found := (*requests)[resource]
 		if !found {
-			return resource.Quantity{}
+			return 0
 		}
-		return quantity.DeepCopy()
+		return quantity.Value()
 	}
 }

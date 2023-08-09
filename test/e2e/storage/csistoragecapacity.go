@@ -35,7 +35,7 @@ import (
 
 var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 	f := framework.NewDefaultFramework("csistoragecapacity")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.24

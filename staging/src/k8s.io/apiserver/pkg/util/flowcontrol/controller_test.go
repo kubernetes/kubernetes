@@ -221,12 +221,17 @@ func (cts *ctlrTestState) popHeldRequest() (plName string, hr *heldRequest, nCou
 	}
 }
 
-var mandQueueSetNames = func() sets.String {
+var mandQueueSetNames, exclQueueSetNames = func() (sets.String, sets.String) {
 	mandQueueSetNames := sets.NewString()
+	exclQueueSetNames := sets.NewString()
 	for _, mpl := range fcboot.MandatoryPriorityLevelConfigurations {
-		mandQueueSetNames.Insert(mpl.Name)
+		if mpl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt {
+			exclQueueSetNames.Insert(mpl.Name)
+		} else {
+			mandQueueSetNames.Insert(mpl.Name)
+		}
 	}
-	return mandQueueSetNames
+	return mandQueueSetNames, exclQueueSetNames
 }()
 
 func TestConfigConsumer(t *testing.T) {
@@ -275,7 +280,7 @@ func TestConfigConsumer(t *testing.T) {
 					}
 				}
 				persistingPLNames = nextPLNames.Union(desiredPLNames)
-				expectedQueueSetNames := persistingPLNames.Union(mandQueueSetNames)
+				expectedQueueSetNames := persistingPLNames.Union(mandQueueSetNames).Difference(exclQueueSetNames)
 				allQueueSetNames := cts.getQueueSetNames()
 				missingQueueSetNames := expectedQueueSetNames.Difference(allQueueSetNames)
 				if len(missingQueueSetNames) > 0 {

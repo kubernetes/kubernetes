@@ -65,11 +65,6 @@ func durationToMilliseconds(timeDuration time.Duration) int64 {
 }
 
 type traceItem interface {
-	// rLock must be called before invoking time or writeItem.
-	rLock()
-	// rUnlock must be called after processing the item is complete.
-	rUnlock()
-
 	// time returns when the trace was recorded as completed.
 	time() time.Time
 	// writeItem outputs the traceItem to the buffer. If stepThreshold is non-nil, only output the
@@ -83,10 +78,6 @@ type traceStep struct {
 	msg      string
 	fields   []Field
 }
-
-// rLock doesn't need to do anything because traceStep instances are immutable.
-func (s traceStep) rLock()   {}
-func (s traceStep) rUnlock() {}
 
 func (s traceStep) time() time.Time {
 	return s.stepTime
@@ -113,14 +104,6 @@ type Trace struct {
 	threshold  *time.Duration
 	endTime    *time.Time
 	traceItems []traceItem
-}
-
-func (t *Trace) rLock() {
-	t.lock.RLock()
-}
-
-func (t *Trace) rUnlock() {
-	t.lock.RUnlock()
 }
 
 func (t *Trace) time() time.Time {
@@ -248,10 +231,8 @@ func (t *Trace) logTrace() {
 func (t *Trace) writeTraceSteps(b *bytes.Buffer, formatter string, stepThreshold *time.Duration) {
 	lastStepTime := t.startTime
 	for _, stepOrTrace := range t.traceItems {
-		stepOrTrace.rLock()
 		stepOrTrace.writeItem(b, formatter, lastStepTime, stepThreshold)
 		lastStepTime = stepOrTrace.time()
-		stepOrTrace.rUnlock()
 	}
 }
 

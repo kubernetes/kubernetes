@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -51,12 +51,12 @@ type StatefulSetStorage struct {
 }
 
 // ReplicasPathMappings returns the mappings between each group version and a replicas path
-func ReplicasPathMappings() managedfields.ResourcePathMappings {
+func ReplicasPathMappings() fieldmanager.ResourcePathMappings {
 	return replicasPathInStatefulSet
 }
 
 // maps a group version to the replicas path in a statefulset object
-var replicasPathInStatefulSet = managedfields.ResourcePathMappings{
+var replicasPathInStatefulSet = fieldmanager.ResourcePathMappings{
 	schema.GroupVersion{Group: "apps", Version: "v1beta1"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
 	schema.GroupVersion{Group: "apps", Version: "v1beta2"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
 	schema.GroupVersion{Group: "apps", Version: "v1"}.String():      fieldpath.MakePathOrDie("spec", "replicas"),
@@ -84,10 +84,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against statefulsets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &apps.StatefulSet{} },
-		NewListFunc:               func() runtime.Object { return &apps.StatefulSetList{} },
-		DefaultQualifiedResource:  apps.Resource("statefulsets"),
-		SingularQualifiedResource: apps.Resource("statefulset"),
+		NewFunc:                  func() runtime.Object { return &apps.StatefulSet{} },
+		NewListFunc:              func() runtime.Object { return &apps.StatefulSetList{} },
+		DefaultQualifiedResource: apps.Resource("statefulsets"),
 
 		CreateStrategy:      statefulset.Strategy,
 		UpdateStrategy:      statefulset.Strategy,
@@ -311,7 +310,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		}
 	}
 
-	managedFieldsHandler := managedfields.NewScaleHandler(
+	managedFieldsHandler := fieldmanager.NewScaleHandler(
 		statefulset.ManagedFields,
 		groupVersion,
 		replicasPathInStatefulSet,

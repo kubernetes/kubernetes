@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	clientset "k8s.io/client-go/kubernetes"
+
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 )
@@ -45,13 +46,12 @@ type sarApprover struct {
 }
 
 // NewCSRApprovingController creates a new CSRApprovingController.
-func NewCSRApprovingController(ctx context.Context, client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
+func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
 	approver := &sarApprover{
 		client:      client,
 		recognizers: recognizers(),
 	}
 	return certificates.NewCertificateController(
-		ctx,
 		"csrapproving",
 		client,
 		csrInformer,
@@ -63,12 +63,12 @@ func recognizers() []csrRecognizer {
 	recognizers := []csrRecognizer{
 		{
 			recognize:      isSelfNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeclient", Version: "*"},
+			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeclient"},
 			successMessage: "Auto approving self kubelet client certificate after SubjectAccessReview.",
 		},
 		{
 			recognize:      isNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient", Version: "*"},
+			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient"},
 			successMessage: "Auto approving kubelet client certificate after SubjectAccessReview.",
 		},
 	}
@@ -152,7 +152,7 @@ func isNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.Certific
 	if csr.Spec.SignerName != capi.KubeAPIServerClientKubeletSignerName {
 		return false
 	}
-	return capihelper.IsKubeletClientCSR(x509cr, usagesToSet(csr.Spec.Usages))
+	return capihelper.IsKubeletClientCSR(x509cr, usagesToSet(csr.Spec.Usages), true)
 }
 
 func isSelfNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {

@@ -25,20 +25,6 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-// probeConnectivityArgs is set of arguments for a probeConnectivity
-type probeConnectivityArgs struct {
-	nsFrom              string
-	podFrom             string
-	containerFrom       string
-	addrTo              string
-	protocol            v1.Protocol
-	toPort              int
-	expectConnectivity  bool
-	timeoutSeconds      int
-	pollIntervalSeconds int
-	pollTimeoutSeconds  int
-}
-
 // decouple us from k8smanager.go
 type Prober interface {
 	probeConnectivity(args *probeConnectivityArgs) (bool, string, error)
@@ -46,13 +32,12 @@ type Prober interface {
 
 // ProbeJob packages the data for the input of a pod->pod connectivity probe
 type ProbeJob struct {
-	PodFrom            TestPod
-	PodTo              TestPod
-	PodToServiceIP     string
-	ToPort             int
-	ToPodDNSDomain     string
-	Protocol           v1.Protocol
-	ExpectConnectivity bool
+	PodFrom        TestPod
+	PodTo          TestPod
+	PodToServiceIP string
+	ToPort         int
+	ToPodDNSDomain string
+	Protocol       v1.Protocol
 }
 
 // ProbeJobResults packages the data for the results of a pod->pod connectivity probe
@@ -69,21 +54,16 @@ func ProbePodToPodConnectivity(prober Prober, allPods []TestPod, dnsDomain strin
 	jobs := make(chan *ProbeJob, size)
 	results := make(chan *ProbeJobResults, size)
 	for i := 0; i < getWorkers(); i++ {
-		go probeWorker(prober, jobs, results)
+		go probeWorker(prober, jobs, results, getProbeTimeoutSeconds())
 	}
 	for _, podFrom := range allPods {
 		for _, podTo := range allPods {
-			// set connectivity expectation for the probe job, this allows to retry probe when observed value
-			// don't match expected value.
-			expectConnectivity := testCase.Reachability.Expected.Get(podFrom.PodString().String(), podTo.PodString().String())
-
 			jobs <- &ProbeJob{
-				PodFrom:            podFrom,
-				PodTo:              podTo,
-				ToPort:             testCase.ToPort,
-				ToPodDNSDomain:     dnsDomain,
-				Protocol:           testCase.Protocol,
-				ExpectConnectivity: expectConnectivity,
+				PodFrom:        podFrom,
+				PodTo:          podTo,
+				ToPort:         testCase.ToPort,
+				ToPodDNSDomain: dnsDomain,
+				Protocol:       testCase.Protocol,
 			}
 		}
 	}
@@ -111,7 +91,7 @@ func ProbePodToPodConnectivity(prober Prober, allPods []TestPod, dnsDomain strin
 
 // probeWorker continues polling a pod connectivity status, until the incoming "jobs" channel is closed, and writes results back out to the "results" channel.
 // it only writes pass/fail status to a channel and has no failure side effects, this is by design since we do not want to fail inside a goroutine.
-func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobResults) {
+func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobResults, timeoutSeconds int) {
 	defer ginkgo.GinkgoRecover()
 	for job := range jobs {
 		podFrom := job.PodFrom
@@ -130,16 +110,13 @@ func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobR
 
 		// TODO make this work on dual-stack clusters...
 		connected, command, err := prober.probeConnectivity(&probeConnectivityArgs{
-			nsFrom:              podFrom.Namespace,
-			podFrom:             podFrom.Name,
-			containerFrom:       podFrom.ContainerName,
-			addrTo:              job.PodTo.ServiceIP,
-			protocol:            job.Protocol,
-			toPort:              job.ToPort,
-			expectConnectivity:  job.ExpectConnectivity,
-			timeoutSeconds:      getProbeTimeoutSeconds(),
-			pollIntervalSeconds: getPollIntervalSeconds(),
-			pollTimeoutSeconds:  getPollTimeoutSeconds(),
+			nsFrom:         podFrom.Namespace,
+			podFrom:        podFrom.Name,
+			containerFrom:  podFrom.ContainerName,
+			addrTo:         job.PodTo.ServiceIP,
+			protocol:       job.Protocol,
+			toPort:         job.ToPort,
+			timeoutSeconds: timeoutSeconds,
 		})
 		result := &ProbeJobResults{
 			Job:         job,

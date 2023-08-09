@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -76,11 +75,11 @@ type SetServiceAccountOptions struct {
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewSetServiceAccountOptions returns an initialized SetServiceAccountOptions instance
-func NewSetServiceAccountOptions(streams genericiooptions.IOStreams) *SetServiceAccountOptions {
+func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
 	return &SetServiceAccountOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("serviceaccount updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -92,7 +91,7 @@ func NewSetServiceAccountOptions(streams genericiooptions.IOStreams) *SetService
 }
 
 // NewCmdServiceAccount returns the "set serviceaccount" command.
-func NewCmdServiceAccount(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSetServiceAccountOptions(streams)
 
 	cmd := &cobra.Command{

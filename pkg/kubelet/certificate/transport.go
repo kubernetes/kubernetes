@@ -22,8 +22,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -99,16 +97,7 @@ func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig 
 
 	lastCertAvailable := time.Now()
 	lastCert := clientCertificateManager.Current()
-
-	var hasCert atomic.Bool
-	hasCert.Store(lastCert != nil)
-
-	checkLock := &sync.Mutex{}
-	checkNewCertificateAndRotate := func() {
-		// don't run concurrently
-		checkLock.Lock()
-		defer checkLock.Unlock()
-
+	go wait.Until(func() {
 		curr := clientCertificateManager.Current()
 
 		if exitAfter > 0 {
@@ -142,7 +131,6 @@ func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig 
 			return
 		}
 		lastCert = curr
-		hasCert.Store(lastCert != nil)
 
 		klog.InfoS("Certificate rotation detected, shutting down client connections to start using new credentials")
 		// The cert has been rotated. Close all existing connections to force the client
@@ -150,18 +138,7 @@ func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		//
 		// See: https://github.com/kubernetes-incubator/bootkube/pull/663#issuecomment-318506493
 		d.CloseAll()
-	}
-
-	// start long-term check
-	go wait.Until(checkNewCertificateAndRotate, period, stopCh)
-
-	if !hasCert.Load() {
-		// start a faster check until we get the initial certificate
-		go wait.PollUntil(time.Second, func() (bool, error) {
-			checkNewCertificateAndRotate()
-			return hasCert.Load(), nil
-		}, stopCh)
-	}
+	}, period, stopCh)
 
 	clientConfig.Transport = utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               http.ProxyFromEnvironment,

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 
 	credentialproviderv1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1"
@@ -107,7 +108,7 @@ func readURL(url string, client *http.Client) (body []byte, err error) {
 	}
 
 	limitedReader := &io.LimitedReader{R: resp.Body, N: maxReadLength}
-	contents, err := io.ReadAll(limitedReader)
+	contents, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
 	}

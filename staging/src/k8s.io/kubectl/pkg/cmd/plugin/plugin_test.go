@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 func TestPluginPathsAreUnaltered(t *testing.T) {
@@ -46,7 +46,7 @@ func TestPluginPathsAreUnaltered(t *testing.T) {
 		}
 	}()
 
-	ioStreams, _, _, errOut := genericiooptions.NewTestIOStreams()
+	ioStreams, _, _, errOut := genericclioptions.NewTestIOStreams()
 	verifier := newFakePluginPathVerifier()
 	pluginPaths := []string{tempDir, tempDir2}
 	o := &PluginListOptions{
@@ -132,7 +132,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 
 	for _, test := range tc {
 		t.Run(test.name, func(t *testing.T) {
-			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
+			ioStreams, _, out, errOut := genericclioptions.NewTestIOStreams()
 			o := &PluginListOptions{
 				Verifier:  test.verifier,
 				IOStreams: ioStreams,
@@ -182,13 +182,12 @@ func TestPluginPathsAreValid(t *testing.T) {
 func TestListPlugins(t *testing.T) {
 	pluginPath, _ := filepath.Abs("./testdata")
 	expectPlugins := []string{
-		filepath.Join(pluginPath, "kubectl-create-foo"),
 		filepath.Join(pluginPath, "kubectl-foo"),
 		filepath.Join(pluginPath, "kubectl-version"),
 	}
 
 	verifier := newFakePluginPathVerifier()
-	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	pluginPaths := []string{pluginPath}
 
 	o := &PluginListOptions{

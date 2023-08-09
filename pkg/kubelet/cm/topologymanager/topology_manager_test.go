@@ -42,7 +42,6 @@ func TestNewManager(t *testing.T) {
 		expectedError  error
 		topologyError  error
 		policyOptions  map[string]string
-		topology       []cadvisorapi.Node
 	}{
 		{
 			description:    "Policy is set to none",
@@ -87,59 +86,10 @@ func TestNewManager(t *testing.T) {
 				"unknown-option": "true",
 			},
 		},
-		{
-			description:    "can't get NUMA distances",
-			policyName:     "best-effort",
-			expectedPolicy: "best-effort",
-			policyOptions: map[string]string{
-				PreferClosestNUMANodes: "true",
-			},
-			expectedError: fmt.Errorf("error getting NUMA distances from cadvisor"),
-			topology: []cadvisorapi.Node{
-				{
-					Id: 0,
-				},
-			},
-		},
-		{
-			description:    "more than 8 NUMA nodes",
-			policyName:     "best-effort",
-			expectedPolicy: "best-effort",
-			expectedError:  fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes),
-			topology: []cadvisorapi.Node{
-				{
-					Id: 0,
-				},
-				{
-					Id: 1,
-				},
-				{
-					Id: 2,
-				},
-				{
-					Id: 3,
-				},
-				{
-					Id: 4,
-				},
-				{
-					Id: 5,
-				},
-				{
-					Id: 6,
-				},
-				{
-					Id: 7,
-				},
-				{
-					Id: 8,
-				},
-			},
-		},
 	}
 
 	for _, tc := range tcases {
-		topology := tc.topology
+		topology := []cadvisorapi.Node{}
 
 		mngr, err := NewManager(topology, tc.policyName, "container", tc.policyOptions)
 		if tc.expectedError != nil {
@@ -148,14 +98,9 @@ func TestNewManager(t *testing.T) {
 			}
 		} else {
 			rawMgr := mngr.(*manager)
-			var policyName string
-			if rawScope, ok := rawMgr.scope.(*containerScope); ok {
-				policyName = rawScope.policy.Name()
-			} else if rawScope, ok := rawMgr.scope.(*noneScope); ok {
-				policyName = rawScope.policy.Name()
-			}
-			if policyName != tc.expectedPolicy {
-				t.Errorf("Unexpected policy name. Have: %q wants %q", policyName, tc.expectedPolicy)
+			rawScope := rawMgr.scope.(*containerScope)
+			if rawScope.policy.Name() != tc.expectedPolicy {
+				t.Errorf("Unexpected policy name. Have: %q wants %q", rawScope.policy.Name(), tc.expectedPolicy)
 			}
 		}
 	}

@@ -20,8 +20,7 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericiooptions"
-
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -41,7 +40,7 @@ var (
 		# Restart a deployment
 		kubectl rollout restart deployment/abc
 
-		# Restart deployments with the 'app=nginx' label
+		# Restart deployments with the app=nginx label
 		kubectl rollout restart deployment --selector=app=nginx`)
 
 	rolloutValidResources = dedent.Dedent(`
@@ -54,7 +53,7 @@ var (
 )
 
 // NewCmdRollout returns a Command instance for 'rollout' sub command
-func NewCmdRollout(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdRollout(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "rollout SUBCOMMAND",
 		DisableFlagsInUseLine: true,

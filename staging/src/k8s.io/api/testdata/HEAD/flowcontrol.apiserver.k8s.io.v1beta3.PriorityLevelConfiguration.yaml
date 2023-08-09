@@ -33,9 +33,6 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  exempt:
-    lendablePercent: 2
-    nominalConcurrencyShares: 1
   limited:
     borrowingLimitPercent: 4
     lendablePercent: 3

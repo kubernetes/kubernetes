@@ -52,18 +52,16 @@ unary
 
 member
     : primary                                                       # PrimaryExpr
-    | member op='.' (opt='?')? id=IDENTIFIER                        # Select
-    | member op='.' id=IDENTIFIER open='(' args=exprList? ')'       # MemberCall
-    | member op='[' (opt='?')? index=expr ']'                       # Index
+    | member op='.' id=IDENTIFIER (open='(' args=exprList? ')')?    # SelectOrCall
+    | member op='[' index=expr ']'                                  # Index
+    | member op='{' entries=fieldInitializerList? ','? '}'          # CreateMessage
     ;
 
 primary
     : leadingDot='.'? id=IDENTIFIER (op='(' args=exprList? ')')?    # IdentOrGlobalCall
     | '(' e=expr ')'                                                # Nested
-    | op='[' elems=listInit? ','? ']'                               # CreateList
+    | op='[' elems=exprList? ','? ']'                               # CreateList
     | op='{' entries=mapInitializerList? ','? '}'                   # CreateStruct
-    | leadingDot='.'? ids+=IDENTIFIER (ops+='.' ids+=IDENTIFIER)*
-        op='{' entries=fieldInitializerList? ','? '}'               # CreateMessage
     | literal                                                       # ConstantLiteral
     ;
 
@@ -71,35 +69,23 @@ exprList
     : e+=expr (',' e+=expr)*
     ;
 
-listInit
-    : elems+=optExpr (',' elems+=optExpr)*
-    ;
-
 fieldInitializerList
-    : fields+=optField cols+=':' values+=expr (',' fields+=optField cols+=':' values+=expr)*
-    ;
-
-optField
-    : (opt='?')? IDENTIFIER
+    : fields+=IDENTIFIER cols+=':' values+=expr (',' fields+=IDENTIFIER cols+=':' values+=expr)*
     ;
 
 mapInitializerList
-    : keys+=optExpr cols+=':' values+=expr (',' keys+=optExpr cols+=':' values+=expr)*
-    ;
-
-optExpr
-    : (opt='?')? e=expr
+    : keys+=expr cols+=':' values+=expr (',' keys+=expr cols+=':' values+=expr)*
     ;
 
 literal
     : sign=MINUS? tok=NUM_INT   # Int
-    | tok=NUM_UINT              # Uint
+    | tok=NUM_UINT  # Uint
     | sign=MINUS? tok=NUM_FLOAT # Double
-    | tok=STRING                # String
-    | tok=BYTES                 # Bytes
-    | tok=CEL_TRUE              # BoolTrue
-    | tok=CEL_FALSE             # BoolFalse
-    | tok=NUL                   # Null
+    | tok=STRING    # String
+    | tok=BYTES     # Bytes
+    | tok=CEL_TRUE   # BoolTrue
+    | tok=CEL_FALSE  # BoolFalse
+    | tok=NUL        # Null
     ;
 
 // Lexer Rules

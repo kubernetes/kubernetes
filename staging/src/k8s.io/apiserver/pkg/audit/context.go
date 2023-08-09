@@ -39,18 +39,21 @@ type AuditContext struct {
 	RequestAuditConfig RequestAuditConfig
 
 	// Event is the audit Event object that is being captured to be written in
-	// the API audit log.
-	Event auditinternal.Event
+	// the API audit log. It is set to nil when the request is not being audited.
+	Event *auditinternal.Event
 
-	// annotationMutex guards event.Annotations
+	// annotations holds audit annotations that are recorded before the event has been initialized.
+	// This is represented as a slice rather than a map to preserve order.
+	annotations []annotation
+	// annotationMutex guards annotations AND event.Annotations
 	annotationMutex sync.Mutex
+
+	// auditID is the Audit ID associated with this request.
+	auditID types.UID
 }
 
-// Enabled checks whether auditing is enabled for this audit context.
-func (ac *AuditContext) Enabled() bool {
-	// Note: An unset Level should be considered Enabled, so that request data (e.g. annotations)
-	// can still be captured before the audit policy is evaluated.
-	return ac != nil && ac.RequestAuditConfig.Level != auditinternal.LevelNone
+type annotation struct {
+	key, value string
 }
 
 // AddAuditAnnotation sets the audit annotation for the given key, value pair.
@@ -62,7 +65,8 @@ func (ac *AuditContext) Enabled() bool {
 // prefer AddAuditAnnotation over LogAnnotation to avoid dropping annotations.
 func AddAuditAnnotation(ctx context.Context, key, value string) {
 	ac := AuditContextFrom(ctx)
-	if !ac.Enabled() {
+	if ac == nil {
+		// auditing is not enabled
 		return
 	}
 
@@ -77,7 +81,8 @@ func AddAuditAnnotation(ctx context.Context, key, value string) {
 // keysAndValues are the key-value pairs to add, and must have an even number of items.
 func AddAuditAnnotations(ctx context.Context, keysAndValues ...string) {
 	ac := AuditContextFrom(ctx)
-	if !ac.Enabled() {
+	if ac == nil {
+		// auditing is not enabled
 		return
 	}
 
@@ -96,7 +101,8 @@ func AddAuditAnnotations(ctx context.Context, keysAndValues ...string) {
 // restrictions on when this can be called.
 func AddAuditAnnotationsMap(ctx context.Context, annotations map[string]string) {
 	ac := AuditContextFrom(ctx)
-	if !ac.Enabled() {
+	if ac == nil {
+		// auditing is not enabled
 		return
 	}
 
@@ -108,10 +114,38 @@ func AddAuditAnnotationsMap(ctx context.Context, annotations map[string]string) 
 	}
 }
 
-// addAuditAnnotationLocked records the audit annotation on the event.
+// addAuditAnnotationLocked is the shared code for recording an audit annotation. This method should
+// only be called while the auditAnnotationsMutex is locked.
 func addAuditAnnotationLocked(ac *AuditContext, key, value string) {
-	ae := &ac.Event
+	if ac.Event != nil {
+		logAnnotation(ac.Event, key, value)
+	} else {
+		ac.annotations = append(ac.annotations, annotation{key: key, value: value})
+	}
+}
 
+// This is private to prevent reads/write to the slice from outside of this package.
+// The audit event should be directly read to get access to the annotations.
+func addAuditAnnotationsFrom(ctx context.Context, ev *auditinternal.Event) {
+	ac := AuditContextFrom(ctx)
+	if ac == nil {
+		// auditing is not enabled
+		return
+	}
+
+	ac.annotationMutex.Lock()
+	defer ac.annotationMutex.Unlock()
+
+	for _, kv := range ac.annotations {
+		logAnnotation(ev, kv.key, kv.value)
+	}
+}
+
+// LogAnnotation fills in the Annotations according to the key value pair.
+func logAnnotation(ae *auditinternal.Event, key, value string) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
+		return
+	}
 	if ae.Annotations == nil {
 		ae.Annotations = make(map[string]string)
 	}
@@ -133,8 +167,8 @@ func WithAuditContext(parent context.Context) context.Context {
 
 // AuditEventFrom returns the audit event struct on the ctx
 func AuditEventFrom(ctx context.Context) *auditinternal.Event {
-	if ac := AuditContextFrom(ctx); ac.Enabled() {
-		return &ac.Event
+	if o := AuditContextFrom(ctx); o != nil {
+		return o.Event
 	}
 	return nil
 }
@@ -153,16 +187,20 @@ func WithAuditID(ctx context.Context, auditID types.UID) {
 	if auditID == "" {
 		return
 	}
-	if ac := AuditContextFrom(ctx); ac != nil {
+	ac := AuditContextFrom(ctx)
+	if ac == nil {
+		return
+	}
+	ac.auditID = auditID
+	if ac.Event != nil {
 		ac.Event.AuditID = auditID
 	}
 }
 
-// AuditIDFrom returns the value of the audit ID from the request context, along with whether
-// auditing is enabled.
+// AuditIDFrom returns the value of the audit ID from the request context.
 func AuditIDFrom(ctx context.Context) (types.UID, bool) {
 	if ac := AuditContextFrom(ctx); ac != nil {
-		return ac.Event.AuditID, true
+		return ac.auditID, ac.auditID != ""
 	}
 	return "", false
 }

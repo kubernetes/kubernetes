@@ -102,18 +102,15 @@ type Env struct {
 	provider        ref.TypeProvider
 	features        map[int]bool
 	appliedFeatures map[int]bool
-	libraries       map[string]bool
 
 	// Internal parser representation
-	prsr     *parser.Parser
-	prsrOpts []parser.Option
+	prsr *parser.Parser
 
 	// Internal checker representation
-	chkMutex sync.Mutex
-	chk      *checker.Env
-	chkErr   error
-	chkOnce  sync.Once
-	chkOpts  []checker.Option
+	chk     *checker.Env
+	chkErr  error
+	chkOnce sync.Once
+	chkOpts []checker.Option
 
 	// Program options tied to the environment
 	progOpts []ProgramOption
@@ -162,7 +159,6 @@ func NewCustomEnv(opts ...EnvOption) (*Env, error) {
 		provider:        registry,
 		features:        map[int]bool{},
 		appliedFeatures: map[int]bool{},
-		libraries:       map[string]bool{},
 		progOpts:        []ProgramOption{},
 	}).configure(opts)
 }
@@ -179,14 +175,14 @@ func (e *Env) Check(ast *Ast) (*Ast, *Issues) {
 	pe, _ := AstToParsedExpr(ast)
 
 	// Construct the internal checker env, erroring if there is an issue adding the declarations.
-	chk, err := e.initChecker()
+	err := e.initChecker()
 	if err != nil {
 		errs := common.NewErrors(ast.Source())
-		errs.ReportError(common.NoLocation, err.Error())
+		errs.ReportError(common.NoLocation, e.chkErr.Error())
 		return nil, NewIssues(errs)
 	}
 
-	res, errs := checker.Check(pe, ast.Source(), chk)
+	res, errs := checker.Check(pe, ast.Source(), e.chk)
 	if len(errs.GetErrors()) > 0 {
 		return nil, NewIssues(errs)
 	}
@@ -240,13 +236,9 @@ func (e *Env) CompileSource(src Source) (*Ast, *Issues) {
 // TypeProvider are immutable, or that their underlying implementations are based on the
 // ref.TypeRegistry which provides a Copy method which will be invoked by this method.
 func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
-	chk, chkErr := e.getCheckerOrError()
-	if chkErr != nil {
-		return nil, chkErr
+	if e.chkErr != nil {
+		return nil, e.chkErr
 	}
-
-	prsrOptsCopy := make([]parser.Option, len(e.prsrOpts))
-	copy(prsrOptsCopy, e.prsrOpts)
 
 	// The type-checker is configured with Declarations. The declarations may either be provided
 	// as options which have not yet been validated, or may come from a previous checker instance
@@ -256,10 +248,10 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 
 	// Copy the declarations if needed.
 	decsCopy := []*exprpb.Decl{}
-	if chk != nil {
+	if e.chk != nil {
 		// If the type-checker has already been instantiated, then the e.declarations have been
-		// validated within the chk instance.
-		chkOptsCopy = append(chkOptsCopy, checker.ValidatedDeclarations(chk))
+		// valdiated within the chk instance.
+		chkOptsCopy = append(chkOptsCopy, checker.ValidatedDeclarations(e.chk))
 	} else {
 		// If the type-checker has not been instantiated, ensure the unvalidated declarations are
 		// provided to the extended Env instance.
@@ -312,11 +304,8 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	for k, v := range e.functions {
 		funcsCopy[k] = v
 	}
-	libsCopy := make(map[string]bool, len(e.libraries))
-	for k, v := range e.libraries {
-		libsCopy[k] = v
-	}
 
+	// TODO: functions copy needs to happen here.
 	ext := &Env{
 		Container:       e.Container,
 		declarations:    decsCopy,
@@ -326,10 +315,8 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 		adapter:         adapter,
 		features:        featuresCopy,
 		appliedFeatures: appliedFeaturesCopy,
-		libraries:       libsCopy,
 		provider:        provider,
 		chkOpts:         chkOptsCopy,
-		prsrOpts:        prsrOptsCopy,
 	}
 	return ext.configure(opts)
 }
@@ -339,12 +326,6 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 func (e *Env) HasFeature(flag int) bool {
 	enabled, has := e.features[flag]
 	return has && enabled
-}
-
-// HasLibrary returns whether a specific SingletonLibrary has been configured in the environment.
-func (e *Env) HasLibrary(libName string) bool {
-	configured, exists := e.libraries[libName]
-	return exists && configured
 }
 
 // Parse parses the input expression value `txt` to a Ast and/or a set of Issues.
@@ -441,8 +422,8 @@ func (e *Env) UnknownVars() interpreter.PartialActivation {
 // TODO: Consider adding an option to generate a Program.Residual to avoid round-tripping to an
 // Ast format and then Program again.
 func (e *Env) ResidualAst(a *Ast, details *EvalDetails) (*Ast, error) {
-	pruned := interpreter.PruneAst(a.Expr(), a.SourceInfo().GetMacroCalls(), details.State())
-	expr, err := AstToString(ParsedExprToAst(pruned))
+	pruned := interpreter.PruneAst(a.Expr(), details.State())
+	expr, err := AstToString(ParsedExprToAst(&exprpb.ParsedExpr{Expr: pruned}))
 	if err != nil {
 		return nil, err
 	}
@@ -462,12 +443,12 @@ func (e *Env) ResidualAst(a *Ast, details *EvalDetails) (*Ast, error) {
 
 // EstimateCost estimates the cost of a type checked CEL expression using the length estimates of input data and
 // extension functions provided by estimator.
-func (e *Env) EstimateCost(ast *Ast, estimator checker.CostEstimator, opts ...checker.CostOption) (checker.CostEstimate, error) {
+func (e *Env) EstimateCost(ast *Ast, estimator checker.CostEstimator) (checker.CostEstimate, error) {
 	checked, err := AstToCheckedExpr(ast)
 	if err != nil {
 		return checker.CostEstimate{}, fmt.Errorf("EsimateCost could not inspect Ast: %v", err)
 	}
-	return checker.Cost(checked, estimator, opts...)
+	return checker.Cost(checked, estimator), nil
 }
 
 // configure applies a series of EnvOptions to the current environment.
@@ -483,9 +464,17 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 	}
 
 	// If the default UTC timezone fix has been enabled, make sure the library is configured
-	e, err = e.maybeApplyFeature(featureDefaultUTCTimeZone, Lib(timeUTCLibrary{}))
-	if err != nil {
-		return nil, err
+	if e.HasFeature(featureDefaultUTCTimeZone) {
+		if _, found := e.appliedFeatures[featureDefaultUTCTimeZone]; !found {
+			e, err = Lib(timeUTCLibrary{})(e)
+			if err != nil {
+				return nil, err
+			}
+			// record that the feature has been applied since it will generate declarations
+			// and functions which will be propagated on Extend() calls and which should only
+			// be registered once.
+			e.appliedFeatures[featureDefaultUTCTimeZone] = true
+		}
 	}
 
 	// Initialize all of the functions configured within the environment.
@@ -497,10 +486,7 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 	}
 
 	// Configure the parser.
-	prsrOpts := []parser.Option{}
-	prsrOpts = append(prsrOpts, e.prsrOpts...)
-	prsrOpts = append(prsrOpts, parser.Macros(e.macros...))
-
+	prsrOpts := []parser.Option{parser.Macros(e.macros...)}
 	if e.HasFeature(featureEnableMacroCallTracking) {
 		prsrOpts = append(prsrOpts, parser.PopulateMacroCalls(true))
 	}
@@ -511,7 +497,7 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 
 	// Ensure that the checker init happens eagerly rather than lazily.
 	if e.HasFeature(featureEagerlyValidateDeclarations) {
-		_, err := e.initChecker()
+		err := e.initChecker()
 		if err != nil {
 			return nil, err
 		}
@@ -520,7 +506,7 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 	return e, nil
 }
 
-func (e *Env) initChecker() (*checker.Env, error) {
+func (e *Env) initChecker() error {
 	e.chkOnce.Do(func() {
 		chkOpts := []checker.Option{}
 		chkOpts = append(chkOpts, e.chkOpts...)
@@ -532,68 +518,32 @@ func (e *Env) initChecker() (*checker.Env, error) {
 
 		ce, err := checker.NewEnv(e.Container, e.provider, chkOpts...)
 		if err != nil {
-			e.setCheckerOrError(nil, err)
+			e.chkErr = err
 			return
 		}
 		// Add the statically configured declarations.
 		err = ce.Add(e.declarations...)
 		if err != nil {
-			e.setCheckerOrError(nil, err)
+			e.chkErr = err
 			return
 		}
 		// Add the function declarations which are derived from the FunctionDecl instances.
 		for _, fn := range e.functions {
 			fnDecl, err := functionDeclToExprDecl(fn)
 			if err != nil {
-				e.setCheckerOrError(nil, err)
+				e.chkErr = err
 				return
 			}
 			err = ce.Add(fnDecl)
 			if err != nil {
-				e.setCheckerOrError(nil, err)
+				e.chkErr = err
 				return
 			}
 		}
 		// Add function declarations here separately.
-		e.setCheckerOrError(ce, nil)
+		e.chk = ce
 	})
-	return e.getCheckerOrError()
-}
-
-// setCheckerOrError sets the checker.Env or error state in a concurrency-safe manner
-func (e *Env) setCheckerOrError(chk *checker.Env, chkErr error) {
-	e.chkMutex.Lock()
-	e.chk = chk
-	e.chkErr = chkErr
-	e.chkMutex.Unlock()
-}
-
-// getCheckerOrError gets the checker.Env or error state in a concurrency-safe manner
-func (e *Env) getCheckerOrError() (*checker.Env, error) {
-	e.chkMutex.Lock()
-	defer e.chkMutex.Unlock()
-	return e.chk, e.chkErr
-}
-
-// maybeApplyFeature determines whether the feature-guarded option is enabled, and if so applies
-// the feature if it has not already been enabled.
-func (e *Env) maybeApplyFeature(feature int, option EnvOption) (*Env, error) {
-	if !e.HasFeature(feature) {
-		return e, nil
-	}
-	_, applied := e.appliedFeatures[feature]
-	if applied {
-		return e, nil
-	}
-	e, err := option(e)
-	if err != nil {
-		return nil, err
-	}
-	// record that the feature has been applied since it will generate declarations
-	// and functions which will be propagated on Extend() calls and which should only
-	// be registered once.
-	e.appliedFeatures[feature] = true
-	return e, nil
+	return e.chkErr
 }
 
 // Issues defines methods for inspecting the error details of parse and check calls.

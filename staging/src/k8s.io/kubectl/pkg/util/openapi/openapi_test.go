@@ -34,9 +34,9 @@ var _ = Describe("Reading apps/v1/Deployment from openAPIData", func() {
 	var resources openapi.Resources
 	BeforeEach(func() {
 		s, err := fakeSchema.OpenAPISchema()
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		resources, err = openapi.NewOpenAPIData(s)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 	})
 
 	gvk := schema.GroupVersionKind{
@@ -52,7 +52,7 @@ var _ = Describe("Reading apps/v1/Deployment from openAPIData", func() {
 		Expect(schema.(*proto.Kind)).ToNot(BeNil())
 		consumes := resources.GetConsumes(gvk, "PATCH")
 		Expect(consumes).ToNot(BeNil())
-		Expect(consumes).To(HaveLen(4))
+		Expect(len(consumes)).To(Equal(4))
 	})
 })
 
@@ -60,9 +60,9 @@ var _ = Describe("Reading authorization.k8s.io/v1/SubjectAccessReview from openA
 	var resources openapi.Resources
 	BeforeEach(func() {
 		s, err := fakeSchema.OpenAPISchema()
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		resources, err = openapi.NewOpenAPIData(s)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 	})
 
 	gvk := schema.GroupVersionKind{

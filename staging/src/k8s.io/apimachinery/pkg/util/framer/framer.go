@@ -32,7 +32,7 @@ func NewLengthDelimitedFrameWriter(w io.Writer) io.Writer {
 	return &lengthDelimitedFrameWriter{w: w}
 }
 
-// Write writes a single frame to the nested writer, prepending it with the length
+// Write writes a single frame to the nested writer, prepending it with the length in
 // in bytes of data (as a 4 byte, bigendian uint32).
 func (w *lengthDelimitedFrameWriter) Write(data []byte) (int, error) {
 	binary.BigEndian.PutUint32(w.h[:], uint32(len(data)))

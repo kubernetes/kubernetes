@@ -54,17 +54,12 @@ const (
 // FromInt creates an IntOrString object with an int32 value. It is
 // your responsibility not to call this method with a value greater
 // than int32.
-// Deprecated: use FromInt32 instead.
+// TODO: convert to (val int32)
 func FromInt(val int) IntOrString {
 	if val > math.MaxInt32 || val < math.MinInt32 {
 		klog.Errorf("value: %d overflows int32\n%s\n", val, debug.Stack())
 	}
 	return IntOrString{Type: Int, IntVal: int32(val)}
-}
-
-// FromInt32 creates an IntOrString object with an int32 value.
-func FromInt32(val int32) IntOrString {
-	return IntOrString{Type: Int, IntVal: val}
 }
 
 // FromString creates an IntOrString object with a string value.

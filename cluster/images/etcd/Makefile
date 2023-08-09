@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.4.18 3.5.8] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.6] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,10 +26,10 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.4.18 3.5.8
+BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.6
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.5.9
+LATEST_ETCD_VERSION?=3.5.6
 
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
@@ -83,7 +83,7 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION := 1.19.9
+GOLANG_VERSION := 1.17.13
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -92,19 +92,19 @@ DOCKERFILE.windows = Dockerfile.windows
 DOCKERFILE := ${DOCKERFILE.${OS}}
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base:bookworm-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base:bullseye-v1.3.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm:bookworm-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm:bullseye-v1.3.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm64:bookworm-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm64:bullseye-v1.3.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base-ppc64le:bookworm-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-ppc64le:bullseye-v1.3.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base-s390x:bookworm-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-s390x:bullseye-v1.3.0
 endif
 
 BASE.windows = mcr.microsoft.com/windows/nanoserver
@@ -125,7 +125,10 @@ build:
 	migrate_tmp_dir=$(shell mktemp -d); \
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOOS=$(OS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
-	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR);
+	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR); \
+	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOOS=$(OS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
+	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
 
 ifeq ($(ARCH),amd64)
 
@@ -171,7 +174,7 @@ else
 			"git clone https://github.com/coreos/etcd $$etcd_build_dir \
 			&& cd $$etcd_build_dir \
 			&& git checkout v$${version} \
-			&& $(arch_prefix) GOARCH=$(ARCH) ./build.sh \
+			&& $(arch_prefix) GOARCH=$(ARCH) ./build \
 			&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"; \
 		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
 		$(BIN_INSTALL) $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
@@ -179,10 +182,10 @@ else
 	done
 
 	# Add this ENV variable in order to workaround an unsupported arch blocker
-	# On arm (which is 32-bit), it can't handle >1GB data in-memory
-        ifeq ($(ARCH),arm)
-		cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> $(DOCKERFILE)
-        endif
+	# The multiarch feature is in an limited and experimental state right now, and etcd should work fine on arm64
+	# On arm (which is 32-bit), it can't handle >1GB data in-memory, but it is very unlikely someone tinkering with their limited arm devices would reach such a high usage
+	# ppc64le is still quite untested, but compiles and is probably in the process of being validated by IBM.
+	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> $(DOCKERFILE)
 endif
 
 	docker run --rm --privileged multiarch/qemu-user-static:$(QEMUVERSION) --reset -p yes

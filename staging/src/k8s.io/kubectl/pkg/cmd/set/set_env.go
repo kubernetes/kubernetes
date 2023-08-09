@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
@@ -130,13 +129,13 @@ type EnvOptions struct {
 	enforceNamespace       bool
 	clientset              *kubernetes.Clientset
 
-	genericiooptions.IOStreams
-	WarningPrinter *printers.WarningPrinter
+	genericclioptions.IOStreams
+	warningPrinter *printers.WarningPrinter
 }
 
 // NewEnvOptions returns an EnvOptions indicating all containers in the selected
 // pod templates are selected by default and allowing environment to be overwritten
-func NewEnvOptions(streams genericiooptions.IOStreams) *EnvOptions {
+func NewEnvOptions(streams genericclioptions.IOStreams) *EnvOptions {
 	return &EnvOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("env updated").WithTypeSetter(scheme.Scheme),
 
@@ -147,7 +146,7 @@ func NewEnvOptions(streams genericiooptions.IOStreams) *EnvOptions {
 }
 
 // NewCmdEnv implements the OpenShift cli env command
-func NewCmdEnv(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewEnvOptions(streams)
 
 	cmd := &cobra.Command{
@@ -208,7 +207,7 @@ func contains(key string, keyList []string) bool {
 func (o *EnvOptions) keyToEnvName(key string) string {
 	envName := strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 	if envName != key {
-		o.WarningPrinter.Print(fmt.Sprintf("key %s transferred to %s", key, envName))
+		o.warningPrinter.Print(fmt.Sprintf("key %s transferred to %s", key, envName))
 	}
 	return envName
 }
@@ -248,10 +247,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return err
 	}
 	o.builder = f.NewBuilder
-	// Set default WarningPrinter if not already set.
-	if o.WarningPrinter == nil {
-		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
-	}
+	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
 
 	return nil
 }
@@ -270,8 +266,8 @@ func (o *EnvOptions) Validate() error {
 	if len(o.Keys) > 0 && len(o.From) == 0 {
 		return fmt.Errorf("when specifying --keys, a configmap or secret must be provided with --from")
 	}
-	if o.WarningPrinter == nil {
-		return fmt.Errorf("WarningPrinter can not be used without initialization")
+	if o.warningPrinter == nil {
+		return fmt.Errorf("warningPrinter can not be used without initialization")
 	}
 	return nil
 }
@@ -425,7 +421,7 @@ func (o *EnvOptions) RunEnv() error {
 						}
 					}
 
-					o.WarningPrinter.Print(fmt.Sprintf("%s/%s does not have any containers matching %q", objKind, objName, o.ContainerSelector))
+					o.warningPrinter.Print(fmt.Sprintf("%s/%s does not have any containers matching %q", objKind, objName, o.ContainerSelector))
 				}
 				return nil
 			}

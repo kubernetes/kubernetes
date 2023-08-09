@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -35,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // strategy implements behavior for CustomResources.

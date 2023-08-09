@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -59,8 +58,7 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 			client := fake.NewSimpleClientset(
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
 			)
-			_, ctx := ktesting.NewTestContext(b)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			_ = informerFactory.Core().V1().Services().Lister()
@@ -71,7 +69,7 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 					b.Errorf("error waiting for informer cache sync")
 				}
 			}
-			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informerFactory))
+			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informerFactory))
 			pl, err := New(nil, fh)
 			if err != nil {
 				b.Fatal(err)

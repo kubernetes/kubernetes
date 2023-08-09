@@ -417,29 +417,6 @@ func (c *Conn) listUnitsInternal(f storeFunc) ([]UnitStatus, error) {
 	return status, nil
 }
 
-// GetUnitByPID returns the unit object path of the unit a process ID
-// belongs to. It takes a UNIX PID and returns the object path. The PID must
-// refer to an existing system process
-func (c *Conn) GetUnitByPID(ctx context.Context, pid uint32) (dbus.ObjectPath, error) {
-	var result dbus.ObjectPath
-
-	err := c.sysobj.CallWithContext(ctx, "org.freedesktop.systemd1.Manager.GetUnitByPID", 0, pid).Store(&result)
-
-	return result, err
-}
-
-// GetUnitNameByPID returns the name of the unit a process ID belongs to. It
-// takes a UNIX PID and returns the object path. The PID must refer to an
-// existing system process
-func (c *Conn) GetUnitNameByPID(ctx context.Context, pid uint32) (string, error) {
-	path, err := c.GetUnitByPID(ctx, pid)
-	if err != nil {
-		return "", err
-	}
-
-	return unitName(path), nil
-}
-
 // Deprecated: use ListUnitsContext instead.
 func (c *Conn) ListUnits() ([]UnitStatus, error) {
 	return c.ListUnitsContext(context.Background())
@@ -850,15 +827,4 @@ func (c *Conn) listJobsInternal(ctx context.Context) ([]JobStatus, error) {
 	}
 
 	return status, nil
-}
-
-// Freeze the cgroup associated with the unit.
-// Note that FreezeUnit and ThawUnit are only supported on systems running with cgroup v2.
-func (c *Conn) FreezeUnit(ctx context.Context, unit string) error {
-	return c.sysobj.CallWithContext(ctx, "org.freedesktop.systemd1.Manager.FreezeUnit", 0, unit).Store()
-}
-
-// Unfreeze the cgroup associated with the unit.
-func (c *Conn) ThawUnit(ctx context.Context, unit string) error {
-	return c.sysobj.CallWithContext(ctx, "org.freedesktop.systemd1.Manager.ThawUnit", 0, unit).Store()
 }

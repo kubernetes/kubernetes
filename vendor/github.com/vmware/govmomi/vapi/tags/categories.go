@@ -20,13 +20,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/vmware/govmomi/vapi/internal"
 )
 
-// Category provides methods to create, read, update, delete, and enumerate
-// categories.
+// Category provides methods to create, read, update, delete, and enumerate categories.
 type Category struct {
 	ID              string   `json:"id,omitempty"`
 	Name            string   `json:"name,omitempty"`
@@ -89,13 +87,12 @@ func (c *Manager) CreateCategory(ctx context.Context, category *Category) (strin
 		// otherwise create fails with invalid_argument
 		spec.Category.AssociableTypes = []string{}
 	}
-	url := c.Resource(internal.CategoryPath)
+	url := internal.URL(c, internal.CategoryPath)
 	var res string
 	return res, c.Do(ctx, url.Request(http.MethodPost, spec), &res)
 }
 
-// UpdateCategory updates one or more of the AssociableTypes, Cardinality,
-// Description and Name fields.
+// UpdateCategory can update one or more of the AssociableTypes, Cardinality, Description and Name fields.
 func (c *Manager) UpdateCategory(ctx context.Context, category *Category) error {
 	spec := struct {
 		Category Category `json:"update_spec"`
@@ -107,13 +104,13 @@ func (c *Manager) UpdateCategory(ctx context.Context, category *Category) error 
 			Name:            category.Name,
 		},
 	}
-	url := c.Resource(internal.CategoryPath).WithID(category.ID)
+	url := internal.URL(c, internal.CategoryPath).WithID(category.ID)
 	return c.Do(ctx, url.Request(http.MethodPatch, spec), nil)
 }
 
-// DeleteCategory deletes a category.
+// DeleteCategory deletes an existing category.
 func (c *Manager) DeleteCategory(ctx context.Context, category *Category) error {
-	url := c.Resource(internal.CategoryPath).WithID(category.ID)
+	url := internal.URL(c, internal.CategoryPath).WithID(category.ID)
 	return c.Do(ctx, url.Request(http.MethodDelete), nil)
 }
 
@@ -132,19 +129,19 @@ func (c *Manager) GetCategory(ctx context.Context, id string) (*Category, error)
 			}
 		}
 	}
-	url := c.Resource(internal.CategoryPath).WithID(id)
+	url := internal.URL(c, internal.CategoryPath).WithID(id)
 	var res Category
 	return &res, c.Do(ctx, url.Request(http.MethodGet), &res)
 }
 
 // ListCategories returns all category IDs in the system.
 func (c *Manager) ListCategories(ctx context.Context) ([]string, error) {
-	url := c.Resource(internal.CategoryPath)
+	url := internal.URL(c, internal.CategoryPath)
 	var res []string
 	return res, c.Do(ctx, url.Request(http.MethodGet), &res)
 }
 
-// GetCategories fetches a list of category information in the system.
+// GetCategories fetches an array of category information in the system.
 func (c *Manager) GetCategories(ctx context.Context) ([]Category, error) {
 	ids, err := c.ListCategories(ctx)
 	if err != nil {
@@ -155,13 +152,11 @@ func (c *Manager) GetCategories(ctx context.Context) ([]Category, error) {
 	for _, id := range ids {
 		category, err := c.GetCategory(ctx, id)
 		if err != nil {
-			if strings.Contains(err.Error(), http.StatusText(http.StatusNotFound)) {
-				continue // deleted since last fetch
-			}
-			return nil, fmt.Errorf("get category %s: %v", id, err)
+			return nil, fmt.Errorf("get category %s: %s", id, err)
 		}
-		categories = append(categories, *category)
-	}
 
+		categories = append(categories, *category)
+
+	}
 	return categories, nil
 }

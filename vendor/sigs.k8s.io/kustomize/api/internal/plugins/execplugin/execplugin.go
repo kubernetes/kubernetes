@@ -6,6 +6,7 @@ package execplugin
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"runtime"
@@ -13,9 +14,9 @@ import (
 
 	"github.com/google/shlex"
 
+	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/internal/plugins/utils"
 	"sigs.k8s.io/kustomize/api/resmap"
-	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/yaml"
 )
 
@@ -149,19 +150,19 @@ func (p *ExecPlugin) Transform(rm resmap.ResMap) error {
 // passes the full temp file path as the first arg to a process
 // running the plugin binary.  Process output is returned.
 func (p *ExecPlugin) invokePlugin(input []byte) ([]byte, error) {
-	f, err := os.CreateTemp("", tmpConfigFilePrefix)
+	f, err := ioutil.TempFile("", tmpConfigFilePrefix)
 	if err != nil {
-		return nil, errors.WrapPrefixf(
+		return nil, errors.Wrap(
 			err, "creating tmp plugin config file")
 	}
 	_, err = f.Write(p.cfg)
 	if err != nil {
-		return nil, errors.WrapPrefixf(
+		return nil, errors.Wrap(
 			err, "writing plugin config to "+f.Name())
 	}
 	err = f.Close()
 	if err != nil {
-		return nil, errors.WrapPrefixf(
+		return nil, errors.Wrap(
 			err, "closing plugin config file "+f.Name())
 	}
 	//nolint:gosec
@@ -175,7 +176,7 @@ func (p *ExecPlugin) invokePlugin(input []byte) ([]byte, error) {
 	}
 	result, err := cmd.Output()
 	if err != nil {
-		return nil, errors.WrapPrefixf(
+		return nil, errors.Wrapf(
 			err, "failure in plugin configured via %s; %v",
 			f.Name(), err.Error())
 	}

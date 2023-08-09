@@ -31,7 +31,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	fakecloud "k8s.io/cloud-provider/fake"
-	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -162,6 +161,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	pod := fakePodWithVol(namespaceName)
+	podStopCh := make(chan struct{})
 
 	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
@@ -183,7 +183,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	go informers.Core().V1().PersistentVolumes().Informer().Run(ctx.Done())
 	go informers.Storage().V1().VolumeAttachments().Informer().Run(ctx.Done())
 	initCSIObjects(ctx.Done(), informers)
-	go ctrl.Run(ctx)
+	go ctrl.Run(ctx.Done())
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(ctx)
 
@@ -201,6 +201,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 
 	waitForPodsInDSWP(t, ctrl.GetDesiredStateOfWorld())
 	// let's stop pod events from getting triggered
+	close(podStopCh)
 	err = podInformer.GetStore().Delete(podInformerObj)
 	if err != nil {
 		t.Fatalf("Error deleting pod : %v", err)
@@ -261,7 +262,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	go informers.Core().V1().PersistentVolumes().Informer().Run(ctx.Done())
 	go informers.Storage().V1().VolumeAttachments().Informer().Run(ctx.Done())
 	initCSIObjects(ctx.Done(), informers)
-	go ctrl.Run(ctx)
+	go ctrl.Run(ctx.Done())
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(ctx)
 
@@ -334,7 +335,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	go informers.Core().V1().PersistentVolumes().Informer().Run(ctx.Done())
 	go informers.Storage().V1().VolumeAttachments().Informer().Run(ctx.Done())
 	initCSIObjects(ctx.Done(), informers)
-	go ctrl.Run(ctx)
+	go ctrl.Run(ctx.Done())
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(ctx)
 
@@ -425,9 +426,7 @@ func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, sync
 	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fakecloud.Cloud{}
 	informers := clientgoinformers.NewSharedInformerFactory(testClient, resyncPeriod)
-	logger, ctx := ktesting.NewTestContext(t)
 	ctrl, err := attachdetach.NewAttachDetachController(
-		logger,
 		testClient,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
@@ -442,6 +441,7 @@ func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, sync
 		false,
 		5*time.Second,
 		timers,
+		nil, /* filteredDialOptions */
 	)
 
 	if err != nil {
@@ -463,7 +463,7 @@ func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, sync
 		NodeInformer:              informers.Core().V1().Nodes(),
 		EnableDynamicProvisioning: false,
 	}
-	pvCtrl, err := persistentvolume.NewController(ctx, params)
+	pvCtrl, err := persistentvolume.NewController(params)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
@@ -509,15 +509,14 @@ func TestPodAddedByDswp(t *testing.T) {
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(ctx.Done())
 	go informers.Core().V1().PersistentVolumes().Informer().Run(ctx.Done())
 	go informers.Storage().V1().VolumeAttachments().Informer().Run(ctx.Done())
 	initCSIObjects(ctx.Done(), informers)
-	go ctrl.Run(ctx)
+	go ctrl.Run(ctx.Done())
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(ctx)
 
@@ -606,7 +605,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	informers.Start(ctx.Done())
 	informers.WaitForCacheSync(ctx.Done())
 	initCSIObjects(ctx.Done(), informers)
-	go ctrl.Run(ctx)
+	go ctrl.Run(ctx.Done())
 	go pvCtrl.Run(ctx)
 
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4)

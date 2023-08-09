@@ -23,25 +23,24 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-func RenameTask(ctx *Context, e mo.Entity, r *types.Rename_Task, dup ...bool) soap.HasFault {
+func RenameTask(e mo.Entity, r *types.Rename_Task) soap.HasFault {
 	task := CreateTask(e, "rename", func(t *Task) (types.AnyType, types.BaseMethodFault) {
-		obj := ctx.Map.Get(r.This).(mo.Entity).Entity()
+		obj := Map.Get(r.This).(mo.Entity).Entity()
 
-		canDup := len(dup) == 1 && dup[0]
-		if parent, ok := asFolderMO(ctx.Map.Get(*obj.Parent)); ok && !canDup {
-			if ctx.Map.FindByName(r.NewName, parent.ChildEntity) != nil {
+		if parent, ok := Map.Get(*obj.Parent).(*Folder); ok {
+			if Map.FindByName(r.NewName, parent.ChildEntity) != nil {
 				return nil, &types.InvalidArgument{InvalidProperty: "name"}
 			}
 		}
 
-		ctx.Map.Update(e, []types.PropertyChange{{Name: "name", Val: r.NewName}})
+		Map.Update(e, []types.PropertyChange{{Name: "name", Val: r.NewName}})
 
 		return nil, nil
 	})
 
 	return &methods.Rename_TaskBody{
 		Res: &types.Rename_TaskResponse{
-			Returnval: task.Run(ctx),
+			Returnval: task.Run(),
 		},
 	}
 }
