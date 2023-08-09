@@ -59,7 +59,7 @@ func (client GalleryApplicationsClient) CreateOrUpdate(ctx context.Context, reso
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationsClient", "CreateOrUpdate", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationsClient", "CreateOrUpdate", nil, "Failure sending request")
 		return
 	}
 
@@ -94,7 +94,6 @@ func (client GalleryApplicationsClient) CreateOrUpdatePreparer(ctx context.Conte
 // http.Response Body if it receives an error.
 func (client GalleryApplicationsClient) CreateOrUpdateSender(req *http.Request) (future GalleryApplicationsCreateOrUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -143,7 +142,7 @@ func (client GalleryApplicationsClient) Delete(ctx context.Context, resourceGrou
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationsClient", "Delete", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationsClient", "Delete", nil, "Failure sending request")
 		return
 	}
 
@@ -176,7 +175,6 @@ func (client GalleryApplicationsClient) DeletePreparer(ctx context.Context, reso
 // http.Response Body if it receives an error.
 func (client GalleryApplicationsClient) DeleteSender(req *http.Request) (future GalleryApplicationsDeleteFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -425,7 +423,7 @@ func (client GalleryApplicationsClient) Update(ctx context.Context, resourceGrou
 
 	result, err = client.UpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationsClient", "Update", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationsClient", "Update", nil, "Failure sending request")
 		return
 	}
 
@@ -460,7 +458,6 @@ func (client GalleryApplicationsClient) UpdatePreparer(ctx context.Context, reso
 // http.Response Body if it receives an error.
 func (client GalleryApplicationsClient) UpdateSender(req *http.Request) (future GalleryApplicationsUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

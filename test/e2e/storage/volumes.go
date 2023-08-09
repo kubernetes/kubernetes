@@ -34,7 +34,7 @@ import (
 // These tests need privileged containers, which are disabled by default.
 var _ = utils.SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	// note that namespace deletion is handled by delete-namespace flag
 	// filled inside BeforeEach

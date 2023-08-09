@@ -32,7 +32,7 @@ import (
 var _ = SIGDescribe("GKE node pools [Feature:GKENodePool]", func() {
 
 	f := framework.NewDefaultFramework("node-pools")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gke")

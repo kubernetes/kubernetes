@@ -30,14 +30,12 @@ import (
 	"io"
 	"io/ioutil"
 	mrand "math/rand"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-
 	"github.com/vmware/govmomi/sts/internal"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -128,32 +126,22 @@ func (s *Signer) Sign(env soap.Envelope) ([]byte, error) {
 			req := x.RequestSecurityToken()
 			c14n = req.C14N()
 			body = req.String()
+			id := newID()
 
-			if len(s.Certificate.Certificate) == 0 {
-				header.Assertion = s.Token
-				if err := s.setTokenReference(&info); err != nil {
-					return nil, err
-				}
-			} else {
-				id := newID()
-
-				header.BinarySecurityToken = &internal.BinarySecurityToken{
-					EncodingType: "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary",
-					ValueType:    "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3",
-					ID:           id,
-					Value:        base64.StdEncoding.EncodeToString(s.Certificate.Certificate[0]),
-				}
-
-				info.SecurityTokenReference = &internal.SecurityTokenReference{
-					Reference: &internal.SecurityReference{
-						URI:       "#" + id,
-						ValueType: "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3",
-					},
-				}
+			info.SecurityTokenReference = &internal.SecurityTokenReference{
+				Reference: &internal.SecurityReference{
+					URI:       "#" + id,
+					ValueType: "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3",
+				},
 			}
-		}
-		// When requesting HoK token for interactive user, request will have both priv. key and username/password.
-		if s.user.Username() != "" {
+
+			header.BinarySecurityToken = &internal.BinarySecurityToken{
+				EncodingType: "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary",
+				ValueType:    "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3",
+				ID:           id,
+				Value:        base64.StdEncoding.EncodeToString(s.Certificate.Certificate[0]),
+			}
+		} else {
 			header.UsernameToken = &internal.UsernameToken{
 				Username: s.user.Username(),
 			}
@@ -275,7 +263,7 @@ func (s *Signer) SignRequest(req *http.Request) error {
 				return fmt.Errorf("sts: reading http.Request body: %s", rerr)
 			}
 		}
-		bhash := sha256.Sum256(body)
+		bhash := sha256.New().Sum(body)
 
 		port := req.URL.Port()
 		if port == "" {
@@ -283,25 +271,18 @@ func (s *Signer) SignRequest(req *http.Request) error {
 		}
 
 		var buf bytes.Buffer
-		host := req.URL.Hostname()
-
-		// Check if the host IP is in IPv6 format. If yes, add the opening and closing square brackets.
-		if isIPv6(host) {
-			host = fmt.Sprintf("%s%s%s", "[", host, "]")
-		}
-
 		msg := []string{
 			nonce,
 			req.Method,
 			req.URL.Path,
-			strings.ToLower(host),
+			strings.ToLower(req.URL.Hostname()),
 			port,
 		}
 		for i := range msg {
 			buf.WriteString(msg[i])
 			buf.WriteByte('\n')
 		}
-		buf.Write(bhash[:])
+		buf.Write(bhash)
 		buf.WriteByte('\n')
 
 		sum := sha256.Sum256(buf.Bytes())
@@ -328,7 +309,7 @@ func (s *Signer) SignRequest(req *http.Request) error {
 		})
 		add(param{
 			key: "bodyhash",
-			val: base64.StdEncoding.EncodeToString(bhash[:]),
+			val: base64.StdEncoding.EncodeToString(bhash),
 		})
 	}
 
@@ -344,12 +325,4 @@ func (s *Signer) NewRequest() TokenRequest {
 		Userinfo:    s.user,
 		KeyID:       s.keyID,
 	}
-}
-
-func isIPv6(s string) bool {
-	ip := net.ParseIP(s)
-	if ip == nil {
-		return false
-	}
-	return ip.To4() == nil
 }

@@ -104,7 +104,6 @@ func autoConvert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorag
 	out.APIServerID = in.APIServerID
 	out.EncodingVersion = in.EncodingVersion
 	out.DecodableVersions = *(*[]string)(unsafe.Pointer(&in.DecodableVersions))
-	out.ServedVersions = *(*[]string)(unsafe.Pointer(&in.ServedVersions))
 	return nil
 }
 
@@ -117,7 +116,6 @@ func autoConvert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorag
 	out.APIServerID = in.APIServerID
 	out.EncodingVersion = in.EncodingVersion
 	out.DecodableVersions = *(*[]string)(unsafe.Pointer(&in.DecodableVersions))
-	out.ServedVersions = *(*[]string)(unsafe.Pointer(&in.ServedVersions))
 	return nil
 }
 

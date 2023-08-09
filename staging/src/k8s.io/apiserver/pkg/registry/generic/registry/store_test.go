@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2021,34 +2020,19 @@ func TestStoreDeletionPropagation(t *testing.T) {
 	}
 }
 
-type storageWithCounter struct {
-	storage.Interface
-
-	listCounter int64
-}
-
-func (s *storageWithCounter) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	atomic.AddInt64(&s.listCounter, 1)
-	return s.Interface.GetList(ctx, key, opts, listObj)
-}
-
 func TestStoreDeleteCollection(t *testing.T) {
+	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	podB := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
-	// Overwrite the underlying storage interface so that it counts GetList calls
-	// and reduce the default page size to 2.
-	storeWithCounter := &storageWithCounter{Interface: registry.Storage.Storage}
-	registry.Storage.Storage = storeWithCounter
-	deleteCollectionPageSize = 2
-
-	numPods := 10
-	for i := 0; i < numPods; i++ {
-		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
-		if _, err := registry.Create(testContext, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
+	if _, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if _, err := registry.Create(testContext, podB, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 
 	// Delete all pods.
@@ -2057,18 +2041,15 @@ func TestStoreDeleteCollection(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	deletedPods := deleted.(*example.PodList)
-	if len(deletedPods.Items) != numPods {
-		t.Errorf("Unexpected number of pods deleted: %d, expected: %d", len(deletedPods.Items), numPods)
-	}
-	expectedCalls := (int64(numPods) + deleteCollectionPageSize - 1) / deleteCollectionPageSize
-	if listCalls := atomic.LoadInt64(&storeWithCounter.listCounter); listCalls != expectedCalls {
-		t.Errorf("Unexpected number of list calls: %d, expected: %d", listCalls, expectedCalls)
+	if len(deletedPods.Items) != 2 {
+		t.Errorf("Unexpected number of pods deleted: %d, expected: 3", len(deletedPods.Items))
 	}
 
-	for i := 0; i < numPods; i++ {
-		if _, err := registry.Get(testContext, fmt.Sprintf("foo-%d", i), &metav1.GetOptions{}); !errors.IsNotFound(err) {
-			t.Errorf("Unexpected error: %v", err)
-		}
+	if _, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
@@ -2234,7 +2215,7 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 	podCreated := objCreated.(*example.Pod)
 
-	watcher, err := registry.WatchPredicate(testContext, matchPodName("foo"), podCreated.ResourceVersion, nil)
+	watcher, err := registry.WatchPredicate(testContext, matchPodName("foo"), podCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -2295,7 +2276,7 @@ func TestStoreWatch(t *testing.T) {
 
 			destroyFunc, registry := NewTestGenericStoreRegistry(t)
 			defer destroyFunc()
-			wi, err := registry.WatchPredicate(ctx, m.selectPred, "0", nil)
+			wi, err := registry.WatchPredicate(ctx, m.selectPred, "0")
 			if err != nil {
 				t.Errorf("%v: unexpected error: %v", name, err)
 			} else {
@@ -2358,13 +2339,12 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	}
 
 	return destroyFunc, &Store{
-		NewFunc:                   func() runtime.Object { return &example.Pod{} },
-		NewListFunc:               func() runtime.Object { return &example.PodList{} },
-		DefaultQualifiedResource:  example.Resource("pods"),
-		SingularQualifiedResource: example.Resource("pod"),
-		CreateStrategy:            strategy,
-		UpdateStrategy:            strategy,
-		DeleteStrategy:            strategy,
+		NewFunc:                  func() runtime.Object { return &example.Pod{} },
+		NewListFunc:              func() runtime.Object { return &example.PodList{} },
+		DefaultQualifiedResource: example.Resource("pods"),
+		CreateStrategy:           strategy,
+		UpdateStrategy:           strategy,
+		DeleteStrategy:           strategy,
 		KeyRootFunc: func(ctx context.Context) string {
 			return podPrefix
 		},

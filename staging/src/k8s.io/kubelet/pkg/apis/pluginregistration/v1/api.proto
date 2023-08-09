@@ -1,8 +1,7 @@
-// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+// To regenerate api.pb.go run hack/update-generated-kubelet-plugin-registration.sh
 syntax = "proto3";
 
-package pluginregistration; // This should have been v1.
-option go_package = "k8s.io/kubelet/pkg/apis/pluginregistration/v1";
+package pluginregistration;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 

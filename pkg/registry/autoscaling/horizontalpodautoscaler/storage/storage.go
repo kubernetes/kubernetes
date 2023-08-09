@@ -40,10 +40,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &autoscaling.HorizontalPodAutoscaler{} },
-		NewListFunc:               func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} },
-		DefaultQualifiedResource:  autoscaling.Resource("horizontalpodautoscalers"),
-		SingularQualifiedResource: autoscaling.Resource("horizontalpodautoscaler"),
+		NewFunc:                  func() runtime.Object { return &autoscaling.HorizontalPodAutoscaler{} },
+		NewListFunc:              func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} },
+		DefaultQualifiedResource: autoscaling.Resource("horizontalpodautoscalers"),
 
 		CreateStrategy:      horizontalpodautoscaler.Strategy,
 		UpdateStrategy:      horizontalpodautoscaler.Strategy,

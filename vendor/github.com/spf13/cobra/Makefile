@@ -5,6 +5,10 @@ ifeq (, $(shell which golangci-lint))
 $(warning "could not find golangci-lint in $(PATH), run: curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh")
 endif
 
+ifeq (, $(shell which richgo))
+$(warning "could not find richgo in $(PATH), run: go install github.com/kyoh86/richgo@latest")
+endif
+
 .PHONY: fmt lint test install_deps clean
 
 default: all
@@ -21,10 +25,6 @@ lint:
 
 test: install_deps
 	$(info ******************** running tests ********************)
-	go test -v ./...
-
-richtest: install_deps
-	$(info ******************** running tests with kyoh86/richgo ********************)
 	richgo test -v ./...
 
 install_deps:

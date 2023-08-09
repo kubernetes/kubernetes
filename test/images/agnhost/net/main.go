@@ -159,7 +159,7 @@ func handleRunRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	runner := urlParts[2]
-	if r.Body == nil || r.Body == http.NoBody {
+	if r.Body == nil {
 		http.Error(w, "Missing request body", 400)
 		return
 	}

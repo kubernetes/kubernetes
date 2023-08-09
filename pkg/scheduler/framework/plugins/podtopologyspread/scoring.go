@@ -36,7 +36,7 @@ const invalidScore = -1
 type preScoreState struct {
 	Constraints []topologySpreadConstraint
 	// IgnoredNodes is a set of node names which miss some Constraints[*].topologyKey.
-	IgnoredNodes sets.Set[string]
+	IgnoredNodes sets.String
 	// TopologyPairToPodCounts is keyed with topologyPair, and valued with the number of matching pods.
 	TopologyPairToPodCounts map[topologyPair]*int64
 	// TopologyNormalizingWeight is the weight we give to the counts per topology.
@@ -120,13 +120,13 @@ func (pl *PodTopologySpread) PreScore(
 		return framework.AsStatus(fmt.Errorf("getting all nodes: %w", err))
 	}
 
-	if len(allNodes) == 0 {
-		// No need to score.
-		return framework.NewStatus(framework.Skip)
+	if len(filteredNodes) == 0 || len(allNodes) == 0 {
+		// No nodes to score.
+		return nil
 	}
 
 	state := &preScoreState{
-		IgnoredNodes:            sets.New[string](),
+		IgnoredNodes:            sets.NewString(),
 		TopologyPairToPodCounts: make(map[topologyPair]*int64),
 	}
 	// Only require that nodes have all the topology labels if using
@@ -138,9 +138,10 @@ func (pl *PodTopologySpread) PreScore(
 		return framework.AsStatus(fmt.Errorf("calculating preScoreState: %w", err))
 	}
 
-	// return Skip if incoming pod doesn't have soft topology spread Constraints.
+	// return if incoming pod doesn't have soft topology spread Constraints.
 	if len(state.Constraints) == 0 {
-		return framework.NewStatus(framework.Skip)
+		cycleState.Write(preScoreStateKey, state)
+		return nil
 	}
 
 	// Ignore parsing errors for backwards compatibility.
@@ -148,6 +149,9 @@ func (pl *PodTopologySpread) PreScore(
 	processAllNode := func(i int) {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
+		if node == nil {
+			return
+		}
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
 			// `node` should satisfy incoming pod's NodeSelector/NodeAffinity

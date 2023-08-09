@@ -23,7 +23,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -386,13 +385,12 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
-			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot))
 
 			p, err := NewFit(
 				&config.NodeResourcesFitArgs{
@@ -409,16 +407,11 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 				return
 			}
 
-			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
-			if !status.IsSuccess() {
-				t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
-			}
-
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
 				if status.Code() != test.wantStatusCode {
-					t.Errorf("unexpected status code, want: %v, got: %v", test.wantStatusCode, status.Code())
+					t.Errorf("unexpected status code, want: %v, got: %v", test.wantStatusCode, status)
 				}
 				gotScores = append(gotScores, framework.NodeScore{Name: n.Name, Score: score})
 			}

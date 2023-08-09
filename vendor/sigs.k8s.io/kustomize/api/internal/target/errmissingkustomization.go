@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/konfig"
-	"sigs.k8s.io/kustomize/kyaml/errors"
 )
 
 type errMissingKustomization struct {
@@ -23,8 +23,12 @@ func (e *errMissingKustomization) Error() string {
 }
 
 func IsMissingKustomizationFileError(err error) bool {
-	e := &errMissingKustomization{}
-	return errors.As(err, &e)
+	_, ok := err.(*errMissingKustomization)
+	if ok {
+		return true
+	}
+	_, ok = errors.Cause(err).(*errMissingKustomization)
+	return ok
 }
 
 func NewErrMissingKustomization(p string) *errMissingKustomization {

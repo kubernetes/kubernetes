@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -35,9 +36,7 @@ func TestAdmission(t *testing.T) {
 	ac := fieldmanager.NewManagedFieldsValidatingAdmissionController(wrap)
 	now := metav1.Now()
 
-	validFieldsV1 := metav1.FieldsV1{}
-	var err error
-	validFieldsV1.Raw, err = fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "labels", "test-label")).ToJSON()
+	validFieldsV1, err := internal.SetToFields(*fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "labels", "test-label")))
 	if err != nil {
 		t.Fatal(err)
 	}

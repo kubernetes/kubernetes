@@ -9,14 +9,13 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"math/big"
 	"sort"
 	"strings"
-	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
-	"unsafe"
 
 	"go.starlark.net/internal/compile"
 	"go.starlark.net/internal/spell"
@@ -47,63 +46,12 @@ type Thread struct {
 	// See example_test.go for some example implementations of Load.
 	Load func(thread *Thread, module string) (StringDict, error)
 
-	// OnMaxSteps is called when the thread reaches the limit set by SetMaxExecutionSteps.
-	// The default behavior is to call thread.Cancel("too many steps").
-	OnMaxSteps func(thread *Thread)
-
-	// Steps a count of abstract computation steps executed
-	// by this thread. It is incremented by the interpreter. It may be used
-	// as a measure of the approximate cost of Starlark execution, by
-	// computing the difference in its value before and after a computation.
-	//
-	// The precise meaning of "step" is not specified and may change.
-	Steps, maxSteps uint64
-
-	// cancelReason records the reason from the first call to Cancel.
-	cancelReason *string
-
 	// locals holds arbitrary "thread-local" Go values belonging to the client.
 	// They are accessible to the client but not to any Starlark program.
 	locals map[string]interface{}
 
 	// proftime holds the accumulated execution time since the last profile event.
 	proftime time.Duration
-}
-
-// ExecutionSteps returns the current value of Steps.
-func (thread *Thread) ExecutionSteps() uint64 {
-	return thread.Steps
-}
-
-// SetMaxExecutionSteps sets a limit on the number of Starlark
-// computation steps that may be executed by this thread. If the
-// thread's step counter exceeds this limit, the interpreter calls
-// the optional OnMaxSteps function or the default behavior
-// of calling thread.Cancel("too many steps").
-func (thread *Thread) SetMaxExecutionSteps(max uint64) {
-	thread.maxSteps = max
-}
-
-// Uncancel resets the cancellation state.
-//
-// Unlike most methods of Thread, it is safe to call Uncancel from any
-// goroutine, even if the thread is actively executing.
-func (thread *Thread) Uncancel() {
-	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&thread.cancelReason)), nil)
-}
-
-// Cancel causes execution of Starlark code in the specified thread to
-// promptly fail with an EvalError that includes the specified reason.
-// There may be a delay before the interpreter observes the cancellation
-// if the thread is currently in a call to a built-in function.
-//
-// Call [Uncancel] to reset the cancellation state.
-//
-// Unlike most methods of Thread, it is safe to call Cancel from any
-// goroutine, even if the thread is actively executing.
-func (thread *Thread) Cancel(reason string) {
-	// Atomically set cancelReason, preserving earlier reason if any.
-	atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(&thread.cancelReason)), nil, unsafe.Pointer(&reason))
 }
 
 // SetLocal sets the thread-local value associated with the specified key.
@@ -230,9 +178,7 @@ func (stack *CallStack) Pop() CallFrame {
 // String returns a user-friendly description of the stack.
 func (stack CallStack) String() string {
 	out := new(strings.Builder)
-	if len(stack) > 0 {
-		fmt.Fprintf(out, "Traceback (most recent call last):\n")
-	}
+	fmt.Fprintf(out, "Traceback (most recent call last):\n")
 	for _, fr := range stack {
 		fmt.Fprintf(out, "  %s: in %s\n", fr.Pos, fr.Name)
 	}
@@ -274,15 +220,7 @@ func (e *EvalError) Error() string { return e.Msg }
 // Backtrace returns a user-friendly error message describing the stack
 // of calls that led to this error.
 func (e *EvalError) Backtrace() string {
-	// If the topmost stack frame is a built-in function,
-	// remove it from the stack and add print "Error in fn:".
-	stack := e.CallStack
-	suffix := ""
-	if last := len(stack) - 1; last >= 0 && stack[last].Pos.Filename() == builtinFilename {
-		suffix = " in " + stack[last].Name
-		stack = stack[:last]
-	}
-	return fmt.Sprintf("%sError%s: %s", stack, suffix, e.Msg)
+	return fmt.Sprintf("%sError: %s", e.CallStack, e.Msg)
 }
 
 func (e *EvalError) Unwrap() error { return e.cause }
@@ -491,8 +429,6 @@ func makeToplevelFunction(prog *compile.Program, predeclared StringDict) *Functi
 			v = MakeBigInt(c)
 		case string:
 			v = String(c)
-		case compile.Bytes:
-			v = Bytes(c)
 		case float64:
 			v = Float(c)
 		default:
@@ -738,22 +674,14 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 			case Int:
 				return x.Add(y), nil
 			case Float:
-				xf, err := x.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
-				return xf + y, nil
+				return x.Float() + y, nil
 			}
 		case Float:
 			switch y := y.(type) {
 			case Float:
 				return x + y, nil
 			case Int:
-				yf, err := y.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
-				return x + yf, nil
+				return x + y.Float(), nil
 			}
 		case *List:
 			if y, ok := y.(*List); ok {
@@ -778,22 +706,14 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 			case Int:
 				return x.Sub(y), nil
 			case Float:
-				xf, err := x.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
-				return xf - y, nil
+				return x.Float() - y, nil
 			}
 		case Float:
 			switch y := y.(type) {
 			case Float:
 				return x - y, nil
 			case Int:
-				yf, err := y.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
-				return x - yf, nil
+				return x - y.Float(), nil
 			}
 		}
 
@@ -804,15 +724,9 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 			case Int:
 				return x.Mul(y), nil
 			case Float:
-				xf, err := x.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
-				return xf * y, nil
+				return x.Float() * y, nil
 			case String:
 				return stringRepeat(y, x)
-			case Bytes:
-				return bytesRepeat(y, x)
 			case *List:
 				elems, err := tupleRepeat(Tuple(y.elems), x)
 				if err != nil {
@@ -827,19 +741,11 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 			case Float:
 				return x * y, nil
 			case Int:
-				yf, err := y.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
-				return x * yf, nil
+				return x * y.Float(), nil
 			}
 		case String:
 			if y, ok := y.(Int); ok {
 				return stringRepeat(x, y)
-			}
-		case Bytes:
-			if y, ok := y.(Int); ok {
-				return bytesRepeat(x, y)
 			}
 		case *List:
 			if y, ok := y.(Int); ok {
@@ -859,40 +765,30 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 	case syntax.SLASH:
 		switch x := x.(type) {
 		case Int:
-			xf, err := x.finiteFloat()
-			if err != nil {
-				return nil, err
-			}
 			switch y := y.(type) {
 			case Int:
-				yf, err := y.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
+				yf := y.Float()
 				if yf == 0.0 {
-					return nil, fmt.Errorf("floating-point division by zero")
+					return nil, fmt.Errorf("real division by zero")
 				}
-				return xf / yf, nil
+				return x.Float() / yf, nil
 			case Float:
 				if y == 0.0 {
-					return nil, fmt.Errorf("floating-point division by zero")
+					return nil, fmt.Errorf("real division by zero")
 				}
-				return xf / y, nil
+				return x.Float() / y, nil
 			}
 		case Float:
 			switch y := y.(type) {
 			case Float:
 				if y == 0.0 {
-					return nil, fmt.Errorf("floating-point division by zero")
+					return nil, fmt.Errorf("real division by zero")
 				}
 				return x / y, nil
 			case Int:
-				yf, err := y.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
+				yf := y.Float()
 				if yf == 0.0 {
-					return nil, fmt.Errorf("floating-point division by zero")
+					return nil, fmt.Errorf("real division by zero")
 				}
 				return x / yf, nil
 			}
@@ -908,14 +804,10 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 				}
 				return x.Div(y), nil
 			case Float:
-				xf, err := x.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
 				if y == 0.0 {
 					return nil, fmt.Errorf("floored division by zero")
 				}
-				return floor(xf / y), nil
+				return floor((x.Float() / y)), nil
 			}
 		case Float:
 			switch y := y.(type) {
@@ -925,10 +817,7 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 				}
 				return floor(x / y), nil
 			case Int:
-				yf, err := y.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
+				yf := y.Float()
 				if yf == 0.0 {
 					return nil, fmt.Errorf("floored division by zero")
 				}
@@ -946,31 +835,23 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 				}
 				return x.Mod(y), nil
 			case Float:
-				xf, err := x.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
 				if y == 0 {
-					return nil, fmt.Errorf("floating-point modulo by zero")
+					return nil, fmt.Errorf("float modulo by zero")
 				}
-				return xf.Mod(y), nil
+				return x.Float().Mod(y), nil
 			}
 		case Float:
 			switch y := y.(type) {
 			case Float:
 				if y == 0.0 {
-					return nil, fmt.Errorf("floating-point modulo by zero")
+					return nil, fmt.Errorf("float modulo by zero")
 				}
-				return x.Mod(y), nil
+				return Float(math.Mod(float64(x), float64(y))), nil
 			case Int:
 				if y.Sign() == 0 {
-					return nil, fmt.Errorf("floating-point modulo by zero")
+					return nil, fmt.Errorf("float modulo by zero")
 				}
-				yf, err := y.finiteFloat()
-				if err != nil {
-					return nil, err
-				}
-				return x.Mod(yf), nil
+				return x.Mod(y.Float()), nil
 			}
 		case String:
 			return interpolate(string(x), y)
@@ -1017,19 +898,6 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 				return nil, fmt.Errorf("'in <string>' requires string as left operand, not %s", x.Type())
 			}
 			return Bool(strings.Contains(string(y), string(needle))), nil
-		case Bytes:
-			switch needle := x.(type) {
-			case Bytes:
-				return Bool(strings.Contains(string(y), string(needle))), nil
-			case Int:
-				var b byte
-				if err := AsInt(needle, &b); err != nil {
-					return nil, fmt.Errorf("int in bytes: %s", err)
-				}
-				return Bool(strings.IndexByte(string(y), b) >= 0), nil
-			default:
-				return nil, fmt.Errorf("'in bytes' requires bytes or int as left operand, not %s", x.Type())
-			}
 		case rangeValue:
 			i, err := NumberToInt(x)
 			if err != nil {
@@ -1044,12 +912,6 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 			if y, ok := y.(Int); ok {
 				return x.Or(y), nil
 			}
-
-		case *Dict: // union
-			if y, ok := y.(*Dict); ok {
-				return x.Union(y), nil
-			}
-
 		case *Set: // union
 			if y, ok := y.(*Set); ok {
 				iter := Iterate(y)
@@ -1070,10 +932,10 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 				if x.Len() > y.Len() {
 					x, y = y, x // opt: range over smaller set
 				}
-				for xe := x.ht.head; xe != nil; xe = xe.next {
+				for _, xelem := range x.elems() {
 					// Has, Insert cannot fail here.
-					if found, _ := y.Has(xe.key); found {
-						set.Insert(xe.key)
+					if found, _ := y.Has(xelem); found {
+						set.Insert(xelem)
 					}
 				}
 				return set, nil
@@ -1089,14 +951,14 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 		case *Set: // symmetric difference
 			if y, ok := y.(*Set); ok {
 				set := new(Set)
-				for xe := x.ht.head; xe != nil; xe = xe.next {
-					if found, _ := y.Has(xe.key); !found {
-						set.Insert(xe.key)
+				for _, xelem := range x.elems() {
+					if found, _ := y.Has(xelem); !found {
+						set.Insert(xelem)
 					}
 				}
-				for ye := y.ht.head; ye != nil; ye = ye.next {
-					if found, _ := x.Has(ye.key); !found {
-						set.Insert(ye.key)
+				for _, yelem := range y.elems() {
+					if found, _ := x.Has(yelem); !found {
+						set.Insert(yelem)
 					}
 				}
 				return set, nil
@@ -1165,8 +1027,7 @@ func tupleRepeat(elems Tuple, n Int) (Tuple, error) {
 	// Inv: i > 0, len > 0
 	sz := len(elems) * i
 	if sz < 0 || sz >= maxAlloc { // sz < 0 => overflow
-		// Don't print sz.
-		return nil, fmt.Errorf("excessive repeat (%d * %d elements)", len(elems), i)
+		return nil, fmt.Errorf("excessive repeat (%d elements)", sz)
 	}
 	res := make([]Value, sz)
 	// copy elems into res, doubling each time
@@ -1176,11 +1037,6 @@ func tupleRepeat(elems Tuple, n Int) (Tuple, error) {
 		x *= 2
 	}
 	return res, nil
-}
-
-func bytesRepeat(b Bytes, n Int) (Bytes, error) {
-	res, err := stringRepeat(String(b), n)
-	return Bytes(res), err
 }
 
 func stringRepeat(s String, n Int) (String, error) {
@@ -1197,8 +1053,7 @@ func stringRepeat(s String, n Int) (String, error) {
 	// Inv: i > 0, len > 0
 	sz := len(s) * i
 	if sz < 0 || sz >= maxAlloc { // sz < 0 => overflow
-		// Don't print sz.
-		return "", fmt.Errorf("excessive repeat (%d * %d elements)", len(s), i)
+		return "", fmt.Errorf("excessive repeat (%d elements)", sz)
 	}
 	return String(strings.Repeat(string(s), i)), nil
 }
@@ -1220,35 +1075,13 @@ func Call(thread *Thread, fn Value, args Tuple, kwargs []Tuple) (Value, error) {
 	if fr == nil {
 		fr = new(frame)
 	}
-
-	if thread.stack == nil {
-		// one-time initialization of thread
-		if thread.maxSteps == 0 {
-			thread.maxSteps-- // (MaxUint64)
-		}
-	}
-
 	thread.stack = append(thread.stack, fr) // push
 
 	fr.callable = c
 
 	thread.beginProfSpan()
-
-	// Use defer to ensure that panics from built-ins
-	// pass through the interpreter without leaving
-	// it in a bad state.
-	defer func() {
-		thread.endProfSpan()
-
-		// clear out any references
-		// TODO(adonovan): opt: zero fr.Locals and
-		// reuse it if it is large enough.
-		*fr = frame{}
-
-		thread.stack = thread.stack[:len(thread.stack)-1] // pop
-	}()
-
 	result, err := c.CallInternal(thread, args, kwargs)
+	thread.endProfSpan()
 
 	// Sanity check: nil is not a valid Starlark value.
 	if result == nil && err == nil {
@@ -1261,6 +1094,9 @@ func Call(thread *Thread, fn Value, args Tuple, kwargs []Tuple) (Value, error) {
 			err = thread.evalError(err)
 		}
 	}
+
+	*fr = frame{}                                     // clear out any references
+	thread.stack = thread.stack[:len(thread.stack)-1] // pop
 
 	return result, err
 }
@@ -1277,7 +1113,7 @@ func slice(x, lo, hi, step_ Value) (Value, error) {
 		var err error
 		step, err = AsInt32(step_)
 		if err != nil {
-			return nil, fmt.Errorf("invalid slice step: %s", err)
+			return nil, fmt.Errorf("got %s for slice step, want int", step_.Type())
 		}
 		if step == 0 {
 			return nil, fmt.Errorf("zero is not a valid slice step")
@@ -1371,7 +1207,7 @@ func asIndex(v Value, len int, result *int) error {
 		var err error
 		*result, err = AsInt32(v)
 		if err != nil {
-			return err
+			return fmt.Errorf("got %s, want int", v.Type())
 		}
 		if *result < 0 {
 			*result += len
@@ -1612,7 +1448,20 @@ func interpolate(format string, x Value) (Value, error) {
 			if !ok {
 				return nil, fmt.Errorf("%%%c format requires float, not %s", c, arg.Type())
 			}
-			Float(f).format(buf, c)
+			switch c {
+			case 'e':
+				fmt.Fprintf(buf, "%e", f)
+			case 'f':
+				fmt.Fprintf(buf, "%f", f)
+			case 'g':
+				fmt.Fprintf(buf, "%g", f)
+			case 'E':
+				fmt.Fprintf(buf, "%E", f)
+			case 'F':
+				fmt.Fprintf(buf, "%F", f)
+			case 'G':
+				fmt.Fprintf(buf, "%G", f)
+			}
 		case 'c':
 			switch arg := arg.(type) {
 			case Int:

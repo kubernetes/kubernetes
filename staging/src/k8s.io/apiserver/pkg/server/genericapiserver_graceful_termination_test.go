@@ -38,7 +38,6 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/klog/v2"
 
@@ -145,10 +144,10 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //	             |                                            |
 //	             |                       |-------------------------------------------------|
 //	             |                       |                                                 |
-//	             |             close(stopHttpServerCh)                         NonLongRunningRequestWaitGroup.Wait()
+//	             |             close(stopHttpServerCh)                         HandlerChainWaitGroup.Wait()
 //	             |                       |                                                 |
 //	             |            server.Shutdown(timeout=60s)                                 |
-//	             |                       |                                         WatchRequestWaitGroup.Wait()
+//	             |                       |                                                 |
 //	             |              stop listener (net/http)                                   |
 //	             |                       |                                                 |
 //	             |          |-------------------------------------|                        |
@@ -177,10 +176,8 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	connReusingClient := newClient(false)
 	doer := setupDoer(t, s.SecureServingInfo)
 
-	// handler for a non long-running and a watch request that
-	// we want to keep in flight through to the end.
-	inflightNonLongRunning := setupInFlightNonLongRunningRequestHandler(s)
-	inflightWatch := setupInFlightWatchRequestHandler(s)
+	// handler for a request that we want to keep in flight through to the end
+	inflightRequest := setupInFlightReuestHandler(s)
 
 	// API calls from the pre-shutdown hook(s) must succeed up to
 	// the point where the HTTP server is shut down.
@@ -207,13 +204,10 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}()
 	waitForAPIServerStarted(t, doer)
 
-	// fire the non long-running and the watch request so it is
-	// in-flight on the server now, and we will unblock them
-	// after ShutdownDelayDuration elapses.
-	inflightNonLongRunning.launch(doer, connReusingClient)
-	waitForeverUntil(t, inflightNonLongRunning.startedCh, "in-flight non long-running request did not reach the server")
-	inflightWatch.launch(doer, connReusingClient)
-	waitForeverUntil(t, inflightWatch.startedCh, "in-flight watch request did not reach the server")
+	// fire a request now so it is in-flight on the server now, and
+	// we will unblock it after ShutdownDelayDuration elapses
+	inflightRequest.launch(doer, connReusingClient)
+	waitForeverUntil(t, inflightRequest.startedCh, "in-flight request did not reach the server")
 
 	// /readyz should return OK
 	resultGot := doer.Do(newClient(true), func(httptrace.GotConnInfo) {}, "/readyz", time.Second)
@@ -306,21 +300,13 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 		t.Errorf("Expected error %v, but got: %v %v", syscall.ECONNREFUSED, resultGot.err, resultGot.response)
 	}
 
-	// the server has stopped listening but we still have a non long-running,
-	// and a watch request in flight, unblock both of these, and we expect
-	// the requests to return appropriate response to the caller.
-	inflightNonLongRunningResultGot := inflightNonLongRunning.unblockAndWaitForResult(t)
-	if err := assertResponseStatusCode(inflightNonLongRunningResultGot, http.StatusOK); err != nil {
+	// the server has stopped listening but we still have a request
+	// in flight, let it unblock and we expect the request to succeed.
+	inFlightResultGot := inflightRequest.unblockAndWaitForResult(t)
+	if err := assertResponseStatusCode(inFlightResultGot, http.StatusOK); err != nil {
 		t.Errorf("%s", err.Error())
 	}
-	if err := assertRequestAudited(inflightNonLongRunningResultGot, fakeAudit); err != nil {
-		t.Errorf("%s", err.Error())
-	}
-	inflightWatchResultGot := inflightWatch.unblockAndWaitForResult(t)
-	if err := assertResponseStatusCode(inflightWatchResultGot, http.StatusOK); err != nil {
-		t.Errorf("%s", err.Error())
-	}
-	if err := assertRequestAudited(inflightWatchResultGot, fakeAudit); err != nil {
+	if err := assertRequestAudited(inFlightResultGot, fakeAudit); err != nil {
 		t.Errorf("%s", err.Error())
 	}
 
@@ -371,9 +357,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 //     |                                            |
 //     |                               (NotAcceptingNewRequest)
 //     |                                            |
-//     |                              NonLongRunningRequestWaitGroup.Wait()
-//     |                                            |
-//     |                                 WatchRequestWaitGroup.Wait()
+//     |                              HandlerChainWaitGroup.Wait()
 //     |                                            |
 //     |                                (InFlightRequestsDrained)
 //     |                                            |
@@ -400,10 +384,8 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	connReusingClient := newClient(false)
 	doer := setupDoer(t, s.SecureServingInfo)
 
-	// handler for a non long-running and a watch request that
-	// we want to keep in flight through to the end.
-	inflightNonLongRunning := setupInFlightNonLongRunningRequestHandler(s)
-	inflightWatch := setupInFlightWatchRequestHandler(s)
+	// handler for a request that we want to keep in flight through to the end
+	inflightRequest := setupInFlightReuestHandler(s)
 
 	// API calls from the pre-shutdown hook(s) must succeed up to
 	// the point where the HTTP server is shut down.
@@ -430,13 +412,10 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	}()
 	waitForAPIServerStarted(t, doer)
 
-	// fire the non long-running and the watch request so it is
-	// in-flight on the server now, and we will unblock them
-	// after ShutdownDelayDuration elapses.
-	inflightNonLongRunning.launch(doer, connReusingClient)
-	waitForeverUntil(t, inflightNonLongRunning.startedCh, "in-flight request did not reach the server")
-	inflightWatch.launch(doer, connReusingClient)
-	waitForeverUntil(t, inflightWatch.startedCh, "in-flight watch request did not reach the server")
+	// fire a request now so it is in-flight on the server now, and
+	// we will unblock it after ShutdownDelayDuration elapses
+	inflightRequest.launch(doer, connReusingClient)
+	waitForeverUntil(t, inflightRequest.startedCh, "in-flight request did not reach the server")
 
 	// /readyz should return OK
 	resultGot := doer.Do(newClient(true), func(httptrace.GotConnInfo) {}, "/readyz", time.Second)
@@ -508,21 +487,12 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 		t.Errorf("%s", err.Error())
 	}
 
-	// we still have a non long-running, and a watch request in flight,
-	// unblock both of these, and we expect the requests
-	// to return appropriate response to the caller.
-	inflightNonLongRunningResultGot := inflightNonLongRunning.unblockAndWaitForResult(t)
-	if err := assertResponseStatusCode(inflightNonLongRunningResultGot, http.StatusOK); err != nil {
+	// we still have a request in flight, let it unblock and we expect the request to succeed.
+	inFlightResultGot := inflightRequest.unblockAndWaitForResult(t)
+	if err := assertResponseStatusCode(inFlightResultGot, http.StatusOK); err != nil {
 		t.Errorf("%s", err.Error())
 	}
-	if err := assertRequestAudited(inflightNonLongRunningResultGot, fakeAudit); err != nil {
-		t.Errorf("%s", err.Error())
-	}
-	inflightWatchResultGot := inflightWatch.unblockAndWaitForResult(t)
-	if err := assertResponseStatusCode(inflightWatchResultGot, http.StatusOK); err != nil {
-		t.Errorf("%s", err.Error())
-	}
-	if err := assertRequestAudited(inflightWatchResultGot, fakeAudit); err != nil {
+	if err := assertRequestAudited(inFlightResultGot, fakeAudit); err != nil {
 		t.Errorf("%s", err.Error())
 	}
 
@@ -693,12 +663,12 @@ type inFlightRequest struct {
 	url                  string
 }
 
-func setupInFlightNonLongRunningRequestHandler(s *GenericAPIServer) *inFlightRequest {
+func setupInFlightReuestHandler(s *GenericAPIServer) *inFlightRequest {
 	inflight := &inFlightRequest{
 		blockedCh: make(chan struct{}),
 		startedCh: make(chan struct{}),
 		resultCh:  make(chan result),
-		url:       "/in-flight-non-long-running-request-as-designed",
+		url:       "/in-flight-request-as-designed",
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		close(inflight.startedCh)
@@ -707,32 +677,6 @@ func setupInFlightNonLongRunningRequestHandler(s *GenericAPIServer) *inFlightReq
 		w.WriteHeader(http.StatusOK)
 	})
 	s.Handler.NonGoRestfulMux.Handle(inflight.url, handler)
-	return inflight
-}
-
-func setupInFlightWatchRequestHandler(s *GenericAPIServer) *inFlightRequest {
-	inflight := &inFlightRequest{
-		blockedCh: make(chan struct{}),
-		startedCh: make(chan struct{}),
-		resultCh:  make(chan result),
-		url:       "/apis/watches.group/v1/namespaces/foo/bar?watch=true",
-	}
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		close(inflight.startedCh)
-		// this request handler blocks until we deliberately unblock it.
-		<-inflight.blockedCh
-
-		// this simulates a watch well enough for our test
-		signals := apirequest.ServerShutdownSignalFrom(req.Context())
-		if signals == nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		<-signals.ShuttingDown()
-		w.WriteHeader(http.StatusOK)
-	})
-	s.Handler.NonGoRestfulMux.Handle("/apis/watches.group/v1/namespaces/foo/bar", handler)
 	return inflight
 }
 
@@ -913,7 +857,7 @@ func waitForAPIServerStarted(t *testing.T, doer doer) {
 	client := newClient(true)
 	i := 1
 	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
-		result := doer.Do(client, func(httptrace.GotConnInfo) {}, fmt.Sprintf("/echo?message=attempt-%d", i), time.Second)
+		result := doer.Do(client, func(httptrace.GotConnInfo) {}, fmt.Sprintf("/echo?message=attempt-%d", i), 100*time.Millisecond)
 		i++
 
 		if result.err != nil {
@@ -1006,8 +950,6 @@ func newGenericAPIServer(t *testing.T, fAudit *fakeAudit, keepListening bool) *G
 	config, _ := setUp(t)
 	config.ShutdownDelayDuration = 100 * time.Millisecond
 	config.ShutdownSendRetryAfter = keepListening
-	// we enable watch draining, any positive value will do that
-	config.ShutdownWatchTerminationGracePeriod = 2 * time.Second
 	config.AuditPolicyRuleEvaluator = fAudit
 	config.AuditBackend = fAudit
 

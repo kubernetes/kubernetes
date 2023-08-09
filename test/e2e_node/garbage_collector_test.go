@@ -74,7 +74,7 @@ type testRun struct {
 // http://kubernetes.io/docs/admin/garbage-collection/
 var _ = SIGDescribe("GarbageCollect [Serial][NodeFeature:GarbageCollect]", func() {
 	f := framework.NewDefaultFramework("garbage-collect-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	containerNamePrefix := "gc-test-container-"
 	podNamePrefix := "gc-test-pod-"
 

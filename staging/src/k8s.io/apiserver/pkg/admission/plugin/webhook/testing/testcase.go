@@ -297,18 +297,7 @@ func ConvertToMutatingTestCases(tests []ValidatingTest, configurationName string
 func ConvertToMutatingWebhooks(webhooks []registrationv1.ValidatingWebhook) []registrationv1.MutatingWebhook {
 	mutating := make([]registrationv1.MutatingWebhook, len(webhooks))
 	for i, h := range webhooks {
-		mutating[i] = registrationv1.MutatingWebhook{
-			Name:                    h.Name,
-			ClientConfig:            h.ClientConfig,
-			Rules:                   h.Rules,
-			FailurePolicy:           h.FailurePolicy,
-			MatchPolicy:             h.MatchPolicy,
-			NamespaceSelector:       h.NamespaceSelector,
-			ObjectSelector:          h.ObjectSelector,
-			SideEffects:             h.SideEffects,
-			TimeoutSeconds:          h.TimeoutSeconds,
-			AdmissionReviewVersions: h.AdmissionReviewVersions,
-		}
+		mutating[i] = registrationv1.MutatingWebhook{h.Name, h.ClientConfig, h.Rules, h.FailurePolicy, h.MatchPolicy, h.NamespaceSelector, h.ObjectSelector, h.SideEffects, h.TimeoutSeconds, h.AdmissionReviewVersions, nil}
 	}
 	return mutating
 }

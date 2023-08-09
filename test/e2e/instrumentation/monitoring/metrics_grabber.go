@@ -36,7 +36,7 @@ import (
 
 var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c, ec clientset.Interface
 	var grabber *e2emetrics.Grabber
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -46,7 +46,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		gomega.Eventually(ctx, func() error {
 			grabber, err = e2emetrics.NewMetricsGrabber(ctx, c, ec, f.ClientConfig(), true, true, true, true, true, true)
 			if err != nil {
-				return fmt.Errorf("failed to create metrics grabber: %w", err)
+				return fmt.Errorf("failed to create metrics grabber: %v", err)
 			}
 			return nil
 		}, 5*time.Minute, 10*time.Second).Should(gomega.BeNil())
@@ -87,16 +87,6 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	ginkgo.It("should grab all metrics from a ControllerManager.", func(ctx context.Context) {
 		ginkgo.By("Proxying to Pod through the API server")
 		response, err := grabber.GrabFromControllerManager(ctx)
-		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
-			e2eskipper.Skipf("%v", err)
-		}
-		framework.ExpectNoError(err)
-		gomega.Expect(response).NotTo(gomega.BeEmpty())
-	})
-
-	ginkgo.It("should grab all metrics slis from API server.", func(ctx context.Context) {
-		ginkgo.By("Connecting to /metrics/slis endpoint")
-		response, err := grabber.GrabMetricsSLIsFromAPIServer(ctx)
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}

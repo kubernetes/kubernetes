@@ -35,15 +35,17 @@ func NewOpaqueNetwork(c *vim25.Client, ref types.ManagedObjectReference) *Opaque
 	}
 }
 
-func (n OpaqueNetwork) GetInventoryPath() string {
-	return n.InventoryPath
-}
-
 // EthernetCardBackingInfo returns the VirtualDeviceBackingInfo for this Network
 func (n OpaqueNetwork) EthernetCardBackingInfo(ctx context.Context) (types.BaseVirtualDeviceBackingInfo, error) {
-	summary, err := n.Summary(ctx)
-	if err != nil {
+	var net mo.OpaqueNetwork
+
+	if err := n.Properties(ctx, n.Reference(), []string{"summary"}, &net); err != nil {
 		return nil, err
+	}
+
+	summary, ok := net.Summary.(*types.OpaqueNetworkSummary)
+	if !ok {
+		return nil, fmt.Errorf("%s unsupported network type: %T", n, net.Summary)
 	}
 
 	backing := &types.VirtualEthernetCardOpaqueNetworkBackingInfo{
@@ -52,21 +54,4 @@ func (n OpaqueNetwork) EthernetCardBackingInfo(ctx context.Context) (types.BaseV
 	}
 
 	return backing, nil
-}
-
-// Summary returns the mo.OpaqueNetwork.Summary property
-func (n OpaqueNetwork) Summary(ctx context.Context) (*types.OpaqueNetworkSummary, error) {
-	var props mo.OpaqueNetwork
-
-	err := n.Properties(ctx, n.Reference(), []string{"summary"}, &props)
-	if err != nil {
-		return nil, err
-	}
-
-	summary, ok := props.Summary.(*types.OpaqueNetworkSummary)
-	if !ok {
-		return nil, fmt.Errorf("%s unsupported network summary type: %T", n, props.Summary)
-	}
-
-	return summary, nil
 }

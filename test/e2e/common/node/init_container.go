@@ -18,7 +18,6 @@ package node
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -161,7 +160,7 @@ func initContainersInvariants(pod *v1.Pod) error {
 
 var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("init-container")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = e2epod.NewPodClient(f)
@@ -395,10 +394,10 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 				case *v1.Pod:
 					for _, status := range t.Status.ContainerStatuses {
 						if status.State.Waiting == nil {
-							return false, fmt.Errorf("container %q should not be out of waiting: %s", status.Name, toDebugJSON(status))
+							return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
 						}
 						if status.State.Waiting.Reason != "PodInitializing" {
-							return false, fmt.Errorf("container %q should have reason PodInitializing: %s", status.Name, toDebugJSON(status))
+							return false, fmt.Errorf("container %q should have reason PodInitializing: %#v", status.Name, status)
 						}
 					}
 					if len(t.Status.InitContainerStatuses) != 2 {
@@ -406,14 +405,14 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 					}
 					status := t.Status.InitContainerStatuses[1]
 					if status.State.Waiting == nil {
-						return false, fmt.Errorf("second init container should not be out of waiting: %s", toDebugJSON(status))
+						return false, fmt.Errorf("second init container should not be out of waiting: %#v", status)
 					}
 					if status.State.Waiting.Reason != "PodInitializing" {
-						return false, fmt.Errorf("second init container should have reason PodInitializing: %s", toDebugJSON(status))
+						return false, fmt.Errorf("second init container should have reason PodInitializing: %#v", status)
 					}
 					status = t.Status.InitContainerStatuses[0]
 					if status.State.Terminated != nil && status.State.Terminated.ExitCode == 0 {
-						return false, fmt.Errorf("first init container should have exitCode != 0: %s", toDebugJSON(status))
+						return false, fmt.Errorf("first init container should have exitCode != 0: %#v", status)
 					}
 					// continue until we see an attempt to restart the pod
 					return status.LastTerminationState.Terminated != nil, nil
@@ -519,10 +518,10 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 					case *v1.Pod:
 						for _, status := range t.Status.ContainerStatuses {
 							if status.State.Waiting == nil {
-								return false, fmt.Errorf("container %q should not be out of waiting: %s", status.Name, toDebugJSON(status))
+								return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
 							}
 							if status.State.Waiting.Reason != "PodInitializing" {
-								return false, fmt.Errorf("container %q should have reason PodInitializing: %s", status.Name, toDebugJSON(status))
+								return false, fmt.Errorf("container %q should have reason PodInitializing: %#v", status.Name, status)
 							}
 						}
 						if len(t.Status.InitContainerStatuses) != 2 {
@@ -531,19 +530,19 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 						status := t.Status.InitContainerStatuses[0]
 						if status.State.Terminated == nil {
 							if status.State.Waiting != nil && status.State.Waiting.Reason != "PodInitializing" {
-								return false, fmt.Errorf("second init container should have reason PodInitializing: %s", toDebugJSON(status))
+								return false, fmt.Errorf("second init container should have reason PodInitializing: %#v", status)
 							}
 							return false, nil
 						}
 						if status.State.Terminated != nil && status.State.Terminated.ExitCode != 0 {
-							return false, fmt.Errorf("first init container should have exitCode != 0: %s", toDebugJSON(status))
+							return false, fmt.Errorf("first init container should have exitCode != 0: %#v", status)
 						}
 						status = t.Status.InitContainerStatuses[1]
 						if status.State.Terminated == nil {
 							return false, nil
 						}
 						if status.State.Terminated.ExitCode == 0 {
-							return false, fmt.Errorf("second init container should have failed: %s", toDebugJSON(status))
+							return false, fmt.Errorf("second init container should have failed: %#v", status)
 						}
 						return true, nil
 					default:
@@ -567,13 +566,3 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 		gomega.Expect(endPod.Status.ContainerStatuses[0].State.Waiting).ToNot(gomega.BeNil())
 	})
 })
-
-// toDebugJSON converts an object to its JSON representation for debug logging
-// purposes instead of using a struct.
-func toDebugJSON(obj interface{}) string {
-	m, err := json.Marshal(obj)
-	if err != nil {
-		return fmt.Sprintf("<error: %v>", err)
-	}
-	return string(m)
-}

@@ -1,0 +1,21 @@
+apiVersion: resource.k8s.io/v1alpha1
+code: 6
+details:
+  causes:
+  - field: fieldValue
+    message: messageValue
+    reason: reasonValue
+  group: groupValue
+  kind: kindValue
+  name: nameValue
+  retryAfterSeconds: 5
+  uid: uidValue
+kind: Status
+message: messageValue
+metadata:
+  continue: continueValue
+  remainingItemCount: 4
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+reason: reasonValue
+status: statusValue

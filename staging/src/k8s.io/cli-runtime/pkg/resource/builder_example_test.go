@@ -73,8 +73,8 @@ items:
 ---
 `
 
-// ExampleNewLocalBuilderLoad demonstrates using a local resource builder to read typed resources from a manifest
-func ExampleNewLocalBuilder() {
+// ExampleLocalBuilderLoad demonstrates using a local resource builder to read typed resources from a manifest
+func ExampleLocalBuilder() {
 	// Create a local builder...
 	builder := resource.NewLocalBuilder().
 		// Configure with a scheme to get typed objects in the versions registered with the scheme.

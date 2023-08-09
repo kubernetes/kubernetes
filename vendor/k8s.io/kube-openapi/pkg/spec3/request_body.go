@@ -19,10 +19,8 @@ package spec3
 import (
 	"encoding/json"
 
-	"github.com/go-openapi/swag"
-	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"github.com/go-openapi/swag"
 )
 
 // RequestBody describes a single request body, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#requestBodyObject
@@ -52,9 +50,6 @@ func (r *RequestBody) MarshalJSON() ([]byte, error) {
 }
 
 func (r *RequestBody) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, r)
-	}
 	if err := json.Unmarshal(data, &r.Refable); err != nil {
 		return err
 	}
@@ -75,20 +70,4 @@ type RequestBodyProps struct {
 	Content map[string]*MediaType `json:"content,omitempty"`
 	// Required determines if the request body is required in the request
 	Required bool `json:"required,omitempty"`
-}
-
-func (r *RequestBody) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
-	var x struct {
-		spec.Extensions
-		RequestBodyProps
-	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
-		return err
-	}
-	if err := internal.JSONRefFromMap(&r.Ref.Ref, x.Extensions); err != nil {
-		return err
-	}
-	r.Extensions = internal.SanitizeExtensions(x.Extensions)
-	r.RequestBodyProps = x.RequestBodyProps
-	return nil
 }

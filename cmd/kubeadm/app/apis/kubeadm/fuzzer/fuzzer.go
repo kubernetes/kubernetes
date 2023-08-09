@@ -40,7 +40,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzNetworking,
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
-		fuzzResetConfiguration,
 	}
 }
 
@@ -86,14 +85,13 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
 		Duration: constants.DefaultControlPlaneTimeout,
 	}
-	obj.ControllerManager.ExtraEnvs = []corev1.EnvVar{}
-	obj.APIServer.ExtraEnvs = []corev1.EnvVar{}
-	obj.Scheduler.ExtraEnvs = []corev1.EnvVar{}
-	obj.Etcd.Local.ExtraEnvs = []corev1.EnvVar{}
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil
+	obj.Type = kubeadm.CoreDNS
 }
 
 func fuzzComponentConfigMap(obj *kubeadm.ComponentConfigMap, c fuzz.Continue) {
@@ -133,11 +131,4 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
-}
-
-func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
-
-	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
-	obj.CertificatesDir = "/tmp"
 }

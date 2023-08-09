@@ -53,12 +53,7 @@ type AuditEvent struct {
 	// not reference these maps after calling the Check functions.
 	AdmissionWebhookMutationAnnotations map[string]string
 	AdmissionWebhookPatchAnnotations    map[string]string
-
-	// Only populated when a filter is provided to testEventFromInternalFiltered
-	CustomAuditAnnotations map[string]string
 }
-
-type AuditAnnotationsFilter func(key, val string) bool
 
 // MissingEventsReport provides an analysis if any events are missing
 type MissingEventsReport struct {
@@ -83,13 +78,6 @@ func (m *MissingEventsReport) String() string {
 
 // CheckAuditLines searches the audit log for the expected audit lines.
 func CheckAuditLines(stream io.Reader, expected []AuditEvent, version schema.GroupVersion) (missingReport *MissingEventsReport, err error) {
-	return CheckAuditLinesFiltered(stream, expected, version, nil)
-}
-
-// CheckAuditLinesFiltered searches the audit log for the expected audit lines, customAnnotationsFilter
-// controls which audit annotations are added to AuditEvent.CustomAuditAnnotations.
-// If the customAnnotationsFilter is nil, AuditEvent.CustomAuditAnnotations will be empty.
-func CheckAuditLinesFiltered(stream io.Reader, expected []AuditEvent, version schema.GroupVersion, customAnnotationsFilter AuditAnnotationsFilter) (missingReport *MissingEventsReport, err error) {
 	expectations := newAuditEventTracker(expected)
 
 	scanner := bufio.NewScanner(stream)
@@ -112,7 +100,7 @@ func CheckAuditLinesFiltered(stream io.Reader, expected []AuditEvent, version sc
 		}
 		missingReport.LastEventChecked = e
 
-		event, err := testEventFromInternalFiltered(e, customAnnotationsFilter)
+		event, err := testEventFromInternal(e)
 		if err != nil {
 			return missingReport, err
 		}
@@ -174,13 +162,6 @@ func CheckForDuplicates(el auditinternal.EventList) (auditinternal.EventList, er
 
 // testEventFromInternal takes an internal audit event and returns a test event
 func testEventFromInternal(e *auditinternal.Event) (AuditEvent, error) {
-	return testEventFromInternalFiltered(e, nil)
-}
-
-// testEventFromInternalFiltered takes an internal audit event and returns a test event, customAnnotationsFilter
-// controls which audit annotations are added to AuditEvent.CustomAuditAnnotations.
-// If the customAnnotationsFilter is nil, AuditEvent.CustomAuditAnnotations will be empty.
-func testEventFromInternalFiltered(e *auditinternal.Event, customAnnotationsFilter AuditAnnotationsFilter) (AuditEvent, error) {
 	event := AuditEvent{
 		Level:      e.Level,
 		Stage:      e.Stage,
@@ -218,11 +199,6 @@ func testEventFromInternalFiltered(e *auditinternal.Event, customAnnotationsFilt
 				event.AdmissionWebhookMutationAnnotations = map[string]string{}
 			}
 			event.AdmissionWebhookMutationAnnotations[k] = v
-		} else if customAnnotationsFilter != nil && customAnnotationsFilter(k, v) {
-			if event.CustomAuditAnnotations == nil {
-				event.CustomAuditAnnotations = map[string]string{}
-			}
-			event.CustomAuditAnnotations[k] = v
 		}
 	}
 	return event, nil

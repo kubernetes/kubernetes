@@ -73,6 +73,7 @@ type Stat_t struct {
 	Blksize int32
 	Flags   uint32
 	Gen     uint32
+	_       [4]byte
 	_       Timespec
 }
 
@@ -80,6 +81,7 @@ type Statfs_t struct {
 	F_flags       uint32
 	F_bsize       uint32
 	F_iosize      uint32
+	_             [4]byte
 	F_blocks      uint64
 	F_bfree       uint64
 	F_bavail      int64
@@ -198,8 +200,10 @@ type IPv6Mreq struct {
 type Msghdr struct {
 	Name       *byte
 	Namelen    uint32
+	_          [4]byte
 	Iov        *Iovec
 	Iovlen     uint32
+	_          [4]byte
 	Control    *byte
 	Controllen uint32
 	Flags      int32
@@ -307,6 +311,7 @@ type IfData struct {
 	Oqdrops      uint64
 	Noproto      uint64
 	Capabilities uint32
+	_            [4]byte
 	Lastchange   Timeval
 }
 
@@ -368,12 +373,14 @@ type RtMetrics struct {
 	Pad      uint32
 }
 
+type Mclpool struct{}
+
 const (
 	SizeofBpfVersion = 0x4
 	SizeofBpfStat    = 0x8
 	SizeofBpfProgram = 0x10
 	SizeofBpfInsn    = 0x8
-	SizeofBpfHdr     = 0x18
+	SizeofBpfHdr     = 0x14
 )
 
 type BpfVersion struct {
@@ -388,6 +395,7 @@ type BpfStat struct {
 
 type BpfProgram struct {
 	Len   uint32
+	_     [4]byte
 	Insns *BpfInsn
 }
 
@@ -403,10 +411,7 @@ type BpfHdr struct {
 	Caplen  uint32
 	Datalen uint32
 	Hdrlen  uint16
-	Ifidx   uint16
-	Flowid  uint16
-	Flags   uint8
-	Drops   uint8
+	_       [2]byte
 }
 
 type BpfTimeval struct {
@@ -483,7 +488,7 @@ type Uvmexp struct {
 	Zeropages          int32
 	Reserve_pagedaemon int32
 	Reserve_kernel     int32
-	Unused01           int32
+	Anonpages          int32
 	Vnodepages         int32
 	Vtextpages         int32
 	Freemin            int32
@@ -502,8 +507,8 @@ type Uvmexp struct {
 	Swpgonly           int32
 	Nswget             int32
 	Nanon              int32
-	Unused05           int32
-	Unused06           int32
+	Nanonneeded        int32
+	Nfreeanon          int32
 	Faults             int32
 	Traps              int32
 	Intrs              int32
@@ -511,8 +516,8 @@ type Uvmexp struct {
 	Softs              int32
 	Syscalls           int32
 	Pageins            int32
-	Unused07           int32
-	Unused08           int32
+	Obsolete_swapins   int32
+	Obsolete_swapouts  int32
 	Pgswapin           int32
 	Pgswapout          int32
 	Forks              int32
@@ -520,7 +525,7 @@ type Uvmexp struct {
 	Forks_sharevm      int32
 	Pga_zerohit        int32
 	Pga_zeromiss       int32
-	Unused09           int32
+	Zeroaborts         int32
 	Fltnoram           int32
 	Fltnoanon          int32
 	Fltnoamap          int32
@@ -552,9 +557,9 @@ type Uvmexp struct {
 	Pdpageouts         int32
 	Pdpending          int32
 	Pddeact            int32
-	Unused11           int32
-	Unused12           int32
-	Unused13           int32
+	Pdreanon           int32
+	Pdrevnode          int32
+	Pdrevtext          int32
 	Fpswtch            int32
 	Kmapent            int32
 }

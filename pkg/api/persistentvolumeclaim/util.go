@@ -22,14 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
-	pvc                                  string = "PersistentVolumeClaim"
-	volumeSnapshot                       string = "VolumeSnapshot"
-	deprecatedStorageClassAnnotationsMsg        = `deprecated since v1.8; use "storageClassName" attribute instead`
+	pvc            string = "PersistentVolumeClaim"
+	volumeSnapshot string = "VolumeSnapshot"
 )
 
 // DropDisabledFields removes disabled fields from the pvc spec.
@@ -51,10 +49,6 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 			pvcSpec.DataSourceRef = nil
 		}
 	}
-
-	// Setting VolumeClaimTemplate.Resources.Claims should have been caught by validation when
-	// extending ResourceRequirements in 1.26. Now we can only accept it and drop the field.
-	pvcSpec.Resources.Claims = nil
 }
 
 // EnforceDataSourceBackwardsCompatibility drops the data source field under certain conditions
@@ -96,11 +90,11 @@ func EnforceDataSourceBackwardsCompatibility(pvcSpec, oldPVCSpec *core.Persisten
 
 func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
-		if !helper.ClaimContainsAllocatedResources(oldPVC) {
+		if !allocatedResourcesInUse(oldPVC) {
 			pvc.Status.AllocatedResources = nil
 		}
-		if !helper.ClaimContainsAllocatedResourceStatus(oldPVC) {
-			pvc.Status.AllocatedResourceStatuses = nil
+		if !resizeStatusInUse(oldPVC) {
+			pvc.Status.ResizeStatus = nil
 		}
 	}
 }
@@ -176,26 +170,34 @@ func NormalizeDataSources(pvcSpec *core.PersistentVolumeClaimSpec) {
 	}
 }
 
-func GetWarningsForPersistentVolumeClaim(pv *core.PersistentVolumeClaim) []string {
-	var warnings []string
+func resizeStatusInUse(oldPVC *core.PersistentVolumeClaim) bool {
+	if oldPVC == nil {
+		return false
+	}
+	if oldPVC.Status.ResizeStatus != nil {
+		return true
+	}
+	return false
+}
 
+func allocatedResourcesInUse(oldPVC *core.PersistentVolumeClaim) bool {
+	if oldPVC == nil {
+		return false
+	}
+
+	if oldPVC.Status.AllocatedResources != nil {
+		return true
+	}
+
+	return false
+}
+
+func GetWarningsForPersistentVolumeClaim(pv *core.PersistentVolumeClaim) []string {
 	if pv == nil {
 		return nil
 	}
 
-	if _, ok := pv.ObjectMeta.Annotations[core.BetaStorageClassAnnotation]; ok {
-		warnings = append(warnings,
-			fmt.Sprintf(
-				"%s: %s",
-				field.NewPath("metadata", "annotations").Key(core.BetaStorageClassAnnotation),
-				deprecatedStorageClassAnnotationsMsg,
-			),
-		)
-	}
-
-	warnings = append(warnings, GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec"), pv.Spec)...)
-
-	return warnings
+	return GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec"), pv.Spec)
 }
 
 func GetWarningsForPersistentVolumeClaimSpec(fieldPath *field.Path, pvSpec core.PersistentVolumeClaimSpec) []string {

@@ -38,7 +38,7 @@ const (
 
 var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 
 	ginkgo.Describe("Pod with a container", func() {

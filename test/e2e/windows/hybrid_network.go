@@ -46,7 +46,7 @@ var (
 
 var _ = SIGDescribe("Hybrid cluster network", func() {
 	f := framework.NewDefaultFramework("hybrid-network")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
@@ -102,7 +102,6 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 })
 
 var (
-	warmUpDuration = "30s"
 	duration       = "10s"
 	pollInterval   = "1s"
 	timeoutSeconds = 10
@@ -118,7 +117,7 @@ func assertConsistentConnectivity(ctx context.Context, f *framework.Framework, p
 		}
 		return err
 	}
-	gomega.Eventually(ctx, connChecker, warmUpDuration, pollInterval).ShouldNot(gomega.HaveOccurred())
+	gomega.Eventually(ctx, connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
 	gomega.Consistently(ctx, connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
 }
 

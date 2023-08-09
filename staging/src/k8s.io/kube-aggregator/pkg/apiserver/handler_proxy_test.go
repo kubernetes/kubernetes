@@ -36,7 +36,6 @@ import (
 
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	"k8s.io/client-go/transport"
 
 	"golang.org/x/net/websocket"
 
@@ -49,7 +48,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -327,6 +325,7 @@ func TestProxyHandler(t *testing.T) {
 			handler := &proxyHandler{
 				localDelegate:              http.NewServeMux(),
 				serviceResolver:            serviceResolver,
+				proxyTransport:             &http.Transport{},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 			}
 			server := httptest.NewServer(contextHandler(handler, tc.user))
@@ -552,6 +551,7 @@ func TestProxyUpgrade(t *testing.T) {
 			serverURL, _ := url.Parse(backendServer.URL)
 			proxyHandler := &proxyHandler{
 				serviceResolver:            &mockedRouter{destinationHost: serverURL.Host},
+				proxyTransport:             &http.Transport{},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 			}
 
@@ -559,14 +559,7 @@ func TestProxyUpgrade(t *testing.T) {
 			var selector *egressselector.EgressSelector
 			if tc.NewEgressSelector != nil {
 				dialer, selector = tc.NewEgressSelector()
-
-				egressDialer, err := selector.Lookup(egressselector.Cluster.AsNetworkContext())
-				if err != nil {
-					t.Fatal(err)
-				}
-				if egressDialer != nil {
-					proxyHandler.proxyTransportDial = &transport.DialHolder{Dial: egressDialer}
-				}
+				proxyHandler.egressSelector = selector
 			}
 
 			proxyHandler.updateAPIService(tc.APIService)
@@ -748,7 +741,7 @@ func TestGetContextForNewRequest(t *testing.T) {
 		location.Path = req.URL.Path
 
 		nestedReq := req.WithContext(genericapirequest.WithRequestInfo(req.Context(), &genericapirequest.RequestInfo{Path: req.URL.Path}))
-		newReq, cancelFn := apiserverproxyutil.NewRequestForProxy(location, nestedReq)
+		newReq, cancelFn := newRequestForProxy(location, nestedReq)
 		defer cancelFn()
 
 		theproxy := proxy.NewUpgradeAwareHandler(location, server.Client().Transport, true, false, &responder{w: w})
@@ -803,7 +796,7 @@ func TestNewRequestForProxyWithAuditID(t *testing.T) {
 				req = req.WithContext(ctx)
 			}
 
-			newReq, _ := apiserverproxyutil.NewRequestForProxy(req.URL, req)
+			newReq, _ := newRequestForProxy(req.URL, req)
 			if newReq == nil {
 				t.Fatal("expected a non nil Request object")
 			}

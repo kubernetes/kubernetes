@@ -21,7 +21,7 @@ import (
 	"hash/adler32"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/dump"
+	"github.com/davecgh/go-spew/spew"
 )
 
 type A struct {
@@ -93,7 +93,7 @@ func TestDeepHashObject(t *testing.T) {
 }
 
 func toString(obj interface{}) string {
-	return dump.Pretty(obj)
+	return spew.Sprintf("%#v", obj)
 }
 
 type wheel struct {

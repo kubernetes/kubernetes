@@ -108,7 +108,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("snapshotting")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("volume snapshot controller", func() {
 		var (

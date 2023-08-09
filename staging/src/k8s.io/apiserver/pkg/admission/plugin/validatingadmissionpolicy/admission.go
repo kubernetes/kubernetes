@@ -23,7 +23,6 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/component-base/featuregate"
@@ -72,7 +71,6 @@ type celAdmissionPlugin struct {
 	restMapper      meta.RESTMapper
 	dynamicClient   dynamic.Interface
 	stopCh          <-chan struct{}
-	authorizer      authorizer.Authorizer
 }
 
 var _ initializer.WantsExternalKubeInformerFactory = &celAdmissionPlugin{}
@@ -80,7 +78,7 @@ var _ initializer.WantsExternalKubeClientSet = &celAdmissionPlugin{}
 var _ initializer.WantsRESTMapper = &celAdmissionPlugin{}
 var _ initializer.WantsDynamicClient = &celAdmissionPlugin{}
 var _ initializer.WantsDrainedNotification = &celAdmissionPlugin{}
-var _ initializer.WantsAuthorizer = &celAdmissionPlugin{}
+
 var _ admission.InitializationValidator = &celAdmissionPlugin{}
 var _ admission.ValidationInterface = &celAdmissionPlugin{}
 
@@ -110,9 +108,6 @@ func (c *celAdmissionPlugin) SetDrainedNotification(stopCh <-chan struct{}) {
 	c.stopCh = stopCh
 }
 
-func (c *celAdmissionPlugin) SetAuthorizer(authorizer authorizer.Authorizer) {
-	c.authorizer = authorizer
-}
 func (c *celAdmissionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	if featureGates.Enabled(features.ValidatingAdmissionPolicy) {
 		c.enabled = true
@@ -143,10 +138,7 @@ func (c *celAdmissionPlugin) ValidateInitialization() error {
 	if c.stopCh == nil {
 		return errors.New("missing stop channel")
 	}
-	if c.authorizer == nil {
-		return errors.New("missing authorizer")
-	}
-	c.evaluator = NewAdmissionController(c.informerFactory, c.client, c.restMapper, c.dynamicClient, c.authorizer)
+	c.evaluator = NewAdmissionController(c.informerFactory, c.client, c.restMapper, c.dynamicClient)
 	if err := c.evaluator.ValidateInitialization(); err != nil {
 		return err
 	}

@@ -92,7 +92,7 @@ func (client InterfaceTapConfigurationsClient) CreateOrUpdate(ctx context.Contex
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.InterfaceTapConfigurationsClient", "CreateOrUpdate", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.InterfaceTapConfigurationsClient", "CreateOrUpdate", nil, "Failure sending request")
 		return
 	}
 
@@ -128,7 +128,6 @@ func (client InterfaceTapConfigurationsClient) CreateOrUpdatePreparer(ctx contex
 // http.Response Body if it receives an error.
 func (client InterfaceTapConfigurationsClient) CreateOrUpdateSender(req *http.Request) (future InterfaceTapConfigurationsCreateOrUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -176,7 +175,7 @@ func (client InterfaceTapConfigurationsClient) Delete(ctx context.Context, resou
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.InterfaceTapConfigurationsClient", "Delete", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.InterfaceTapConfigurationsClient", "Delete", nil, "Failure sending request")
 		return
 	}
 
@@ -209,7 +208,6 @@ func (client InterfaceTapConfigurationsClient) DeletePreparer(ctx context.Contex
 // http.Response Body if it receives an error.
 func (client InterfaceTapConfigurationsClient) DeleteSender(req *http.Request) (future InterfaceTapConfigurationsDeleteFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

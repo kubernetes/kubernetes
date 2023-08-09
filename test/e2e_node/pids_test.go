@@ -40,7 +40,7 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *v1.Pod {
 	// convert the cgroup name to its literal form
 	cgroupFsName := ""
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
-	if kubeletCfg.CgroupDriver == "systemd" {
+	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		cgroupFsName = cgroupName.ToSystemd()
 	} else {
 		cgroupFsName = cgroupName.ToCgroupfs()
@@ -122,7 +122,7 @@ func runPodPidsLimitTests(f *framework.Framework) {
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("PodPidsLimit [Serial]", func() {
 	f := framework.NewDefaultFramework("pids-limit-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("With config updated with pids limits", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.PodPidsLimit = int64(1024)

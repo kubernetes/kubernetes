@@ -20,23 +20,30 @@ limitations under the License.
 package mount
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 )
 
-func writeFile(t *testing.T, content string) string {
-	filename := filepath.Join(t.TempDir(), "mountinfo")
-	err := os.WriteFile(filename, []byte(content), 0o600)
+func writeFile(content string) (string, string, error) {
+	tempDir, err := ioutil.TempDir("", "mounter_shared_test")
 	if err != nil {
-		t.Fatal(err)
+		return "", "", err
 	}
-	return filename
+	filename := filepath.Join(tempDir, "mountinfo")
+	err = ioutil.WriteFile(filename, []byte(content), 0600)
+	if err != nil {
+		os.RemoveAll(tempDir)
+		return "", "", err
+	}
+	return tempDir, filename, nil
 }
 
 func TestParseMountInfo(t *testing.T) {
-	info := `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+	info :=
+		`62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
 78 62 0:41 / /tmp rw,nosuid,nodev shared:30 - tmpfs tmpfs rw,seclabel
 80 62 0:42 / /var/lib/nfs/rpc_pipefs rw,relatime shared:31 - rpc_pipefs sunrpc rw
 82 62 0:43 / /var/lib/foo rw,relatime shared:32 - tmpfs tmpfs rw
@@ -78,7 +85,11 @@ func TestParseMountInfo(t *testing.T) {
 40 28 0:36 / /sys/fs/cgroup/perf_event rw,nosuid,nodev,noexec,relatime shared:22 - cgroup cgroup rw,perf_event
 761 60 8:0 / /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface-default/127.0.0.1:3260-iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c-lun-0 rw,relatime shared:421 - ext4 /dev/sda rw,context="system_u:object_r:container_file_t:s0:c314,c894",data=ordered
 `
-	filename := writeFile(t, info)
+	tempDir, filename, err := writeFile(info)
+	if err != nil {
+		t.Fatalf("cannot create temporary file: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
 
 	tests := []struct {
 		name         string
@@ -293,7 +304,11 @@ func TestBadParseMountInfo(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		filename := writeFile(t, test.info)
+		tempDir, filename, err := writeFile(test.info)
+		if err != nil {
+			t.Fatalf("cannot create temporary file: %v", err)
+		}
+		defer os.RemoveAll(tempDir)
 
 		infos, err := ParseMountInfo(filename)
 		if err != nil {
@@ -316,37 +331,5 @@ func TestBadParseMountInfo(t *testing.T) {
 		if !found {
 			t.Errorf("Test case %q: mountPoint %d not found", test.name, test.id)
 		}
-	}
-}
-
-func testIsMountPointMatch(t testing.TB) {
-	mpCases := []struct {
-		mp, dir string
-		res     bool
-	}{
-		{"", "", true},
-		{"/", "/", true},
-		{"/some/path", "/some/path", true},
-		{"/a/different/kind/of/path\\040(deleted)", "/a/different/kind/of/path", true},
-		{"one", "two", false},
-		{"a somewhat long path that ends with A", "a somewhat long path that ends with B", false},
-	}
-
-	for _, tc := range mpCases {
-		mp := MountPoint{Path: tc.mp}
-		res := isMountPointMatch(mp, tc.dir)
-		if res != tc.res {
-			t.Errorf("mp: %q, dir: %q, expected %v, got %v", tc.mp, tc.dir, tc.res, res)
-		}
-	}
-}
-
-func TestIsMountPointMatch(t *testing.T) {
-	testIsMountPointMatch(t)
-}
-
-func BenchmarkIsMountPointMatch(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		testIsMountPointMatch(b)
 	}
 }

@@ -74,30 +74,30 @@ func PathJoin(incoming []string) string {
 //
 // E.g. if part == 'PEACH'
 //
-//	             OLD : NEW                    : POS
-//	 --------------------------------------------------------
-//	         {empty} : PEACH                  : irrelevant
-//	               / : /PEACH                 : irrelevant
-//	             pie : PEACH/pie              : 0 (or negative)
-//	            /pie : /PEACH/pie             : 0 (or negative)
-//	             raw : raw/PEACH              : 1 (or larger)
-//	            /raw : /raw/PEACH             : 1 (or larger)
-//	 a/nice/warm/pie : a/nice/warm/PEACH/pie  : 3
-//	/a/nice/warm/pie : /a/nice/warm/PEACH/pie : 3
+//                  OLD : NEW                    : POS
+//      --------------------------------------------------------
+//              {empty} : PEACH                  : irrelevant
+//                    / : /PEACH                 : irrelevant
+//                  pie : PEACH/pie              : 0 (or negative)
+//                 /pie : /PEACH/pie             : 0 (or negative)
+//                  raw : raw/PEACH              : 1 (or larger)
+//                 /raw : /raw/PEACH             : 1 (or larger)
+//      a/nice/warm/pie : a/nice/warm/PEACH/pie  : 3
+//     /a/nice/warm/pie : /a/nice/warm/PEACH/pie : 3
 //
 // * An empty part results in no change.
 //
-//   - Absolute paths get their leading '/' stripped, treated like
-//     relative paths, and the leading '/' is re-added on output.
-//     The meaning of pos is intentionally the same in either absolute or
-//     relative paths; if it weren't, this function could convert absolute
-//     paths to relative paths, which is not desirable.
+// * Absolute paths get their leading '/' stripped, treated like
+//   relative paths, and the leading '/' is re-added on output.
+//   The meaning of pos is intentionally the same in either absolute or
+//   relative paths; if it weren't, this function could convert absolute
+//   paths to relative paths, which is not desirable.
 //
-//   - For robustness (liberal input, conservative output) Pos values
-//     that are too small (large) to index the split filepath result in a
-//     prefix (postfix) rather than an error.  Use extreme position values
-//     to assure a prefix or postfix (e.g. 0 will always prefix, and
-//     9999 will presumably always postfix).
+// * For robustness (liberal input, conservative output) Pos values that
+//   that are too small (large) to index the split filepath result in a
+//   prefix (postfix) rather than an error.  Use extreme position values
+//   to assure a prefix or postfix (e.g. 0 will always prefix, and
+//   9999 will presumably always postfix).
 func InsertPathPart(path string, pos int, part string) string {
 	if part == "" {
 		return path
@@ -121,7 +121,7 @@ func InsertPathPart(path string, pos int, part string) string {
 	result := make([]string, len(parts)+1)
 	copy(result, parts[0:pos])
 	result[pos] = part
-	return PathJoin(append(result, parts[pos:]...)) //nolint: makezero
+	return PathJoin(append(result, parts[pos:]...)) // nolint: makezero
 }
 
 func IsHiddenFilePath(pattern string) bool {

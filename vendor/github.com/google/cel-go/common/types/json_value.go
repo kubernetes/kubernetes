@@ -25,5 +25,4 @@ var (
 	jsonValueType     = reflect.TypeOf(&structpb.Value{})
 	jsonListValueType = reflect.TypeOf(&structpb.ListValue{})
 	jsonStructType    = reflect.TypeOf(&structpb.Struct{})
-	jsonNullType      = reflect.TypeOf(structpb.NullValue_NULL_VALUE)
 )

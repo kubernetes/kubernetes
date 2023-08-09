@@ -91,7 +91,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	var systemPodsNo int
 	var ns string
 	f := framework.NewDefaultFramework("sched-priority")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = f.ClientSet
@@ -108,7 +108,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		err = framework.CheckTestingNSDeletedExcept(ctx, cs, ns)
 		framework.ExpectNoError(err)
-		err = e2epod.WaitForPodsRunningReady(ctx, cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout)
+		err = e2epod.WaitForPodsRunningReady(ctx, cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, map[string]string{})
 		framework.ExpectNoError(err)
 
 		// skip if the most utilized node has less than the cri-o minMemLimit available

@@ -4,8 +4,8 @@ metadata:
   name: base
 spec:
   containers:
-  - image: registry.k8s.io/pause
+  - image: k8s.gcr.io/pause
     name: container1
   initContainers:
-  - image: registry.k8s.io/pause
+  - image: k8s.gcr.io/pause
     name: initcontainer1

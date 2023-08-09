@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -74,16 +73,6 @@ const (
 // NamespaceNodeSelectors the annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
 // node selectors labels to namespaces
 var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
-
-var nonTerminalPhaseSelector = func() labels.Selector {
-	var reqs []labels.Requirement
-	for _, phase := range []v1.PodPhase{v1.PodFailed, v1.PodSucceeded} {
-		req, _ := labels.NewRequirement("status.phase", selection.NotEquals, []string{string(phase)})
-		reqs = append(reqs, *req)
-	}
-	selector := labels.NewSelector()
-	return selector.Add(reqs...)
-}()
 
 type updateDSFunc func(*appsv1.DaemonSet)
 
@@ -146,7 +135,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	f = framework.NewDefaultFramework("daemonsets")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	image := WebserverImage
 	dsName := "daemon-set"
@@ -507,9 +496,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			rollbackPods[pod.Name] = true
 		}
 		for _, pod := range existingPods {
-			if !rollbackPods[pod.Name] {
-				framework.Failf("unexpected pod %s be restarted", pod.Name)
-			}
+			framework.ExpectEqual(rollbackPods[pod.Name], true, fmt.Sprintf("unexpected pod %s be restarted", pod.Name))
 		}
 	})
 
@@ -1036,13 +1023,10 @@ func newDaemonSetWithLabel(dsName, image string, label map[string]string) *appsv
 
 func listDaemonPods(ctx context.Context, c clientset.Interface, ns string, label map[string]string) *v1.PodList {
 	selector := labels.Set(label).AsSelector()
-	options := metav1.ListOptions{
-		LabelSelector: selector.String(),
-		FieldSelector: nonTerminalPhaseSelector.String(),
-	}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := c.CoreV1().Pods(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	gomega.Expect(podList.Items).ToNot(gomega.BeEmpty())
+	gomega.Expect(len(podList.Items)).To(gomega.BeNumerically(">", 0))
 	return podList
 }
 
@@ -1205,7 +1189,7 @@ func checkDaemonSetPodsLabels(podList *v1.PodList, hash string) {
 			continue
 		}
 		podHash := pod.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]
-		gomega.Expect(podHash).ToNot(gomega.BeEmpty())
+		gomega.Expect(len(podHash)).To(gomega.BeNumerically(">", 0))
 		if len(hash) > 0 {
 			framework.ExpectEqual(podHash, hash, "unexpected hash for pod %s", pod.Name)
 		}
@@ -1235,7 +1219,7 @@ func listDaemonHistories(ctx context.Context, c clientset.Interface, ns string, 
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	historyList, err := c.AppsV1().ControllerRevisions(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	gomega.Expect(historyList.Items).ToNot(gomega.BeEmpty())
+	gomega.Expect(len(historyList.Items)).To(gomega.BeNumerically(">", 0))
 	return historyList
 }
 
@@ -1245,7 +1229,7 @@ func curHistory(historyList *appsv1.ControllerRevisionList, ds *appsv1.DaemonSet
 	for i := range historyList.Items {
 		history := &historyList.Items[i]
 		// Every history should have the hash label
-		gomega.Expect(history.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]).ToNot(gomega.BeEmpty())
+		gomega.Expect(len(history.Labels[appsv1.DefaultDaemonSetUniqueLabelKey])).To(gomega.BeNumerically(">", 0))
 		match, err := daemon.Match(ds, history)
 		framework.ExpectNoError(err)
 		if match {
@@ -1264,7 +1248,7 @@ func waitFailedDaemonPodDeleted(c clientset.Interface, pod *v1.Pod) func(ctx con
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
-			return false, fmt.Errorf("failed to get failed daemon pod %q: %w", pod.Name, err)
+			return false, fmt.Errorf("failed to get failed daemon pod %q: %v", pod.Name, err)
 		}
 		return false, nil
 	}

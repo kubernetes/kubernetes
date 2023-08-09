@@ -26,8 +26,6 @@ import (
 	"testing"
 	"time"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -83,28 +81,28 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer utiltesting.CloseAndRemove(t, saSigningKeyFile)
+	defer os.RemoveAll(saSigningKeyFile.Name())
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 
-	opts := options.NewServerRunOptions()
-	opts.Options.SecureServing.Listener = listener
-	opts.Options.SecureServing.ServerCert.CertDirectory = certDir
-	opts.Options.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
-	opts.Options.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
-	opts.Options.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // force json we can easily interpret the result in etcd
-	opts.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
-	opts.Options.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
-	opts.Options.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
-	opts.Options.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
-	opts.Options.Authorization.Modes = []string{"RBAC"}
-	opts.Options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-	opts.Options.APIEnablement.RuntimeConfig["api/all"] = "true"
+	kubeAPIServerOptions := options.NewServerRunOptions()
+	kubeAPIServerOptions.SecureServing.Listener = listener
+	kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
+	kubeAPIServerOptions.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	kubeAPIServerOptions.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
+	kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // force json we can easily interpret the result in etcd
+	kubeAPIServerOptions.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
+	kubeAPIServerOptions.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
+	kubeAPIServerOptions.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	kubeAPIServerOptions.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
+	kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
+	kubeAPIServerOptions.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	kubeAPIServerOptions.APIEnablement.RuntimeConfig["api/all"] = "true"
 	for _, f := range configFuncs {
-		f(opts)
+		f(kubeAPIServerOptions)
 	}
-	completedOptions, err := opts.Complete()
+	completedOptions, err := app.Complete(kubeAPIServerOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,15 +122,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		t.Fatal(err)
 	}
 
-	config, err := app.NewConfig(completedOptions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	completed, err := config.Complete()
-	if err != nil {
-		t.Fatal(err)
-	}
-	kubeAPIServer, err := app.CreateServerChain(completed)
+	kubeAPIServer, err := app.CreateServerChain(completedOptions)
 	if err != nil {
 		t.Fatal(err)
 	}

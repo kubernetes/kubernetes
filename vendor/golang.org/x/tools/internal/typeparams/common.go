@@ -87,6 +87,7 @@ func IsTypeParam(t types.Type) bool {
 func OriginMethod(fn *types.Func) *types.Func {
 	recv := fn.Type().(*types.Signature).Recv()
 	if recv == nil {
+
 		return fn
 	}
 	base := recv.Type()

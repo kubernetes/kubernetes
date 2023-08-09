@@ -25,9 +25,9 @@ package util
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
-	"sigs.k8s.io/kustomize/kyaml/errors"
 )
 
 // // asString unquotes a starlark string value
@@ -44,7 +44,6 @@ func IsEmptyString(s starlark.String) bool {
 }
 
 // Unmarshal decodes a starlark.Value into it's golang counterpart
-//
 //nolint:nakedret
 func Unmarshal(x starlark.Value) (val interface{}, err error) {
 	switch v := x.(type) {
@@ -162,7 +161,7 @@ func Unmarshal(x starlark.Value) (val interface{}, err error) {
 		if _var, ok := v.Constructor().(Unmarshaler); ok {
 			err = _var.UnmarshalStarlark(x)
 			if err != nil {
-				err = errors.WrapPrefixf(err, "failed marshal %q to Starlark object", v.Constructor().Type())
+				err = errors.Wrapf(err, "failed marshal %q to Starlark object", v.Constructor().Type())
 				return
 			}
 			val = _var
@@ -177,7 +176,6 @@ func Unmarshal(x starlark.Value) (val interface{}, err error) {
 }
 
 // Marshal turns go values into starlark types
-//
 //nolint:nakedret
 func Marshal(data interface{}) (v starlark.Value, err error) {
 	switch x := data.(type) {

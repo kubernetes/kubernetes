@@ -69,9 +69,6 @@ var (
 	e2es *services.E2EServices
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
 	featureGates map[string]bool
-	// serviceFeatureGates is a map of feature names to bools that enable or
-	// disable alpha/experimental features for API service.
-	serviceFeatureGates map[string]bool
 
 	// TODO(random-liu): Change the following modes to sub-command.
 	runServicesMode    = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
@@ -103,8 +100,6 @@ func registerNodeFlags(flags *flag.FlagSet) {
 	flag.Var(cliflag.NewMapStringString(&framework.TestContext.RuntimeConfig), "runtime-config", "The runtime configuration used on node e2e tests.")
 	flags.BoolVar(&framework.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
 	flags.Var(cliflag.NewMapStringBool(&featureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
-	flags.Var(cliflag.NewMapStringBool(&serviceFeatureGates), "service-feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features for API service.")
-	flags.BoolVar(&framework.TestContext.StandaloneMode, "standalone-mode", false, "If true, starts kubelet in standalone mode.")
 }
 
 func init() {
@@ -130,21 +125,11 @@ func TestMain(m *testing.M) {
 
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
-	if pflag.CommandLine.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unknown additional command line arguments: %s", pflag.CommandLine.Args())
-		os.Exit(1)
-	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
 	if err := e2eskipper.InitFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
 		os.Exit(1)
 	}
-
-	if err := services.SetFeatureGatesForInProcessComponents(serviceFeatureGates); err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: initialize process feature gates for API service: %v", err)
-		os.Exit(1)
-	}
-
 	setExtraEnvs()
 	os.Exit(m.Run())
 }
@@ -236,10 +221,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 		klog.Infof("Running tests without starting services.")
 	}
 
-	if !framework.TestContext.StandaloneMode {
-		klog.Infof("Wait for the node to be ready")
-		waitForNodeReady(ctx)
-	}
+	klog.Infof("Wait for the node to be ready")
+	waitForNodeReady(ctx)
 
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
@@ -252,13 +235,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	framework.TestContext.BearerToken = string(token)
 	// update test context with node configuration.
 	gomega.Expect(updateTestContext(ctx)).To(gomega.Succeed(), "update test context with node config.")
-
-	// Store current Kubelet configuration in the package variable
-	// This assumes all tests which dynamically change kubelet configuration
-	// must: 1) run in serial; 2) restore kubelet configuration after test.
-	var err error
-	kubeletCfg, err = getCurrentKubeletConfig(ctx)
-	framework.ExpectNoError(err)
 })
 
 // Tear down the kubelet on the node
@@ -277,14 +253,14 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
 func validateSystem() error {
 	testBin, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("can't get current binary: %w", err)
+		return fmt.Errorf("can't get current binary: %v", err)
 	}
 	// Pass all flags into the child process, so that it will see the same flag set.
 	output, err := exec.Command(testBin, append([]string{"--system-validate-mode"}, os.Args[1:]...)...).CombinedOutput()
 	// The output of system validation should have been formatted, directly print here.
 	fmt.Print(string(output))
 	if err != nil {
-		return fmt.Errorf("system validation failed: %w", err)
+		return fmt.Errorf("system validation failed: %v", err)
 	}
 	return nil
 }
@@ -315,7 +291,7 @@ func waitForNodeReady(ctx context.Context) {
 	gomega.Eventually(ctx, func() error {
 		node, err := getNode(client)
 		if err != nil {
-			return fmt.Errorf("failed to get node: %w", err)
+			return fmt.Errorf("failed to get node: %v", err)
 		}
 		if !isNodeReady(node) {
 			return fmt.Errorf("node is not ready: %+v", node)
@@ -331,20 +307,22 @@ func updateTestContext(ctx context.Context) error {
 
 	client, err := getAPIServerClient()
 	if err != nil {
-		return fmt.Errorf("failed to get apiserver client: %w", err)
+		return fmt.Errorf("failed to get apiserver client: %v", err)
 	}
-
-	if !framework.TestContext.StandaloneMode {
-		// Update test context with current node object.
-		node, err := getNode(client)
-		if err != nil {
-			return fmt.Errorf("failed to get node: %w", err)
-		}
-		framework.TestContext.NodeName = node.Name // Set node name from API server, it is already set to the computer name by default.
+	// Update test context with current node object.
+	node, err := getNode(client)
+	if err != nil {
+		return fmt.Errorf("failed to get node: %v", err)
 	}
-
-	framework.Logf("Node name: %s", framework.TestContext.NodeName)
-
+	framework.TestContext.NodeName = node.Name // Set node name.
+	// Update test context with current kubelet configuration.
+	// This assumes all tests which dynamically change kubelet configuration
+	// must: 1) run in serial; 2) restore kubelet configuration after test.
+	kubeletCfg, err := getCurrentKubeletConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get kubelet configuration: %v", err)
+	}
+	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
 	return nil
 }
 
@@ -366,11 +344,11 @@ func getNode(c *clientset.Clientset) (*v1.Node, error) {
 func getAPIServerClient() (*clientset.Clientset, error) {
 	config, err := framework.LoadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
+		return nil, fmt.Errorf("failed to load config: %v", err)
 	}
 	client, err := clientset.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
+		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
 	return client, nil
 }

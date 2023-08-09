@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fcache "k8s.io/client-go/tools/cache/testing"
 
-	fuzz "github.com/google/gofuzz"
+	"github.com/google/gofuzz"
 )
 
 func Example() {

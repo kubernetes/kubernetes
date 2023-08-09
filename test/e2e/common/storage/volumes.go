@@ -18,14 +18,14 @@ limitations under the License.
  * This test checks that various VolumeSources are working.
  *
  * There are two ways, how to test the volumes:
- * 1) With containerized server (NFS, Ceph, iSCSI, ...)
+ * 1) With containerized server (NFS, Ceph, Gluster, iSCSI, ...)
  * The test creates a server pod, exporting simple 'index.html' file.
  * Then it uses appropriate VolumeSource to import this file into a client pod
  * and checks that the pod can see the file. It does so by importing the file
  * into web server root and loading the index.html from it.
  *
  * These tests work only when privileged containers are allowed, exporting
- * various filesystems (ex: NFS) usually needs some mounting or
+ * various filesystems (NFS, GlusterFS, ...) usually needs some mounting or
  * other privileged magic in the server pod.
  *
  * Note that the server containers are for testing purposes only and should not
@@ -36,6 +36,9 @@ limitations under the License.
  * the tested Kubernetes cluster. The test itself creates a new volume,
  * and checks, that Kubernetes can use it as a volume.
  */
+
+// GlusterFS test is duplicated from test/e2e/volumes.go.  Any changes made there
+// should be duplicated here
 
 package storage
 
@@ -55,7 +58,7 @@ import (
 // TODO(#99468): Check if these tests are still needed.
 var _ = SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// note that namespace deletion is handled by delete-namespace flag
 	// filled in BeforeEach

@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
@@ -49,26 +48,26 @@ import (
 
 var (
 	eventsLong = templates.LongDesc(i18n.T(`
-		Display events.
+		Display events
 
 		Prints a table of the most important information about events.
 		You can request events for a namespace, for all namespace, or
 		filtered to only those pertaining to a specified resource.`))
 
 	eventsExample = templates.Examples(i18n.T(`
-	# List recent events in the default namespace
+	# List recent events in the default namespace.
 	kubectl events
 
-	# List recent events in all namespaces
+	# List recent events in all namespaces.
 	kubectl events --all-namespaces
 
-	# List recent events for the specified pod, then wait for more events and list them as they arrive
+	# List recent events for the specified pod, then wait for more events and list them as they arrive.
 	kubectl events --for pod/web-pod-13je7 --watch
 
-	# List recent events in YAML format
+	# List recent events in given format. Supported ones, apart from default, are json and yaml.
 	kubectl events -oyaml
 
-	# List recent only events of type 'Warning' or 'Normal'
+	# List recent only events in given event types
 	kubectl events --types=Warning,Normal`))
 )
 
@@ -85,11 +84,11 @@ type EventsFlags struct {
 	ForObject     string
 	FilterTypes   []string
 	ChunkSize     int64
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewEventsFlags returns a default EventsFlags
-func NewEventsFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *EventsFlags {
+func NewEventsFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *EventsFlags {
 	return &EventsFlags{
 		RESTClientGetter: restClientGetter,
 		PrintFlags:       genericclioptions.NewPrintFlags("events").WithTypeSetter(scheme.Scheme),
@@ -113,11 +112,11 @@ type EventsOptions struct {
 
 	PrintObj printers.ResourcePrinterFunc
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewCmdEvents creates a new events command
-func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
 	flags := NewEventsFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
@@ -387,18 +386,11 @@ func decodeResourceTypeName(mapper meta.RESTMapper, s string) (gvk schema.GroupV
 	}
 	resource, name := seg[0], seg[1]
 
-	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(strings.ToLower(resource))
-	gvr := schema.GroupVersionResource{}
-	if fullySpecifiedGVR != nil {
-		gvr, _ = mapper.ResourceFor(*fullySpecifiedGVR)
+	var gvr schema.GroupVersionResource
+	gvr, err = mapper.ResourceFor(schema.GroupVersionResource{Resource: resource})
+	if err != nil {
+		return
 	}
-	if gvr.Empty() {
-		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
-		if err != nil {
-			return
-		}
-	}
-
 	gvk, err = mapper.KindFor(gvr)
 	if err != nil {
 		return

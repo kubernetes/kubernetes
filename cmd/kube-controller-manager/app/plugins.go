@@ -49,10 +49,10 @@ import (
 // detach controller.
 // The list of plugins is manually compiled. This code and the plugin
 // initialization code for kubelet really, really need a through refactor.
-func ProbeAttachableVolumePlugins(logger klog.Logger) ([]volume.VolumePlugin, error) {
+func ProbeAttachableVolumePlugins() ([]volume.VolumePlugin, error) {
 	var err error
 	allPlugins := []volume.VolumePlugin{}
-	allPlugins, err = appendAttachableLegacyProviderVolumes(logger, allPlugins, utilfeature.DefaultFeatureGate)
+	allPlugins, err = appendAttachableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
 	if err != nil {
 		return allPlugins, err
 	}
@@ -70,10 +70,10 @@ func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) v
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
-func ProbeExpandableVolumePlugins(logger klog.Logger, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
+func ProbeExpandableVolumePlugins(config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
 	var err error
 	allPlugins := []volume.VolumePlugin{}
-	allPlugins, err = appendExpandableLegacyProviderVolumes(logger, allPlugins, utilfeature.DefaultFeatureGate)
+	allPlugins, err = appendExpandableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
 	if err != nil {
 		return allPlugins, err
 	}
@@ -84,7 +84,7 @@ func ProbeExpandableVolumePlugins(logger klog.Logger, config persistentvolumecon
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
 // easy to use list. Only volume plugins that implement any of
 // provisioner/recycler/deleter interface should be returned.
-func ProbeControllerVolumePlugins(logger klog.Logger, cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
+func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
@@ -103,8 +103,7 @@ func ProbeControllerVolumePlugins(logger klog.Logger, cloud cloudprovider.Interf
 		ProvisioningEnabled:      config.EnableHostPathProvisioning,
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
-		logger.Error(err, "Could not create hostpath recycler pod from file", "path", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		klog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
 	}
 	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(hostPathConfig)...)
 
@@ -114,13 +113,12 @@ func ProbeControllerVolumePlugins(logger klog.Logger, cloud cloudprovider.Interf
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {
-		logger.Error(err, "Could not create NFS recycler pod from file", "path", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		klog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 
 	var err error
-	allPlugins, err = appendExpandableLegacyProviderVolumes(logger, allPlugins, utilfeature.DefaultFeatureGate)
+	allPlugins, err = appendExpandableLegacyProviderVolumes(allPlugins, utilfeature.DefaultFeatureGate)
 	if err != nil {
 		return allPlugins, err
 	}

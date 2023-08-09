@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -112,25 +111,12 @@ func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOption
 // GenerateContainerSecurityContext generates the corresponding container security context with the given inputs
 // If the Node OS is windows, currently we will ignore the inputs and return nil.
 // TODO: Will modify it after windows has its own security context
-func GenerateContainerSecurityContext(level psaapi.Level) *v1.SecurityContext {
+func GenerateContainerSecurityContext(privileged bool) *v1.SecurityContext {
 	if NodeOSDistroIs("windows") {
 		return nil
 	}
-
-	switch level {
-	case psaapi.LevelBaseline:
-		return &v1.SecurityContext{
-			Privileged: pointer.Bool(false),
-		}
-	case psaapi.LevelPrivileged:
-		return &v1.SecurityContext{
-			Privileged: pointer.Bool(true),
-		}
-	case psaapi.LevelRestricted:
-		return GetRestrictedContainerSecurityContext()
-	default:
-		ginkgo.Fail(fmt.Sprintf("unknown k8s.io/pod-security-admission/policy.Level %q", level))
-		panic("not reached")
+	return &v1.SecurityContext{
+		Privileged: &privileged,
 	}
 }
 
@@ -155,14 +141,14 @@ const DefaultNonRootUserName = "ContainerUser"
 // Tests that require a specific user ID should override this.
 func GetRestrictedPodSecurityContext() *v1.PodSecurityContext {
 	psc := &v1.PodSecurityContext{
-		RunAsNonRoot:   pointer.Bool(true),
+		RunAsNonRoot:   pointer.BoolPtr(true),
 		RunAsUser:      GetDefaultNonRootUser(),
 		SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
 	}
 
 	if NodeOSDistroIs("windows") {
 		psc.WindowsOptions = &v1.WindowsSecurityContextOptions{}
-		psc.WindowsOptions.RunAsUserName = pointer.String(DefaultNonRootUserName)
+		psc.WindowsOptions.RunAsUserName = pointer.StringPtr(DefaultNonRootUserName)
 	}
 
 	return psc
@@ -171,7 +157,7 @@ func GetRestrictedPodSecurityContext() *v1.PodSecurityContext {
 // GetRestrictedContainerSecurityContext returns a minimal restricted container security context.
 func GetRestrictedContainerSecurityContext() *v1.SecurityContext {
 	return &v1.SecurityContext{
-		AllowPrivilegeEscalation: pointer.Bool(false),
+		AllowPrivilegeEscalation: pointer.BoolPtr(false),
 		Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
 	}
 }
@@ -195,7 +181,7 @@ func MixinRestrictedPodSecurity(pod *v1.Pod) error {
 		pod.Spec.SecurityContext = GetRestrictedPodSecurityContext()
 	} else {
 		if pod.Spec.SecurityContext.RunAsNonRoot == nil {
-			pod.Spec.SecurityContext.RunAsNonRoot = pointer.Bool(true)
+			pod.Spec.SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
 		}
 		if pod.Spec.SecurityContext.RunAsUser == nil {
 			pod.Spec.SecurityContext.RunAsUser = GetDefaultNonRootUser()
@@ -205,7 +191,7 @@ func MixinRestrictedPodSecurity(pod *v1.Pod) error {
 		}
 		if NodeOSDistroIs("windows") && pod.Spec.SecurityContext.WindowsOptions == nil {
 			pod.Spec.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{}
-			pod.Spec.SecurityContext.WindowsOptions.RunAsUserName = pointer.String(DefaultNonRootUserName)
+			pod.Spec.SecurityContext.WindowsOptions.RunAsUserName = pointer.StringPtr(DefaultNonRootUserName)
 		}
 	}
 	for i := range pod.Spec.Containers {
@@ -251,26 +237,6 @@ func FindPodConditionByType(podStatus *v1.PodStatus, conditionType v1.PodConditi
 	for _, cond := range podStatus.Conditions {
 		if cond.Type == conditionType {
 			return &cond
-		}
-	}
-	return nil
-}
-
-// FindContainerStatusInPod finds a container status by its name in the provided pod
-func FindContainerStatusInPod(pod *v1.Pod, containerName string) *v1.ContainerStatus {
-	for _, containerStatus := range pod.Status.InitContainerStatuses {
-		if containerStatus.Name == containerName {
-			return &containerStatus
-		}
-	}
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.Name == containerName {
-			return &containerStatus
-		}
-	}
-	for _, containerStatus := range pod.Status.EphemeralContainerStatuses {
-		if containerStatus.Name == containerName {
-			return &containerStatus
 		}
 	}
 	return nil

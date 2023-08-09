@@ -31,7 +31,7 @@ type DatastorePath struct {
 // FromString parses a datastore path.
 // Returns true if the path could be parsed, false otherwise.
 func (p *DatastorePath) FromString(s string) bool {
-	if s == "" {
+	if len(s) == 0 {
 		return false
 	}
 

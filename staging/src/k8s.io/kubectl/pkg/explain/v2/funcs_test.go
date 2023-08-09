@@ -201,11 +201,11 @@ func TestFuncs(t *testing.T) {
 			FuncName: "contains",
 			Source:   `{{contains $.haystack $.needle}}`,
 			Context: map[string]any{
-				"needle": schema.GroupVersionKind{Group: "testgroup.k8s.io", Version: "v1", Kind: "Kind"},
+				"needle": schema.GroupVersionKind{"testgroup.k8s.io", "v1", "Kind"},
 				"haystack": []schema.GroupVersionKind{
-					{Group: "randomgroup.k8s.io", Version: "v1", Kind: "OtherKind"},
-					{Group: "testgroup.k8s.io", Version: "v1", Kind: "OtherKind"},
-					{Group: "testgroup.k8s.io", Version: "v1", Kind: "Kind"},
+					{"randomgroup.k8s.io", "v1", "OtherKind"},
+					{"testgroup.k8s.io", "v1", "OtherKind"},
+					{"testgroup.k8s.io", "v1", "Kind"},
 				},
 			},
 			Expect: `true`,

@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -92,7 +92,9 @@ func TestVolumeBinding(t *testing.T) {
 			nodes: []*v1.Node{
 				makeNode("node-a").Node,
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantStateAfterPreFilter: &stateData{
+				skip: true,
+			},
 			wantFilterStatus: []*framework.Status{
 				nil,
 			},
@@ -148,7 +150,7 @@ func TestVolumeBinding(t *testing.T) {
 				}).PersistentVolume,
 			},
 			wantPreFilterResult: &framework.PreFilterResult{
-				NodeNames: sets.New("node-a"),
+				NodeNames: sets.NewString("node-a"),
 			},
 			wantStateAfterPreFilter: &stateData{
 				podVolumeClaims: &PodVolumeClaims{
@@ -781,8 +783,7 @@ func TestVolumeBinding(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -790,7 +791,7 @@ func TestVolumeBinding(t *testing.T) {
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 			}
-			fh, err := runtime.NewFramework(ctx, nil, nil, opts...)
+			fh, err := runtime.NewFramework(nil, nil, wait.NeverStop, opts...)
 			if err != nil {
 				t.Fatal(err)
 			}

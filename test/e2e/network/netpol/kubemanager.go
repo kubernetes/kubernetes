@@ -19,25 +19,29 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	netutils "k8s.io/utils/net"
-	"net"
-	"strconv"
-	"strings"
-	"time"
 )
 
-// defaultPollIntervalSeconds [seconds] is the default value for which the Prober will wait before attempting next attempt.
-const defaultPollIntervalSeconds = 1
-
-// defaultPollTimeoutSeconds [seconds] is the default timeout when polling on probes.
-const defaultPollTimeoutSeconds = 10
+// probeConnectivityArgs is set of arguments for a probeConnectivity
+type probeConnectivityArgs struct {
+	nsFrom         string
+	podFrom        string
+	containerFrom  string
+	addrTo         string
+	protocol       v1.Protocol
+	toPort         int
+	timeoutSeconds int
+}
 
 // TestPod represents an actual running pod. For each Pod defined by the model,
 // there will be a corresponding TestPod. TestPod includes some runtime info
@@ -177,60 +181,9 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 	}
 
 	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", args.podFrom, args.containerFrom, args.nsFrom, strings.Join(cmd, " "))
-
-	attempt := 0
-
-	// NOTE: The return value of this function[probeConnectivity] should be true if the probe is successful and false otherwise.
-
-	// probeError will be the return value of this function[probeConnectivity] call.
-	var probeError error
-	var stderr string
-
-	// Instead of re-running the job on connectivity failure, the following conditionFunc when passed to PollImmediate, reruns
-	// the job when the observed value don't match the expected value, so we don't rely on return value of PollImmediate, we
-	// simply discard it and use probeError, defined outside scope of conditionFunc, for returning the result of probeConnectivity.
-	conditionFunc := func() (bool, error) {
-		_, stderr, probeError = k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
-		// retry should only occur if expected and observed value don't match.
-		if args.expectConnectivity {
-			if probeError != nil {
-				// since we expect connectivity here, we fail the condition for PollImmediate to reattempt the probe.
-				// this happens in the cases where network is congested, we don't have any policy rejecting traffic
-				// from "podFrom" to "podTo" and probes from "podFrom" to "podTo" are failing.
-				framework.Logf("probe #%d :: connectivity expected :: %s/%s -> %s :: stderr - %s",
-					attempt+1, args.nsFrom, args.podFrom, args.addrTo, stderr,
-				)
-				attempt++
-				return false, nil
-			} else {
-				// we got the expected results, exit immediately.
-				return true, nil
-			}
-		} else {
-			if probeError != nil {
-				// we got the expected results, exit immediately.
-				return true, nil
-			} else {
-				// since we don't expect connectivity here, we fail the condition for PollImmediate to reattempt the probe.
-				// this happens in the cases where we have policy rejecting traffic from "podFrom" to "podTo", but CNI takes
-				// time to implement the policy and probe from "podFrom" to "podTo" was successful in that window.
-				framework.Logf(" probe #%d :: connectivity not expected :: %s/%s -> %s",
-					attempt+1, args.nsFrom, args.podFrom, args.addrTo,
-				)
-				attempt++
-				return false, nil
-			}
-		}
-	}
-
-	// ignore the result of PollImmediate, we are only concerned with probeError.
-	_ = wait.PollImmediate(
-		time.Duration(args.pollIntervalSeconds)*time.Second,
-		time.Duration(args.pollTimeoutSeconds)*time.Second,
-		conditionFunc,
-	)
-
-	if probeError != nil {
+	stdout, stderr, err := k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
+	if err != nil {
+		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", args.nsFrom, args.podFrom, args.addrTo, err, stdout, stderr)
 		return false, commandDebugString, nil
 	}
 	return true, commandDebugString, nil
@@ -336,17 +289,4 @@ func getProbeTimeoutSeconds() int {
 // getWorkers returns the number of workers suggested to run when testing.
 func getWorkers() int {
 	return 3
-}
-
-// getPollInterval returns the value for which the Prober will wait before attempting next attempt.
-func getPollIntervalSeconds() int {
-	return defaultPollIntervalSeconds
-}
-
-// getPollTimeout returns the timeout for polling on probes, and takes windows heuristics into account, where requests can take longer sometimes.
-func getPollTimeoutSeconds() int {
-	if framework.NodeOSDistroIs("windows") {
-		return defaultPollTimeoutSeconds * 2
-	}
-	return defaultPollTimeoutSeconds
 }

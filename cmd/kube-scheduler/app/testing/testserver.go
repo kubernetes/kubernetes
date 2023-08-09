@@ -29,20 +29,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/configz"
-	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeschedulerconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 
 	"k8s.io/klog/v2"
 )
-
-func init() {
-	// If instantiated more than once or together with other servers, the
-	// servers would try to modify the global logging state. This must get
-	// ignored during testing.
-	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
-}
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
@@ -56,16 +48,21 @@ type TestServer struct {
 	TmpDir               string       // Temp Dir used, by the apiserver
 }
 
+// Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
+type Logger interface {
+	Errorf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Logf(format string, args ...interface{})
+}
+
 // StartTestServer starts a kube-scheduler. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
-//
-//	files that because Golang testing's call to os.Exit will not give a stop channel go routine
-//	enough time to remove temporary files.
-func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
-	logger := klog.FromContext(ctx)
-	ctx, cancel := context.WithCancel(ctx)
+// files that because Golang testing's call to os.Exit will not give a stop channel go routine
+// enough time to remove temporary files.
+func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
+	ctx, cancel := context.WithCancel(context.Background())
 
 	var errCh chan error
 	tearDown := func() {
@@ -76,7 +73,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		if errCh != nil {
 			err, ok := <-errCh
 			if ok && err != nil {
-				logger.Error(err, "Failed to shutdown test server clearly")
+				klog.ErrorS(err, "Failed to shutdown test server clearly")
 			}
 		}
 		if len(result.TmpDir) != 0 {
@@ -111,7 +108,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		}
 		opts.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
-		logger.Info("kube-scheduler will listen securely", "port", opts.SecureServing.BindPort)
+		t.Logf("kube-scheduler will listen securely on port %d...", opts.SecureServing.BindPort)
 	}
 
 	cc, sched, err := app.Setup(ctx, opts)
@@ -127,7 +124,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		}
 	}(ctx)
 
-	logger.Info("Waiting for /healthz to be ok...")
+	t.Logf("Waiting for /healthz to be ok...")
 	client, err := kubernetes.NewForConfig(cc.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
@@ -160,14 +157,15 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	return result, nil
 }
 
-// StartTestServerOrDie calls StartTestServer panic if it does not succeed.
-func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
-	result, err := StartTestServer(ctx, flags)
+// StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
+func StartTestServerOrDie(t Logger, flags []string) *TestServer {
+	result, err := StartTestServer(t, flags)
 	if err == nil {
 		return &result
 	}
 
-	panic(fmt.Errorf("failed to launch server: %v", err))
+	t.Fatalf("failed to launch server: %v", err)
+	return nil
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {

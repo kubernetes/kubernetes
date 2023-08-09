@@ -129,11 +129,11 @@ func (kl *Kubelet) runPod(ctx context.Context, pod *v1.Pod, retryDelay time.Dura
 		klog.InfoS("Pod's containers not running: syncing", "pod", klog.KObj(pod))
 
 		klog.InfoS("Creating a mirror pod for static pod", "pod", klog.KObj(pod))
-		if err := kl.mirrorPodClient.CreateMirrorPod(pod); err != nil {
+		if err := kl.podManager.CreateMirrorPod(pod); err != nil {
 			klog.ErrorS(err, "Failed creating a mirror pod", "pod", klog.KObj(pod))
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		if isTerminal, err = kl.SyncPod(ctx, kubetypes.SyncPodUpdate, pod, mirrorPod, status); err != nil {
+		if isTerminal, err = kl.syncPod(ctx, kubetypes.SyncPodUpdate, pod, mirrorPod, status); err != nil {
 			return fmt.Errorf("error syncing pod %q: %v", format.Pod(pod), err)
 		}
 		if retry >= runOnceMaxRetries {

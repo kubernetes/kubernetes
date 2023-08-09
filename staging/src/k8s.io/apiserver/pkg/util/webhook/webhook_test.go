@@ -47,7 +47,7 @@ import (
 )
 
 const (
-	errBadCertificate    = "Get .*: remote error: tls: (bad certificate|unknown certificate authority)"
+	errBadCertificate    = "Get .*: remote error: tls: bad certificate"
 	errNoConfiguration   = "invalid configuration: no configuration has been provided"
 	errMissingCertPath   = "invalid configuration: unable to read %s %s for %s due to open %s: .*"
 	errSignedByUnknownCA = "Get .*: x509: .*(unknown authority|not standards compliant|not trusted)"
@@ -704,7 +704,6 @@ func bootstrapTestDir(t *testing.T) string {
 	// Write the certificate files to disk or fail
 	for fileName, fileData := range files {
 		if err := ioutil.WriteFile(filepath.Join(dir, fileName), fileData, 0400); err != nil {
-			os.RemoveAll(dir)
 			t.Fatal(err)
 		}
 	}
@@ -714,10 +713,6 @@ func bootstrapTestDir(t *testing.T) string {
 
 func newKubeConfigFile(config v1.Config) (string, error) {
 	configFile, err := ioutil.TempFile("", "")
-	if err != nil {
-		return "", err
-	}
-	defer configFile.Close()
 
 	if err != nil {
 		return "", fmt.Errorf("unable to create the Kubernetes client config file: %v", err)

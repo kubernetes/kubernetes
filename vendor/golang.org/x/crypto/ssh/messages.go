@@ -68,7 +68,7 @@ type kexInitMsg struct {
 
 // See RFC 4253, section 8.
 
-// Diffie-Hellman
+// Diffie-Helman
 const msgKexDHInit = 30
 
 type kexDHInitMsg struct {

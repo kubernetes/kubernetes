@@ -70,5 +70,6 @@ snapshot to the end of the WAL are read first:
 
 This will give you the metadata, the last raft.State and the slice of
 raft.Entry items in the log.
+
 */
 package wal

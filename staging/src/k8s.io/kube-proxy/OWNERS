@@ -8,6 +8,3 @@ reviewers:
   - sig-network-reviewers
   - luxas
   - sttts
-labels:
-  - sig/network
-  - area/kube-proxy

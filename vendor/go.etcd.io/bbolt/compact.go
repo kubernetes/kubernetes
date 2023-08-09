@@ -12,11 +12,7 @@ func Compact(dst, src *DB, txMaxSize int64) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if tempErr := tx.Rollback(); tempErr != nil {
-			err = tempErr
-		}
-	}()
+	defer tx.Rollback()
 
 	if err := walk(src, func(keys [][]byte, k, v []byte, seq uint64) error {
 		// On each key/value, check if we have exceeded tx size.
@@ -77,9 +73,8 @@ func Compact(dst, src *DB, txMaxSize int64) error {
 	}); err != nil {
 		return err
 	}
-	err = tx.Commit()
 
-	return err
+	return tx.Commit()
 }
 
 // walkFunc is the type of the function called for keys (buckets and "normal"

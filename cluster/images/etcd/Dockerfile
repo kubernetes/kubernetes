@@ -34,4 +34,5 @@ COPY --from=builder /sh /bin/
 EXPOSE 2379 2380 4001 7001
 # etcdctl is used by etcd.manifest for livenessProbe.
 COPY etcd* etcdctl* /usr/local/bin/
+COPY cp* /bin/
 COPY migrate-if-needed.sh migrate /usr/local/bin/

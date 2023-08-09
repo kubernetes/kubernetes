@@ -1,0 +1,12 @@
+language: go
+
+script:
+    - go vet ./...
+    - go test -v ./...
+
+go:
+  - 1.12
+  - 1.13
+  - 1.14
+  - 1.15
+  - tip

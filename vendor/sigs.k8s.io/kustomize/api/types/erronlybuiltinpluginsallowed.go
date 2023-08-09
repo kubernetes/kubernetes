@@ -6,7 +6,7 @@ package types
 import (
 	"fmt"
 
-	"sigs.k8s.io/kustomize/kyaml/errors"
+	"github.com/pkg/errors"
 )
 
 type errOnlyBuiltinPluginsAllowed struct {
@@ -24,6 +24,10 @@ func NewErrOnlyBuiltinPluginsAllowed(n string) *errOnlyBuiltinPluginsAllowed {
 }
 
 func IsErrOnlyBuiltinPluginsAllowed(err error) bool {
-	e := &errOnlyBuiltinPluginsAllowed{}
-	return errors.As(err, &e)
+	_, ok := err.(*errOnlyBuiltinPluginsAllowed)
+	if ok {
+		return true
+	}
+	_, ok = errors.Cause(err).(*errOnlyBuiltinPluginsAllowed)
+	return ok
 }

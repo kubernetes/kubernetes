@@ -38,7 +38,6 @@ spec:
         resources:
           requests:
             cpu: {{ cpurequest }}
-            memory: {{ memoryrequest }}
         command:
         - /bin/sh
         - -c

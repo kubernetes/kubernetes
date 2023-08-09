@@ -30,7 +30,7 @@ var (
 			Namespace:      "kubernetes",
 			Name:           "feature_enabled",
 			Help:           "This metric records the data about the stage and enablement of a k8s feature.",
-			StabilityLevel: k8smetrics.BETA,
+			StabilityLevel: k8smetrics.ALPHA,
 		},
 		[]string{"name", "stage"},
 	)

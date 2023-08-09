@@ -47,7 +47,7 @@ type KubeletManagedHostConfig struct {
 
 var _ = SIGDescribe("KubeletManagedEtcHosts", func() {
 	f := framework.NewDefaultFramework("e2e-kubelet-etc-hosts")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	config := &KubeletManagedHostConfig{
 		f: f,
 	}

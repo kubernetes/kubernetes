@@ -52,7 +52,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 	)
 
 	f := framework.NewDefaultFramework("pv")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	/*
 		Test Setup
 
@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		clientPod = nil
 		pvc = nil
 		pv = nil
-		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx, c)
+		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx)
 
 		volLabel = labels.Set{e2epv.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)

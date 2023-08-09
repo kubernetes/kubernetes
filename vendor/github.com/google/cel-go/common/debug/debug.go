@@ -29,7 +29,7 @@ import (
 // representation of an expression.
 type Adorner interface {
 	// GetMetadata for the input context.
-	GetMetadata(ctx any) string
+	GetMetadata(ctx interface{}) string
 }
 
 // Writer manages writing expressions to an internal string.
@@ -46,7 +46,7 @@ type emptyDebugAdorner struct {
 
 var emptyAdorner Adorner = &emptyDebugAdorner{}
 
-func (a *emptyDebugAdorner) GetMetadata(e any) string {
+func (a *emptyDebugAdorner) GetMetadata(e interface{}) string {
 	return ""
 }
 
@@ -170,9 +170,6 @@ func (w *debugWriter) appendObject(obj *exprpb.Expr_CreateStruct) {
 				w.append(",")
 				w.appendLine()
 			}
-			if entry.GetOptionalEntry() {
-				w.append("?")
-			}
 			w.append(entry.GetFieldKey())
 			w.append(":")
 			w.Buffer(entry.GetValue())
@@ -193,9 +190,6 @@ func (w *debugWriter) appendMap(obj *exprpb.Expr_CreateStruct) {
 			if i > 0 {
 				w.append(",")
 				w.appendLine()
-			}
-			if entry.GetOptionalEntry() {
-				w.append("?")
 			}
 			w.Buffer(entry.GetMapKey())
 			w.append(":")
@@ -275,7 +269,7 @@ func (w *debugWriter) append(s string) {
 	w.buffer.WriteString(s)
 }
 
-func (w *debugWriter) appendFormat(f string, args ...any) {
+func (w *debugWriter) appendFormat(f string, args ...interface{}) {
 	w.append(fmt.Sprintf(f, args...))
 }
 
@@ -286,7 +280,7 @@ func (w *debugWriter) doIndent() {
 	}
 }
 
-func (w *debugWriter) adorn(e any) {
+func (w *debugWriter) adorn(e interface{}) {
 	w.append(w.adorner.GetMetadata(e))
 }
 

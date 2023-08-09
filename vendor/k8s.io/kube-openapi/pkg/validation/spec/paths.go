@@ -92,7 +92,7 @@ func (p *Paths) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Deco
 			}
 
 			switch k := tok.String(); {
-			case internal.IsExtensionKey(k):
+			case isExtensionKey(k):
 				ext = nil
 				if err := opts.UnmarshalNext(dec, &ext); err != nil {
 					return err
@@ -114,9 +114,7 @@ func (p *Paths) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Deco
 				p.Paths[k] = pi
 			default:
 				_, err := dec.ReadValue() // skip value
-				if err != nil {
-					return err
-				}
+				return err
 			}
 		}
 	default:
@@ -126,9 +124,6 @@ func (p *Paths) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Deco
 
 // MarshalJSON converts this items object to JSON
 func (p Paths) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(p)
-	}
 	b1, err := json.Marshal(p.VendorExtensible)
 	if err != nil {
 		return nil, err
@@ -146,19 +141,4 @@ func (p Paths) MarshalJSON() ([]byte, error) {
 	}
 	concated := swag.ConcatJSON(b1, b2)
 	return concated, nil
-}
-
-func (p Paths) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
-	m := make(map[string]any, len(p.Extensions)+len(p.Paths))
-	for k, v := range p.Extensions {
-		if internal.IsExtensionKey(k) {
-			m[k] = v
-		}
-	}
-	for k, v := range p.Paths {
-		if strings.HasPrefix(k, "/") {
-			m[k] = v
-		}
-	}
-	return opts.MarshalNext(enc, m)
 }

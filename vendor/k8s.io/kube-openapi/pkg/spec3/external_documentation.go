@@ -18,11 +18,8 @@ package spec3
 
 import (
 	"encoding/json"
-
-	"github.com/go-openapi/swag"
-	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"github.com/go-openapi/swag"
 )
 
 type ExternalDocumentation struct {
@@ -51,27 +48,11 @@ func (e *ExternalDocumentation) MarshalJSON() ([]byte, error) {
 }
 
 func (e *ExternalDocumentation) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, e)
-	}
 	if err := json.Unmarshal(data, &e.ExternalDocumentationProps); err != nil {
 		return err
 	}
 	if err := json.Unmarshal(data, &e.VendorExtensible); err != nil {
 		return err
 	}
-	return nil
-}
-
-func (e *ExternalDocumentation) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
-	var x struct {
-		spec.Extensions
-		ExternalDocumentationProps
-	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
-		return err
-	}
-	e.Extensions = internal.SanitizeExtensions(x.Extensions)
-	e.ExternalDocumentationProps = x.ExternalDocumentationProps
 	return nil
 }

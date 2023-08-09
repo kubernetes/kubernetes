@@ -70,7 +70,7 @@ func (client ReplicationsClient) Create(ctx context.Context, resourceGroupName s
 
 	result, err = client.CreateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerregistry.ReplicationsClient", "Create", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerregistry.ReplicationsClient", "Create", nil, "Failure sending request")
 		return
 	}
 
@@ -105,7 +105,6 @@ func (client ReplicationsClient) CreatePreparer(ctx context.Context, resourceGro
 // http.Response Body if it receives an error.
 func (client ReplicationsClient) CreateSender(req *http.Request) (future ReplicationsCreateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -167,7 +166,7 @@ func (client ReplicationsClient) Delete(ctx context.Context, resourceGroupName s
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerregistry.ReplicationsClient", "Delete", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerregistry.ReplicationsClient", "Delete", nil, "Failure sending request")
 		return
 	}
 
@@ -200,7 +199,6 @@ func (client ReplicationsClient) DeletePreparer(ctx context.Context, resourceGro
 // http.Response Body if it receives an error.
 func (client ReplicationsClient) DeleteSender(req *http.Request) (future ReplicationsDeleteFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -482,7 +480,7 @@ func (client ReplicationsClient) Update(ctx context.Context, resourceGroupName s
 
 	result, err = client.UpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerregistry.ReplicationsClient", "Update", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerregistry.ReplicationsClient", "Update", nil, "Failure sending request")
 		return
 	}
 
@@ -517,7 +515,6 @@ func (client ReplicationsClient) UpdatePreparer(ctx context.Context, resourceGro
 // http.Response Body if it receives an error.
 func (client ReplicationsClient) UpdateSender(req *http.Request) (future ReplicationsUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

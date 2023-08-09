@@ -97,16 +97,10 @@ func (p *Collector) CreateFilter(ctx context.Context, req types.CreateFilter) er
 	return nil
 }
 
-func (p *Collector) WaitForUpdates(ctx context.Context, version string, opts ...*types.WaitOptions) (*types.UpdateSet, error) {
+func (p *Collector) WaitForUpdates(ctx context.Context, v string) (*types.UpdateSet, error) {
 	req := types.WaitForUpdatesEx{
 		This:    p.Reference(),
-		Version: version,
-	}
-
-	if len(opts) == 1 {
-		req.Options = opts[0]
-	} else if len(opts) > 1 {
-		panic("only one option may be specified")
+		Version: v,
 	}
 
 	res, err := methods.WaitForUpdatesEx(ctx, p.roundTripper, &req)
@@ -149,7 +143,7 @@ func (p *Collector) Retrieve(ctx context.Context, objs []types.ManagedObjectRefe
 			spec := types.PropertySpec{
 				Type: obj.Type,
 			}
-			if len(ps) == 0 {
+			if ps == nil {
 				spec.All = types.NewBool(true)
 			} else {
 				spec.PathSet = ps
@@ -185,7 +179,7 @@ func (p *Collector) Retrieve(ctx context.Context, objs []types.ManagedObjectRefe
 		return nil
 	}
 
-	return mo.LoadObjectContent(res.Returnval, dst)
+	return mo.LoadRetrievePropertiesResponse(res, dst)
 }
 
 // RetrieveWithFilter populates dst as Retrieve does, but only for entities matching the given filter.

@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
@@ -309,7 +308,7 @@ func TestAttach(t *testing.T) {
 			options := &AttachOptions{
 				StreamOptions: exec.StreamOptions{
 					ContainerName: test.container,
-					IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
+					IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
 				},
 				Attach:        remoteAttach,
 				GetPodTimeout: 1000,
@@ -380,7 +379,7 @@ func TestAttachWarnings(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			streams, _, _, bufErr := genericiooptions.NewTestIOStreams()
+			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := scheme.Codecs.WithoutConversion()

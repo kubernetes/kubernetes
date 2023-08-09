@@ -40,10 +40,9 @@ type REST struct {
 // NewStorage returns a RESTStorage object that will work against CSINodes
 func NewStorage(optsGetter generic.RESTOptionsGetter) (*CSINodeStorage, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &storageapi.CSINode{} },
-		NewListFunc:               func() runtime.Object { return &storageapi.CSINodeList{} },
-		DefaultQualifiedResource:  storageapi.Resource("csinodes"),
-		SingularQualifiedResource: storageapi.Resource("csinode"),
+		NewFunc:                  func() runtime.Object { return &storageapi.CSINode{} },
+		NewListFunc:              func() runtime.Object { return &storageapi.CSINodeList{} },
+		DefaultQualifiedResource: storageapi.Resource("csinodes"),
 
 		CreateStrategy:      csinode.Strategy,
 		UpdateStrategy:      csinode.Strategy,

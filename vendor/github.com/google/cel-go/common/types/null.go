@@ -18,9 +18,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"google.golang.org/protobuf/proto"
-
 	"github.com/google/cel-go/common/types/ref"
+	"google.golang.org/protobuf/proto"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -35,20 +34,14 @@ var (
 	// NullValue singleton.
 	NullValue = Null(structpb.NullValue_NULL_VALUE)
 
-	// golang reflect type for Null values.
-	nullReflectType = reflect.TypeOf(NullValue)
+	jsonNullType = reflect.TypeOf(structpb.NullValue_NULL_VALUE)
 )
 
 // ConvertToNative implements ref.Val.ConvertToNative.
-func (n Null) ConvertToNative(typeDesc reflect.Type) (any, error) {
+func (n Null) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	switch typeDesc.Kind() {
 	case reflect.Int32:
-		switch typeDesc {
-		case jsonNullType:
-			return structpb.NullValue_NULL_VALUE, nil
-		case nullReflectType:
-			return n, nil
-		}
+		return reflect.ValueOf(n).Convert(typeDesc).Interface(), nil
 	case reflect.Ptr:
 		switch typeDesc {
 		case anyValueType:
@@ -61,10 +54,6 @@ func (n Null) ConvertToNative(typeDesc reflect.Type) (any, error) {
 			return anypb.New(pb.(proto.Message))
 		case jsonValueType:
 			return structpb.NewNullValue(), nil
-		case boolWrapperType, byteWrapperType, doubleWrapperType, floatWrapperType,
-			int32WrapperType, int64WrapperType, stringWrapperType, uint32WrapperType,
-			uint64WrapperType:
-			return nil, nil
 		}
 	case reflect.Interface:
 		nv := n.Value()
@@ -97,17 +86,12 @@ func (n Null) Equal(other ref.Val) ref.Val {
 	return Bool(NullType == other.Type())
 }
 
-// IsZeroValue returns true as null always represents an absent value.
-func (n Null) IsZeroValue() bool {
-	return true
-}
-
 // Type implements ref.Val.Type.
 func (n Null) Type() ref.Type {
 	return NullType
 }
 
 // Value implements ref.Val.Value.
-func (n Null) Value() any {
+func (n Null) Value() interface{} {
 	return structpb.NullValue_NULL_VALUE
 }

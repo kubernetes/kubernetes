@@ -40,10 +40,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against CronJobs.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &batch.CronJob{} },
-		NewListFunc:               func() runtime.Object { return &batch.CronJobList{} },
-		DefaultQualifiedResource:  batch.Resource("cronjobs"),
-		SingularQualifiedResource: batch.Resource("cronjob"),
+		NewFunc:                  func() runtime.Object { return &batch.CronJob{} },
+		NewListFunc:              func() runtime.Object { return &batch.CronJobList{} },
+		DefaultQualifiedResource: batch.Resource("cronjobs"),
 
 		CreateStrategy:      cronjob.Strategy,
 		UpdateStrategy:      cronjob.Strategy,

@@ -22,13 +22,13 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
-	testversion = "v10.1.2-alpha.1.100+0123456789abcdef"
-	expected    = "v10.1.2-alpha.1.100_0123456789abcdef"
+	testversion = "v10.1.2-alpha.1.100+0123456789abcdef+SOMETHING"
+	expected    = "v10.1.2-alpha.1.100_0123456789abcdef_SOMETHING"
 	gcrPrefix   = "registry.k8s.io"
 )
 
@@ -97,7 +97,6 @@ func TestGetKubernetesImage(t *testing.T) {
 }
 
 func TestGetEtcdImage(t *testing.T) {
-	testEtcdVer, _, _ := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, testversion)
 	var tests = []struct {
 		expected string
 		cfg      *kubeadmapi.ClusterConfiguration
@@ -105,17 +104,17 @@ func TestGetEtcdImage(t *testing.T) {
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   "real.repo",
-				KubernetesVersion: testversion,
+				KubernetesVersion: "1.16.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{},
 				},
 			},
-			expected: "real.repo/etcd:" + testEtcdVer.String(),
+			expected: "real.repo/etcd:3.3.17-0",
 		},
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   "real.repo",
-				KubernetesVersion: testversion,
+				KubernetesVersion: "1.16.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ImageMeta: kubeadmapi.ImageMeta{
@@ -129,7 +128,7 @@ func TestGetEtcdImage(t *testing.T) {
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   "real.repo",
-				KubernetesVersion: testversion,
+				KubernetesVersion: "1.16.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ImageMeta: kubeadmapi.ImageMeta{
@@ -138,7 +137,7 @@ func TestGetEtcdImage(t *testing.T) {
 					},
 				},
 			},
-			expected: "override/etcd:" + testEtcdVer.String(),
+			expected: "override/etcd:3.3.17-0",
 		},
 		{
 			expected: GetGenericImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
@@ -242,24 +241,29 @@ func TestGetDNSImage(t *testing.T) {
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			expected: "foo.io/coredns:v1.10.1",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				ImageRepository: "foo.io",
-				DNS:             kubeadmapi.DNS{},
-			},
-		},
-		{
-			expected: kubeadmapiv1beta3.DefaultImageRepository + "/coredns/coredns:v1.10.1",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				ImageRepository: kubeadmapiv1beta3.DefaultImageRepository,
-				DNS:             kubeadmapi.DNS{},
-			},
-		},
-		{
-			expected: "foo.io/coredns/coredns:v1.10.1",
+			expected: "foo.io/coredns:v1.10.0",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
 				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+				},
+			},
+		},
+		{
+			expected: kubeadmapiv1beta2.DefaultImageRepository + "/coredns/coredns:v1.10.0",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: kubeadmapiv1beta2.DefaultImageRepository,
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+				},
+			},
+		},
+		{
+			expected: "foo.io/coredns/coredns:v1.10.0",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "foo.io",
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
 					ImageMeta: kubeadmapi.ImageMeta{
 						ImageRepository: "foo.io/coredns",
 					},
@@ -271,6 +275,7 @@ func TestGetDNSImage(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io/coredns",
 				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
 					ImageMeta: kubeadmapi.ImageMeta{
 						ImageTag: "v1.11.0",
 					},

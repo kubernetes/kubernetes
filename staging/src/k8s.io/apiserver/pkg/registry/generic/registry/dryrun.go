@@ -18,10 +18,7 @@ package registry
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -75,30 +72,19 @@ func (s *DryRunnableStorage) GuaranteedUpdate(
 	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, dryRun bool, cachedExistingObject runtime.Object) error {
 	if dryRun {
-		var current runtime.Object
-		v, err := conversion.EnforcePtr(destination)
-		if err != nil {
-			return fmt.Errorf("unable to convert output object to pointer: %v", err)
-		}
-		if u, ok := v.Addr().Interface().(runtime.Unstructured); ok {
-			current = u.NewEmptyInstance()
-		} else {
-			current = reflect.New(v.Type()).Interface().(runtime.Object)
-		}
-
-		err = s.Storage.Get(ctx, key, storage.GetOptions{IgnoreNotFound: ignoreNotFound}, current)
+		err := s.Storage.Get(ctx, key, storage.GetOptions{IgnoreNotFound: ignoreNotFound}, destination)
 		if err != nil {
 			return err
 		}
-		err = preconditions.Check(key, current)
+		err = preconditions.Check(key, destination)
 		if err != nil {
 			return err
 		}
-		rev, err := s.Versioner().ObjectResourceVersion(current)
+		rev, err := s.Versioner().ObjectResourceVersion(destination)
 		if err != nil {
 			return err
 		}
-		updated, _, err := tryUpdate(current, storage.ResponseMeta{ResourceVersion: rev})
+		updated, _, err := tryUpdate(destination, storage.ResponseMeta{ResourceVersion: rev})
 		if err != nil {
 			return err
 		}

@@ -20,22 +20,20 @@ package verflag
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"strconv"
-	"strings"
 
 	flag "github.com/spf13/pflag"
 
 	"k8s.io/component-base/version"
 )
 
-type versionValue string
+type versionValue int
 
 const (
-	VersionFalse versionValue = "false"
-	VersionTrue  versionValue = "true"
-	VersionRaw   versionValue = "raw"
+	VersionFalse versionValue = 0
+	VersionTrue  versionValue = 1
+	VersionRaw   versionValue = 2
 )
 
 const strRawVersion string = "raw"
@@ -53,28 +51,20 @@ func (v *versionValue) Set(s string) error {
 		*v = VersionRaw
 		return nil
 	}
-
-	if strings.HasPrefix(s, "v") {
-		err := version.SetDynamicVersion(s)
-		if err == nil {
-			*v = versionValue(s)
-		}
-		return err
-	}
-
 	boolVal, err := strconv.ParseBool(s)
-	if err == nil {
-		if boolVal {
-			*v = VersionTrue
-		} else {
-			*v = VersionFalse
-		}
+	if boolVal {
+		*v = VersionTrue
+	} else {
+		*v = VersionFalse
 	}
 	return err
 }
 
 func (v *versionValue) String() string {
-	return string(*v)
+	if *v == VersionRaw {
+		return strRawVersion
+	}
+	return fmt.Sprintf("%v", bool(*v == VersionTrue))
 }
 
 // The type of the flag as required by the pflag.Value interface
@@ -98,7 +88,7 @@ func Version(name string, value versionValue, usage string) *versionValue {
 const versionFlagName = "version"
 
 var (
-	versionFlag = Version(versionFlagName, VersionFalse, "--version, --version=raw prints version information and quits; --version=vX.Y.Z... sets the reported version")
+	versionFlag = Version(versionFlagName, VersionFalse, "Print version information and quit")
 	programName = "Kubernetes"
 )
 
@@ -108,20 +98,14 @@ func AddFlags(fs *flag.FlagSet) {
 	fs.AddFlag(flag.Lookup(versionFlagName))
 }
 
-// variables for unit testing PrintAndExitIfRequested
-var (
-	output = io.Writer(os.Stdout)
-	exit   = os.Exit
-)
-
-// PrintAndExitIfRequested will check if --version or --version=raw was passed
+// PrintAndExitIfRequested will check if the -version flag was passed
 // and, if so, print the version and exit.
 func PrintAndExitIfRequested() {
 	if *versionFlag == VersionRaw {
-		fmt.Fprintf(output, "%#v\n", version.Get())
-		exit(0)
+		fmt.Printf("%#v\n", version.Get())
+		os.Exit(0)
 	} else if *versionFlag == VersionTrue {
-		fmt.Fprintf(output, "%s %s\n", programName, version.Get())
-		exit(0)
+		fmt.Printf("%s %s\n", programName, version.Get())
+		os.Exit(0)
 	}
 }

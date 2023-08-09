@@ -17,6 +17,7 @@ limitations under the License.
 package simulator
 
 import (
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -29,13 +30,19 @@ type CustomFieldsManager struct {
 	nextKey int32
 }
 
+func NewCustomFieldsManager(ref types.ManagedObjectReference) object.Reference {
+	m := &CustomFieldsManager{}
+	m.Self = ref
+	return m
+}
+
 // Iterates through all entities of passed field type;
 // Removes found field from their custom field properties.
-func entitiesFieldRemove(ctx *Context, field types.CustomFieldDef) {
-	entities := ctx.Map.All(field.ManagedObjectType)
+func entitiesFieldRemove(field types.CustomFieldDef) {
+	entities := Map.All(field.ManagedObjectType)
 	for _, e := range entities {
 		entity := e.Entity()
-		ctx.WithLock(entity, func() {
+		Map.WithLock(entity, func() {
 			aFields := entity.AvailableField
 			for i, aField := range aFields {
 				if aField.Key == field.Key {
@@ -65,11 +72,11 @@ func entitiesFieldRemove(ctx *Context, field types.CustomFieldDef) {
 
 // Iterates through all entities of passed field type;
 // Renames found field in entity's AvailableField property.
-func entitiesFieldRename(ctx *Context, field types.CustomFieldDef) {
-	entities := ctx.Map.All(field.ManagedObjectType)
+func entitiesFieldRename(field types.CustomFieldDef) {
+	entities := Map.All(field.ManagedObjectType)
 	for _, e := range entities {
 		entity := e.Entity()
-		ctx.WithLock(entity, func() {
+		Map.WithLock(entity, func() {
 			aFields := entity.AvailableField
 			for i, aField := range aFields {
 				if aField.Key == field.Key {
@@ -102,7 +109,7 @@ func (c *CustomFieldsManager) findByKey(key int32) (int, *types.CustomFieldDef) 
 	return -1, nil
 }
 
-func (c *CustomFieldsManager) AddCustomFieldDef(ctx *Context, req *types.AddCustomFieldDef) soap.HasFault {
+func (c *CustomFieldsManager) AddCustomFieldDef(req *types.AddCustomFieldDef) soap.HasFault {
 	body := &methods.AddCustomFieldDefBody{}
 
 	_, field := c.findByNameType(req.Name, req.MoType)
@@ -123,10 +130,10 @@ func (c *CustomFieldsManager) AddCustomFieldDef(ctx *Context, req *types.AddCust
 		FieldInstancePrivileges: req.FieldPolicy,
 	}
 
-	entities := ctx.Map.All(req.MoType)
+	entities := Map.All(req.MoType)
 	for _, e := range entities {
 		entity := e.Entity()
-		ctx.WithLock(entity, func() {
+		Map.WithLock(entity, func() {
 			entity.AvailableField = append(entity.AvailableField, def)
 		})
 	}
@@ -140,7 +147,7 @@ func (c *CustomFieldsManager) AddCustomFieldDef(ctx *Context, req *types.AddCust
 	return body
 }
 
-func (c *CustomFieldsManager) RemoveCustomFieldDef(ctx *Context, req *types.RemoveCustomFieldDef) soap.HasFault {
+func (c *CustomFieldsManager) RemoveCustomFieldDef(req *types.RemoveCustomFieldDef) soap.HasFault {
 	body := &methods.RemoveCustomFieldDefBody{}
 
 	i, field := c.findByKey(req.Key)
@@ -149,7 +156,7 @@ func (c *CustomFieldsManager) RemoveCustomFieldDef(ctx *Context, req *types.Remo
 		return body
 	}
 
-	entitiesFieldRemove(ctx, *field)
+	entitiesFieldRemove(*field)
 
 	c.Field = append(c.Field[:i], c.Field[i+1:]...)
 
@@ -157,7 +164,7 @@ func (c *CustomFieldsManager) RemoveCustomFieldDef(ctx *Context, req *types.Remo
 	return body
 }
 
-func (c *CustomFieldsManager) RenameCustomFieldDef(ctx *Context, req *types.RenameCustomFieldDef) soap.HasFault {
+func (c *CustomFieldsManager) RenameCustomFieldDef(req *types.RenameCustomFieldDef) soap.HasFault {
 	body := &methods.RenameCustomFieldDefBody{}
 
 	_, field := c.findByKey(req.Key)
@@ -168,7 +175,7 @@ func (c *CustomFieldsManager) RenameCustomFieldDef(ctx *Context, req *types.Rena
 
 	field.Name = req.Name
 
-	entitiesFieldRename(ctx, *field)
+	entitiesFieldRename(*field)
 
 	body.Res = &types.RenameCustomFieldDefResponse{}
 	return body
@@ -188,30 +195,8 @@ func (c *CustomFieldsManager) SetField(ctx *Context, req *types.SetField) soap.H
 		Value:            req.Value,
 	}
 
-	removeIndex := func(s []types.BaseCustomFieldValue, i int) []types.BaseCustomFieldValue {
-		new := make([]types.BaseCustomFieldValue, 0)
-		new = append(new, s[:i]...)
-		return append(new, s[i+1:]...)
-	}
-
-	removeExistingValues := func(s []types.BaseCustomFieldValue) []types.BaseCustomFieldValue {
-		for i := 0; i < len(s); {
-			if s[i].GetCustomFieldValue().Key == newValue.GetCustomFieldValue().Key {
-				s = removeIndex(s, i)
-			}
-			i++
-		}
-		return s
-	}
-
-	entity := ctx.Map.Get(req.Entity).(mo.Entity).Entity()
-
+	entity := Map.Get(req.Entity).(mo.Entity).Entity()
 	ctx.WithLock(entity, func() {
-		// Check if custom value and value are already set. If so, remove them.
-		entity.CustomValue = removeExistingValues(entity.CustomValue)
-		entity.Value = removeExistingValues(entity.Value)
-
-		// Add the new value
 		entity.CustomValue = append(entity.CustomValue, newValue)
 		entity.Value = append(entity.Value, newValue)
 	})

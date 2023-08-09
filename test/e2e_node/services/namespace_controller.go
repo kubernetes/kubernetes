@@ -17,7 +17,6 @@ limitations under the License.
 package services
 
 import (
-	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -50,7 +49,7 @@ func NewNamespaceController(host string) *NamespaceController {
 }
 
 // Start starts the namespace controller.
-func (n *NamespaceController) Start(ctx context.Context) error {
+func (n *NamespaceController) Start() error {
 	config := restclient.AddUserAgent(&restclient.Config{
 		Host:        n.host,
 		BearerToken: framework.TestContext.BearerToken,
@@ -73,9 +72,7 @@ func (n *NamespaceController) Start(ctx context.Context) error {
 	}
 	discoverResourcesFn := client.Discovery().ServerPreferredNamespacedResources
 	informerFactory := informers.NewSharedInformerFactory(client, ncResyncPeriod)
-
 	nc := namespacecontroller.NewNamespaceController(
-		ctx,
 		client,
 		metadataClient,
 		discoverResourcesFn,
@@ -83,7 +80,7 @@ func (n *NamespaceController) Start(ctx context.Context) error {
 		ncResyncPeriod, v1.FinalizerKubernetes,
 	)
 	informerFactory.Start(n.stopCh)
-	go nc.Run(ctx, ncConcurrency)
+	go nc.Run(ncConcurrency, n.stopCh)
 	return nil
 }
 

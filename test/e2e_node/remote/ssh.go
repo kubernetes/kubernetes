@@ -35,7 +35,6 @@ var sshUser = flag.String("ssh-user", "", "Use predefined user for ssh.")
 
 var sshOptionsMap map[string]string
 var sshDefaultKeyMap map[string]string
-var sshDefaultUserMap map[string]string
 
 func init() {
 	usr, err := user.Current()
@@ -44,7 +43,6 @@ func init() {
 	}
 	sshOptionsMap = map[string]string{
 		"gce": "-o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o LogLevel=ERROR",
-		"aws": "-o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o LogLevel=ERROR",
 	}
 	defaultGceKey := os.Getenv("GCE_SSH_PRIVATE_KEY_FILE")
 	if defaultGceKey == "" {
@@ -52,9 +50,6 @@ func init() {
 	}
 	sshDefaultKeyMap = map[string]string{
 		"gce": defaultGceKey,
-	}
-	sshDefaultUserMap = map[string]string{
-		"aws": "ec2-user",
 	}
 }
 
@@ -70,30 +65,6 @@ func AddHostnameIP(hostname, ip string) {
 	hostnameIPOverrides.m[hostname] = ip
 }
 
-var sshKeyOverrides = struct {
-	sync.RWMutex
-	m map[string]string
-}{m: make(map[string]string)}
-
-// AddSSHKey adds a <hosrtname,path to SSH private key> pair into the sshKeyOverrides map
-func AddSSHKey(hostname, keyFilePath string) {
-	sshKeyOverrides.Lock()
-	defer sshKeyOverrides.Unlock()
-	sshKeyOverrides.m[hostname] = keyFilePath
-}
-
-// GetSSHUser returns the ssh-user CLI flag, the KUBE_SSH_USER environment variable, or the default ssh user
-// for the ssh environment in that order
-func GetSSHUser() string {
-	if *sshUser == "" {
-		*sshUser = os.Getenv("KUBE_SSH_USER")
-	}
-	if *sshUser == "" {
-		*sshUser = sshDefaultUserMap[*sshEnv]
-	}
-	return *sshUser
-}
-
 // GetHostnameOrIP converts hostname into ip and apply user if necessary.
 func GetHostnameOrIP(hostname string) string {
 	hostnameIPOverrides.RLock()
@@ -103,9 +74,12 @@ func GetHostnameOrIP(hostname string) string {
 		host = ip
 	}
 
-	sshUser := GetSSHUser()
-	if sshUser != "" {
-		host = fmt.Sprintf("%s@%s", sshUser, host)
+	if *sshUser == "" {
+		*sshUser = os.Getenv("KUBE_SSH_USER")
+	}
+
+	if *sshUser != "" {
+		host = fmt.Sprintf("%s@%s", *sshUser, host)
 	}
 	return host
 }
@@ -118,18 +92,18 @@ func getSSHCommand(sep string, args ...string) string {
 // SSH executes ssh command with runSSHCommand as root. The `sudo` makes sure that all commands
 // are executed by root, so that there won't be permission mismatch between different commands.
 func SSH(host string, cmd ...string) (string, error) {
-	return runSSHCommand(host, "ssh", append([]string{GetHostnameOrIP(host), "--", "sudo"}, cmd...)...)
+	return runSSHCommand("ssh", append([]string{GetHostnameOrIP(host), "--", "sudo"}, cmd...)...)
 }
 
 // SSHNoSudo executes ssh command with runSSHCommand as normal user. Sometimes we need this,
 // for example creating a directory that we'll copy files there with scp.
 func SSHNoSudo(host string, cmd ...string) (string, error) {
-	return runSSHCommand(host, "ssh", append([]string{GetHostnameOrIP(host), "--"}, cmd...)...)
+	return runSSHCommand("ssh", append([]string{GetHostnameOrIP(host), "--"}, cmd...)...)
 }
 
 // runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
-func runSSHCommand(host, cmd string, args ...string) (string, error) {
-	if key, err := getPrivateSSHKey(host); len(key) != 0 {
+func runSSHCommand(cmd string, args ...string) (string, error) {
+	if key, err := getPrivateSSHKey(); len(key) != 0 {
 		if err != nil {
 			klog.Errorf("private SSH key (%s) not found. Check if the SSH key is configured properly:, err: %v", key, err)
 			return "", fmt.Errorf("private SSH key (%s) does not exist", key)
@@ -147,25 +121,19 @@ func runSSHCommand(host, cmd string, args ...string) (string, error) {
 	output, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
 		klog.Errorf("failed to run SSH command: out: %s, err: %v", output, err)
-		return string(output), fmt.Errorf("command [%s %s] failed with error: %w", cmd, strings.Join(args, " "), err)
+		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
 	}
 	return string(output), nil
 }
 
 // getPrivateSSHKey returns the path to ssh private key
-func getPrivateSSHKey(host string) (string, error) {
+func getPrivateSSHKey() (string, error) {
 	if *sshKey != "" {
 		if _, err := os.Stat(*sshKey); err != nil {
 			return *sshKey, err
 		}
 
 		return *sshKey, nil
-	}
-
-	sshKeyOverrides.Lock()
-	defer sshKeyOverrides.Unlock()
-	if key, ok := sshKeyOverrides.m[host]; ok {
-		return key, nil
 	}
 
 	if key, found := sshDefaultKeyMap[*sshEnv]; found {

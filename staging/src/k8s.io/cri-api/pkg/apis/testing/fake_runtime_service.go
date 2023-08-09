@@ -64,15 +64,14 @@ type FakeRuntimeService struct {
 	Called []string
 	Errors map[string][]error
 
-	FakeStatus             *runtimeapi.RuntimeStatus
-	Containers             map[string]*FakeContainer
-	Sandboxes              map[string]*FakePodSandbox
-	FakeContainerStats     map[string]*runtimeapi.ContainerStats
-	FakePodSandboxStats    map[string]*runtimeapi.PodSandboxStats
-	FakePodSandboxMetrics  map[string]*runtimeapi.PodSandboxMetrics
-	FakeMetricDescriptors  map[string]*runtimeapi.MetricDescriptor
-	FakeContainerMetrics   map[string]*runtimeapi.ContainerMetrics
-	FakeLinuxConfiguration *runtimeapi.LinuxRuntimeConfiguration
+	FakeStatus            *runtimeapi.RuntimeStatus
+	Containers            map[string]*FakeContainer
+	Sandboxes             map[string]*FakePodSandbox
+	FakeContainerStats    map[string]*runtimeapi.ContainerStats
+	FakePodSandboxStats   map[string]*runtimeapi.PodSandboxStats
+	FakePodSandboxMetrics map[string]*runtimeapi.PodSandboxMetrics
+	FakeMetricDescriptors map[string]*runtimeapi.MetricDescriptor
+	FakeContainerMetrics  map[string]*runtimeapi.ContainerMetrics
 
 	ErrorOnSandboxCreate bool
 }
@@ -780,17 +779,4 @@ func (r *FakeRuntimeService) ListPodSandboxMetrics(_ context.Context) ([]*runtim
 	}
 
 	return result, nil
-}
-
-// RuntimeConfig returns runtime configuration of the FakeRuntimeService.
-func (r *FakeRuntimeService) RuntimeConfig(_ context.Context) (*runtimeapi.RuntimeConfigResponse, error) {
-	r.Lock()
-	defer r.Unlock()
-
-	r.Called = append(r.Called, "RuntimeConfig")
-	if err := r.popError("RuntimeConfig"); err != nil {
-		return nil, err
-	}
-
-	return &runtimeapi.RuntimeConfigResponse{Linux: r.FakeLinuxConfiguration}, nil
 }

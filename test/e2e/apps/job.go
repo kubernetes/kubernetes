@@ -69,7 +69,7 @@ type watchEventConfig struct {
 
 var _ = SIGDescribe("Job", func() {
 	f := framework.NewDefaultFramework("job")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	parallelism := int32(2)
 	completions := int32(4)
 
@@ -298,9 +298,7 @@ var _ = SIGDescribe("Job", func() {
 				break
 			}
 		}
-		if !exists {
-			framework.Failf("Job was expected to be completed or failed")
-		}
+		framework.ExpectEqual(exists, true)
 
 		ginkgo.By("Updating the job with suspend=false")
 		job.Spec.Suspend = pointer.BoolPtr(false)
@@ -356,9 +354,7 @@ var _ = SIGDescribe("Job", func() {
 				break
 			}
 		}
-		if !exists {
-			framework.Failf("Job was expected to be completed or failed")
-		}
+		framework.ExpectEqual(exists, true)
 	})
 
 	/*
@@ -498,9 +494,7 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring job was deleted")
 		_, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectError(err, "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
-		if !apierrors.IsNotFound(err) {
-			framework.Failf("failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
-		}
+		framework.ExpectEqual(apierrors.IsNotFound(err), true)
 	})
 
 	/*
@@ -667,9 +661,7 @@ var _ = SIGDescribe("Job", func() {
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(jStatusJSON)+`}`),
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
-		if !patchedStatus.Status.StartTime.Equal(&now1) {
-			framework.Failf("patched object should have the applied StartTime %#v, got %#v instead", jStatus.StartTime, patchedStatus.Status.StartTime)
-		}
+		framework.ExpectEqual(patchedStatus.Status.StartTime.Equal(&now1), true, "patched object should have the applied StartTime status")
 		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating /status")
@@ -686,9 +678,7 @@ var _ = SIGDescribe("Job", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		if !updatedStatus.Status.StartTime.Equal(&now2) {
-			framework.Failf("updated object status expected to have updated StartTime %#v, got %#v", statusToUpdate.Status.StartTime, updatedStatus.Status.StartTime)
-		}
+		framework.ExpectEqual(updatedStatus.Status.StartTime.Equal(&now2), true, fmt.Sprintf("updated object status expected to have updated StartTime %#v, got %#v", statusToUpdate.Status.StartTime, updatedStatus.Status.StartTime))
 
 		ginkgo.By("get /status")
 		jResource := schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}

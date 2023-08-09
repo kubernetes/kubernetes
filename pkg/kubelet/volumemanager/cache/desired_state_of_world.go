@@ -31,8 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
-
-	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
+	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -207,23 +206,12 @@ type volumeToMount struct {
 	// Usually this value reflects size recorded in pv.Spec.Capacity
 	persistentVolumeSize *resource.Quantity
 
-	// effectiveSELinuxMountFileLabel is the SELinux label that will be applied to the volume using mount options.
-	// If empty, then:
+	// seLinuxFileLabel is desired SELinux label on files on the volume. If empty, then
 	// - either the context+label is unknown (assigned randomly by the container runtime)
 	// - or the volume plugin responsible for this volume does not support mounting with -o context
-	// - or the volume is not ReadWriteOncePod
 	// - or the OS does not support SELinux
 	// In all cases, the SELinux context does not matter when mounting the volume.
-	effectiveSELinuxMountFileLabel string
-
-	// originalSELinuxLabel is the SELinux label that would be used if SELinux mount was supported for all access modes.
-	// For RWOP volumes it's the same as effectiveSELinuxMountFileLabel.
-	// It is used only to report potential SELinux mismatch metrics.
-	// If empty, then:
-	// - either the context+label is unknown (assigned randomly by the container runtime)
-	// - or the volume plugin responsible for this volume does not support mounting with -o context
-	// - or the OS does not support SELinux
-	originalSELinuxLabel string
+	seLinuxFileLabel string
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -308,7 +296,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		var sizeLimit *resource.Quantity
 		if volumeSpec.Volume != nil {
 			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
-				podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+				_, podLimits := apiv1resource.PodRequestsAndLimits(pod)
 				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
 				if volumeSpec.Volume.EmptyDir != nil &&
@@ -319,25 +307,23 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				}
 			}
 		}
-		effectiveSELinuxMountLabel := seLinuxFileLabel
 		if !util.VolumeSupportsSELinuxMount(volumeSpec) {
 			// Clear SELinux label for the volume with unsupported access modes.
 			klog.V(4).InfoS("volume does not support SELinux context mount, clearing the expected label", "volume", volumeSpec.Name())
-			effectiveSELinuxMountLabel = ""
+			seLinuxFileLabel = ""
 		}
 		if seLinuxFileLabel != "" {
 			seLinuxVolumesAdmitted.Add(1.0)
 		}
 		vmt := volumeToMount{
-			volumeName:                     volumeName,
-			podsToMount:                    make(map[types.UniquePodName]podToMount),
-			pluginIsAttachable:             attachable,
-			pluginIsDeviceMountable:        deviceMountable,
-			volumeGidValue:                 volumeGidValue,
-			reportedInUse:                  false,
-			desiredSizeLimit:               sizeLimit,
-			effectiveSELinuxMountFileLabel: effectiveSELinuxMountLabel,
-			originalSELinuxLabel:           seLinuxFileLabel,
+			volumeName:              volumeName,
+			podsToMount:             make(map[types.UniquePodName]podToMount),
+			pluginIsAttachable:      attachable,
+			pluginIsDeviceMountable: deviceMountable,
+			volumeGidValue:          volumeGidValue,
+			reportedInUse:           false,
+			desiredSizeLimit:        sizeLimit,
+			seLinuxFileLabel:        seLinuxFileLabel,
 		}
 		// record desired size of the volume
 		if volumeSpec.PersistentVolume != nil {
@@ -351,12 +337,16 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	} else {
 		// volume exists
 		if pluginSupportsSELinuxContextMount {
-			if seLinuxFileLabel != vol.originalSELinuxLabel {
+			if seLinuxFileLabel != vol.seLinuxFileLabel {
 				// TODO: update the error message after tests, e.g. add at least the conflicting pod names.
-				fullErr := fmt.Errorf("conflicting SELinux labels of volume %s: %q and %q", volumeSpec.Name(), vol.originalSELinuxLabel, seLinuxFileLabel)
+				fullErr := fmt.Errorf("conflicting SELinux labels of volume %s: %q and %q", volumeSpec.Name(), vol.seLinuxFileLabel, seLinuxFileLabel)
 				supported := util.VolumeSupportsSELinuxMount(volumeSpec)
 				if err := handleSELinuxMetricError(fullErr, supported, seLinuxVolumeContextMismatchWarnings, seLinuxVolumeContextMismatchErrors); err != nil {
 					return "", err
+				}
+			} else {
+				if seLinuxFileLabel != "" {
+					seLinuxVolumesAdmitted.Add(1.0)
 				}
 			}
 		}
@@ -509,7 +499,7 @@ func (dsw *desiredStateOfWorld) VolumeExists(
 		// and mounted with new SELinux mount options for pod B.
 		// Without SELinux, kubelet can (and often does) reuse device mounted
 		// for A.
-		return vol.effectiveSELinuxMountFileLabel == seLinuxMountContext
+		return vol.seLinuxFileLabel == seLinuxMountContext
 	}
 	return true
 }
@@ -525,7 +515,7 @@ func (dsw *desiredStateOfWorld) PodExistsInVolume(
 	}
 
 	if feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
-		if volumeObj.effectiveSELinuxMountFileLabel != seLinuxMountOption {
+		if volumeObj.seLinuxFileLabel != seLinuxMountOption {
 			// The volume is in DSW, but with a different SELinux mount option.
 			// Report it as unused, so the volume is unmounted and mounted back
 			// with the right SELinux option.
@@ -583,11 +573,11 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 					ReportedInUse:           volumeObj.reportedInUse,
 					MountRequestTime:        podObj.mountRequestTime,
 					DesiredSizeLimit:        volumeObj.desiredSizeLimit,
-					SELinuxLabel:            volumeObj.effectiveSELinuxMountFileLabel,
+					SELinuxLabel:            volumeObj.seLinuxFileLabel,
 				},
 			}
 			if volumeObj.persistentVolumeSize != nil {
-				vmt.DesiredPersistentVolumeSize = volumeObj.persistentVolumeSize.DeepCopy()
+				vmt.PersistentVolumeSize = volumeObj.persistentVolumeSize.DeepCopy()
 			}
 			volumesToMount = append(volumesToMount, vmt)
 		}

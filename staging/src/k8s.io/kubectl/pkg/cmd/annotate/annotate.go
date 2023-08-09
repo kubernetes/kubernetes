@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -64,13 +63,13 @@ type AnnotateFlags struct {
 	resourceVersion string
 	Selector        string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewAnnotateFlags returns a default AnnotateFlags
-func NewAnnotateFlags(streams genericiooptions.IOStreams) *AnnotateFlags {
+func NewAnnotateFlags(streams genericclioptions.IOStreams) *AnnotateFlags {
 	return &AnnotateFlags{
-		PrintFlags:  genericclioptions.NewPrintFlags("annotated").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("annotate").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		IOStreams:   streams,
 	}
@@ -89,7 +88,7 @@ type AnnotateOptions struct {
 	fieldManager     string
 	resource.FilenameOptions
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 
 	list           bool
 	local          bool
@@ -144,7 +143,7 @@ var (
 )
 
 // NewCmdAnnotate creates the `annotate` command
-func NewCmdAnnotate(parent string, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdAnnotate(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	flags := NewAnnotateFlags(streams)
 
 	cmd := &cobra.Command{
@@ -167,7 +166,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, streams genericiooptions.I
 }
 
 // AddFlags registers flags for a cli.
-func (flags *AnnotateFlags) AddFlags(cmd *cobra.Command, ioStreams genericiooptions.IOStreams) {
+func (flags *AnnotateFlags) AddFlags(cmd *cobra.Command, ioStreams genericclioptions.IOStreams) {
 	flags.PrintFlags.AddFlags(cmd)
 	flags.RecordFlags.AddFlags(cmd)
 

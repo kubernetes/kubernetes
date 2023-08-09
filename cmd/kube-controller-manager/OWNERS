@@ -3,10 +3,10 @@
 approvers:
   - cheftako
   - deads2k
+  - lavalamp
   - mikedanese
   - soltysh
   - sttts
-  - jpbetz
 reviewers:
   - caesarxuchao
   - cheftako
@@ -20,6 +20,7 @@ reviewers:
   - jayunit100
   - jsafrane
   - justinsb
+  - lavalamp
   - liggitt
   - luxas
   - mikedanese
@@ -33,8 +34,5 @@ reviewers:
   - sttts
   - thockin
   - wojtek-t
-  - jpbetz
 labels:
   - sig/api-machinery
-emeritus_approvers:
-  - lavalamp

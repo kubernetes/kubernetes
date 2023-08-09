@@ -36,5 +36,6 @@ func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(policy.AddToScheme(scheme))
 	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion))
+	// TODO (mortent): priority should change after 1.21. See https://github.com/kubernetes/kubernetes/pull/95718#discussion_r520969477
+	utilruntime.Must(scheme.SetVersionPriority(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion))
 }

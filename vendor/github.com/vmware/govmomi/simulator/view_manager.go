@@ -19,6 +19,7 @@ package simulator
 import (
 	"reflect"
 
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -53,14 +54,25 @@ var entities = []struct {
 	{reflect.TypeOf((*mo.VmwareDistributedVirtualSwitch)(nil)).Elem(), false},
 }
 
-func (m *ViewManager) init(*Registry) {
-	m.entities = make(map[string]bool, len(entities))
-	for _, e := range entities {
-		m.entities[e.Type.Name()] = e.Container
+func NewViewManager(ref types.ManagedObjectReference) object.Reference {
+	s := &ViewManager{
+		entities: make(map[string]bool),
 	}
+
+	s.Self = ref
+
+	for _, e := range entities {
+		s.entities[e.Type.Name()] = e.Container
+	}
+
+	return s
 }
 
 func destroyView(ref types.ManagedObjectReference) soap.HasFault {
+	m := Map.ViewManager()
+
+	RemoveReference(&m.ViewList, ref)
+
 	return &methods.DestroyViewBody{
 		Res: &types.DestroyViewResponse{},
 	}
@@ -69,13 +81,13 @@ func destroyView(ref types.ManagedObjectReference) soap.HasFault {
 func (m *ViewManager) CreateContainerView(ctx *Context, req *types.CreateContainerView) soap.HasFault {
 	body := &methods.CreateContainerViewBody{}
 
-	root := ctx.Map.Get(req.Container)
+	root := Map.Get(req.Container)
 	if root == nil {
 		body.Fault_ = Fault("", &types.ManagedObjectNotFound{Obj: req.Container})
 		return body
 	}
 
-	if !m.entities[root.Reference().Type] {
+	if m.entities[root.Reference().Type] != true {
 		body.Fault_ = Fault("", &types.InvalidArgument{InvalidProperty: "container"})
 		return body
 	}
@@ -86,7 +98,6 @@ func (m *ViewManager) CreateContainerView(ctx *Context, req *types.CreateContain
 			Recursive: req.Recursive,
 			Type:      req.Type,
 		},
-		root,
 		make(map[string]bool),
 	}
 
@@ -106,7 +117,9 @@ func (m *ViewManager) CreateContainerView(ctx *Context, req *types.CreateContain
 		}
 	}
 
-	ctx.Session.setReference(container)
+	ctx.Session.Put(container)
+
+	m.ViewList = append(m.ViewList, container.Reference())
 
 	body.Res = &types.CreateContainerViewResponse{
 		Returnval: container.Self,
@@ -115,22 +128,17 @@ func (m *ViewManager) CreateContainerView(ctx *Context, req *types.CreateContain
 	seen := make(map[types.ManagedObjectReference]bool)
 	container.add(root, seen)
 
-	ctx.Session.Registry.Put(container)
-	ctx.Map.AddHandler(container)
-
 	return body
 }
 
 type ContainerView struct {
 	mo.ContainerView
 
-	root  mo.Reference
 	types map[string]bool
 }
 
 func (v *ContainerView) DestroyView(ctx *Context, c *types.DestroyView) soap.HasFault {
-	ctx.Map.RemoveHandler(v)
-	ctx.Session.Remove(ctx, c.This)
+	ctx.Session.Remove(c.This)
 	return destroyView(c.This)
 }
 
@@ -143,30 +151,26 @@ func (v *ContainerView) include(o types.ManagedObjectReference) bool {
 }
 
 func walk(root mo.Reference, f func(child types.ManagedObjectReference)) {
-	if _, ok := root.(types.ManagedObjectReference); ok || root == nil {
-		return
-	}
-
 	var children []types.ManagedObjectReference
 
-	switch e := getManagedObject(root).Addr().Interface().(type) {
-	case *mo.Datacenter:
+	switch e := root.(type) {
+	case *Datacenter:
 		children = []types.ManagedObjectReference{e.VmFolder, e.HostFolder, e.DatastoreFolder, e.NetworkFolder}
-	case *mo.Folder:
+	case *Folder:
 		children = e.ChildEntity
 	case *mo.ComputeResource:
 		children = e.Host
 		children = append(children, *e.ResourcePool)
-	case *mo.ClusterComputeResource:
+	case *ClusterComputeResource:
 		children = e.Host
 		children = append(children, *e.ResourcePool)
-	case *mo.ResourcePool:
-		children = e.ResourcePool
-		children = append(children, e.Vm...)
-	case *mo.VirtualApp:
+	case *ResourcePool:
 		children = e.ResourcePool.ResourcePool
 		children = append(children, e.Vm...)
-	case *mo.HostSystem:
+	case *VirtualApp:
+		children = e.ResourcePool.ResourcePool
+		children = append(children, e.Vm...)
+	case *HostSystem:
 		children = e.Vm
 	}
 
@@ -178,7 +182,7 @@ func walk(root mo.Reference, f func(child types.ManagedObjectReference)) {
 func (v *ContainerView) add(root mo.Reference, seen map[types.ManagedObjectReference]bool) {
 	walk(root, func(child types.ManagedObjectReference) {
 		if v.include(child) {
-			if !seen[child] {
+			if seen[child] == false {
 				seen[child] = true
 				v.View = append(v.View, child)
 			}
@@ -189,37 +193,6 @@ func (v *ContainerView) add(root mo.Reference, seen map[types.ManagedObjectRefer
 		}
 	})
 }
-
-func (v *ContainerView) find(root mo.Reference, ref types.ManagedObjectReference, found *bool) bool {
-	walk(root, func(child types.ManagedObjectReference) {
-		if *found {
-			return
-		}
-		if child == ref {
-			*found = true
-			return
-		}
-		if v.Recursive {
-			*found = v.find(Map.Get(child), ref, found)
-		}
-	})
-
-	return *found
-}
-
-func (v *ContainerView) PutObject(obj mo.Reference) {
-	ref := obj.Reference()
-
-	if v.include(ref) && v.find(v.root, ref, types.NewBool(false)) {
-		Map.Update(v, []types.PropertyChange{{Name: "view", Val: append(v.View, ref)}})
-	}
-}
-
-func (v *ContainerView) RemoveObject(ctx *Context, obj types.ManagedObjectReference) {
-	ctx.Map.RemoveReference(ctx, v, &v.View, obj)
-}
-
-func (*ContainerView) UpdateObject(mo.Reference, []types.PropertyChange) {}
 
 func (m *ViewManager) CreateListView(ctx *Context, req *types.CreateListView) soap.HasFault {
 	body := new(methods.CreateListViewBody)
@@ -259,7 +232,7 @@ func (v *ListView) add(refs []types.ManagedObjectReference) *types.ManagedObject
 }
 
 func (v *ListView) DestroyView(ctx *Context, c *types.DestroyView) soap.HasFault {
-	ctx.Session.Remove(ctx, c.This)
+	ctx.Session.Remove(c.This)
 	return destroyView(c.This)
 }
 

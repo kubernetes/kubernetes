@@ -1,0 +1,14 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - thockin
+  - andrewsykim
+approvers:
+  - thockin
+  - andrewsykim
+labels:
+  - sig/network
+  - area/ipvs
+emeritus_approvers:
+  - lbernail
+  - m1093782566

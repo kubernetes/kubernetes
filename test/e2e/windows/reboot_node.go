@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,7 +39,7 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 	})
 
 	f := framework.NewDefaultFramework("reboot-host-test-windows")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a reboot process on the host/node", func(ctx context.Context) {
 
@@ -169,7 +168,7 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
-		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
+		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 
 		ginkgo.By("Waiting for Windows worker rebooting")
 
@@ -196,10 +195,10 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 		}
 
 		ginkgo.By("Checking whether agn-test-pod is rebooted")
-		gomega.Expect(restartCount).To(gomega.Equal(1), "restart count of agn-test-pod is 1")
+		framework.ExpectEqual(restartCount, 1)
 
 		agnPodOut, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, agnPod.Name, metav1.GetOptions{})
-		gomega.Expect(agnPodOut.Status.Phase).To(gomega.Equal(v1.PodRunning))
+		framework.ExpectEqual(agnPodOut.Status.Phase, v1.PodRunning)
 		framework.ExpectNoError(err, "getting pod info after reboot")
 		assertConsistentConnectivity(ctx, f, nginxPod.ObjectMeta.Name, "linux", linuxCheck(agnPodOut.Status.PodIP, 80))
 
@@ -252,6 +251,6 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
-		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
+		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 })

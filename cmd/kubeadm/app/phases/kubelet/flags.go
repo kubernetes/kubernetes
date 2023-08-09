@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	nodeutil "k8s.io/component-helpers/node/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -46,7 +45,7 @@ type kubeletFlagsOpts struct {
 // - "hostname-override" flag in NodeRegistrationOptions.KubeletExtraArgs
 // It also returns the hostname or an error if getting the hostname failed.
 func GetNodeNameAndHostname(cfg *kubeadmapi.NodeRegistrationOptions) (string, string, error) {
-	hostname, err := nodeutil.GetHostname("")
+	hostname, err := kubeadmutil.GetHostname("")
 	nodeName := hostname
 	if cfg.Name != "" {
 		nodeName = cfg.Name

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -91,7 +89,7 @@ func (f *fakePodPullingTimeRecorder) RecordImageStartedPulling(podUID types.UID)
 
 func (f *fakePodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID) {}
 
-func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring, tracer trace.Tracer) (*kubeGenericRuntimeManager, error) {
+func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
 	ctx := context.Background()
 	recorder := &record.FakeRecorder{}
 	logManager, err := logs.NewContainerLogManager(runtimeService, osInterface, "1", 2)
@@ -114,7 +112,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		internalLifecycle:      cm.NewFakeInternalContainerLifecycle(),
 		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
 		logManager:             logManager,
-		memoryThrottlingFactor: 0.9,
+		memoryThrottlingFactor: 0.8,
 	}
 
 	typedVersion, err := runtimeService.Version(ctx, kubeRuntimeAPIVersion)
@@ -123,7 +121,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 	}
 
 	podStateProvider := newFakePodStateProvider()
-	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager, tracer)
+	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
 	kubeRuntimeManager.podStateProvider = podStateProvider
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
@@ -131,8 +129,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		kubeRuntimeManager,
 		flowcontrol.NewBackOff(time.Second, 300*time.Second),
 		false,
-		utilpointer.Int32Ptr(0), // No limit on max parallel image pulls,
-		0,                       // Disable image pull throttling by setting QPS to 0,
+		0, // Disable image pull throttling by setting QPS to 0,
 		0,
 		&fakePodPullingTimeRecorder{},
 	)

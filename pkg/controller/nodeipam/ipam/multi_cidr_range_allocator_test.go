@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	cidrset "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/multicidrset"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
@@ -83,8 +82,8 @@ func getTestNodeSelector(requirements []testNodeSelectorRequirement) string {
 		testNodeSelector.NodeSelectorTerms = append(testNodeSelector.NodeSelectorTerms, nst)
 	}
 
-	selector, _ := nodeSelectorAsSelector(testNodeSelector)
-	return selector.String()
+	marshalledSelector, _ := testNodeSelector.Marshal()
+	return string(marshalledSelector)
 }
 
 func getTestCidrMap(testClusterCIDRMap map[string][]*testClusterCIDR) map[string][]*cidrset.ClusterCIDR {
@@ -473,7 +472,6 @@ func TestMultiCIDROccupyPreExistingCIDR(t *testing.T) {
 	}
 
 	// test function
-	_, ctx := ktesting.NewTestContext(t)
 	for _, tc := range testCaseMultiCIDRs {
 		t.Run(tc.description, func(t *testing.T) {
 			// Initialize the range allocator.
@@ -483,7 +481,7 @@ func TestMultiCIDROccupyPreExistingCIDR(t *testing.T) {
 			fakeClusterCIDRInformer := fakeInformerFactory.Networking().V1alpha1().ClusterCIDRs()
 			nodeList, _ := tc.fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
 
-			_, err := NewMultiCIDRRangeAllocator(ctx, tc.fakeNodeHandler, fakeNodeInformer, fakeClusterCIDRInformer, tc.allocatorParams, nodeList, tc.testCIDRMap)
+			_, err := NewMultiCIDRRangeAllocator(tc.fakeNodeHandler, fakeNodeInformer, fakeClusterCIDRInformer, tc.allocatorParams, nodeList, tc.testCIDRMap)
 			if err == nil && tc.ctrlCreateFail {
 				t.Fatalf("creating range allocator was expected to fail, but it did not")
 			}
@@ -1178,8 +1176,6 @@ func TestMultiCIDRAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		},
 	}
 
-	logger, ctx := ktesting.NewTestContext(t)
-
 	// test function
 	testFunc := func(tc testCaseMultiCIDR) {
 		nodeList, _ := tc.fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
@@ -1188,7 +1184,7 @@ func TestMultiCIDRAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		fakeClient := &fake.Clientset{}
 		fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
 		fakeClusterCIDRInformer := fakeInformerFactory.Networking().V1alpha1().ClusterCIDRs()
-		allocator, err := NewMultiCIDRRangeAllocator(ctx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), fakeClusterCIDRInformer, tc.allocatorParams, nodeList, tc.testCIDRMap)
+		allocator, err := NewMultiCIDRRangeAllocator(tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), fakeClusterCIDRInformer, tc.allocatorParams, nodeList, tc.testCIDRMap)
 		if err != nil {
 			t.Errorf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
 			return
@@ -1233,7 +1229,7 @@ func TestMultiCIDRAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			if node.Spec.PodCIDRs == nil {
 				updateCount++
 			}
-			if err := allocator.AllocateOrOccupyCIDR(logger, node); err != nil {
+			if err := allocator.AllocateOrOccupyCIDR(node); err != nil {
 				t.Errorf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
 			}
 		}
@@ -1311,15 +1307,13 @@ func TestMultiCIDRAllocateOrOccupyCIDRFailure(t *testing.T) {
 		},
 	}
 
-	logger, ctx := ktesting.NewTestContext(t)
-
 	testFunc := func(tc testCaseMultiCIDR) {
 		fakeClient := &fake.Clientset{}
 		fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
 		fakeClusterCIDRInformer := fakeInformerFactory.Networking().V1alpha1().ClusterCIDRs()
 
 		// Initialize the range allocator.
-		allocator, err := NewMultiCIDRRangeAllocator(ctx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), fakeClusterCIDRInformer, tc.allocatorParams, nil, tc.testCIDRMap)
+		allocator, err := NewMultiCIDRRangeAllocator(tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), fakeClusterCIDRInformer, tc.allocatorParams, nil, tc.testCIDRMap)
 		if err != nil {
 			t.Logf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
 		}
@@ -1358,7 +1352,7 @@ func TestMultiCIDRAllocateOrOccupyCIDRFailure(t *testing.T) {
 			}
 		}
 
-		if err := allocator.AllocateOrOccupyCIDR(logger, tc.fakeNodeHandler.Existing[0]); err == nil {
+		if err := allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0]); err == nil {
 			t.Errorf("%v: unexpected success in AllocateOrOccupyCIDR: %v", tc.description, err)
 		}
 		// We don't expect any updates, so just sleep for some time
@@ -1503,13 +1497,13 @@ func TestMultiCIDRReleaseCIDRSuccess(t *testing.T) {
 			},
 		},
 	}
-	logger, ctx := ktesting.NewTestContext(t)
+
 	testFunc := func(tc releasetestCaseMultiCIDR) {
 		fakeClient := &fake.Clientset{}
 		fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
 		fakeClusterCIDRInformer := fakeInformerFactory.Networking().V1alpha1().ClusterCIDRs()
 		// Initialize the range allocator.
-		allocator, _ := NewMultiCIDRRangeAllocator(ctx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), fakeClusterCIDRInformer, tc.allocatorParams, nil, tc.testCIDRMap)
+		allocator, _ := NewMultiCIDRRangeAllocator(tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), fakeClusterCIDRInformer, tc.allocatorParams, nil, tc.testCIDRMap)
 		rangeAllocator, ok := allocator.(*multiCIDRRangeAllocator)
 		if !ok {
 			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
@@ -1545,7 +1539,7 @@ func TestMultiCIDRReleaseCIDRSuccess(t *testing.T) {
 			}
 		}
 
-		err := allocator.AllocateOrOccupyCIDR(logger, tc.fakeNodeHandler.Existing[0])
+		err := allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0])
 		if len(tc.expectedAllocatedCIDRFirstRound) != 0 {
 			if err != nil {
 				t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
@@ -1575,12 +1569,12 @@ func TestMultiCIDRReleaseCIDRSuccess(t *testing.T) {
 				},
 			}
 			nodeToRelease.Spec.PodCIDRs = cidrToRelease
-			err = allocator.ReleaseCIDR(logger, &nodeToRelease)
+			err = allocator.ReleaseCIDR(&nodeToRelease)
 			if err != nil {
 				t.Fatalf("%v: unexpected error in ReleaseCIDR: %v", tc.description, err)
 			}
 		}
-		if err = allocator.AllocateOrOccupyCIDR(logger, tc.fakeNodeHandler.Existing[0]); err != nil {
+		if err = allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0]); err != nil {
 			t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
 		}
 		if err := test.WaitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, 1, wait.ForeverTestTimeout); err != nil {
@@ -1619,7 +1613,7 @@ type clusterCIDRController struct {
 	clusterCIDRStore cache.Store
 }
 
-func newController(ctx context.Context) (*fake.Clientset, *clusterCIDRController) {
+func newController() (*fake.Clientset, *clusterCIDRController) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
@@ -1662,7 +1656,7 @@ func newController(ctx context.Context) (*fake.Clientset, *clusterCIDRController
 	testCIDRMap := make(map[string][]*cidrset.ClusterCIDR, 0)
 
 	// Initialize the range allocator.
-	ra, _ := NewMultiCIDRRangeAllocator(ctx, client, nodeInformer, cccInformer, allocatorParams, nil, testCIDRMap)
+	ra, _ := NewMultiCIDRRangeAllocator(client, nodeInformer, cccInformer, allocatorParams, nil, testCIDRMap)
 	cccController := ra.(*multiCIDRRangeAllocator)
 
 	cccController.clusterCIDRSynced = alwaysReady
@@ -1676,8 +1670,8 @@ func newController(ctx context.Context) (*fake.Clientset, *clusterCIDRController
 // Ensure default ClusterCIDR is created during bootstrap.
 func TestClusterCIDRDefault(t *testing.T) {
 	defaultCCC := makeClusterCIDR(defaultClusterCIDRName, "192.168.0.0/16", "", 8, nil)
-	_, ctx := ktesting.NewTestContext(t)
-	client, _ := newController(ctx)
+
+	client, _ := newController()
 	createdCCC, err := client.NetworkingV1alpha1().ClusterCIDRs().Get(context.TODO(), defaultClusterCIDRName, metav1.GetOptions{})
 	assert.Nil(t, err, "Expected no error getting clustercidr objects")
 	assert.Equal(t, defaultCCC.Spec, createdCCC.Spec)
@@ -1757,11 +1751,11 @@ func TestSyncClusterCIDRCreate(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	_, ctx := ktesting.NewTestContext(t)
-	client, cccController := newController(ctx)
+
+	client, cccController := newController()
 	for _, tc := range tests {
 		cccController.clusterCIDRStore.Add(tc.ccc)
-		err := cccController.syncClusterCIDR(ctx, tc.ccc.Name)
+		err := cccController.syncClusterCIDR(tc.ccc.Name)
 		if tc.wantErr {
 			assert.Error(t, err)
 			continue
@@ -1778,32 +1772,30 @@ func TestSyncClusterCIDRCreate(t *testing.T) {
 
 // Ensure syncClusterCIDR for ClusterCIDR delete removes the ClusterCIDR.
 func TestSyncClusterCIDRDelete(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	_, cccController := newController(ctx)
+	_, cccController := newController()
 
 	testCCC := makeClusterCIDR("testing-1", "10.1.0.0/16", "", 8, makeNodeSelector("foo", v1.NodeSelectorOpIn, []string{"bar"}))
 
 	cccController.clusterCIDRStore.Add(testCCC)
-	err := cccController.syncClusterCIDR(ctx, testCCC.Name)
+	err := cccController.syncClusterCIDR(testCCC.Name)
 	assert.NoError(t, err)
 
 	deletionTimestamp := metav1.Now()
 	testCCC.DeletionTimestamp = &deletionTimestamp
 	cccController.clusterCIDRStore.Update(testCCC)
-	err = cccController.syncClusterCIDR(ctx, testCCC.Name)
+	err = cccController.syncClusterCIDR(testCCC.Name)
 	assert.NoError(t, err)
 }
 
 // Ensure syncClusterCIDR for ClusterCIDR delete does not remove ClusterCIDR
 // if a node is associated with the ClusterCIDR.
 func TestSyncClusterCIDRDeleteWithNodesAssociated(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	client, cccController := newController(ctx)
+	client, cccController := newController()
 
 	testCCC := makeClusterCIDR("testing-1", "10.1.0.0/16", "", 8, makeNodeSelector("foo", v1.NodeSelectorOpIn, []string{"bar"}))
 
 	cccController.clusterCIDRStore.Add(testCCC)
-	err := cccController.syncClusterCIDR(ctx, testCCC.Name)
+	err := cccController.syncClusterCIDR(testCCC.Name)
 	assert.NoError(t, err)
 
 	// Mock the IPAM controller behavior associating node with ClusterCIDR.
@@ -1817,7 +1809,7 @@ func TestSyncClusterCIDRDeleteWithNodesAssociated(t *testing.T) {
 	deletionTimestamp := metav1.Now()
 	createdCCC.DeletionTimestamp = &deletionTimestamp
 	cccController.clusterCIDRStore.Update(createdCCC)
-	err = cccController.syncClusterCIDR(ctx, createdCCC.Name)
+	err = cccController.syncClusterCIDR(createdCCC.Name)
 	assert.Error(t, err, fmt.Sprintf("ClusterCIDR %s marked as terminating, won't be deleted until all associated nodes are deleted", createdCCC.Name))
 }
 

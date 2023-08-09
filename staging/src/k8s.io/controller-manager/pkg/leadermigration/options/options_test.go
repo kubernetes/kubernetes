@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/spf13/pflag"
 
 	"k8s.io/controller-manager/config"
@@ -107,13 +105,13 @@ apiVersion: controllermanager.config.k8s.io/v1
 kind: LeaderMigrationConfiguration
 leaderName: test-leader-migration
 controllerLeaders:
-  - name: route-controller
+  - name: route
     component: "*"
-  - name: service-controller
+  - name: service
     component: "*"
-  - name: cloud-node-lifecycle-controller
+  - name: cloud-node-lifecycle
     component: "*"
-  - name: node-ipam-controller
+  - name: nodeipam
     component: "*"
 `,
 			expectErr: false,
@@ -122,19 +120,19 @@ controllerLeaders:
 				ResourceLock: "leases",
 				ControllerLeaders: []config.ControllerLeaderConfiguration{
 					{
-						Name:      "route-controller",
+						Name:      "route",
 						Component: "*",
 					},
 					{
-						Name:      "service-controller",
+						Name:      "service",
 						Component: "*",
 					},
 					{
-						Name:      "cloud-node-lifecycle-controller",
+						Name:      "cloud-node-lifecycle",
 						Component: "*",
 					},
 					{
-						Name:      "node-ipam-controller",
+						Name:      "nodeipam",
 						Component: "*",
 					},
 				},
@@ -148,13 +146,13 @@ apiVersion: controllermanager.config.k8s.io/v1
 kind: LeaderMigrationConfiguration
 leaderName: test-leader-migration
 controllerLeaders:
-  - name: route-controller
+  - name: route
     component: "cloud-controller-manager"
-  - name: service-controller
+  - name: service
     component: "cloud-controller-manager"
-  - name: cloud-node-lifecycle-controller
+  - name: cloud-node-lifecycle
     component: "cloud-controller-manager"
-  - name: node-ipam-controller
+  - name: nodeipam
     component: "kube-controller-manager"
 `,
 			expectErr: false,
@@ -163,19 +161,19 @@ controllerLeaders:
 				ResourceLock: "leases",
 				ControllerLeaders: []config.ControllerLeaderConfiguration{
 					{
-						Name:      "route-controller",
+						Name:      "route",
 						Component: "cloud-controller-manager",
 					},
 					{
-						Name:      "service-controller",
+						Name:      "service",
 						Component: "cloud-controller-manager",
 					},
 					{
-						Name:      "cloud-node-lifecycle-controller",
+						Name:      "cloud-node-lifecycle",
 						Component: "cloud-controller-manager",
 					},
 					{
-						Name:      "node-ipam-controller",
+						Name:      "nodeipam",
 						Component: "kube-controller-manager",
 					},
 				},
@@ -190,7 +188,7 @@ controllerLeaders:
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer utiltesting.CloseAndRemove(t, configFile)
+				defer os.Remove(configFile.Name())
 				err = os.WriteFile(configFile.Name(), []byte(tc.configContent), os.FileMode(0755))
 				if err != nil {
 					t.Fatal(err)

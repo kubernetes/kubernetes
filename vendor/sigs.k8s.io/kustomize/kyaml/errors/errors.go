@@ -31,16 +31,6 @@ func Errorf(msg string, args ...interface{}) error {
 	return goerrors.Wrap(fmt.Errorf(msg, args...), 1)
 }
 
-// As finds the targeted error in any wrapped error.
-func As(err error, target interface{}) bool {
-	return goerrors.As(err, target)
-}
-
-// Is detects whether the error is equal to a given error.
-func Is(err error, target error) bool {
-	return goerrors.Is(err, target)
-}
-
 // GetStack returns a stack trace for the error if it has one
 func GetStack(err error) string {
 	if e, ok := err.(*goerrors.Error); ok {

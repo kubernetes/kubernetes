@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"io"
+	"log"
 	"os"
 	"runtime"
 	"sort"
@@ -81,7 +81,7 @@ type DB struct {
 	NoFreelistSync bool
 
 	// FreelistType sets the backend freelist type. There are two options. Array which is simple but endures
-	// dramatic performance degradation if database is large and fragmentation in freelist is common.
+	// dramatic performance degradation if database is large and framentation in freelist is common.
 	// The alternative one is using hashmap, it is faster in almost all circumstances
 	// but it doesn't guarantee that it offers the smallest page id available. In normal case it is safe.
 	// The default type is array
@@ -94,11 +94,6 @@ type DB struct {
 	//
 	// https://github.com/boltdb/bolt/issues/284
 	NoGrowSync bool
-
-	// When `true`, bbolt will always load the free pages when opening the DB.
-	// When opening db in write mode, this flag will always automatically
-	// set to `true`.
-	PreLoadFreelist bool
 
 	// If you want to read the entire database fast, you can set MmapFlag to
 	// syscall.MAP_POPULATE on Linux 2.6.23+ for sequential read-ahead.
@@ -134,9 +129,6 @@ type DB struct {
 	path     string
 	openFile func(string, int, os.FileMode) (*os.File, error)
 	file     *os.File
-	// `dataref` isn't used at all on Windows, and the golangci-lint
-	// always fails on Windows platform.
-	//nolint
 	dataref  []byte // mmap'ed readonly, write throws SEGV
 	data     *[maxMapSize]byte
 	datasz   int
@@ -201,7 +193,6 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	db.NoGrowSync = options.NoGrowSync
 	db.MmapFlags = options.MmapFlags
 	db.NoFreelistSync = options.NoFreelistSync
-	db.PreLoadFreelist = options.PreLoadFreelist
 	db.FreelistType = options.FreelistType
 	db.Mlock = options.Mlock
 
@@ -214,9 +205,6 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	if options.ReadOnly {
 		flag = os.O_RDONLY
 		db.readOnly = true
-	} else {
-		// always load free pages in write mode
-		db.PreLoadFreelist = true
 	}
 
 	db.openFile = options.OpenFile
@@ -264,9 +252,21 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 			return nil, err
 		}
 	} else {
-		// try to get the page size from the metadata pages
-		if pgSize, err := db.getPageSize(); err == nil {
-			db.pageSize = pgSize
+		// Read the first meta page to determine the page size.
+		var buf [0x1000]byte
+		// If we can't read the page size, but can read a page, assume
+		// it's the same as the OS or one given -- since that's how the
+		// page size was chosen in the first place.
+		//
+		// If the first page is invalid and this OS uses a different
+		// page size than what the database was created with then we
+		// are out of luck and cannot access the database.
+		//
+		// TODO: scan for next page
+		if bw, err := db.file.ReadAt(buf[:], 0); err == nil && bw == len(buf) {
+			if m := db.pageInBuffer(buf[:], 0).meta(); m.validate() == nil {
+				db.pageSize = int(m.pageSize)
+			}
 		} else {
 			_ = db.close()
 			return nil, ErrInvalid
@@ -286,13 +286,11 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 		return nil, err
 	}
 
-	if db.PreLoadFreelist {
-		db.loadFreelist()
-	}
-
 	if db.readOnly {
 		return db, nil
 	}
+
+	db.loadFreelist()
 
 	// Flush freelist when transitioning from no sync to sync so
 	// NoFreelistSync unaware boltdb can open the db later.
@@ -309,96 +307,6 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 
 	// Mark the database as opened and return.
 	return db, nil
-}
-
-// getPageSize reads the pageSize from the meta pages. It tries
-// to read the first meta page firstly. If the first page is invalid,
-// then it tries to read the second page using the default page size.
-func (db *DB) getPageSize() (int, error) {
-	var (
-		meta0CanRead, meta1CanRead bool
-	)
-
-	// Read the first meta page to determine the page size.
-	if pgSize, canRead, err := db.getPageSizeFromFirstMeta(); err != nil {
-		// We cannot read the page size from page 0, but can read page 0.
-		meta0CanRead = canRead
-	} else {
-		return pgSize, nil
-	}
-
-	// Read the second meta page to determine the page size.
-	if pgSize, canRead, err := db.getPageSizeFromSecondMeta(); err != nil {
-		// We cannot read the page size from page 1, but can read page 1.
-		meta1CanRead = canRead
-	} else {
-		return pgSize, nil
-	}
-
-	// If we can't read the page size from both pages, but can read
-	// either page, then we assume it's the same as the OS or the one
-	// given, since that's how the page size was chosen in the first place.
-	//
-	// If both pages are invalid, and (this OS uses a different page size
-	// from what the database was created with or the given page size is
-	// different from what the database was created with), then we are out
-	// of luck and cannot access the database.
-	if meta0CanRead || meta1CanRead {
-		return db.pageSize, nil
-	}
-
-	return 0, ErrInvalid
-}
-
-// getPageSizeFromFirstMeta reads the pageSize from the first meta page
-func (db *DB) getPageSizeFromFirstMeta() (int, bool, error) {
-	var buf [0x1000]byte
-	var metaCanRead bool
-	if bw, err := db.file.ReadAt(buf[:], 0); err == nil && bw == len(buf) {
-		metaCanRead = true
-		if m := db.pageInBuffer(buf[:], 0).meta(); m.validate() == nil {
-			return int(m.pageSize), metaCanRead, nil
-		}
-	}
-	return 0, metaCanRead, ErrInvalid
-}
-
-// getPageSizeFromSecondMeta reads the pageSize from the second meta page
-func (db *DB) getPageSizeFromSecondMeta() (int, bool, error) {
-	var (
-		fileSize    int64
-		metaCanRead bool
-	)
-
-	// get the db file size
-	if info, err := db.file.Stat(); err != nil {
-		return 0, metaCanRead, err
-	} else {
-		fileSize = info.Size()
-	}
-
-	// We need to read the second meta page, so we should skip the first page;
-	// but we don't know the exact page size yet, it's chicken & egg problem.
-	// The solution is to try all the possible page sizes, which starts from 1KB
-	// and until 16MB (1024<<14) or the end of the db file
-	//
-	// TODO: should we support larger page size?
-	for i := 0; i <= 14; i++ {
-		var buf [0x1000]byte
-		var pos int64 = 1024 << uint(i)
-		if pos >= fileSize-1024 {
-			break
-		}
-		bw, err := db.file.ReadAt(buf[:], pos)
-		if (err == nil && bw == len(buf)) || (err == io.EOF && int64(bw) == (fileSize-pos)) {
-			metaCanRead = true
-			if m := db.pageInBuffer(buf[:], 0).meta(); m.validate() == nil {
-				return int(m.pageSize), metaCanRead, nil
-			}
-		}
-	}
-
-	return 0, metaCanRead, ErrInvalid
 }
 
 // loadFreelist reads the freelist if it is synced, or reconstructs it
@@ -464,8 +372,6 @@ func (db *DB) mmap(minsz int) error {
 	}
 
 	// Memory-map the data file as a byte slice.
-	// gofail: var mapError string
-	// return errors.New(mapError)
 	if err := mmap(db, size); err != nil {
 		return err
 	}
@@ -493,25 +399,11 @@ func (db *DB) mmap(minsz int) error {
 	return nil
 }
 
-func (db *DB) invalidate() {
-	db.dataref = nil
-	db.data = nil
-	db.datasz = 0
-
-	db.meta0 = nil
-	db.meta1 = nil
-}
-
 // munmap unmaps the data file from memory.
 func (db *DB) munmap() error {
-	defer db.invalidate()
-
-	// gofail: var unmapError string
-	// return errors.New(unmapError)
 	if err := munmap(db); err != nil {
 		return fmt.Errorf("unmap error: " + err.Error())
 	}
-
 	return nil
 }
 
@@ -660,7 +552,7 @@ func (db *DB) close() error {
 		if !db.readOnly {
 			// Unlock the file.
 			if err := funlock(db); err != nil {
-				return fmt.Errorf("bolt.Close(): funlock error: %w", err)
+				log.Printf("bolt.Close(): funlock error: %s", err)
 			}
 		}
 
@@ -717,13 +609,6 @@ func (db *DB) beginTx() (*Tx, error) {
 		return nil, ErrDatabaseNotOpen
 	}
 
-	// Exit if the database is not correctly mapped.
-	if db.data == nil {
-		db.mmaplock.RUnlock()
-		db.metalock.Unlock()
-		return nil, ErrInvalidMapping
-	}
-
 	// Create a transaction associated with the database.
 	t := &Tx{}
 	t.init(db)
@@ -763,12 +648,6 @@ func (db *DB) beginRWTx() (*Tx, error) {
 	if !db.opened {
 		db.rwlock.Unlock()
 		return nil, ErrDatabaseNotOpen
-	}
-
-	// Exit if the database is not correctly mapped.
-	if db.data == nil {
-		db.rwlock.Unlock()
-		return nil, ErrInvalidMapping
 	}
 
 	// Create a transaction associated with the database.
@@ -1045,7 +924,6 @@ func (db *DB) Stats() Stats {
 // This is for internal access to the raw data bytes from the C cursor, use
 // carefully, or not at all.
 func (db *DB) Info() *Info {
-	_assert(db.data != nil, "database file isn't correctly mapped")
 	return &Info{uintptr(unsafe.Pointer(&db.data[0])), db.pageSize}
 }
 
@@ -1072,7 +950,7 @@ func (db *DB) meta() *meta {
 		metaB = db.meta0
 	}
 
-	// Use higher meta page if valid. Otherwise, fallback to previous, if valid.
+	// Use higher meta page if valid. Otherwise fallback to previous, if valid.
 	if err := metaA.validate(); err == nil {
 		return metaA
 	} else if err := metaB.validate(); err == nil {
@@ -1125,7 +1003,7 @@ func (db *DB) grow(sz int) error {
 
 	// If the data is smaller than the alloc size then only allocate what's needed.
 	// Once it goes over the allocation size then allocate in chunks.
-	if db.datasz <= db.AllocSize {
+	if db.datasz < db.AllocSize {
 		sz = db.datasz
 	} else {
 		sz += db.AllocSize
@@ -1178,10 +1056,8 @@ func (db *DB) freepages() []pgid {
 			panic(fmt.Sprintf("freepages: failed to get all reachable pages (%v)", e))
 		}
 	}()
-	tx.checkBucket(&tx.root, reachable, nofreed, HexKVStringer(), ech)
+	tx.checkBucket(&tx.root, reachable, nofreed, ech)
 	close(ech)
-
-	// TODO: If check bucket reported any corruptions (ech) we shouldn't proceed to freeing the pages.
 
 	var fids []pgid
 	for i := pgid(2); i < db.meta().pgid; i++ {
@@ -1206,13 +1082,8 @@ type Options struct {
 	// under normal operation, but requires a full database re-sync during recovery.
 	NoFreelistSync bool
 
-	// PreLoadFreelist sets whether to load the free pages when opening
-	// the db file. Note when opening db in write mode, bbolt will always
-	// load the free pages.
-	PreLoadFreelist bool
-
 	// FreelistType sets the backend freelist type. There are two options. Array which is simple but endures
-	// dramatic performance degradation if database is large and fragmentation in freelist is common.
+	// dramatic performance degradation if database is large and framentation in freelist is common.
 	// The alternative one is using hashmap, it is faster in almost all circumstances
 	// but it doesn't guarantee that it offers the smallest page id available. In normal case it is safe.
 	// The default type is array
@@ -1316,7 +1187,7 @@ func (m *meta) validate() error {
 		return ErrInvalid
 	} else if m.version != version {
 		return ErrVersionMismatch
-	} else if m.checksum != m.sum64() {
+	} else if m.checksum != 0 && m.checksum != m.sum64() {
 		return ErrChecksum
 	}
 	return nil

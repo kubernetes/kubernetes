@@ -98,16 +98,14 @@ const doesnt = "this Starlark dialect does not "
 // These features are either not standard Starlark (yet), or deprecated
 // features of the BUILD language, so we put them behind flags.
 var (
+	AllowNestedDef      = false // allow def statements within function bodies
+	AllowLambda         = false // allow lambda expressions
+	AllowFloat          = false // allow floating point literals, the 'float' built-in, and x / y
 	AllowSet            = false // allow the 'set' built-in
 	AllowGlobalReassign = false // allow reassignment to top-level names; also, allow if/for/while at top-level
 	AllowRecursion      = false // allow while statements and recursive functions
+	AllowBitwise        = true  // obsolete; bitwise operations (&, |, ^, ~, <<, and >>) are always enabled
 	LoadBindsGlobally   = false // load creates global not file-local bindings (deprecated)
-
-	// obsolete flags for features that are now standard. No effect.
-	AllowNestedDef = true
-	AllowLambda    = true
-	AllowFloat     = true
-	AllowBitwise   = true
 )
 
 // File resolves the specified file and records information about the
@@ -216,8 +214,7 @@ type resolver struct {
 	// isGlobal may be nil.
 	isGlobal, isPredeclared, isUniversal func(name string) bool
 
-	loops   int // number of enclosing for/while loops
-	ifstmts int // number of enclosing if statements loops
+	loops int // number of enclosing for loops
 
 	errors ErrorList
 }
@@ -420,6 +417,9 @@ func (r *resolver) useToplevel(use use) (bind *Binding) {
 		r.predeclared[id.Name] = bind // save it
 	} else if r.isUniversal(id.Name) {
 		// use of universal name
+		if !AllowFloat && id.Name == "float" {
+			r.errorf(id.NamePos, doesnt+"support floating point")
+		}
 		if !AllowSet && id.Name == "set" {
 			r.errorf(id.NamePos, doesnt+"support sets")
 		}
@@ -497,10 +497,8 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 			r.errorf(stmt.If, "if statement not within a function")
 		}
 		r.expr(stmt.Cond)
-		r.ifstmts++
 		r.stmts(stmt.True)
 		r.stmts(stmt.False)
-		r.ifstmts--
 
 	case *syntax.AssignStmt:
 		r.expr(stmt.RHS)
@@ -508,6 +506,9 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		r.assign(stmt.LHS, isAugmented)
 
 	case *syntax.DefStmt:
+		if !AllowNestedDef && r.container().function != nil {
+			r.errorf(stmt.Def, doesnt+"support nested def")
+		}
 		r.bind(stmt.Name)
 		fn := &Function{
 			Name:   stmt.Name.Name,
@@ -550,13 +551,8 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		}
 
 	case *syntax.LoadStmt:
-		// A load statement may not be nested in any other statement.
 		if r.container().function != nil {
 			r.errorf(stmt.Load, "load statement within a function")
-		} else if r.loops > 0 {
-			r.errorf(stmt.Load, "load statement within a loop")
-		} else if r.ifstmts > 0 {
-			r.errorf(stmt.Load, "load statement within a conditional")
 		}
 
 		for i, from := range stmt.From {
@@ -601,6 +597,9 @@ func (r *resolver) assign(lhs syntax.Expr, isAugmented bool) {
 
 	case *syntax.TupleExpr:
 		// (x, y) = ...
+		if len(lhs.List) == 0 {
+			r.errorf(syntax.Start(lhs), "can't assign to ()")
+		}
 		if isAugmented {
 			r.errorf(syntax.Start(lhs), "can't use tuple expression in augmented assignment")
 		}
@@ -610,6 +609,9 @@ func (r *resolver) assign(lhs syntax.Expr, isAugmented bool) {
 
 	case *syntax.ListExpr:
 		// [x, y, z] = ...
+		if len(lhs.List) == 0 {
+			r.errorf(syntax.Start(lhs), "can't assign to []")
+		}
 		if isAugmented {
 			r.errorf(syntax.Start(lhs), "can't use list expression in augmented assignment")
 		}
@@ -632,6 +634,9 @@ func (r *resolver) expr(e syntax.Expr) {
 		r.use(e)
 
 	case *syntax.Literal:
+		if !AllowFloat && e.Token == syntax.FLOAT {
+			r.errorf(e.TokenPos, doesnt+"support floating point")
+		}
 
 	case *syntax.ListExpr:
 		for _, x := range e.List {
@@ -706,6 +711,9 @@ func (r *resolver) expr(e syntax.Expr) {
 		r.expr(e.X)
 
 	case *syntax.BinaryExpr:
+		if !AllowFloat && e.Op == syntax.SLASH {
+			r.errorf(e.OpPos, doesnt+"support floating point (use //)")
+		}
 		r.expr(e.X)
 		r.expr(e.Y)
 
@@ -740,13 +748,11 @@ func (r *resolver) expr(e syntax.Expr) {
 				// k=v
 				n++
 				if seenKwargs {
-					r.errorf(pos, "keyword argument may not follow **kwargs")
-				} else if seenVarargs {
-					r.errorf(pos, "keyword argument may not follow *args")
+					r.errorf(pos, "argument may not follow **kwargs")
 				}
 				x := binop.X.(*syntax.Ident)
 				if seenName[x.Name] {
-					r.errorf(x.NamePos, "keyword argument %q is repeated", x.Name)
+					r.errorf(x.NamePos, "keyword argument %s repeated", x.Name)
 				} else {
 					if seenName == nil {
 						seenName = make(map[string]bool)
@@ -758,9 +764,9 @@ func (r *resolver) expr(e syntax.Expr) {
 				// positional argument
 				p++
 				if seenVarargs {
-					r.errorf(pos, "positional argument may not follow *args")
+					r.errorf(pos, "argument may not follow *args")
 				} else if seenKwargs {
-					r.errorf(pos, "positional argument may not follow **kwargs")
+					r.errorf(pos, "argument may not follow **kwargs")
 				} else if len(seenName) > 0 {
 					r.errorf(pos, "positional argument may not follow named")
 				}
@@ -779,6 +785,9 @@ func (r *resolver) expr(e syntax.Expr) {
 		}
 
 	case *syntax.LambdaExpr:
+		if !AllowLambda {
+			r.errorf(e.Lambda, doesnt+"support lambda")
+		}
 		fn := &Function{
 			Name:   "lambda",
 			Pos:    e.Lambda,

@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -79,7 +78,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdServiceAccount(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			cmd.Flags().Set("local", "true")
@@ -115,7 +114,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 
 	outputFormat := "name"
 
-	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdServiceAccount(tf, streams)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
@@ -348,7 +347,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			streams := genericiooptions.NewTestIOStreamsDiscard()
+			streams := genericclioptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdServiceAccount(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			saConfig := SetServiceAccountOptions{
@@ -389,7 +388,7 @@ func TestServiceAccountValidation(t *testing.T) {
 
 			outputFormat := ""
 
-			streams := genericiooptions.NewTestIOStreamsDiscard()
+			streams := genericclioptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdServiceAccount(tf, streams)
 
 			saConfig := &SetServiceAccountOptions{

@@ -21,33 +21,31 @@ import (
 	"testing"
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
+	batch "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/pointer"
 )
 
-func newJob(completionTime, failedTime metav1.Time, ttl *int32) *batchv1.Job {
-	j := &batchv1.Job{
+func newJob(completionTime, failedTime metav1.Time, ttl *int32) *batch.Job {
+	j := &batch.Job{
 		TypeMeta: metav1.TypeMeta{Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: batchv1.JobSpec{
+		Spec: batch.JobSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
-			Template: corev1.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
 				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{Image: "foo/bar"},
 					},
 				},
@@ -56,12 +54,12 @@ func newJob(completionTime, failedTime metav1.Time, ttl *int32) *batchv1.Job {
 	}
 
 	if !completionTime.IsZero() {
-		c := batchv1.JobCondition{Type: batchv1.JobComplete, Status: corev1.ConditionTrue, LastTransitionTime: completionTime}
+		c := batch.JobCondition{Type: batch.JobComplete, Status: v1.ConditionTrue, LastTransitionTime: completionTime}
 		j.Status.Conditions = append(j.Status.Conditions, c)
 	}
 
 	if !failedTime.IsZero() {
-		c := batchv1.JobCondition{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, LastTransitionTime: failedTime}
+		c := batch.JobCondition{Type: batch.JobFailed, Status: v1.ConditionTrue, LastTransitionTime: failedTime}
 		j.Status.Conditions = append(j.Status.Conditions, c)
 	}
 
@@ -70,6 +68,11 @@ func newJob(completionTime, failedTime metav1.Time, ttl *int32) *batchv1.Job {
 	}
 
 	return j
+}
+
+func durationPointer(n int) *time.Duration {
+	s := time.Duration(n) * time.Second
+	return &s
 }
 
 func TestTimeLeft(t *testing.T) {
@@ -105,7 +108,7 @@ func TestTimeLeft(t *testing.T) {
 			completionTime:   now,
 			ttl:              pointer.Int32(0),
 			since:            &now.Time,
-			expectedTimeLeft: pointer.Duration(0 * time.Second),
+			expectedTimeLeft: durationPointer(0),
 			expectedExpireAt: now.Time,
 		},
 		{
@@ -113,7 +116,7 @@ func TestTimeLeft(t *testing.T) {
 			completionTime:   now,
 			ttl:              pointer.Int32(10),
 			since:            &now.Time,
-			expectedTimeLeft: pointer.Duration(10 * time.Second),
+			expectedTimeLeft: durationPointer(10),
 			expectedExpireAt: now.Add(10 * time.Second),
 		},
 		{
@@ -121,7 +124,7 @@ func TestTimeLeft(t *testing.T) {
 			completionTime:   metav1.NewTime(now.Add(-10 * time.Second)),
 			ttl:              pointer.Int32(15),
 			since:            &now.Time,
-			expectedTimeLeft: pointer.Duration(5 * time.Second),
+			expectedTimeLeft: durationPointer(5),
 			expectedExpireAt: now.Add(5 * time.Second),
 		},
 		{
@@ -136,7 +139,7 @@ func TestTimeLeft(t *testing.T) {
 			failedTime:       now,
 			ttl:              pointer.Int32(0),
 			since:            &now.Time,
-			expectedTimeLeft: pointer.Duration(0 * time.Second),
+			expectedTimeLeft: durationPointer(0),
 			expectedExpireAt: now.Time,
 		},
 		{
@@ -144,7 +147,7 @@ func TestTimeLeft(t *testing.T) {
 			failedTime:       now,
 			ttl:              pointer.Int32(10),
 			since:            &now.Time,
-			expectedTimeLeft: pointer.Duration(10 * time.Second),
+			expectedTimeLeft: durationPointer(10),
 			expectedExpireAt: now.Add(10 * time.Second),
 		},
 		{
@@ -152,17 +155,14 @@ func TestTimeLeft(t *testing.T) {
 			failedTime:       metav1.NewTime(now.Add(-10 * time.Second)),
 			ttl:              pointer.Int32(15),
 			since:            &now.Time,
-			expectedTimeLeft: pointer.Duration(5 * time.Second),
+			expectedTimeLeft: durationPointer(5),
 			expectedExpireAt: now.Add(5 * time.Second),
 		},
 	}
 
 	for _, tc := range testCases {
-
 		job := newJob(tc.completionTime, tc.failedTime, tc.ttl)
-		_, ctx := ktesting.NewTestContext(t)
-		logger := klog.FromContext(ctx)
-		gotTimeLeft, gotExpireAt, gotErr := timeLeft(logger, job, tc.since)
+		gotTimeLeft, gotExpireAt, gotErr := timeLeft(job, tc.since)
 		if tc.expectErr != (gotErr != nil) {
 			t.Errorf("%s: expected error is %t, got %t, error: %v", tc.name, tc.expectErr, gotErr != nil, gotErr)
 		}

@@ -217,16 +217,16 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	var migratedPlugins = map[string](func() bool){
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
-			return true
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 		},
 		csitranslationplugins.AWSEBSInTreePluginName: func() bool {
-			return true
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
 		},
 		csitranslationplugins.CinderInTreePluginName: func() bool {
 			return true
 		},
 		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
-			return true
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
 		},
 		csitranslationplugins.AzureFileInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)

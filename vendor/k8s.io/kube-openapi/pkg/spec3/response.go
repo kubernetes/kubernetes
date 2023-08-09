@@ -18,13 +18,10 @@ package spec3
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 
-	"github.com/go-openapi/swag"
-	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"github.com/go-openapi/swag"
 )
 
 // Responses holds the list of possible responses as they are returned from executing this operation
@@ -49,15 +46,13 @@ func (r *Responses) MarshalJSON() ([]byte, error) {
 }
 
 func (r *Responses) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, r)
-	}
 	if err := json.Unmarshal(data, &r.ResponsesProps); err != nil {
 		return err
 	}
 	if err := json.Unmarshal(data, &r.VendorExtensible); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -83,89 +78,23 @@ func (r ResponsesProps) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON unmarshals responses from JSON
 func (r *ResponsesProps) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, r)
-	}
-	var res map[string]json.RawMessage
+	var res map[string]*Response
 	if err := json.Unmarshal(data, &res); err != nil {
-		return err
+		return nil
 	}
 	if v, ok := res["default"]; ok {
-		value := Response{}
-		if err := json.Unmarshal(v, &value); err != nil {
-			return err
-		}
-		r.Default = &value
+		r.Default = v
 		delete(res, "default")
 	}
 	for k, v := range res {
-		// Take all integral keys
 		if nk, err := strconv.Atoi(k); err == nil {
 			if r.StatusCodeResponses == nil {
 				r.StatusCodeResponses = map[int]*Response{}
 			}
-			value := Response{}
-			if err := json.Unmarshal(v, &value); err != nil {
-				return err
-			}
-			r.StatusCodeResponses[nk] = &value
+			r.StatusCodeResponses[nk] = v
 		}
 	}
 	return nil
-}
-
-func (r *Responses) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) (err error) {
-	tok, err := dec.ReadToken()
-	if err != nil {
-		return err
-	}
-	switch k := tok.Kind(); k {
-	case 'n':
-		*r = Responses{}
-		return nil
-	case '{':
-		for {
-			tok, err := dec.ReadToken()
-			if err != nil {
-				return err
-			}
-			if tok.Kind() == '}' {
-				return nil
-			}
-			switch k := tok.String(); {
-			case internal.IsExtensionKey(k):
-				var ext any
-				if err := opts.UnmarshalNext(dec, &ext); err != nil {
-					return err
-				}
-
-				if r.Extensions == nil {
-					r.Extensions = make(map[string]any)
-				}
-				r.Extensions[k] = ext
-			case k == "default":
-				resp := Response{}
-				if err := opts.UnmarshalNext(dec, &resp); err != nil {
-					return err
-				}
-				r.ResponsesProps.Default = &resp
-			default:
-				if nk, err := strconv.Atoi(k); err == nil {
-					resp := Response{}
-					if err := opts.UnmarshalNext(dec, &resp); err != nil {
-						return err
-					}
-
-					if r.StatusCodeResponses == nil {
-						r.StatusCodeResponses = map[int]*Response{}
-					}
-					r.StatusCodeResponses[nk] = &resp
-				}
-			}
-		}
-	default:
-		return fmt.Errorf("unknown JSON kind: %v", k)
-	}
 }
 
 // Response describes a single response from an API Operation, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#responseObject
@@ -195,9 +124,6 @@ func (r *Response) MarshalJSON() ([]byte, error) {
 }
 
 func (r *Response) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, r)
-	}
 	if err := json.Unmarshal(data, &r.Refable); err != nil {
 		return err
 	}
@@ -207,22 +133,7 @@ func (r *Response) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &r.VendorExtensible); err != nil {
 		return err
 	}
-	return nil
-}
 
-func (r *Response) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
-	var x struct {
-		spec.Extensions
-		ResponseProps
-	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
-		return err
-	}
-	if err := internal.JSONRefFromMap(&r.Ref.Ref, x.Extensions); err != nil {
-		return err
-	}
-	r.Extensions = internal.SanitizeExtensions(x.Extensions)
-	r.ResponseProps = x.ResponseProps
 	return nil
 }
 
@@ -237,6 +148,7 @@ type ResponseProps struct {
 	// Links is a map of operations links that can be followed from the response
 	Links map[string]*Link `json:"links,omitempty"`
 }
+
 
 // Link represents a possible design-time link for a response, more at https://swagger.io/specification/#link-object
 type Link struct {
@@ -263,9 +175,6 @@ func (r *Link) MarshalJSON() ([]byte, error) {
 }
 
 func (r *Link) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, r)
-	}
 	if err := json.Unmarshal(data, &r.Refable); err != nil {
 		return err
 	}
@@ -276,22 +185,6 @@ func (r *Link) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	return nil
-}
-
-func (l *Link) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
-	var x struct {
-		spec.Extensions
-		LinkProps
-	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
-		return err
-	}
-	if err := internal.JSONRefFromMap(&l.Ref.Ref, x.Extensions); err != nil {
-		return err
-	}
-	l.Extensions = internal.SanitizeExtensions(x.Extensions)
-	l.LinkProps = x.LinkProps
 	return nil
 }
 

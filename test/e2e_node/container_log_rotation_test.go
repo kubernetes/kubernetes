@@ -43,7 +43,7 @@ const (
 
 var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("container-log-rotation-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when a container generates a lot of log", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.ContainerLogMaxFiles = testContainerLogMaxFiles

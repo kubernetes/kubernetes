@@ -92,11 +92,6 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	if flag.CommandLine.NArg() > 0 {
-		fmt.Fprintf(os.Stderr, "unknown additional command line arguments: %s", flag.CommandLine.Args())
-		os.Exit(1)
-	}
-
 	// Enable embedded FS file lookup as fallback
 	testfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
 	testfiles.AddFileSource(testfixtures.GetTestFixturesFS())
@@ -148,10 +143,6 @@ func TestE2E(t *testing.T) {
 
 var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
 	progressReporter.ProcessSpecReport(report)
-})
-
-var _ = ginkgo.ReportBeforeSuite(func(report ginkgo.Report) {
-	progressReporter.SetTestsTotal(report.PreRunStats.SpecsThatWillRun)
 })
 
 var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {

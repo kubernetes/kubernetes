@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -57,7 +56,7 @@ func TestSetEnvLocal(t *testing.T) {
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 	outputFormat := "name"
 
-	streams, _, buf, bufErr := genericiooptions.NewTestIOStreams()
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
 	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
@@ -72,7 +71,7 @@ func TestSetEnvLocal(t *testing.T) {
 	err = opts.RunEnv()
 	assert.NoError(t, err)
 	if bufErr.Len() > 0 {
-		t.Errorf("unexpected error: %s", bufErr.String())
+		t.Errorf("unexpected error: %s", string(bufErr.String()))
 	}
 	if !strings.Contains(buf.String(), "replicationcontroller/cassandra") {
 		t.Errorf("did not set env: %s", buf.String())
@@ -94,7 +93,7 @@ func TestSetEnvLocalNamespace(t *testing.T) {
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 	outputFormat := "yaml"
 
-	streams, _, buf, bufErr := genericiooptions.NewTestIOStreams()
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
 	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
@@ -109,7 +108,7 @@ func TestSetEnvLocalNamespace(t *testing.T) {
 	err = opts.RunEnv()
 	assert.NoError(t, err)
 	if bufErr.Len() > 0 {
-		t.Errorf("unexpected error: %s", bufErr.String())
+		t.Errorf("unexpected error: %s", string(bufErr.String()))
 	}
 	if !strings.Contains(buf.String(), "namespace: existing-ns") {
 		t.Errorf("did not set env: %s", buf.String())
@@ -131,7 +130,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
-	streams, _, buf, bufErr := genericiooptions.NewTestIOStreams()
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
 	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
@@ -146,7 +145,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	err = opts.RunEnv()
 	assert.NoError(t, err)
 	if bufErr.Len() > 0 {
-		t.Errorf("unexpected error: %s", bufErr.String())
+		t.Errorf("unexpected error: %s", string(bufErr.String()))
 	}
 	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {
@@ -513,7 +512,7 @@ func TestSetEnvRemote(t *testing.T) {
 			}
 
 			outputFormat := "yaml"
-			streams := genericiooptions.NewTestIOStreamsDiscard()
+			streams := genericclioptions.NewTestIOStreamsDiscard()
 			opts := NewEnvOptions(streams)
 			opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 			opts.Local = false
@@ -710,7 +709,7 @@ func TestSetEnvFromResource(t *testing.T) {
 			}
 
 			outputFormat := "yaml"
-			streams, _, _, errOut := genericiooptions.NewTestIOStreams()
+			streams, _, _, errOut := genericclioptions.NewTestIOStreams()
 			opts := NewEnvOptions(streams)
 			opts.From = input.from
 			opts.Keys = input.keys
@@ -814,7 +813,7 @@ func TestSetEnvRemoteWithSpecificContainers(t *testing.T) {
 					}
 				}),
 			}
-			streams := genericiooptions.NewTestIOStreamsDiscard()
+			streams := genericclioptions.NewTestIOStreamsDiscard()
 			opts := &EnvOptions{
 				PrintFlags:        genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml").WithTypeSetter(scheme.Scheme),
 				ContainerSelector: input.selector,
@@ -843,7 +842,7 @@ func TestSetEnvDoubleStdinUsage(t *testing.T) {
 	}
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
-	streams, bufIn, _, _ := genericiooptions.NewTestIOStreams()
+	streams, bufIn, _, _ := genericclioptions.NewTestIOStreams()
 	bufIn.WriteString("SOME_ENV_VAR_KEY=SOME_ENV_VAR_VAL")
 	opts := NewEnvOptions(streams)
 	opts.FilenameOptions = resource.FilenameOptions{

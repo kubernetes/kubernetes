@@ -143,7 +143,7 @@ func normalize(i interface{}) (map[string]interface{}, error) {
 	}
 
 	d := json.NewDecoder(bytes.NewReader(raw))
-	d.SetNumberType(json.UnmarshalJSONNumber)
+	d.UseNumber()
 
 	if err := d.Decode(&m); err != nil {
 		return nil, err

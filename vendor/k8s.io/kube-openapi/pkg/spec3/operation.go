@@ -19,10 +19,8 @@ package spec3
 import (
 	"encoding/json"
 
-	"github.com/go-openapi/swag"
-	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"github.com/go-openapi/swag"
 )
 
 // Operation describes a single API operation on a path, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#operationObject
@@ -48,26 +46,10 @@ func (o *Operation) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (o *Operation) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, o)
-	}
 	if err := json.Unmarshal(data, &o.OperationProps); err != nil {
 		return err
 	}
 	return json.Unmarshal(data, &o.VendorExtensible)
-}
-
-func (o *Operation) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
-	var x struct {
-		spec.Extensions
-		OperationProps
-	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
-		return err
-	}
-	o.Extensions = internal.SanitizeExtensions(x.Extensions)
-	o.OperationProps = x.OperationProps
-	return nil
 }
 
 // OperationProps describes a single API operation on a path, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#operationObject
@@ -91,7 +73,7 @@ type OperationProps struct {
 	// Deprecated declares this operation to be deprecated
 	Deprecated bool `json:"deprecated,omitempty"`
 	// SecurityRequirement holds a declaration of which security mechanisms can be used for this operation
-	SecurityRequirement []map[string][]string `json:"security,omitempty"`
+	SecurityRequirement []*SecurityRequirement `json:"security,omitempty"`
 	// Servers contains an alternative server array to service this operation
 	Servers []*Server `json:"servers,omitempty"`
 }

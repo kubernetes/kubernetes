@@ -17,10 +17,9 @@ limitations under the License.
 package hash
 
 import (
-	"fmt"
 	"hash"
 
-	"k8s.io/apimachinery/pkg/util/dump"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // DeepHashObject writes specified object to hash using the spew library
@@ -28,5 +27,11 @@ import (
 // ensuring the hash does not change when a pointer changes.
 func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
-	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
+	printer := spew.ConfigState{
+		Indent:         " ",
+		SortKeys:       true,
+		DisableMethods: true,
+		SpewKeys:       true,
+	}
+	printer.Fprintf(hasher, "%#v", objectToWrite)
 }

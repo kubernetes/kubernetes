@@ -48,13 +48,11 @@ func neighbours(value, matcher interface{}) (bool, error) {
 
 func equalMatchersToElements(matchers []interface{}) (elements []interface{}) {
 	for _, matcher := range matchers {
-		if equalMatcher, ok := matcher.(*EqualMatcher); ok {
-			elements = append(elements, equalMatcher.Expected)
-		} else if _, ok := matcher.(*BeNilMatcher); ok {
-			elements = append(elements, nil)
-		} else {
-			elements = append(elements, matcher)
+		equalMatcher, ok := matcher.(*EqualMatcher)
+		if ok {
+			matcher = equalMatcher.Expected
 		}
+		elements = append(elements, matcher)
 	}
 	return
 }
@@ -74,13 +72,11 @@ func flatten(elems []interface{}) []interface{} {
 
 func matchers(expectedElems []interface{}) (matchers []interface{}) {
 	for _, e := range flatten(expectedElems) {
-		if e == nil {
-			matchers = append(matchers, &BeNilMatcher{})
-		} else if matcher, isMatcher := e.(omegaMatcher); isMatcher {
-			matchers = append(matchers, matcher)
-		} else {
-			matchers = append(matchers, &EqualMatcher{Expected: e})
+		matcher, isMatcher := e.(omegaMatcher)
+		if !isMatcher {
+			matcher = &EqualMatcher{Expected: e}
 		}
+		matchers = append(matchers, matcher)
 	}
 	return
 }
@@ -93,14 +89,9 @@ func presentable(elems []interface{}) interface{} {
 	}
 
 	sv := reflect.ValueOf(elems)
-	firstEl := sv.Index(0)
-	if firstEl.IsNil() {
-		return elems
-	}
-	tt := firstEl.Elem().Type()
+	tt := sv.Index(0).Elem().Type()
 	for i := 1; i < sv.Len(); i++ {
-		el := sv.Index(i)
-		if el.IsNil() || (sv.Index(i).Elem().Type() != tt) {
+		if sv.Index(i).Elem().Type() != tt {
 			return elems
 		}
 	}

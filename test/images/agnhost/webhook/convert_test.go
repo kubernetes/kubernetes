@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 
 	v1 "k8s.io/api/admission/v1"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/diff"
 	admissionfuzzer "k8s.io/kubernetes/pkg/apis/admission/fuzzer"
 )
 
@@ -42,7 +42,7 @@ func TestConvertAdmissionRequestToV1(t *testing.T) {
 			converted := convertAdmissionRequestToV1(orig)
 			rt := convertAdmissionRequestToV1beta1(converted)
 			if !reflect.DeepEqual(orig, rt) {
-				t.Errorf("expected all request fields to be in converted object but found unaccounted for differences, diff:\n%s", cmp.Diff(orig, converted))
+				t.Errorf("expected all request fields to be in converted object but found unaccounted for differences, diff:\n%s", diff.ObjectReflectDiff(orig, converted))
 			}
 		})
 	}
@@ -57,7 +57,7 @@ func TestConvertAdmissionResponseToV1beta1(t *testing.T) {
 			converted := convertAdmissionResponseToV1beta1(orig)
 			rt := convertAdmissionResponseToV1(converted)
 			if !reflect.DeepEqual(orig, rt) {
-				t.Errorf("expected all fields to be in converted object but found unaccounted for differences, diff:\n%s", cmp.Diff(orig, converted))
+				t.Errorf("expected all fields to be in converted object but found unaccounted for differences, diff:\n%s", diff.ObjectReflectDiff(orig, converted))
 			}
 		})
 	}

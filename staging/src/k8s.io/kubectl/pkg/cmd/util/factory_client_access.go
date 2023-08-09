@@ -30,11 +30,10 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	openapiclient "k8s.io/client-go/openapi"
-	"k8s.io/client-go/openapi/cached"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/util/openapi"
+	openapivalidation "k8s.io/kubectl/pkg/util/openapi/validation"
 	"k8s.io/kubectl/pkg/validation"
 )
 
@@ -160,7 +159,7 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 	}
 
 	schema := validation.ConjunctiveSchema{
-		validation.NewSchemaValidation(resources),
+		openapivalidation.NewSchemaValidation(resources),
 		validation.NoDoubleKeySchema{},
 	}
 
@@ -169,18 +168,8 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 		return nil, err
 	}
 	// Create the FieldValidationVerifier for use in the ParamVerifyingSchema.
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return nil, err
-	}
-	// Memory-cache the OpenAPI V3 responses. The disk cache behavior is determined by
-	// the discovery client.
-	oapiV3Client := cached.NewClient(discoveryClient.OpenAPIV3())
-	queryParam := resource.QueryParamFieldValidation
-	primary := resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam)
-	secondary := resource.NewQueryParamVerifier(dynamicClient, f.openAPIGetter(), queryParam)
-	fallback := resource.NewFallbackQueryParamVerifier(primary, secondary)
-	return validation.NewParamVerifyingSchema(schema, fallback, string(validationDirective)), nil
+	verifier := resource.NewQueryParamVerifier(dynamicClient, f.openAPIGetter(), resource.QueryParamFieldValidation)
+	return validation.NewParamVerifyingSchema(schema, verifier, string(validationDirective)), nil
 }
 
 // OpenAPISchema returns metadata and structural information about
@@ -211,13 +200,4 @@ func (f *factoryImpl) openAPIGetter() discovery.OpenAPISchemaInterface {
 	})
 
 	return f.oapi
-}
-
-func (f *factoryImpl) OpenAPIV3Client() (openapiclient.Client, error) {
-	discovery, err := f.clientGetter.ToDiscoveryClient()
-	if err != nil {
-		return nil, err
-	}
-
-	return discovery.OpenAPIV3(), nil
 }

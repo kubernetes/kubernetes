@@ -26,6 +26,7 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
@@ -38,9 +39,9 @@ type FakeDaemonSets struct {
 	ns   string
 }
 
-var daemonsetsResource = v1beta1.SchemeGroupVersion.WithResource("daemonsets")
+var daemonsetsResource = schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "daemonsets"}
 
-var daemonsetsKind = v1beta1.SchemeGroupVersion.WithKind("DaemonSet")
+var daemonsetsKind = schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}
 
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
 func (c *FakeDaemonSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.DaemonSet, err error) {

@@ -19,7 +19,6 @@
 package binarylog
 
 import (
-	"context"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -27,7 +26,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
-	binlogpb "google.golang.org/grpc/binarylog/grpc_binarylog_v1"
+	pb "google.golang.org/grpc/binarylog/grpc_binarylog_v1"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -50,7 +49,7 @@ var idGen callIDGenerator
 
 // MethodLogger is the sub-logger for each method.
 type MethodLogger interface {
-	Log(context.Context, LogEntryConfig)
+	Log(LogEntryConfig)
 }
 
 // TruncatingMethodLogger is a method logger that truncates headers and messages
@@ -80,7 +79,7 @@ func NewTruncatingMethodLogger(h, m uint64) *TruncatingMethodLogger {
 // Build is an internal only method for building the proto message out of the
 // input event. It's made public to enable other library to reuse as much logic
 // in TruncatingMethodLogger as possible.
-func (ml *TruncatingMethodLogger) Build(c LogEntryConfig) *binlogpb.GrpcLogEntry {
+func (ml *TruncatingMethodLogger) Build(c LogEntryConfig) *pb.GrpcLogEntry {
 	m := c.toProto()
 	timestamp, _ := ptypes.TimestampProto(time.Now())
 	m.Timestamp = timestamp
@@ -88,22 +87,22 @@ func (ml *TruncatingMethodLogger) Build(c LogEntryConfig) *binlogpb.GrpcLogEntry
 	m.SequenceIdWithinCall = ml.idWithinCallGen.next()
 
 	switch pay := m.Payload.(type) {
-	case *binlogpb.GrpcLogEntry_ClientHeader:
+	case *pb.GrpcLogEntry_ClientHeader:
 		m.PayloadTruncated = ml.truncateMetadata(pay.ClientHeader.GetMetadata())
-	case *binlogpb.GrpcLogEntry_ServerHeader:
+	case *pb.GrpcLogEntry_ServerHeader:
 		m.PayloadTruncated = ml.truncateMetadata(pay.ServerHeader.GetMetadata())
-	case *binlogpb.GrpcLogEntry_Message:
+	case *pb.GrpcLogEntry_Message:
 		m.PayloadTruncated = ml.truncateMessage(pay.Message)
 	}
 	return m
 }
 
 // Log creates a proto binary log entry, and logs it to the sink.
-func (ml *TruncatingMethodLogger) Log(ctx context.Context, c LogEntryConfig) {
+func (ml *TruncatingMethodLogger) Log(c LogEntryConfig) {
 	ml.sink.Write(ml.Build(c))
 }
 
-func (ml *TruncatingMethodLogger) truncateMetadata(mdPb *binlogpb.Metadata) (truncated bool) {
+func (ml *TruncatingMethodLogger) truncateMetadata(mdPb *pb.Metadata) (truncated bool) {
 	if ml.headerMaxLen == maxUInt {
 		return false
 	}
@@ -122,7 +121,7 @@ func (ml *TruncatingMethodLogger) truncateMetadata(mdPb *binlogpb.Metadata) (tru
 			// but not counted towards the size limit.
 			continue
 		}
-		currentEntryLen := uint64(len(entry.GetKey())) + uint64(len(entry.GetValue()))
+		currentEntryLen := uint64(len(entry.Value))
 		if currentEntryLen > bytesLimit {
 			break
 		}
@@ -133,7 +132,7 @@ func (ml *TruncatingMethodLogger) truncateMetadata(mdPb *binlogpb.Metadata) (tru
 	return truncated
 }
 
-func (ml *TruncatingMethodLogger) truncateMessage(msgPb *binlogpb.Message) (truncated bool) {
+func (ml *TruncatingMethodLogger) truncateMessage(msgPb *pb.Message) (truncated bool) {
 	if ml.messageMaxLen == maxUInt {
 		return false
 	}
@@ -146,7 +145,7 @@ func (ml *TruncatingMethodLogger) truncateMessage(msgPb *binlogpb.Message) (trun
 
 // LogEntryConfig represents the configuration for binary log entry.
 type LogEntryConfig interface {
-	toProto() *binlogpb.GrpcLogEntry
+	toProto() *pb.GrpcLogEntry
 }
 
 // ClientHeader configs the binary log entry to be a ClientHeader entry.
@@ -160,10 +159,10 @@ type ClientHeader struct {
 	PeerAddr net.Addr
 }
 
-func (c *ClientHeader) toProto() *binlogpb.GrpcLogEntry {
+func (c *ClientHeader) toProto() *pb.GrpcLogEntry {
 	// This function doesn't need to set all the fields (e.g. seq ID). The Log
 	// function will set the fields when necessary.
-	clientHeader := &binlogpb.ClientHeader{
+	clientHeader := &pb.ClientHeader{
 		Metadata:   mdToMetadataProto(c.Header),
 		MethodName: c.MethodName,
 		Authority:  c.Authority,
@@ -171,16 +170,16 @@ func (c *ClientHeader) toProto() *binlogpb.GrpcLogEntry {
 	if c.Timeout > 0 {
 		clientHeader.Timeout = ptypes.DurationProto(c.Timeout)
 	}
-	ret := &binlogpb.GrpcLogEntry{
-		Type: binlogpb.GrpcLogEntry_EVENT_TYPE_CLIENT_HEADER,
-		Payload: &binlogpb.GrpcLogEntry_ClientHeader{
+	ret := &pb.GrpcLogEntry{
+		Type: pb.GrpcLogEntry_EVENT_TYPE_CLIENT_HEADER,
+		Payload: &pb.GrpcLogEntry_ClientHeader{
 			ClientHeader: clientHeader,
 		},
 	}
 	if c.OnClientSide {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_CLIENT
+		ret.Logger = pb.GrpcLogEntry_LOGGER_CLIENT
 	} else {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_SERVER
+		ret.Logger = pb.GrpcLogEntry_LOGGER_SERVER
 	}
 	if c.PeerAddr != nil {
 		ret.Peer = addrToProto(c.PeerAddr)
@@ -196,19 +195,19 @@ type ServerHeader struct {
 	PeerAddr net.Addr
 }
 
-func (c *ServerHeader) toProto() *binlogpb.GrpcLogEntry {
-	ret := &binlogpb.GrpcLogEntry{
-		Type: binlogpb.GrpcLogEntry_EVENT_TYPE_SERVER_HEADER,
-		Payload: &binlogpb.GrpcLogEntry_ServerHeader{
-			ServerHeader: &binlogpb.ServerHeader{
+func (c *ServerHeader) toProto() *pb.GrpcLogEntry {
+	ret := &pb.GrpcLogEntry{
+		Type: pb.GrpcLogEntry_EVENT_TYPE_SERVER_HEADER,
+		Payload: &pb.GrpcLogEntry_ServerHeader{
+			ServerHeader: &pb.ServerHeader{
 				Metadata: mdToMetadataProto(c.Header),
 			},
 		},
 	}
 	if c.OnClientSide {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_CLIENT
+		ret.Logger = pb.GrpcLogEntry_LOGGER_CLIENT
 	} else {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_SERVER
+		ret.Logger = pb.GrpcLogEntry_LOGGER_SERVER
 	}
 	if c.PeerAddr != nil {
 		ret.Peer = addrToProto(c.PeerAddr)
@@ -224,7 +223,7 @@ type ClientMessage struct {
 	Message interface{}
 }
 
-func (c *ClientMessage) toProto() *binlogpb.GrpcLogEntry {
+func (c *ClientMessage) toProto() *pb.GrpcLogEntry {
 	var (
 		data []byte
 		err  error
@@ -239,19 +238,19 @@ func (c *ClientMessage) toProto() *binlogpb.GrpcLogEntry {
 	} else {
 		grpclogLogger.Infof("binarylogging: message to log is neither proto.message nor []byte")
 	}
-	ret := &binlogpb.GrpcLogEntry{
-		Type: binlogpb.GrpcLogEntry_EVENT_TYPE_CLIENT_MESSAGE,
-		Payload: &binlogpb.GrpcLogEntry_Message{
-			Message: &binlogpb.Message{
+	ret := &pb.GrpcLogEntry{
+		Type: pb.GrpcLogEntry_EVENT_TYPE_CLIENT_MESSAGE,
+		Payload: &pb.GrpcLogEntry_Message{
+			Message: &pb.Message{
 				Length: uint32(len(data)),
 				Data:   data,
 			},
 		},
 	}
 	if c.OnClientSide {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_CLIENT
+		ret.Logger = pb.GrpcLogEntry_LOGGER_CLIENT
 	} else {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_SERVER
+		ret.Logger = pb.GrpcLogEntry_LOGGER_SERVER
 	}
 	return ret
 }
@@ -264,7 +263,7 @@ type ServerMessage struct {
 	Message interface{}
 }
 
-func (c *ServerMessage) toProto() *binlogpb.GrpcLogEntry {
+func (c *ServerMessage) toProto() *pb.GrpcLogEntry {
 	var (
 		data []byte
 		err  error
@@ -279,19 +278,19 @@ func (c *ServerMessage) toProto() *binlogpb.GrpcLogEntry {
 	} else {
 		grpclogLogger.Infof("binarylogging: message to log is neither proto.message nor []byte")
 	}
-	ret := &binlogpb.GrpcLogEntry{
-		Type: binlogpb.GrpcLogEntry_EVENT_TYPE_SERVER_MESSAGE,
-		Payload: &binlogpb.GrpcLogEntry_Message{
-			Message: &binlogpb.Message{
+	ret := &pb.GrpcLogEntry{
+		Type: pb.GrpcLogEntry_EVENT_TYPE_SERVER_MESSAGE,
+		Payload: &pb.GrpcLogEntry_Message{
+			Message: &pb.Message{
 				Length: uint32(len(data)),
 				Data:   data,
 			},
 		},
 	}
 	if c.OnClientSide {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_CLIENT
+		ret.Logger = pb.GrpcLogEntry_LOGGER_CLIENT
 	} else {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_SERVER
+		ret.Logger = pb.GrpcLogEntry_LOGGER_SERVER
 	}
 	return ret
 }
@@ -301,15 +300,15 @@ type ClientHalfClose struct {
 	OnClientSide bool
 }
 
-func (c *ClientHalfClose) toProto() *binlogpb.GrpcLogEntry {
-	ret := &binlogpb.GrpcLogEntry{
-		Type:    binlogpb.GrpcLogEntry_EVENT_TYPE_CLIENT_HALF_CLOSE,
+func (c *ClientHalfClose) toProto() *pb.GrpcLogEntry {
+	ret := &pb.GrpcLogEntry{
+		Type:    pb.GrpcLogEntry_EVENT_TYPE_CLIENT_HALF_CLOSE,
 		Payload: nil, // No payload here.
 	}
 	if c.OnClientSide {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_CLIENT
+		ret.Logger = pb.GrpcLogEntry_LOGGER_CLIENT
 	} else {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_SERVER
+		ret.Logger = pb.GrpcLogEntry_LOGGER_SERVER
 	}
 	return ret
 }
@@ -325,7 +324,7 @@ type ServerTrailer struct {
 	PeerAddr net.Addr
 }
 
-func (c *ServerTrailer) toProto() *binlogpb.GrpcLogEntry {
+func (c *ServerTrailer) toProto() *pb.GrpcLogEntry {
 	st, ok := status.FromError(c.Err)
 	if !ok {
 		grpclogLogger.Info("binarylogging: error in trailer is not a status error")
@@ -341,10 +340,10 @@ func (c *ServerTrailer) toProto() *binlogpb.GrpcLogEntry {
 			grpclogLogger.Infof("binarylogging: failed to marshal status proto: %v", err)
 		}
 	}
-	ret := &binlogpb.GrpcLogEntry{
-		Type: binlogpb.GrpcLogEntry_EVENT_TYPE_SERVER_TRAILER,
-		Payload: &binlogpb.GrpcLogEntry_Trailer{
-			Trailer: &binlogpb.Trailer{
+	ret := &pb.GrpcLogEntry{
+		Type: pb.GrpcLogEntry_EVENT_TYPE_SERVER_TRAILER,
+		Payload: &pb.GrpcLogEntry_Trailer{
+			Trailer: &pb.Trailer{
 				Metadata:      mdToMetadataProto(c.Trailer),
 				StatusCode:    uint32(st.Code()),
 				StatusMessage: st.Message(),
@@ -353,9 +352,9 @@ func (c *ServerTrailer) toProto() *binlogpb.GrpcLogEntry {
 		},
 	}
 	if c.OnClientSide {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_CLIENT
+		ret.Logger = pb.GrpcLogEntry_LOGGER_CLIENT
 	} else {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_SERVER
+		ret.Logger = pb.GrpcLogEntry_LOGGER_SERVER
 	}
 	if c.PeerAddr != nil {
 		ret.Peer = addrToProto(c.PeerAddr)
@@ -368,15 +367,15 @@ type Cancel struct {
 	OnClientSide bool
 }
 
-func (c *Cancel) toProto() *binlogpb.GrpcLogEntry {
-	ret := &binlogpb.GrpcLogEntry{
-		Type:    binlogpb.GrpcLogEntry_EVENT_TYPE_CANCEL,
+func (c *Cancel) toProto() *pb.GrpcLogEntry {
+	ret := &pb.GrpcLogEntry{
+		Type:    pb.GrpcLogEntry_EVENT_TYPE_CANCEL,
 		Payload: nil,
 	}
 	if c.OnClientSide {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_CLIENT
+		ret.Logger = pb.GrpcLogEntry_LOGGER_CLIENT
 	} else {
-		ret.Logger = binlogpb.GrpcLogEntry_LOGGER_SERVER
+		ret.Logger = pb.GrpcLogEntry_LOGGER_SERVER
 	}
 	return ret
 }
@@ -393,15 +392,15 @@ func metadataKeyOmit(key string) bool {
 	return strings.HasPrefix(key, "grpc-")
 }
 
-func mdToMetadataProto(md metadata.MD) *binlogpb.Metadata {
-	ret := &binlogpb.Metadata{}
+func mdToMetadataProto(md metadata.MD) *pb.Metadata {
+	ret := &pb.Metadata{}
 	for k, vv := range md {
 		if metadataKeyOmit(k) {
 			continue
 		}
 		for _, v := range vv {
 			ret.Entry = append(ret.Entry,
-				&binlogpb.MetadataEntry{
+				&pb.MetadataEntry{
 					Key:   k,
 					Value: []byte(v),
 				},
@@ -411,26 +410,26 @@ func mdToMetadataProto(md metadata.MD) *binlogpb.Metadata {
 	return ret
 }
 
-func addrToProto(addr net.Addr) *binlogpb.Address {
-	ret := &binlogpb.Address{}
+func addrToProto(addr net.Addr) *pb.Address {
+	ret := &pb.Address{}
 	switch a := addr.(type) {
 	case *net.TCPAddr:
 		if a.IP.To4() != nil {
-			ret.Type = binlogpb.Address_TYPE_IPV4
+			ret.Type = pb.Address_TYPE_IPV4
 		} else if a.IP.To16() != nil {
-			ret.Type = binlogpb.Address_TYPE_IPV6
+			ret.Type = pb.Address_TYPE_IPV6
 		} else {
-			ret.Type = binlogpb.Address_TYPE_UNKNOWN
+			ret.Type = pb.Address_TYPE_UNKNOWN
 			// Do not set address and port fields.
 			break
 		}
 		ret.Address = a.IP.String()
 		ret.IpPort = uint32(a.Port)
 	case *net.UnixAddr:
-		ret.Type = binlogpb.Address_TYPE_UNIX
+		ret.Type = pb.Address_TYPE_UNIX
 		ret.Address = a.String()
 	default:
-		ret.Type = binlogpb.Address_TYPE_UNKNOWN
+		ret.Type = pb.Address_TYPE_UNKNOWN
 	}
 	return ret
 }

@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	v1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -34,9 +35,9 @@ type FakePodMetricses struct {
 	ns   string
 }
 
-var podmetricsesResource = v1beta1.SchemeGroupVersion.WithResource("pods")
+var podmetricsesResource = schema.GroupVersionResource{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "pods"}
 
-var podmetricsesKind = v1beta1.SchemeGroupVersion.WithKind("PodMetrics")
+var podmetricsesKind = schema.GroupVersionKind{Group: "metrics.k8s.io", Version: "v1beta1", Kind: "PodMetrics"}
 
 // Get takes name of the podMetrics, and returns the corresponding podMetrics object, and an error if there is any.
 func (c *FakePodMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PodMetrics, err error) {

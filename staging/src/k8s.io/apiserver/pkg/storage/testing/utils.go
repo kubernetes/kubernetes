@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"path"
 	"reflect"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -150,7 +149,7 @@ func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 	}
 }
 
-func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj runtime.Object) {
+func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
 	testCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
 		ExpectNoDiff(t, "incorrect object", expectObj, object)
 		return nil
@@ -164,11 +163,7 @@ func testCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.
 			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
 			return
 		}
-		obj := res.Object
-		if co, ok := obj.(runtime.CacheableObject); ok {
-			obj = co.GetObject()
-		}
-		if err := check(obj); err != nil {
+		if err := check(res.Object); err != nil {
 			t.Error(err)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
@@ -213,36 +208,6 @@ func resourceVersionNotOlderThan(sentinel string) func(string) error {
 		}
 		return nil
 	}
-}
-
-// StorageInjectingListErrors injects a dummy error for first N GetList calls.
-type StorageInjectingListErrors struct {
-	storage.Interface
-
-	lock   sync.Mutex
-	Errors int
-}
-
-func (s *StorageInjectingListErrors) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	err := func() error {
-		s.lock.Lock()
-		defer s.lock.Unlock()
-		if s.Errors > 0 {
-			s.Errors--
-			return fmt.Errorf("injected error")
-		}
-		return nil
-	}()
-	if err != nil {
-		return err
-	}
-	return s.Interface.GetList(ctx, key, opts, listObj)
-}
-
-func (s *StorageInjectingListErrors) ErrorsConsumed() (bool, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	return s.Errors == 0, nil
 }
 
 // PrefixTransformer adds and verifies that all data has the correct prefix on its way in and out.

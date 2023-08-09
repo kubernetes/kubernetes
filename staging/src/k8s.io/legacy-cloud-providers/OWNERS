@@ -4,10 +4,8 @@
 options:
   no_parent_owners: true
 approvers:
-  - bridgetkromhout # SIG Cloud Provider chair, for approving bug fixes only
-  - elmiko # SIG Cloud Provider chair, for approving bug fixes only
-  - andrewsykim # SIG Cloud Provider TL, for approving bug fixes only
-  - nckturner # SIG Cloud Provider TL, for approving bug fixes only
+  - andrewsykim # SIG Cloud Provider lead, for approving bug fixes only
+  - nckturner # SIG Cloud Provider lead, for approving bug fixes only
   - cheftako # SIG Cloud Provider TL, for approving bug fixes only
   - dims # For code organization / dependency updates only
   - liggitt # For code organization / dependency updates only

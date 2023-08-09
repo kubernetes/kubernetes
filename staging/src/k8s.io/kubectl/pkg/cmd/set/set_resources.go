@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -88,12 +87,12 @@ type SetResourcesOptions struct {
 	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewResourcesOptions returns a ResourcesOptions indicating all containers in the selected
 // pod templates are selected by default.
-func NewResourcesOptions(streams genericiooptions.IOStreams) *SetResourcesOptions {
+func NewResourcesOptions(streams genericclioptions.IOStreams) *SetResourcesOptions {
 	return &SetResourcesOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("resource requirements updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -107,7 +106,7 @@ func NewResourcesOptions(streams genericiooptions.IOStreams) *SetResourcesOption
 }
 
 // NewCmdResources returns initialized Command instance for the 'set resources' sub command
-func NewCmdResources(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewResourcesOptions(streams)
 
 	cmd := &cobra.Command{

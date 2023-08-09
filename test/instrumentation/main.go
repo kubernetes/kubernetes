@@ -55,7 +55,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "USAGE: %s <DIR or FILE or '-'> [...]\n", os.Args[0])
 		os.Exit(64)
 	}
-	stableMetricNames := map[string]struct{}{}
+
 	stableMetrics := []metric{}
 	errors := []error{}
 
@@ -66,12 +66,7 @@ func main() {
 			continue
 		}
 		ms, es := searchPathForStableMetrics(arg)
-		for _, m := range ms {
-			if _, ok := stableMetricNames[m.Name]; !ok {
-				stableMetrics = append(stableMetrics, m)
-			}
-			stableMetricNames[m.Name] = struct{}{}
-		}
+		stableMetrics = append(stableMetrics, ms...)
 		errors = append(errors, es...)
 	}
 	if addStdin {

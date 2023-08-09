@@ -23,10 +23,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus/internal"
-
+	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
+	"github.com/golang/protobuf/proto"
 	dto "github.com/prometheus/client_model/go"
-	"google.golang.org/protobuf/proto"
+
+	"github.com/prometheus/client_golang/prometheus/internal"
 )
 
 const (

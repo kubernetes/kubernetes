@@ -27,7 +27,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -92,8 +91,8 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 
 	//add the given node to the list of nodes managed by dsw
 	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName), false /*keepTerminatedPodVolumes*/)
-	logger, _ := ktesting.NewTestContext(t)
-	dswp.findAndAddActivePods(logger)
+
+	dswp.findAndAddActivePods()
 
 	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
 
@@ -119,7 +118,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 
 	//add pod and volume again
-	dswp.findAndAddActivePods(logger)
+	dswp.findAndAddActivePods()
 
 	//check if the given volume referenced by the pod is added to dsw for the second time
 	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
@@ -131,7 +130,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 
 	fakePodInformer.Informer().GetStore().Delete(pod)
-	dswp.findAndRemoveDeletedPods(logger)
+	dswp.findAndRemoveDeletedPods()
 	//check if the given volume referenced by the pod still exists in dsw
 	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
 	if volumeExists {
@@ -197,8 +196,8 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 
 	//add the given node to the list of nodes managed by dsw
 	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName), false /*keepTerminatedPodVolumes*/)
-	logger, _ := ktesting.NewTestContext(t)
-	dswp.findAndAddActivePods(logger)
+
+	dswp.findAndAddActivePods()
 
 	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
 
@@ -214,7 +213,7 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 	// Change the CSI volume plugin attachability
 	fakeVolumePlugin.NonAttachable = true
 
-	dswp.findAndRemoveDeletedPods(logger)
+	dswp.findAndRemoveDeletedPods()
 
 	// The volume should not exist after it becomes non-attachable
 	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))

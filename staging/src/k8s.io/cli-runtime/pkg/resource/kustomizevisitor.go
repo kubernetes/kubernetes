@@ -38,7 +38,7 @@ type KustomizeVisitor struct {
 // Visit passes the result of a kustomize build to a StreamVisitor.
 func (v *KustomizeVisitor) Visit(fn VisitorFunc) error {
 	kOpts := krusty.MakeDefaultOptions()
-	kOpts.Reorder = krusty.ReorderOptionLegacy
+	kOpts.DoLegacyResourceSort = true
 	k := krusty.MakeKustomizer(kOpts)
 	m, err := k.Run(v.fSys, v.dirPath)
 	if err != nil {

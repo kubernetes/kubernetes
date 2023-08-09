@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
@@ -126,7 +126,7 @@ func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *apps.
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
 		// Set PVC policy as much as is possible at this point.
-		if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+		if err := spc.UpdatePodClaimForRetentionPolicy(set, pod); err != nil {
 			spc.recordPodEvent("update", set, pod, err)
 			return err
 		}
@@ -135,7 +135,7 @@ func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *apps.
 	return err
 }
 
-func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) error {
+func (spc *StatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
 	attemptedUpdate := false
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
@@ -158,11 +158,11 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
 			// if the Pod's PVCs are not consistent with the StatefulSet's PVC deletion policy, update the PVC
 			// and dirty the pod.
-			if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
+			if match, err := spc.ClaimsMatchRetentionPolicy(set, pod); err != nil {
 				spc.recordPodEvent("update", set, pod, err)
 				return err
 			} else if !match {
-				if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+				if err := spc.UpdatePodClaimForRetentionPolicy(set, pod); err != nil {
 					spc.recordPodEvent("update", set, pod, err)
 					return err
 				}
@@ -207,8 +207,7 @@ func (spc *StatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.
 // ClaimsMatchRetentionPolicy returns false if the PVCs for pod are not consistent with set's PVC deletion policy.
 // An error is returned if something is not consistent. This is expected if the pod is being otherwise updated,
 // but a problem otherwise (see usage of this method in UpdateStatefulPod).
-func (spc *StatefulPodControl) ClaimsMatchRetentionPolicy(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) (bool, error) {
-	logger := klog.FromContext(ctx)
+func (spc *StatefulPodControl) ClaimsMatchRetentionPolicy(set *apps.StatefulSet, pod *v1.Pod) (bool, error) {
 	ordinal := getOrdinal(pod)
 	templates := set.Spec.VolumeClaimTemplates
 	for i := range templates {
@@ -216,11 +215,11 @@ func (spc *StatefulPodControl) ClaimsMatchRetentionPolicy(ctx context.Context, s
 		claim, err := spc.objectMgr.GetClaim(set.Namespace, claimName)
 		switch {
 		case apierrors.IsNotFound(err):
-			klog.FromContext(ctx).V(4).Info("Expected claim missing, continuing to pick up in next iteration", "PVC", klog.KObj(claim))
+			klog.V(4).Infof("Expected claim %s missing, continuing to pick up in next iteration", claimName)
 		case err != nil:
 			return false, fmt.Errorf("Could not retrieve claim %s for %s when checking PVC deletion policy", claimName, pod.Name)
 		default:
-			if !claimOwnerMatchesSetAndPod(logger, claim, set, pod) {
+			if !claimOwnerMatchesSetAndPod(claim, set, pod) {
 				return false, nil
 			}
 		}
@@ -229,8 +228,7 @@ func (spc *StatefulPodControl) ClaimsMatchRetentionPolicy(ctx context.Context, s
 }
 
 // UpdatePodClaimForRetentionPolicy updates the PVCs used by pod to match the PVC deletion policy of set.
-func (spc *StatefulPodControl) UpdatePodClaimForRetentionPolicy(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) error {
-	logger := klog.FromContext(ctx)
+func (spc *StatefulPodControl) UpdatePodClaimForRetentionPolicy(set *apps.StatefulSet, pod *v1.Pod) error {
 	ordinal := getOrdinal(pod)
 	templates := set.Spec.VolumeClaimTemplates
 	for i := range templates {
@@ -238,13 +236,12 @@ func (spc *StatefulPodControl) UpdatePodClaimForRetentionPolicy(ctx context.Cont
 		claim, err := spc.objectMgr.GetClaim(set.Namespace, claimName)
 		switch {
 		case apierrors.IsNotFound(err):
-			logger.V(4).Info("Expected claim missing, continuing to pick up in next iteration", "PVC", klog.KObj(claim))
+			klog.V(4).Infof("Expected claim %s missing, continuing to pick up in next iteration.")
 		case err != nil:
 			return fmt.Errorf("Could not retrieve claim %s not found for %s when checking PVC deletion policy: %w", claimName, pod.Name, err)
 		default:
-			if !claimOwnerMatchesSetAndPod(logger, claim, set, pod) {
-				claim = claim.DeepCopy() // Make a copy so we don't mutate the shared cache.
-				needsUpdate := updateClaimOwnerRefForSetAndPod(logger, claim, set, pod)
+			if !claimOwnerMatchesSetAndPod(claim, set, pod) {
+				needsUpdate := updateClaimOwnerRefForSetAndPod(claim, set, pod)
 				if needsUpdate {
 					err := spc.objectMgr.UpdateClaim(claim)
 					if err != nil {
@@ -317,22 +314,6 @@ func (spc *StatefulPodControl) recordClaimEvent(verb string, set *apps.StatefulS
 	}
 }
 
-// createMissingPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, and updates its retention policy
-func (spc *StatefulPodControl) createMissingPersistentVolumeClaims(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) error {
-	if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
-		return err
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		// Set PVC policy as much as is possible at this point.
-		if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
-			spc.recordPodEvent("update", set, pod, err)
-			return err
-		}
-	}
-	return nil
-}
-
 // createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which must be a member of
 // set. If all of the claims for Pod are successfully created, the returned error is nil. If creation fails, this method
 // may be called again until no error is returned, indicating the PersistentVolumeClaims for pod are consistent with
@@ -353,7 +334,7 @@ func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSe
 		case err != nil:
 			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %s", claim.Name, err))
 			spc.recordClaimEvent("create", set, pod, &claim, err)
-		default:
+		case err == nil:
 			if pvc.DeletionTimestamp != nil {
 				errs = append(errs, fmt.Errorf("pvc %s is being deleted", claim.Name))
 			}

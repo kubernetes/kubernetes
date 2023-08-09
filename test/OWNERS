@@ -7,6 +7,7 @@ reviewers:
   - aojea
   - dchen1107
   - johnSchnake
+  - lavalamp
   - liggitt
   - neolit123
   - SataQiu
@@ -25,19 +26,19 @@ approvers:
   - dims
   - enj
   - janetkuo
+  - lavalamp
   - liggitt
   - mikedanese
   - MrHohn
   - msau42
   - neolit123
   - oomichi
-  - pohly
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
   - SataQiu
+  - sig-testing-approvers
   - smarterclayton
   - soltysh
-  - spiffxp
   - sttts
   - thockin
   - wojtek-t
@@ -45,11 +46,8 @@ emeritus_approvers:
   - eparis
   - foxish
   - gmarek
-  - ixdy
   - krousey
-  - krzyzacy
   - kow3ns
-  - lavalamp
   - madhusudancs
   - marun
   - zmerlynn

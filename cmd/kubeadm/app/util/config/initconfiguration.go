@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
-	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
@@ -99,7 +98,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]bootstraptokenv1.BootstrapToken) e
 // SetNodeRegistrationDynamicDefaults checks and sets configuration values for the NodeRegistration object
 func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, controlPlaneTaint bool) error {
 	var err error
-	cfg.Name, err = nodeutil.GetHostname(cfg.Name)
+	cfg.Name, err = kubeadmutil.GetHostname(cfg.Name)
 	if err != nil {
 		return err
 	}
@@ -287,27 +286,23 @@ func BytesToInitConfiguration(b []byte) (*kubeadmapi.InitConfiguration, error) {
 		return nil, err
 	}
 
-	return documentMapToInitConfiguration(gvkmap, false, false, false)
+	return documentMapToInitConfiguration(gvkmap, false)
 }
 
 // documentMapToInitConfiguration converts a map of GVKs and YAML documents to defaulted and validated configuration object.
-func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, allowExperimental, strictErrors bool) (*kubeadmapi.InitConfiguration, error) {
+func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated bool) (*kubeadmapi.InitConfiguration, error) {
 	var initcfg *kubeadmapi.InitConfiguration
 	var clustercfg *kubeadmapi.ClusterConfiguration
 
 	for gvk, fileContent := range gvkmap {
 		// first, check if this GVK is supported and possibly not deprecated
-		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated, allowExperimental); err != nil {
+		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated); err != nil {
 			return nil, err
 		}
 
 		// verify the validity of the YAML
 		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme, componentconfigs.Scheme}, gvk, fileContent); err != nil {
-			if !strictErrors {
-				klog.Warning(err.Error())
-			} else {
-				return nil, err
-			}
+			klog.Warning(err.Error())
 		}
 
 		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) {

@@ -24,8 +24,9 @@ import (
 )
 
 // CopyDir copies the content of a folder
-func CopyDir(src string, dst string) ([]byte, error) {
+func CopyDir(src string, dst string) error {
 	// /E Copies directories and subdirectories, including empty ones.
 	// /H Copies hidden and system files also.
-	return exec.Command("xcopy", "/E", "/H", src, dst).CombinedOutput()
+	cmd := exec.Command("xcopy", "/E", "/H", src, dst)
+	return cmd.Run()
 }

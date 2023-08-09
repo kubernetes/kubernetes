@@ -1,41 +1,6 @@
 Releases
 ========
 
-v1.11.0 (2023-03-28)
-====================
--   `Errors` now supports any error that implements multiple-error
-    interface.
--   Add `Every` function to allow checking if all errors in the chain
-    satisfies `errors.Is` against the target error.
-
-v1.10.0 (2023-03-08)
-====================
-
--   Comply with Go 1.20's multiple-error interface.
--   Drop Go 1.18 support.
-    Per the support policy, only Go 1.19 and 1.20 are supported now.
--   Drop all non-test external dependencies.
-
-v1.9.0 (2022-12-12)
-===================
-
--   Add `AppendFunc` that allow passsing functions to similar to
-    `AppendInvoke`.
-
--   Bump up yaml.v3 dependency to 3.0.1.
-
-v1.8.0 (2022-02-28)
-===================
-
--   `Combine`: perform zero allocations when there are no errors.
-
-
-v1.7.0 (2021-05-06)
-===================
-
--   Add `AppendInvoke` to append into errors from `defer` blocks.
-
-
 v1.6.0 (2020-09-14)
 ===================
 

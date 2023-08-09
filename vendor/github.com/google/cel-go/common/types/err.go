@@ -22,12 +22,6 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 )
 
-// Error interface which allows types types.Err values to be treated as error values.
-type Error interface {
-	error
-	ref.Val
-}
-
 // Err type which extends the built-in go error and implements ref.Val.
 type Err struct {
 	error
@@ -57,7 +51,7 @@ var (
 
 // NewErr creates a new Err described by the format string and args.
 // TODO: Audit the use of this function and standardize the error messages and codes.
-func NewErr(format string, args ...any) ref.Val {
+func NewErr(format string, args ...interface{}) ref.Val {
 	return &Err{fmt.Errorf(format, args...)}
 }
 
@@ -68,7 +62,7 @@ func NoSuchOverloadErr() ref.Val {
 
 // UnsupportedRefValConversionErr returns a types.NewErr instance with a no such conversion
 // message that indicates that the native value could not be converted to a CEL ref.Val.
-func UnsupportedRefValConversionErr(val any) ref.Val {
+func UnsupportedRefValConversionErr(val interface{}) ref.Val {
 	return NewErr("unsupported conversion to ref.Val: (%T)%v", val, val)
 }
 
@@ -80,20 +74,20 @@ func MaybeNoSuchOverloadErr(val ref.Val) ref.Val {
 
 // ValOrErr either returns the existing error or creates a new one.
 // TODO: Audit the use of this function and standardize the error messages and codes.
-func ValOrErr(val ref.Val, format string, args ...any) ref.Val {
+func ValOrErr(val ref.Val, format string, args ...interface{}) ref.Val {
 	if val == nil || !IsUnknownOrError(val) {
 		return NewErr(format, args...)
 	}
 	return val
 }
 
-// WrapErr wraps an existing Go error value into a CEL Err value.
-func WrapErr(err error) ref.Val {
+// wrapErr wraps an existing Go error value into a CEL Err value.
+func wrapErr(err error) ref.Val {
 	return &Err{error: err}
 }
 
 // ConvertToNative implements ref.Val.ConvertToNative.
-func (e *Err) ConvertToNative(typeDesc reflect.Type) (any, error) {
+func (e *Err) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	return nil, e.error
 }
 
@@ -120,13 +114,8 @@ func (e *Err) Type() ref.Type {
 }
 
 // Value implements ref.Val.Value.
-func (e *Err) Value() any {
+func (e *Err) Value() interface{} {
 	return e.error
-}
-
-// Is implements errors.Is.
-func (e *Err) Is(target error) bool {
-	return e.error.Error() == target.Error()
 }
 
 // IsError returns whether the input element ref.Type or ref.Val is equal to

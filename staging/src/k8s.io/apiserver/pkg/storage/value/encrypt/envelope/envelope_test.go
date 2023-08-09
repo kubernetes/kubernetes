@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/aes"
-	"crypto/cipher"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
@@ -107,12 +106,9 @@ func TestEnvelopeCaching(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
-			cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
-				return aestransformer.NewCBCTransformer(block), nil
-			}
-			envelopeTransformer := NewEnvelopeTransformer(envelopeService, tt.cacheSize, cbcTransformer)
+			envelopeTransformer := NewEnvelopeTransformer(envelopeService, tt.cacheSize, aestransformer.NewCBCTransformer)
 			ctx := context.Background()
-			dataCtx := value.DefaultContext(testContextText)
+			dataCtx := value.DefaultContext([]byte(testContextText))
 			originalText := []byte(testText)
 
 			transformedData, err := envelopeTransformer.TransformToStorage(ctx, originalText, dataCtx)
@@ -150,12 +146,9 @@ func TestEnvelopeCaching(t *testing.T) {
 
 // Makes Envelope transformer hit cache limit, throws error if it misbehaves.
 func TestEnvelopeCacheLimit(t *testing.T) {
-	cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
-		return aestransformer.NewCBCTransformer(block), nil
-	}
-	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, cbcTransformer)
+	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
 	ctx := context.Background()
-	dataCtx := value.DefaultContext(testContextText)
+	dataCtx := value.DefaultContext([]byte(testContextText))
 
 	transformedOutputs := map[int][]byte{}
 
@@ -186,10 +179,7 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 }
 
 func BenchmarkEnvelopeCBCRead(b *testing.B) {
-	cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
-		return aestransformer.NewCBCTransformer(block), nil
-	}
-	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, cbcTransformer)
+	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
 	benchmarkRead(b, envelopeTransformer, 1024)
 }
 
@@ -214,17 +204,13 @@ func BenchmarkAESGCMRead(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	aesGCMTransformer, err := aestransformer.NewGCMTransformer(block)
-	if err != nil {
-		b.Fatal(err)
-	}
-
+	aesGCMTransformer := aestransformer.NewGCMTransformer(block)
 	benchmarkRead(b, aesGCMTransformer, 1024)
 }
 
 func benchmarkRead(b *testing.B, transformer value.Transformer, valueLength int) {
 	ctx := context.Background()
-	dataCtx := value.DefaultContext(testContextText)
+	dataCtx := value.DefaultContext([]byte(testContextText))
 	v := bytes.Repeat([]byte("0123456789abcdef"), valueLength/16)
 
 	out, err := transformer.TransformToStorage(ctx, v, dataCtx)
@@ -248,12 +234,9 @@ func benchmarkRead(b *testing.B, transformer value.Transformer, valueLength int)
 // remove after 1.13
 func TestBackwardsCompatibility(t *testing.T) {
 	envelopeService := newTestEnvelopeService()
-	cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
-		return aestransformer.NewCBCTransformer(block), nil
-	}
-	envelopeTransformerInst := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize, cbcTransformer)
+	envelopeTransformerInst := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
 	ctx := context.Background()
-	dataCtx := value.DefaultContext(testContextText)
+	dataCtx := value.DefaultContext([]byte(testContextText))
 	originalText := []byte(testText)
 
 	transformedData, err := oldTransformToStorage(ctx, envelopeTransformerInst.(*envelopeTransformer), originalText, dataCtx)

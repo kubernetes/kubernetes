@@ -18,10 +18,9 @@ package session
 
 import (
 	"context"
-	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
-	"strings"
 
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
@@ -40,21 +39,6 @@ func init() {
 	} else if Locale == "" {
 		Locale = "en_US"
 	}
-}
-
-// Secret returns the contents if a file path value is given, otherwise returns value itself.
-func Secret(value string) (string, error) {
-	if len(value) == 0 {
-		return value, nil
-	}
-	contents, err := ioutil.ReadFile(value)
-	if err != nil {
-		if os.IsPermission(err) {
-			return "", err
-		}
-		return value, nil
-	}
-	return strings.TrimSpace(string(contents)), nil
 }
 
 type Manager struct {
@@ -123,7 +107,7 @@ func (sm *Manager) LoginExtensionByCertificate(ctx context.Context, key string) 
 		// "Post https://sdkTunnel:8089/sdk: x509: certificate is valid for $vcenter_hostname, not sdkTunnel"
 		// The only easy way around this is to disable verification for the call to LoginExtensionByCertificate().
 		// TODO: find a way to avoid disabling InsecureSkipVerify.
-		c.DefaultTransport().TLSClientConfig.InsecureSkipVerify = true
+		c.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	req := types.LoginExtensionByCertificate{
@@ -280,15 +264,4 @@ func (sm *Manager) CloneSession(ctx context.Context, ticket string) error {
 
 	sm.userSession = &res.Returnval
 	return nil
-}
-
-func (sm *Manager) UpdateServiceMessage(ctx context.Context, message string) error {
-	req := types.UpdateServiceMessage{
-		This:    sm.Reference(),
-		Message: message,
-	}
-
-	_, err := methods.UpdateServiceMessage(ctx, sm.client, &req)
-
-	return err
 }

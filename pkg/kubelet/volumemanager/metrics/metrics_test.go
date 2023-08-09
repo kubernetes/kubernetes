@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"k8s.io/klog/v2/ktesting"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -75,8 +74,7 @@ func TestMetricCollection(t *testing.T) {
 
 	// Add one volume to ActualStateOfWorld
 	devicePath := "fake/device/path"
-	logger, _ := ktesting.NewTestContext(t)
-	err = asw.MarkVolumeAsAttached(logger, "", volumeSpec, "", devicePath)
+	err = asw.MarkVolumeAsAttached("", volumeSpec, "", devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}

@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -109,9 +108,8 @@ func TestCancel(t *testing.T) {
 	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, then)
 	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, then)
 	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, then)
-	logger, _ := ktesting.NewTestContext(t)
-	queue.CancelWork(logger, NewWorkArgs("2", "2").KeyFromWorkArgs())
-	queue.CancelWork(logger, NewWorkArgs("4", "4").KeyFromWorkArgs())
+	queue.CancelWork(NewWorkArgs("2", "2").KeyFromWorkArgs())
+	queue.CancelWork(NewWorkArgs("4", "4").KeyFromWorkArgs())
 	fakeClock.Step(11 * time.Second)
 	wg.Wait()
 	lastVal := atomic.LoadInt32(&testVal)
@@ -143,9 +141,8 @@ func TestCancelAndReadd(t *testing.T) {
 	queue.AddWork(context.TODO(), NewWorkArgs("3", "3"), now, then)
 	queue.AddWork(context.TODO(), NewWorkArgs("4", "4"), now, then)
 	queue.AddWork(context.TODO(), NewWorkArgs("5", "5"), now, then)
-	logger, _ := ktesting.NewTestContext(t)
-	queue.CancelWork(logger, NewWorkArgs("2", "2").KeyFromWorkArgs())
-	queue.CancelWork(logger, NewWorkArgs("4", "4").KeyFromWorkArgs())
+	queue.CancelWork(NewWorkArgs("2", "2").KeyFromWorkArgs())
+	queue.CancelWork(NewWorkArgs("4", "4").KeyFromWorkArgs())
 	queue.AddWork(context.TODO(), NewWorkArgs("2", "2"), now, then)
 	fakeClock.Step(11 * time.Second)
 	wg.Wait()

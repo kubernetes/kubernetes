@@ -1,6 +1,8 @@
 package gcfg
 
-import warnings "gopkg.in/warnings.v0"
+import (
+	"gopkg.in/warnings.v0"
+)
 
 // FatalOnly filters the results of a Read*Into invocation and returns only
 // fatal errors. That is, errors (warnings) indicating data for unknown
@@ -19,39 +21,21 @@ func isFatal(err error) bool {
 	return !ok
 }
 
-type loc struct {
+type extraData struct {
 	section    string
 	subsection *string
 	variable   *string
 }
 
-type extraData struct {
-	loc
-}
-
-type locErr struct {
-	msg string
-	loc
-}
-
-func (l loc) String() string {
-	s := "section \"" + l.section + "\""
-	if l.subsection != nil {
-		s += ", subsection \"" + *l.subsection + "\""
+func (e extraData) Error() string {
+	s := "can't store data at section \"" + e.section + "\""
+	if e.subsection != nil {
+		s += ", subsection \"" + *e.subsection + "\""
 	}
-	if l.variable != nil {
-		s += ", variable \"" + *l.variable + "\""
+	if e.variable != nil {
+		s += ", variable \"" + *e.variable + "\""
 	}
 	return s
 }
 
-func (e extraData) Error() string {
-	return "can't store data at " + e.loc.String()
-}
-
-func (e locErr) Error() string {
-	return e.msg + " at " + e.loc.String()
-}
-
 var _ error = extraData{}
-var _ error = locErr{}

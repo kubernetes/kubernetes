@@ -29,7 +29,7 @@ import (
 
 var _ = SIGDescribe("server version", func() {
 	f := framework.NewDefaultFramework("server-version")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 	   Release: v1.19

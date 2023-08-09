@@ -56,11 +56,9 @@ func (ns Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 
 // Run runs the filter on a single node rather than a slice
 func (ns Filter) run(node *yaml.RNode) (*yaml.RNode, error) {
-	// Special handling for metadata.namespace and metadata.name -- :(
+	// Special handling for metadata.namespace -- :(
 	// never let SetEntry handle metadata.namespace--it will incorrectly include cluster-scoped resources
-	// only update metadata.name if api version is expected one--so-as it leaves other resources of kind namespace alone
-	apiVersion := node.GetApiVersion()
-	ns.FsSlice = ns.removeUnneededMetaFieldSpecs(apiVersion, ns.FsSlice)
+	ns.FsSlice = ns.removeMetaNamespaceFieldSpecs(ns.FsSlice)
 	gvk := resid.GvkFromNode(node)
 	if err := ns.metaNamespaceHack(node, gvk); err != nil {
 		return nil, err
@@ -81,11 +79,7 @@ func (ns Filter) run(node *yaml.RNode) (*yaml.RNode, error) {
 		CreateKind: yaml.ScalarNode, // Namespace is a ScalarNode
 		CreateTag:  yaml.NodeTagString,
 	})
-	invalidKindErr := &yaml.InvalidNodeKindError{}
-	if err != nil && errors.As(err, &invalidKindErr) && invalidKindErr.ActualNodeKind() != yaml.ScalarNode {
-		return nil, errors.WrapPrefixf(err, "namespace field specs must target scalar nodes")
-	}
-	return node, errors.WrapPrefixf(err, "namespace transformation failed")
+	return node, err
 }
 
 // metaNamespaceHack is a hack for implementing the namespace transform
@@ -180,7 +174,8 @@ func setNamespaceField(node *yaml.RNode, setter filtersutil.SetFn) error {
 func (ns Filter) removeRoleBindingSubjectFieldSpecs(fs types.FsSlice) types.FsSlice {
 	var val types.FsSlice
 	for i := range fs {
-		if isRoleBinding(fs[i].Kind) && fs[i].Path == subjectsNamespacePath {
+		if isRoleBinding(fs[i].Kind) &&
+			(fs[i].Path == subjectsNamespacePath || fs[i].Path == subjectsField) {
 			continue
 		}
 		val = append(val, fs[i])
@@ -188,13 +183,10 @@ func (ns Filter) removeRoleBindingSubjectFieldSpecs(fs types.FsSlice) types.FsSl
 	return val
 }
 
-func (ns Filter) removeUnneededMetaFieldSpecs(apiVersion string, fs types.FsSlice) types.FsSlice {
+func (ns Filter) removeMetaNamespaceFieldSpecs(fs types.FsSlice) types.FsSlice {
 	var val types.FsSlice
 	for i := range fs {
 		if fs[i].Path == types.MetadataNamespacePath {
-			continue
-		}
-		if apiVersion != types.MetadataNamespaceApiVersion && fs[i].Path == types.MetadataNamePath {
 			continue
 		}
 		val = append(val, fs[i])

@@ -42,7 +42,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 	var c clientset.Interface
 
 	f := framework.NewDefaultFramework("bootstrap-signer")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.AfterEach(func(ctx context.Context) {
 		if len(secretNeedClean) > 0 {
 			ginkgo.By("delete the bootstrap token secret")

@@ -43,7 +43,7 @@ const (
 var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 	f := framework.NewDefaultFramework("node-authz")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	// client that will impersonate a node
 	var c clientset.Interface
 	var ns string

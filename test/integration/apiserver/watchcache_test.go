@@ -31,19 +31,18 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // setup create kube-apiserver backed up by two separate etcds,
 // with one of them containing events and the other all other objects.
-func multiEtcdSetup(ctx context.Context, t *testing.T) (clientset.Interface, framework.TearDownFunc) {
+func multiEtcdSetup(t *testing.T) (clientset.Interface, framework.TearDownFunc) {
 	etcdArgs := []string{"--experimental-watch-progress-notify-interval", "1s"}
-	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd("etcd_watchcache0", etcdArgs, nil)
+	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd("etcd_watchcache0", etcdArgs)
 	if err != nil {
 		t.Fatalf("Couldn't start etcd: %v", err)
 	}
 
-	etcd1URL, stopEtcd1, err := framework.RunCustomEtcd("etcd_watchcache1", etcdArgs, nil)
+	etcd1URL, stopEtcd1, err := framework.RunCustomEtcd("etcd_watchcache1", etcdArgs)
 	if err != nil {
 		t.Fatalf("Couldn't start etcd: %v", err)
 	}
@@ -54,7 +53,7 @@ func multiEtcdSetup(ctx context.Context, t *testing.T) (clientset.Interface, fra
 	etcdOptions.EtcdServersOverrides = []string{fmt.Sprintf("/events#%s", etcd1URL)}
 	etcdOptions.EnableWatchCache = true
 
-	clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure we're using the same etcd across apiserver restarts.
 			opts.Etcd = etcdOptions
@@ -75,6 +74,7 @@ func multiEtcdSetup(ctx context.Context, t *testing.T) (clientset.Interface, fra
 	// Everything but default service creation is checked in StartTestServer above by
 	// waiting for post start hooks, so we just wait for default service to exist.
 	// TODO(wojtek-t): Figure out less fragile way.
+	ctx := context.Background()
 	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 		_, err := clientSet.CoreV1().Services("default").Get(ctx, "kubernetes", metav1.GetOptions{})
 		return err == nil, nil
@@ -85,12 +85,10 @@ func multiEtcdSetup(ctx context.Context, t *testing.T) (clientset.Interface, fra
 }
 
 func TestWatchCacheUpdatedByEtcd(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	c, closeFn := multiEtcdSetup(ctx, t)
+	c, closeFn := multiEtcdSetup(t)
 	defer closeFn()
+
+	ctx := context.Background()
 
 	makeConfigMap := func(name string) *v1.ConfigMap {
 		return &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}}
@@ -169,11 +167,7 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 }
 
 func BenchmarkListFromWatchCache(b *testing.B) {
-	_, ctx := ktesting.NewTestContext(b)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	c, _, tearDownFn := framework.StartTestServer(ctx, b, framework.TestServerSetup{
+	c, _, tearDownFn := framework.StartTestServer(b, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Switch off endpoints reconciler to avoid unnecessary operations.
 			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
@@ -191,6 +185,7 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 		go func() {
 			defer wg.Done()
 
+			ctx := context.Background()
 			ns := &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("namespace-%d", index)},
 			}
@@ -223,6 +218,7 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 
 	b.ResetTimer()
 
+	ctx := context.Background()
 	opts := metav1.ListOptions{
 		ResourceVersion: "0",
 	}

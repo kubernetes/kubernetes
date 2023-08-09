@@ -21,22 +21,21 @@ package app
 
 import (
 	"k8s.io/component-base/featuregate"
-	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-func appendAttachableLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
+func appendAttachableLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	// no-op when compiled without legacy cloud providers
 	return allPlugins, nil
 }
 
-func appendExpandableLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
+func appendExpandableLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	// no-op when compiled without legacy cloud providers
 	return allPlugins, nil
 }
 
-func appendLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
+func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	// no-op when compiled without legacy cloud providers
 	return allPlugins, nil
 }

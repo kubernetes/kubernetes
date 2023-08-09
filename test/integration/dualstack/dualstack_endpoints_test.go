@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestDualStackEndpoints(t *testing.T) {
@@ -44,11 +43,7 @@ func TestDualStackEndpoints(t *testing.T) {
 		return map[string]string{"foo": "bar"}
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = fmt.Sprintf("%s,%s", serviceCIDR, secondaryServiceCIDR)
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
@@ -59,7 +54,7 @@ func TestDualStackEndpoints(t *testing.T) {
 
 	// Wait until the default "kubernetes" service is created.
 	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -88,7 +83,7 @@ func TestDualStackEndpoints(t *testing.T) {
 			},
 		},
 	}
-	if _, err := client.CoreV1().Nodes().Create(ctx, testNode, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Nodes().Create(context.TODO(), testNode, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create Node %q: %v", testNode.Name, err)
 	}
 
@@ -100,7 +95,6 @@ func TestDualStackEndpoints(t *testing.T) {
 		1*time.Second)
 
 	epsController := endpointslice.NewController(
-		ctx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),
@@ -109,11 +103,13 @@ func TestDualStackEndpoints(t *testing.T) {
 		client,
 		1*time.Second)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// Start informer and controllers
 	informers.Start(ctx.Done())
 	// use only one worker to serialize the updates
 	go epController.Run(ctx, 1)
-	go epsController.Run(ctx, 1)
+	go epsController.Run(1, ctx.Done())
 
 	var testcases = []struct {
 		name           string
@@ -170,7 +166,7 @@ func TestDualStackEndpoints(t *testing.T) {
 				},
 			}
 
-			createdPod, err := client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+			createdPod, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
 			}
@@ -181,7 +177,7 @@ func TestDualStackEndpoints(t *testing.T) {
 				Phase:  v1.PodRunning,
 				PodIPs: []v1.PodIP{{IP: podIPbyFamily[v1.IPv4Protocol]}, {IP: podIPbyFamily[v1.IPv6Protocol]}},
 			}
-			_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, createdPod, metav1.UpdateOptions{})
+			_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), createdPod, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
 			}
@@ -209,7 +205,7 @@ func TestDualStackEndpoints(t *testing.T) {
 			}
 
 			// create a service
-			_, err = client.CoreV1().Services(ns.Name).Create(ctx, svc, metav1.CreateOptions{})
+			_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error creating service: %v", err)
 			}
@@ -218,7 +214,7 @@ func TestDualStackEndpoints(t *testing.T) {
 			// legacy endpoints are not dual stack
 			// and use the address of the first IP family
 			if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-				e, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
+				e, err := client.CoreV1().Endpoints(ns.Name).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Logf("Error fetching endpoints: %v", err)
 					return false, nil
@@ -240,7 +236,7 @@ func TestDualStackEndpoints(t *testing.T) {
 			// wait until the endpoint slices are created
 			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + svc.Name
-				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: lSelector})
+				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {
 					t.Logf("Error listing EndpointSlices: %v", err)
 					return false, nil

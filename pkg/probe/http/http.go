@@ -53,11 +53,7 @@ func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
 			DisableKeepAlives:  true,
 			Proxy:              http.ProxyURL(nil),
 			DisableCompression: true, // removes Accept-Encoding header
-			// DialContext creates unencrypted TCP connections
-			// and is also used by the transport for HTTPS connection
-			DialContext: probe.ProbeDialer().DialContext,
 		})
-
 	return httpProber{transport, followNonLocalRedirects}
 }
 
@@ -117,9 +113,7 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 		return probe.Success, body, nil
 	}
 	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
-	// Note: Until https://issue.k8s.io/99425 is addressed, this user-facing failure message must not contain the response body.
-	failureMsg := fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode)
-	return probe.Failure, failureMsg, nil
+	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
 }
 
 // RedirectChecker returns a function that can be used to check HTTP redirects.

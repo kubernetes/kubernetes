@@ -106,10 +106,11 @@ type Route struct {
 }
 
 func (f *Cloud) addCall(desc string) {
-	time.Sleep(f.RequestDelay)
-
 	f.addCallLock.Lock()
 	defer f.addCallLock.Unlock()
+
+	time.Sleep(f.RequestDelay)
+
 	f.Calls = append(f.Calls, desc)
 }
 

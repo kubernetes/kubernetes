@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	policyv1client "k8s.io/client-go/kubernetes/typed/policy/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -73,11 +72,11 @@ type PodDisruptionBudgetOpts struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewPodDisruptionBudgetOpts creates a new *PodDisruptionBudgetOpts with sane defaults
-func NewPodDisruptionBudgetOpts(ioStreams genericiooptions.IOStreams) *PodDisruptionBudgetOpts {
+func NewPodDisruptionBudgetOpts(ioStreams genericclioptions.IOStreams) *PodDisruptionBudgetOpts {
 	return &PodDisruptionBudgetOpts{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -85,7 +84,7 @@ func NewPodDisruptionBudgetOpts(ioStreams genericiooptions.IOStreams) *PodDisrup
 }
 
 // NewCmdCreatePodDisruptionBudget is a macro command to create a new pod disruption budget.
-func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewPodDisruptionBudgetOpts(ioStreams)
 
 	cmd := &cobra.Command{

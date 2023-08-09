@@ -28,20 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	logsapi "k8s.io/component-base/logs/api/v1"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
-)
 
-func init() {
-	// If instantiated more than once or together with other servers, the
-	// servers would try to modify the global logging state. This must get
-	// ignored during testing.
-	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
-}
+	"k8s.io/klog/v2"
+)
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
@@ -55,25 +47,31 @@ type TestServer struct {
 	TmpDir               string       // Temp Dir used, by the apiserver
 }
 
+// Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
+type Logger interface {
+	Errorf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Logf(format string, args ...interface{})
+}
+
 // StartTestServer starts a kube-controller-manager. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
-func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
-	logger := klog.FromContext(ctx)
-	ctx, cancel := context.WithCancel(ctx)
+func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
+	stopCh := make(chan struct{})
 	var errCh chan error
 	tearDown := func() {
-		cancel()
+		close(stopCh)
 
 		// If the kube-controller-manager was started, let's wait for
-		// it to shutdown cleanly.
+		// it to shutdown clearly.
 		if errCh != nil {
 			err, ok := <-errCh
 			if ok && err != nil {
-				logger.Error(err, "Failed to shutdown test server cleanly")
+				klog.Errorf("Failed to shutdown test server clearly: %v", err)
 			}
 		}
 		if len(result.TmpDir) != 0 {
@@ -97,8 +95,8 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	if err != nil {
 		return TestServer{}, err
 	}
-	all, disabled, aliases := app.KnownControllers(), app.ControllersDisabledByDefault.List(), names.KCMControllerAliases()
-	namedFlagSets := s.Flags(all, disabled, aliases)
+	all, disabled := app.KnownControllers(), app.ControllersDisabledByDefault.List()
+	namedFlagSets := s.Flags(all, disabled)
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -111,32 +109,30 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		}
 		s.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
-		logger.Info("kube-controller-manager will listen securely", "port", s.SecureServing.BindPort)
+		t.Logf("kube-controller-manager will listen securely on port %d...", s.SecureServing.BindPort)
 	}
 
-	config, err := s.Config(all, disabled, aliases)
+	config, err := s.Config(all, disabled)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
 
 	errCh = make(chan error)
-	go func(ctx context.Context) {
+	go func(stopCh <-chan struct{}) {
 		defer close(errCh)
 
-		if err := app.Run(ctx, config.Complete()); err != nil {
+		if err := app.Run(config.Complete(), stopCh); err != nil {
 			errCh <- err
 		}
-	}(ctx)
+	}(stopCh)
 
-	logger.Info("Waiting for /healthz to be ok...")
+	t.Logf("Waiting for /healthz to be ok...")
 	client, err := kubernetes.NewForConfig(config.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
-	err = wait.PollWithContext(ctx, 100*time.Millisecond, 30*time.Second, func(ctx context.Context) (bool, error) {
+	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		select {
-		case <-ctx.Done():
-			return false, ctx.Err()
 		case err := <-errCh:
 			return false, err
 		default:
@@ -164,13 +160,14 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
-	result, err := StartTestServer(ctx, flags)
+func StartTestServerOrDie(t Logger, flags []string) *TestServer {
+	result, err := StartTestServer(t, flags)
 	if err == nil {
 		return &result
 	}
 
-	panic(fmt.Errorf("failed to launch server: %v", err))
+	t.Fatalf("failed to launch server: %v", err)
+	return nil
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {

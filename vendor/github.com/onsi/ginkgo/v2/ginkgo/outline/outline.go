@@ -85,19 +85,12 @@ func (o *outline) String() string {
 // one 'width' of spaces for every level of nesting.
 func (o *outline) StringIndent(width int) string {
 	var b strings.Builder
-	b.WriteString("Name,Text,Start,End,Spec,Focused,Pending,Labels\n")
+	b.WriteString("Name,Text,Start,End,Spec,Focused,Pending\n")
 
 	currentIndent := 0
 	pre := func(n *ginkgoNode) {
 		b.WriteString(fmt.Sprintf("%*s", currentIndent, ""))
-		var labels string
-		if len(n.Labels) == 1 {
-			labels = n.Labels[0]
-		} else {
-			labels = strings.Join(n.Labels, ", ")
-		}
-		//enclosing labels in a double quoted comma separate listed so that when inmported into a CSV app the Labels column has comma separate strings
-		b.WriteString(fmt.Sprintf("%s,%s,%d,%d,%t,%t,%t,\"%s\"\n", n.Name, n.Text, n.Start, n.End, n.Spec, n.Focused, n.Pending, labels))
+		b.WriteString(fmt.Sprintf("%s,%s,%d,%d,%t,%t,%t\n", n.Name, n.Text, n.Start, n.End, n.Spec, n.Focused, n.Pending))
 		currentIndent += width
 	}
 	post := func(n *ginkgoNode) {

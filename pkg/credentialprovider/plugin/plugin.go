@@ -410,7 +410,7 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 	cmd.Env = mergeEnvVars(e.environ(), configEnvVars)
 
 	if err = e.runPlugin(ctx, cmd, image); err != nil {
-		return nil, fmt.Errorf("%w: %s", err, stderr.String())
+		return nil, err
 	}
 
 	data = stdout.Bytes()

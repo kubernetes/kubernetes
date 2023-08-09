@@ -54,7 +54,7 @@ func (client BastionHostsClient) CreateOrUpdate(ctx context.Context, resourceGro
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.BastionHostsClient", "CreateOrUpdate", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.BastionHostsClient", "CreateOrUpdate", nil, "Failure sending request")
 		return
 	}
 
@@ -89,7 +89,6 @@ func (client BastionHostsClient) CreateOrUpdatePreparer(ctx context.Context, res
 // http.Response Body if it receives an error.
 func (client BastionHostsClient) CreateOrUpdateSender(req *http.Request) (future BastionHostsCreateOrUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -136,7 +135,7 @@ func (client BastionHostsClient) Delete(ctx context.Context, resourceGroupName s
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.BastionHostsClient", "Delete", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.BastionHostsClient", "Delete", nil, "Failure sending request")
 		return
 	}
 
@@ -168,7 +167,6 @@ func (client BastionHostsClient) DeletePreparer(ctx context.Context, resourceGro
 // http.Response Body if it receives an error.
 func (client BastionHostsClient) DeleteSender(req *http.Request) (future BastionHostsDeleteFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -520,7 +518,7 @@ func (client BastionHostsClient) UpdateTags(ctx context.Context, resourceGroupNa
 
 	result, err = client.UpdateTagsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.BastionHostsClient", "UpdateTags", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.BastionHostsClient", "UpdateTags", nil, "Failure sending request")
 		return
 	}
 
@@ -554,7 +552,6 @@ func (client BastionHostsClient) UpdateTagsPreparer(ctx context.Context, resourc
 // http.Response Body if it receives an error.
 func (client BastionHostsClient) UpdateTagsSender(req *http.Request) (future BastionHostsUpdateTagsFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

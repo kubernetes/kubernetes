@@ -50,9 +50,9 @@ func (r *TokenREST) Destroy() {
 }
 
 type TokenREST struct {
-	svcaccts             rest.Getter
-	pods                 rest.Getter
-	secrets              rest.Getter
+	svcaccts             getter
+	pods                 getter
+	secrets              getter
 	issuer               token.TokenGenerator
 	auds                 authenticator.Audiences
 	audsSet              sets.String
@@ -196,6 +196,10 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 
 func (r *TokenREST) GroupVersionKind(schema.GroupVersion) schema.GroupVersionKind {
 	return gvk
+}
+
+type getter interface {
+	Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
 }
 
 // newContext return a copy of ctx in which new RequestInfo is set

@@ -553,13 +553,6 @@
                 }
               ]
             },
-            "resizePolicy": [
-              {
-                "resourceName": "resourceNameValue",
-                "restartPolicy": "restartPolicyValue"
-              }
-            ],
-            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -837,13 +830,6 @@
                 }
               ]
             },
-            "resizePolicy": [
-              {
-                "resourceName": "resourceNameValue",
-                "restartPolicy": "restartPolicyValue"
-              }
-            ],
-            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -1121,13 +1107,6 @@
                 }
               ]
             },
-            "resizePolicy": [
-              {
-                "resourceName": "resourceNameValue",
-                "restartPolicy": "restartPolicyValue"
-              }
-            ],
-            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",

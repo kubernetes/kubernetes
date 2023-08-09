@@ -27,14 +27,13 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/utils/pointer"
 )
@@ -945,8 +944,7 @@ func TestDeploymentTimedOut(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nowFn = test.nowFn
-			_, ctx := ktesting.NewTestContext(t)
-			if got, exp := DeploymentTimedOut(ctx, &test.d, &test.d.Status), test.expected; got != exp {
+			if got, exp := DeploymentTimedOut(&test.d, &test.d.Status), test.expected; got != exp {
 				t.Errorf("expected timeout: %t, got: %t", exp, got)
 			}
 		})
@@ -975,22 +973,22 @@ func TestMaxUnavailable(t *testing.T) {
 	}{
 		{
 			name:       "maxUnavailable less than replicas",
-			deployment: deployment(10, intstr.FromInt32(5)),
+			deployment: deployment(10, intstr.FromInt(5)),
 			expected:   int32(5),
 		},
 		{
 			name:       "maxUnavailable equal replicas",
-			deployment: deployment(10, intstr.FromInt32(10)),
+			deployment: deployment(10, intstr.FromInt(10)),
 			expected:   int32(10),
 		},
 		{
 			name:       "maxUnavailable greater than replicas",
-			deployment: deployment(5, intstr.FromInt32(10)),
+			deployment: deployment(5, intstr.FromInt(10)),
 			expected:   int32(5),
 		},
 		{
 			name:       "maxUnavailable with replicas is 0",
-			deployment: deployment(0, intstr.FromInt32(10)),
+			deployment: deployment(0, intstr.FromInt(10)),
 			expected:   int32(0),
 		},
 		{
@@ -1042,13 +1040,11 @@ func TestAnnotationUtils(t *testing.T) {
 
 	//Test Case 1: Check if anotations are copied properly from deployment to RS
 	t.Run("SetNewReplicaSetAnnotations", func(t *testing.T) {
-		_, ctx := ktesting.NewTestContext(t)
-
 		//Try to set the increment revision from 11 through 20
 		for i := 10; i < 20; i++ {
 
 			nextRevision := fmt.Sprintf("%d", i+1)
-			SetNewReplicaSetAnnotations(ctx, &tDeployment, &tRS, nextRevision, true, 5)
+			SetNewReplicaSetAnnotations(&tDeployment, &tRS, nextRevision, true, 5)
 			//Now the ReplicaSets Revision Annotation should be i+1
 
 			if i >= 12 {
@@ -1277,22 +1273,22 @@ func TestMinAvailable(t *testing.T) {
 	}{
 		{
 			name:       "replicas greater than maxUnavailable",
-			deployment: deployment(10, intstr.FromInt32(5)),
+			deployment: deployment(10, intstr.FromInt(5)),
 			expected:   5,
 		},
 		{
 			name:       "replicas equal maxUnavailable",
-			deployment: deployment(10, intstr.FromInt32(10)),
+			deployment: deployment(10, intstr.FromInt(10)),
 			expected:   0,
 		},
 		{
 			name:       "replicas less than maxUnavailable",
-			deployment: deployment(5, intstr.FromInt32(10)),
+			deployment: deployment(5, intstr.FromInt(10)),
 			expected:   0,
 		},
 		{
 			name:       "replicas is 0",
-			deployment: deployment(0, intstr.FromInt32(10)),
+			deployment: deployment(0, intstr.FromInt(10)),
 			expected:   0,
 		},
 		{

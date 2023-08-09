@@ -70,7 +70,7 @@ func (client ExpressRouteCrossConnectionPeeringsClient) CreateOrUpdate(ctx conte
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionPeeringsClient", "CreateOrUpdate", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionPeeringsClient", "CreateOrUpdate", nil, "Failure sending request")
 		return
 	}
 
@@ -106,7 +106,6 @@ func (client ExpressRouteCrossConnectionPeeringsClient) CreateOrUpdatePreparer(c
 // http.Response Body if it receives an error.
 func (client ExpressRouteCrossConnectionPeeringsClient) CreateOrUpdateSender(req *http.Request) (future ExpressRouteCrossConnectionPeeringsCreateOrUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -154,7 +153,7 @@ func (client ExpressRouteCrossConnectionPeeringsClient) Delete(ctx context.Conte
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionPeeringsClient", "Delete", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionPeeringsClient", "Delete", nil, "Failure sending request")
 		return
 	}
 
@@ -187,7 +186,6 @@ func (client ExpressRouteCrossConnectionPeeringsClient) DeletePreparer(ctx conte
 // http.Response Body if it receives an error.
 func (client ExpressRouteCrossConnectionPeeringsClient) DeleteSender(req *http.Request) (future ExpressRouteCrossConnectionPeeringsDeleteFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

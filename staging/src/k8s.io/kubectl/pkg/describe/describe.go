@@ -35,7 +35,7 @@ import (
 	"github.com/fatih/camelcase"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -209,14 +209,14 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                          &PriorityClassDescriber{c},
 		{Group: discoveryv1beta1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                     &EndpointSliceDescriber{c},
-		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:         &HorizontalPodAutoscalerDescriber{c},
+		{Group: policyv1beta1.GroupName, Kind: "PodSecurityPolicy"}:               &PodSecurityPolicyDescriber{c},
+		{Group: autoscalingv2beta2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                          &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                     &IngressClassDescriber{c},
 		{Group: networkingv1alpha1.GroupName, Kind: "ClusterCIDR"}:                &ClusterCIDRDescriber{c},
-		{Group: networkingv1alpha1.GroupName, Kind: "IPAddress"}:                  &IPAddressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: batchv1beta1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
@@ -381,35 +381,14 @@ var DefaultObjectDescriber ObjectDescriber
 func init() {
 	d := &Describers{}
 	err := d.Add(
-		describeCertificateSigningRequest,
-		describeCronJob,
-		describeCSINode,
-		describeDaemonSet,
-		describeDeployment,
-		describeEndpoints,
-		describeEndpointSliceV1,
-		describeEndpointSliceV1beta1,
-		describeHorizontalPodAutoscalerV1,
-		describeHorizontalPodAutoscalerV2,
-		describeJob,
 		describeLimitRange,
-		describeNamespace,
-		describeNetworkPolicy,
-		describeNode,
-		describePersistentVolume,
-		describePersistentVolumeClaim,
-		describePod,
-		describePodDisruptionBudgetV1,
-		describePodDisruptionBudgetV1beta1,
-		describePriorityClass,
 		describeQuota,
-		describeReplicaSet,
-		describeReplicationController,
-		describeSecret,
+		describePod,
 		describeService,
-		describeServiceAccount,
-		describeStatefulSet,
-		describeStorageClass,
+		describeReplicationController,
+		describeDaemonSet,
+		describeNode,
+		describeNamespace,
 	)
 	if err != nil {
 		klog.Fatalf("Cannot register describers: %v", err)
@@ -2347,14 +2326,22 @@ func (d *CronJobDescriber) Describe(namespace, name string, describerSettings De
 	var events *corev1.EventList
 
 	cronJob, err := d.client.BatchV1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil {
+		if describerSettings.ShowEvents {
+			events, _ = searchEvents(d.client.CoreV1(), cronJob, describerSettings.ChunkSize)
+		}
+		return describeCronJob(cronJob, events)
+	}
+
+	// TODO: drop this condition when beta disappears in 1.25
+	cronJobBeta, err := d.client.BatchV1beta1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
-
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.client.CoreV1(), cronJob, describerSettings.ChunkSize)
+		events, _ = searchEvents(d.client.CoreV1(), cronJobBeta, describerSettings.ChunkSize)
 	}
-	return describeCronJob(cronJob, events)
+	return describeCronJobBeta(cronJobBeta, events)
 }
 
 func describeCronJob(cronJob *batchv1.CronJob, events *corev1.EventList) (string, error) {
@@ -2397,6 +2384,71 @@ func describeCronJob(cronJob *batchv1.CronJob, events *corev1.EventList) (string
 }
 
 func describeJobTemplate(jobTemplate batchv1.JobTemplateSpec, w PrefixWriter) {
+	if jobTemplate.Spec.Selector != nil {
+		if selector, err := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector); err == nil {
+			w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		} else {
+			w.Write(LEVEL_0, "Selector:\tFailed to get selector: %s\n", err)
+		}
+	} else {
+		w.Write(LEVEL_0, "Selector:\t<unset>\n")
+	}
+	if jobTemplate.Spec.Parallelism != nil {
+		w.Write(LEVEL_0, "Parallelism:\t%d\n", *jobTemplate.Spec.Parallelism)
+	} else {
+		w.Write(LEVEL_0, "Parallelism:\t<unset>\n")
+	}
+	if jobTemplate.Spec.Completions != nil {
+		w.Write(LEVEL_0, "Completions:\t%d\n", *jobTemplate.Spec.Completions)
+	} else {
+		w.Write(LEVEL_0, "Completions:\t<unset>\n")
+	}
+	if jobTemplate.Spec.ActiveDeadlineSeconds != nil {
+		w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *jobTemplate.Spec.ActiveDeadlineSeconds)
+	}
+	DescribePodTemplate(&jobTemplate.Spec.Template, w)
+}
+
+func describeCronJobBeta(cronJob *batchv1beta1.CronJob, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", cronJob.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", cronJob.Namespace)
+		printLabelsMultiline(w, "Labels", cronJob.Labels)
+		printAnnotationsMultiline(w, "Annotations", cronJob.Annotations)
+		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
+		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
+		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
+		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
+			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", *cronJob.Spec.SuccessfulJobsHistoryLimit)
+		} else {
+			w.Write(LEVEL_0, "Successful Job History Limit:\t<unset>\n")
+		}
+		if cronJob.Spec.FailedJobsHistoryLimit != nil {
+			w.Write(LEVEL_0, "Failed Job History Limit:\t%d\n", *cronJob.Spec.FailedJobsHistoryLimit)
+		} else {
+			w.Write(LEVEL_0, "Failed Job History Limit:\t<unset>\n")
+		}
+		if cronJob.Spec.StartingDeadlineSeconds != nil {
+			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *cronJob.Spec.StartingDeadlineSeconds)
+		} else {
+			w.Write(LEVEL_0, "Starting Deadline Seconds:\t<unset>\n")
+		}
+		describeJobTemplateBeta(cronJob.Spec.JobTemplate, w)
+		if cronJob.Status.LastScheduleTime != nil {
+			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", cronJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
+		} else {
+			w.Write(LEVEL_0, "Last Schedule Time:\t<unset>\n")
+		}
+		printActiveJobs(w, "Active Jobs", cronJob.Status.Active)
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
+func describeJobTemplateBeta(jobTemplate batchv1beta1.JobTemplateSpec, w PrefixWriter) {
 	if jobTemplate.Spec.Selector != nil {
 		if selector, err := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector); err == nil {
 			w.Write(LEVEL_0, "Selector:\t%s\n", selector)
@@ -2866,46 +2918,6 @@ func (c *ClusterCIDRDescriber) describeClusterCIDRV1alpha1(cc *networkingv1alpha
 
 		if cc.Spec.IPv6 != "" {
 			w.Write(LEVEL_0, "IPv6:\t%s\n", cc.Spec.IPv6)
-		}
-
-		if events != nil {
-			DescribeEvents(events, w)
-		}
-		return nil
-	})
-}
-
-// IPAddressDescriber generates information about an IPAddress.
-type IPAddressDescriber struct {
-	client clientset.Interface
-}
-
-func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	var events *corev1.EventList
-
-	ipV1alpha1, err := c.client.NetworkingV1alpha1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
-	if err == nil {
-		if describerSettings.ShowEvents {
-			events, _ = searchEvents(c.client.CoreV1(), ipV1alpha1, describerSettings.ChunkSize)
-		}
-		return c.describeIPAddressV1alpha1(ipV1alpha1, events)
-	}
-	return "", err
-}
-
-func (c *IPAddressDescriber) describeIPAddressV1alpha1(ip *networkingv1alpha1.IPAddress, events *corev1.EventList) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%v\n", ip.Name)
-		printLabelsMultiline(w, "Labels", ip.Labels)
-		printAnnotationsMultiline(w, "Annotations", ip.Annotations)
-
-		if ip.Spec.ParentRef != nil {
-			w.Write(LEVEL_0, "Parent Reference:\n")
-			w.Write(LEVEL_1, "Group:\t%v\n", ip.Spec.ParentRef.Group)
-			w.Write(LEVEL_1, "Resource:\t%v\n", ip.Spec.ParentRef.Resource)
-			w.Write(LEVEL_1, "Namespace:\t%v\n", ip.Spec.ParentRef.Namespace)
-			w.Write(LEVEL_1, "Name:\t%v\n", ip.Spec.ParentRef.Name)
 		}
 
 		if events != nil {
@@ -3941,15 +3953,15 @@ type HorizontalPodAutoscalerDescriber struct {
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	// autoscaling/v2 is introduced since v1.23 and autoscaling/v1 does not have full backward compatibility
-	// with autoscaling/v2, so describer will try to get and describe hpa v2 object firstly, if it fails,
+	// autoscaling/v2beta2 is introduced since v1.12 and autoscaling/v1 does not have full backward compatibility
+	// with autoscaling/v2beta2, so describer will try to get and describe hpa v2beta2 object firstly, if it fails,
 	// describer will fall back to do with hpa v1 object
-	hpaV2, err := d.client.AutoscalingV2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	hpaV2beta2, err := d.client.AutoscalingV2beta2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(d.client.CoreV1(), hpaV2, describerSettings.ChunkSize)
+			events, _ = searchEvents(d.client.CoreV1(), hpaV2beta2, describerSettings.ChunkSize)
 		}
-		return describeHorizontalPodAutoscalerV2(hpaV2, events, d)
+		return describeHorizontalPodAutoscalerV2beta2(hpaV2beta2, events, d)
 	}
 
 	hpaV1, err := d.client.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -3963,7 +3975,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 	return "", err
 }
 
-func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
+func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", hpa.Name)
@@ -3977,7 +3989,7 @@ func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscale
 		w.Write(LEVEL_0, "Metrics:\t( current / target )\n")
 		for i, metric := range hpa.Spec.Metrics {
 			switch metric.Type {
-			case autoscalingv2.ExternalMetricSourceType:
+			case autoscalingv2beta2.ExternalMetricSourceType:
 				if metric.External.Target.AverageValue != nil {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil &&
@@ -3993,15 +4005,15 @@ func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscale
 					w.Write(LEVEL_1, "%q (target value):\t%s / %s\n", metric.External.Metric.Name, current, metric.External.Target.Value.String())
 
 				}
-			case autoscalingv2.PodsMetricSourceType:
+			case autoscalingv2beta2.PodsMetricSourceType:
 				current := "<unknown>"
 				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Pods != nil {
 					current = hpa.Status.CurrentMetrics[i].Pods.Current.AverageValue.String()
 				}
 				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.Metric.Name, current, metric.Pods.Target.AverageValue.String())
-			case autoscalingv2.ObjectMetricSourceType:
+			case autoscalingv2beta2.ObjectMetricSourceType:
 				w.Write(LEVEL_1, "\"%s\" on %s/%s ", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name)
-				if metric.Object.Target.Type == autoscalingv2.AverageValueMetricType {
+				if metric.Object.Target.Type == autoscalingv2beta2.AverageValueMetricType {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
 						current = hpa.Status.CurrentMetrics[i].Object.Current.AverageValue.String()
@@ -4014,7 +4026,7 @@ func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscale
 					}
 					w.Write(LEVEL_0, "(target value):\t%s / %s\n", current, metric.Object.Target.Value.String())
 				}
-			case autoscalingv2.ResourceMetricSourceType:
+			case autoscalingv2beta2.ResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
 				if metric.Resource.Target.AverageValue != nil {
 					current := "<unknown>"
@@ -4034,7 +4046,7 @@ func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscale
 					}
 					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
 				}
-			case autoscalingv2.ContainerResourceMetricSourceType:
+			case autoscalingv2beta2.ContainerResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s of container \"%s\" on pods", string(metric.ContainerResource.Name), metric.ContainerResource.Container)
 				if metric.ContainerResource.Target.AverageValue != nil {
 					current := "<unknown>"
@@ -4090,7 +4102,7 @@ func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscale
 	})
 }
 
-func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscalingv2.HPAScalingRules) {
+func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscalingv2beta2.HPAScalingRules) {
 	if rules != nil {
 		w.Write(LEVEL_1, "%s:\n", direction)
 		if rules.StabilizationWindowSeconds != nil {
@@ -4100,7 +4112,7 @@ func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscaling
 			if rules.SelectPolicy != nil {
 				w.Write(LEVEL_2, "Select Policy: %s\n", *rules.SelectPolicy)
 			} else {
-				w.Write(LEVEL_2, "Select Policy: %s\n", autoscalingv2.MaxChangePolicySelect)
+				w.Write(LEVEL_2, "Select Policy: %s\n", autoscalingv2beta2.MaxPolicySelect)
 			}
 			w.Write(LEVEL_2, "Policies:\n")
 			for _, p := range rules.Policies {
@@ -4878,6 +4890,84 @@ func describePriorityClass(pc *schedulingv1.PriorityClass, events *corev1.EventL
 	})
 }
 
+// PodSecurityPolicyDescriber generates information about a PodSecuritypolicyv1beta1.
+type PodSecurityPolicyDescriber struct {
+	clientset.Interface
+}
+
+func (d *PodSecurityPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	psp, err := d.PolicyV1beta1().PodSecurityPolicies().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return describePodSecurityPolicy(psp)
+}
+
+func describePodSecurityPolicy(psp *policyv1beta1.PodSecurityPolicy) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", psp.Name)
+
+		w.Write(LEVEL_0, "\nSettings:\n")
+
+		w.Write(LEVEL_1, "Allow Privileged:\t%t\n", psp.Spec.Privileged)
+		if psp.Spec.AllowPrivilegeEscalation != nil {
+			w.Write(LEVEL_1, "Allow Privilege Escalation:\t%t\n", *psp.Spec.AllowPrivilegeEscalation)
+		} else {
+			w.Write(LEVEL_1, "Allow Privilege Escalation:\t<unset>\n")
+		}
+		w.Write(LEVEL_1, "Default Add Capabilities:\t%v\n", capsToString(psp.Spec.DefaultAddCapabilities))
+		w.Write(LEVEL_1, "Required Drop Capabilities:\t%s\n", capsToString(psp.Spec.RequiredDropCapabilities))
+		w.Write(LEVEL_1, "Allowed Capabilities:\t%s\n", capsToString(psp.Spec.AllowedCapabilities))
+		w.Write(LEVEL_1, "Allowed Volume Types:\t%s\n", fsTypeToString(psp.Spec.Volumes))
+
+		if len(psp.Spec.AllowedFlexVolumes) > 0 {
+			w.Write(LEVEL_1, "Allowed FlexVolume Types:\t%s\n", flexVolumesToString(psp.Spec.AllowedFlexVolumes))
+		}
+
+		if len(psp.Spec.AllowedCSIDrivers) > 0 {
+			w.Write(LEVEL_1, "Allowed CSI Drivers:\t%s\n", csiDriversToString(psp.Spec.AllowedCSIDrivers))
+		}
+
+		if len(psp.Spec.AllowedUnsafeSysctls) > 0 {
+			w.Write(LEVEL_1, "Allowed Unsafe Sysctls:\t%s\n", sysctlsToString(psp.Spec.AllowedUnsafeSysctls))
+		}
+		if len(psp.Spec.ForbiddenSysctls) > 0 {
+			w.Write(LEVEL_1, "Forbidden Sysctls:\t%s\n", sysctlsToString(psp.Spec.ForbiddenSysctls))
+		}
+		w.Write(LEVEL_1, "Allow Host Network:\t%t\n", psp.Spec.HostNetwork)
+		w.Write(LEVEL_1, "Allow Host Ports:\t%s\n", hostPortRangeToString(psp.Spec.HostPorts))
+		w.Write(LEVEL_1, "Allow Host PID:\t%t\n", psp.Spec.HostPID)
+		w.Write(LEVEL_1, "Allow Host IPC:\t%t\n", psp.Spec.HostIPC)
+		w.Write(LEVEL_1, "Read Only Root Filesystem:\t%v\n", psp.Spec.ReadOnlyRootFilesystem)
+
+		w.Write(LEVEL_1, "SELinux Context Strategy: %s\t\n", string(psp.Spec.SELinux.Rule))
+		var user, role, seLinuxType, level string
+		if psp.Spec.SELinux.SELinuxOptions != nil {
+			user = psp.Spec.SELinux.SELinuxOptions.User
+			role = psp.Spec.SELinux.SELinuxOptions.Role
+			seLinuxType = psp.Spec.SELinux.SELinuxOptions.Type
+			level = psp.Spec.SELinux.SELinuxOptions.Level
+		}
+		w.Write(LEVEL_2, "User:\t%s\n", stringOrNone(user))
+		w.Write(LEVEL_2, "Role:\t%s\n", stringOrNone(role))
+		w.Write(LEVEL_2, "Type:\t%s\n", stringOrNone(seLinuxType))
+		w.Write(LEVEL_2, "Level:\t%s\n", stringOrNone(level))
+
+		w.Write(LEVEL_1, "Run As User Strategy: %s\t\n", string(psp.Spec.RunAsUser.Rule))
+		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.RunAsUser.Ranges))
+
+		w.Write(LEVEL_1, "FSGroup Strategy: %s\t\n", string(psp.Spec.FSGroup.Rule))
+		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.FSGroup.Ranges))
+
+		w.Write(LEVEL_1, "Supplemental Groups Strategy: %s\t\n", string(psp.Spec.SupplementalGroups.Rule))
+		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.SupplementalGroups.Ranges))
+
+		return nil
+	})
+}
+
 func stringOrNone(s string) string {
 	return stringOrDefaultValue(s, "<none>")
 }
@@ -4887,6 +4977,70 @@ func stringOrDefaultValue(s, defaultValue string) string {
 		return s
 	}
 	return defaultValue
+}
+
+func fsTypeToString(volumes []policyv1beta1.FSType) string {
+	strVolumes := []string{}
+	for _, v := range volumes {
+		strVolumes = append(strVolumes, string(v))
+	}
+	return stringOrNone(strings.Join(strVolumes, ","))
+}
+
+func flexVolumesToString(flexVolumes []policyv1beta1.AllowedFlexVolume) string {
+	volumes := []string{}
+	for _, flexVolume := range flexVolumes {
+		volumes = append(volumes, "driver="+flexVolume.Driver)
+	}
+	return stringOrDefaultValue(strings.Join(volumes, ","), "<all>")
+}
+
+func csiDriversToString(csiDrivers []policyv1beta1.AllowedCSIDriver) string {
+	drivers := []string{}
+	for _, csiDriver := range csiDrivers {
+		drivers = append(drivers, "driver="+csiDriver.Name)
+	}
+	return stringOrDefaultValue(strings.Join(drivers, ","), "<all>")
+}
+
+func sysctlsToString(sysctls []string) string {
+	return stringOrNone(strings.Join(sysctls, ","))
+}
+
+func hostPortRangeToString(ranges []policyv1beta1.HostPortRange) string {
+	formattedString := ""
+	if ranges != nil {
+		strRanges := []string{}
+		for _, r := range ranges {
+			strRanges = append(strRanges, fmt.Sprintf("%d-%d", r.Min, r.Max))
+		}
+		formattedString = strings.Join(strRanges, ",")
+	}
+	return stringOrNone(formattedString)
+}
+
+func idRangeToString(ranges []policyv1beta1.IDRange) string {
+	formattedString := ""
+	if ranges != nil {
+		strRanges := []string{}
+		for _, r := range ranges {
+			strRanges = append(strRanges, fmt.Sprintf("%d-%d", r.Min, r.Max))
+		}
+		formattedString = strings.Join(strRanges, ",")
+	}
+	return stringOrNone(formattedString)
+}
+
+func capsToString(caps []corev1.Capability) string {
+	formattedString := ""
+	if caps != nil {
+		strCaps := []string{}
+		for _, c := range caps {
+			strCaps = append(strCaps, string(c))
+		}
+		formattedString = strings.Join(strCaps, ",")
+	}
+	return stringOrNone(formattedString)
 }
 
 func policyTypesToString(pts []networkingv1.PolicyType) string {
@@ -5030,12 +5184,8 @@ func (fn typeFunc) Matches(types []reflect.Type) bool {
 // Describe invokes the nested function with the exact number of arguments.
 func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, error) {
 	values := []reflect.Value{reflect.ValueOf(exact)}
-	for i, obj := range extra {
-		if obj != nil {
-			values = append(values, reflect.ValueOf(obj))
-		} else {
-			values = append(values, reflect.New(fn.Extra[i]).Elem())
-		}
+	for _, obj := range extra {
+		values = append(values, reflect.ValueOf(obj))
 	}
 	out := fn.Fn.Call(values)
 	s := out[0].Interface().(string)
@@ -5209,7 +5359,8 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	}
 
 	out.Flush()
-	return buf.String(), nil
+	str := string(buf.String())
+	return str, nil
 }
 
 type SortableResourceNames []corev1.ResourceName

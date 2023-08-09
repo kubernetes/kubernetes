@@ -6,6 +6,7 @@ linters:
   disable-all: true
   enable:
     - asciicheck
+    - deadcode
     - errcheck
     - forcetypeassert
     - gocritic
@@ -17,8 +18,10 @@ linters:
     - misspell
     - revive
     - staticcheck
+    - structcheck
     - typecheck
     - unused
+    - varcheck
 
 issues:
   exclude-use-default: false

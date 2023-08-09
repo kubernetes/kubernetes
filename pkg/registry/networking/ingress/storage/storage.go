@@ -40,10 +40,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &networking.Ingress{} },
-		NewListFunc:               func() runtime.Object { return &networking.IngressList{} },
-		DefaultQualifiedResource:  networking.Resource("ingresses"),
-		SingularQualifiedResource: networking.Resource("ingress"),
+		NewFunc:                  func() runtime.Object { return &networking.Ingress{} },
+		NewListFunc:              func() runtime.Object { return &networking.IngressList{} },
+		DefaultQualifiedResource: networking.Resource("ingresses"),
 
 		CreateStrategy:      ingress.Strategy,
 		UpdateStrategy:      ingress.Strategy,

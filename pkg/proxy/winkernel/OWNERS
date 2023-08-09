@@ -10,8 +10,6 @@ reviewers:
   - daschott
 labels:
   - sig/network
-  - sig/windows
-  - area/kube-proxy
 emeritus_approvers:
   - dineshgovindasamy
   - ksubrmnn

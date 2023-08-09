@@ -68,8 +68,6 @@
       ]
     },
     "backoffLimit": 7,
-    "backoffLimitPerIndex": 12,
-    "maxFailedIndexes": 13,
     "selector": {
       "matchLabels": {
         "matchLabelsKey": "matchLabelsValue"
@@ -578,13 +576,6 @@
                 }
               ]
             },
-            "resizePolicy": [
-              {
-                "resourceName": "resourceNameValue",
-                "restartPolicy": "restartPolicyValue"
-              }
-            ],
-            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -862,13 +853,6 @@
                 }
               ]
             },
-            "resizePolicy": [
-              {
-                "resourceName": "resourceNameValue",
-                "restartPolicy": "restartPolicyValue"
-              }
-            ],
-            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -1146,13 +1130,6 @@
                 }
               ]
             },
-            "resizePolicy": [
-              {
-                "resourceName": "resourceNameValue",
-                "restartPolicy": "restartPolicyValue"
-              }
-            ],
-            "restartPolicy": "restartPolicyValue",
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -1714,8 +1691,7 @@
     },
     "ttlSecondsAfterFinished": 8,
     "completionMode": "completionModeValue",
-    "suspend": true,
-    "podReplacementPolicy": "podReplacementPolicyValue"
+    "suspend": true
   },
   "status": {
     "conditions": [
@@ -1733,9 +1709,7 @@
     "active": 4,
     "succeeded": 5,
     "failed": 6,
-    "terminating": 11,
     "completedIndexes": "completedIndexesValue",
-    "failedIndexes": "failedIndexesValue",
     "uncountedTerminatedPods": {
       "succeeded": [
         "succeededValue"

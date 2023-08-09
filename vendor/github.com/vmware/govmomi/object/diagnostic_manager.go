@@ -71,8 +71,10 @@ func (m DiagnosticManager) GenerateLogBundles(ctx context.Context, includeDefaul
 		IncludeDefault: includeDefault,
 	}
 
-	for _, h := range host {
-		req.Host = append(req.Host, h.Reference())
+	if host != nil {
+		for _, h := range host {
+			req.Host = append(req.Host, h.Reference())
+		}
 	}
 
 	res, err := methods.GenerateLogBundles_Task(ctx, m.c, &req)

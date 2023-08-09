@@ -426,13 +426,6 @@ func autoConvert_url_Values_To_v1_ListOptions(in *url.Values, out *ListOptions, 
 	} else {
 		out.Continue = ""
 	}
-	if values, ok := map[string][]string(*in)["sendInitialEvents"]; ok && len(values) > 0 {
-		if err := runtime.Convert_Slice_string_To_Pointer_bool(&values, &out.SendInitialEvents, s); err != nil {
-			return err
-		}
-	} else {
-		out.SendInitialEvents = nil
-	}
 	return nil
 }
 

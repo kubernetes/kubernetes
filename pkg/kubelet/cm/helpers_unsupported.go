@@ -25,13 +25,10 @@ import (
 )
 
 const (
-	MinShares = 0
-	MaxShares = 0
-
+	MinShares     = 0
 	SharesPerCPU  = 0
 	MilliCPUToCPU = 0
 
-	QuotaPeriod    = 0
 	MinQuotaPeriod = 0
 )
 

@@ -146,18 +146,8 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 	cc.safeConfigSelector.UpdateConfigSelector(&defaultConfigSelector{nil})
 	cc.ctx, cc.cancel = context.WithCancel(context.Background())
 
-	disableGlobalOpts := false
-	for _, opt := range opts {
-		if _, ok := opt.(*disableGlobalDialOptions); ok {
-			disableGlobalOpts = true
-			break
-		}
-	}
-
-	if !disableGlobalOpts {
-		for _, opt := range globalDialOptions {
-			opt.apply(&cc.dopts)
-		}
+	for _, opt := range extraDialOptions {
+		opt.apply(&cc.dopts)
 	}
 
 	for _, opt := range opts {
@@ -266,7 +256,7 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 	if err != nil {
 		return nil, err
 	}
-	cc.authority, err = determineAuthority(cc.parsedTarget.Endpoint(), cc.target, cc.dopts)
+	cc.authority, err = determineAuthority(cc.parsedTarget.Endpoint, cc.target, cc.dopts)
 	if err != nil {
 		return nil, err
 	}
@@ -798,16 +788,10 @@ func (cc *ClientConn) incrCallsFailed() {
 func (ac *addrConn) connect() error {
 	ac.mu.Lock()
 	if ac.state == connectivity.Shutdown {
-		if logger.V(2) {
-			logger.Infof("connect called on shutdown addrConn; ignoring.")
-		}
 		ac.mu.Unlock()
 		return errConnClosing
 	}
 	if ac.state != connectivity.Idle {
-		if logger.V(2) {
-			logger.Infof("connect called on addrConn in non-idle state (%v); ignoring.", ac.state)
-		}
 		ac.mu.Unlock()
 		return nil
 	}
@@ -944,7 +928,7 @@ func (cc *ClientConn) healthCheckConfig() *healthCheckConfig {
 	return cc.sc.healthCheckConfig
 }
 
-func (cc *ClientConn) getTransport(ctx context.Context, failfast bool, method string) (transport.ClientTransport, balancer.PickResult, error) {
+func (cc *ClientConn) getTransport(ctx context.Context, failfast bool, method string) (transport.ClientTransport, func(balancer.DoneInfo), error) {
 	return cc.blockingpicker.pick(ctx, failfast, balancer.PickInfo{
 		Ctx:            ctx,
 		FullMethodName: method,
@@ -1113,11 +1097,7 @@ func (ac *addrConn) updateConnectivityState(s connectivity.State, lastErr error)
 		return
 	}
 	ac.state = s
-	if lastErr == nil {
-		channelz.Infof(logger, ac.channelzID, "Subchannel Connectivity change to %v", s)
-	} else {
-		channelz.Infof(logger, ac.channelzID, "Subchannel Connectivity change to %v, last error: %s", s, lastErr)
-	}
+	channelz.Infof(logger, ac.channelzID, "Subchannel Connectivity change to %v", s)
 	ac.cc.handleSubConnStateChange(ac.acbw, s, lastErr)
 }
 
@@ -1251,11 +1231,9 @@ func (ac *addrConn) createTransport(addr resolver.Address, copts transport.Conne
 	addr.ServerName = ac.cc.getServerName(addr)
 	hctx, hcancel := context.WithCancel(ac.ctx)
 
-	onClose := func(r transport.GoAwayReason) {
+	onClose := grpcsync.OnceFunc(func() {
 		ac.mu.Lock()
 		defer ac.mu.Unlock()
-		// adjust params based on GoAwayReason
-		ac.adjustParams(r)
 		if ac.state == connectivity.Shutdown {
 			// Already shut down.  tearDown() already cleared the transport and
 			// canceled hctx via ac.ctx, and we expected this connection to be
@@ -1276,17 +1254,20 @@ func (ac *addrConn) createTransport(addr resolver.Address, copts transport.Conne
 		// Always go idle and wait for the LB policy to initiate a new
 		// connection attempt.
 		ac.updateConnectivityState(connectivity.Idle, nil)
+	})
+	onGoAway := func(r transport.GoAwayReason) {
+		ac.mu.Lock()
+		ac.adjustParams(r)
+		ac.mu.Unlock()
+		onClose()
 	}
 
 	connectCtx, cancel := context.WithDeadline(ac.ctx, connectDeadline)
 	defer cancel()
 	copts.ChannelzParentID = ac.channelzID
 
-	newTr, err := transport.NewClientTransport(connectCtx, ac.cc.ctx, addr, copts, onClose)
+	newTr, err := transport.NewClientTransport(connectCtx, ac.cc.ctx, addr, copts, onGoAway, onClose)
 	if err != nil {
-		if logger.V(2) {
-			logger.Infof("Creating new client transport to %q: %v", addr, err)
-		}
 		// newTr is either nil, or closed.
 		hcancel()
 		channelz.Warningf(logger, ac.channelzID, "grpc: addrConn.createTransport failed to connect to %s. Err: %v", addr, err)
@@ -1390,7 +1371,7 @@ func (ac *addrConn) startHealthCheck(ctx context.Context) {
 			if status.Code(err) == codes.Unimplemented {
 				channelz.Error(logger, ac.channelzID, "Subchannel health check is unimplemented at server side, thus health check is disabled")
 			} else {
-				channelz.Errorf(logger, ac.channelzID, "Health checking failed: %v", err)
+				channelz.Errorf(logger, ac.channelzID, "HealthCheckFunc exits with unexpected error %v", err)
 			}
 		}
 	}()
@@ -1541,9 +1522,6 @@ func (c *channelzChannel) ChannelzMetric() *channelz.ChannelInternalMetric {
 // referenced by users.
 var ErrClientConnTimeout = errors.New("grpc: timed out when dialing")
 
-// getResolver finds the scheme in the cc's resolvers or the global registry.
-// scheme should always be lowercase (typically by virtue of url.Parse()
-// performing proper RFC3986 behavior).
 func (cc *ClientConn) getResolver(scheme string) resolver.Builder {
 	for _, rb := range cc.dopts.resolvers {
 		if scheme == rb.Scheme() {
@@ -1604,17 +1582,30 @@ func (cc *ClientConn) parseTargetAndFindResolver() (resolver.Builder, error) {
 }
 
 // parseTarget uses RFC 3986 semantics to parse the given target into a
-// resolver.Target struct containing scheme, authority and url. Query
+// resolver.Target struct containing scheme, authority and endpoint. Query
 // params are stripped from the endpoint.
 func parseTarget(target string) (resolver.Target, error) {
 	u, err := url.Parse(target)
 	if err != nil {
 		return resolver.Target{}, err
 	}
-
+	// For targets of the form "[scheme]://[authority]/endpoint, the endpoint
+	// value returned from url.Parse() contains a leading "/". Although this is
+	// in accordance with RFC 3986, we do not want to break existing resolver
+	// implementations which expect the endpoint without the leading "/". So, we
+	// end up stripping the leading "/" here. But this will result in an
+	// incorrect parsing for something like "unix:///path/to/socket". Since we
+	// own the "unix" resolver, we can workaround in the unix resolver by using
+	// the `URL` field instead of the `Endpoint` field.
+	endpoint := u.Path
+	if endpoint == "" {
+		endpoint = u.Opaque
+	}
+	endpoint = strings.TrimPrefix(endpoint, "/")
 	return resolver.Target{
 		Scheme:    u.Scheme,
 		Authority: u.Host,
+		Endpoint:  endpoint,
 		URL:       *u,
 	}, nil
 }

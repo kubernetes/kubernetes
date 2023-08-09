@@ -26,6 +26,7 @@ import (
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	storagev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
@@ -37,9 +38,9 @@ type FakeVolumeAttachments struct {
 	Fake *FakeStorageV1alpha1
 }
 
-var volumeattachmentsResource = v1alpha1.SchemeGroupVersion.WithResource("volumeattachments")
+var volumeattachmentsResource = schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1alpha1", Resource: "volumeattachments"}
 
-var volumeattachmentsKind = v1alpha1.SchemeGroupVersion.WithKind("VolumeAttachment")
+var volumeattachmentsKind = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1alpha1", Kind: "VolumeAttachment"}
 
 // Get takes name of the volumeAttachment, and returns the corresponding volumeAttachment object, and an error if there is any.
 func (c *FakeVolumeAttachments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.VolumeAttachment, err error) {

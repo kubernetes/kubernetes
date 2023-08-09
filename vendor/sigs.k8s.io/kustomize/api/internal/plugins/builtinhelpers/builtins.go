@@ -19,6 +19,7 @@ const (
 	HashTransformer
 	ImageTagTransformer
 	LabelTransformer
+	LegacyOrderTransformer
 	NamespaceTransformer
 	PatchJson6902Transformer
 	PatchStrategicMergeTransformer
@@ -99,6 +100,7 @@ var TransformerFactories = map[BuiltinPluginType]func() resmap.TransformerPlugin
 	HashTransformer:                builtins.NewHashTransformerPlugin,
 	ImageTagTransformer:            builtins.NewImageTagTransformerPlugin,
 	LabelTransformer:               builtins.NewLabelTransformerPlugin,
+	LegacyOrderTransformer:         builtins.NewLegacyOrderTransformerPlugin,
 	NamespaceTransformer:           builtins.NewNamespaceTransformerPlugin,
 	PatchJson6902Transformer:       builtins.NewPatchJson6902TransformerPlugin,
 	PatchStrategicMergeTransformer: builtins.NewPatchStrategicMergeTransformerPlugin,
@@ -109,7 +111,4 @@ var TransformerFactories = map[BuiltinPluginType]func() resmap.TransformerPlugin
 	ReplacementTransformer:         builtins.NewReplacementTransformerPlugin,
 	ReplicaCountTransformer:        builtins.NewReplicaCountTransformerPlugin,
 	ValueAddTransformer:            builtins.NewValueAddTransformerPlugin,
-	// Do not wired SortOrderTransformer as a builtin plugin.
-	// We only want it to be available in the top-level kustomization.
-	// See: https://github.com/kubernetes-sigs/kustomize/issues/3913
 }

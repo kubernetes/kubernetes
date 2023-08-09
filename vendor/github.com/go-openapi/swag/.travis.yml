@@ -1,0 +1,37 @@
+after_success:
+- bash <(curl -s https://codecov.io/bash)
+go:
+- 1.14.x
+- 1.x
+arch:
+- amd64
+jobs:
+  include:
+  # include arch ppc, but only for latest go version - skip testing for race
+  - go: 1.x
+    arch: ppc64le
+    install: ~
+    script:
+    - go test -v
+
+  #- go: 1.x
+  #  arch: arm
+  #  install: ~
+  #  script:
+  #  - go test -v
+
+  # include linting job, but only for latest go version and amd64 arch
+  - go: 1.x
+    arch: amd64
+    install:
+      go get github.com/golangci/golangci-lint/cmd/golangci-lint
+    script:
+    - golangci-lint run --new-from-rev master
+install:
+- GO111MODULE=off go get -u gotest.tools/gotestsum
+language: go
+notifications:
+  slack:
+    secure: QUWvCkBBK09GF7YtEvHHVt70JOkdlNBG0nIKu/5qc4/nW5HP8I2w0SEf/XR2je0eED1Qe3L/AfMCWwrEj+IUZc3l4v+ju8X8R3Lomhme0Eb0jd1MTMCuPcBT47YCj0M7RON7vXtbFfm1hFJ/jLe5+9FXz0hpXsR24PJc5ZIi/ogNwkaPqG4BmndzecpSh0vc2FJPZUD9LT0I09REY/vXR0oQAalLkW0asGD5taHZTUZq/kBpsNxaAFrLM23i4mUcf33M5fjLpvx5LRICrX/57XpBrDh2TooBU6Qj3CgoY0uPRYUmSNxbVx1czNzl2JtEpb5yjoxfVPQeg0BvQM00G8LJINISR+ohrjhkZmAqchDupAX+yFrxTtORa78CtnIL6z/aTNlgwwVD8kvL/1pFA/JWYmKDmz93mV/+6wubGzNSQCstzjkFA4/iZEKewKUoRIAi/fxyscP6L/rCpmY/4llZZvrnyTqVbt6URWpopUpH4rwYqreXAtJxJsfBJIeSmUIiDIOMGkCTvyTEW3fWGmGoqWtSHLoaWDyAIGb7azb+KvfpWtEcoPFWfSWU+LGee0A/YsUhBl7ADB9A0CJEuR8q4BPpKpfLwPKSiKSAXL7zDkyjExyhtgqbSl2jS+rKIHOZNL8JkCcTP2MKMVd563C5rC5FMKqu3S9m2b6380E=
+script:
+- gotestsum -f short-verbose -- -race -coverprofile=coverage.txt -covermode=atomic ./...

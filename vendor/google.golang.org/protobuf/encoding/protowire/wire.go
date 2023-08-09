@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package protowire parses and formats the raw wire encoding.
-// See https://protobuf.dev/programming-guides/encoding.
+// See https://developers.google.com/protocol-buffers/docs/encoding.
 //
 // For marshaling and unmarshaling entire protobuf messages,
 // use the "google.golang.org/protobuf/proto" package instead.
@@ -29,8 +29,12 @@ const (
 )
 
 // IsValid reports whether the field number is semantically valid.
+//
+// Note that while numbers within the reserved range are semantically invalid,
+// they are syntactically valid in the wire format.
+// Implementations may treat records with reserved field numbers as unknown.
 func (n Number) IsValid() bool {
-	return MinValidNumber <= n && n <= MaxValidNumber
+	return MinValidNumber <= n && n < FirstReservedNumber || LastReservedNumber < n && n <= MaxValidNumber
 }
 
 // Type represents the wire type.

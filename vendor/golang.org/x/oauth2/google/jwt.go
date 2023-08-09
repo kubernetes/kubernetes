@@ -66,8 +66,7 @@ func newJWTSource(jsonKey []byte, audience string, scopes []string) (oauth2.Toke
 	if err != nil {
 		return nil, err
 	}
-	rts := newErrWrappingTokenSource(oauth2.ReuseTokenSource(tok, ts))
-	return rts, nil
+	return oauth2.ReuseTokenSource(tok, ts), nil
 }
 
 type jwtAccessTokenSource struct {

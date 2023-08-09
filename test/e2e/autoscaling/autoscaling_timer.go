@@ -35,7 +35,7 @@ import (
 
 var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling", func() {
 	f := framework.NewDefaultFramework("autoscaling")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var experiment *gmeasure.Experiment
 
 	ginkgo.Describe("Autoscaling a service", func() {

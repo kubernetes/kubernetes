@@ -1,31 +1,33 @@
+// +build linux
+
 package netns
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 )
 
-// Deprecated: use golang.org/x/sys/unix pkg instead.
+// Deprecated: use syscall pkg instead (go >= 1.5 needed).
 const (
-	CLONE_NEWUTS  = unix.CLONE_NEWUTS  /* New utsname group? */
-	CLONE_NEWIPC  = unix.CLONE_NEWIPC  /* New ipcs */
-	CLONE_NEWUSER = unix.CLONE_NEWUSER /* New user namespace */
-	CLONE_NEWPID  = unix.CLONE_NEWPID  /* New pid namespace */
-	CLONE_NEWNET  = unix.CLONE_NEWNET  /* New network namespace */
-	CLONE_IO      = unix.CLONE_IO      /* Get io context */
+	CLONE_NEWUTS  = 0x04000000   /* New utsname group? */
+	CLONE_NEWIPC  = 0x08000000   /* New ipcs */
+	CLONE_NEWUSER = 0x10000000   /* New user namespace */
+	CLONE_NEWPID  = 0x20000000   /* New pid namespace */
+	CLONE_NEWNET  = 0x40000000   /* New network namespace */
+	CLONE_IO      = 0x80000000   /* Get io context */
+	bindMountPath = "/run/netns" /* Bind mount path for named netns */
 )
 
-const bindMountPath = "/run/netns" /* Bind mount path for named netns */
-
-// Setns sets namespace using golang.org/x/sys/unix.Setns.
-//
-// Deprecated: Use golang.org/x/sys/unix.Setns instead.
+// Setns sets namespace using syscall. Note that this should be a method
+// in syscall but it has not been added.
 func Setns(ns NsHandle, nstype int) (err error) {
 	return unix.Setns(int(ns), nstype)
 }
@@ -33,20 +35,19 @@ func Setns(ns NsHandle, nstype int) (err error) {
 // Set sets the current network namespace to the namespace represented
 // by NsHandle.
 func Set(ns NsHandle) (err error) {
-	return unix.Setns(int(ns), unix.CLONE_NEWNET)
+	return Setns(ns, CLONE_NEWNET)
 }
 
 // New creates a new network namespace, sets it as current and returns
 // a handle to it.
 func New() (ns NsHandle, err error) {
-	if err := unix.Unshare(unix.CLONE_NEWNET); err != nil {
+	if err := unix.Unshare(CLONE_NEWNET); err != nil {
 		return -1, err
 	}
 	return Get()
 }
 
-// NewNamed creates a new named network namespace, sets it as current,
-// and returns a handle to it
+// NewNamed creates a new named network namespace and returns a handle to it
 func NewNamed(name string) (NsHandle, error) {
 	if _, err := os.Stat(bindMountPath); os.IsNotExist(err) {
 		err = os.MkdirAll(bindMountPath, 0755)
@@ -64,15 +65,13 @@ func NewNamed(name string) (NsHandle, error) {
 
 	f, err := os.OpenFile(namedPath, os.O_CREATE|os.O_EXCL, 0444)
 	if err != nil {
-		newNs.Close()
 		return None(), err
 	}
 	f.Close()
 
-	nsPath := fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid())
-	err = unix.Mount(nsPath, namedPath, "bind", unix.MS_BIND, "")
+	nsPath := fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), syscall.Gettid())
+	err = syscall.Mount(nsPath, namedPath, "bind", syscall.MS_BIND, "")
 	if err != nil {
-		newNs.Close()
 		return None(), err
 	}
 
@@ -83,7 +82,7 @@ func NewNamed(name string) (NsHandle, error) {
 func DeleteNamed(name string) error {
 	namedPath := path.Join(bindMountPath, name)
 
-	err := unix.Unmount(namedPath, unix.MNT_DETACH)
+	err := syscall.Unmount(namedPath, syscall.MNT_DETACH)
 	if err != nil {
 		return err
 	}
@@ -109,7 +108,7 @@ func GetFromPath(path string) (NsHandle, error) {
 // GetFromName gets a handle to a named network namespace such as one
 // created by `ip netns add`.
 func GetFromName(name string) (NsHandle, error) {
-	return GetFromPath(filepath.Join(bindMountPath, name))
+	return GetFromPath(fmt.Sprintf("/var/run/netns/%s", name))
 }
 
 // GetFromPid gets a handle to the network namespace of a given pid.
@@ -134,38 +133,33 @@ func GetFromDocker(id string) (NsHandle, error) {
 }
 
 // borrowed from docker/utils/utils.go
-func findCgroupMountpoint(cgroupType string) (int, string, error) {
-	output, err := os.ReadFile("/proc/mounts")
+func findCgroupMountpoint(cgroupType string) (string, error) {
+	output, err := ioutil.ReadFile("/proc/mounts")
 	if err != nil {
-		return -1, "", err
+		return "", err
 	}
 
 	// /proc/mounts has 6 fields per line, one mount per line, e.g.
 	// cgroup /sys/fs/cgroup/devices cgroup rw,relatime,devices 0 0
 	for _, line := range strings.Split(string(output), "\n") {
 		parts := strings.Split(line, " ")
-		if len(parts) == 6 {
-			switch parts[2] {
-			case "cgroup2":
-				return 2, parts[1], nil
-			case "cgroup":
-				for _, opt := range strings.Split(parts[3], ",") {
-					if opt == cgroupType {
-						return 1, parts[1], nil
-					}
+		if len(parts) == 6 && parts[2] == "cgroup" {
+			for _, opt := range strings.Split(parts[3], ",") {
+				if opt == cgroupType {
+					return parts[1], nil
 				}
 			}
 		}
 	}
 
-	return -1, "", fmt.Errorf("cgroup mountpoint not found for %s", cgroupType)
+	return "", fmt.Errorf("cgroup mountpoint not found for %s", cgroupType)
 }
 
 // Returns the relative path to the cgroup docker is running in.
 // borrowed from docker/utils/utils.go
 // modified to get the docker pid instead of using /proc/self
-func getDockerCgroup(cgroupVer int, cgroupType string) (string, error) {
-	dockerpid, err := os.ReadFile("/var/run/docker.pid")
+func getThisCgroup(cgroupType string) (string, error) {
+	dockerpid, err := ioutil.ReadFile("/var/run/docker.pid")
 	if err != nil {
 		return "", err
 	}
@@ -177,15 +171,14 @@ func getDockerCgroup(cgroupVer int, cgroupType string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	output, err := os.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	output, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err
 	}
 	for _, line := range strings.Split(string(output), "\n") {
 		parts := strings.Split(line, ":")
 		// any type used by docker should work
-		if (cgroupVer == 1 && parts[1] == cgroupType) ||
-			(cgroupVer == 2 && parts[1] == "") {
+		if parts[1] == cgroupType {
 			return parts[2], nil
 		}
 	}
@@ -197,56 +190,40 @@ func getDockerCgroup(cgroupVer int, cgroupType string) (string, error) {
 // modified to only return the first pid
 // modified to glob with id
 // modified to search for newer docker containers
-// modified to look for cgroups v2
 func getPidForContainer(id string) (int, error) {
 	pid := 0
 
 	// memory is chosen randomly, any cgroup used by docker works
 	cgroupType := "memory"
 
-	cgroupVer, cgroupRoot, err := findCgroupMountpoint(cgroupType)
+	cgroupRoot, err := findCgroupMountpoint(cgroupType)
 	if err != nil {
 		return pid, err
 	}
 
-	cgroupDocker, err := getDockerCgroup(cgroupVer, cgroupType)
+	cgroupThis, err := getThisCgroup(cgroupType)
 	if err != nil {
 		return pid, err
 	}
 
 	id += "*"
 
-	var pidFile string
-	if cgroupVer == 1 {
-		pidFile = "tasks"
-	} else if cgroupVer == 2 {
-		pidFile = "cgroup.procs"
-	} else {
-		return -1, fmt.Errorf("Invalid cgroup version '%d'", cgroupVer)
-	}
-
 	attempts := []string{
-		filepath.Join(cgroupRoot, cgroupDocker, id, pidFile),
+		filepath.Join(cgroupRoot, cgroupThis, id, "tasks"),
 		// With more recent lxc versions use, cgroup will be in lxc/
-		filepath.Join(cgroupRoot, cgroupDocker, "lxc", id, pidFile),
+		filepath.Join(cgroupRoot, cgroupThis, "lxc", id, "tasks"),
 		// With more recent docker, cgroup will be in docker/
-		filepath.Join(cgroupRoot, cgroupDocker, "docker", id, pidFile),
+		filepath.Join(cgroupRoot, cgroupThis, "docker", id, "tasks"),
 		// Even more recent docker versions under systemd use docker-<id>.scope/
-		filepath.Join(cgroupRoot, "system.slice", "docker-"+id+".scope", pidFile),
+		filepath.Join(cgroupRoot, "system.slice", "docker-"+id+".scope", "tasks"),
 		// Even more recent docker versions under cgroup/systemd/docker/<id>/
-		filepath.Join(cgroupRoot, "..", "systemd", "docker", id, pidFile),
-		// Kubernetes with docker and CNI is even more different. Works for BestEffort and Burstable QoS
-		filepath.Join(cgroupRoot, "..", "systemd", "kubepods", "*", "pod*", id, pidFile),
-		// Same as above but for Guaranteed QoS
-		filepath.Join(cgroupRoot, "..", "systemd", "kubepods", "pod*", id, pidFile),
-		// Another flavor of containers location in recent kubernetes 1.11+. Works for BestEffort and Burstable QoS
-		filepath.Join(cgroupRoot, cgroupDocker, "kubepods.slice", "*.slice", "*", "docker-"+id+".scope", pidFile),
-		// Same as above but for Guaranteed QoS
-		filepath.Join(cgroupRoot, cgroupDocker, "kubepods.slice", "*", "docker-"+id+".scope", pidFile),
-		// When runs inside of a container with recent kubernetes 1.11+. Works for BestEffort and Burstable QoS
-		filepath.Join(cgroupRoot, "kubepods.slice", "*.slice", "*", "docker-"+id+".scope", pidFile),
-		// Same as above but for Guaranteed QoS
-		filepath.Join(cgroupRoot, "kubepods.slice", "*", "docker-"+id+".scope", pidFile),
+		filepath.Join(cgroupRoot, "..", "systemd", "docker", id, "tasks"),
+		// Kubernetes with docker and CNI is even more different
+		filepath.Join(cgroupRoot, "..", "systemd", "kubepods", "*", "pod*", id, "tasks"),
+		// Another flavor of containers location in recent kubernetes 1.11+
+		filepath.Join(cgroupRoot, cgroupThis, "kubepods.slice", "kubepods-besteffort.slice", "*", "docker-"+id+".scope", "tasks"),
+		// When runs inside of a container with recent kubernetes 1.11+
+		filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-besteffort.slice", "*", "docker-"+id+".scope", "tasks"),
 	}
 
 	var filename string
@@ -264,7 +241,7 @@ func getPidForContainer(id string) (int, error) {
 		return pid, fmt.Errorf("Unable to find container: %v", id[:len(id)-1])
 	}
 
-	output, err := os.ReadFile(filename)
+	output, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return pid, err
 	}

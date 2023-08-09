@@ -68,16 +68,12 @@ func (i *Config) SetVersion(version string) {
 	i.version = version
 }
 
-func Init(repoList string) {
-	registry, imageConfigs, originalImageConfigs = readRepoList(repoList)
-}
-
-func readRepoList(repoList string) (RegistryList, map[ImageID]Config, map[ImageID]Config) {
+func initReg() RegistryList {
 	registry := initRegistry
 
+	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
-		imageConfigs, originalImageConfigs := initImageConfigs(registry)
-		return registry, imageConfigs, originalImageConfigs
+		return registry
 	}
 
 	var fileContent []byte
@@ -98,13 +94,9 @@ func readRepoList(repoList string) (RegistryList, map[ImageID]Config, map[ImageI
 
 	err = yaml.Unmarshal(fileContent, &registry)
 	if err != nil {
-		panic(fmt.Errorf("error unmarshalling '%v' YAML file: %v", repoList, err))
+		panic(fmt.Errorf("Error unmarshalling '%v' YAML file: %v", repoList, err))
 	}
-
-	imageConfigs, originalImageConfigs := initImageConfigs(registry)
-
-	return registry, imageConfigs, originalImageConfigs
-
+	return registry
 }
 
 // Essentially curl url | writer
@@ -143,7 +135,10 @@ var (
 		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
 	}
 
-	registry, imageConfigs, originalImageConfigs = readRepoList(os.Getenv("KUBE_TEST_REPO_LIST"))
+	registry = initReg()
+
+	// Preconfigured image configs
+	imageConfigs, originalImageConfigs = initImageConfigs(registry)
 )
 
 type ImageID int
@@ -173,6 +168,8 @@ const (
 	DistrolessIptables
 	// Etcd image
 	Etcd
+	// GlusterDynamicProvisioner image
+	GlusterDynamicProvisioner
 	// Httpd image
 	Httpd
 	// HttpdNew image
@@ -224,6 +221,8 @@ const (
 	VolumeNFSServer
 	// VolumeISCSIServer image
 	VolumeISCSIServer
+	// VolumeGlusterServer image
+	VolumeGlusterServer
 	// VolumeRBDServer image
 	VolumeRBDServer
 	// WindowsServer image
@@ -232,7 +231,7 @@ const (
 
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
-	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.45"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.43"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
@@ -240,9 +239,10 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-4"}
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
-	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.3"}
-	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.2.7"}
-	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.9-0"}
+	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
+	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.1.2"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.6-0"}
+	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.3"}
 	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-4"}
 	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-4"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
@@ -268,8 +268,9 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.13"}
 	configs[SdDummyExporter] = Config{list.GcRegistry, "sd-dummy-exporter", "v0.2.0"}
 	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.3"}
-	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.6"}
-	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.6"}
+	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.3"}
+	configs[VolumeGlusterServer] = Config{list.PromoterE2eRegistry, "volume/gluster", "1.3"}
+	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.4"}
 	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
 
 	// This adds more config entries. Those have no pre-defined ImageID number,

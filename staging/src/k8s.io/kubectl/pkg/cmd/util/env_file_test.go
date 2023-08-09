@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -84,7 +85,12 @@ func Test_processEnvFileLine_readEnvironment(t *testing.T) {
 	const realKey = "k8s_test_env_file_key"
 	const realValue = `my_value`
 
-	t.Setenv(realKey, `my_value`)
+	// Just in case, these two lines ensure the environment is restored to
+	// its original state.
+	original := os.Getenv(realKey)
+	defer func() { os.Setenv(realKey, original) }()
+
+	os.Setenv(realKey, `my_value`)
 
 	key, value, err := processEnvFileLine([]byte(realKey), `filename`, 3)
 	if err != nil {

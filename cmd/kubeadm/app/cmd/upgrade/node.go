@@ -41,7 +41,6 @@ import (
 // supported by this api will be exposed as a flag.
 type nodeOptions struct {
 	kubeConfigPath        string
-	isControlPlaneNode    bool
 	etcdUpgrade           bool
 	renewCerts            bool
 	dryRun                bool
@@ -106,26 +105,11 @@ func newCmdNode(out io.Writer) *cobra.Command {
 
 // newNodeOptions returns a struct ready for being used for creating cmd kubeadm upgrade node flags.
 func newNodeOptions() *nodeOptions {
-	kubeConfigPath := constants.GetKubeletKubeConfigPath()
-
-	// isControlPlaneNode checks if a node is a control-plane node by looking up
-	// the kube-apiserver manifest file
-	isControlPlaneNode := true
-	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
-	if _, err := os.Stat(filepath); os.IsNotExist(err) {
-		isControlPlaneNode = false
-	}
-
-	if isControlPlaneNode {
-		kubeConfigPath = constants.GetAdminKubeConfigPath()
-	}
-
 	return &nodeOptions{
-		kubeConfigPath:     kubeConfigPath,
-		isControlPlaneNode: isControlPlaneNode,
-		dryRun:             false,
-		renewCerts:         true,
-		etcdUpgrade:        true,
+		kubeConfigPath: constants.GetKubeletKubeConfigPath(),
+		dryRun:         false,
+		renewCerts:     true,
+		etcdUpgrade:    true,
 	}
 }
 
@@ -145,10 +129,19 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", options.kubeConfigPath)
 	}
+
+	// isControlPlane checks if a node is a control-plane node by looking up
+	// the kube-apiserver manifest file
+	isControlPlaneNode := true
+	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		isControlPlaneNode = false
+	}
+
 	// Fetches the cluster configuration
 	// NB in case of control-plane node, we are reading all the info for the node; in case of NOT control-plane node
 	//    (worker node), we are not reading local API address and the CRI socket from the node object
-	cfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", !options.isControlPlaneNode, false)
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", !isControlPlaneNode, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
@@ -165,7 +158,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io
 		dryRun:                options.dryRun,
 		cfg:                   cfg,
 		client:                client,
-		isControlPlaneNode:    options.isControlPlaneNode,
+		isControlPlaneNode:    isControlPlaneNode,
 		patchesDir:            options.patchesDir,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		kubeConfigPath:        options.kubeConfigPath,
@@ -213,7 +206,7 @@ func (d *nodeData) IgnorePreflightErrors() sets.Set[string] {
 	return d.ignorePreflightErrors
 }
 
-// KubeConfigPath returns the path to the user kubeconfig file.
+// KubeconfigPath returns the path to the user kubeconfig file.
 func (d *nodeData) KubeConfigPath() string {
 	return d.kubeConfigPath
 }

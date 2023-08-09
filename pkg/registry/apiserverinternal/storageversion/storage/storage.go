@@ -45,8 +45,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*apiserverinternal.StorageVersion).Name, nil
 		},
-		DefaultQualifiedResource:  apiserverinternal.Resource("storageversions"),
-		SingularQualifiedResource: apiserverinternal.Resource("storageversion"),
+		DefaultQualifiedResource: apiserverinternal.Resource("storageversions"),
 
 		CreateStrategy:      strategy.Strategy,
 		UpdateStrategy:      strategy.Strategy,

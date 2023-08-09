@@ -17,7 +17,6 @@ limitations under the License.
 package etcd
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -25,8 +24,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -38,64 +35,9 @@ import (
 	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
 )
 
-var errNotImplemented = errors.New("not implemented")
-
-type fakeEtcdClient struct {
-	members   []*pb.Member
-	endpoints []string
-}
-
-// Close shuts down the client's etcd connections.
-func (f *fakeEtcdClient) Close() error {
-	f.members = []*pb.Member{}
-	return nil
-}
-
-// Endpoints lists the registered endpoints for the client.
-func (f *fakeEtcdClient) Endpoints() []string {
-	return f.endpoints
-}
-
-// MemberList lists the current cluster membership.
-func (f *fakeEtcdClient) MemberList(_ context.Context) (*clientv3.MemberListResponse, error) {
-	return &clientv3.MemberListResponse{
-		Members: f.members,
-	}, nil
-}
-
-// MemberAdd adds a new member into the cluster.
-func (f *fakeEtcdClient) MemberAdd(_ context.Context, peerAddrs []string) (*clientv3.MemberAddResponse, error) {
-	return nil, errNotImplemented
-}
-
-// MemberAddAsLearner adds a new learner member into the cluster.
-func (f *fakeEtcdClient) MemberAddAsLearner(_ context.Context, peerAddrs []string) (*clientv3.MemberAddResponse, error) {
-	return nil, errNotImplemented
-}
-
-// MemberRemove removes an existing member from the cluster.
-func (f *fakeEtcdClient) MemberRemove(_ context.Context, id uint64) (*clientv3.MemberRemoveResponse, error) {
-	return nil, errNotImplemented
-}
-
-// MemberPromote promotes a member from raft learner (non-voting) to raft voting member.
-func (f *fakeEtcdClient) MemberPromote(_ context.Context, id uint64) (*clientv3.MemberPromoteResponse, error) {
-	return nil, errNotImplemented
-}
-
-// Status gets the status of the endpoint.
-func (f *fakeEtcdClient) Status(_ context.Context, endpoint string) (*clientv3.StatusResponse, error) {
-	return nil, errNotImplemented
-}
-
-// Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
-func (f *fakeEtcdClient) Sync(_ context.Context) error {
-	return errNotImplemented
-}
-
 func testGetURL(t *testing.T, getURLFunc func(*kubeadmapi.APIEndpoint) string, port int) {
 	portStr := strconv.Itoa(port)
-	tests := []struct {
+	var tests = []struct {
 		name             string
 		advertiseAddress string
 		expectedURL      string
@@ -140,7 +82,7 @@ func TestGetPeerURL(t *testing.T) {
 
 func TestGetClientURLByIP(t *testing.T) {
 	portStr := strconv.Itoa(constants.EtcdListenClientPort)
-	tests := []struct {
+	var tests = []struct {
 		name        string
 		ip          string
 		expectedURL string
@@ -176,7 +118,7 @@ func TestGetClientURLByIP(t *testing.T) {
 }
 
 func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name              string
 		pods              []testresources.FakeStaticPod
 		expectedEndpoints []string
@@ -227,7 +169,7 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 }
 
 func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name              string
 		pods              []testresources.FakeStaticPod
 		clientSetup       func(*clientsetfake.Clientset)
@@ -311,7 +253,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 }
 
 func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name              string
 		pods              []testresources.FakeStaticPod
 		clientSetup       func(*clientsetfake.Clientset)
@@ -405,91 +347,6 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 			}
 			if !reflect.DeepEqual(endpoints, rt.expectedEndpoints) {
 				t.Errorf("expected etcd endpoints: %v; got: %v", rt.expectedEndpoints, endpoints)
-			}
-		})
-	}
-}
-
-func TestClient_GetMemberID(t *testing.T) {
-	type fields struct {
-		Endpoints     []string
-		newEtcdClient func(endpoints []string) (etcdClient, error)
-	}
-	type args struct {
-		peerURL string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    uint64
-		wantErr error
-	}{
-		{
-			name: "member ID found",
-			fields: fields{
-				Endpoints: []string{},
-				newEtcdClient: func(endpoints []string) (etcdClient, error) {
-					f := &fakeEtcdClient{
-						members: []*pb.Member{
-							{
-								ID:   1,
-								Name: "member1",
-								PeerURLs: []string{
-									"https://member1:2380",
-								},
-							},
-						},
-					}
-					return f, nil
-				},
-			},
-			args: args{
-				peerURL: "https://member1:2380",
-			},
-			wantErr: nil,
-			want:    1,
-		},
-		{
-			name: "member ID not found",
-			fields: fields{
-				Endpoints: []string{},
-				newEtcdClient: func(endpoints []string) (etcdClient, error) {
-					f := &fakeEtcdClient{
-						members: []*pb.Member{
-							{
-								ID:   1,
-								Name: "member1",
-								PeerURLs: []string{
-									"https://member1:2380",
-								},
-							},
-						},
-					}
-					return f, nil
-				},
-			},
-			args: args{
-				peerURL: "https://member2:2380",
-			},
-			wantErr: ErrNoMemberIDForPeerURL,
-			want:    0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := &Client{
-				Endpoints:     tt.fields.Endpoints,
-				newEtcdClient: tt.fields.newEtcdClient,
-			}
-
-			got, err := c.GetMemberID(tt.args.peerURL)
-			if !errors.Is(tt.wantErr, err) {
-				t.Errorf("Client.GetMemberID() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("Client.GetMemberID() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -64,8 +64,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -99,11 +100,6 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.Lock == nil {
 		return nil, fmt.Errorf("Lock must not be nil.")
 	}
-	id := lec.Lock.Identity()
-	if id == "" {
-		return nil, fmt.Errorf("Lock identity is empty")
-	}
-
 	le := LeaderElector{
 		config:  lec,
 		clock:   clock.RealClock{},
@@ -203,7 +199,9 @@ type LeaderElector struct {
 // stopped holding the leader lease
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
-	defer le.config.Callbacks.OnStoppedLeading()
+	defer func() {
+		le.config.Callbacks.OnStoppedLeading()
+	}()
 
 	if !le.acquire(ctx) {
 		return // ctx signalled done
@@ -265,7 +263,6 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 
 // renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails or ctx signals done.
 func (le *LeaderElector) renew(ctx context.Context) {
-	defer le.config.Lock.RecordEvent("stopped leading")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wait.Until(func() {
@@ -281,6 +278,7 @@ func (le *LeaderElector) renew(ctx context.Context) {
 			klog.V(5).Infof("successfully renewed lease %v", desc)
 			return
 		}
+		le.config.Lock.RecordEvent("stopped leading")
 		le.metrics.leaderOff(le.config.Name)
 		klog.Infof("failed to renew lease %v: %v", desc, err)
 		cancel()
@@ -297,7 +295,7 @@ func (le *LeaderElector) release() bool {
 	if !le.IsLeader() {
 		return true
 	}
-	now := metav1.NewTime(le.clock.Now())
+	now := metav1.Now()
 	leaderElectionRecord := rl.LeaderElectionRecord{
 		LeaderTransitions:    le.observedRecord.LeaderTransitions,
 		LeaseDurationSeconds: 1,
@@ -317,7 +315,7 @@ func (le *LeaderElector) release() bool {
 // else it tries to renew the lease if it has already been acquired. Returns true
 // on success else returns false.
 func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
-	now := metav1.NewTime(le.clock.Now())
+	now := metav1.Now()
 	leaderElectionRecord := rl.LeaderElectionRecord{
 		HolderIdentity:       le.config.Lock.Identity(),
 		LeaseDurationSeconds: int(le.config.LeaseDuration / time.Second),
@@ -349,7 +347,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 		le.observedRawRecord = oldLeaderElectionRawRecord
 	}
 	if len(oldLeaderElectionRecord.HolderIdentity) > 0 &&
-		le.observedTime.Add(time.Second*time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).After(now.Time) &&
+		le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
 		!le.IsLeader() {
 		klog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
 		return false

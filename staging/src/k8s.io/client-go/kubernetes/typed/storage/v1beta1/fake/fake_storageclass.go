@@ -26,6 +26,7 @@ import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
@@ -37,9 +38,9 @@ type FakeStorageClasses struct {
 	Fake *FakeStorageV1beta1
 }
 
-var storageclassesResource = v1beta1.SchemeGroupVersion.WithResource("storageclasses")
+var storageclassesResource = schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "storageclasses"}
 
-var storageclassesKind = v1beta1.SchemeGroupVersion.WithKind("StorageClass")
+var storageclassesKind = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"}
 
 // Get takes name of the storageClass, and returns the corresponding storageClass object, and an error if there is any.
 func (c *FakeStorageClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.StorageClass, err error) {

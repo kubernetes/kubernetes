@@ -44,7 +44,7 @@ const (
 
 var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 	f := framework.NewDefaultFramework("recreate")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var originalNodes []v1.Node
 	var originalPodNames []string
 	var ps *testutils.PodStore

@@ -46,10 +46,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against priority level configuration.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &flowcontrol.PriorityLevelConfiguration{} },
-		NewListFunc:               func() runtime.Object { return &flowcontrol.PriorityLevelConfigurationList{} },
-		DefaultQualifiedResource:  flowcontrol.Resource("prioritylevelconfigurations"),
-		SingularQualifiedResource: flowcontrol.Resource("prioritylevelconfiguration"),
+		NewFunc:                  func() runtime.Object { return &flowcontrol.PriorityLevelConfiguration{} },
+		NewListFunc:              func() runtime.Object { return &flowcontrol.PriorityLevelConfigurationList{} },
+		DefaultQualifiedResource: flowcontrol.Resource("prioritylevelconfigurations"),
 
 		CreateStrategy:      prioritylevelconfiguration.Strategy,
 		UpdateStrategy:      prioritylevelconfiguration.Strategy,

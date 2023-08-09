@@ -39,7 +39,7 @@ import (
 var _ = common.SIGDescribe("HostPort", func() {
 
 	f := framework.NewDefaultFramework("hostport")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		cs clientset.Interface

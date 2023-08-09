@@ -161,9 +161,16 @@ func TestCreateJobFromCronJob(t *testing.T) {
 			expected: &batchv1.Job{
 				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:            jobName,
-					Annotations:     map[string]string{"cronjob.kubernetes.io/instantiate": "manual"},
-					OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(cronJob, batchv1.SchemeGroupVersion.WithKind("CronJob"))},
+					Name:        jobName,
+					Annotations: map[string]string{"cronjob.kubernetes.io/instantiate": "manual"},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: batchv1.SchemeGroupVersion.String(),
+							Kind:       "CronJob",
+							Name:       cronJob.GetName(),
+							UID:        cronJob.GetUID(),
+						},
+					},
 				},
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{

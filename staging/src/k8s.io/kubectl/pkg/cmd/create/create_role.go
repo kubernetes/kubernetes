@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -149,11 +148,11 @@ type CreateRoleOptions struct {
 	FieldManager        string
 	CreateAnnotation    bool
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewCreateRoleOptions returns an initialized CreateRoleOptions instance
-func NewCreateRoleOptions(ioStreams genericiooptions.IOStreams) *CreateRoleOptions {
+func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
 	return &CreateRoleOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
@@ -162,7 +161,7 @@ func NewCreateRoleOptions(ioStreams genericiooptions.IOStreams) *CreateRoleOptio
 }
 
 // NewCmdCreateRole returnns an initialized Command instance for 'create role' sub command
-func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateRoleOptions(ioStreams)
 
 	cmd := &cobra.Command{

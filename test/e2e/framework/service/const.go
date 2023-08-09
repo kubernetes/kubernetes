@@ -32,9 +32,9 @@ const (
 
 	// KubeProxyLagTimeout is the maximum time a kube-proxy daemon on a node is allowed
 	// to not notice a Service update, such as type=NodePort.
-	// TODO: This timeout should be O(10s), observed values are O(1m), 2m is very
+	// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
 	// liberal. Fix tracked in #20567.
-	KubeProxyLagTimeout = 2 * time.Minute
+	KubeProxyLagTimeout = 5 * time.Minute
 
 	// KubeProxyEndpointLagTimeout is the maximum time a kube-proxy daemon on a node is allowed
 	// to not notice an Endpoint update.
@@ -54,7 +54,7 @@ const (
 	loadBalancerCreateTimeoutDefault = 15 * time.Minute
 	// LoadBalancerCreateTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
 	// Hideen - use GetServiceLoadBalancerCreateTimeout function instead.
-	loadBalancerCreateTimeoutLarge = 60 * time.Minute
+	loadBalancerCreateTimeoutLarge = 45 * time.Minute
 
 	// LoadBalancerPropagationTimeoutDefault is the default time to wait for pods to
 	// be targeted by load balancers.

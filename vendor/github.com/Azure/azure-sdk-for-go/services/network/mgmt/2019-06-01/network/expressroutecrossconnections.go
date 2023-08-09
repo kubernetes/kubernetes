@@ -55,7 +55,7 @@ func (client ExpressRouteCrossConnectionsClient) CreateOrUpdate(ctx context.Cont
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "CreateOrUpdate", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "CreateOrUpdate", nil, "Failure sending request")
 		return
 	}
 
@@ -90,7 +90,6 @@ func (client ExpressRouteCrossConnectionsClient) CreateOrUpdatePreparer(ctx cont
 // http.Response Body if it receives an error.
 func (client ExpressRouteCrossConnectionsClient) CreateOrUpdateSender(req *http.Request) (future ExpressRouteCrossConnectionsCreateOrUpdateFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -329,7 +328,7 @@ func (client ExpressRouteCrossConnectionsClient) ListArpTable(ctx context.Contex
 
 	result, err = client.ListArpTableSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "ListArpTable", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "ListArpTable", nil, "Failure sending request")
 		return
 	}
 
@@ -363,7 +362,6 @@ func (client ExpressRouteCrossConnectionsClient) ListArpTablePreparer(ctx contex
 // http.Response Body if it receives an error.
 func (client ExpressRouteCrossConnectionsClient) ListArpTableSender(req *http.Request) (future ExpressRouteCrossConnectionsListArpTableFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -529,7 +527,7 @@ func (client ExpressRouteCrossConnectionsClient) ListRoutesTable(ctx context.Con
 
 	result, err = client.ListRoutesTableSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "ListRoutesTable", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "ListRoutesTable", nil, "Failure sending request")
 		return
 	}
 
@@ -563,7 +561,6 @@ func (client ExpressRouteCrossConnectionsClient) ListRoutesTablePreparer(ctx con
 // http.Response Body if it receives an error.
 func (client ExpressRouteCrossConnectionsClient) ListRoutesTableSender(req *http.Request) (future ExpressRouteCrossConnectionsListRoutesTableFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -613,7 +610,7 @@ func (client ExpressRouteCrossConnectionsClient) ListRoutesTableSummary(ctx cont
 
 	result, err = client.ListRoutesTableSummarySender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "ListRoutesTableSummary", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "ListRoutesTableSummary", nil, "Failure sending request")
 		return
 	}
 
@@ -647,7 +644,6 @@ func (client ExpressRouteCrossConnectionsClient) ListRoutesTableSummaryPreparer(
 // http.Response Body if it receives an error.
 func (client ExpressRouteCrossConnectionsClient) ListRoutesTableSummarySender(req *http.Request) (future ExpressRouteCrossConnectionsListRoutesTableSummaryFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -695,7 +691,7 @@ func (client ExpressRouteCrossConnectionsClient) UpdateTags(ctx context.Context,
 
 	result, err = client.UpdateTagsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "UpdateTags", result.Response(), "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCrossConnectionsClient", "UpdateTags", nil, "Failure sending request")
 		return
 	}
 
@@ -729,7 +725,6 @@ func (client ExpressRouteCrossConnectionsClient) UpdateTagsPreparer(ctx context.
 // http.Response Body if it receives an error.
 func (client ExpressRouteCrossConnectionsClient) UpdateTagsSender(req *http.Request) (future ExpressRouteCrossConnectionsUpdateTagsFuture, err error) {
 	var resp *http.Response
-	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

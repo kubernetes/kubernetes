@@ -50,7 +50,6 @@ func validNewCSIDriver(name string) *storageapi.CSIDriver {
 	podInfoOnMount := true
 	requiresRepublish := true
 	storageCapacity := true
-	seLinuxMount := true
 	return &storageapi.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -60,7 +59,6 @@ func validNewCSIDriver(name string) *storageapi.CSIDriver {
 			PodInfoOnMount:    &podInfoOnMount,
 			RequiresRepublish: &requiresRepublish,
 			StorageCapacity:   &storageCapacity,
-			SELinuxMount:      &seLinuxMount,
 		},
 	}
 }
@@ -76,7 +74,6 @@ func TestCreate(t *testing.T) {
 	notPodInfoOnMount := false
 	notRequiresRepublish := false
 	notStorageCapacity := false
-	notSELinuxMount := false
 	test.TestCreate(
 		// valid
 		csiDriver,
@@ -88,7 +85,6 @@ func TestCreate(t *testing.T) {
 				PodInfoOnMount:    &notPodInfoOnMount,
 				RequiresRepublish: &notRequiresRepublish,
 				StorageCapacity:   &notStorageCapacity,
-				SELinuxMount:      &notSELinuxMount,
 			},
 		},
 	)

@@ -19,7 +19,6 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/apiserver/pkg/apis/example
 // +k8s:openapi-gen=false
 // +k8s:defaulter-gen=TypeMeta
-// +k8s:protobuf-gen=package
 
 // +groupName=example2.apiserver.k8s.io
 

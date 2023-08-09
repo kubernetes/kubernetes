@@ -62,11 +62,11 @@ func (nodeIpamController *nodeIPAMController) StartNodeIpamControllerWrapper(ini
 	nodeIpamController.nodeIPAMControllerOptions.ApplyTo(&nodeIpamController.nodeIPAMControllerConfiguration)
 
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startNodeIpamController(ctx, initContext, completedConfig, nodeIpamController.nodeIPAMControllerConfiguration, controllerContext, cloud)
+		return startNodeIpamController(initContext, completedConfig, nodeIpamController.nodeIPAMControllerConfiguration, controllerContext, cloud)
 	}
 }
 
-func startNodeIpamController(ctx context.Context, initContext app.ControllerInitContext, ccmConfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, controllerCtx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+func startNodeIpamController(initContext app.ControllerInitContext, ccmConfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, ctx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
 
@@ -130,14 +130,14 @@ func startNodeIpamController(ctx context.Context, initContext app.ControllerInit
 
 	var clusterCIDRInformer v1alpha1.ClusterCIDRInformer
 	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRRangeAllocator) {
-		clusterCIDRInformer = controllerCtx.InformerFactory.Networking().V1alpha1().ClusterCIDRs()
+		clusterCIDRInformer = ctx.InformerFactory.Networking().V1alpha1().ClusterCIDRs()
 	}
+
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
-		ctx,
-		controllerCtx.InformerFactory.Core().V1().Nodes(),
+		ctx.InformerFactory.Core().V1().Nodes(),
 		clusterCIDRInformer,
 		cloud,
-		controllerCtx.ClientBuilder.ClientOrDie(initContext.ClientName),
+		ctx.ClientBuilder.ClientOrDie(initContext.ClientName),
 		clusterCIDRs,
 		serviceCIDR,
 		secondaryServiceCIDR,
@@ -147,7 +147,7 @@ func startNodeIpamController(ctx context.Context, initContext app.ControllerInit
 	if err != nil {
 		return nil, true, err
 	}
-	go nodeIpamController.Run(ctx)
+	go nodeIpamController.Run(ctx.Stop)
 	return nil, true, nil
 }
 

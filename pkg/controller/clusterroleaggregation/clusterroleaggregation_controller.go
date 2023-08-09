@@ -185,9 +185,8 @@ func (c *ClusterRoleAggregationController) Run(ctx context.Context, workers int)
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting ClusterRoleAggregator controller")
-	defer logger.Info("Shutting down ClusterRoleAggregator controller")
+	klog.Infof("Starting ClusterRoleAggregator")
+	defer klog.Infof("Shutting down ClusterRoleAggregator")
 
 	if !cache.WaitForNamedCacheSync("ClusterRoleAggregator", ctx.Done(), c.clusterRolesSynced) {
 		return

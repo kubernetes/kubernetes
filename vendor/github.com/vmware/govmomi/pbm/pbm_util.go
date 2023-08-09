@@ -27,7 +27,6 @@ import (
 // A struct to capture pbm create spec details.
 type CapabilityProfileCreateSpec struct {
 	Name           string
-	SubProfileName string
 	Description    string
 	Category       string
 	CapabilityList []Capability
@@ -65,7 +64,6 @@ func CreateCapabilityProfileSpec(pbmCreateSpec CapabilityProfileCreateSpec) (*ty
 			SubProfiles: []types.PbmCapabilitySubProfile{
 				types.PbmCapabilitySubProfile{
 					Capability: capabilities,
-					Name:       pbmCreateSpec.SubProfileName,
 				},
 			},
 		},

@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -568,7 +568,6 @@ func TestGetBitforCIDR(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range cases {
 		_, clusterCIDR, err := utilnet.ParseCIDRSloppy(tc.clusterCIDRStr)
 		if err != nil {
@@ -584,19 +583,19 @@ func TestGetBitforCIDR(t *testing.T) {
 			t.Fatalf("unexpected error: %v for %v", err, tc.description)
 		}
 
-		got, err := cs.getIndexForIP(subnetCIDR.IP)
+		got, err := cs.getIndexForCIDR(subnetCIDR)
 		if err == nil && tc.expectErr {
-			logger.Error(nil, "Expected error but got null", "description", tc.description)
+			klog.Errorf("expected error but got null for %v", tc.description)
 			continue
 		}
 
 		if err != nil && !tc.expectErr {
-			logger.Error(err, "Unexpected error", "description", tc.description)
+			klog.Errorf("unexpected error: %v for %v", err, tc.description)
 			continue
 		}
 
 		if got != tc.expectedBit {
-			logger.Error(nil, "Unexpected value", "description", tc.description, "expected", tc.expectedBit, "got", got)
+			klog.Errorf("expected %v, but got %v for %v", tc.expectedBit, got, tc.description)
 		}
 	}
 }

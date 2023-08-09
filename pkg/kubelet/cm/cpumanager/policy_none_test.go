@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
-	"k8s.io/utils/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 func TestNonePolicyName(t *testing.T) {
@@ -37,7 +37,7 @@ func TestNonePolicyAllocate(t *testing.T) {
 
 	st := &mockState{
 		assignments:   state.ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
+		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
 	}
 
 	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
@@ -54,7 +54,7 @@ func TestNonePolicyRemove(t *testing.T) {
 
 	st := &mockState{
 		assignments:   state.ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
+		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
 	}
 
 	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
@@ -78,7 +78,7 @@ func TestNonePolicyGetAllocatableCPUs(t *testing.T) {
 
 	st := &mockState{
 		assignments:   state.ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.New(cpuIDs...),
+		defaultCPUSet: cpuset.NewCPUSet(cpuIDs...),
 	}
 
 	cpus := policy.GetAllocatableCPUs(st)

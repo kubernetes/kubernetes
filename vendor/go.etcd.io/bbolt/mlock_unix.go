@@ -1,4 +1,3 @@
-//go:build !windows
 // +build !windows
 
 package bbolt
@@ -18,7 +17,7 @@ func mlock(db *DB, fileSize int) error {
 	return nil
 }
 
-// munlock unlocks memory of db file
+//munlock unlocks memory of db file
 func munlock(db *DB, fileSize int) error {
 	if db.dataref == nil {
 		return nil

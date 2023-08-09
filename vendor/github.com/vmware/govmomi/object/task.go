@@ -48,13 +48,9 @@ func (t *Task) Wait(ctx context.Context) error {
 	return err
 }
 
-func (t *Task) WaitForResult(ctx context.Context, s ...progress.Sinker) (*types.TaskInfo, error) {
-	var pr progress.Sinker
-	if len(s) == 1 {
-		pr = s[0]
-	}
+func (t *Task) WaitForResult(ctx context.Context, s progress.Sinker) (*types.TaskInfo, error) {
 	p := property.DefaultCollector(t.c)
-	return task.Wait(ctx, t.Reference(), p, pr)
+	return task.Wait(ctx, t.Reference(), p, s)
 }
 
 func (t *Task) Cancel(ctx context.Context) error {
@@ -62,39 +58,5 @@ func (t *Task) Cancel(ctx context.Context) error {
 		This: t.Reference(),
 	})
 
-	return err
-}
-
-// SetState sets task state and optionally sets results or fault, as appropriate for state.
-func (t *Task) SetState(ctx context.Context, state types.TaskInfoState, result types.AnyType, fault *types.LocalizedMethodFault) error {
-	req := types.SetTaskState{
-		This:   t.Reference(),
-		State:  state,
-		Result: result,
-		Fault:  fault,
-	}
-	_, err := methods.SetTaskState(ctx, t.Common.Client(), &req)
-	return err
-}
-
-// SetDescription updates task description to describe the current phase of the task.
-func (t *Task) SetDescription(ctx context.Context, description types.LocalizableMessage) error {
-	req := types.SetTaskDescription{
-		This:        t.Reference(),
-		Description: description,
-	}
-	_, err := methods.SetTaskDescription(ctx, t.Common.Client(), &req)
-	return err
-}
-
-// UpdateProgress Sets percentage done for this task and recalculates overall percentage done.
-// If a percentDone value of less than zero or greater than 100 is specified,
-// a value of zero or 100 respectively is used.
-func (t *Task) UpdateProgress(ctx context.Context, percentDone int) error {
-	req := types.UpdateProgress{
-		This:        t.Reference(),
-		PercentDone: int32(percentDone),
-	}
-	_, err := methods.UpdateProgress(ctx, t.Common.Client(), &req)
 	return err
 }

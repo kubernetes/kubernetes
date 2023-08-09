@@ -18,6 +18,8 @@ package mount
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -56,6 +58,11 @@ func TestSafeFormatAndMount(t *testing.T) {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
+	mntDir, err := ioutil.TempDir(os.TempDir(), "mount")
+	if err != nil {
+		t.Fatalf("failed to create tmp dir: %v", err)
+	}
+	defer os.RemoveAll(mntDir)
 	tests := []struct {
 		description           string
 		fstype                string
@@ -234,7 +241,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 		}
 
 		device := "/dev/foo"
-		dest := t.TempDir()
+		dest := mntDir
 		var err error
 		if len(test.formatOptions) > 0 {
 			err = mounter.FormatAndMountSensitiveWithFormatOptions(device, dest, test.fstype, test.mountOptions, test.sensitiveMountOptions, test.formatOptions)
@@ -254,7 +261,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 				t.Errorf("test \"%s\" the directory was not mounted", test.description)
 			}
 
-			// check that the correct device was mounted
+			//check that the correct device was mounted
 			mountedDevice, _, err := GetDeviceNameFromMount(fakeMounter.FakeMounter, dest)
 			if err != nil || mountedDevice != device {
 				t.Errorf("test \"%s\" the correct device was not mounted", test.description)

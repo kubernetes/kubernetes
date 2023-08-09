@@ -126,8 +126,7 @@ var coolBarCRD = &v1.CustomResourceDefinition{
 }
 
 var coolFooDiscovery apidiscoveryv2beta1.APIVersionDiscovery = apidiscoveryv2beta1.APIVersionDiscovery{
-	Version:   "v1",
-	Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+	Version: "v1",
 	Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
 		{
 			Resource:         "coolfoos",
@@ -158,8 +157,7 @@ var coolFooDiscovery apidiscoveryv2beta1.APIVersionDiscovery = apidiscoveryv2bet
 }
 
 var mergedDiscovery apidiscoveryv2beta1.APIVersionDiscovery = apidiscoveryv2beta1.APIVersionDiscovery{
-	Version:   "v1",
-	Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+	Version: "v1",
 	Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
 		{
 			Resource:         "coolbars",

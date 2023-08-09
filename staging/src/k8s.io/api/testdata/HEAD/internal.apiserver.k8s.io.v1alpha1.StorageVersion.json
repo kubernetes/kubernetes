@@ -51,9 +51,6 @@
         "encodingVersion": "encodingVersionValue",
         "decodableVersions": [
           "decodableVersionsValue"
-        ],
-        "servedVersions": [
-          "servedVersionsValue"
         ]
       }
     ],

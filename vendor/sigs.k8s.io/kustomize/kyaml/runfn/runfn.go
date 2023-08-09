@@ -308,10 +308,7 @@ func (r RunFns) getFunctionFilters(global bool, fns ...*yaml.RNode) (
 	var fltrs []kio.Filter
 	for i := range fns {
 		api := fns[i]
-		spec, err := runtimeutil.GetFunctionSpec(api)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get FunctionSpec: %w", err)
-		}
+		spec := runtimeutil.GetFunctionSpec(api)
 		if spec == nil {
 			// resource doesn't have function spec
 			continue

@@ -37,12 +37,12 @@ import (
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/cpuset"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
@@ -144,12 +144,12 @@ func getMemoryManagerState() (*state.MemoryManagerCheckpoint, error) {
 
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat %s", memoryManagerStateFile)).Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run command 'cat %s': out: %s, err: %w", memoryManagerStateFile, out, err)
+		return nil, fmt.Errorf("failed to run command 'cat %s': out: %s, err: %v", memoryManagerStateFile, out, err)
 	}
 
 	memoryManagerCheckpoint := &state.MemoryManagerCheckpoint{}
 	if err := json.Unmarshal(out, memoryManagerCheckpoint); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal memory manager state file: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal memory manager state file: %v", err)
 	}
 	return memoryManagerCheckpoint, nil
 }
@@ -254,7 +254,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 	)
 
 	f := framework.NewDefaultFramework("memory-manager-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	memoryQuantity := resource.MustParse("1100Mi")
 	defaultKubeParams := &kubeletParams{
@@ -280,7 +280,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		currentNUMANodeIDs, err := cpuset.Parse(strings.Trim(output, "\n"))
 		framework.ExpectNoError(err)
 
-		framework.ExpectEqual(numaNodeIDs, currentNUMANodeIDs.List())
+		framework.ExpectEqual(numaNodeIDs, currentNUMANodeIDs.ToSlice())
 	}
 
 	waitingForHugepages := func(ctx context.Context, hugepagesCount int) {
@@ -627,7 +627,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 
 					return true
 				}, time.Minute, 5*time.Second).Should(
-					gomega.BeTrue(),
+					gomega.Equal(true),
 					"the pod succeeded to start, when it should fail with the admission error",
 				)
 			})

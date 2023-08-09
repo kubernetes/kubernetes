@@ -92,7 +92,7 @@ type pluginIndex struct {
 }
 
 func mergePluginSet(defaultPluginSet, customPluginSet v1beta3.PluginSet) v1beta3.PluginSet {
-	disabledPlugins := sets.New[string]()
+	disabledPlugins := sets.NewString()
 	enabledCustomPlugins := make(map[string]pluginIndex)
 	// replacedPluginIndex is a set of index of plugins, which have replaced the default plugins.
 	replacedPluginIndex := sets.NewInt()

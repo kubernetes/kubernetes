@@ -39,6 +39,8 @@ type TypeProvider interface {
 
 	// FieldFieldType returns the field type for a checked type value. Returns
 	// false if the field could not be found.
+	//
+	// Used during type-checking only.
 	FindFieldType(messageType string, fieldName string) (*FieldType, bool)
 
 	// NewValue creates a new type value from a qualified name and map of field
@@ -53,7 +55,7 @@ type TypeProvider interface {
 // TypeAdapter converts native Go values of varying type and complexity to equivalent CEL values.
 type TypeAdapter interface {
 	// NativeToValue converts the input `value` to a CEL `ref.Val`.
-	NativeToValue(value any) Val
+	NativeToValue(value interface{}) Val
 }
 
 // TypeRegistry allows third-parties to add custom types to CEL. Not all `TypeProvider`
@@ -95,7 +97,7 @@ type FieldType struct {
 }
 
 // FieldTester is used to test field presence on an input object.
-type FieldTester func(target any) bool
+type FieldTester func(target interface{}) bool
 
 // FieldGetter is used to get the field value from an input object, if set.
-type FieldGetter func(target any) (any, error)
+type FieldGetter func(target interface{}) (interface{}, error)

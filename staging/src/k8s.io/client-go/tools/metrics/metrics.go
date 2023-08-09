@@ -42,10 +42,6 @@ type LatencyMetric interface {
 	Observe(ctx context.Context, verb string, u url.URL, latency time.Duration)
 }
 
-type ResolverLatencyMetric interface {
-	Observe(ctx context.Context, host string, latency time.Duration)
-}
-
 // SizeMetric observes client response size partitioned by verb and host.
 type SizeMetric interface {
 	Observe(ctx context.Context, verb string, host string, size float64)
@@ -62,23 +58,6 @@ type CallsMetric interface {
 	Increment(exitCode int, callStatus string)
 }
 
-// RetryMetric counts the number of retries sent to the server
-// partitioned by code, method, and host.
-type RetryMetric interface {
-	IncrementRetry(ctx context.Context, code string, method string, host string)
-}
-
-// TransportCacheMetric shows the number of entries in the internal transport cache
-type TransportCacheMetric interface {
-	Observe(value int)
-}
-
-// TransportCreateCallsMetric counts the number of times a transport is created
-// partitioned by the result of the cache: hit, miss, uncacheable
-type TransportCreateCallsMetric interface {
-	Increment(result string)
-}
-
 var (
 	// ClientCertExpiry is the expiry time of a client certificate
 	ClientCertExpiry ExpiryMetric = noopExpiry{}
@@ -86,8 +65,6 @@ var (
 	ClientCertRotationAge DurationMetric = noopDuration{}
 	// RequestLatency is the latency metric that rest clients will update.
 	RequestLatency LatencyMetric = noopLatency{}
-	// ResolverLatency is the latency metric that DNS resolver will update
-	ResolverLatency ResolverLatencyMetric = noopResolverLatency{}
 	// RequestSize is the request size metric that rest clients will update.
 	RequestSize SizeMetric = noopSize{}
 	// ResponseSize is the response size metric that rest clients will update.
@@ -99,15 +76,6 @@ var (
 	// ExecPluginCalls is the number of calls made to an exec plugin, partitioned by
 	// exit code and call status.
 	ExecPluginCalls CallsMetric = noopCalls{}
-	// RequestRetry is the retry metric that tracks the number of
-	// retries sent to the server.
-	RequestRetry RetryMetric = noopRetry{}
-	// TransportCacheEntries is the metric that tracks the number of entries in the
-	// internal transport cache.
-	TransportCacheEntries TransportCacheMetric = noopTransportCache{}
-	// TransportCreateCalls is the metric that counts the number of times a new transport
-	// is created
-	TransportCreateCalls TransportCreateCallsMetric = noopTransportCreateCalls{}
 )
 
 // RegisterOpts contains all the metrics to register. Metrics may be nil.
@@ -115,15 +83,11 @@ type RegisterOpts struct {
 	ClientCertExpiry      ExpiryMetric
 	ClientCertRotationAge DurationMetric
 	RequestLatency        LatencyMetric
-	ResolverLatency       ResolverLatencyMetric
 	RequestSize           SizeMetric
 	ResponseSize          SizeMetric
 	RateLimiterLatency    LatencyMetric
 	RequestResult         ResultMetric
 	ExecPluginCalls       CallsMetric
-	RequestRetry          RetryMetric
-	TransportCacheEntries TransportCacheMetric
-	TransportCreateCalls  TransportCreateCallsMetric
 }
 
 // Register registers metrics for the rest client to use. This can
@@ -138,9 +102,6 @@ func Register(opts RegisterOpts) {
 		}
 		if opts.RequestLatency != nil {
 			RequestLatency = opts.RequestLatency
-		}
-		if opts.ResolverLatency != nil {
-			ResolverLatency = opts.ResolverLatency
 		}
 		if opts.RequestSize != nil {
 			RequestSize = opts.RequestSize
@@ -157,15 +118,6 @@ func Register(opts RegisterOpts) {
 		if opts.ExecPluginCalls != nil {
 			ExecPluginCalls = opts.ExecPluginCalls
 		}
-		if opts.RequestRetry != nil {
-			RequestRetry = opts.RequestRetry
-		}
-		if opts.TransportCacheEntries != nil {
-			TransportCacheEntries = opts.TransportCacheEntries
-		}
-		if opts.TransportCreateCalls != nil {
-			TransportCreateCalls = opts.TransportCreateCalls
-		}
 	})
 }
 
@@ -181,11 +133,6 @@ type noopLatency struct{}
 
 func (noopLatency) Observe(context.Context, string, url.URL, time.Duration) {}
 
-type noopResolverLatency struct{}
-
-func (n noopResolverLatency) Observe(ctx context.Context, host string, latency time.Duration) {
-}
-
 type noopSize struct{}
 
 func (noopSize) Observe(context.Context, string, string, float64) {}
@@ -197,15 +144,3 @@ func (noopResult) Increment(context.Context, string, string, string) {}
 type noopCalls struct{}
 
 func (noopCalls) Increment(int, string) {}
-
-type noopRetry struct{}
-
-func (noopRetry) IncrementRetry(context.Context, string, string, string) {}
-
-type noopTransportCache struct{}
-
-func (noopTransportCache) Observe(int) {}
-
-type noopTransportCreateCalls struct{}
-
-func (noopTransportCreateCalls) Increment(string) {}

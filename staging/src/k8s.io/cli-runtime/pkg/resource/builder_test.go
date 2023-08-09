@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"sigs.k8s.io/yaml"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -39,13 +41,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/dump"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/restmapper"
+	utiltesting "k8s.io/client-go/util/testing"
+
 	// TODO we need to remove this linkage and create our own scheme
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -57,7 +60,7 @@ var (
 )
 
 func stringBody(body string) io.ReadCloser {
-	return io.NopCloser(bytes.NewReader([]byte(body)))
+	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
 }
 
 func watchBody(events ...watch.Event) string {
@@ -422,7 +425,7 @@ func createTestDir(t *testing.T, path string) {
 }
 
 func writeTestFile(t *testing.T, path string, contents string) {
-	if err := os.WriteFile(path, []byte(contents), 0644); err != nil {
+	if err := ioutil.WriteFile(path, []byte(contents), 0644); err != nil {
 		t.Fatalf("error creating test file %#v", err)
 	}
 }
@@ -485,11 +488,10 @@ func TestFilenameOptionsValidate(t *testing.T) {
 
 func TestPathBuilderWithMultiple(t *testing.T) {
 	// create test dirs
-	tmpDir, err := os.MkdirTemp("", "recursive_test_multiple")
+	tmpDir, err := utiltesting.MkTmpdir("recursive_test_multiple")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
-
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "recursive/pod/pod_1"))
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "recursive/rc/rc_1"))
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "inode/hardlink"))
@@ -540,11 +542,11 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 				switch tt.object.(type) {
 				case *v1.Pod:
 					if _, ok := v.Object.(*v1.Pod); !ok || v.Name != tt.expectedNames[i] || v.Namespace != "test" {
-						t.Errorf("unexpected info: %v", dump.Pretty(v.Object))
+						t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
 					}
 				case *v1.ReplicationController:
 					if _, ok := v.Object.(*v1.ReplicationController); !ok || v.Name != tt.expectedNames[i] || v.Namespace != "test" {
-						t.Errorf("unexpected info: %v", dump.Pretty(v.Object))
+						t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
 					}
 				}
 			}
@@ -554,11 +556,10 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 
 func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 	// create test dirs
-	tmpDir, err := os.MkdirTemp("", "recursive_test_multiple_invalid")
+	tmpDir, err := utiltesting.MkTmpdir("recursive_test_multiple_invalid")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
-
 	createTestDir(t, fmt.Sprintf("%s/%s", tmpDir, "inode/symlink/pod"))
 	defer os.RemoveAll(tmpDir)
 
@@ -703,7 +704,7 @@ func TestErrorFilePatternBuilder(t *testing.T) {
 }
 
 func setupKustomizeDirectory() (string, error) {
-	path, err := os.MkdirTemp("", "")
+	path, err := ioutil.TempDir("/tmp", "")
 	if err != nil {
 		return "", err
 	}
@@ -774,7 +775,7 @@ resources:
 	}
 
 	for filename, content := range contents {
-		err = os.WriteFile(filepath.Join(path, filename), []byte(content), 0660)
+		err = ioutil.WriteFile(filepath.Join(path, filename), []byte(content), 0660)
 		if err != nil {
 			return "", err
 		}
@@ -1891,7 +1892,7 @@ func TestHasNames(t *testing.T) {
 
 func TestUnstructured(t *testing.T) {
 	// create test dirs
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "unstructured_test")
+	tmpDir, err := utiltesting.MkTmpdir("unstructured_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}

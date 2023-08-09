@@ -19,7 +19,3 @@ package object
 type VmwareDistributedVirtualSwitch struct {
 	DistributedVirtualSwitch
 }
-
-func (s VmwareDistributedVirtualSwitch) GetInventoryPath() string {
-	return s.InventoryPath
-}

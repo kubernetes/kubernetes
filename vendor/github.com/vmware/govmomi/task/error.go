@@ -20,7 +20,6 @@ import "github.com/vmware/govmomi/vim25/types"
 
 type Error struct {
 	*types.LocalizedMethodFault
-	Description *types.LocalizableMessage
 }
 
 // Error returns the task's localized fault message.

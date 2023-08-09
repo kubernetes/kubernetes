@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -43,6 +42,7 @@ func hasNodeInProcessing(ca *cloudCIDRAllocator, name string) bool {
 func TestBoundedRetries(t *testing.T) {
 	clientSet := fake.NewSimpleClientset()
 	updateChan := make(chan string, 1) // need to buffer as we are using only on go routine
+	stopChan := make(chan struct{})
 	sharedInfomer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 	ca := &cloudCIDRAllocator{
 		client:            clientSet,
@@ -51,10 +51,9 @@ func TestBoundedRetries(t *testing.T) {
 		nodesSynced:       sharedInfomer.Core().V1().Nodes().Informer().HasSynced,
 		nodesInProcessing: map[string]*nodeProcessingInfo{},
 	}
-	logger, ctx := ktesting.NewTestContext(t)
-	go ca.worker(ctx)
+	go ca.worker(stopChan)
 	nodeName := "testNode"
-	ca.AllocateOrOccupyCIDR(logger, &v1.Node{
+	ca.AllocateOrOccupyCIDR(&v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
 		},
@@ -177,9 +176,9 @@ func TestNeedPodCIDRsUpdate(t *testing.T) {
 		if err != nil {
 			t.Errorf("failed to parse %v as CIDRs: %v", tc.cidrs, err)
 		}
-		logger, _ := ktesting.NewTestContext(t)
+
 		t.Run(tc.desc, func(t *testing.T) {
-			got, err := needPodCIDRsUpdate(logger, &node, netCIDRs)
+			got, err := needPodCIDRsUpdate(&node, netCIDRs)
 			if tc.wantErr == (err == nil) {
 				t.Errorf("err: %v, wantErr: %v", err, tc.wantErr)
 			}

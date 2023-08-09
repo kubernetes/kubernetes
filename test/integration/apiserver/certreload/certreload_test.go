@@ -43,7 +43,6 @@ import (
 	"k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type caWithClient struct {
@@ -136,10 +135,6 @@ func TestClientCARecreate(t *testing.T) {
 }
 
 func testClientCA(t *testing.T, recreate bool) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	frontProxyCA, err := newTestCAWithClient(
 		pkix.Name{
 			CommonName: "test-front-proxy-ca",
@@ -175,7 +170,7 @@ func testClientCA(t *testing.T, recreate bool) {
 	clientCAFilename := ""
 	frontProxyCAFilename := ""
 
-	kubeClient, kubeconfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	kubeClient, kubeconfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			clientCAFilename = opts.Authentication.ClientCert.ClientCA
@@ -305,7 +300,7 @@ func testClientCA(t *testing.T, recreate bool) {
 	}
 
 	// Call an endpoint to make sure we are authenticated
-	_, err = testClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	_, err = testClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -473,13 +468,9 @@ func TestServingCertRecreate(t *testing.T) {
 }
 
 func testServingCert(t *testing.T, recreate bool) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	var servingCertPath string
 
-	_, kubeconfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	_, kubeconfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			servingCertPath = opts.SecureServing.ServerCert.CertDirectory
@@ -518,11 +509,7 @@ func testServingCert(t *testing.T, recreate bool) {
 func TestSNICert(t *testing.T) {
 	var servingCertPath string
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	_, kubeconfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	_, kubeconfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			servingCertPath = opts.SecureServing.ServerCert.CertDirectory

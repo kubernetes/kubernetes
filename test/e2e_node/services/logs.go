@@ -70,8 +70,14 @@ var requiredLogs = []LogFileData{
 	},
 	{
 		Name:              "cloud-init.log",
-		Files:             []string{"/var/log/cloud-init.log", "/var/log/cloud-init-output.log"},
+		Files:             []string{"/var/log/cloud-init.log"},
 		JournalctlCommand: []string{"-u", "cloud*"},
+	},
+	// TODO(random-liu): Make docker.log non-required.
+	{
+		Name:              "docker.log",
+		Files:             []string{"/var/log/docker.log", "/var/log/upstart/docker.log"},
+		JournalctlCommand: []string{"-u", "docker"},
 	},
 	{
 		Name:              "containerd.log",

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 const (
@@ -79,7 +80,7 @@ func TestGet(t *testing.T) {
 		},
 	}
 	if !equality.Semantic.DeepEqual(get, expected) {
-		t.Fatal(cmp.Diff(expected, get))
+		t.Fatal(diff.ObjectGoPrintDiff(expected, get))
 	}
 }
 
@@ -98,7 +99,7 @@ func TestListDecoding(t *testing.T) {
 		Items: []unstructured.Unstructured{},
 	}
 	if !equality.Semantic.DeepEqual(list, expectedList) {
-		t.Fatal(cmp.Diff(expectedList, list))
+		t.Fatal(diff.ObjectGoPrintDiff(expectedList, list))
 	}
 }
 
@@ -116,7 +117,7 @@ func TestGetDecoding(t *testing.T) {
 		},
 	}
 	if !equality.Semantic.DeepEqual(get, expectedObj) {
-		t.Fatal(cmp.Diff(expectedObj, get))
+		t.Fatal(diff.ObjectGoPrintDiff(expectedObj, get))
 	}
 }
 
@@ -144,7 +145,7 @@ func TestList(t *testing.T) {
 		*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
 	}
 	if !equality.Semantic.DeepEqual(listFirst.Items, expected) {
-		t.Fatal(cmp.Diff(expected, listFirst.Items))
+		t.Fatal(diff.ObjectGoPrintDiff(expected, listFirst.Items))
 	}
 }
 
@@ -188,7 +189,7 @@ func Test_ListKind(t *testing.T) {
 		},
 	}
 	if !equality.Semantic.DeepEqual(listFirst, expectedList) {
-		t.Fatal(cmp.Diff(expectedList, listFirst))
+		t.Fatal(diff.ObjectGoPrintDiff(expectedList, listFirst))
 	}
 }
 
@@ -241,7 +242,7 @@ func (tc *patchTestCase) verifyResult(result *unstructured.Unstructured) error {
 		return nil
 	}
 	if !equality.Semantic.DeepEqual(result, tc.expectedPatchedObject) {
-		return fmt.Errorf("unexpected diff in received object: %s", cmp.Diff(tc.expectedPatchedObject, result))
+		return fmt.Errorf("unexpected diff in received object: %s", diff.ObjectGoPrintDiff(tc.expectedPatchedObject, result))
 	}
 	return nil
 }

@@ -24,7 +24,6 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 
-	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
@@ -125,8 +124,6 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.FeatureGates == nil {
 		obj.FeatureGates = make(map[string]bool)
 	}
-	// Use the Default LoggingConfiguration option
-	logsapi.SetRecommendedLoggingConfiguration(&obj.Logging)
 }
 
 // getDefaultAddresses returns default address of healthz and metrics server

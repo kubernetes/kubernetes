@@ -30,7 +30,7 @@ var (
 )
 
 // ConvertToNative implements ref.Val.ConvertToNative.
-func (u Unknown) ConvertToNative(typeDesc reflect.Type) (any, error) {
+func (u Unknown) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	return u.Value(), nil
 }
 
@@ -50,7 +50,7 @@ func (u Unknown) Type() ref.Type {
 }
 
 // Value implements ref.Val.Value.
-func (u Unknown) Value() any {
+func (u Unknown) Value() interface{} {
 	return []int64(u)
 }
 

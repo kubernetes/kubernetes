@@ -1,4 +1,3 @@
-//go:build windows
 // +build windows
 
 package winio
@@ -25,15 +24,19 @@ import (
 //sys lookupPrivilegeDisplayName(systemName string, name *uint16, buffer *uint16, size *uint32, languageId *uint32) (err error) = advapi32.LookupPrivilegeDisplayNameW
 
 const (
-	//revive:disable-next-line:var-naming ALL_CAPS
-	SE_PRIVILEGE_ENABLED = windows.SE_PRIVILEGE_ENABLED
+	SE_PRIVILEGE_ENABLED = 2
 
-	//revive:disable-next-line:var-naming ALL_CAPS
-	ERROR_NOT_ALL_ASSIGNED syscall.Errno = windows.ERROR_NOT_ALL_ASSIGNED
+	ERROR_NOT_ALL_ASSIGNED syscall.Errno = 1300
 
-	SeBackupPrivilege   = "SeBackupPrivilege"
-	SeRestorePrivilege  = "SeRestorePrivilege"
-	SeSecurityPrivilege = "SeSecurityPrivilege"
+	SeBackupPrivilege  = "SeBackupPrivilege"
+	SeRestorePrivilege = "SeRestorePrivilege"
+)
+
+const (
+	securityAnonymous = iota
+	securityIdentification
+	securityImpersonation
+	securityDelegation
 )
 
 var (
@@ -47,9 +50,11 @@ type PrivilegeError struct {
 }
 
 func (e *PrivilegeError) Error() string {
-	s := "Could not enable privilege "
+	s := ""
 	if len(e.privileges) > 1 {
 		s = "Could not enable privileges "
+	} else {
+		s = "Could not enable privilege "
 	}
 	for i, p := range e.privileges {
 		if i != 0 {
@@ -88,7 +93,7 @@ func RunWithPrivileges(names []string, fn func() error) error {
 }
 
 func mapPrivileges(names []string) ([]uint64, error) {
-	privileges := make([]uint64, 0, len(names))
+	var privileges []uint64
 	privNameMutex.Lock()
 	defer privNameMutex.Unlock()
 	for _, name := range names {
@@ -121,7 +126,7 @@ func enableDisableProcessPrivilege(names []string, action uint32) error {
 		return err
 	}
 
-	p := windows.CurrentProcess()
+	p, _ := windows.GetCurrentProcess()
 	var token windows.Token
 	err = windows.OpenProcessToken(p, windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token)
 	if err != nil {
@@ -134,10 +139,10 @@ func enableDisableProcessPrivilege(names []string, action uint32) error {
 
 func adjustPrivileges(token windows.Token, privileges []uint64, action uint32) error {
 	var b bytes.Buffer
-	_ = binary.Write(&b, binary.LittleEndian, uint32(len(privileges)))
+	binary.Write(&b, binary.LittleEndian, uint32(len(privileges)))
 	for _, p := range privileges {
-		_ = binary.Write(&b, binary.LittleEndian, p)
-		_ = binary.Write(&b, binary.LittleEndian, action)
+		binary.Write(&b, binary.LittleEndian, p)
+		binary.Write(&b, binary.LittleEndian, action)
 	}
 	prevState := make([]byte, b.Len())
 	reqSize := uint32(0)
@@ -145,7 +150,7 @@ func adjustPrivileges(token windows.Token, privileges []uint64, action uint32) e
 	if !success {
 		return err
 	}
-	if err == ERROR_NOT_ALL_ASSIGNED { //nolint:errorlint // err is Errno
+	if err == ERROR_NOT_ALL_ASSIGNED {
 		return &PrivilegeError{privileges}
 	}
 	return nil
@@ -171,7 +176,7 @@ func getPrivilegeName(luid uint64) string {
 }
 
 func newThreadToken() (windows.Token, error) {
-	err := impersonateSelf(windows.SecurityImpersonation)
+	err := impersonateSelf(securityImpersonation)
 	if err != nil {
 		return 0, err
 	}

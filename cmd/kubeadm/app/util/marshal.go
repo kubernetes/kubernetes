@@ -158,8 +158,3 @@ func GroupVersionKindsHasInitConfiguration(gvks ...schema.GroupVersionKind) bool
 func GroupVersionKindsHasJoinConfiguration(gvks ...schema.GroupVersionKind) bool {
 	return GroupVersionKindsHasKind(gvks, constants.JoinConfigurationKind)
 }
-
-// GroupVersionKindsHasResetConfiguration returns whether the following gvk slice contains a ResetConfiguration object
-func GroupVersionKindsHasResetConfiguration(gvks ...schema.GroupVersionKind) bool {
-	return GroupVersionKindsHasKind(gvks, constants.ResetConfigurationKind)
-}

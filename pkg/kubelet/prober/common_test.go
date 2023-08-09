@@ -17,7 +17,6 @@ limitations under the License.
 package prober
 
 import (
-	"os"
 	"reflect"
 	"sync"
 
@@ -106,18 +105,12 @@ func setTestProbe(pod *v1.Pod, probeType probeType, probeSpec v1.Probe) {
 }
 
 func newTestManager() *manager {
-	podManager := kubepod.NewBasicPodManager()
+	podManager := kubepod.NewBasicPodManager(nil)
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	// Add test pod to pod manager, so that status manager can get the pod from pod manager if needed.
 	podManager.AddPod(getTestPod())
-	testRootDir := ""
-	if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
-		return nil
-	} else {
-		testRootDir = tempDir
-	}
 	m := NewManager(
-		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, testRootDir),
+		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
 		results.NewManager(),
 		results.NewManager(),
 		results.NewManager(),

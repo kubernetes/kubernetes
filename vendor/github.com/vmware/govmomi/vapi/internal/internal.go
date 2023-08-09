@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018-2022 VMware, Inc. All Rights Reserved.
+Copyright (c) 2018 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,36 +17,23 @@ limitations under the License.
 package internal
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/url"
+
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-// VAPI REST Paths
 const (
-	SessionPath                    = "/com/vmware/cis/session"
-	CategoryPath                   = "/com/vmware/cis/tagging/category"
-	TagPath                        = "/com/vmware/cis/tagging/tag"
-	AssociationPath                = "/com/vmware/cis/tagging/tag-association"
-	LibraryPath                    = "/com/vmware/content/library"
-	LibraryItemFileData            = "/com/vmware/cis/data"
-	LibraryItemPath                = "/com/vmware/content/library/item"
-	LibraryItemFilePath            = "/com/vmware/content/library/item/file"
-	LibraryItemUpdateSession       = "/com/vmware/content/library/item/update-session"
-	LibraryItemUpdateSessionFile   = "/com/vmware/content/library/item/updatesession/file"
-	LibraryItemDownloadSession     = "/com/vmware/content/library/item/download-session"
-	LibraryItemDownloadSessionFile = "/com/vmware/content/library/item/downloadsession/file"
-	LocalLibraryPath               = "/com/vmware/content/local-library"
-	SubscribedLibraryPath          = "/com/vmware/content/subscribed-library"
-	SecurityPoliciesPath           = "/api/content/security-policies"
-	SubscribedLibraryItem          = "/com/vmware/content/library/subscribed-item"
-	Subscriptions                  = "/com/vmware/content/library/subscriptions"
-	TrustedCertificatesPath        = "/api/content/trusted-certificates"
-	VCenterOVFLibraryItem          = "/com/vmware/vcenter/ovf/library-item"
-	VCenterVMTXLibraryItem         = "/vcenter/vm-template/library-items"
-	VCenterVM                      = "/vcenter/vm"
-	SessionCookieName              = "vmware-api-session-id"
-	UseHeaderAuthn                 = "vmware-use-header-authn"
-	DebugEcho                      = "/vc-sim/debug/echo"
+	Path              = "/rest/com/vmware"
+	SessionPath       = "/cis/session"
+	CategoryPath      = "/cis/tagging/category"
+	TagPath           = "/cis/tagging/tag"
+	AssociationPath   = "/cis/tagging/tag-association"
+	SessionCookieName = "vmware-api-session-id"
 )
 
 // AssociatedObject is the same structure as types.ManagedObjectReference,
@@ -75,15 +62,63 @@ func NewAssociation(ref mo.Reference) Association {
 	}
 }
 
-type SubscriptionDestination struct {
-	ID string `json:"subscription"`
+type CloneURL interface {
+	URL() *url.URL
 }
 
-type SubscriptionDestinationSpec struct {
-	Subscriptions []SubscriptionDestination `json:"subscriptions,omitempty"`
+// Resource wraps url.URL with helpers
+type Resource struct {
+	u *url.URL
 }
 
-type SubscriptionItemDestinationSpec struct {
-	Force         bool                      `json:"force_sync_content"`
-	Subscriptions []SubscriptionDestination `json:"subscriptions,omitempty"`
+func URL(c CloneURL, path string) *Resource {
+	r := &Resource{u: c.URL()}
+	r.u.Path = Path + path
+	return r
+}
+
+// WithID appends id to the URL.Path
+func (r *Resource) WithID(id string) *Resource {
+	r.u.Path += "/id:" + id
+	return r
+}
+
+// WithAction sets adds action to the URL.RawQuery
+func (r *Resource) WithAction(action string) *Resource {
+	r.u.RawQuery = url.Values{
+		"~action": []string{action},
+	}.Encode()
+	return r
+}
+
+// Request returns a new http.Request for the given method.
+// An optional body can be provided for POST and PATCH methods.
+func (r *Resource) Request(method string, body ...interface{}) *http.Request {
+	rdr := io.MultiReader() // empty body by default
+	if len(body) != 0 {
+		rdr = encode(body[0])
+	}
+	req, err := http.NewRequest(method, r.u.String(), rdr)
+	if err != nil {
+		panic(err)
+	}
+	return req
+}
+
+type errorReader struct {
+	e error
+}
+
+func (e errorReader) Read([]byte) (int, error) {
+	return -1, e.e
+}
+
+// encode body as JSON, deferring any errors until io.Reader is used.
+func encode(body interface{}) io.Reader {
+	var b bytes.Buffer
+	err := json.NewEncoder(&b).Encode(body)
+	if err != nil {
+		return errorReader{err}
+	}
+	return &b
 }

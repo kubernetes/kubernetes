@@ -31,7 +31,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -45,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
@@ -136,6 +136,11 @@ func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
 	r := (&Request{c: &RESTClient{base: &url.URL{}}}).AbsPath("/foo/")
+	if s := r.URL().String(); s != "/foo/" {
+		t.Errorf("trailing slash should be preserved: %s", s)
+	}
+
+	r = (&Request{c: &RESTClient{base: &url.URL{}}}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -263,26 +268,6 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 	}
 }
 
-func TestRequestVersionedParamsWithInvalidScheme(t *testing.T) {
-	parameterCodec := runtime.NewParameterCodec(runtime.NewScheme())
-	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}})
-	r.VersionedParams(&v1.PodExecOptions{Stdin: false, Stdout: true},
-		parameterCodec)
-
-	if r.Error() == nil {
-		t.Errorf("should have recorded an error: %#v", r.params)
-	}
-}
-
-func TestRequestError(t *testing.T) {
-	// Invalid body, see TestRequestBody()
-	r := (&Request{}).Body([]string{"test"})
-
-	if r.Error() != r.err {
-		t.Errorf("getter should be identical to reference: %#v %#v", r.Error(), r.err)
-	}
-}
-
 func TestRequestURI(t *testing.T) {
 	r := (&Request{}).Param("foo", "a")
 	r.Prefix("other")
@@ -317,7 +302,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test error set when failing to read file
-	f, err := os.CreateTemp("", "")
+	f, err := os.CreateTemp("", "test")
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
@@ -919,22 +904,22 @@ func TestTransformUnstructuredError(t *testing.T) {
 				expect = err
 			}
 			if !reflect.DeepEqual(expect, transformed) {
-				t.Errorf("unexpected Error(): %s", cmp.Diff(expect, transformed))
+				t.Errorf("unexpected Error(): %s", diff.ObjectReflectDiff(expect, transformed))
 			}
 
 			// verify result.Get properly transforms the error
 			if _, err := result.Get(); !reflect.DeepEqual(expect, err) {
-				t.Errorf("unexpected error on Get(): %s", cmp.Diff(expect, err))
+				t.Errorf("unexpected error on Get(): %s", diff.ObjectReflectDiff(expect, err))
 			}
 
 			// verify result.Into properly handles the error
 			if err := result.Into(&v1.Pod{}); !reflect.DeepEqual(expect, err) {
-				t.Errorf("unexpected error on Into(): %s", cmp.Diff(expect, err))
+				t.Errorf("unexpected error on Into(): %s", diff.ObjectReflectDiff(expect, err))
 			}
 
 			// verify result.Raw leaves the error in the untransformed state
 			if _, err := result.Raw(); !reflect.DeepEqual(result.err, err) {
-				t.Errorf("unexpected error on Raw(): %s", cmp.Diff(expect, err))
+				t.Errorf("unexpected error on Raw(): %s", diff.ObjectReflectDiff(expect, err))
 			}
 		})
 	}
@@ -1214,7 +1199,7 @@ func TestRequestWatch(t *testing.T) {
 						t.Fatalf("Watch closed early, %d/%d read", i, len(testCase.Expect))
 					}
 					if !reflect.DeepEqual(evt, out) {
-						t.Fatalf("Event %d does not match: %s", i, cmp.Diff(evt, out))
+						t.Fatalf("Event %d does not match: %s", i, diff.ObjectReflectDiff(evt, out))
 					}
 				}
 			}
@@ -1460,7 +1445,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt32(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1703,7 +1688,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt32(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1742,7 +1727,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt32(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1797,7 +1782,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt32(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1842,7 +1827,7 @@ func TestWasCreated(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt32(12345),
+		TargetPort: intstr.FromInt(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -3005,7 +2990,6 @@ type withRateLimiterBackoffManagerAndMetrics struct {
 	metrics.ResultMetric
 	calculateBackoffSeq int64
 	calculateBackoffFn  func(i int64) time.Duration
-	metrics.RetryMetric
 
 	invokeOrderGot []string
 	sleepsGot      []string
@@ -3038,14 +3022,6 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Increment(ctx context.Context
 	// we are interested in the request context that is marked by this test
 	if marked, ok := ctx.Value(retryTestKey).(bool); ok && marked {
 		lb.invokeOrderGot = append(lb.invokeOrderGot, "RequestResult.Increment")
-		lb.statusCodesGot = append(lb.statusCodesGot, code)
-	}
-}
-
-func (lb *withRateLimiterBackoffManagerAndMetrics) IncrementRetry(ctx context.Context, code, _, _ string) {
-	// we are interested in the request context that is marked by this test
-	if marked, ok := ctx.Value(retryTestKey).(bool); ok && marked {
-		lb.invokeOrderGot = append(lb.invokeOrderGot, "RequestRetry.IncrementRetry")
 		lb.statusCodesGot = append(lb.statusCodesGot, code)
 	}
 }
@@ -3095,17 +3071,13 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 		"Client.Do",
 
 		// it's a success, so do the following:
-		// count the result metric, and since it's a retry,
-		// count the retry metric, and then update backoff parameters.
+		//  - call metrics and update backoff parameters
 		"RequestResult.Increment",
-		"RequestRetry.IncrementRetry",
 		"BackoffManager.UpdateBackoff",
 	}
 	statusCodesWant := []string{
-		// first attempt (A): we count the result metric only
 		"500",
-		// final attempt (B): we count the result metric, and the retry metric
-		"200", "200",
+		"200",
 	}
 
 	tests := []struct {
@@ -3219,13 +3191,10 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 			//  to override as well, and we want tests to be able to run in
 			//  parallel then we will need to provide a way for tests to
 			//  register/deregister their own metric inerfaces.
-			oldRequestResult := metrics.RequestResult
-			oldRequestRetry := metrics.RequestRetry
+			old := metrics.RequestResult
 			metrics.RequestResult = interceptor
-			metrics.RequestRetry = interceptor
 			defer func() {
-				metrics.RequestResult = oldRequestResult
-				metrics.RequestRetry = oldRequestRetry
+				metrics.RequestResult = old
 			}()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -3800,268 +3769,5 @@ func TestTransportConcurrency(t *testing.T) {
 			}
 			wg.Wait()
 		})
-	}
-}
-
-func TestRetryableConditions(t *testing.T) {
-	var (
-		methods = map[string]func(ctx context.Context, r *Request){
-			"Do": func(ctx context.Context, r *Request) {
-				r.Do(ctx)
-			},
-			"DoRaw": func(ctx context.Context, r *Request) {
-				r.DoRaw(ctx)
-			},
-			"Stream": func(ctx context.Context, r *Request) {
-				r.Stream(ctx)
-			},
-			"Watch": func(ctx context.Context, r *Request) {
-				w, err := r.Watch(ctx)
-				if err == nil {
-					// we need to wait here to avoid race condition.
-					<-w.ResultChan()
-				}
-			},
-		}
-
-		alwaysRetry = map[string]bool{
-			"Do":     true,
-			"DoRaw":  true,
-			"Watch":  true,
-			"Stream": true,
-		}
-
-		neverRetry = map[string]bool{
-			"Do":     false,
-			"DoRaw":  false,
-			"Watch":  false,
-			"Stream": false,
-		}
-
-		alwaysRetryExceptStream = map[string]bool{
-			"Do":     true,
-			"DoRaw":  true,
-			"Watch":  true,
-			"Stream": false,
-		}
-	)
-
-	tests := []struct {
-		name             string
-		verbs            []string
-		serverReturns    responseErr
-		retryExpectation map[string]bool
-	}{
-		// {429, Retry-After: N} - we expect retry
-		{
-			name:             "server returns {429, Retry-After}",
-			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
-			serverReturns:    responseErr{response: retryAfterResponseWithCodeAndDelay(http.StatusTooManyRequests, "0"), err: nil},
-			retryExpectation: alwaysRetry,
-		},
-		// {5xx, Retry-After: N} - we expect retry
-		{
-			name:             "server returns {503, Retry-After}",
-			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
-			serverReturns:    responseErr{response: retryAfterResponseWithCodeAndDelay(http.StatusServiceUnavailable, "0"), err: nil},
-			retryExpectation: alwaysRetry,
-		},
-		// 5xx, but Retry-After: N is missing - no retry is expected
-		{
-			name:             "server returns 5xx, but no Retry-After",
-			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
-			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusInternalServerError}, err: nil},
-			retryExpectation: neverRetry,
-		},
-		// 429, but Retry-After: N is missing - no retry is expected
-		{
-			name:             "server returns 429 but no Retry-After",
-			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
-			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusTooManyRequests}, err: nil},
-			retryExpectation: neverRetry,
-		},
-		// response is nil, but error is set
-		{
-			name:             "server returns connection reset error",
-			verbs:            []string{"GET"},
-			serverReturns:    responseErr{response: nil, err: syscall.ECONNRESET},
-			retryExpectation: alwaysRetryExceptStream,
-		},
-		{
-			name:             "server returns EOF error",
-			verbs:            []string{"GET"},
-			serverReturns:    responseErr{response: nil, err: io.EOF},
-			retryExpectation: alwaysRetryExceptStream,
-		},
-		{
-			name:             "server returns unexpected EOF error",
-			verbs:            []string{"GET"},
-			serverReturns:    responseErr{response: nil, err: io.ErrUnexpectedEOF},
-			retryExpectation: alwaysRetryExceptStream,
-		},
-		{
-			name:             "server returns broken connection error",
-			verbs:            []string{"GET"},
-			serverReturns:    responseErr{response: nil, err: errors.New("http: can't write HTTP request on broken connection")},
-			retryExpectation: alwaysRetryExceptStream,
-		},
-		{
-			name:             "server returns GOAWAY error",
-			verbs:            []string{"GET"},
-			serverReturns:    responseErr{response: nil, err: errors.New("http2: server sent GOAWAY and closed the connection")},
-			retryExpectation: alwaysRetryExceptStream,
-		},
-		{
-			name:             "server returns connection reset by peer error",
-			verbs:            []string{"GET"},
-			serverReturns:    responseErr{response: nil, err: errors.New("connection reset by peer")},
-			retryExpectation: alwaysRetryExceptStream,
-		},
-		{
-			name:             "server returns use of closed network connection error",
-			verbs:            []string{"GET"},
-			serverReturns:    responseErr{response: nil, err: errors.New("use of closed network connection")},
-			retryExpectation: alwaysRetryExceptStream,
-		},
-		// connection refused error never gets retried
-		{
-			name:             "server returns connection refused error",
-			verbs:            []string{"GET"},
-			serverReturns:    responseErr{response: nil, err: syscall.ECONNREFUSED},
-			retryExpectation: neverRetry,
-		},
-		{
-			name:             "server returns connection refused error",
-			verbs:            []string{"POST"},
-			serverReturns:    responseErr{response: nil, err: syscall.ECONNREFUSED},
-			retryExpectation: neverRetry,
-		},
-		{
-			name:          "server returns EOF error",
-			verbs:         []string{"POST"},
-			serverReturns: responseErr{response: nil, err: io.EOF},
-			retryExpectation: map[string]bool{
-				"Do":     false,
-				"DoRaw":  false,
-				"Watch":  true, // not applicable, Watch should always be GET only
-				"Stream": false,
-			},
-		},
-		// Timeout error gets retries by watch only
-		{
-			name:          "server returns net.Timeout() == true error",
-			verbs:         []string{"GET"},
-			serverReturns: responseErr{response: nil, err: &net.DNSError{IsTimeout: true}},
-			retryExpectation: map[string]bool{
-				"Do":     false,
-				"DoRaw":  false,
-				"Watch":  true,
-				"Stream": false,
-			},
-		},
-		{
-			name:             "server returns OK, never retry",
-			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
-			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusOK}, err: nil},
-			retryExpectation: neverRetry,
-		},
-		{
-			name:             "server returns {3xx, Retry-After}",
-			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
-			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusMovedPermanently, Header: http.Header{"Retry-After": []string{"0"}}}, err: nil},
-			retryExpectation: neverRetry,
-		},
-	}
-
-	for _, test := range tests {
-		for method, retryExpected := range test.retryExpectation {
-			fn, ok := methods[method]
-			if !ok {
-				t.Fatalf("Wrong test setup, unknown method: %s", method)
-			}
-
-			for _, verb := range test.verbs {
-				t.Run(fmt.Sprintf("%s/%s/%s", test.name, method, verb), func(t *testing.T) {
-					var attemptsGot int
-					client := clientForFunc(func(req *http.Request) (*http.Response, error) {
-						attemptsGot++
-						return test.serverReturns.response, test.serverReturns.err
-					})
-
-					u, _ := url.Parse("http://localhost:123" + "/apis")
-					req := &Request{
-						verb: verb,
-						c: &RESTClient{
-							base:    u,
-							content: defaultContentConfig(),
-							Client:  client,
-						},
-						backoff:    &noSleepBackOff{},
-						maxRetries: 2,
-						retryFn:    defaultRequestRetryFn,
-					}
-
-					fn(context.Background(), req)
-
-					if retryExpected {
-						if attemptsGot != 3 {
-							t.Errorf("Expected attempt count: %d, but got: %d", 3, attemptsGot)
-						}
-						return
-					}
-					// we don't expect retry, so we should see the first attempt only.
-					if attemptsGot > 1 {
-						t.Errorf("Expected no retry, but got %d attempts", attemptsGot)
-					}
-				})
-			}
-		}
-	}
-}
-
-func TestRequestConcurrencyWithRetry(t *testing.T) {
-	var attempts int32
-	client := clientForFunc(func(req *http.Request) (*http.Response, error) {
-		defer func() {
-			atomic.AddInt32(&attempts, 1)
-		}()
-
-		// always send a retry-after response
-		return &http.Response{
-			StatusCode: http.StatusInternalServerError,
-			Header:     http.Header{"Retry-After": []string{"1"}},
-		}, nil
-	})
-
-	req := &Request{
-		verb: "POST",
-		c: &RESTClient{
-			content: defaultContentConfig(),
-			Client:  client,
-		},
-		backoff:    &noSleepBackOff{},
-		maxRetries: 9, // 10 attempts in total, including the first
-		retryFn:    defaultRequestRetryFn,
-	}
-
-	concurrency := 20
-	wg := sync.WaitGroup{}
-	wg.Add(concurrency)
-	startCh := make(chan struct{})
-	for i := 0; i < concurrency; i++ {
-		go func() {
-			defer wg.Done()
-			<-startCh
-			req.Do(context.Background())
-		}()
-	}
-
-	close(startCh)
-	wg.Wait()
-
-	// we expect (concurrency*req.maxRetries+1) attempts to be recorded
-	expected := concurrency * (req.maxRetries + 1)
-	if atomic.LoadInt32(&attempts) != int32(expected) {
-		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts)
 	}
 }

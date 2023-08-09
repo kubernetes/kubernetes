@@ -51,7 +51,7 @@ const (
 
 var _ = SIGDescribe("LimitRange", func() {
 	f := framework.NewDefaultFramework("limitrange")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.18
@@ -236,7 +236,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		the limitRange by collection with a labelSelector it MUST delete only one
 		limitRange.
 	*/
-	framework.ConformanceIt("should list, patch and delete a LimitRange by collection", ginkgo.NodeTimeout(wait.ForeverTestTimeout), func(ctx context.Context) {
+	framework.ConformanceIt("should list, patch and delete a LimitRange by collection", func(ctx context.Context) {
 
 		ns := f.Namespace.Name
 		lrClient := f.ClientSet.CoreV1().LimitRanges(ns)
@@ -274,6 +274,9 @@ var _ = SIGDescribe("LimitRange", func() {
 		// Create a copy to be used in a second namespace
 		limitRange2 := &v1.LimitRange{}
 		*limitRange2 = *limitRange
+
+		ctx, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+		defer cancelCtx()
 
 		ginkgo.By(fmt.Sprintf("Creating LimitRange %q in namespace %q", lrName, f.Namespace.Name))
 		limitRange, err := lrClient.Create(ctx, limitRange, metav1.CreateOptions{})
@@ -315,9 +318,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err, "Failed to patch limitRange %q", lrName)
 		framework.ExpectEqual(patchedLimitRange.Labels[lrName], "patched", "%q label didn't have value 'patched' for this limitRange. Current labels: %v", lrName, patchedLimitRange.Labels)
 		checkMinLimitRange := apiequality.Semantic.DeepEqual(patchedLimitRange.Spec.Limits[0].Min, newMin)
-		if !checkMinLimitRange {
-			framework.Failf("LimitRange does not have the correct min limitRange. Currently is %#v ", patchedLimitRange.Spec.Limits[0].Min)
-		}
+		framework.ExpectEqual(checkMinLimitRange, true, "LimitRange does not have the correct min limitRange. Currently is %#v ", patchedLimitRange.Spec.Limits[0].Min)
 		framework.Logf("LimitRange %q has been patched", lrName)
 
 		ginkgo.By(fmt.Sprintf("Delete LimitRange %q by Collection with labelSelector: %q", lrName, patchedLabelSelector))

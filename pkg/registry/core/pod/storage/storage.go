@@ -33,10 +33,12 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -71,11 +73,10 @@ type REST struct {
 func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) (PodStorage, error) {
 
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &api.Pod{} },
-		NewListFunc:               func() runtime.Object { return &api.PodList{} },
-		PredicateFunc:             registrypod.MatchPod,
-		DefaultQualifiedResource:  api.Resource("pods"),
-		SingularQualifiedResource: api.Resource("pod"),
+		NewFunc:                  func() runtime.Object { return &api.Pod{} },
+		NewListFunc:              func() runtime.Object { return &api.PodList{} },
+		PredicateFunc:            registrypod.MatchPod,
+		DefaultQualifiedResource: api.Resource("pods"),
 
 		CreateStrategy:      registrypod.Strategy,
 		UpdateStrategy:      registrypod.Strategy,
@@ -163,7 +164,6 @@ func (r *BindingREST) Destroy() {
 }
 
 var _ = rest.NamedCreater(&BindingREST{})
-var _ = rest.SubresourceObjectMetaPreserver(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
 func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
@@ -190,13 +190,6 @@ func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Objec
 	err = r.assignPod(ctx, binding.UID, binding.ResourceVersion, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))
 	out = &metav1.Status{Status: metav1.StatusSuccess}
 	return
-}
-
-// PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate indicates to a
-// handler that this endpoint requires the UID and ResourceVersion to use as
-// preconditions. Other fields, such as timestamp, are ignored.
-func (r *BindingREST) PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() bool {
-	return true
 }
 
 // setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if
@@ -231,7 +224,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podUID types
 			return nil, fmt.Errorf("pod %v is already assigned to node %q", pod.Name, pod.Spec.NodeName)
 		}
 		// Reject binding to a scheduling un-ready Pod.
-		if len(pod.Spec.SchedulingGates) != 0 {
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) && len(pod.Spec.SchedulingGates) != 0 {
 			return nil, fmt.Errorf("pod %v has non-empty .spec.schedulingGates", pod.Name)
 		}
 		pod.Spec.NodeName = machine
@@ -293,10 +286,6 @@ func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, crea
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a Binding object: %T", obj))
 	}
 	return r.bindingRest.Create(ctx, metadata.GetName(), obj, createValidation, options)
-}
-
-func (r *LegacyBindingREST) GetSingularName() string {
-	return "binding"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.

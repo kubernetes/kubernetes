@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -66,7 +65,7 @@ var extendedResourceName = "example.com/dongle"
 
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.16
@@ -1007,7 +1006,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		reported hard status values MUST equal the new spec hard values.
 		Getting the /status MUST succeed and the reported hard status
 		values MUST equal the spec hard values. Repatching the hard status
-		values MUST succeed. The spec MUST NOT be changed when
+		values MUST succeed. The spec spec MUST NOT be changed when
 		patching /status.
 	*/
 	framework.ConformanceIt("should apply changes to a resourcequota status", func(ctx context.Context) {
@@ -1204,7 +1203,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 	f := framework.NewDefaultFramework("scope-selectors")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.It("should verify ResourceQuota with best effort scope using scope-selectors.", func(ctx context.Context) {
 		ginkgo.By("Creating a ResourceQuota with best effort scope")
 		resourceQuotaBestEffort, err := createResourceQuota(ctx, f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector("quota-besteffort", v1.ResourceQuotaScopeBestEffort))
@@ -1385,7 +1384,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 
 var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	f := framework.NewDefaultFramework("resourcequota-priorityclass")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with same priority class.", func(ctx context.Context) {
 
@@ -1727,7 +1726,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("cross-namespace-pod-affinity")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.It("should verify ResourceQuota with cross namespace pod affinity scope using scope-selectors.", func(ctx context.Context) {
 		ginkgo.By("Creating a ResourceQuota with cross namespace pod affinity scope")
 		quota, err := createResourceQuota(
@@ -1993,7 +1992,7 @@ func newTestReplicationControllerForQuota(name, image string, replicas int32) *v
 			Name: name,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(replicas),
+			Replicas: func(i int32) *int32 { return &i }(replicas),
 			Selector: map[string]string{
 				"name": name,
 			},

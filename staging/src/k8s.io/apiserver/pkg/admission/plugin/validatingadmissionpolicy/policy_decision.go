@@ -20,54 +20,37 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/api/admissionregistration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type PolicyDecisionAction string
+type policyDecisionAction string
 
 const (
-	ActionAdmit PolicyDecisionAction = "admit"
-	ActionDeny  PolicyDecisionAction = "deny"
+	actionAdmit policyDecisionAction = "admit"
+	actionDeny  policyDecisionAction = "deny"
 )
 
-type PolicyDecisionEvaluation string
+type policyDecisionEvaluation string
 
 const (
-	EvalAdmit PolicyDecisionEvaluation = "admit"
-	EvalError PolicyDecisionEvaluation = "error"
-	EvalDeny  PolicyDecisionEvaluation = "deny"
+	evalAdmit policyDecisionEvaluation = "admit"
+	evalError policyDecisionEvaluation = "error"
+	evalDeny  policyDecisionEvaluation = "deny"
 )
 
-// PolicyDecision contains the action determined from a cel evaluation along with metadata such as message, reason and duration
-type PolicyDecision struct {
-	Action     PolicyDecisionAction
-	Evaluation PolicyDecisionEvaluation
-	Message    string
-	Reason     metav1.StatusReason
-	Elapsed    time.Duration
+type policyDecision struct {
+	action     policyDecisionAction
+	evaluation policyDecisionEvaluation
+	message    string
+	reason     metav1.StatusReason
+	elapsed    time.Duration
 }
 
-type PolicyAuditAnnotationAction string
-
-const (
-	// AuditAnnotationActionPublish indicates that the audit annotation should be
-	// published with the audit event.
-	AuditAnnotationActionPublish PolicyAuditAnnotationAction = "publish"
-	// AuditAnnotationActionError indicates that the valueExpression resulted
-	// in an error.
-	AuditAnnotationActionError PolicyAuditAnnotationAction = "error"
-	// AuditAnnotationActionExclude indicates that the audit annotation should be excluded
-	// because the valueExpression evaluated to null, or because FailurePolicy is Ignore
-	// and the expression failed with a parse error, type check error, or runtime error.
-	AuditAnnotationActionExclude PolicyAuditAnnotationAction = "exclude"
-)
-
-type PolicyAuditAnnotation struct {
-	Key     string
-	Value   string
-	Elapsed time.Duration
-	Action  PolicyAuditAnnotationAction
-	Error   string
+type policyDecisionWithMetadata struct {
+	policyDecision
+	definition *v1alpha1.ValidatingAdmissionPolicy
+	binding    *v1alpha1.ValidatingAdmissionPolicyBinding
 }
 
 func reasonToCode(r metav1.StatusReason) int32 {

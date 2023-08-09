@@ -496,6 +496,12 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 func ValidateDNS(dns *kubeadm.DNS, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
+	const kubeDNSType = "kube-dns"
+	if dns.Type == kubeDNSType {
+		allErrs = append(allErrs, field.Invalid(fldPath, dns.Type, fmt.Sprintf("DNS type %q is no longer supported", kubeDNSType)))
+	}
+
 	if len(dns.ImageRepository) > 0 {
 		allErrs = append(allErrs, ValidateImageRepository(dns.ImageRepository, fldPath.Child("imageRepository"))...)
 	}
@@ -605,6 +611,13 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflight
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
 	}
 
+	if ignoreErrors.Has("all") {
+		// "all" is forbidden in config files. Administrators should use an
+		// explicit list of errors they want to ignore, as it can be risky to
+		// mask all errors in such a way. Hence, we return an error:
+		allErrs = append(allErrs, field.Invalid(field.NewPath("ignorePreflightErrors"), "all", "'all' cannot be used in configuration file"))
+	}
+
 	for _, item := range ignorePreflightErrorsFromCLI {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
 	}
@@ -646,13 +659,5 @@ func ValidateImageRepository(imageRepository string, fldPath *field.Path) field.
 		return append(allErrs, field.Invalid(fldPath, imageRepository, "invalid image repository format"))
 	}
 
-	return allErrs
-}
-
-// ValidateResetConfiguration validates a ResetConfiguration object and collects all encountered errors
-func ValidateResetConfiguration(c *kubeadm.ResetConfiguration) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateSocketPath(c.CRISocket, field.NewPath("criSocket"))...)
-	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
 	return allErrs
 }

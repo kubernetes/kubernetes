@@ -32,7 +32,7 @@ option go_package = "k8s.io/api/node/v1alpha1";
 
 // Overhead structure represents the resource overhead associated with running a pod.
 message Overhead {
-  // podFixed represents the fixed resource overhead associated with running a pod.
+  // PodFixed represents the fixed resource overhead associated with running a pod.
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> podFixed = 1;
 }
@@ -49,7 +49,7 @@ message RuntimeClass {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // spec represents specification of the RuntimeClass
+  // Specification of the RuntimeClass
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   optional RuntimeClassSpec spec = 2;
 }
@@ -61,7 +61,7 @@ message RuntimeClassList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // items is a list of schema objects.
+  // Items is a list of schema objects.
   repeated RuntimeClass items = 2;
 }
 
@@ -70,7 +70,7 @@ message RuntimeClassList {
 // Interface (CRI) implementation, as well as any other components that need to
 // understand how the pod will be run. The RuntimeClassSpec is immutable.
 message RuntimeClassSpec {
-  // runtimeHandler specifies the underlying runtime and configuration that the
+  // RuntimeHandler specifies the underlying runtime and configuration that the
   // CRI implementation will use to handle pods of this class. The possible
   // values are specific to the node & CRI configuration.  It is assumed that
   // all handlers are available on every node, and handlers of the same name are
@@ -78,17 +78,17 @@ message RuntimeClassSpec {
   // For example, a handler called "runc" might specify that the runc OCI
   // runtime (using native Linux containers) will be used to run the containers
   // in a pod.
-  // The runtimeHandler must be lowercase, conform to the DNS Label (RFC 1123)
+  // The RuntimeHandler must be lowercase, conform to the DNS Label (RFC 1123)
   // requirements, and is immutable.
   optional string runtimeHandler = 1;
 
-  // overhead represents the resource overhead associated with running a pod for a
+  // Overhead represents the resource overhead associated with running a pod for a
   // given RuntimeClass. For more details, see
   // https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md
   // +optional
   optional Overhead overhead = 2;
 
-  // scheduling holds the scheduling constraints to ensure that pods running
+  // Scheduling holds the scheduling constraints to ensure that pods running
   // with this RuntimeClass are scheduled to nodes that support it.
   // If scheduling is nil, this RuntimeClass is assumed to be supported by all
   // nodes.

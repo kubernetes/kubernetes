@@ -44,47 +44,42 @@ type CSRSigningController struct {
 }
 
 func NewKubeletServingCSRSigningController(
-	ctx context.Context,
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController(ctx, "csrsigning-kubelet-serving", capi.KubeletServingSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController("csrsigning-kubelet-serving", capi.KubeletServingSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
 func NewKubeletClientCSRSigningController(
-	ctx context.Context,
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController(ctx, "csrsigning-kubelet-client", capi.KubeAPIServerClientKubeletSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController("csrsigning-kubelet-client", capi.KubeAPIServerClientKubeletSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
 func NewKubeAPIServerClientCSRSigningController(
-	ctx context.Context,
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController(ctx, "csrsigning-kube-apiserver-client", capi.KubeAPIServerClientSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController("csrsigning-kube-apiserver-client", capi.KubeAPIServerClientSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
 func NewLegacyUnknownCSRSigningController(
-	ctx context.Context,
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController(ctx, "csrsigning-legacy-unknown", capiv1beta1.LegacyUnknownSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController("csrsigning-legacy-unknown", capiv1beta1.LegacyUnknownSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
 func NewCSRSigningController(
-	ctx context.Context,
 	controllerName string,
 	signerName string,
 	client clientset.Interface,
@@ -99,7 +94,6 @@ func NewCSRSigningController(
 
 	return &CSRSigningController{
 		certificateController: certificates.NewCertificateController(
-			ctx,
 			controllerName,
 			client,
 			csrInformer,
@@ -254,14 +248,14 @@ func isKubeletServing(req *x509.CertificateRequest, usages []capi.KeyUsage, sign
 	if signerName != capi.KubeletServingSignerName {
 		return false, nil
 	}
-	return true, capihelper.ValidateKubeletServingCSR(req, usagesToSet(usages))
+	return true, capihelper.ValidateKubeletServingCSR(req, usagesToSet(usages), true)
 }
 
 func isKubeletClient(req *x509.CertificateRequest, usages []capi.KeyUsage, signerName string) (bool, error) {
 	if signerName != capi.KubeAPIServerClientKubeletSignerName {
 		return false, nil
 	}
-	return true, capihelper.ValidateKubeletClientCSR(req, usagesToSet(usages))
+	return true, capihelper.ValidateKubeletClientCSR(req, usagesToSet(usages), true)
 }
 
 func isKubeAPIServerClient(req *x509.CertificateRequest, usages []capi.KeyUsage, signerName string) (bool, error) {

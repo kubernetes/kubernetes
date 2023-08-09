@@ -77,9 +77,7 @@ func (*regex) CompileOptions() []cel.EnvOption {
 }
 
 func (*regex) ProgramOptions() []cel.ProgramOption {
-	return []cel.ProgramOption{
-		cel.OptimizeRegex(FindRegexOptimization, FindAllRegexOptimization),
-	}
+	return []cel.ProgramOption{}
 }
 
 func find(strVal ref.Val, regexVal ref.Val) ref.Val {

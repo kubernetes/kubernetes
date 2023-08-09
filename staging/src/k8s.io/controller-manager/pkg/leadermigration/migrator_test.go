@@ -28,13 +28,13 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 		LeaderName:   "cloud-provider-extraction-migration",
 		ControllerLeaders: []internal.ControllerLeaderConfiguration{
 			{
-				Name:      "route-controller",
+				Name:      "route",
 				Component: "kube-controller-manager",
 			}, {
-				Name:      "service-controller",
+				Name:      "service",
 				Component: "kube-controller-manager",
 			}, {
-				Name:      "cloud-node-lifecycle-controller",
+				Name:      "cloud-node-lifecycle",
 				Component: "kube-controller-manager",
 			},
 		},
@@ -44,13 +44,13 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 		LeaderName:   "cloud-provider-extraction-migration",
 		ControllerLeaders: []internal.ControllerLeaderConfiguration{
 			{
-				Name:      "route-controller",
+				Name:      "route",
 				Component: "cloud-controller-manager",
 			}, {
-				Name:      "service-controller",
+				Name:      "service",
 				Component: "cloud-controller-manager",
 			}, {
-				Name:      "cloud-node-lifecycle-controller",
+				Name:      "cloud-node-lifecycle",
 				Component: "cloud-controller-manager",
 			},
 		},
@@ -60,13 +60,13 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 		LeaderName:   "cloud-provider-extraction-migration",
 		ControllerLeaders: []internal.ControllerLeaderConfiguration{
 			{
-				Name:      "route-controller",
+				Name:      "route",
 				Component: "*",
 			}, {
-				Name:      "service-controller",
+				Name:      "service",
 				Component: "*",
 			}, {
-				Name:      "cloud-node-lifecycle-controller",
+				Name:      "cloud-node-lifecycle",
 				Component: "*",
 			},
 		},
@@ -83,10 +83,10 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 			config:    fromConfig,
 			component: "kube-controller-manager",
 			expectResult: map[string]FilterResult{
-				"deployment-controller":           ControllerNonMigrated,
-				"route-controller":                ControllerMigrated,
-				"service-controller":              ControllerMigrated,
-				"cloud-node-lifecycle-controller": ControllerMigrated,
+				"deployment":           ControllerNonMigrated,
+				"route":                ControllerMigrated,
+				"service":              ControllerMigrated,
+				"cloud-node-lifecycle": ControllerMigrated,
 			},
 		},
 		{
@@ -94,10 +94,10 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 			config:    fromConfig,
 			component: "cloud-controller-manager",
 			expectResult: map[string]FilterResult{
-				"cloud-node":                      ControllerNonMigrated,
-				"route-controller":                ControllerUnowned,
-				"service-controller":              ControllerUnowned,
-				"cloud-node-lifecycle-controller": ControllerUnowned,
+				"cloud-node":           ControllerNonMigrated,
+				"route":                ControllerUnowned,
+				"service":              ControllerUnowned,
+				"cloud-node-lifecycle": ControllerUnowned,
 			},
 		},
 		{
@@ -105,10 +105,10 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 			config:    toConfig,
 			component: "kube-controller-manager",
 			expectResult: map[string]FilterResult{
-				"deployment-controller":           ControllerNonMigrated,
-				"route-controller":                ControllerUnowned,
-				"service-controller":              ControllerUnowned,
-				"cloud-node-lifecycle-controller": ControllerUnowned,
+				"deployment":           ControllerNonMigrated,
+				"route":                ControllerUnowned,
+				"service":              ControllerUnowned,
+				"cloud-node-lifecycle": ControllerUnowned,
 			},
 		},
 		{
@@ -116,10 +116,10 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 			config:    toConfig,
 			component: "cloud-controller-manager",
 			expectResult: map[string]FilterResult{
-				"cloud-node-controller":           ControllerNonMigrated,
-				"route-controller":                ControllerMigrated,
-				"service-controller":              ControllerMigrated,
-				"cloud-node-lifecycle-controller": ControllerMigrated,
+				"cloud-node":           ControllerNonMigrated,
+				"route":                ControllerMigrated,
+				"service":              ControllerMigrated,
+				"cloud-node-lifecycle": ControllerMigrated,
 			},
 		},
 		{
@@ -127,10 +127,10 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 			config:    wildcardConfig,
 			component: "kube-controller-manager",
 			expectResult: map[string]FilterResult{
-				"deployment-controller":           ControllerNonMigrated, // KCM only
-				"route-controller":                ControllerMigrated,
-				"service-controller":              ControllerMigrated,
-				"cloud-node-lifecycle-controller": ControllerMigrated,
+				"deployment":           ControllerNonMigrated, // KCM only
+				"route":                ControllerMigrated,
+				"service":              ControllerMigrated,
+				"cloud-node-lifecycle": ControllerMigrated,
 			},
 		},
 		{
@@ -138,10 +138,10 @@ func TestLeaderMigratorFilterFunc(t *testing.T) {
 			config:    wildcardConfig,
 			component: "cloud-controller-manager",
 			expectResult: map[string]FilterResult{
-				"cloud-node-controller":           ControllerNonMigrated, // CCM only
-				"route-controller":                ControllerMigrated,
-				"service-controller":              ControllerMigrated,
-				"cloud-node-lifecycle-controller": ControllerMigrated,
+				"cloud-node":           ControllerNonMigrated, // CCM only
+				"route":                ControllerMigrated,
+				"service":              ControllerMigrated,
+				"cloud-node-lifecycle": ControllerMigrated,
 			},
 		},
 	} {

@@ -18,6 +18,7 @@ package simulator
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -127,8 +128,12 @@ func (s *searchDatastore) queryMatch(file os.FileInfo) bool {
 			}
 		case *types.VmDiskFileQuery:
 			if ext == ".vmdk" {
+				if strings.HasSuffix(name, "-flat.vmdk") {
+					// only matches the descriptor, not the backing file(s)
+					return false
+				}
 				// TODO: check Filter and Details fields
-				return !strings.HasSuffix(name, "-flat.vmdk")
+				return true
 			}
 		case *types.VmLogFileQuery:
 			if ext == ".log" {
@@ -151,7 +156,7 @@ func (s *searchDatastore) queryMatch(file os.FileInfo) bool {
 func (s *searchDatastore) search(ds *types.ManagedObjectReference, folder string, dir string) error {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		tracef("search %s: %s", dir, err)
+		log.Printf("search %s: %s", dir, err)
 		return err
 	}
 
@@ -194,12 +199,8 @@ func (s *searchDatastore) Run(task *Task) (types.AnyType, types.BaseMethodFault)
 	}
 
 	ds := ref.(*Datastore)
-
-	isolatedLockContext := &Context{} // we don't need/want to share the task lock
-	Map.WithLock(isolatedLockContext, task, func() {
-		task.Info.Entity = &ds.Self // TODO: CreateTask() should require mo.Entity, rather than mo.Reference
-		task.Info.EntityName = ds.Name
-	})
+	task.Info.Entity = &ds.Self // TODO: CreateTask() should require mo.Entity, rather than mo.Reference
+	task.Info.EntityName = ds.Name
 
 	dir := path.Join(ds.Info.GetDatastoreInfo().Url, p.Path)
 
@@ -225,7 +226,7 @@ func (s *searchDatastore) Run(task *Task) (types.AnyType, types.BaseMethodFault)
 	return s.res[0], nil
 }
 
-func (b *HostDatastoreBrowser) SearchDatastoreTask(ctx *Context, s *types.SearchDatastore_Task) soap.HasFault {
+func (b *HostDatastoreBrowser) SearchDatastoreTask(s *types.SearchDatastore_Task) soap.HasFault {
 	task := NewTask(&searchDatastore{
 		HostDatastoreBrowser: b,
 		DatastorePath:        s.DatastorePath,
@@ -234,12 +235,12 @@ func (b *HostDatastoreBrowser) SearchDatastoreTask(ctx *Context, s *types.Search
 
 	return &methods.SearchDatastore_TaskBody{
 		Res: &types.SearchDatastore_TaskResponse{
-			Returnval: task.Run(ctx),
+			Returnval: task.Run(),
 		},
 	}
 }
 
-func (b *HostDatastoreBrowser) SearchDatastoreSubFoldersTask(ctx *Context, s *types.SearchDatastoreSubFolders_Task) soap.HasFault {
+func (b *HostDatastoreBrowser) SearchDatastoreSubFoldersTask(s *types.SearchDatastoreSubFolders_Task) soap.HasFault {
 	task := NewTask(&searchDatastore{
 		HostDatastoreBrowser: b,
 		DatastorePath:        s.DatastorePath,
@@ -249,7 +250,7 @@ func (b *HostDatastoreBrowser) SearchDatastoreSubFoldersTask(ctx *Context, s *ty
 
 	return &methods.SearchDatastoreSubFolders_TaskBody{
 		Res: &types.SearchDatastoreSubFolders_TaskResponse{
-			Returnval: task.Run(ctx),
+			Returnval: task.Run(),
 		},
 	}
 }

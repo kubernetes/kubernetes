@@ -27,7 +27,6 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
@@ -38,10 +37,8 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe/exec"
-
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -56,11 +53,6 @@ type remoteRuntimeService struct {
 const (
 	// How frequently to report identical errors
 	identicalErrorDelay = 1 * time.Minute
-
-	// connection parameters
-	maxBackoffDelay      = 3 * time.Second
-	baseBackoffDelay     = 100 * time.Millisecond
-	minConnectionTimeout = 5 * time.Second
 )
 
 // CRIVersion is the type for valid Container Runtime Interface (CRI) API
@@ -85,7 +77,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	var dialOpts []grpc.DialOption
+	dialOpts := []grpc.DialOption{}
 	dialOpts = append(dialOpts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
@@ -101,17 +93,6 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
 			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
 	}
-
-	connParams := grpc.ConnectParams{
-		Backoff: backoff.DefaultConfig,
-	}
-	connParams.MinConnectTimeout = minConnectionTimeout
-	connParams.Backoff.BaseDelay = baseBackoffDelay
-	connParams.Backoff.MaxDelay = maxBackoffDelay
-	dialOpts = append(dialOpts,
-		grpc.WithConnectParams(connParams),
-	)
-
 	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
 		klog.ErrorS(err, "Connect remote runtime failed", "address", addr)
@@ -136,11 +117,13 @@ func (r *remoteRuntimeService) validateServiceConnection(ctx context.Context, co
 	klog.V(4).InfoS("Validating the CRI v1 API runtime version")
 	r.runtimeClient = runtimeapi.NewRuntimeServiceClient(conn)
 
-	if _, err := r.runtimeClient.Version(ctx, &runtimeapi.VersionRequest{}); err != nil {
-		return fmt.Errorf("validate CRI v1 runtime API for endpoint %q: %w", endpoint, err)
+	if _, err := r.runtimeClient.Version(ctx, &runtimeapi.VersionRequest{}); err == nil {
+		klog.V(2).InfoS("Validated CRI v1 runtime API")
+
+	} else if status.Code(err) == codes.Unimplemented {
+		return fmt.Errorf("CRI v1 runtime API is not implemented for endpoint %q: %w", endpoint, err)
 	}
 
-	klog.V(2).InfoS("Validated CRI v1 runtime API")
 	return nil
 }
 
@@ -816,9 +799,6 @@ func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtim
 		return err
 	}
 
-	// The connection is successfully established and we have a streaming client ready for use.
-	metrics.EventedPLEGConn.Inc()
-
 	for {
 		resp, err := containerEventsStreamingClient.Recv()
 		if err == io.EOF {
@@ -864,19 +844,4 @@ func (r *remoteRuntimeService) ListPodSandboxMetrics(ctx context.Context) ([]*ru
 	klog.V(10).InfoS("[RemoteRuntimeService] ListPodSandboxMetrics Response", "stats", resp.GetPodMetrics())
 
 	return resp.GetPodMetrics(), nil
-}
-
-// RuntimeConfig returns the configuration information of the runtime.
-func (r *remoteRuntimeService) RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, r.timeout)
-	defer cancel()
-
-	resp, err := r.runtimeClient.RuntimeConfig(ctx, &runtimeapi.RuntimeConfigRequest{})
-	if err != nil {
-		klog.ErrorS(err, "RuntimeConfig from runtime service failed")
-		return nil, err
-	}
-	klog.V(10).InfoS("[RemoteRuntimeService] RuntimeConfigResponse", "linuxConfig", resp.GetLinux())
-
-	return resp, nil
 }

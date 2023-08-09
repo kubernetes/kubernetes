@@ -29,7 +29,6 @@ import (
 )
 
 var fancyBetaOption = "fancy-new-option"
-var fancyAlphaOption = "fancy-alpha-option"
 
 type optionAvailTest struct {
 	option            string
@@ -40,17 +39,15 @@ type optionAvailTest struct {
 
 func TestNewTopologyManagerOptions(t *testing.T) {
 	testCases := []struct {
-		description       string
-		policyOptions     map[string]string
-		featureGate       featuregate.Feature
-		featureGateEnable bool
-		expectedErr       error
-		expectedOptions   PolicyOptions
+		description     string
+		policyOptions   map[string]string
+		featureGate     featuregate.Feature
+		expectedErr     error
+		expectedOptions PolicyOptions
 	}{
 		{
-			description:       "return TopologyManagerOptions with PreferClosestNUMA set to true",
-			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
-			featureGateEnable: true,
+			description: "return TopologyManagerOptions with PreferClosestNUMA set to true",
+			featureGate: pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			expectedOptions: PolicyOptions{
 				PreferClosestNUMA: true,
 			},
@@ -59,65 +56,38 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			},
 		},
 		{
-			description: "fail to set option when TopologyManagerPolicyBetaOptions feature gate is not set",
-			featureGate: pkgfeatures.TopologyManagerPolicyBetaOptions,
-			policyOptions: map[string]string{
-				PreferClosestNUMANodes: "true",
-			},
-			expectedErr: fmt.Errorf("Topology Manager Policy Beta-level Options not enabled,"),
-		},
-		{
 			description: "return empty TopologyManagerOptions",
 		},
 		{
-			description:       "fail to parse options",
-			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
-			featureGateEnable: true,
+			description: "fail to parse options",
+			featureGate: pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			policyOptions: map[string]string{
 				PreferClosestNUMANodes: "not a boolean",
 			},
 			expectedErr: fmt.Errorf("bad value for option"),
 		},
 		{
-			description:       "test beta options success",
-			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
-			featureGateEnable: true,
+			description: "test beta options success",
+			featureGate: pkgfeatures.TopologyManagerPolicyBetaOptions,
 			policyOptions: map[string]string{
 				fancyBetaOption: "true",
 			},
 		},
 		{
-			description: "test beta options fail",
-			featureGate: pkgfeatures.TopologyManagerPolicyBetaOptions,
+			description: "test beta options success",
 			policyOptions: map[string]string{
 				fancyBetaOption: "true",
 			},
 			expectedErr: fmt.Errorf("Topology Manager Policy Beta-level Options not enabled,"),
 		},
-		{
-			description:       "test alpha options success",
-			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
-			featureGateEnable: true,
-			policyOptions: map[string]string{
-				fancyAlphaOption: "true",
-			},
-		},
-		{
-			description: "test alpha options fail",
-			policyOptions: map[string]string{
-				fancyAlphaOption: "true",
-			},
-			expectedErr: fmt.Errorf("Topology Manager Policy Alpha-level Options not enabled,"),
-		},
 	}
 
-	betaOptions.Insert(fancyBetaOption)
-	alphaOptions = sets.NewString(fancyAlphaOption)
+	betaOptions = sets.NewString(fancyBetaOption)
 
 	for _, tcase := range testCases {
 		t.Run(tcase.description, func(t *testing.T) {
 			if tcase.featureGate != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tcase.featureGate, tcase.featureGateEnable)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tcase.featureGate, true)()
 			}
 			opts, err := NewPolicyOptions(tcase.policyOptions)
 			if tcase.expectedErr != nil {
@@ -142,7 +112,7 @@ func TestPolicyDefaultsAvailable(t *testing.T) {
 		},
 		{
 			option:            PreferClosestNUMANodes,
-			expectedAvailable: true,
+			expectedAvailable: false,
 		},
 	}
 	for _, testCase := range testCases {
@@ -172,15 +142,15 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 		},
 		{
 			option:            PreferClosestNUMANodes,
-			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			featureGateEnable: true,
 			expectedAvailable: true,
 		},
 		{
 			option:            PreferClosestNUMANodes,
-			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
-			featureGateEnable: false,
-			expectedAvailable: true,
+			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
+			featureGateEnable: true,
+			expectedAvailable: false,
 		},
 	}
 	for _, testCase := range testCases {

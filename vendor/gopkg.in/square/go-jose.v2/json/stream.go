@@ -31,14 +31,9 @@ func NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{r: r}
 }
 
-// Deprecated: Use `SetNumberType` instead
 // UseNumber causes the Decoder to unmarshal a number into an interface{} as a
 // Number instead of as a float64.
-func (dec *Decoder) UseNumber() { dec.d.numberType = UnmarshalJSONNumber }
-
-// SetNumberType causes the Decoder to unmarshal a number into an interface{} as a
-// Number, float64 or int64 depending on `t` enum value.
-func (dec *Decoder) SetNumberType(t NumberUnmarshalType) { dec.d.numberType = t }
+func (dec *Decoder) UseNumber() { dec.d.useNumber = true }
 
 // Decode reads the next JSON-encoded value from its
 // input and stores it in the value pointed to by v.

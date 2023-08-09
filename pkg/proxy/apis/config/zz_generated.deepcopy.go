@@ -92,7 +92,6 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 	}
 	out.Winkernel = in.Winkernel
 	out.DetectLocal = in.DetectLocal
-	in.Logging.DeepCopyInto(&out.Logging)
 	return
 }
 

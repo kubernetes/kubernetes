@@ -25,23 +25,17 @@ import (
 
 // QueueSetDump is an instant dump of queue-set.
 type QueueSetDump struct {
-	Queues                     []QueueDump
-	QueuelessExecutingRequests []RequestDump
-	Waiting                    int
-	Executing                  int
-	SeatsInUse                 int
-	SeatsWaiting               int
-	Dispatched                 int
-	Rejected                   int
-	Timedout                   int
-	Cancelled                  int
+	Queues       []QueueDump
+	Waiting      int
+	Executing    int
+	SeatsInUse   int
+	SeatsWaiting int
 }
 
 // QueueDump is an instant dump of one queue in a queue-set.
 type QueueDump struct {
 	QueueSum          QueueSum
-	Requests          []RequestDump // just the waiting ones
-	RequestsExecuting []RequestDump
+	Requests          []RequestDump
 	NextDispatchR     string
 	ExecutingRequests int
 	SeatsInUse        int

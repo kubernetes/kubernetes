@@ -24,6 +24,7 @@ import (
 )
 
 // CopyDir copies the content of a folder
-func CopyDir(src string, dst string) ([]byte, error) {
-	return exec.Command("cp", "-r", src, dst).CombinedOutput()
+func CopyDir(src string, dst string) error {
+	cmd := exec.Command("cp", "-r", src, dst)
+	return cmd.Run()
 }

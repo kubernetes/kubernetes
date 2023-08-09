@@ -19,6 +19,7 @@ package simulator
 import (
 	"strings"
 
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -29,14 +30,17 @@ type SearchIndex struct {
 	mo.SearchIndex
 }
 
+func NewSearchIndex(ref types.ManagedObjectReference) object.Reference {
+	m := &SearchIndex{}
+	m.Self = ref
+	return m
+}
+
 func (s *SearchIndex) FindByDatastorePath(r *types.FindByDatastorePath) soap.HasFault {
 	res := &methods.FindByDatastorePathBody{Res: new(types.FindByDatastorePathResponse)}
 
-	Map.m.Lock()
-	defer Map.m.Unlock()
-
 	for ref, obj := range Map.objects {
-		vm, ok := asVirtualMachineMO(obj)
+		vm, ok := obj.(*VirtualMachine)
 		if !ok {
 			continue
 		}
@@ -124,13 +128,10 @@ func (s *SearchIndex) FindChild(req *types.FindChild) soap.HasFault {
 func (s *SearchIndex) FindByUuid(req *types.FindByUuid) soap.HasFault {
 	body := &methods.FindByUuidBody{Res: new(types.FindByUuidResponse)}
 
-	Map.m.Lock()
-	defer Map.m.Unlock()
-
 	if req.VmSearch {
 		// Find Virtual Machine using UUID
 		for ref, obj := range Map.objects {
-			vm, ok := asVirtualMachineMO(obj)
+			vm, ok := obj.(*VirtualMachine)
 			if !ok {
 				continue
 			}
@@ -149,7 +150,7 @@ func (s *SearchIndex) FindByUuid(req *types.FindByUuid) soap.HasFault {
 	} else {
 		// Find Host System using UUID
 		for ref, obj := range Map.objects {
-			host, ok := asHostSystemMO(obj)
+			host, ok := obj.(*HostSystem)
 			if !ok {
 				continue
 			}
@@ -183,13 +184,10 @@ func (s *SearchIndex) FindByDnsName(req *types.FindByDnsName) soap.HasFault {
 func (s *SearchIndex) FindAllByDnsName(req *types.FindAllByDnsName) soap.HasFault {
 	body := &methods.FindAllByDnsNameBody{Res: new(types.FindAllByDnsNameResponse)}
 
-	Map.m.Lock()
-	defer Map.m.Unlock()
-
 	if req.VmSearch {
 		// Find Virtual Machine using DNS name
 		for ref, obj := range Map.objects {
-			vm, ok := asVirtualMachineMO(obj)
+			vm, ok := obj.(*VirtualMachine)
 			if !ok {
 				continue
 			}
@@ -200,7 +198,7 @@ func (s *SearchIndex) FindAllByDnsName(req *types.FindAllByDnsName) soap.HasFaul
 	} else {
 		// Find Host System using DNS name
 		for ref, obj := range Map.objects {
-			host, ok := asHostSystemMO(obj)
+			host, ok := obj.(*HostSystem)
 			if !ok {
 				continue
 			}
@@ -235,13 +233,10 @@ func (s *SearchIndex) FindByIp(req *types.FindByIp) soap.HasFault {
 func (s *SearchIndex) FindAllByIp(req *types.FindAllByIp) soap.HasFault {
 	body := &methods.FindAllByIpBody{Res: new(types.FindAllByIpResponse)}
 
-	Map.m.Lock()
-	defer Map.m.Unlock()
-
 	if req.VmSearch {
 		// Find Virtual Machine using IP
 		for ref, obj := range Map.objects {
-			vm, ok := asVirtualMachineMO(obj)
+			vm, ok := obj.(*VirtualMachine)
 			if !ok {
 				continue
 			}
@@ -252,7 +247,7 @@ func (s *SearchIndex) FindAllByIp(req *types.FindAllByIp) soap.HasFault {
 	} else {
 		// Find Host System using IP
 		for ref, obj := range Map.objects {
-			host, ok := asHostSystemMO(obj)
+			host, ok := obj.(*HostSystem)
 			if !ok {
 				continue
 			}

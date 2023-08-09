@@ -22,8 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -40,7 +38,7 @@ import (
 var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
 	f := framework.NewDefaultFramework("csi-mock-volumes-attach")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSI attach test using mock driver", func() {
@@ -130,9 +128,8 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 
 			err = e2eevents.WaitTimeoutForEvent(ctx, m.cs, pod.Namespace, eventSelector, msg, f.Timeouts.PodStart)
 			if err != nil {
-				getPod := e2epod.Get(m.cs, pod)
-				gomega.Consistently(ctx, getPod).WithTimeout(10*time.Second).Should(e2epod.BeInPhase(v1.PodPending),
-					"Pod should not be in running status because attaching should failed")
+				podErr := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace, 10*time.Second)
+				framework.ExpectError(podErr, "Pod should not be in running status because attaching should failed")
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				framework.Logf("Attach should fail and the corresponding event should show up, error: %v", err)
 			}

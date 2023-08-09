@@ -29,7 +29,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/ktesting"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -221,13 +220,11 @@ func TestUpdatePodInCache(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           cache.New(ctx, ttl),
+				Cache:           cache.New(ttl, ctx.Done()),
 				SchedulingQueue: queue.NewTestQueue(ctx, nil),
-				logger:          logger,
 			}
 			sched.addPodToCache(tt.oldObj)
 			sched.updatePodInCache(tt.oldObj, tt.newObj)
@@ -433,8 +430,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
@@ -442,15 +438,12 @@ func TestAddAllEventHandlers(t *testing.T) {
 			testSched := Scheduler{
 				StopEverything:  ctx.Done(),
 				SchedulingQueue: schedulingQueue,
-				logger:          logger,
 			}
 
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 
-			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, tt.gvkMap); err != nil {
-				t.Fatalf("Add event handlers failed, error = %v", err)
-			}
+			addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, tt.gvkMap)
 
 			informerFactory.Start(testSched.StopEverything)
 			dynInformerFactory.Start(testSched.StopEverything)

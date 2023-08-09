@@ -5,7 +5,6 @@ package krusty
 
 import (
 	"fmt"
-	"log"
 
 	"sigs.k8s.io/kustomize/api/internal/builtins"
 	pLdr "sigs.k8s.io/kustomize/api/internal/plugins/loader"
@@ -17,7 +16,6 @@ import (
 	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
-	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/kustomize/kyaml/openapi"
 )
@@ -91,9 +89,11 @@ func (b *Kustomizer) Run(
 	if err != nil {
 		return nil, err
 	}
-	err = b.applySortOrder(m, kt)
-	if err != nil {
-		return nil, err
+	if b.options.DoLegacyResourceSort {
+		err = builtins.NewLegacyOrderTransformerPlugin().Transform(m)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if b.options.AddManagedbyLabel || utils.StringSliceContains(kt.Kustomization().BuildMetadata, types.ManagedByLabelOption) {
 		t := builtins.LabelTransformerPlugin{
@@ -112,52 +112,10 @@ func (b *Kustomizer) Run(
 	}
 	m.RemoveBuildAnnotations()
 	if !utils.StringSliceContains(kt.Kustomization().BuildMetadata, types.OriginAnnotations) {
-		err = m.RemoveOriginAnnotations()
-		if err != nil {
-			return nil, errors.WrapPrefixf(err, "failed to clean up origin tracking annotations")
-		}
+		m.RemoveOriginAnnotations()
 	}
 	if !utils.StringSliceContains(kt.Kustomization().BuildMetadata, types.TransformerAnnotations) {
-		err = m.RemoveTransformerAnnotations()
-		if err != nil {
-			return nil, errors.WrapPrefixf(err, "failed to clean up transformer annotations")
-		}
+		m.RemoveTransformerAnnotations()
 	}
 	return m, nil
-}
-
-func (b *Kustomizer) applySortOrder(m resmap.ResMap, kt *target.KustTarget) error {
-	// Sort order can be defined in two places:
-	// - (new) kustomization file
-	// - (old) CLI flag
-	//
-	// We want the kustomization file to take precedence over the CLI flag.
-	// Eventually, we may want to move away from having a CLI flag altogether:
-	// https://github.com/kubernetes-sigs/kustomize/issues/3947
-
-	// Case 1: Sort order set in kustomization file.
-	if kt.Kustomization().SortOptions != nil {
-		// If set in CLI flag too, warn the user.
-		if b.options.Reorder != ReorderOptionUnspecified {
-			log.Println("Warning: Sorting order is set both in 'kustomization.yaml'" +
-				" ('sortOptions') and in a CLI flag ('--reorder'). Using the" +
-				" kustomization file over the CLI flag.")
-		}
-		pl := &builtins.SortOrderTransformerPlugin{
-			SortOptions: kt.Kustomization().SortOptions,
-		}
-		err := pl.Transform(m)
-		if err != nil {
-			return errors.Wrap(err)
-		}
-	} else if b.options.Reorder == ReorderOptionLegacy || b.options.Reorder == ReorderOptionUnspecified {
-		// Case 2: Sort order set in CLI flag only or not at all.
-		pl := &builtins.SortOrderTransformerPlugin{
-			SortOptions: &types.SortOptions{
-				Order: types.LegacySortOrder,
-			},
-		}
-		return errors.Wrap(pl.Transform(m))
-	}
-	return nil
 }

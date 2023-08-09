@@ -28,7 +28,6 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -52,7 +51,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -82,7 +80,7 @@ const (
 var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	var certCtx *certContext
 	f := framework.NewDefaultFramework("webhook")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	servicePort := int32(8443)
 	containerPort := int32(8444)
 
@@ -374,17 +372,17 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		policyIgnore := admissionregistrationv1.Ignore
 
 		ginkgo.By("Setting timeout (1s) shorter than webhook latency (5s)")
-		slowWebhookCleanup := registerSlowWebhook(ctx, f, markersNamespaceName, f.UniqueName, certCtx, &policyFail, pointer.Int32(1), servicePort)
+		slowWebhookCleanup := registerSlowWebhook(ctx, f, markersNamespaceName, f.UniqueName, certCtx, &policyFail, pointer.Int32Ptr(1), servicePort)
 		testSlowWebhookTimeoutFailEarly(ctx, f)
 		slowWebhookCleanup(ctx)
 
 		ginkgo.By("Having no error when timeout is shorter than webhook latency and failure policy is ignore")
-		slowWebhookCleanup = registerSlowWebhook(ctx, f, markersNamespaceName, f.UniqueName, certCtx, &policyIgnore, pointer.Int32(1), servicePort)
+		slowWebhookCleanup = registerSlowWebhook(ctx, f, markersNamespaceName, f.UniqueName, certCtx, &policyIgnore, pointer.Int32Ptr(1), servicePort)
 		testSlowWebhookTimeoutNoError(ctx, f)
 		slowWebhookCleanup(ctx)
 
 		ginkgo.By("Having no error when timeout is longer than webhook latency")
-		slowWebhookCleanup = registerSlowWebhook(ctx, f, markersNamespaceName, f.UniqueName, certCtx, &policyFail, pointer.Int32(10), servicePort)
+		slowWebhookCleanup = registerSlowWebhook(ctx, f, markersNamespaceName, f.UniqueName, certCtx, &policyFail, pointer.Int32Ptr(10), servicePort)
 		testSlowWebhookTimeoutNoError(ctx, f)
 		slowWebhookCleanup(ctx)
 
@@ -705,368 +703,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		})
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s this is not mutated", f.Namespace.Name)
 	})
-
-	/*
-		Release: v1.28
-		Testname: Validating Admission webhook, create and update validating webhook configuration with matchConditions
-		Description: Register a validating webhook configuration. Verify that the match conditions field are
-		properly stored in the api-server.  Update the validating webhook configuration and retrieve it; the
-		retrieved object must contain the newly update matchConditions fields.
-	*/
-	ginkgo.It("should be able to create and update validating webhook configurations with match conditions", func(ctx context.Context) {
-		initalMatchConditions := []admissionregistrationv1.MatchCondition{
-			{
-				Name:       "expression-1",
-				Expression: "object.metadata.namespace == 'production'",
-			},
-		}
-
-		ginkgo.By("creating a validating webhook with match conditions")
-		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, initalMatchConditions)
-
-		_, err := createValidatingWebhookConfiguration(ctx, f, validatingWebhookConfiguration)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("verifying the validating webhook match conditions")
-		validatingWebhookConfiguration, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(validatingWebhookConfiguration.Webhooks[0].MatchConditions, initalMatchConditions, "verifying that match conditions are created")
-		defer func() {
-			err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, validatingWebhookConfiguration.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "deleting mutating webhook configuration")
-		}()
-
-		ginkgo.By("updating the validating webhook match conditions")
-		updatedMatchConditions := []admissionregistrationv1.MatchCondition{
-			{
-				Name:       "expression-1",
-				Expression: "object.metadata.namespace == 'production'",
-			},
-			{
-				Name:       "expression-2",
-				Expression: "object.metadata.namespace == 'staging'",
-			},
-		}
-		validatingWebhookConfiguration.Webhooks[0].MatchConditions = updatedMatchConditions
-		_, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, validatingWebhookConfiguration, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("verifying the validating webhook match conditions")
-		validatingWebhookConfiguration, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(validatingWebhookConfiguration.Webhooks[0].MatchConditions, updatedMatchConditions, "verifying that match conditions are updated")
-	})
-
-	/*
-		Release: v1.28
-		Testname: Mutating Admission webhook, create and update mutating webhook configuration with matchConditions
-		Description: Register a mutating webhook configuration. Verify that the match conditions field are
-		properly stored in the api-server.  Update the mutating webhook configuration and retrieve it; the
-		retrieved object must contain the newly update matchConditions fields.
-	*/
-	ginkgo.It("should be able to create and update mutating webhook configurations with match conditions", func(ctx context.Context) {
-		initalMatchConditions := []admissionregistrationv1.MatchCondition{
-			{
-				Name:       "expression-1",
-				Expression: "object.metadata.namespace == 'production'",
-			},
-		}
-
-		ginkgo.By("creating a mutating webhook with match conditions")
-		mutatingWebhookConfiguration := newMutatingWebhookWithMatchConditions(f, servicePort, certCtx, initalMatchConditions)
-
-		_, err := createMutatingWebhookConfiguration(ctx, f, mutatingWebhookConfiguration)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("verifying the mutating webhook match conditions")
-		mutatingWebhookConfiguration, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(mutatingWebhookConfiguration.Webhooks[0].MatchConditions, initalMatchConditions, "verifying that match conditions are created")
-		defer func() {
-			err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, mutatingWebhookConfiguration.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "deleting mutating webhook configuration")
-		}()
-
-		ginkgo.By("updating the mutating webhook match conditions")
-		updatedMatchConditions := []admissionregistrationv1.MatchCondition{
-			{
-				Name:       "expression-1",
-				Expression: "object.metadata.namespace == 'production'",
-			},
-			{
-				Name:       "expression-2",
-				Expression: "object.metadata.namespace == 'staging'",
-			},
-		}
-		mutatingWebhookConfiguration.Webhooks[0].MatchConditions = updatedMatchConditions
-		_, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(ctx, mutatingWebhookConfiguration, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("verifying the mutating webhook match conditions")
-		mutatingWebhookConfiguration, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(mutatingWebhookConfiguration.Webhooks[0].MatchConditions, updatedMatchConditions, "verifying that match conditions are updated")
-	})
-
-	/*
-		Release: v1.28
-		Testname: Validing Admission webhook, reject validating webhook configurations with invalid matchConditions
-		Description: Creates a validating webhook configuration with an invalid CEL expression in it's
-		matchConditions field. The api-server server should reject the create request with a "compilation
-		failed" error message.
-	*/
-	ginkgo.It("should reject validating webhook configurations with invalid match conditions", func(ctx context.Context) {
-		initalMatchConditions := []admissionregistrationv1.MatchCondition{
-			{
-				Name:       "invalid-expression-1",
-				Expression: "... [] bad expression",
-			},
-		}
-
-		ginkgo.By("creating a validating webhook with match conditions")
-		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, initalMatchConditions)
-
-		_, err := createValidatingWebhookConfiguration(ctx, f, validatingWebhookConfiguration)
-		framework.ExpectError(err, "create validatingwebhookconfiguration should have been denied by the api-server")
-		expectedErrMsg := "compilation failed"
-		gomega.Expect(strings.Contains(err.Error(), expectedErrMsg)).To(gomega.BeTrue())
-	})
-
-	/*
-		Release: v1.28
-		Testname: Mutating Admission webhook, reject mutating webhook configurations with invalid matchConditions
-		Description: Creates a mutating webhook configuration with an invalid CEL expression in it's
-		matchConditions field. The api-server server should reject the create request with a "compilation
-		failed" error message.
-	*/
-	ginkgo.It("should reject mutating webhook configurations with invalid match conditions", func(ctx context.Context) {
-		initalMatchConditions := []admissionregistrationv1.MatchCondition{
-			{
-				Name:       "invalid-expression-1",
-				Expression: "... [] bad expression",
-			},
-		}
-
-		ginkgo.By("creating a mutating webhook with match conditions")
-		mutatingWebhookConfiguration := newMutatingWebhookWithMatchConditions(f, servicePort, certCtx, initalMatchConditions)
-
-		_, err := createMutatingWebhookConfiguration(ctx, f, mutatingWebhookConfiguration)
-		framework.ExpectError(err, "create mutatingwebhookconfiguration should have been denied by the api-server")
-		expectedErrMsg := "compilation failed"
-		gomega.Expect(strings.Contains(err.Error(), expectedErrMsg)).To(gomega.BeTrue())
-	})
-
-	/*
-		Release: v1.28
-		Testname: Validating Admission webhook, validating webhook exclude leases using match conditions field.
-		Description: Create a validating webhook configuration with matchConditions field that
-		will reject all resources except the coordination.k8s.io/lease ones. Try to create pods
-		until the webhook is ready and rejecting the pods with "denied" error message. Create
-		a Lease object and validate that it bypasses the webhook. Create a configMap and validate
-		that it's rejected by the webhook.
-	*/
-	ginkgo.It("should reject everything except leases", func(ctx context.Context) {
-		excludeLeasesMatchConditions := []admissionregistrationv1.MatchCondition{
-			{
-				Name:       "exclude-leases",
-				Expression: `!(request.resource.group == "coordination.k8s.io" && request.resource.resource == "leases")`,
-			},
-		}
-
-		ginkgo.By("creating a validating webhook with match conditions")
-		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, excludeLeasesMatchConditions)
-		_, err := createValidatingWebhookConfiguration(ctx, f, validatingWebhookConfiguration)
-		framework.ExpectNoError(err, "registering webhook config %s", f.UniqueName)
-		defer func() {
-			err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, validatingWebhookConfiguration.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "Deleting mutating webhook configuration")
-		}()
-
-		err = waitWebhookConfigurationReady(ctx, f, f.Namespace.Name)
-		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-
-		ginkgo.By("validate that the validating webhook configuration does not reject leases")
-		_, err = client.CoordinationV1().Leases(f.Namespace.Name).Create(ctx, &coordinationv1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "lease" + f.UniqueName,
-			},
-			Spec: coordinationv1.LeaseSpec{},
-		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "creating coordination.k8s.io/lease object")
-
-		ginkgo.By("validate that the validating webhook configuration does reject configMaps")
-		_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "cm" + f.UniqueName,
-			},
-			Data: map[string]string{
-				"reject": "this",
-			},
-		}, metav1.CreateOptions{})
-		framework.ExpectError(err, "creating configmap object")
-		expectedErrMsg := "denied the request: this webhook denies all requests"
-		gomega.Expect(strings.Contains(err.Error(), expectedErrMsg)).To(gomega.BeTrue())
-	})
-
-	/*
-		Release: v1.28
-		Testname: Mutating Admission webhook, mutating webhook excluding object with specific name
-		Description: Create a mutating webhook configuration with matchConditions field that
-		will reject all resources except ones with a specific name 'skip-me'. Create
-		a configMap with the name 'skip-me' and verify that it's mutated. Create a
-		configMap with a different name than 'skip-me' and verify that it's mustated.
-	*/
-	ginkgo.It("should mutate everything except 'skip-me' configmaps", func(ctx context.Context) {
-		skipMeMatchConditions := []admissionregistrationv1.MatchCondition{
-			{
-				Name:       "skip-me",
-				Expression: "object.metadata.name != 'skip-me'",
-			},
-		}
-
-		ginkgo.By("creating a mutating webhook with match conditions")
-		namespace := f.Namespace.Name
-
-		mutatingWebhook1 := newMutateConfigMapWebhookFixture(f, certCtx, 1, servicePort)
-		mutatingWebhook1.MatchConditions = skipMeMatchConditions
-		created, err := createMutatingWebhookConfiguration(ctx, f, &admissionregistrationv1.MutatingWebhookConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: f.UniqueName,
-			},
-			Webhooks: []admissionregistrationv1.MutatingWebhook{
-				mutatingWebhook1,
-				// Register a webhook that can be probed by marker requests to detect when the configuration is ready.
-				newMutatingIsReadyWebhookFixture(f, certCtx, servicePort),
-			},
-		})
-		framework.ExpectNoError(err, "registering mutating webhook config %s with namespace %s", f.UniqueName, namespace)
-		defer func() {
-			err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, created.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "deleting mutating webhook configuration")
-		}()
-
-		err = waitWebhookConfigurationReady(ctx, f, markersNamespaceName)
-		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-		ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete), f.UniqueName, metav1.DeleteOptions{})
-
-		// ensure backend is ready before proceeding
-		err = waitWebhookConfigurationReady(ctx, f, markersNamespaceName)
-		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-
-		ginkgo.By("create the configmap with a random name")
-
-		cm := namedToBeMutatedConfigMap(string(uuid.NewUUID()), f)
-		mutatedCM, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "creating configMap object")
-
-		ginkgo.By("verify the configmap is mutated")
-		expectedConfigMapData := map[string]string{
-			"mutation-start":   "yes",
-			"mutation-stage-1": "yes",
-		}
-		gomega.Expect(reflect.DeepEqual(expectedConfigMapData, mutatedCM.Data)).To(gomega.BeTrue())
-
-		ginkgo.By("create the configmap with 'skip-me' name")
-
-		cm = namedToBeMutatedConfigMap("skip-me", f)
-		skippedCM, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "creating configMap object")
-		expectedConfigMapData = map[string]string{
-			"mutation-start": "yes",
-		}
-		gomega.Expect(reflect.DeepEqual(expectedConfigMapData, skippedCM.Data)).To(gomega.BeTrue())
-	})
 })
-
-func newValidatingWebhookWithMatchConditions(
-	f *framework.Framework,
-	servicePort int32,
-	certCtx *certContext,
-	matchConditions []admissionregistrationv1.MatchCondition,
-) *admissionregistrationv1.ValidatingWebhookConfiguration {
-	sideEffects := admissionregistrationv1.SideEffectClassNone
-	equivalent := admissionregistrationv1.Equivalent
-	return &admissionregistrationv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: f.UniqueName,
-		},
-		Webhooks: []admissionregistrationv1.ValidatingWebhook{
-			{
-				Name: "validation-webhook-with-match-conditions.k8s.io",
-				Rules: []admissionregistrationv1.RuleWithOperations{{
-					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
-					Rule: admissionregistrationv1.Rule{
-						APIGroups:   []string{""},
-						APIVersions: []string{"v1"},
-						Resources:   []string{"*"},
-					},
-				}},
-				ClientConfig: admissionregistrationv1.WebhookClientConfig{
-					Service: &admissionregistrationv1.ServiceReference{
-						Namespace: f.Namespace.Name,
-						Name:      serviceName,
-						Path:      strPtr("/always-deny"),
-						Port:      pointer.Int32(servicePort),
-					},
-					CABundle: certCtx.signingCert,
-				},
-				SideEffects:             &sideEffects,
-				MatchPolicy:             &equivalent,
-				AdmissionReviewVersions: []string{"v1"},
-				// Scope the webhook to just the markers namespace
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{f.UniqueName: "true"},
-				},
-				MatchConditions: matchConditions,
-			},
-			newValidatingIsReadyWebhookFixture(f, certCtx, servicePort),
-		},
-	}
-}
-
-func newMutatingWebhookWithMatchConditions(
-	f *framework.Framework,
-	servicePort int32,
-	certCtx *certContext,
-	matchConditions []admissionregistrationv1.MatchCondition,
-) *admissionregistrationv1.MutatingWebhookConfiguration {
-	sideEffects := admissionregistrationv1.SideEffectClassNone
-	return &admissionregistrationv1.MutatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: f.UniqueName,
-		},
-		Webhooks: []admissionregistrationv1.MutatingWebhook{
-			{
-				Name: "adding-configmap-data.k8s.io",
-				Rules: []admissionregistrationv1.RuleWithOperations{{
-					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
-					Rule: admissionregistrationv1.Rule{
-						APIGroups:   []string{""},
-						APIVersions: []string{"v1"},
-						Resources:   []string{"configmaps"},
-					},
-				}},
-				ClientConfig: admissionregistrationv1.WebhookClientConfig{
-					Service: &admissionregistrationv1.ServiceReference{
-						Namespace: f.Namespace.Name,
-						Name:      serviceName,
-						Path:      strPtr("/mutating-configmaps"),
-						Port:      pointer.Int32(servicePort),
-					},
-					CABundle: certCtx.signingCert,
-				},
-				SideEffects:             &sideEffects,
-				AdmissionReviewVersions: []string{"v1", "v1beta1"},
-				// Scope the webhook to just this namespace
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{f.UniqueName: "true"},
-				},
-				MatchConditions: matchConditions,
-			},
-			newMutatingIsReadyWebhookFixture(f, certCtx, servicePort),
-		},
-	}
-}
 
 func createAuthReaderRoleBinding(ctx context.Context, f *framework.Framework, namespace string) {
 	ginkgo.By("Create role binding to let webhook read extension-apiserver-authentication")
@@ -1270,7 +907,7 @@ func registerWebhookForAttachingPod(ctx context.Context, f *framework.Framework,
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/pods/attach"),
-						Port:      pointer.Int32(servicePort),
+						Port:      pointer.Int32Ptr(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1360,7 +997,7 @@ func registerMutatingWebhookForPod(ctx context.Context, f *framework.Framework, 
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/mutating-pods"),
-						Port:      pointer.Int32(servicePort),
+						Port:      pointer.Int32Ptr(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1549,7 +1186,7 @@ func failingWebhook(namespace, name string, servicePort int32) admissionregistra
 				Namespace: namespace,
 				Name:      serviceName,
 				Path:      strPtr("/configmaps"),
-				Port:      pointer.Int32(servicePort),
+				Port:      pointer.Int32Ptr(servicePort),
 			},
 			// Without CA bundle, the call to webhook always fails
 			CABundle: nil,
@@ -1656,7 +1293,7 @@ func registerValidatingWebhookForWebhookConfigurations(ctx context.Context, f *f
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/always-deny"),
-						Port:      pointer.Int32(servicePort),
+						Port:      pointer.Int32Ptr(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1714,7 +1351,7 @@ func registerMutatingWebhookForWebhookConfigurations(ctx context.Context, f *fra
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/add-label"),
-						Port:      pointer.Int32(servicePort),
+						Port:      pointer.Int32Ptr(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1774,7 +1411,7 @@ func testWebhooksForWebhookConfigurations(ctx context.Context, f *framework.Fram
 						// but because the failure policy is ignore, it will
 						// have no effect on admission requests.
 						Path: strPtr(""),
-						Port: pointer.Int32(servicePort),
+						Port: pointer.Int32Ptr(servicePort),
 					},
 					CABundle: nil,
 				},
@@ -1830,7 +1467,7 @@ func testWebhooksForWebhookConfigurations(ctx context.Context, f *framework.Fram
 						// but because the failure policy is ignore, it will
 						// have no effect on admission requests.
 						Path: strPtr(""),
-						Port: pointer.Int32(servicePort),
+						Port: pointer.Int32Ptr(servicePort),
 					},
 					CABundle: nil,
 				},
@@ -2026,7 +1663,7 @@ func registerWebhookForCustomResource(ctx context.Context, f *framework.Framewor
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/custom-resource"),
-						Port:      pointer.Int32(servicePort),
+						Port:      pointer.Int32Ptr(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -2075,7 +1712,7 @@ func registerMutatingWebhookForCustomResource(ctx context.Context, f *framework.
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/mutating-custom-resource"),
-						Port:      pointer.Int32(servicePort),
+						Port:      pointer.Int32Ptr(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -2101,7 +1738,7 @@ func registerMutatingWebhookForCustomResource(ctx context.Context, f *framework.
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/mutating-custom-resource"),
-						Port:      pointer.Int32(servicePort),
+						Port:      pointer.Int32Ptr(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -2332,7 +1969,7 @@ func registerValidatingWebhookForCRD(ctx context.Context, f *framework.Framework
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/crd"),
-						Port:      pointer.Int32(servicePort),
+						Port:      pointer.Int32Ptr(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -2457,7 +2094,7 @@ func registerSlowWebhook(ctx context.Context, f *framework.Framework, markersNam
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/always-allow-delay-5s"),
-						Port:      pointer.Int32(servicePort),
+						Port:      pointer.Int32Ptr(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -2606,7 +2243,7 @@ func newDenyPodWebhookFixture(f *framework.Framework, certCtx *certContext, serv
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/pods"),
-				Port:      pointer.Int32(servicePort),
+				Port:      pointer.Int32Ptr(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},
@@ -2647,7 +2284,7 @@ func newDenyConfigMapWebhookFixture(f *framework.Framework, certCtx *certContext
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/configmaps"),
-				Port:      pointer.Int32(servicePort),
+				Port:      pointer.Int32Ptr(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},
@@ -2673,7 +2310,7 @@ func newMutateConfigMapWebhookFixture(f *framework.Framework, certCtx *certConte
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/mutating-configmaps"),
-				Port:      pointer.Int32(servicePort),
+				Port:      pointer.Int32Ptr(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},
@@ -2747,7 +2384,7 @@ func newValidatingIsReadyWebhookFixture(f *framework.Framework, certCtx *certCon
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/always-deny"),
-				Port:      pointer.Int32(servicePort),
+				Port:      pointer.Int32Ptr(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},
@@ -2786,7 +2423,7 @@ func newMutatingIsReadyWebhookFixture(f *framework.Framework, certCtx *certConte
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/always-deny"),
-				Port:      pointer.Int32(servicePort),
+				Port:      pointer.Int32Ptr(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},

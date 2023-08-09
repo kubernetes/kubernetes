@@ -1,0 +1,19 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "name",
+    "labels": {
+      "name": "redis-master"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "master",
+        "image": "gcr.io/fake_project/fake_image:fake_tag",
+        "args": "this is a bad command"
+      }
+    ]
+  }
+}

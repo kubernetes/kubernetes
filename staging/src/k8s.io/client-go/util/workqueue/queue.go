@@ -33,60 +33,17 @@ type Interface interface {
 	ShuttingDown() bool
 }
 
-// QueueConfig specifies optional configurations to customize an Interface.
-type QueueConfig struct {
-	// Name for the queue. If unnamed, the metrics will not be registered.
-	Name string
-
-	// MetricsProvider optionally allows specifying a metrics provider to use for the queue
-	// instead of the global provider.
-	MetricsProvider MetricsProvider
-
-	// Clock ability to inject real or fake clock for testing purposes.
-	Clock clock.WithTicker
-}
-
 // New constructs a new work queue (see the package comment).
 func New() *Type {
-	return NewWithConfig(QueueConfig{
-		Name: "",
-	})
+	return NewNamed("")
 }
 
-// NewWithConfig constructs a new workqueue with ability to
-// customize different properties.
-func NewWithConfig(config QueueConfig) *Type {
-	return newQueueWithConfig(config, defaultUnfinishedWorkUpdatePeriod)
-}
-
-// NewNamed creates a new named queue.
-// Deprecated: Use NewWithConfig instead.
 func NewNamed(name string) *Type {
-	return NewWithConfig(QueueConfig{
-		Name: name,
-	})
-}
-
-// newQueueWithConfig constructs a new named workqueue
-// with the ability to customize different properties for testing purposes
-func newQueueWithConfig(config QueueConfig, updatePeriod time.Duration) *Type {
-	var metricsFactory *queueMetricsFactory
-	if config.MetricsProvider != nil {
-		metricsFactory = &queueMetricsFactory{
-			metricsProvider: config.MetricsProvider,
-		}
-	} else {
-		metricsFactory = &globalMetricsFactory
-	}
-
-	if config.Clock == nil {
-		config.Clock = clock.RealClock{}
-	}
-
+	rc := clock.RealClock{}
 	return newQueue(
-		config.Clock,
-		metricsFactory.newQueueMetrics(config.Name, config.Clock),
-		updatePeriod,
+		rc,
+		globalMetricsFactory.newQueueMetrics(name, rc),
+		defaultUnfinishedWorkUpdatePeriod,
 	)
 }
 

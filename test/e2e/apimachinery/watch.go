@@ -48,7 +48,7 @@ const (
 
 var _ = SIGDescribe("Watchers", func() {
 	f := framework.NewDefaultFramework("watch")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 		    Release: v1.11

@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,10 +40,6 @@ type NamespaceSelectorProvider interface {
 type Matcher struct {
 	NamespaceLister corelisters.NamespaceLister
 	Client          clientset.Interface
-}
-
-func (m *Matcher) GetNamespace(name string) (*v1.Namespace, error) {
-	return m.NamespaceLister.Get(name)
 }
 
 // Validate checks if the Matcher has a NamespaceLister and Client.
@@ -122,7 +116,7 @@ func (m *Matcher) MatchNamespaceSelector(p NamespaceSelectorProvider, attr admis
 		if !ok {
 			return false, apierrors.NewInternalError(err)
 		}
-		return false, &apierrors.StatusError{ErrStatus: status.Status()}
+		return false, &apierrors.StatusError{status.Status()}
 	}
 	if err != nil {
 		return false, apierrors.NewInternalError(err)

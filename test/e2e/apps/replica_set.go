@@ -101,7 +101,7 @@ func newPodQuota(name, number string) *v1.ResourceQuota {
 
 var _ = SIGDescribe("ReplicaSet", func() {
 	f := framework.NewDefaultFramework("replicaset")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -210,9 +210,9 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 		if err != nil {
 			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 			if getErr == nil {
-				err = fmt.Errorf("pod %q never run (phase: %s, conditions: %+v): %w", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
+				err = fmt.Errorf("pod %q never run (phase: %s, conditions: %+v): %v", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
 			} else {
-				err = fmt.Errorf("pod %q never run: %w", pod.Name, err)
+				err = fmt.Errorf("pod %q never run: %v", pod.Name, err)
 			}
 		}
 		framework.ExpectNoError(err)
@@ -225,7 +225,13 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
-	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, true, 2*time.Minute, pods))
+	retryTimeout := 2 * time.Minute
+	retryInterval := 5 * time.Second
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+	err = wait.PollWithContext(ctx, retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
+	if err != nil {
+		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
+	}
 }
 
 // 1. Create a quota restricting pods in the current namespace to 2.
@@ -515,7 +521,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 			"replicas": rsPatchReplicas,
 			"template": map[string]interface{}{
 				"spec": map[string]interface{}{
-					"terminationGracePeriodSeconds": &zero,
+					"TerminationGracePeriodSeconds": &zero,
 					"containers": [1]map[string]interface{}{{
 						"name":  rsName,
 						"image": rsPatchImage,
@@ -536,8 +542,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 				rset.ObjectMeta.Labels["test-rs"] == "patched" &&
 				rset.Status.ReadyReplicas == rsPatchReplicas &&
 				rset.Status.AvailableReplicas == rsPatchReplicas &&
-				rset.Spec.Template.Spec.Containers[0].Image == rsPatchImage &&
-				*rset.Spec.Template.Spec.TerminationGracePeriodSeconds == zero
+				rset.Spec.Template.Spec.Containers[0].Image == rsPatchImage
 			if !found {
 				framework.Logf("observed ReplicaSet %v in namespace %v with ReadyReplicas %v, AvailableReplicas %v", rset.ObjectMeta.Name, rset.ObjectMeta.Namespace, rset.Status.ReadyReplicas,
 					rset.Status.AvailableReplicas)

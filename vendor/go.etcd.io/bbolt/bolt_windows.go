@@ -6,9 +6,39 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
-
-	"golang.org/x/sys/windows"
 )
+
+// LockFileEx code derived from golang build filemutex_windows.go @ v1.5.1
+var (
+	modkernel32      = syscall.NewLazyDLL("kernel32.dll")
+	procLockFileEx   = modkernel32.NewProc("LockFileEx")
+	procUnlockFileEx = modkernel32.NewProc("UnlockFileEx")
+)
+
+const (
+	// see https://msdn.microsoft.com/en-us/library/windows/desktop/aa365203(v=vs.85).aspx
+	flagLockExclusive       = 2
+	flagLockFailImmediately = 1
+
+	// see https://msdn.microsoft.com/en-us/library/windows/desktop/ms681382(v=vs.85).aspx
+	errLockViolation syscall.Errno = 0x21
+)
+
+func lockFileEx(h syscall.Handle, flags, reserved, locklow, lockhigh uint32, ol *syscall.Overlapped) (err error) {
+	r, _, err := procLockFileEx.Call(uintptr(h), uintptr(flags), uintptr(reserved), uintptr(locklow), uintptr(lockhigh), uintptr(unsafe.Pointer(ol)))
+	if r == 0 {
+		return err
+	}
+	return nil
+}
+
+func unlockFileEx(h syscall.Handle, reserved, locklow, lockhigh uint32, ol *syscall.Overlapped) (err error) {
+	r, _, err := procUnlockFileEx.Call(uintptr(h), uintptr(reserved), uintptr(locklow), uintptr(lockhigh), uintptr(unsafe.Pointer(ol)), 0)
+	if r == 0 {
+		return err
+	}
+	return nil
+}
 
 // fdatasync flushes written data to a file descriptor.
 func fdatasync(db *DB) error {
@@ -21,22 +51,22 @@ func flock(db *DB, exclusive bool, timeout time.Duration) error {
 	if timeout != 0 {
 		t = time.Now()
 	}
-	var flags uint32 = windows.LOCKFILE_FAIL_IMMEDIATELY
+	var flag uint32 = flagLockFailImmediately
 	if exclusive {
-		flags |= windows.LOCKFILE_EXCLUSIVE_LOCK
+		flag |= flagLockExclusive
 	}
 	for {
 		// Fix for https://github.com/etcd-io/bbolt/issues/121. Use byte-range
 		// -1..0 as the lock on the database file.
 		var m1 uint32 = (1 << 32) - 1 // -1 in a uint32
-		err := windows.LockFileEx(windows.Handle(db.file.Fd()), flags, 0, 1, 0, &windows.Overlapped{
+		err := lockFileEx(syscall.Handle(db.file.Fd()), flag, 0, 1, 0, &syscall.Overlapped{
 			Offset:     m1,
 			OffsetHigh: m1,
 		})
 
 		if err == nil {
 			return nil
-		} else if err != windows.ERROR_LOCK_VIOLATION {
+		} else if err != errLockViolation {
 			return err
 		}
 
@@ -53,37 +83,34 @@ func flock(db *DB, exclusive bool, timeout time.Duration) error {
 // funlock releases an advisory lock on a file descriptor.
 func funlock(db *DB) error {
 	var m1 uint32 = (1 << 32) - 1 // -1 in a uint32
-	return windows.UnlockFileEx(windows.Handle(db.file.Fd()), 0, 1, 0, &windows.Overlapped{
+	err := unlockFileEx(syscall.Handle(db.file.Fd()), 0, 1, 0, &syscall.Overlapped{
 		Offset:     m1,
 		OffsetHigh: m1,
 	})
+	return err
 }
 
 // mmap memory maps a DB's data file.
 // Based on: https://github.com/edsrzf/mmap-go
 func mmap(db *DB, sz int) error {
-	var sizelo, sizehi uint32
-
 	if !db.readOnly {
 		// Truncate the database to the size of the mmap.
 		if err := db.file.Truncate(int64(sz)); err != nil {
 			return fmt.Errorf("truncate: %s", err)
 		}
-		sizehi = uint32(sz >> 32)
-		sizelo = uint32(sz) & 0xffffffff
 	}
 
 	// Open a file mapping handle.
-	h, errno := syscall.CreateFileMapping(syscall.Handle(db.file.Fd()), nil, syscall.PAGE_READONLY, sizehi, sizelo, nil)
+	sizelo := uint32(sz >> 32)
+	sizehi := uint32(sz) & 0xffffffff
+	h, errno := syscall.CreateFileMapping(syscall.Handle(db.file.Fd()), nil, syscall.PAGE_READONLY, sizelo, sizehi, nil)
 	if h == 0 {
 		return os.NewSyscallError("CreateFileMapping", errno)
 	}
 
 	// Create the memory map.
-	addr, errno := syscall.MapViewOfFile(h, syscall.FILE_MAP_READ, 0, 0, 0)
+	addr, errno := syscall.MapViewOfFile(h, syscall.FILE_MAP_READ, 0, 0, uintptr(sz))
 	if addr == 0 {
-		// Do our best and report error returned from MapViewOfFile.
-		_ = syscall.CloseHandle(h)
 		return os.NewSyscallError("MapViewOfFile", errno)
 	}
 
@@ -107,11 +134,8 @@ func munmap(db *DB) error {
 	}
 
 	addr := (uintptr)(unsafe.Pointer(&db.data[0]))
-	var err1 error
 	if err := syscall.UnmapViewOfFile(addr); err != nil {
-		err1 = os.NewSyscallError("UnmapViewOfFile", err)
+		return os.NewSyscallError("UnmapViewOfFile", err)
 	}
-	db.data = nil
-	db.datasz = 0
-	return err1
+	return nil
 }

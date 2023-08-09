@@ -55,7 +55,7 @@ var _ = Describe("proxy addon", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("proxy")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
@@ -100,7 +100,7 @@ var _ = Describe("proxy addon", func() {
 		ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 			ds := GetDaemonSet(f.ClientSet, kubeSystemNamespace, kubeProxyDaemonSetName)
 
-			gomega.Expect(ds.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(kubeProxyServiceAccountName))
+			framework.ExpectEqual(ds.Spec.Template.Spec.ServiceAccountName, kubeProxyServiceAccountName)
 		})
 	})
 })

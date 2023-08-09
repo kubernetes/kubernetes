@@ -169,20 +169,14 @@ type ActualStateOfWorld interface {
 	GetAttachedVolumes() []AttachedVolume
 
 	// SyncReconstructedVolume check the volume.outerVolumeSpecName in asw and
-	// the one populated from dsw, if they do not match, update this field from the value from dsw.
+	// the one populated from dsw , if they do not match, update this field from the value from dsw.
 	SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string)
-
-	// Add the specified volume to ASW as uncertainly attached.
-	AddAttachUncertainReconstructedVolume(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
 	// UpdateReconstructedDevicePath updates devicePath of a reconstructed volume
 	// from Node.Status.VolumesAttached. The ASW is updated only when the volume is still
 	// uncertain. If the volume got mounted in the meantime, its devicePath must have
 	// been fixed by such an update.
 	UpdateReconstructedDevicePath(volumeName v1.UniqueVolumeName, devicePath string)
-
-	// UpdateReconstructedVolumeAttachability updates volume attachability from the API server.
-	UpdateReconstructedVolumeAttachability(volumeName v1.UniqueVolumeName, volumeAttachable bool)
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -257,14 +251,6 @@ type actualStateOfWorld struct {
 	sync.RWMutex
 }
 
-type volumeAttachability string
-
-const (
-	volumeAttachabilityTrue      volumeAttachability = "True"
-	volumeAttachabilityFalse     volumeAttachability = "False"
-	volumeAttachabilityUncertain volumeAttachability = "Uncertain"
-)
-
 // attachedVolume represents a volume the kubelet volume manager believes to be
 // successfully attached to a node it is managing. Volume types that do not
 // implement an attacher are assumed to be in this state.
@@ -294,7 +280,7 @@ type attachedVolume struct {
 
 	// pluginIsAttachable indicates the volume plugin used to attach and mount
 	// this volume implements the volume.Attacher interface
-	pluginIsAttachable volumeAttachability
+	pluginIsAttachable bool
 
 	// deviceMountState stores information that tells us if device is mounted
 	// globally or not
@@ -373,25 +359,12 @@ type mountedPod struct {
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
-	logger klog.Logger,
 	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName, devicePath string) error {
-
-	pluginIsAttachable := volumeAttachabilityFalse
-	if attachablePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec); err == nil && attachablePlugin != nil {
-		pluginIsAttachable = volumeAttachabilityTrue
-	}
-
-	return asw.addVolume(volumeName, volumeSpec, devicePath, pluginIsAttachable)
-}
-
-func (asw *actualStateOfWorld) AddAttachUncertainReconstructedVolume(
-	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName, devicePath string) error {
-
-	return asw.addVolume(volumeName, volumeSpec, devicePath, volumeAttachabilityUncertain)
+	return asw.addVolume(volumeName, volumeSpec, devicePath)
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsUncertain(
-	logger klog.Logger, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName) error {
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName) error {
 	return nil
 }
 
@@ -500,7 +473,7 @@ func (asw *actualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts operationexecu
 	return asw.AddPodToVolume(markVolumeOpts)
 }
 
-func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
+func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	// no operation for kubelet side
 }
 
@@ -549,28 +522,6 @@ func (asw *actualStateOfWorld) UpdateReconstructedDevicePath(volumeName v1.Uniqu
 	}
 
 	volumeObj.devicePath = devicePath
-	asw.attachedVolumes[volumeName] = volumeObj
-}
-
-func (asw *actualStateOfWorld) UpdateReconstructedVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool) {
-	asw.Lock()
-	defer asw.Unlock()
-
-	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
-	if !volumeExists {
-		return
-	}
-	if volumeObj.pluginIsAttachable != volumeAttachabilityUncertain {
-		// Reconciler must have updated volume state, i.e. when a pod uses the volume and
-		// succeeded mounting the volume. Such update has fixed the device path.
-		return
-	}
-
-	if attachable {
-		volumeObj.pluginIsAttachable = volumeAttachabilityTrue
-	} else {
-		volumeObj.pluginIsAttachable = volumeAttachabilityFalse
-	}
 	asw.attachedVolumes[volumeName] = volumeObj
 }
 
@@ -640,7 +591,7 @@ func (asw *actualStateOfWorld) IsVolumeMountedElsewhere(volumeName v1.UniqueVolu
 // volume plugin can support the given volumeSpec or more than one plugin can
 // support it, an error is returned.
 func (asw *actualStateOfWorld) addVolume(
-	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, devicePath string, attachability volumeAttachability) error {
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, devicePath string) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -663,6 +614,11 @@ func (asw *actualStateOfWorld) addVolume(
 		}
 	}
 
+	pluginIsAttachable := false
+	if attachablePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec); err == nil && attachablePlugin != nil {
+		pluginIsAttachable = true
+	}
+
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if !volumeExists {
 		volumeObj = attachedVolume{
@@ -670,7 +626,7 @@ func (asw *actualStateOfWorld) addVolume(
 			spec:               volumeSpec,
 			mountedPods:        make(map[volumetypes.UniquePodName]mountedPod),
 			pluginName:         volumePlugin.GetPluginName(),
-			pluginIsAttachable: attachability,
+			pluginIsAttachable: pluginIsAttachable,
 			deviceMountState:   operationexecutor.DeviceNotMounted,
 			devicePath:         devicePath,
 		}
@@ -814,7 +770,7 @@ func (asw *actualStateOfWorld) SetDeviceMountState(
 	return nil
 }
 
-func (asw *actualStateOfWorld) InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
+func (asw *actualStateOfWorld) InitializeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -1137,7 +1093,7 @@ func (asw *actualStateOfWorld) newAttachedVolume(
 			VolumeName:          attachedVolume.volumeName,
 			VolumeSpec:          attachedVolume.spec,
 			NodeName:            asw.nodeName,
-			PluginIsAttachable:  attachedVolume.pluginIsAttachable == volumeAttachabilityTrue,
+			PluginIsAttachable:  attachedVolume.pluginIsAttachable,
 			DevicePath:          attachedVolume.devicePath,
 			DeviceMountPath:     attachedVolume.deviceMountPath,
 			PluginName:          attachedVolume.pluginName,

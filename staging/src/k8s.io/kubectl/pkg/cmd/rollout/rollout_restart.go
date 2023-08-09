@@ -18,13 +18,10 @@ package rollout
 
 import (
 	"fmt"
-
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/set"
@@ -51,7 +48,7 @@ type RestartOptions struct {
 	LabelSelector    string
 
 	resource.FilenameOptions
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 
 	fieldManager string
 }
@@ -74,7 +71,7 @@ var (
 )
 
 // NewRolloutRestartOptions returns an initialized RestartOptions instance
-func NewRolloutRestartOptions(streams genericiooptions.IOStreams) *RestartOptions {
+func NewRolloutRestartOptions(streams genericclioptions.IOStreams) *RestartOptions {
 	return &RestartOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("restarted").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
@@ -82,7 +79,7 @@ func NewRolloutRestartOptions(streams genericiooptions.IOStreams) *RestartOption
 }
 
 // NewCmdRolloutRestart returns a Command instance for 'rollout restart' sub command
-func NewCmdRolloutRestart(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdRolloutRestart(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutRestartOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}

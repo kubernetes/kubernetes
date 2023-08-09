@@ -17,11 +17,11 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"errors"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"testing"
 
@@ -173,7 +173,6 @@ var provision2Success = provisionCall{
 func TestProvisionSync(t *testing.T) {
 	// Default enable the HonorPVReclaimPolicy feature gate.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
-	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{
 			// Provision a volume (with a default class)
@@ -244,7 +243,7 @@ func TestProvisionSync(t *testing.T) {
 			expectedClaims: newClaimArray("claim11-7", "uid11-7", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
 			expectedEvents: noevents,
 			errors:         noerrors,
-			test: wrapTestWithInjectedOperation(ctx, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			test: wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Create a volume before provisionClaimOperation starts.
 				// This similates a parallel controller provisioning the volume.
 				volume := newVolume("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned)
@@ -529,7 +528,7 @@ func TestProvisionSync(t *testing.T) {
 				newClaimArray("claim11-23", "uid11-23", "1Gi", "", v1.ClaimPending, &classCopper, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner)),
 			[]string{"Normal ProvisioningSucceeded"},
 			noerrors,
-			wrapTestWithInjectedOperation(ctx, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 				func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 					nodesIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 					node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
@@ -579,7 +578,7 @@ func TestProvisionSync(t *testing.T) {
 			wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 	}
-	runSyncTests(t, ctx, tests, storageClasses, []*v1.Pod{})
+	runSyncTests(t, tests, storageClasses, []*v1.Pod{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -598,7 +597,6 @@ func TestProvisionSync(t *testing.T) {
 //
 // Some limit of calls in enforced to prevent endless loops.
 func TestProvisionMultiSync(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{
 			// Provision a volume with binding
@@ -622,7 +620,7 @@ func TestProvisionMultiSync(t *testing.T) {
 					newClaimArray("claim12-2", "uid12-2", "1Gi", "pvc-uid12-2", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted))),
 			expectedEvents: []string{"Normal ExternalProvisioning"},
 			errors:         noerrors,
-			test: wrapTestWithInjectedOperation(ctx, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			test: wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Create a volume before syncClaim tries to bind a PV to PVC
 				// This simulates external provisioner creating a volume while the controller
 				// is waiting for a volume to bind to the existed claim
@@ -661,7 +659,7 @@ func TestProvisionMultiSync(t *testing.T) {
 					newClaimArray("claim12-4", "uid12-4", "1Gi", "pvc-uid12-4", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted))),
 			expectedEvents: []string{"Normal ExternalProvisioning"},
 			errors:         noerrors,
-			test: wrapTestWithInjectedOperation(ctx, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			test: wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Create a volume before syncClaim tries to bind a PV to PVC
 				// This simulates external provisioner creating a volume while the controller
 				// is waiting for a volume to bind to the existed claim
@@ -678,17 +676,16 @@ func TestProvisionMultiSync(t *testing.T) {
 		},
 	}
 
-	runMultisyncTests(t, ctx, tests, storageClasses, storageClasses[0].Name)
+	runMultisyncTests(t, tests, storageClasses, storageClasses[0].Name)
 }
 
 // When provisioning is disabled, provisioning a claim should instantly return nil
 func TestDisablingDynamicProvisioner(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctrl, err := newTestController(ctx, nil, nil, false)
+	ctrl, err := newTestController(nil, nil, false)
 	if err != nil {
 		t.Fatalf("Construct PersistentVolume controller failed: %v", err)
 	}
-	retVal := ctrl.provisionClaim(ctx, nil)
+	retVal := ctrl.provisionClaim(context.TODO(), nil)
 	if retVal != nil {
 		t.Errorf("Expected nil return but got %v", retVal)
 	}

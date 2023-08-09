@@ -19,6 +19,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -42,7 +43,7 @@ import (
 var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 
 	f := framework.NewDefaultFramework("memory-limit-test-windows")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// NOTE(vyta): these tests are Windows specific
@@ -92,8 +93,10 @@ func checkNodeAllocatableTest(ctx context.Context, f *framework.Framework) {
 	calculatedNodeAlloc.Sub(nodeMem.softEviction)
 	calculatedNodeAlloc.Sub(nodeMem.hardEviction)
 
+	ginkgo.By(fmt.Sprintf("Checking stated allocatable memory %v against calculated allocatable memory %v", &nodeMem.allocatable, calculatedNodeAlloc))
+
 	// sanity check against stated allocatable
-	gomega.Expect(calculatedNodeAlloc.Cmp(nodeMem.allocatable)).To(gomega.Equal(0), "calculated allocatable memory %+v and stated allocatable memory %+v are same", calculatedNodeAlloc, nodeMem.allocatable)
+	framework.ExpectEqual(calculatedNodeAlloc.Cmp(nodeMem.allocatable), 0)
 }
 
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable
@@ -168,7 +171,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 			}
 		}
 		return false
-	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrue())
+	}, 3*time.Minute, 10*time.Second).Should(gomega.Equal(true))
 
 }
 
@@ -182,7 +185,7 @@ func getNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory {
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	gomega.Expect(nodeList.Items).ToNot(gomega.BeEmpty())
+	framework.ExpectNotEqual(nodeList.Size(), 0)
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
 	status := nodeList.Items[0].Status

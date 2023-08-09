@@ -60,31 +60,19 @@ func portsForObject(object runtime.Object) ([]string, error) {
 }
 
 func getPorts(spec corev1.PodSpec) []string {
-	var result []string
-	exists := map[string]struct{}{}
+	result := []string{}
 	for _, container := range spec.Containers {
 		for _, port := range container.Ports {
-			// remove duplicate ports
-			key := strconv.Itoa(int(port.ContainerPort))
-			if _, ok := exists[key]; !ok {
-				exists[key] = struct{}{}
-				result = append(result, key)
-			}
+			result = append(result, strconv.Itoa(int(port.ContainerPort)))
 		}
 	}
 	return result
 }
 
 func getServicePorts(spec corev1.ServiceSpec) []string {
-	var result []string
-	exists := map[string]struct{}{}
+	result := []string{}
 	for _, servicePort := range spec.Ports {
-		// remove duplicate ports
-		key := strconv.Itoa(int(servicePort.Port))
-		if _, ok := exists[key]; !ok {
-			exists[key] = struct{}{}
-			result = append(result, key)
-		}
+		result = append(result, strconv.Itoa(int(servicePort.Port)))
 	}
 	return result
 }

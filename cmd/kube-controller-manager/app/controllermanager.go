@@ -51,7 +51,6 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
-	cpnames "k8s.io/cloud-provider/names"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
@@ -74,7 +73,6 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -106,8 +104,7 @@ const (
 func NewControllerManagerCommand() *cobra.Command {
 	s, err := options.NewKubeControllerManagerOptions()
 	if err != nil {
-		klog.Background().Error(err, "Unable to initialize command options")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 
 	cmd := &cobra.Command{
@@ -137,13 +134,13 @@ controller, and serviceaccounts controller.`,
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
-			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List(), names.KCMControllerAliases())
+			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
 				return err
 			}
 			// add feature enablement metrics
 			utilfeature.DefaultMutableFeatureGate.AddMetrics()
-			return Run(context.Background(), c.Complete())
+			return Run(c.Complete(), wait.NeverStop)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -156,7 +153,7 @@ controller, and serviceaccounts controller.`,
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List(), names.KCMControllerAliases())
+	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	registerLegacyGlobalFlags(namedFlagSets)
@@ -181,14 +178,11 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 }
 
 // Run runs the KubeControllerManagerOptions.
-func Run(ctx context.Context, c *config.CompletedConfig) error {
-	logger := klog.FromContext(ctx)
-	stopCh := ctx.Done()
-
+func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
-	logger.Info("Starting", "version", version.Get())
+	klog.Infof("Version: %+v", version.Get())
 
-	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	// Start events processing pipeline.
 	c.EventBroadcaster.StartStructuredLogging(0)
@@ -198,7 +192,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	if cfgz, err := configz.New(ConfigzName); err == nil {
 		cfgz.Set(c.ComponentConfig)
 	} else {
-		logger.Error(err, "Unable to register configz")
+		klog.Errorf("unable to register configz: %v", err)
 	}
 
 	// Setup any healthz checks we will want to use.
@@ -225,20 +219,18 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 	}
 
-	clientBuilder, rootClientBuilder := createClientBuilders(logger, c)
+	clientBuilder, rootClientBuilder := createClientBuilders(c)
 
 	saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
 	run := func(ctx context.Context, startSATokenController InitFunc, initializersFunc ControllerInitializersFunc) {
-		controllerContext, err := CreateControllerContext(logger, c, rootClientBuilder, clientBuilder, ctx.Done())
+		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
-			logger.Error(err, "Error building controller context")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+			klog.Fatalf("error building controller context: %v", err)
 		}
 		controllerInitializers := initializersFunc(controllerContext.LoopMode)
 		if err := StartControllers(ctx, controllerContext, startSATokenController, controllerInitializers, unsecuredMux, healthzHandler); err != nil {
-			logger.Error(err, "Error starting controllers")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+			klog.Fatalf("error starting controllers: %v", err)
 		}
 
 		controllerContext.InformerFactory.Start(stopCh)
@@ -250,6 +242,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 	// No leader election, run directly
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
+		ctx, _ := wait.ContextForChannel(stopCh)
 		run(ctx, saTokenControllerInitFunc, NewControllerInitializers)
 		return nil
 	}
@@ -270,7 +263,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 	// If leader migration is enabled, create the LeaderMigrator and prepare for migration
 	if leadermigration.Enabled(&c.ComponentConfig.Generic) {
-		logger.Info("starting leader migration")
+		klog.Infof("starting leader migration")
 
 		leaderMigrator = leadermigration.NewLeaderMigrator(&c.ComponentConfig.Generic.LeaderMigration,
 			"kube-controller-manager")
@@ -284,7 +277,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	// Start the main lock
-	go leaderElectAndRun(ctx, c, id, electionChecker,
+	go leaderElectAndRun(c, id, electionChecker,
 		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
@@ -294,12 +287,12 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 					// If leader migration is enabled, we should start only non-migrated controllers
 					//  for the main lock.
 					initializersFunc = createInitializersFunc(leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
-					logger.Info("leader migration: starting main controllers.")
+					klog.Info("leader migration: starting main controllers.")
 				}
 				run(ctx, startSATokenController, initializersFunc)
 			},
 			OnStoppedLeading: func() {
-				logger.Error(nil, "leaderelection lost")
+				klog.ErrorS(nil, "leaderelection lost")
 				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 			},
 		})
@@ -313,17 +306,17 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		<-leaderMigrator.MigrationReady
 
 		// Start the migration lock.
-		go leaderElectAndRun(ctx, c, id, electionChecker,
+		go leaderElectAndRun(c, id, electionChecker,
 			c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
 			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
 			leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
-					logger.Info("leader migration: starting migrated controllers.")
+					klog.Info("leader migration: starting migrated controllers.")
 					// DO NOT start saTokenController under migration lock
 					run(ctx, nil, createInitializersFunc(leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
 				},
 				OnStoppedLeading: func() {
-					logger.Error(nil, "migration leaderelection lost")
+					klog.ErrorS(nil, "migration leaderelection lost")
 					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 				},
 			})
@@ -409,7 +402,7 @@ func KnownControllers() []string {
 	// first to ensure that the SA tokens for future controllers will exist.  Think very carefully before adding
 	// to this list.
 	ret.Insert(
-		names.ServiceAccountTokenController,
+		saTokenControllerName,
 	)
 
 	return ret.List()
@@ -417,8 +410,12 @@ func KnownControllers() []string {
 
 // ControllersDisabledByDefault is the set of controllers which is disabled by default
 var ControllersDisabledByDefault = sets.NewString(
-	names.BootstrapSignerController,
-	names.TokenCleanerController,
+	"bootstrapsigner",
+	"tokencleaner",
+)
+
+const (
+	saTokenControllerName = "serviceaccount-token"
 )
 
 // NewControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
@@ -434,58 +431,52 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 		controllers[name] = fn
 	}
 
-	register(names.EndpointsController, startEndpointController)
-	register(names.EndpointSliceController, startEndpointSliceController)
-	register(names.EndpointSliceMirroringController, startEndpointSliceMirroringController)
-	register(names.ReplicationControllerController, startReplicationController)
-	register(names.PodGarbageCollectorController, startPodGCController)
-	register(names.ResourceQuotaController, startResourceQuotaController)
-	register(names.NamespaceController, startNamespaceController)
-	register(names.ServiceAccountController, startServiceAccountController)
-	register(names.GarbageCollectorController, startGarbageCollectorController)
-	register(names.DaemonSetController, startDaemonSetController)
-	register(names.JobController, startJobController)
-	register(names.DeploymentController, startDeploymentController)
-	register(names.ReplicaSetController, startReplicaSetController)
-	register(names.HorizontalPodAutoscalerController, startHPAController)
-	register(names.DisruptionController, startDisruptionController)
-	register(names.StatefulSetController, startStatefulSetController)
-	register(names.CronJobController, startCronJobController)
-	register(names.CertificateSigningRequestSigningController, startCSRSigningController)
-	register(names.CertificateSigningRequestApprovingController, startCSRApprovingController)
-	register(names.CertificateSigningRequestCleanerController, startCSRCleanerController)
-	register(names.TTLController, startTTLController)
-	register(names.BootstrapSignerController, startBootstrapSignerController)
-	register(names.TokenCleanerController, startTokenCleanerController)
-	register(names.NodeIpamController, startNodeIpamController)
-	register(names.NodeLifecycleController, startNodeLifecycleController)
+	register("endpoint", startEndpointController)
+	register("endpointslice", startEndpointSliceController)
+	register("endpointslicemirroring", startEndpointSliceMirroringController)
+	register("replicationcontroller", startReplicationController)
+	register("podgc", startPodGCController)
+	register("resourcequota", startResourceQuotaController)
+	register("namespace", startNamespaceController)
+	register("serviceaccount", startServiceAccountController)
+	register("garbagecollector", startGarbageCollectorController)
+	register("daemonset", startDaemonSetController)
+	register("job", startJobController)
+	register("deployment", startDeploymentController)
+	register("replicaset", startReplicaSetController)
+	register("horizontalpodautoscaling", startHPAController)
+	register("disruption", startDisruptionController)
+	register("statefulset", startStatefulSetController)
+	register("cronjob", startCronJobController)
+	register("csrsigning", startCSRSigningController)
+	register("csrapproving", startCSRApprovingController)
+	register("csrcleaner", startCSRCleanerController)
+	register("ttl", startTTLController)
+	register("bootstrapsigner", startBootstrapSignerController)
+	register("tokencleaner", startTokenCleanerController)
+	register("nodeipam", startNodeIpamController)
+	register("nodelifecycle", startNodeLifecycleController)
 	if loopMode == IncludeCloudLoops {
-		register(cpnames.ServiceLBController, startServiceController)
-		register(cpnames.NodeRouteController, startRouteController)
-		register(cpnames.CloudNodeLifecycleController, startCloudNodeLifecycleController)
-		// TODO: persistent volume controllers into the IncludeCloudLoops only set.
+		register("service", startServiceController)
+		register("route", startRouteController)
+		register("cloud-node-lifecycle", startCloudNodeLifecycleController)
+		// TODO: volume controller into the IncludeCloudLoops only set.
 	}
-	register(names.PersistentVolumeBinderController, startPersistentVolumeBinderController)
-	register(names.PersistentVolumeAttachDetachController, startAttachDetachController)
-	register(names.PersistentVolumeExpanderController, startVolumeExpandController)
-	register(names.ClusterRoleAggregationController, startClusterRoleAggregrationController)
-	register(names.PersistentVolumeClaimProtectionController, startPVCProtectionController)
-	register(names.PersistentVolumeProtectionController, startPVProtectionController)
-	register(names.TTLAfterFinishedController, startTTLAfterFinishedController)
-	register(names.RootCACertificatePublisherController, startRootCACertPublisher)
-	register(names.EphemeralVolumeController, startEphemeralVolumeController)
+	register("persistentvolume-binder", startPersistentVolumeBinderController)
+	register("attachdetach", startAttachDetachController)
+	register("persistentvolume-expander", startVolumeExpandController)
+	register("clusterrole-aggregation", startClusterRoleAggregrationController)
+	register("pvc-protection", startPVCProtectionController)
+	register("pv-protection", startPVProtectionController)
+	register("ttl-after-finished", startTTLAfterFinishedController)
+	register("root-ca-cert-publisher", startRootCACertPublisher)
+	register("ephemeral-volume", startEphemeralVolumeController)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) &&
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
-		register(names.StorageVersionGarbageCollectorController, startStorageVersionGCController)
+		register("storage-version-gc", startStorageVersionGCController)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		register(names.ResourceClaimController, startResourceClaimController)
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenCleanUp) {
-		register(names.LegacyServiceAccountTokenCleanerController, startLegacySATokenCleaner)
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidatingAdmissionPolicy) {
-		register("validatingadmissionpolicy-status-controller", startValidatingAdmissionPolicyStatusController)
+		controllers["resource-claim-controller"] = startResourceClaimController
 	}
 
 	return controllers
@@ -523,7 +514,7 @@ func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) 
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
-func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
+func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
@@ -549,7 +540,7 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 		return ControllerContext{}, err
 	}
 
-	cloud, loopMode, err := createCloudProvider(logger, s.ComponentConfig.KubeCloudShared.CloudProvider.Name, s.ComponentConfig.KubeCloudShared.ExternalCloudVolumePlugin,
+	cloud, loopMode, err := createCloudProvider(s.ComponentConfig.KubeCloudShared.CloudProvider.Name, s.ComponentConfig.KubeCloudShared.ExternalCloudVolumePlugin,
 		s.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile, s.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
 	if err != nil {
 		return ControllerContext{}, err
@@ -575,8 +566,6 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 // StartControllers starts a set of controllers with a specified ControllerContext
 func StartControllers(ctx context.Context, controllerCtx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc,
 	unsecuredMux *mux.PathRecorderMux, healthzHandler *controllerhealthz.MutableHealthzHandler) error {
-	logger := klog.FromContext(ctx)
-
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.
 	if startSATokenController != nil {
@@ -593,31 +582,22 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, star
 
 	var controllerChecks []healthz.HealthChecker
 
-	// Each controller is passed a context where the logger has the name of
-	// the controller set through WithName. That name then becomes the prefix of
-	// of all log messages emitted by that controller.
-	//
-	// In this loop, an explicit "controller" key is used instead, for two reasons:
-	// - while contextual logging is alpha, klog.LoggerWithName is still a no-op,
-	//   so we cannot rely on it yet to add the name
-	// - it allows distinguishing between log entries emitted by the controller
-	//   and those emitted for it - this is a bit debatable and could be revised.
 	for controllerName, initFn := range controllers {
 		if !controllerCtx.IsControllerEnabled(controllerName) {
-			logger.Info("Warning: controller is disabled", "controller", controllerName)
+			klog.Warningf("%q is disabled", controllerName)
 			continue
 		}
 
 		time.Sleep(wait.Jitter(controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
-		logger.V(1).Info("Starting controller", "controller", controllerName)
-		ctrl, started, err := initFn(klog.NewContext(ctx, klog.LoggerWithName(logger, controllerName)), controllerCtx)
+		klog.V(1).Infof("Starting %q", controllerName)
+		ctrl, started, err := initFn(ctx, controllerCtx)
 		if err != nil {
-			logger.Error(err, "Error starting controller", "controller", controllerName)
+			klog.Errorf("Error starting %q", controllerName)
 			return err
 		}
 		if !started {
-			logger.Info("Warning: skipping controller", "controller", controllerName)
+			klog.Warningf("Skipping %q", controllerName)
 			continue
 		}
 		check := controllerhealthz.NamedPingChecker(controllerName)
@@ -639,7 +619,7 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, star
 		}
 		controllerChecks = append(controllerChecks, check)
 
-		logger.Info("Started controller", "controller", controllerName)
+		klog.Infof("Started %q", controllerName)
 	}
 
 	healthzHandler.AddHealthChecker(controllerChecks...)
@@ -655,14 +635,13 @@ type serviceAccountTokenControllerStarter struct {
 }
 
 func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	logger := klog.FromContext(ctx)
-	if !controllerContext.IsControllerEnabled(names.ServiceAccountTokenController) {
-		logger.Info("Warning: controller is disabled", "controller", names.ServiceAccountTokenController)
+	if !controllerContext.IsControllerEnabled(saTokenControllerName) {
+		klog.Warningf("%q is disabled", saTokenControllerName)
 		return nil, false, nil
 	}
 
 	if len(controllerContext.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
-		logger.Info("Controller is disabled because there is no private key", "controller", names.ServiceAccountTokenController)
+		klog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
 		return nil, false, nil
 	}
 	privateKey, err := keyutil.PrivateKeyFromFile(controllerContext.ComponentConfig.SAController.ServiceAccountKeyFile)
@@ -695,7 +674,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating Tokens controller: %v", err)
 	}
-	go controller.Run(ctx, int(controllerContext.ComponentConfig.SAController.ConcurrentSATokenSyncs))
+	go controller.Run(int(controllerContext.ComponentConfig.SAController.ConcurrentSATokenSyncs), ctx.Done())
 
 	// start the first set of informers now so that other controllers can start
 	controllerContext.InformerFactory.Start(ctx.Done())
@@ -716,7 +695,7 @@ func readCA(file string) ([]byte, error) {
 }
 
 // createClientBuilders creates clientBuilder and rootClientBuilder from the given configuration
-func createClientBuilders(logger klog.Logger, c *config.CompletedConfig) (clientBuilder clientbuilder.ControllerClientBuilder, rootClientBuilder clientbuilder.ControllerClientBuilder) {
+func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilder.ControllerClientBuilder, rootClientBuilder clientbuilder.ControllerClientBuilder) {
 	rootClientBuilder = clientbuilder.SimpleControllerClientBuilder{
 		ClientConfig: c.Kubeconfig,
 	}
@@ -724,7 +703,7 @@ func createClientBuilders(logger klog.Logger, c *config.CompletedConfig) (client
 		if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 			// It's possible another controller process is creating the tokens for us.
 			// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
-			logger.Info("Warning: --use-service-account-credentials was specified without providing a --service-account-private-key-file")
+			klog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
 		}
 
 		clientBuilder = clientbuilder.NewDynamicClientBuilder(
@@ -739,8 +718,7 @@ func createClientBuilders(logger klog.Logger, c *config.CompletedConfig) (client
 
 // leaderElectAndRun runs the leader election, and runs the callbacks once the leader lease is acquired.
 // TODO: extract this function into staging/controller-manager
-func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
-	logger := klog.FromContext(ctx)
+func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
 	rl, err := resourcelock.NewFromKubeconfig(resourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
 		leaseName,
@@ -751,11 +729,10 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 		c.Kubeconfig,
 		c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
 	if err != nil {
-		logger.Error(err, "Error creating lock")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		klog.Fatalf("error creating lock: %v", err)
 	}
 
-	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,

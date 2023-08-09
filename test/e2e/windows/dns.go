@@ -28,7 +28,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:Windows] DNS", func() {
@@ -38,7 +37,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 	})
 
 	f := framework.NewDefaultFramework("dns")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.It("should support configurable pod DNS servers", func(ctx context.Context) {
 
 		ginkgo.By("Getting the IP address of the internal Kubernetes service")
@@ -65,8 +64,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("confirming that the pod has a windows label")
-		gomega.Expect(testPod.Spec.NodeSelector).To(gomega.HaveKeyWithValue("kubernetes.io/os", "windows"), "pod.spec.nodeSelector")
-
+		framework.ExpectEqual(testPod.Spec.NodeSelector["kubernetes.io/os"], "windows")
 		framework.Logf("Created pod %v", testPod)
 		defer func() {
 			framework.Logf("Deleting pod %s...", testPod.Name)

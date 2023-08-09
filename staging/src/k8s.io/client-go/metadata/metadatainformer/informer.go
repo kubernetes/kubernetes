@@ -60,11 +60,6 @@ type metadataSharedInformerFactory struct {
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[schema.GroupVersionResource]bool
 	tweakListOptions TweakListOptionsFunc
-	// wg tracks how many goroutines were started.
-	wg sync.WaitGroup
-	// shuttingDown is true when Shutdown has been called. It may still be running
-	// because it needs to wait for goroutines.
-	shuttingDown bool
 }
 
 var _ SharedInformerFactory = &metadataSharedInformerFactory{}
@@ -90,21 +85,9 @@ func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	if f.shuttingDown {
-		return
-	}
-
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			f.wg.Add(1)
-			// We need a new variable in each loop iteration,
-			// otherwise the goroutine would use the loop variable
-			// and that keeps changing.
-			informer := informer.Informer()
-			go func() {
-				defer f.wg.Done()
-				informer.Run(stopCh)
-			}()
+			go informer.Informer().Run(stopCh)
 			f.startedInformers[informerType] = true
 		}
 	}
@@ -130,15 +113,6 @@ func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{})
 		res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
 	}
 	return res
-}
-
-func (f *metadataSharedInformerFactory) Shutdown() {
-	// Will return immediately if there is nothing to wait for.
-	defer f.wg.Wait()
-
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.shuttingDown = true
 }
 
 // NewFilteredMetadataInformer constructs a new informer for a metadata type.

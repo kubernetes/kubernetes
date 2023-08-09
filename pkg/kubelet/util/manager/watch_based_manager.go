@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/klog/v2"
@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -45,7 +44,7 @@ type isImmutableFunc func(runtime.Object) bool
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {
-	refMap    map[types.UID]int
+	refCount  int
 	store     *cacheStore
 	reflector *cache.Reflector
 
@@ -232,7 +231,7 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		0,
 	)
 	item := &objectCacheItem{
-		refMap:    make(map[types.UID]int),
+		refCount:  0,
 		store:     store,
 		reflector: reflector,
 		hasSynced: func() (bool, error) { return store.hasSynced(), nil },
@@ -246,7 +245,7 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 	return item
 }
 
-func (c *objectCache) AddReference(namespace, name string, referencedFrom types.UID) {
+func (c *objectCache) AddReference(namespace, name string) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod thus it needs to be efficient.
@@ -261,20 +260,17 @@ func (c *objectCache) AddReference(namespace, name string, referencedFrom types.
 		item = c.newReflectorLocked(namespace, name)
 		c.items[key] = item
 	}
-	item.refMap[referencedFrom]++
+	item.refCount++
 }
 
-func (c *objectCache) DeleteReference(namespace, name string, referencedFrom types.UID) {
+func (c *objectCache) DeleteReference(namespace, name string) {
 	key := objectKey{namespace: namespace, name: name}
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if item, ok := c.items[key]; ok {
-		item.refMap[referencedFrom]--
-		if item.refMap[referencedFrom] == 0 {
-			delete(item.refMap, referencedFrom)
-		}
-		if len(item.refMap) == 0 {
+		item.refCount--
+		if item.refCount == 0 {
 			// Stop the underlying reflector.
 			item.stop()
 			delete(c.items, key)

@@ -36,7 +36,7 @@ import (
 
 var _ = SIGDescribe("Projected secret", func() {
 	f := framework.NewDefaultFramework("projected")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 	   Release: v1.9
@@ -414,9 +414,8 @@ var _ = SIGDescribe("Projected secret", func() {
 	ginkgo.It("Should fail non-optional pod creation due to secret object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/projected-secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
-		pod := createNonOptionalSecretPod(ctx, f, volumeMountPath, podName)
-		getPod := e2epod.Get(f.ClientSet, pod)
-		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
+		err := createNonOptionalSecretPod(ctx, f, volumeMountPath, podName)
+		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 
 	//Secret object defined for the pod, If a key is specified which is not present in the secret,
@@ -425,9 +424,8 @@ var _ = SIGDescribe("Projected secret", func() {
 	ginkgo.It("Should fail non-optional pod creation due to the key in the secret object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
-		pod := createNonOptionalSecretPodWithSecret(ctx, f, volumeMountPath, podName)
-		getPod := e2epod.Get(f.ClientSet, pod)
-		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
+		err := createNonOptionalSecretPodWithSecret(ctx, f, volumeMountPath, podName)
+		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 })
 

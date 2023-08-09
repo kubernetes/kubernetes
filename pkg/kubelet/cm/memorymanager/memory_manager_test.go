@@ -312,7 +312,7 @@ func TestValidateReservedMemory(t *testing.T) {
 			err := validateReservedMemory(tc.machineInfo, tc.nodeAllocatableReservation, tc.systemReservedMemory)
 			if strings.TrimSpace(tc.expectedError) != "" {
 				assert.Error(t, err)
-				assert.Equal(t, tc.expectedError, err.Error())
+				assert.Equal(t, err.Error(), tc.expectedError)
 			}
 		})
 	}
@@ -2437,7 +2437,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
+			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "test name", testCase.description)
 			mgr := &manager{
 				policy:       returnPolicyByName(testCase),
 				state:        state.NewMemoryState(),

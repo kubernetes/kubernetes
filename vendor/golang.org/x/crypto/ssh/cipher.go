@@ -114,8 +114,7 @@ var cipherModes = map[string]*cipherMode{
 	"arcfour": {16, 0, streamCipherMode(0, newRC4)},
 
 	// AEAD ciphers
-	gcm128CipherID:     {16, 12, newGCMCipher},
-	gcm256CipherID:     {32, 12, newGCMCipher},
+	gcmCipherID:        {16, 12, newGCMCipher},
 	chacha20Poly1305ID: {64, 0, newChaCha20Cipher},
 
 	// CBC mode is insecure and so is not included in the default config.

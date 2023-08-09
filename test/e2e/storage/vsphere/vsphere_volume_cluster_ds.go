@@ -42,7 +42,7 @@ This test reads env
 */
 var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-provision")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		client           clientset.Interface
@@ -57,7 +57,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx, client)
+		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx)
 		scParameters = make(map[string]string)
 		clusterDatastore = GetAndExpectStringEnvVar(VCPClusterDatastore)
 	})

@@ -45,6 +45,7 @@ func NewCodec(e Encoder, d Decoder) Codec {
 
 // Encode is a convenience wrapper for encoding to a []byte from an Encoder
 func Encode(e Encoder, obj Object) ([]byte, error) {
+	// TODO: reuse buffer
 	buf := &bytes.Buffer{}
 	if err := e.Encode(obj, buf); err != nil {
 		return nil, err

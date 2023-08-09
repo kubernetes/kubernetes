@@ -71,13 +71,12 @@ var legacySubsystems = []subsystem{
 	&fs.NetClsGroup{},
 	&fs.NameGroup{GroupName: "name=systemd"},
 	&fs.RdmaGroup{},
-	&fs.NameGroup{GroupName: "misc"},
 }
 
 func genV1ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
 	var properties []systemdDbus.Property
 
-	deviceProperties, err := generateDeviceProperties(r, systemdVersion(cm))
+	deviceProperties, err := generateDeviceProperties(r)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +206,7 @@ func (m *legacyManager) Apply(pid int) error {
 
 	properties = append(properties, c.SystemdProps...)
 
-	if err := startUnit(m.dbus, unitName, properties, pid == -1); err != nil {
+	if err := startUnit(m.dbus, unitName, properties); err != nil {
 		return err
 	}
 
@@ -274,7 +273,14 @@ func getSubsystemPath(slice, unit, subsystem string) (string, error) {
 		return "", err
 	}
 
-	return filepath.Join(mountpoint, slice, unit), nil
+	initPath, err := cgroups.GetInitCgroup(subsystem)
+	if err != nil {
+		return "", err
+	}
+	// if pid 1 is systemd 226 or later, it will be in init.scope, not the root
+	initPath = strings.TrimSuffix(filepath.Clean(initPath), "init.scope")
+
+	return filepath.Join(mountpoint, initPath, slice, unit), nil
 }
 
 func (m *legacyManager) Freeze(state configs.FreezerState) error {

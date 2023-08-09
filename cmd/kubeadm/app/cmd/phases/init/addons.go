@@ -42,7 +42,7 @@ var (
 		Install the kube-proxy addon components via the API server.
 		`)
 
-	printManifest = false
+	printManifest bool = false
 )
 
 // NewAddonPhase returns the addon Cobra command

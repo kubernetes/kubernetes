@@ -26,6 +26,7 @@ import (
 	v2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	autoscalingv2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
@@ -38,9 +39,9 @@ type FakeHorizontalPodAutoscalers struct {
 	ns   string
 }
 
-var horizontalpodautoscalersResource = v2.SchemeGroupVersion.WithResource("horizontalpodautoscalers")
+var horizontalpodautoscalersResource = schema.GroupVersionResource{Group: "autoscaling", Version: "v2", Resource: "horizontalpodautoscalers"}
 
-var horizontalpodautoscalersKind = v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscaler")
+var horizontalpodautoscalersKind = schema.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"}
 
 // Get takes name of the horizontalPodAutoscaler, and returns the corresponding horizontalPodAutoscaler object, and an error if there is any.
 func (c *FakeHorizontalPodAutoscalers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.HorizontalPodAutoscaler, err error) {

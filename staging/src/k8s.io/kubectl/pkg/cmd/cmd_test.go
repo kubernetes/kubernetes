@@ -25,17 +25,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/cobra"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/kubectl/pkg/cmd/plugin"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	// This test can be safely deleted when we will not support multiple flag formats
-	root := NewKubectlCommand(KubectlOptions{IOStreams: genericiooptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}})
+	root := NewKubectlCommand(KubectlOptions{IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}})
 
 	if root.Parent() != nil {
 		t.Fatal("We expect the root command to be returned")
@@ -59,138 +54,17 @@ func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	}
 }
 
-func TestKubectlSubcommandShadowPlugin(t *testing.T) {
-	tests := []struct {
-		name              string
-		args              []string
-		expectPlugin      string
-		expectPluginArgs  []string
-		expectLookupError string
-	}{
-		{
-			name:             "test that a plugin executable is found based on command args when builtin subcommand does not exist",
-			args:             []string{"kubectl", "create", "foo", "--bar", "--bar2", "--namespace", "test-namespace"},
-			expectPlugin:     "plugin/testdata/kubectl-create-foo",
-			expectPluginArgs: []string{"--bar", "--bar2", "--namespace", "test-namespace"},
-		},
-		{
-			name:              "test that a plugin executable is not found based on command args when also builtin subcommand does not exist",
-			args:              []string{"kubectl", "create", "foo2", "--bar", "--bar2", "--namespace", "test-namespace"},
-			expectLookupError: "unable to find a plugin executable \"kubectl-create-foo2\"",
-		},
-		{
-			name:             "test that normal commands are able to be executed, when builtin subcommand exists",
-			args:             []string{"kubectl", "create", "job", "foo", "--image=busybox", "--dry-run=client", "--namespace", "test-namespace"},
-			expectPlugin:     "",
-			expectPluginArgs: []string{},
-		},
-		// rest of the tests are copied from TestKubectlCommandHandlesPlugins function,
-		// just to retest them also when feature is enabled.
-		{
-			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
-			args:             []string{"kubectl", "config", "get-clusters"},
-			expectPlugin:     "",
-			expectPluginArgs: []string{},
-		},
-		{
-			name:             "test that a plugin executable is found based on command args",
-			args:             []string{"kubectl", "foo", "--bar"},
-			expectPlugin:     "plugin/testdata/kubectl-foo",
-			expectPluginArgs: []string{"--bar"},
-		},
-		{
-			name: "test that a plugin does not execute over an existing command by the same name",
-			args: []string{"kubectl", "version", "--client=true"},
-		},
-		{
-			name: "test that a plugin does not execute over Cobra's help command",
-			args: []string{"kubectl", "help"},
-		},
-		{
-			name: "test that a plugin does not execute over Cobra's __complete command",
-			args: []string{"kubectl", cobra.ShellCompRequestCmd, "de"},
-		},
-		{
-			name: "test that a plugin does not execute over Cobra's __completeNoDesc command",
-			args: []string{"kubectl", cobra.ShellCompNoDescRequestCmd, "de"},
-		},
-		{
-			name: "test that a flag does not break Cobra's help command",
-			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", "help"},
-		},
-		{
-			name: "test that a flag does not break Cobra's __complete command",
-			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", cobra.ShellCompRequestCmd},
-		},
-		{
-			name: "test that a flag does not break Cobra's __completeNoDesc command",
-			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", cobra.ShellCompNoDescRequestCmd},
-		},
-	}
-
-	for _, test := range tests {
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.CmdPluginAsSubcommand}, t, func(t *testing.T) {
-			t.Run(test.name, func(t *testing.T) {
-				pluginsHandler := &testPluginHandler{
-					pluginsDirectory: "plugin/testdata",
-					validPrefixes:    plugin.ValidPluginFilenamePrefixes,
-				}
-				ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
-				root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
-				// original plugin handler (DefaultPluginHandler) is implemented by exec call so no additional actions are expected on the cobra command if we activate the plugin flow
-				if !pluginsHandler.lookedup && !pluginsHandler.executed {
-					// args must be set, otherwise Execute will use os.Args (args used for starting the test) and test.args would not be passed
-					// to the command which might invoke only "kubectl" without any additional args and give false positives
-					root.SetArgs(test.args[1:])
-					// Important note! Incorrect command or command failing validation might just call os.Exit(1) which would interrupt execution of the test
-					if err := root.Execute(); err != nil {
-						t.Fatalf("unexpected error: %v", err)
-					}
-				}
-
-				if (pluginsHandler.lookupErr != nil && pluginsHandler.lookupErr.Error() != test.expectLookupError) ||
-					(pluginsHandler.lookupErr == nil && len(test.expectLookupError) > 0) {
-					t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectLookupError, pluginsHandler.lookupErr)
-				}
-
-				if pluginsHandler.lookedup && !pluginsHandler.executed && len(test.expectLookupError) == 0 {
-					// we have to fail here, because we have found the plugin, but not executed the plugin, nor the command (this would normally result in an error: unknown command)
-					t.Fatalf("expected plugin execution, but did not occur")
-				}
-
-				if pluginsHandler.executedPlugin != test.expectPlugin {
-					t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
-				}
-
-				if pluginsHandler.executed && len(test.expectPlugin) == 0 {
-					t.Fatalf("unexpected plugin execution: expected no plugin, got %q", pluginsHandler.executedPlugin)
-				}
-
-				if !cmp.Equal(pluginsHandler.withArgs, test.expectPluginArgs, cmpopts.EquateEmpty()) {
-					t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
-				}
-			})
-		})
-	}
-}
-
 func TestKubectlCommandHandlesPlugins(t *testing.T) {
 	tests := []struct {
-		name              string
-		args              []string
-		expectPlugin      string
-		expectPluginArgs  []string
-		expectLookupError string
+		name             string
+		args             []string
+		expectPlugin     string
+		expectPluginArgs []string
+		expectError      string
 	}{
 		{
 			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
-			args:             []string{"kubectl", "config", "get-clusters"},
-			expectPlugin:     "",
-			expectPluginArgs: []string{},
-		},
-		{
-			name:             "test that normal commands are able to be executed, when no plugin overshadows them and shadowing feature is not enabled",
-			args:             []string{"kubectl", "create", "job", "foo", "--image=busybox", "--dry-run=client"},
+			args:             []string{"kubectl", "get", "foo"},
 			expectPlugin:     "",
 			expectPluginArgs: []string{},
 		},
@@ -202,7 +76,7 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 		},
 		{
 			name: "test that a plugin does not execute over an existing command by the same name",
-			args: []string{"kubectl", "version", "--client=true"},
+			args: []string{"kubectl", "version"},
 		},
 		// The following tests make sure that commands added by Cobra cannot be shadowed by a plugin
 		// See https://github.com/kubernetes/kubectl/issues/1116
@@ -212,11 +86,11 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 		},
 		{
 			name: "test that a plugin does not execute over Cobra's __complete command",
-			args: []string{"kubectl", cobra.ShellCompRequestCmd, "de"},
+			args: []string{"kubectl", cobra.ShellCompRequestCmd},
 		},
 		{
 			name: "test that a plugin does not execute over Cobra's __completeNoDesc command",
-			args: []string{"kubectl", cobra.ShellCompNoDescRequestCmd, "de"},
+			args: []string{"kubectl", cobra.ShellCompNoDescRequestCmd},
 		},
 		// The following tests make sure that commands added by Cobra cannot be shadowed by a plugin
 		// even when a flag is specified first.  This can happen when using aliases.
@@ -254,37 +128,20 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pluginsHandler := &testPluginHandler{
 				pluginsDirectory: "plugin/testdata",
-				validPrefixes:    plugin.ValidPluginFilenamePrefixes,
 			}
-			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+
 			root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
-			// original plugin handler (DefaultPluginHandler) is implemented by exec call so no additional actions are expected on the cobra command if we activate the plugin flow
-			if !pluginsHandler.lookedup && !pluginsHandler.executed {
-				// args must be set, otherwise Execute will use os.Args (args used for starting the test) and test.args would not be passed
-				// to the command which might invoke only "kubectl" without any additional args and give false positives
-				root.SetArgs(test.args[1:])
-				// Important note! Incorrect command or command failing validation might just call os.Exit(1) which would interrupt execution of the test
-				if err := root.Execute(); err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
+			if err := root.Execute(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if (pluginsHandler.lookupErr != nil && pluginsHandler.lookupErr.Error() != test.expectLookupError) ||
-				(pluginsHandler.lookupErr == nil && len(test.expectLookupError) > 0) {
-				t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectLookupError, pluginsHandler.lookupErr)
-			}
-
-			if pluginsHandler.lookedup && !pluginsHandler.executed && len(test.expectLookupError) == 0 {
-				// we have to fail here, because we have found the plugin, but not executed the plugin, nor the command (this would normally result in an error: unknown command)
-				t.Fatalf("expected plugin execution, but did not occur")
+			if pluginsHandler.err != nil && pluginsHandler.err.Error() != test.expectError {
+				t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectError, pluginsHandler.err)
 			}
 
 			if pluginsHandler.executedPlugin != test.expectPlugin {
 				t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
-			}
-
-			if pluginsHandler.executed && len(test.expectPlugin) == 0 {
-				t.Fatalf("unexpected plugin execution: expected no plugin, got %q", pluginsHandler.executedPlugin)
 			}
 
 			if !cmp.Equal(pluginsHandler.withArgs, test.expectPluginArgs, cmpopts.EquateEmpty()) {
@@ -296,55 +153,47 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 
 type testPluginHandler struct {
 	pluginsDirectory string
-	validPrefixes    []string
-
-	// lookup results
-	lookedup  bool
-	lookupErr error
 
 	// execution results
-	executed       bool
 	executedPlugin string
 	withArgs       []string
 	withEnv        []string
+
+	err error
 }
 
 func (h *testPluginHandler) Lookup(filename string) (string, bool) {
-	h.lookedup = true
+	// append supported plugin prefix to the filename
+	filename = fmt.Sprintf("%s-%s", "kubectl", filename)
 
 	dir, err := os.Stat(h.pluginsDirectory)
 	if err != nil {
-		h.lookupErr = err
+		h.err = err
 		return "", false
 	}
 
 	if !dir.IsDir() {
-		h.lookupErr = fmt.Errorf("expected %q to be a directory", h.pluginsDirectory)
+		h.err = fmt.Errorf("expected %q to be a directory", h.pluginsDirectory)
 		return "", false
 	}
 
 	plugins, err := os.ReadDir(h.pluginsDirectory)
 	if err != nil {
-		h.lookupErr = err
+		h.err = err
 		return "", false
 	}
 
-	filenameWithSuportedPrefix := ""
-	for _, prefix := range h.validPrefixes {
-		for _, p := range plugins {
-			filenameWithSuportedPrefix = fmt.Sprintf("%s-%s", prefix, filename)
-			if p.Name() == filenameWithSuportedPrefix {
-				return fmt.Sprintf("%s/%s", h.pluginsDirectory, p.Name()), true
-			}
+	for _, p := range plugins {
+		if p.Name() == filename {
+			return fmt.Sprintf("%s/%s", h.pluginsDirectory, p.Name()), true
 		}
 	}
 
-	h.lookupErr = fmt.Errorf("unable to find a plugin executable %q", filenameWithSuportedPrefix)
+	h.err = fmt.Errorf("unable to find a plugin executable %q", filename)
 	return "", false
 }
 
 func (h *testPluginHandler) Execute(executablePath string, cmdArgs, env []string) error {
-	h.executed = true
 	h.executedPlugin = executablePath
 	h.withArgs = cmdArgs
 	h.withEnv = env
@@ -385,7 +234,7 @@ func TestKubectlCommandHeadersHooks(t *testing.T) {
 			if kubeConfigFlags.WrapConfigFn != nil {
 				t.Fatal("expected initial nil WrapConfigFn")
 			}
-			t.Setenv(kubectlCmdHeaders, testCase.envVar)
+			os.Setenv(kubectlCmdHeaders, testCase.envVar)
 			addCmdHeaderHooks(cmds, kubeConfigFlags)
 			// Valdidate whether the hooks were added.
 			if testCase.addsHooks && kubeConfigFlags.WrapConfigFn == nil {

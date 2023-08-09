@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Test the current package under a different kernel.
 # Requires virtme and qemu to be installed.
 # Examples:
@@ -48,31 +48,21 @@ if [[ "${1:-}" = "--exec-vm" ]]; then
     rm "${output}/fake-stdin"
   fi
 
-  for ((i = 0; i < 3; i++)); do
-    if ! $sudo virtme-run --kimg "${input}/bzImage" --memory 768M --pwd \
-      --rwdir="${testdir}=${testdir}" \
-      --rodir=/run/input="${input}" \
-      --rwdir=/run/output="${output}" \
-      --script-sh "PATH=\"$PATH\" CI_MAX_KERNEL_VERSION="${CI_MAX_KERNEL_VERSION:-}" \"$script\" --exec-test $cmd" \
-      --kopt possible_cpus=2; then # need at least two CPUs for some tests
-      exit 23
-    fi
+  if ! $sudo virtme-run --kimg "${input}/bzImage" --memory 768M --pwd \
+    --rwdir="${testdir}=${testdir}" \
+    --rodir=/run/input="${input}" \
+    --rwdir=/run/output="${output}" \
+    --script-sh "PATH=\"$PATH\" \"$script\" --exec-test $cmd" \
+    --kopt possible_cpus=2; then # need at least two CPUs for some tests
+    exit 23
+  fi
 
-    if [[ -e "${output}/status" ]]; then
-      break
-    fi
-
-    if [[ -v CI ]]; then
-      echo "Retrying test run due to qemu crash"
-      continue
-    fi
-
+  if [[ ! -e "${output}/success" ]]; then
     exit 42
-  done
+  fi
 
-  rc=$(<"${output}/status")
   $sudo rm -r "$output"
-  exit $rc
+  exit 0
 elif [[ "${1:-}" = "--exec-test" ]]; then
   shift
 
@@ -83,16 +73,13 @@ elif [[ "${1:-}" = "--exec-test" ]]; then
     export KERNEL_SELFTESTS="/run/input/bpf"
   fi
 
-  if [[ -f "/run/input/bpf/bpf_testmod/bpf_testmod.ko" ]]; then
-    insmod "/run/input/bpf/bpf_testmod/bpf_testmod.ko"
+  dmesg -C
+  if ! "$@"; then
+    dmesg
+    exit 1 # this return code is "swallowed" by qemu
   fi
-
-  dmesg --clear
-  rc=0
-  "$@" || rc=$?
-  dmesg
-  echo $rc > "/run/output/status"
-  exit $rc # this return code is "swallowed" by qemu
+  touch "/run/output/success"
+  exit 0
 fi
 
 readonly kernel_version="${1:-}"
@@ -103,27 +90,22 @@ fi
 shift
 
 readonly kernel="linux-${kernel_version}.bz"
-readonly selftests="linux-${kernel_version}-selftests-bpf.tgz"
+readonly selftests="linux-${kernel_version}-selftests-bpf.bz"
 readonly input="$(mktemp -d)"
 readonly tmp_dir="${TMPDIR:-/tmp}"
 readonly branch="${BRANCH:-master}"
 
 fetch() {
     echo Fetching "${1}"
-    pushd "${tmp_dir}" > /dev/null
-    curl -s -L -O --fail --etag-compare "${1}.etag" --etag-save "${1}.etag" "https://github.com/cilium/ci-kernels/raw/${branch}/${1}"
-    local ret=$?
-    popd > /dev/null
-    return $ret
+    wget -nv -N -P "${tmp_dir}" "https://github.com/cilium/ci-kernels/raw/${branch}/${1}"
 }
 
 fetch "${kernel}"
 cp "${tmp_dir}/${kernel}" "${input}/bzImage"
 
 if fetch "${selftests}"; then
-  echo "Decompressing selftests"
   mkdir "${input}/bpf"
-  tar --strip-components=4 -xf "${tmp_dir}/${selftests}" -C "${input}/bpf"
+  tar --strip-components=4 -xjf "${tmp_dir}/${selftests}" -C "${input}/bpf"
 else
   echo "No selftests found, disabling"
 fi
@@ -135,8 +117,6 @@ fi
 
 export GOFLAGS=-mod=readonly
 export CGO_ENABLED=0
-# LINUX_VERSION_CODE test compares this to discovered value.
-export KERNEL_VERSION="${kernel_version}"
 
 echo Testing on "${kernel_version}"
 go test -exec "$script --exec-vm $input" "${args[@]}"

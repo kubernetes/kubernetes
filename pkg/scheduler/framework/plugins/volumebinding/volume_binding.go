@@ -47,6 +47,7 @@ const (
 // framework.CycleState, in the later phases we don't need to call Write method
 // to update the value
 type stateData struct {
+	skip     bool // set true if pod does not have PVCs
 	allBound bool
 	// podVolumesByNode holds the pod's volume information found in the Filter
 	// phase for each node
@@ -87,25 +88,25 @@ func (pl *VolumeBinding) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
-	events := []framework.ClusterEventWithHint{
+func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEvent {
+	events := []framework.ClusterEvent{
 		// Pods may fail because of missing or mis-configured storage class
 		// (e.g., allowedTopologies, volumeBindingMode), and hence may become
 		// schedulable upon StorageClass Add or Update events.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update}},
+		{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update},
 		// We bind PVCs with PVs, so any changes may make the pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
+		{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update},
+		{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update},
 		// Pods may fail to find available PVs because the node labels do not
 		// match the storage class's allowed topologies or PV's node affinity.
 		// A new or updated node may make pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel}},
+		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
 		// We rely on CSI node to translate in-tree PV to CSI.
-		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add | framework.Update}},
+		{Resource: framework.CSINode, ActionType: framework.Add | framework.Update},
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
-		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update}},
-		{Event: framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update}},
+		{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update},
+		{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update},
 	}
 	return events
 }
@@ -165,8 +166,8 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
 		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
 	} else if !hasPVC {
-		state.Write(stateKey, &stateData{})
-		return nil, framework.NewStatus(framework.Skip)
+		state.Write(stateKey, &stateData{skip: true})
+		return nil, nil
 	}
 	podVolumeClaims, err := pl.Binder.GetPodVolumeClaims(pod)
 	if err != nil {
@@ -233,10 +234,17 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 // PVCs can be matched with an available and node-compatible PV.
 func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
+	if node == nil {
+		return framework.NewStatus(framework.Error, "node not found")
+	}
 
 	state, err := getStateData(cs)
 	if err != nil {
 		return framework.AsStatus(err)
+	}
+
+	if state.skip {
+		return nil
 	}
 
 	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.podVolumeClaims, node)

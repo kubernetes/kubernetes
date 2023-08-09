@@ -32,7 +32,7 @@ var goBinary = flag.String("go", "", "path to a `go` binary")
 func TestVerify(t *testing.T) {
 	// x/tools/packages is going to literally exec `go`, so it needs some
 	// setup.
-	setEnvVars(t)
+	setEnvVars()
 
 	tcs := []struct {
 		path   string
@@ -57,18 +57,17 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-func setEnvVars(t testing.TB) {
-	t.Helper()
+func setEnvVars() {
 	if *goBinary != "" {
 		newPath := filepath.Dir(*goBinary)
 		curPath := os.Getenv("PATH")
 		if curPath != "" {
 			newPath = newPath + ":" + curPath
 		}
-		t.Setenv("PATH", newPath)
+		os.Setenv("PATH", newPath)
 	}
 	if os.Getenv("HOME") == "" {
-		t.Setenv("HOME", "/tmp")
+		os.Setenv("HOME", "/tmp")
 	}
 }
 

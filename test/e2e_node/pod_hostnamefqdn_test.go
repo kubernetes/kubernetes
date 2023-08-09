@@ -74,7 +74,7 @@ func testPod(podnamebase string) *v1.Pod {
 
 var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("hostfqdn")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	/*
 	   Release: v1.19
 	   Testname: Create Pod without fully qualified domain name (FQDN)

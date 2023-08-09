@@ -59,6 +59,7 @@ func NewConverter(t reflect.Type, fd protoreflect.FieldDescriptor) Converter {
 	default:
 		return newSingularConverter(t, fd)
 	}
+	panic(fmt.Sprintf("invalid Go type %v for field %v", t, fd.FullName()))
 }
 
 var (

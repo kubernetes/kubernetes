@@ -51,11 +51,11 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 			return
 		}
 
-		if !ac.Enabled() {
+		if ac == nil || ac.Event == nil {
 			handler.ServeHTTP(w, req)
 			return
 		}
-		ev := &ac.Event
+		ev := ac.Event
 
 		ctx := req.Context()
 		omitStages := ac.RequestAuditConfig.OmitStages
@@ -124,7 +124,7 @@ func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRul
 	ctx := req.Context()
 	ac := audit.AuditContextFrom(ctx)
 	if ac == nil {
-		// Auditing not configured.
+		// Auditing not enabled.
 		return nil, nil
 	}
 
@@ -145,7 +145,12 @@ func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRul
 	if !ok {
 		requestReceivedTimestamp = time.Now()
 	}
-	audit.LogRequestMetadata(ctx, req, requestReceivedTimestamp, rac.Level, attribs)
+	ev, err := audit.NewEventFromRequest(req, requestReceivedTimestamp, rac.Level, attribs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to complete audit event from request: %v", err)
+	}
+
+	ac.Event = ev
 
 	return ac, nil
 }

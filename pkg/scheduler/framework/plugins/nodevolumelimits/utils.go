@@ -40,15 +40,21 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	// along with the plugin-specific one
 	switch pluginName {
 	case csilibplugins.AWSEBSInTreePluginName:
-		return true
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS) {
+			return false
+		}
 	case csilibplugins.PortworxVolumePluginName:
 		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx) {
 			return false
 		}
 	case csilibplugins.GCEPDInTreePluginName:
-		return true
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE) {
+			return false
+		}
 	case csilibplugins.AzureDiskInTreePluginName:
-		return true
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk) {
+			return false
+		}
 	case csilibplugins.CinderInTreePluginName:
 		return true
 	case csilibplugins.RBDVolumePluginName:
@@ -66,13 +72,13 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 		return false
 	}
 
-	var mpaSet sets.Set[string]
+	var mpaSet sets.String
 	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
 	if len(mpa) == 0 {
-		mpaSet = sets.New[string]()
+		mpaSet = sets.NewString()
 	} else {
 		tok := strings.Split(mpa, ",")
-		mpaSet = sets.New(tok...)
+		mpaSet = sets.NewString(tok...)
 	}
 
 	return mpaSet.Has(pluginName)

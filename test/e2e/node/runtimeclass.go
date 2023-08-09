@@ -30,7 +30,6 @@ import (
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2eruntimeclass "k8s.io/kubernetes/test/e2e/framework/node/runtimeclass"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -41,7 +40,7 @@ import (
 
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
-	f.NamespacePodSecurityLevel = api.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
@@ -57,7 +56,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
@@ -112,7 +111,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
@@ -129,9 +128,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	})
 
 	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func(ctx context.Context) {
-		if err := e2eruntimeclass.NodeSupportsPreconfiguredRuntimeClassHandler(ctx, f); err != nil {
-			e2eskipper.Skipf("Skipping test as node does not have E2E runtime class handler preconfigured in container runtime config: %v", err)
-		}
+		// Requires special setup of test-handler which is only done in GCE kube-up environment
+		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
+		e2eskipper.SkipUnlessProviderIs("gce")
 
 		labelFooName := "foo-" + string(uuid.NewUUID())
 		labelFizzName := "fizz-" + string(uuid.NewUUID())
@@ -158,7 +157,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
@@ -177,5 +176,5 @@ var _ = SIGDescribe("RuntimeClass", func() {
 // newRuntimeClass returns a test runtime class.
 func newRuntimeClass(namespace, name string) *nodev1.RuntimeClass {
 	uniqueName := fmt.Sprintf("%s-%s", namespace, name)
-	return runtimeclasstest.NewRuntimeClass(uniqueName, e2eruntimeclass.PreconfiguredRuntimeClassHandler)
+	return runtimeclasstest.NewRuntimeClass(uniqueName, e2enode.PreconfiguredRuntimeClassHandler)
 }

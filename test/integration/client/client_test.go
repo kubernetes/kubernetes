@@ -46,7 +46,6 @@ import (
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/utils/pointer"
 
 	"k8s.io/component-base/version"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -142,7 +141,7 @@ func TestAtomicPut(t *testing.T) {
 			},
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(0),
+			Replicas: func(i int32) *int32 { return &i }(0),
 			Selector: map[string]string{
 				"foo": "bar",
 			},

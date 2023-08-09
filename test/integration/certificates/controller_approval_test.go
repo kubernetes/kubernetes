@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
@@ -89,9 +88,6 @@ func TestController_AutoApproval(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
 			// Run an apiserver with the default configuration options.
 			s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{""}, framework.SharedEtcd())
 			defer s.TearDownFn()
@@ -99,8 +95,10 @@ func TestController_AutoApproval(t *testing.T) {
 			informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(s.ClientConfig, "certificatesigningrequest-informers")), time.Second)
 
 			// Register the controller
-			c := approver.NewCSRApprovingController(ctx, client, informers.Certificates().V1().CertificateSigningRequests())
+			c := approver.NewCSRApprovingController(client, informers.Certificates().V1().CertificateSigningRequests())
 			// Start the controller & informers
+			ctx, cancel := context.WithCancel(context.TODO())
+			defer cancel()
 			informers.Start(ctx.Done())
 			go c.Run(ctx, 1)
 

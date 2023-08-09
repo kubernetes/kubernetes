@@ -41,8 +41,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*admissionregistration.ValidatingWebhookConfiguration).Name, nil
 		},
-		DefaultQualifiedResource:  admissionregistration.Resource("validatingwebhookconfigurations"),
-		SingularQualifiedResource: admissionregistration.Resource("validatingwebhookconfiguration"),
+		DefaultQualifiedResource: admissionregistration.Resource("validatingwebhookconfigurations"),
 
 		CreateStrategy: validatingwebhookconfiguration.Strategy,
 		UpdateStrategy: validatingwebhookconfiguration.Strategy,

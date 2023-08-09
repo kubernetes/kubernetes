@@ -4,11 +4,11 @@
 package resmap
 
 import (
+	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/ifc"
 	"sigs.k8s.io/kustomize/api/internal/kusterr"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
-	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -81,7 +81,7 @@ func (rmF *Factory) NewResMapFromConfigMapArgs(
 	for i := range argList {
 		res, err := rmF.resF.MakeConfigMap(kvLdr, &argList[i])
 		if err != nil {
-			return nil, errors.WrapPrefixf(err, "NewResMapFromConfigMapArgs")
+			return nil, errors.Wrap(err, "NewResMapFromConfigMapArgs")
 		}
 		resources = append(resources, res)
 	}
@@ -106,7 +106,7 @@ func (rmF *Factory) NewResMapFromSecretArgs(
 	for i := range argsList {
 		res, err := rmF.resF.MakeSecret(kvLdr, &argsList[i])
 		if err != nil {
-			return nil, errors.WrapPrefixf(err, "NewResMapFromSecretArgs")
+			return nil, errors.Wrap(err, "NewResMapFromSecretArgs")
 		}
 		resources = append(resources, res)
 	}

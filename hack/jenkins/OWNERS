@@ -1,8 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - bentheelder
-  - cblecker
-  - spiffxp
+  - sig-testing-approvers
 reviewers:
   - sig-testing-reviewers

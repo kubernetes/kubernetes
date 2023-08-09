@@ -19,28 +19,19 @@ package metrics
 import (
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var (
-	processStartedAt time.Time
-)
-
-func init() {
-	processStartedAt = time.Now()
-}
-
 // These constants cause handlers serving metrics to behave as described if
 // errors are encountered.
 const (
-	// HTTPErrorOnError serve an HTTP status code 500 upon the first error
+	// Serve an HTTP status code 500 upon the first error
 	// encountered. Report the error message in the body.
 	HTTPErrorOnError promhttp.HandlerErrorHandling = iota
 
-	// ContinueOnError ignore errors and try to serve as many metrics as possible.
-	// However, if no metrics can be served, serve an HTTP status code 500 and the
+	// Ignore errors and try to serve as many metrics as possible.  However,
+	// if no metrics can be served, serve an HTTP status code 500 and the
 	// last error message in the body. Only use this in deliberate "best
 	// effort" metrics collection scenarios. In this case, it is highly
 	// recommended to provide other means of detecting errors: By setting an
@@ -50,7 +41,7 @@ const (
 	// alerts.
 	ContinueOnError
 
-	// PanicOnError panics upon the first error encountered (useful for "crash only" apps).
+	// Panic upon the first error encountered (useful for "crash only" apps).
 	PanicOnError
 )
 
@@ -59,7 +50,6 @@ const (
 type HandlerOpts promhttp.HandlerOpts
 
 func (ho *HandlerOpts) toPromhttpHandlerOpts() promhttp.HandlerOpts {
-	ho.ProcessStartTime = processStartedAt
 	return promhttp.HandlerOpts(*ho)
 }
 

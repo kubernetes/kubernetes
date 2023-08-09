@@ -46,10 +46,9 @@ type REST struct {
 // NewStorage returns a RESTStorage object that will work against VolumeAttachments
 func NewStorage(optsGetter generic.RESTOptionsGetter) (*VolumeAttachmentStorage, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &storageapi.VolumeAttachment{} },
-		NewListFunc:               func() runtime.Object { return &storageapi.VolumeAttachmentList{} },
-		DefaultQualifiedResource:  storageapi.Resource("volumeattachments"),
-		SingularQualifiedResource: storageapi.Resource("volumeattachment"),
+		NewFunc:                  func() runtime.Object { return &storageapi.VolumeAttachment{} },
+		NewListFunc:              func() runtime.Object { return &storageapi.VolumeAttachmentList{} },
+		DefaultQualifiedResource: storageapi.Resource("volumeattachments"),
 
 		CreateStrategy:      volumeattachment.Strategy,
 		UpdateStrategy:      volumeattachment.Strategy,

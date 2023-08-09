@@ -28,6 +28,7 @@ import (
 	"github.com/go-logr/logr"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 // OperationExecutor defines a set of operations for attaching, detaching,
@@ -63,7 +65,7 @@ import (
 type OperationExecutor interface {
 	// AttachVolume attaches the volume to the node specified in volumeToAttach.
 	// It then updates the actual state of the world to reflect that.
-	AttachVolume(logger klog.Logger, volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	AttachVolume(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// VerifyVolumesAreAttachedPerNode verifies the given list of volumes to see whether they are still attached to the node.
 	// If any volume is not attached right now, it will update the actual state of the world to reflect that.
@@ -81,7 +83,7 @@ type OperationExecutor interface {
 	// that. If verifySafeToDetach is set, a call is made to the fetch the node
 	// object and it is used to verify that the volume does not exist in Node's
 	// Status.VolumesInUse list (operation fails with error if it is).
-	DetachVolume(logger klog.Logger, volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	DetachVolume(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// If a volume has 'Filesystem' volumeMode, MountVolume mounts the
 	// volume to the pod specified in volumeToMount.
@@ -137,7 +139,7 @@ type OperationExecutor interface {
 	// If the volume is not found or there is an error (fetching the node
 	// object, for example) then an error is returned which triggers exponential
 	// back off on retries.
-	VerifyControllerAttachedVolume(logger klog.Logger, volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	VerifyControllerAttachedVolume(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// IsOperationPending returns true if an operation for the given volumeName
 	// and one of podName or nodeName is pending, otherwise it returns false
@@ -149,6 +151,8 @@ type OperationExecutor interface {
 	ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
 	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, volumePath string, pluginName string) (volume.ReconstructedVolume, error)
+	// CheckVolumeExistenceOperation checks volume existence
+	CheckVolumeExistenceOperation(volumeSpec *volume.Spec, mountPath, volumeName string, mounter mount.Interface, uniqueVolumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, podUID types.UID, attachable volume.AttachableVolumePlugin) (bool, error)
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -241,13 +245,13 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// TODO: in the future, we should be able to remove the volumeName
 	// argument to this method -- since it is used only for attachable
 	// volumes.  See issue 29695.
-	MarkVolumeAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
+	MarkVolumeAsAttached(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
 	// Marks the specified volume as *possibly* attached to the specified node.
 	// If an attach operation fails, the attach/detach controller does not know for certain if the volume is attached or not.
 	// If the volume name is supplied, that volume name will be used.  If not, the
 	// volume name is computed using the result from querying the plugin.
-	MarkVolumeAsUncertain(logger klog.Logger, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName) error
+	MarkVolumeAsUncertain(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName) error
 
 	// Marks the specified volume as detached from the specified node
 	MarkVolumeAsDetached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
@@ -258,10 +262,10 @@ type ActualStateOfWorldAttacherUpdater interface {
 
 	// Unmarks the desire to detach for the specified volume (add the volume back to
 	// the node's volumesToReportAsAttached list)
-	AddVolumeToReportAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, nodeName types.NodeName)
+	AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 
 	// InitializeClaimSize sets pvc claim size by reading pvc.Status.Capacity
-	InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize *resource.Quantity)
+	InitializeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity)
 
 	GetClaimSize(volumeName v1.UniqueVolumeName) *resource.Quantity
 }
@@ -440,9 +444,9 @@ type VolumeToMount struct {
 	// time at which volume was requested to be mounted
 	MountRequestTime time.Time
 
-	// DesiredPersistentVolumeSize stores desired size of the volume.
+	// PersistentVolumeSize stores desired size of the volume.
 	// usually this is the size if pv.Spec.Capacity
-	DesiredPersistentVolumeSize resource.Quantity
+	PersistentVolumeSize resource.Quantity
 
 	// SELinux label that should be used to mount.
 	SELinuxLabel string
@@ -785,11 +789,10 @@ func (oe *operationExecutor) IsOperationSafeToRetry(
 }
 
 func (oe *operationExecutor) AttachVolume(
-	logger klog.Logger,
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	generatedOperations :=
-		oe.operationGenerator.GenerateAttachVolumeFunc(logger, volumeToAttach, actualStateOfWorld)
+		oe.operationGenerator.GenerateAttachVolumeFunc(volumeToAttach, actualStateOfWorld)
 
 	if util.IsMultiAttachAllowed(volumeToAttach.VolumeSpec) {
 		return oe.pendingOperations.Run(
@@ -801,12 +804,11 @@ func (oe *operationExecutor) AttachVolume(
 }
 
 func (oe *operationExecutor) DetachVolume(
-	logger klog.Logger,
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	generatedOperations, err :=
-		oe.operationGenerator.GenerateDetachVolumeFunc(logger, volumeToDetach, verifySafeToDetach, actualStateOfWorld)
+		oe.operationGenerator.GenerateDetachVolumeFunc(volumeToDetach, verifySafeToDetach, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -1037,12 +1039,11 @@ func (oe *operationExecutor) ExpandInUseVolume(volumeToMount VolumeToMount, actu
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
-	logger klog.Logger,
 	volumeToMount VolumeToMount,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	generatedOperations, err :=
-		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(logger, volumeToMount, nodeName, actualStateOfWorld)
+		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -1087,4 +1088,62 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 	return volume.ReconstructedVolume{
 		Spec: volumeSpec,
 	}, nil
+}
+
+// CheckVolumeExistenceOperation checks mount path directory if volume still exists
+func (oe *operationExecutor) CheckVolumeExistenceOperation(
+	volumeSpec *volume.Spec,
+	mountPath, volumeName string,
+	mounter mount.Interface,
+	uniqueVolumeName v1.UniqueVolumeName,
+	podName volumetypes.UniquePodName,
+	podUID types.UID,
+	attachable volume.AttachableVolumePlugin) (bool, error) {
+	fsVolume, err := util.CheckVolumeModeFilesystem(volumeSpec)
+	if err != nil {
+		return false, err
+	}
+
+	// Filesystem Volume case
+	// For attachable volume case, check mount path directory if volume is still existing and mounted.
+	// Return true if volume is mounted.
+	if fsVolume {
+		if attachable != nil {
+			var isNotMount bool
+			var mountCheckErr error
+			if mounter == nil {
+				return false, fmt.Errorf("mounter was not set for a filesystem volume")
+			}
+			if isNotMount, mountCheckErr = mount.IsNotMountPoint(mounter, mountPath); mountCheckErr != nil {
+				return false, fmt.Errorf("could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
+					uniqueVolumeName,
+					volumeName,
+					podName,
+					podUID,
+					mountCheckErr)
+			}
+			return !isNotMount, nil
+		}
+		// For non-attachable volume case, skip check and return true without mount point check
+		// since plugins may not have volume mount point.
+		return true, nil
+	}
+
+	// Block Volume case
+	// Check mount path directory if volume still exists, then return true if volume
+	// is there. Either plugin is attachable or non-attachable, the plugin should
+	// have symbolic link associated to raw block device under pod device map
+	// if volume exists.
+	blkutil := volumepathhandler.NewBlockVolumePathHandler()
+	var islinkExist bool
+	var checkErr error
+	if islinkExist, checkErr = blkutil.IsSymlinkExist(mountPath); checkErr != nil {
+		return false, fmt.Errorf("could not check whether the block volume %q (spec.Name: %q) pod %q (UID: %q) is mapped to: %v",
+			uniqueVolumeName,
+			volumeName,
+			podName,
+			podUID,
+			checkErr)
+	}
+	return islinkExist, nil
 }

@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	registrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -94,7 +94,6 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 
 	storage := customresource.NewStorage(
 		groupResource,
-		groupResource,
 		kind,
 		schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItemList"},
 		customresource.NewStrategy(
@@ -110,7 +109,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 		restOptions,
 		[]string{"all"},
 		table,
-		managedfields.ResourcePathMappings{},
+		fieldmanager.ResourcePathMappings{},
 	)
 
 	return storage, server

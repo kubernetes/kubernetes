@@ -34,16 +34,6 @@ func TestWatch(t *testing.T) {
 	storagetesting.RunTestWatch(ctx, t, store)
 }
 
-func TestClusterScopedWatch(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestClusterScopedWatch(ctx, t, store)
-}
-
-func TestNamespaceScopedWatch(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestNamespaceScopedWatch(ctx, t, store)
-}
-
 func TestDeleteTriggerWatch(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestDeleteTriggerWatch(ctx, t, store)
@@ -54,16 +44,11 @@ func TestWatchFromZero(t *testing.T) {
 	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client))
 }
 
-// TestWatchFromNonZero tests that
+// TestWatchFromNoneZero tests that
 // - watch from non-0 should just watch changes after given version
 func TestWatchFromNoneZero(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchFromNonZero(ctx, t, store)
-}
-
-func TestDelayedWatchDelivery(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestDelayedWatchDelivery(ctx, t, store)
+	storagetesting.RunTestWatchFromNoneZero(ctx, t, store)
 }
 
 func TestWatchError(t *testing.T) {
@@ -74,11 +59,6 @@ func TestWatchError(t *testing.T) {
 func TestWatchContextCancel(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestWatchContextCancel(ctx, t, store)
-}
-
-func TestWatcherTimeout(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatcherTimeout(ctx, t, store)
 }
 
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
@@ -97,11 +77,6 @@ func TestProgressNotify(t *testing.T) {
 	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
 
 	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
-}
-
-func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
 }
 
 // =======================================================================

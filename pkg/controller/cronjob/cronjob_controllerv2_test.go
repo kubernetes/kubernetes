@@ -18,7 +18,6 @@ package cronjob
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -31,14 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2/ktesting"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -201,6 +202,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		now                 time.Time
 		jobCreateError      error
 		jobGetErr           error
+		enableTimeZone      bool
 
 		// expectations
 		expectCreate               bool
@@ -248,6 +250,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justBeforeTheHour(),
+			enableTimeZone:             true,
 			expectedWarnings:           1,
 			jobPresentInCJActiveStatus: true,
 		},
@@ -287,6 +290,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justBeforeTheHour(),
+			enableTimeZone:             true,
 			expectRequeueAfter:         true,
 			expectedRequeueDuration:    1*time.Minute + nextScheduleDelta,
 			jobPresentInCJActiveStatus: true,
@@ -337,6 +341,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justAfterTheHourInZone(newYork),
+			enableTimeZone:             false,
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
@@ -351,6 +356,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justAfterTheHourInZone(newYork),
+			enableTimeZone:             true,
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
@@ -365,6 +371,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justAfterTheHourInZone(newYork),
+			enableTimeZone:             true,
 			expectCreate:               true,
 			expectedWarnings:           1,
 			expectRequeueAfter:         true,
@@ -1158,32 +1165,14 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
-		"do nothing if the namespace is terminating": {
-			jobCreateError: &errors.StatusError{ErrStatus: metav1.Status{Details: &metav1.StatusDetails{Causes: []metav1.StatusCause{
-				{
-					Type:    v1.NamespaceTerminatingCause,
-					Message: fmt.Sprintf("namespace %s is being terminated", metav1.NamespaceDefault),
-					Field:   "metadata.namespace",
-				}}}}},
-			concurrencyPolicy:          "Allow",
-			schedule:                   onTheHour,
-			deadline:                   noDead,
-			ranPreviously:              true,
-			stillActive:                true,
-			jobCreationTime:            justAfterThePriorHour(),
-			now:                        *justAfterTheHour(),
-			expectActive:               0,
-			expectRequeueAfter:         false,
-			expectUpdateStatus:         false,
-			expectErr:                  true,
-			jobPresentInCJActiveStatus: false,
-		},
 	}
 	for name, tc := range testCases {
 		name := name
 		tc := tc
 
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CronJobTimeZone, tc.enableTimeZone)()
+
 			cj := cronJob()
 			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 			cj.Spec.Suspend = &tc.suspend
@@ -1566,12 +1555,9 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
 			kubeClient := fake.NewSimpleClientset()
 			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-			jm, err := NewControllerV2(ctx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 				return
@@ -1583,7 +1569,7 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 			jm.cronJobControl = &fakeCJControl{}
 			jm.recorder = record.NewFakeRecorder(10)
 
-			jm.updateCronJob(logger, tt.oldCronJob, tt.newCronJob)
+			jm.updateCronJob(tt.oldCronJob, tt.newCronJob)
 			if queue.delay.Seconds() != tt.expectedDelay.Seconds() {
 				t.Errorf("Expected delay %#v got %#v", tt.expectedDelay.Seconds(), queue.delay.Seconds())
 			}
@@ -1666,15 +1652,12 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
 			kubeClient := fake.NewSimpleClientset()
 			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 			for _, job := range tt.jobs {
 				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
-			jm, err := NewControllerV2(ctx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 				return

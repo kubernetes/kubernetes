@@ -36,7 +36,7 @@ import (
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("SeccompDefault [Serial] [Feature:SeccompDefault] [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("seccompdefault-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("with SeccompDefault enabled", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, cfg *kubeletconfig.KubeletConfiguration) {

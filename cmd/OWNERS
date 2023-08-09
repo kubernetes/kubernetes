@@ -6,6 +6,7 @@ options:
 reviewers:
   - dchen1107
   - dims
+  - lavalamp
   - liggitt
   - mikedanese
   - smarterclayton
@@ -14,10 +15,9 @@ reviewers:
 approvers:
   - dchen1107
   - dims
+  - lavalamp
   - liggitt
   - mikedanese
   - smarterclayton
   - thockin
   - wojtek-t
-emeritus_approvers:
-  - lavalamp

@@ -231,8 +231,8 @@ loop:
 				hasCR = true
 				s.next()
 			}
-			if s.ch != '\n' && s.ch != '"' {
-				s.error(offs, "unquoted '\\' must be followed by new line or double quote")
+			if s.ch != '\n' {
+				s.error(offs, "unquoted '\\' must be followed by new line")
 				break loop
 			}
 			s.next()

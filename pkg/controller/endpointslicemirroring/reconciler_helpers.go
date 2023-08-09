@@ -19,7 +19,7 @@ package endpointslicemirroring
 import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
-	endpointsliceutil "k8s.io/endpointslice/util"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // slicesByAction includes lists of slices to create, update, or delete.

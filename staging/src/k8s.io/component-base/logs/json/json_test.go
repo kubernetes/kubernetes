@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package json
+package logs
 
 import (
 	"bytes"
@@ -27,7 +27,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"k8s.io/apimachinery/pkg/types"
 	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
@@ -71,16 +70,6 @@ func TestZapLoggerInfo(t *testing.T) {
 			msg:        "test for duplicate keys",
 			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for duplicate keys\",\"v\":0,\"akey\":\"avalue\",\"akey\":\"anothervalue\"}\n",
 			keysValues: []interface{}{"akey", "avalue", "akey", "anothervalue"},
-		},
-		{
-			msg:        "test for NamespacedName argument",
-			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for NamespacedName argument\",\"v\":0,\"obj\":{\"name\":\"kube-proxy\",\"namespace\":\"kube-system\"}}\n",
-			keysValues: []interface{}{"obj", types.NamespacedName{Name: "kube-proxy", Namespace: "kube-system"}},
-		},
-		{
-			msg:        "test for NamespacedName argument with no namespace",
-			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for NamespacedName argument with no namespace\",\"v\":0,\"obj\":{\"name\":\"kube-proxy\"}}\n",
-			keysValues: []interface{}{"obj", types.NamespacedName{Name: "kube-proxy"}},
 		},
 	}
 

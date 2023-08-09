@@ -44,7 +44,7 @@ const (
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	podStartDurationKey = "pod_start_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
-	podStartSLIDurationKey = "pod_start_sli_duration_seconds"
+	PodStartSLIDurationKey = "pod_start_sli_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	cgroupManagerOperationsKey = "cgroup_manager_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
@@ -91,6 +91,31 @@ func parseKubeletMetrics(data string) (KubeletMetrics, error) {
 		return KubeletMetrics{}, err
 	}
 	return result, nil
+}
+
+func (g *Grabber) getMetricsFromNode(ctx context.Context, nodeName string, kubeletPort int) (string, error) {
+	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
+	finished := make(chan struct{}, 1)
+	var err error
+	var rawOutput []byte
+	go func() {
+		rawOutput, err = g.client.CoreV1().RESTClient().Get().
+			Resource("nodes").
+			SubResource("proxy").
+			Name(fmt.Sprintf("%v:%v", nodeName, kubeletPort)).
+			Suffix("metrics").
+			Do(ctx).Raw()
+		finished <- struct{}{}
+	}()
+	select {
+	case <-time.After(proxyTimeout):
+		return "", fmt.Errorf("Timed out when waiting for proxy to gather metrics from %v", nodeName)
+	case <-finished:
+		if err != nil {
+			return "", err
+		}
+		return string(rawOutput), nil
+	}
 }
 
 // KubeletLatencyMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -155,7 +180,7 @@ func GetDefaultKubeletLatencyMetrics(ms KubeletMetrics) KubeletLatencyMetrics {
 		podWorkerDurationKey,
 		podWorkerStartDurationKey,
 		podStartDurationKey,
-		podStartSLIDurationKey,
+		PodStartSLIDurationKey,
 		cgroupManagerOperationsKey,
 		dockerOperationsLatencyKey,
 		podWorkerStartDurationKey,

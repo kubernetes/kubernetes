@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -45,7 +46,7 @@ func getCredentials(tokenEndpoint string, r io.Reader, w io.Writer) error {
 		tokenEndpoint: tokenEndpoint,
 	}
 
-	data, err := io.ReadAll(r)
+	data, err := ioutil.ReadAll(r)
 	if err != nil {
 		return err
 	}

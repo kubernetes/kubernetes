@@ -1,7 +1,6 @@
 package gcfg
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,7 +13,6 @@ import (
 )
 
 var unescape = map[rune]rune{'\\': '\\', '"': '"', 'n': '\n', 't': '\t'}
-var utf8Bom = []byte("\ufeff")
 
 // no error: invalid literals should be caught by scanner
 func unquote(s string) string {
@@ -185,6 +183,7 @@ func readIntoPass(c *warnings.Collector, config interface{}, fset *token.FileSet
 			}
 		}
 	}
+	panic("never reached")
 }
 
 func readInto(config interface{}, fset *token.FileSet, file *token.File,
@@ -223,9 +222,6 @@ func ReadStringInto(config interface{}, str string) error {
 
 // ReadFileInto reads gcfg formatted data from the file filename and sets the
 // values into the corresponding fields in config.
-//
-// For compatibility with files created on Windows, the ReadFileInto skips a
-// single leading UTF8 BOM sequence if it exists.
 func ReadFileInto(config interface{}, filename string) error {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -236,22 +232,7 @@ func ReadFileInto(config interface{}, filename string) error {
 	if err != nil {
 		return err
 	}
-
-	// Skips a single leading UTF8 BOM sequence if it exists.
-	src = skipLeadingUtf8Bom(src)
-
 	fset := token.NewFileSet()
 	file := fset.AddFile(filename, fset.Base(), len(src))
 	return readInto(config, fset, file, src)
-}
-
-func skipLeadingUtf8Bom(src []byte) []byte {
-	lengthUtf8Bom := len(utf8Bom)
-
-	if len(src) >= lengthUtf8Bom {
-		if bytes.Equal(src[:lengthUtf8Bom], utf8Bom) {
-			return src[lengthUtf8Bom:]
-		}
-	}
-	return src
 }

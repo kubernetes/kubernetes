@@ -464,7 +464,8 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	}
 
 	out.Flush()
-	return buf.String(), nil
+	str := string(buf.String())
+	return str, nil
 }
 
 // getChangeCause returns the change-cause annotation of the input object

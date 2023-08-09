@@ -17,22 +17,21 @@ limitations under the License.
 package apiresources
 
 import (
+	"github.com/spf13/cobra"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func TestAPIVersionsComplete(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	cmd := NewCmdAPIVersions(tf, genericiooptions.NewTestIOStreamsDiscard())
+	cmd := NewCmdAPIVersions(tf, genericclioptions.NewTestIOStreamsDiscard())
 	parentCmd := &cobra.Command{Use: "kubectl"}
 	parentCmd.AddCommand(cmd)
-	o := NewAPIVersionsOptions(genericiooptions.NewTestIOStreamsDiscard())
+	o := NewAPIVersionsOptions(genericclioptions.NewTestIOStreamsDiscard())
 
 	err := o.Complete(tf, cmd, []string{})
 	if err != nil {
@@ -77,7 +76,7 @@ func TestAPIVersionsRun(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithDiscoveryClient(dc)
 	defer tf.Cleanup()
 
-	ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
+	ioStreams, _, out, errOut := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAPIVersions(tf, ioStreams)
 	cmd.Run(cmd, []string{})
 

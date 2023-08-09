@@ -41,3 +41,7 @@ type NetworkPolicyListerExpansion interface{}
 // NetworkPolicyNamespaceListerExpansion allows custom methods to be added to
 // NetworkPolicyNamespaceLister.
 type NetworkPolicyNamespaceListerExpansion interface{}
+
+// PodSecurityPolicyListerExpansion allows custom methods to be added to
+// PodSecurityPolicyLister.
+type PodSecurityPolicyListerExpansion interface{}

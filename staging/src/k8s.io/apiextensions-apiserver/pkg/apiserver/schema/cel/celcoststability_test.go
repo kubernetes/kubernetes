@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 func TestCelCostStability(t *testing.T) {
@@ -1081,41 +1080,6 @@ func TestCelCostStability(t *testing.T) {
 				"self.listOfListMap[0].exists(e, e.k3 == '3' && e.v3 == 'i')": 14,
 			},
 		},
-		{name: "optionals",
-			obj: map[string]interface{}{
-				"obj": map[string]interface{}{
-					"field": "a",
-				},
-				"m": map[string]interface{}{
-					"k": "v",
-				},
-				"l": []interface{}{
-					"a",
-				},
-			},
-			schema: objectTypePtr(map[string]schema.Structural{
-				"obj": objectType(map[string]schema.Structural{
-					"field":       stringType,
-					"absentField": stringType,
-				}),
-				"m": mapType(&stringType),
-				"l": listType(&stringType),
-			}),
-			expectCost: map[string]int64{
-				"optional.of('a') != optional.of('b')":                3,
-				"optional.of('a') != optional.none()":                 3,
-				"optional.of('a').hasValue()":                         2,
-				"optional.of('a').or(optional.of('a')).hasValue()":    2, // or() is short-circuited
-				"optional.none().or(optional.of('a')).hasValue()":     3,
-				"optional.of('a').optMap(v, v == 'value').hasValue()": 8,
-				"self.obj.?field == optional.of('a')":                 5,
-				"self.obj.?absentField == optional.none()":            4,
-				"self.obj.?field.orValue('v') == 'a'":                 4,
-				"self.m[?'k'] == optional.of('v')":                    5,
-				"self.l[?0] == optional.of('a')":                      5,
-				"optional.ofNonZeroValue(1).hasValue()":               2,
-			},
-		},
 	}
 
 	for _, tt := range cases {
@@ -1123,8 +1087,6 @@ func TestCelCostStability(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for validRule, expectedCost := range tt.expectCost {
-				validRule := validRule
-				expectedCost := expectedCost
 				testName := validRule
 				if len(testName) > 127 {
 					testName = testName[:127]
@@ -1132,16 +1094,16 @@ func TestCelCostStability(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
+					celValidator := NewValidator(&s, true, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
 					ctx := context.TODO()
-					errs, remainingBudegt := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
+					errs, remainingBudegt := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
 					}
-					rtCost := celconfig.RuntimeCELCostBudget - remainingBudegt
+					rtCost := RuntimeCELCostBudget - remainingBudegt
 					if rtCost != expectedCost {
 						t.Fatalf("runtime cost %d does not match expected runtime cost %d", rtCost, expectedCost)
 					}

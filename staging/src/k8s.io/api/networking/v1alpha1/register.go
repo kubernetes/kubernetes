@@ -22,16 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// GroupName is the group name used in this package.
+// GroupName is the group name use in this package.
 const GroupName = "networking.k8s.io"
 
-// SchemeGroupVersion is group version used to register objects in this package.
+// SchemeGroupVersion is group version used to register these objects.
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
-
-// Kind takes an unqualified kind and returns a Group qualified GroupKind.
-func Kind(kind string) schema.GroupKind {
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource.
 func Resource(resource string) schema.GroupResource {
@@ -54,9 +49,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ClusterCIDR{},
 		&ClusterCIDRList{},
-		&IPAddress{},
-		&IPAddressList{},
 	)
+	// Add the watch version that applies.
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

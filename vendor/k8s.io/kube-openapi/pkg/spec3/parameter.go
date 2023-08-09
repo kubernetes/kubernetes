@@ -20,8 +20,6 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/swag"
-	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -52,10 +50,6 @@ func (p *Parameter) MarshalJSON() ([]byte, error) {
 }
 
 func (p *Parameter) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, p)
-	}
-
 	if err := json.Unmarshal(data, &p.Refable); err != nil {
 		return err
 	}
@@ -66,22 +60,6 @@ func (p *Parameter) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	return nil
-}
-
-func (p *Parameter) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
-	var x struct {
-		spec.Extensions
-		ParameterProps
-	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
-		return err
-	}
-	if err := internal.JSONRefFromMap(&p.Ref.Ref, x.Extensions); err != nil {
-		return err
-	}
-	p.Extensions = internal.SanitizeExtensions(x.Extensions)
-	p.ParameterProps = x.ParameterProps
 	return nil
 }
 

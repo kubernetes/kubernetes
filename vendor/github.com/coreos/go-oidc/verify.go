@@ -79,9 +79,7 @@ type Config struct {
 	ClientID string
 	// If specified, only this set of algorithms may be used to sign the JWT.
 	//
-	// If the IDTokenVerifier is created from a provider with (*Provider).Verifier, this
-	// defaults to the set of algorithms the provider supports. Otherwise this values
-	// defaults to RS256.
+	// Since many providers only support RS256, SupportedSigningAlgs defaults to this value.
 	SupportedSigningAlgs []string
 
 	// If true, no ClientID check performed. Must be true if ClientID field is empty.
@@ -107,13 +105,6 @@ type Config struct {
 // The returned IDTokenVerifier is tied to the Provider's context and its behavior is
 // undefined once the Provider's context is canceled.
 func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
-	if len(config.SupportedSigningAlgs) == 0 && len(p.algorithms) > 0 {
-		// Make a copy so we don't modify the config values.
-		cp := &Config{}
-		*cp = *config
-		cp.SupportedSigningAlgs = p.algorithms
-		config = cp
-	}
 	return NewVerifier(p.issuer, p.remoteKeySet, config)
 }
 
