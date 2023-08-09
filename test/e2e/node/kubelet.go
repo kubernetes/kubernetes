@@ -340,6 +340,7 @@ var _ = SIGDescribe("kubelet", func() {
 		for _, itArg := range deleteTests {
 			name := fmt.Sprintf(
 				"kubelet should be able to delete %d pods per node in %v.", itArg.podsPerNode, itArg.timeout)
+			itArg := itArg
 			ginkgo.It(name, func() {
 				totalPods := itArg.podsPerNode * numNodes
 				ginkgo.By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
@@ -432,6 +433,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			// execute It blocks from above table of tests
 			for _, t := range testTbl {
+				t := t
 				ginkgo.It(t.itDescr, func() {
 					pod = createPodUsingNfs(f, c, ns, nfsIP, t.podCmd)
 
