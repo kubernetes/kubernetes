@@ -127,7 +127,7 @@ func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, provide
 		envelopeService: envelopeService,
 		providerName:    providerName,
 		stateFunc:       stateFunc,
-		cache:           newSimpleCache(clock, cacheTTL),
+		cache:           newSimpleCache(clock, cacheTTL, providerName),
 	}
 }
 
@@ -208,7 +208,6 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 	// this prevents a cache miss every time the DEK rotates
 	// this has the side benefit of causing the cache to perform a GC
 	// TODO see if we can do this inside the stateFunc control loop
-	// TODO(aramase): Add metrics for cache size.
 	t.cache.set(state.CacheKey, state.Transformer)
 
 	requestInfo := getRequestInfoFromContext(ctx)
@@ -250,7 +249,6 @@ func (t *envelopeTransformer) addTransformerForDecryption(cacheKey []byte, key [
 	if err != nil {
 		return nil, err
 	}
-	// TODO(aramase): Add metrics for cache size.
 	t.cache.set(cacheKey, transformer)
 	return transformer, nil
 }

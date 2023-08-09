@@ -156,6 +156,17 @@ var (
 		},
 		[]string{"provider_name", "error"},
 	)
+
+	DekSourceCacheSize = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "dek_source_cache_size",
+			Help:           "Number of records in data encryption key (DEK) source cache. On a restart, this value is an approximation of the number of decrypt RPC calls the server will make to the KMS plugin.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"provider_name"},
+	)
 )
 
 var registerMetricsFunc sync.Once
@@ -197,6 +208,7 @@ func RegisterMetrics() {
 		}
 		legacyregistry.MustRegister(dekCacheFillPercent)
 		legacyregistry.MustRegister(dekCacheInterArrivals)
+		legacyregistry.MustRegister(DekSourceCacheSize)
 		legacyregistry.MustRegister(KeyIDHashTotal)
 		legacyregistry.MustRegister(KeyIDHashLastTimestampSeconds)
 		legacyregistry.MustRegister(KeyIDHashStatusLastTimestampSeconds)
@@ -253,6 +265,10 @@ func RecordArrival(transformationType string, start time.Time) {
 
 func RecordDekCacheFillPercent(percent float64) {
 	dekCacheFillPercent.Set(percent)
+}
+
+func RecordDekSourceCacheSize(providerName string, size int) {
+	DekSourceCacheSize.WithLabelValues(providerName).Set(float64(size))
 }
 
 // RecordKMSOperationLatency records the latency of KMS operation.
