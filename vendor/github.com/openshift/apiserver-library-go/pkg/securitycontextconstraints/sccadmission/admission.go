@@ -230,28 +230,24 @@ func (c *constraint) computeSecurityContext(
 		return nil, "", nil, admission.NewForbidden(a, fmt.Errorf("securitycontextconstraints.security.openshift.io required check failed oddly"))
 	}
 
-	constraints, err := c.sccLister.List(labels.Everything())
-	if err != nil {
-		return nil, "", nil, admission.NewForbidden(a, err)
+	var constraints []*securityv1.SecurityContextConstraints
+	if len(requiredSCCName) > 0 {
+		requiredSCC, err := c.sccLister.Get(requiredSCCName)
+		if err != nil {
+			return nil, "", nil, admission.NewForbidden(a, fmt.Errorf("failed to retrieve the required SCC %q: %w", requiredSCCName, err))
+		}
+		constraints = []*securityv1.SecurityContextConstraints{requiredSCC}
+	} else {
+		constraints, err = c.sccLister.List(labels.Everything())
+		if err != nil {
+			return nil, "", nil, admission.NewForbidden(a, err)
+		}
 	}
+
 	if len(constraints) == 0 {
 		return nil, "", nil, admission.NewForbidden(a, fmt.Errorf("no SecurityContextConstraints found in cluster"))
 	}
 	sort.Sort(sccsort.ByPriority(constraints))
-
-	if len(requiredSCCName) > 0 {
-		var requiredConstraint *securityv1.SecurityContextConstraints
-		for i := range constraints {
-			if constraints[i].Name == requiredSCCName {
-				requiredConstraint = constraints[i]
-				break
-			}
-		}
-		if requiredConstraint == nil {
-			return nil, "", nil, admission.NewForbidden(a, fmt.Errorf("required scc/%v not found", requiredSCCName))
-		}
-		constraints = []*securityv1.SecurityContextConstraints{requiredConstraint}
-	}
 
 	// If mutation is not allowed and validatedSCCHint is provided, check the validated policy first.
 	// Keep the order the same for everything else

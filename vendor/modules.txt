@@ -630,7 +630,7 @@ github.com/openshift/api/security
 github.com/openshift/api/security/v1
 github.com/openshift/api/template/v1
 github.com/openshift/api/user/v1
-# github.com/openshift/apiserver-library-go v0.0.0-20230703120157-e3794c5cc9fd
+# github.com/openshift/apiserver-library-go v0.0.0-20230807133552-675520b3d567
 ## explicit; go 1.20
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/apis/imagepolicy/v1

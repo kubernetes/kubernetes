@@ -560,8 +560,8 @@ github.com/opencontainers/selinux v1.10.0 h1:rAiKF8hTcgLI3w0DHm6i0ylVVcOrlgR1kK9
 github.com/opencontainers/selinux v1.10.0/go.mod h1:2i0OySw99QjzBBQByd1Gr9gSjvuho1lHsJxIJ3gGbJI=
 github.com/openshift/api v0.0.0-20230703134140-1c2204a0195c h1:b1aPWPgW3MyK4BEKFjKBIHTV2LrdwGwErITEUw//xl4=
 github.com/openshift/api v0.0.0-20230703134140-1c2204a0195c/go.mod h1:4VWG+W22wrB4HfBL88P40DxLEpSOaiBVxUnfalfJo9k=
-github.com/openshift/apiserver-library-go v0.0.0-20230703120157-e3794c5cc9fd h1:aGcOLuv/M25VtFjDyd21vOktBuSycnOFbBO0a93Y0c8=
-github.com/openshift/apiserver-library-go v0.0.0-20230703120157-e3794c5cc9fd/go.mod h1:IB+lIRX6DAezD849VtIqlMZrWQIugSdEWMZzfOTP9kI=
+github.com/openshift/apiserver-library-go v0.0.0-20230807133552-675520b3d567 h1:s+XH/hrs4bb61OtP2OVnTIEU2MMiOqy/DZk8Q9dqvjY=
+github.com/openshift/apiserver-library-go v0.0.0-20230807133552-675520b3d567/go.mod h1:IB+lIRX6DAezD849VtIqlMZrWQIugSdEWMZzfOTP9kI=
 github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb h1:Nij5OnaECrkmcRQMAE9LMbQXPo95aqFnf+12B7SyFVI=
 github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb/go.mod h1:Rhb3moCqeiTuGHAbXBOlwPubUMlOZEkrEWTRjIF3jzs=
 github.com/openshift/google-cadvisor v0.47.1-openshift-4.15 h1:iMXdTAwyWOzWBjDDZHeNzCBasH25y+IP83B2r5AIxLw=
