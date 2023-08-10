@@ -25,6 +25,9 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -55,6 +58,7 @@ type mockPodKiller struct {
 	evict               bool
 	statusFn            func(*v1.PodStatus)
 	gracePeriodOverride *int64
+	evictFailed         bool
 }
 
 // killPodNow records the pod that was killed
@@ -63,6 +67,9 @@ func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride 
 	m.statusFn = statusFn
 	m.evict = evict
 	m.gracePeriodOverride = gracePeriodOverride
+	if m.evictFailed {
+		return fmt.Errorf("kill pod failed")
+	}
 	return nil
 }
 
@@ -2557,6 +2564,144 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
 	}
+}
+
+func TestEvictionSuccessSpan(t *testing.T) {
+	podMaker := makePodWithMemoryStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "below-requests", requests: newResourceList("", "1Gi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "900Mi"},
+		{name: "above-requests", requests: newResourceList("", "100Mi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "700Mi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("2Gi"),
+				},
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
+
+	fakeRecorder := tracetest.NewSpanRecorder()
+	oteltracer := trace.NewTracerProvider(trace.WithSpanProcessor(fakeRecorder)).Tracer(instrumentationScope)
+
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltracer,
+	}
+
+	// synchronize to detect the memory pressure
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	output := fakeRecorder.Ended()
+
+	assert.Equal(t, 1, len(output), "Manager should output 1 span")
+	assert.Equal(t, "Eviction/EvictPod", output[0].Name(), "Manager should output 1 span with name 'Eviction/EvictPod'")
+	assert.Equal(t, 3, len(output[0].Attributes()), "Manager should output 1 span with 3 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name")
+	assert.Equal(t, 2, len(output[0].Events()), "Manager should output 1 span with 2 events")
+	assert.Equal(t, 4, len(output[0].Events()[0].Attributes), "Manager should output first event with 4 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name, k8s.eviction.message")
+	assert.Equal(t, 3, len(output[0].Events()[1].Attributes), "Manager should output second event with 3 attributes, if eviction is successful, k8s.pod.id, k8s.pod.name, k8s.namespace.name")
+}
+
+func TestEvictionFailSpan(t *testing.T) {
+	podMaker := makePodWithMemoryStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "below-requests", requests: newResourceList("", "1Gi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "900Mi"},
+		{name: "above-requests", requests: newResourceList("", "100Mi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "700Mi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{
+		evictFailed: true,
+	}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("2Gi"),
+				},
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
+
+	fakeRecorder := tracetest.NewSpanRecorder()
+	oteltracer := trace.NewTracerProvider(trace.WithSpanProcessor(fakeRecorder)).Tracer(instrumentationScope)
+
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		tracer:                       oteltracer,
+	}
+
+	// synchronize to detect the memory pressure
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	output := fakeRecorder.Ended()
+
+	assert.Equal(t, 1, len(output), "Manager should output 1 span")
+	assert.Equal(t, "Eviction/EvictPod", output[0].Name(), "Manager should output 1 span with name 'Eviction/EvictPod'")
+	assert.Equal(t, 3, len(output[0].Attributes()), "Manager should output 1 span with 3 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name")
+	assert.Equal(t, 2, len(output[0].Events()), "Manager should output 1 span with 2 events")
+	assert.Equal(t, 4, len(output[0].Events()[0].Attributes), "Manager should output first event with 4 attributes, k8s.pod.id, k8s.pod.name, k8s.namespace.name, k8s.eviction.message")
+	assert.Equal(t, 5, len(output[0].Events()[1].Attributes), "Manager should output second event with 5 attributes, if eviction is failed, k8s.pod.id, k8s.pod.name, k8s.namespace.name, exception.type, exception.message")
 }
 
 func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
