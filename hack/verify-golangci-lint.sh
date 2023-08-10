@@ -48,6 +48,12 @@ PATH="${GOBIN}:${PATH}"
 
 invocation=(./hack/verify-golangci-lint.sh "$@")
 
+# Disable warnings about the logcheck plugin using the old API
+# (https://github.com/golangci/golangci-lint/issues/4001).
+# Can be removed once logcheck gets updated to a newer release
+# which uses the new plugin API
+export GOLANGCI_LINT_HIDE_WARNING_ABOUT_PLUGIN_API_DEPRECATION=1
+
 # The logcheck plugin currently has to be configured via env variables
 # (https://github.com/golangci/golangci-lint/issues/1512).
 #

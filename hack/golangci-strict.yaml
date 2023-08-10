@@ -19,7 +19,6 @@ issues:
 linters:
   disable-all: false # in contrast to golangci.yaml, the default set of linters remains enabled
   enable: # please keep this alphabetized and in sync with golangci.yaml
-    - ginkgolinter
     - gocritic
     - govet
     - ineffassign
