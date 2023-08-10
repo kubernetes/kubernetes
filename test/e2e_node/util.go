@@ -150,7 +150,7 @@ func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResour
 	if err != nil {
 		return nil, fmt.Errorf("Error getting local endpoint: %w", err)
 	}
-	client, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	client, conn, err := podresources.WaitForReady(podresources.GetClient(endpoint))
 	if err != nil {
 		return nil, fmt.Errorf("Error getting gRPC client: %w", err)
 	}
