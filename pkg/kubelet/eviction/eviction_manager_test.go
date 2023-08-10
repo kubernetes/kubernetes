@@ -68,7 +68,7 @@ func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride 
 	m.evict = evict
 	m.gracePeriodOverride = gracePeriodOverride
 	if m.evictFailed {
-		return fmt.Errorf("kill pod failed")
+		return errors.New("kill pod failed")
 	}
 	return nil
 }
