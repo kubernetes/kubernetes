@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/apiserver/pkg/apis/config/validation"
@@ -369,8 +368,7 @@ func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) 
 func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
 	baseTransformerFunc := func(block cipher.Block) value.Transformer {
 		// v1.24: write using AES-CBC only but support reads via AES-CBC and AES-GCM (so we can move to AES-GCM)
-		// TODO(aramase): swap this ordering in v1.25
-		return unionTransformers{aestransformer.NewCBCTransformer(block), aestransformer.NewGCMTransformer(block)}
+		return &cbcToGCMTransformer{cbc: aestransformer.NewCBCTransformer(block), gcm: aestransformer.NewGCMTransformer(block)}
 	}
 
 	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), baseTransformerFunc)
@@ -383,26 +381,22 @@ func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelop
 	}, nil
 }
 
-type unionTransformers []value.Transformer
+var _ value.Transformer = &cbcToGCMTransformer{}
 
-func (u unionTransformers) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
-	var errs []error
-	for i, transformer := range u {
-		result, stale, err := transformer.TransformFromStorage(ctx, data, dataCtx)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		// when i != 0, we have transformed the data from storage using the new transformer,
-		// we want to issue a write to etcd even if the contents of the data haven't changed
-		return result, stale || i != 0, nil
-	}
-	if err := utilerrors.Reduce(utilerrors.NewAggregate(errs)); err != nil {
-		return nil, false, err
-	}
-	return nil, false, fmt.Errorf("unionTransformers: unable to transform from storage")
+type cbcToGCMTransformer struct {
+	cbc, gcm value.Transformer
 }
 
-func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, err error) {
-	return u[0].TransformToStorage(ctx, data, dataCtx)
+func (c *cbcToGCMTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	// support reads via AES-CBC and AES-GCM
+	// check AES-GCM first because an AEAD can detect when data is meant for it
+	if out, _, err := c.gcm.TransformFromStorage(ctx, data, dataCtx); err == nil {
+		return out, true, nil // data encrypted via AES-GCM is considered stale because writes are supposed to use AES-CBC in v1.24
+	}
+
+	return c.cbc.TransformFromStorage(ctx, data, dataCtx)
+}
+
+func (c *cbcToGCMTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	return c.cbc.TransformToStorage(ctx, data, dataCtx) // write using AES-CBC only
 }
