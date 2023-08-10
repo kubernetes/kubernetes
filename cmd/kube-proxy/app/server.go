@@ -235,7 +235,7 @@ func NewOptions() *Options {
 }
 
 // Complete completes all the required options.
-func (o *Options) Complete() error {
+func (o *Options) Complete(fs *pflag.FlagSet) error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
 		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
 		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
@@ -247,6 +247,14 @@ func (o *Options) Complete() error {
 		if err != nil {
 			return err
 		}
+
+		// Before we overwrite the config which holds the parsed
+		// command line parameters, we need to copy all modified
+		// logging settings over to the loaded config (i.e.  logging
+		// command line flags have priority). Otherwise `--config
+		// ... -v=5` doesn't work (config resets verbosity even
+		// when it contains no logging settings).
+		copyLogsFromFlags(fs, &c.Logging)
 		o.config = c
 
 		if err := o.initWatcher(); err != nil {
@@ -261,6 +269,39 @@ func (o *Options) Complete() error {
 	}
 
 	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
+}
+
+// copyLogsFromFlags applies the logging flags from the given flag set to the given
+// configuration. Fields for which the corresponding flag was not used are left
+// unmodified. For fields that have multiple values (like vmodule), the values from
+// the flags get joined so that the command line flags have priority.
+//
+// TODO (pohly): move this to logsapi
+func copyLogsFromFlags(from *pflag.FlagSet, to *logsapi.LoggingConfiguration) error {
+	var cloneFS pflag.FlagSet
+	logsapi.AddFlags(to, &cloneFS)
+	vmodule := to.VModule
+	to.VModule = nil
+	var err error
+	cloneFS.VisitAll(func(f *pflag.Flag) {
+		if err != nil {
+			return
+		}
+		fsFlag := from.Lookup(f.Name)
+		if fsFlag == nil {
+			err = fmt.Errorf("logging flag %s not found in flag set", f.Name)
+			return
+		}
+		if !fsFlag.Changed {
+			return
+		}
+		if setErr := f.Value.Set(fsFlag.Value.String()); setErr != nil {
+			err = fmt.Errorf("copying flag %s value: %v", f.Name, setErr)
+			return
+		}
+	})
+	to.VModule = append(to.VModule, vmodule...)
+	return err
 }
 
 // Creates a new filesystem watcher and adds watches for the config file.
@@ -476,7 +517,7 @@ with the apiserver API to configure the proxy.`,
 				return fmt.Errorf("failed os init: %w", err)
 			}
 
-			if err := opts.Complete(); err != nil {
+			if err := opts.Complete(cmd.Flags()); err != nil {
 				return fmt.Errorf("failed complete: %w", err)
 			}
 
