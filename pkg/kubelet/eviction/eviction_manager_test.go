@@ -18,6 +18,7 @@ package eviction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
 
@@ -612,14 +613,14 @@ func (m *managerImpl) evictPod(ctx context.Context, pod *v1.Pod, gracePeriodOver
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
 	_, otelSpan := m.tracer.Start(ctx, "Eviction/EvictPod", trace.WithAttributes(
-		attribute.String("k8s.pod.uid", string(pod.UID)),
-		attribute.String("k8s.pod.name", pod.Name),
-		attribute.String("k8s.namespace.name", pod.Namespace),
+		semconv.K8SPodUIDKey.String(string(pod.UID)),
+		semconv.K8SPodNameKey.String(pod.Name),
+		semconv.K8SNamespaceNameKey.String(pod.Namespace),
 	))
 	otelSpan.AddEvent("Evicting pod", trace.WithAttributes(
-		attribute.String("k8s.pod.uid", string(pod.UID)),
-		attribute.String("k8s.pod.name", pod.Name),
-		attribute.String("k8s.namespace.name", pod.Namespace),
+		semconv.K8SPodUIDKey.String(string(pod.UID)),
+		semconv.K8SPodNameKey.String(pod.Name),
+		semconv.K8SNamespaceNameKey.String(pod.Namespace),
 		attribute.String("k8s.eviction.message", evictMsg),
 	))
 	defer otelSpan.End()
@@ -634,16 +635,16 @@ func (m *managerImpl) evictPod(ctx context.Context, pod *v1.Pod, gracePeriodOver
 	if err != nil {
 		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
 		otelSpan.RecordError(fmt.Errorf("pod failed to evict: %w", err), trace.WithAttributes(
-			attribute.String("k8s.pod.uid", string(pod.UID)),
-			attribute.String("k8s.pod.name", pod.Name),
-			attribute.String("k8s.namespace.name", pod.Namespace),
+			semconv.K8SPodUIDKey.String(string(pod.UID)),
+			semconv.K8SPodNameKey.String(pod.Name),
+			semconv.K8SNamespaceNameKey.String(pod.Namespace),
 		))
 	} else {
 		klog.InfoS("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))
 		otelSpan.AddEvent("pod is evicted successfully", trace.WithAttributes(
-			attribute.String("k8s.pod.uid", string(pod.UID)),
-			attribute.String("k8s.pod.name", pod.Name),
-			attribute.String("k8s.namespace.name", pod.Namespace),
+			semconv.K8SPodUIDKey.String(string(pod.UID)),
+			semconv.K8SPodNameKey.String(pod.Name),
+			semconv.K8SNamespaceNameKey.String(pod.Namespace),
 		))
 	}
 	return true
