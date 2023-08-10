@@ -4428,7 +4428,7 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIResourceDiscovery(ref common.Refer
 					},
 					"responseKind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns. APIs may return other objects types at their discretion, such as error conditions, requests for alternate representations, or other operation specific behavior. This value will be null if an APIService reports subresources but supports no operations on the parent resource",
+							Description: "responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns. APIs may return other objects types at their discretion, such as error conditions, requests for alternate representations, or other operation specific behavior. This value will be null or empty if an APIService reports subresources but supports no operations on the parent resource",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionKind"),
 						},
 					},
@@ -4556,7 +4556,7 @@ func schema_k8sio_api_apidiscovery_v2beta1_APISubresourceDiscovery(ref common.Re
 					},
 					"responseKind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns. Some subresources do not return normal resources, these will have null return types.",
+							Description: "responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns. Some subresources do not return normal resources, these will have null or empty return types.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionKind"),
 						},
 					},
@@ -21766,13 +21766,6 @@ func schema_k8sio_api_core_v1_LoadBalancerIngress(ref common.ReferenceCallback) 
 					"hostname": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"ipMode": {
-						SchemaProps: spec.SchemaProps{
-							Description: "IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified. Setting this to \"VIP\" indicates that traffic is delivered to the node with the destination set to the load-balancer's IP and port. Setting this to \"Proxy\" indicates that traffic is delivered to the node or pod with the destination set to the node's IP and node port or the pod's IP and port. Service implementations may use this information to adjust traffic routing.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
