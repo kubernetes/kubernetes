@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -464,20 +463,29 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 // lose precision. If the value of the quantity is outside the range of a float64
 // +Inf/-Inf will be returned.
 func (q *Quantity) AsApproximateFloat64() float64 {
-	var base float64
-	var exponent int
-	if q.d.Dec != nil {
-		base, _ = big.NewFloat(0).SetInt(q.d.Dec.UnscaledBig()).Float64()
-		exponent = int(-q.d.Dec.Scale())
+	infDec := q.AsDec()
+
+	var absScale int64
+	if infDec.Scale() < 0 {
+		absScale = int64(-infDec.Scale())
 	} else {
-		base = float64(q.i.value)
-		exponent = int(q.i.scale)
+		absScale = int64(infDec.Scale())
 	}
-	if exponent == 0 {
-		return base
+	pow10AbsScale := big.NewInt(10)
+	pow10AbsScale = pow10AbsScale.Exp(pow10AbsScale, big.NewInt(absScale), nil)
+
+	var resultBigFloat *big.Float
+	if infDec.Scale() < 0 {
+		resultBigInt := new(big.Int).Mul(infDec.UnscaledBig(), pow10AbsScale)
+		resultBigFloat = new(big.Float).SetInt(resultBigInt)
+	} else {
+		pow10AbsScaleFloat := new(big.Float).SetInt(pow10AbsScale)
+		resultBigFloat = new(big.Float).SetInt(infDec.UnscaledBig())
+		resultBigFloat = resultBigFloat.Quo(resultBigFloat, pow10AbsScaleFloat)
 	}
 
-	return base * math.Pow10(exponent)
+	result, _ := resultBigFloat.Float64()
+	return result
 }
 
 // AsInt64 returns a representation of the current value as an int64 if a fast conversion
