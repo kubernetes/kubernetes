@@ -87,6 +87,11 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 	podSandbox *runtimeapi.PodSandbox,
 	rootFsInfo *cadvisorapiv2.FsInfo,
 	updateCPUNanoCoreUsage bool) {
+	// Check if criSandboxStat or criSandboxStat.Windows is nil before proceeding
+    	if criSandboxStat == nil || criSandboxStat.Windows == nil {
+        log.Println("Error: criSandboxStat or criSandboxStat.Windows is nil, skipping container processing.")
+        return
+    	}
 	for _, criContainerStat := range criSandboxStat.Windows.Containers {
 		container, found := containerMap[criContainerStat.Attributes.Id]
 		if !found {
