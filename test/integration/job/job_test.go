@@ -1898,6 +1898,69 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	}
 }
 
+// This tests the feature enable -> disable -> enable path for PodReplacementPolicy.
+// We verify that Failed case works as expected when turned on.
+// Disable reverts to previous behavior.
+// Enabling will then match the original failed case.
+func TestJobPodReplacementPolicyFeatureToggling(t *testing.T) {
+	const podCount int32 = 2
+	jobSpec := batchv1.JobSpec{
+		Parallelism:          ptr.To(podCount),
+		Completions:          ptr.To(podCount),
+		CompletionMode:       ptr.To(batchv1.NonIndexedCompletion),
+		PodReplacementPolicy: ptr.To(batchv1.Failed),
+	}
+	wantTerminating := ptr.To(podCount)
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, true)()
+	closeFn, restConfig, clientSet, ns := setup(t, "pod-replacement-policy")
+	defer closeFn()
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	defer func() {
+		cancel()
+	}()
+	resetMetrics()
+
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: jobSpec,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+	jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+
+	waitForPodsToBeActive(ctx, t, jobClient, 2, jobObj)
+	deletePods(ctx, t, clientSet, jobObj.Namespace)
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Terminating: wantTerminating,
+		Failed:      0,
+		Ready:       ptr.To[int32](0),
+	})
+	// Disable controller and turn feature off.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, false)()
+	cancel()
+	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
+
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Terminating: nil,
+		Failed:      int(podCount),
+		Ready:       ptr.To[int32](0),
+		Active:      int(podCount),
+	})
+	// Disable the controller and turn feature on again.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, true)()
+	cancel()
+	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
+	waitForPodsToBeActive(ctx, t, jobClient, 2, jobObj)
+	deletePods(ctx, t, clientSet, jobObj.Namespace)
+
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Terminating: wantTerminating,
+		Failed:      int(podCount),
+		Active:      0,
+		Ready:       ptr.To[int32](0),
+	})
+}
+
 func TestElasticIndexedJob(t *testing.T) {
 	const initialCompletions int32 = 3
 	type jobUpdate struct {
