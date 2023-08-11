@@ -199,7 +199,6 @@ name | architectures
 
 ### API Change
 
-- Add IP mode field to loadbalancer status ingress ([#118895](https://github.com/kubernetes/kubernetes/pull/118895), [@RyanAoh](https://github.com/RyanAoh)) [SIG API Machinery, Apps, Cloud Provider, Network and Testing]
 - Aggregated discovery now returns `responseKind: {}` for resources which are missing group/version/kind information, to ensure compatibility with v0.26.0-v0.26.3 clients. ([#119835](https://github.com/kubernetes/kubernetes/pull/119835), [@liggitt](https://github.com/liggitt)) [SIG API Machinery and Testing]
 - Fix CustomResourceDefinition status.storedVersions validation error messages. ([#119653](https://github.com/kubernetes/kubernetes/pull/119653), [@sttts](https://github.com/sttts)) [SIG API Machinery]
 - Kube-proxy in Kubernetes >= 1.28 up until v1.28.0-beta.0 ignored the `-v` command line flag when combined with `--config`. ([#119867](https://github.com/kubernetes/kubernetes/pull/119867), [@pohly](https://github.com/pohly)) [SIG Network]
