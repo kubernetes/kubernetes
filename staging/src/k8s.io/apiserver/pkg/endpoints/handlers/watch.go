@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	"reflect"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -91,6 +90,8 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 		mediaType += ";stream=watch"
 	}
 
+	ctx := req.Context()
+
 	// locate the appropriate embedded encoder based on the transform
 	var embeddedEncoder runtime.Encoder
 	contentKind, contentSerializer, transform := targetEncodingForTransform(scope, mediaTypeOptions, req)
@@ -114,6 +115,16 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 		defer runtime.AllocatorPool.Put(memoryAllocator)
 		embeddedEncoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
 	}
+	var tableOptions *metav1.TableOptions
+	if options != nil {
+		if passedOptions, ok := options.(*metav1.TableOptions); ok {
+			tableOptions = passedOptions
+		} else {
+			scope.err(fmt.Errorf("unexpected options type: %T", options), w, req)
+			return
+		}
+	}
+	embeddedEncoder = newWatchEmbeddedEncoder(ctx, embeddedEncoder, mediaTypeOptions.Convert, tableOptions, scope)
 
 	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
 		if memoryAllocator == nil {
@@ -130,8 +141,6 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 		serverShuttingDownCh = signals.ShuttingDown()
 	}
 
-	ctx := req.Context()
-
 	server := &WatchServer{
 		Watching: watcher,
 		Scope:    scope,
@@ -141,21 +150,6 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 		Framer:          framer,
 		Encoder:         encoder,
 		EmbeddedEncoder: embeddedEncoder,
-
-		Fixup: func(obj runtime.Object) runtime.Object {
-			result, err := transformObject(ctx, obj, options, mediaTypeOptions.Convert, scope)
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to transform object %v: %v", reflect.TypeOf(obj), err))
-				return obj
-			}
-			// When we are transformed to a table, use the table options as the state for whether we
-			// should print headers - on watch, we only want to print table headers on the first object
-			// and omit them on subsequent events.
-			if tableOptions, ok := options.(*metav1.TableOptions); ok {
-				tableOptions.NoHeaders = true
-			}
-			return result
-		},
 
 		TimeoutFactory:       &realTimeoutFactory{timeout},
 		ServerShuttingDownCh: serverShuttingDownCh,
@@ -179,8 +173,6 @@ type WatchServer struct {
 	Encoder runtime.Encoder
 	// used to encode the nested object in the watch stream
 	EmbeddedEncoder runtime.Encoder
-	// used to correct the object before we send it to the serializer
-	Fixup func(runtime.Object) runtime.Object
 
 	TimeoutFactory       TimeoutFactory
 	ServerShuttingDownCh <-chan struct{}
@@ -256,10 +248,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 
-			obj := s.Fixup(event.Object)
-			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
+			if err := s.EmbeddedEncoder.Encode(event.Object, buf); err != nil {
 				// unexpected error
-				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", event.Object, err))
 				return
 			}
 
@@ -324,10 +315,10 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
-			obj := s.Fixup(event.Object)
-			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
+
+			if err := s.EmbeddedEncoder.Encode(event.Object, buf); err != nil {
 				// unexpected error
-				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", event.Object, err))
 				return
 			}
 
