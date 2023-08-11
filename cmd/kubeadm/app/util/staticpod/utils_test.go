@@ -244,7 +244,7 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 		cfg              *kubeadmapi.Etcd
 		isIPv6           bool
 		expectedHostname string
-		expectedPort     int
+		expectedPort     int32
 		expectedScheme   v1.URIScheme
 	}{
 		{

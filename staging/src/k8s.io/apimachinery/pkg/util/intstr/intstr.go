@@ -79,6 +79,9 @@ func Parse(val string) IntOrString {
 	if err != nil {
 		return FromString(val)
 	}
+	if i > math.MaxInt32 || i < math.MinInt32 {
+		return FromString(val)
+	}
 	return FromInt32(int32(i))
 }
 
