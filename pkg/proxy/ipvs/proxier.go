@@ -1172,7 +1172,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, ingress := range svcInfo.LoadBalancerVIPStrings() {
+		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
 			// ipset call
 			entry = &utilipset.Entry{
 				IP:       ingress,

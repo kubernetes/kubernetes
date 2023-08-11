@@ -934,12 +934,6 @@ const (
 	//
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
-
-	// owner: @Sh4d1,@RyanAoh
-	// kep: http://kep.k8s.io/1860
-	// alpha: v1.29
-	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
-	LoadBalancerIPMode featuregate.Feature = "LoadBalancerIPMode"
 )
 
 func init() {
@@ -1190,8 +1184,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodIndexLabel: {Default: true, PreRelease: featuregate.Beta},
-
-	LoadBalancerIPMode: {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

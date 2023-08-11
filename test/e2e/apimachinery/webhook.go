@@ -28,7 +28,6 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -853,58 +852,6 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		_, err := createMutatingWebhookConfiguration(ctx, f, mutatingWebhookConfiguration)
 		framework.ExpectError(err, "create mutatingwebhookconfiguration should have been denied by the api-server")
 		expectedErrMsg := "compilation failed"
-		gomega.Expect(strings.Contains(err.Error(), expectedErrMsg)).To(gomega.BeTrue())
-	})
-
-	/*
-		Release: v1.28
-		Testname: Validating Admission webhook, validating webhook exclude leases using match conditions field.
-		Description: Create a validating webhook configuration with matchConditions field that
-		will reject all resources except the coordination.k8s.io/lease ones. Try to create pods
-		until the webhook is ready and rejecting the pods with "denied" error message. Create
-		a Lease object and validate that it bypasses the webhook. Create a configMap and validate
-		that it's rejected by the webhook.
-	*/
-	ginkgo.It("should reject everything except leases", func(ctx context.Context) {
-		excludeLeasesMatchConditions := []admissionregistrationv1.MatchCondition{
-			{
-				Name:       "exclude-leases",
-				Expression: `!(request.resource.group == "coordination.k8s.io" && request.resource.resource == "leases")`,
-			},
-		}
-
-		ginkgo.By("creating a validating webhook with match conditions")
-		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, excludeLeasesMatchConditions)
-		_, err := createValidatingWebhookConfiguration(ctx, f, validatingWebhookConfiguration)
-		framework.ExpectNoError(err, "registering webhook config %s", f.UniqueName)
-		defer func() {
-			err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, validatingWebhookConfiguration.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "Deleting mutating webhook configuration")
-		}()
-
-		err = waitWebhookConfigurationReady(ctx, f, f.Namespace.Name)
-		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-
-		ginkgo.By("validate that the validating webhook configuration does not reject leases")
-		_, err = client.CoordinationV1().Leases(f.Namespace.Name).Create(ctx, &coordinationv1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "lease" + f.UniqueName,
-			},
-			Spec: coordinationv1.LeaseSpec{},
-		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "creating coordination.k8s.io/lease object")
-
-		ginkgo.By("validate that the validating webhook configuration does reject configMaps")
-		_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "cm" + f.UniqueName,
-			},
-			Data: map[string]string{
-				"reject": "this",
-			},
-		}, metav1.CreateOptions{})
-		framework.ExpectError(err, "creating configmap object")
-		expectedErrMsg := "denied the request: this webhook denies all requests"
 		gomega.Expect(strings.Contains(err.Error(), expectedErrMsg)).To(gomega.BeTrue())
 	})
 

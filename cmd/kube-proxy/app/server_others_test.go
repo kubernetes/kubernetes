@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -563,7 +564,7 @@ detectLocalMode: "BridgeInterface"`)
 
 		opt := NewOptions()
 		opt.ConfigFile = file.Name()
-		err = opt.Complete()
+		err = opt.Complete(new(pflag.FlagSet))
 		if err != nil {
 			t.Fatal(err)
 		}
