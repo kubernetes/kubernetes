@@ -85,7 +85,7 @@ var (
 		[]string{"endpoint"},
 	)
 	storageSizeDescription   = compbasemetrics.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"cluster"}, nil, compbasemetrics.ALPHA, "")
-	storageMonitor           = &monitorCollector{}
+	storageMonitor           = &monitorCollector{monitorGetter: func() ([]Monitor, error) { return nil, nil }}
 	etcdEventsReceivedCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      "apiserver",
