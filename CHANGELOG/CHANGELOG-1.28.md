@@ -402,7 +402,6 @@ name | architectures
 ### API Change
 
 - A CDIDevice field is includes in the Device Plugin's `ContainerAllocateResponse`. This field maps to the CDIDevice field in the CRI protocol. ([#118254](https://github.com/kubernetes/kubernetes/pull/118254), [@elezar](https://github.com/elezar)) [SIG Node and Testing]
-- Add IP mode field to loadbalancer status ingress ([#118895](https://github.com/kubernetes/kubernetes/pull/118895), [@RyanAoh](https://github.com/RyanAoh)) [SIG API Machinery, Apps, Cloud Provider, Network and Testing]
 - Add new annotation `batch.kubernetes.io/cronjob-scheduled-timestamp` to Job objects scheduled from CronJobs. ([#118137](https://github.com/kubernetes/kubernetes/pull/118137), [@helayoty](https://github.com/helayoty)) [SIG Apps]
 - Add podReplacementPolicy and terminating field to job api ([#119301](https://github.com/kubernetes/kubernetes/pull/119301), [@kannon92](https://github.com/kannon92)) [SIG API Machinery and Apps]
 - Added fields `reason` and `fieldPath` into CRD validation rules to allow users to specify reason and field path when validation failed. ([#118041](https://github.com/kubernetes/kubernetes/pull/118041), [@cici37](https://github.com/cici37)) [SIG API Machinery]
