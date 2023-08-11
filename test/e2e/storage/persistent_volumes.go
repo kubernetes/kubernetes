@@ -202,6 +202,24 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				completeTest(ctx, f, c, ns, pv, pvc)
 			})
 
+			// Create new PV without claim, verify it's in Available state and LastPhaseTransitionTime is set.
+			ginkgo.It("create a PV: test phase transition timestamp is set and phase is Available [Feature:PersistentVolumeLastPhaseTransitionTime]", func(ctx context.Context) {
+				pvObj := e2epv.MakePersistentVolume(pvConfig)
+				pv, err = e2epv.CreatePV(ctx, c, f.Timeouts, pvObj)
+				framework.ExpectNoError(err)
+
+				// The new PV should transition phase to: Available
+				err = e2epv.WaitForPersistentVolumePhase(ctx, v1.VolumeAvailable, c, pv.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+				framework.ExpectNoError(err)
+
+				// Verify that new PV has phase transition timestamp set.
+				pv, err = c.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				if pv.Status.LastPhaseTransitionTime == nil {
+					framework.Failf("New persistent volume %v should have LastPhaseTransitionTime value set, but it's nil.", pv.GetName())
+				}
+			})
+
 			// Create PV and pre-bound PVC that matches the PV, verify that when PV and PVC bind
 			// the LastPhaseTransitionTime filed of the PV is updated.
 			ginkgo.It("create a PV and a pre-bound PVC: test phase transition timestamp is set [Feature:PersistentVolumeLastPhaseTransitionTime]", func(ctx context.Context) {
