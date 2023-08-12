@@ -29,12 +29,16 @@ import (
 )
 
 func startJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	go job.NewController(
+	jobController, err := job.NewController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to start job controller: %v", err)
+	}
+	go jobController.Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
 	return nil, true, nil
 }
 
