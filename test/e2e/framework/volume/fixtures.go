@@ -387,7 +387,7 @@ func TestServerCleanup(ctx context.Context, f *framework.Framework, config TestC
 	framework.ExpectNoError(err, "delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
-func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeouts *framework.TimeoutContext, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
+func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeouts *framework.TimeoutContext, config TestConfig, podSuffix string, securityLevel admissionapi.Level, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-", podSuffix))
 	var gracePeriod int64 = 1
 	var command string
@@ -399,8 +399,7 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 	When SELinux is enabled on the host, client-pod can not read the content, with permission denied.
 	Invoking client-pod as privileged, so that it can access the volume content, even when SELinux is enabled on the host.
 	*/
-	securityLevel := admissionapi.LevelBaseline // TODO (#118184): also support LevelRestricted
-	if privileged || config.Prefix == "hostpathsymlink" || config.Prefix == "hostpath" {
+	if config.Prefix == "hostpathsymlink" || config.Prefix == "hostpath" {
 		securityLevel = admissionapi.LevelPrivileged
 	}
 	command = "while true ; do sleep 2; done "
@@ -439,14 +438,6 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
 
-		// We need to make the container privileged when SELinux is enabled on the
-		// host,  so the test can write data to a location like /tmp. Also, due to
-		// the Docker bug below, it's not currently possible to map a device with
-		// a privileged container, so we don't go privileged for block volumes.
-		// https://github.com/moby/moby/issues/35991
-		if privileged && test.Mode == v1.PersistentVolumeBlock {
-			securityLevel = admissionapi.LevelBaseline
-		}
 		clientPod.Spec.Containers[0].SecurityContext = e2epod.GenerateContainerSecurityContext(securityLevel)
 
 		if test.Mode == v1.PersistentVolumeBlock {
@@ -547,7 +538,7 @@ func TestVolumeClientSlow(ctx context.Context, f *framework.Framework, config Te
 
 func testVolumeClient(ctx context.Context, f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test, slow bool) {
 	timeouts := f.Timeouts
-	clientPod, err := runVolumeTesterPod(ctx, f.ClientSet, timeouts, config, "client", false, fsGroup, tests, slow)
+	clientPod, err := runVolumeTesterPod(ctx, f.ClientSet, timeouts, config, "client", f.NamespacePodSecurityLevel, fsGroup, tests, slow)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
 	}
@@ -576,12 +567,12 @@ func testVolumeClient(ctx context.Context, f *framework.Framework, config TestCo
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
 func InjectContent(ctx context.Context, f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
-	privileged := true
+	securityLevel := f.NamespacePodSecurityLevel
 	timeouts := f.Timeouts
 	if framework.NodeOSDistroIs("windows") {
-		privileged = false
+		securityLevel = admissionapi.LevelPrivileged
 	}
-	injectorPod, err := runVolumeTesterPod(ctx, f.ClientSet, timeouts, config, "injector", privileged, fsGroup, tests, false /*slow*/)
+	injectorPod, err := runVolumeTesterPod(ctx, f.ClientSet, timeouts, config, "injector", securityLevel, fsGroup, tests, false /*slow*/)
 	if err != nil {
 		framework.Failf("Failed to create injector pod: %v", err)
 		return
