@@ -401,6 +401,12 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		if !s.IsUnschedulable() {
 			return nil, diagnosis, s.AsError()
 		}
+		// All nodes in NodeToStatusMap will have the same status so that they can be handled in the preemption.
+		// Some non trivial refactoring is needed to avoid this copy.
+		for _, n := range allNodes {
+			diagnosis.NodeToStatusMap[n.Node().Name] = s
+		}
+
 		// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
 		msg := s.Message()
 		diagnosis.PreFilterMsg = msg

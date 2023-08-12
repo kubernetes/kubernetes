@@ -1390,8 +1390,32 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
+				NodeToStatusMap: NodeToStatusMap{
+					// They're inserted by the framework.
+					// We don't include them in the reason message because they'd be just duplicates.
+					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				},
 			},
 			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter.",
+		},
+		{
+			name:        "nodes failed Prefilter plugin and the preemption also failed",
+			numAllNodes: 3,
+			diagnosis: Diagnosis{
+				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
+				NodeToStatusMap: NodeToStatusMap{
+					// They're inserted by the framework.
+					// We don't include them in the reason message because they'd be just duplicates.
+					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				},
+				// PostFilterMsg will be included.
+				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
+			},
+			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter. Error running PostFilter plugin FailedPostFilter.",
 		},
 		{
 			name:        "nodes failed one Filter plugin with an empty PostFilterMsg",
