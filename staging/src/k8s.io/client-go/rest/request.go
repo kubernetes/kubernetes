@@ -626,7 +626,7 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 	}
 
 	if latency > longThrottleLatency {
-		klog.V(3).Info(message)
+		klog.FromContext(ctx).V(3).Info(message)
 	}
 	if latency > extraLongThrottleLatency {
 		// If the rate limiter latency is very high, the log message should be printed at a higher log level,
@@ -970,7 +970,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	}()
 
 	if r.err != nil {
-		klog.V(4).Infof("Error in request: %v", r.err)
+		klog.FromContext(ctx).V(4).Info("Error in request", "error", r.err)
 		return r.err
 	}
 
