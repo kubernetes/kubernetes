@@ -35,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/gengo/namer"
+	gengotypes "k8s.io/gengo/types"
 )
 
 // ObjectTracker keeps track of objects. It is intended to be used to
@@ -332,13 +334,17 @@ func (t *tracker) Add(obj runtime.Object) error {
 	if len(gvks) == 0 {
 		return fmt.Errorf("no registered kinds for %v", obj)
 	}
+
+	namer := namer.NewAllLowercasePluralNamer(nil)
 	for _, gvk := range gvks {
-		// NOTE: UnsafeGuessKindToResource is a heuristic and default match. The
-		// actual registration in apiserver can specify arbitrary route for a
+		// NOTE: This is a heuristic and default match.
+		// The actual registration in apiserver can specify arbitrary route for a
 		// gvk. If a test uses such objects, it cannot preset the tracker with
 		// objects via Add(). Instead, it should trigger the Create() function
 		// of the tracker, where an arbitrary gvr can be specified.
-		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+		name := namer.Name(gengotypes.Ref(gvk.GroupKind().String(), gvk.Kind))
+		gvr := gvk.GroupVersion().WithResource(name)
+
 		// Resource doesn't have the concept of "__internal" version, just set it to "".
 		if gvr.Version == runtime.APIVersionInternal {
 			gvr.Version = ""

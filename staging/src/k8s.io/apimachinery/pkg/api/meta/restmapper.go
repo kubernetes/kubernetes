@@ -24,6 +24,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
 )
 
 // Implements RESTScope interface
@@ -62,6 +64,8 @@ type DefaultRESTMapper struct {
 	kindToScope          map[schema.GroupVersionKind]RESTScope
 	singularToPlural     map[schema.GroupVersionResource]schema.GroupVersionResource
 	pluralToSingular     map[schema.GroupVersionResource]schema.GroupVersionResource
+
+	namer namer.Namer
 }
 
 func (m *DefaultRESTMapper) String() string {
@@ -93,11 +97,15 @@ func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion) *DefaultRE
 		defaultGroupVersions: defaultGroupVersions,
 		singularToPlural:     singularToPlural,
 		pluralToSingular:     pluralToSingular,
+		namer:                namer.NewAllLowercasePluralNamer(nil),
 	}
 }
 
 func (m *DefaultRESTMapper) Add(kind schema.GroupVersionKind, scope RESTScope) {
-	plural, singular := UnsafeGuessKindToResource(kind)
+	t := types.Ref(kind.GroupVersion().String(), kind.Kind)
+	plural := kind.GroupVersion().WithResource(m.namer.Name(t))
+	singular := kind.GroupVersion().WithResource(strings.ToLower(kind.Kind))
+
 	m.AddSpecific(kind, plural, singular, scope)
 }
 
@@ -123,6 +131,9 @@ var unpluralizedSuffixes = []string{
 // UnsafeGuessKindToResource converts Kind to a resource name.
 // Broken. This method only "sort of" works when used outside of this package.  It assumes that Kinds and Resources match
 // and they aren't guaranteed to do so.
+//
+// Deprecated: This is and may yield unwanted and unexpected results.
+// Use k8s.io/gengo/namer's NewAllLowercasePluralNamer() instead.
 func UnsafeGuessKindToResource(kind schema.GroupVersionKind) ( /*plural*/ schema.GroupVersionResource /*singular*/, schema.GroupVersionResource) {
 	kindName := kind.Kind
 	if len(kindName) == 0 {
@@ -244,7 +255,6 @@ func (m *DefaultRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]s
 					ret = append(ret, plural)
 				}
 			}
-
 		}
 
 	case hasVersion:
@@ -329,7 +339,6 @@ func (m *DefaultRESTMapper) KindsFor(input schema.GroupVersionResource) ([]schem
 					ret = append(ret, currKind)
 				}
 			}
-
 		}
 
 	case hasVersion:
@@ -495,7 +504,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 	}
 
 	for _, gvk := range potentialGVK {
-		//Ensure we have a REST mapping
+		// Ensure we have a REST mapping
 		res, ok := m.kindToPluralResource[gvk]
 		if !ok {
 			continue

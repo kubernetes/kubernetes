@@ -19,10 +19,11 @@ package fake
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/testing"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
 	"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	cmclient "k8s.io/metrics/pkg/client/custom_metrics"
 )
@@ -64,9 +65,13 @@ func (i GetForActionImpl) DeepCopy() testing.Action {
 }
 
 func NewGetForAction(groupKind schema.GroupKind, namespace, name string, metricName string, labelSelector labels.Selector) GetForActionImpl {
+	namer := namer.NewAllLowercasePluralNamer(nil)
+
 	// the version doesn't matter
 	gvk := groupKind.WithVersion("")
-	gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+	t := types.Ref(groupKind.String(), groupKind.Kind)
+	gvr := gvk.GroupVersion().WithResource(namer.Name(t))
+
 	groupResourceForKind := schema.GroupResource{
 		Group:    gvr.Group,
 		Resource: gvr.Resource,
@@ -83,9 +88,13 @@ func NewGetForAction(groupKind schema.GroupKind, namespace, name string, metricN
 }
 
 func NewRootGetForAction(groupKind schema.GroupKind, name string, metricName string, labelSelector labels.Selector) GetForActionImpl {
+	namer := namer.NewAllLowercasePluralNamer(nil)
+
 	// the version doesn't matter
 	gvk := groupKind.WithVersion("")
-	gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+	t := types.Ref(groupKind.String(), groupKind.Kind)
+	gvr := gvk.GroupVersion().WithResource(namer.Name(t))
+
 	groupResourceForKind := schema.GroupResource{
 		Group:    gvr.Group,
 		Resource: gvr.Resource,

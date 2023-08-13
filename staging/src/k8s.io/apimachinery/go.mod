@@ -52,6 +52,7 @@ require (
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/gengo v0.0.0-20230306165830-ab3349d207d4
 )
 
 replace k8s.io/apimachinery => ../apimachinery

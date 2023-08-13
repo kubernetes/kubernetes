@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/testing"
+	"k8s.io/gengo/namer"
+	gengotypes "k8s.io/gengo/types"
 )
 
 func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *FakeDynamicClient {
@@ -78,12 +80,16 @@ func NewSimpleDynamicClientWithCustomListKinds(scheme *runtime.Scheme, gvrToList
 	// first we attempt to invert known List types from the scheme to auto guess the resource with unsafe guesses
 	// this covers common usage of registering types in scheme and passing them
 	completeGVRToListKind := map[schema.GroupVersionResource]string{}
+	namer := namer.NewAllLowercasePluralNamer(nil)
 	for listGVK := range scheme.AllKnownTypes() {
 		if !strings.HasSuffix(listGVK.Kind, "List") {
 			continue
 		}
+
 		nonListGVK := listGVK.GroupVersion().WithKind(listGVK.Kind[:len(listGVK.Kind)-4])
-		plural, _ := meta.UnsafeGuessKindToResource(nonListGVK)
+		t := gengotypes.Ref(nonListGVK.GroupVersion().String(), nonListGVK.Kind)
+		plural := nonListGVK.GroupVersion().WithResource(namer.Name(t))
+
 		completeGVRToListKind[plural] = listGVK.Kind
 	}
 

@@ -31,7 +31,6 @@ import (
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,6 +44,8 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregator "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	aggregatorclientsetscheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
@@ -59,13 +60,15 @@ type aggegatorClientSet = aggregator.Interface
 
 type apiextensionsClientSet = apiextensions.Interface
 
-type dynamicClientset = dynamic.Interface
-type testClientSet struct {
-	kubeClientSet
-	aggegatorClientSet
-	apiextensionsClientSet
-	dynamicClientset
-}
+type (
+	dynamicClientset = dynamic.Interface
+	testClientSet    struct {
+		kubeClientSet
+		aggegatorClientSet
+		apiextensionsClientSet
+		dynamicClientset
+	}
+)
 
 var _ testClient = testClientSet{}
 
@@ -622,7 +625,6 @@ func TestFreshness(t *testing.T) {
 			},
 		},
 	})
-
 }
 
 // Shows a group for which multiple APIServices specify a GroupPriorityMinimum,
@@ -906,7 +908,12 @@ func makeCRDSpec(group string, kind string, namespaced bool, versions []string, 
 		scope = apiextensionsv1.ClusterScoped
 	}
 
-	plural, singular := meta.UnsafeGuessKindToResource(schema.GroupVersionKind{Kind: kind})
+	gvk := schema.GroupVersionKind{Kind: kind}
+	namer := namer.NewAllLowercasePluralNamer(nil)
+	t := types.Ref(gvk.GroupKind().String(), gvk.Kind)
+	plural := gvk.GroupVersion().WithResource(namer.Name(t))
+	singular := gvk.GroupVersion().WithResource(strings.ToLower(gvk.Kind))
+
 	res := apiextensionsv1.CustomResourceDefinitionSpec{
 		Group: group,
 		Scope: scope,

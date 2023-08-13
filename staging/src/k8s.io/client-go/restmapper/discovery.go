@@ -108,7 +108,7 @@ func NewDiscoveryRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper
 				singular := gv.WithResource(resource.SingularName)
 				// this is for legacy resources and servers which don't list singular forms.  For those we must still guess.
 				if len(resource.SingularName) == 0 {
-					_, singular = meta.UnsafeGuessKindToResource(gv.WithKind(resource.Kind))
+					singular = gv.WithResource(strings.ToLower(resource.Kind))
 				}
 
 				versionMapper.AddSpecific(gv.WithKind(strings.ToLower(resource.Kind)), plural, singular, scope)

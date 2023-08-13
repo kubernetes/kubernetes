@@ -33,6 +33,8 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/gengo/namer"
+	gengotypes "k8s.io/gengo/types"
 )
 
 func getArbitraryResource(s schema.GroupVersionResource, name, namespace string) *unstructured.Unstructured {
@@ -278,12 +280,17 @@ func TestPatchWithMissingObject(t *testing.T) {
 func TestGetWithExactMatch(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
+	namer := namer.NewAllLowercasePluralNamer(nil)
 
 	constructObject := func(s schema.GroupVersionResource, name, namespace string) (*unstructured.Unstructured, schema.GroupVersionResource) {
 		obj := getArbitraryResource(s, name, namespace)
 		gvks, _, err := scheme.ObjectKinds(obj)
 		assert.NoError(t, err)
-		gvr, _ := meta.UnsafeGuessKindToResource(gvks[0])
+
+		gvk := gvks[0]
+		t := gengotypes.Ref(gvk.GroupKind().String(), gvk.Kind)
+		gvr := gvk.GroupVersion().WithResource(namer.Name(t))
+
 		return obj, gvr
 	}
 
