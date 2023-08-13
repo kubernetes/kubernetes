@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,10 +79,15 @@ func CreateVolumeResourceWithAccessModes(ctx context.Context, driver TestDriver,
 	case PreprovisionedPV:
 		framework.Logf("Creating resource for pre-provisioned PV")
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
-			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, pattern.FsType, r.Volume)
-			if pvSource != nil {
-				r.Pv, r.Pvc = createPVCPV(ctx, f, dInfo.Name, pvSource, volumeNodeAffinity, pattern.VolMode, accessModes)
-				r.VolSource = storageutils.CreateVolumeSource(r.Pvc.Name, false /* readOnly */)
+			dynamicProvisionedPVC := r.Volume.GetVolumeClaim(ctx)
+			if dynamicProvisionedPVC == nil {
+				pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, pattern.FsType, r.Volume)
+				if pvSource != nil {
+					r.Pv, r.Pvc = createPVCPV(ctx, f, dInfo.Name, pvSource, volumeNodeAffinity, pattern.VolMode, accessModes)
+					r.VolSource = storageutils.CreateVolumeSource(r.Pvc.Name, false /* readOnly */)
+				}
+			} else {
+				r.VolSource = storageutils.CreateVolumeSource(dynamicProvisionedPVC.Name, false /* readOnly */)
 			}
 		}
 	case DynamicPV, GenericEphemeralVolume:

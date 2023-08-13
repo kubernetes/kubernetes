@@ -199,23 +199,27 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 			ginkgo.It("should fail to create pod by failing to mount volume [Slow]", func(ctx context.Context) {
 				manualInit(ctx)
 				ginkgo.DeferCleanup(cleanup)
-
 				var err error
 
-				ginkgo.By("Creating sc")
-				l.Sc, err = l.cs.StorageV1().StorageClasses().Create(ctx, l.Sc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create sc")
+				dynamicProvisionedPVC := l.Volume.GetVolumeClaim(ctx)
+				if dynamicProvisionedPVC == nil {
+					ginkgo.By("Creating sc")
+					l.Sc, err = l.cs.StorageV1().StorageClasses().Create(ctx, l.Sc, metav1.CreateOptions{})
+					framework.ExpectNoError(err, "Failed to create sc")
 
-				ginkgo.By("Creating pv and pvc")
-				l.Pv, err = l.cs.CoreV1().PersistentVolumes().Create(ctx, l.Pv, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create pv")
+					ginkgo.By("Creating pv and pvc")
+					l.Pv, err = l.cs.CoreV1().PersistentVolumes().Create(ctx, l.Pv, metav1.CreateOptions{})
+					framework.ExpectNoError(err, "Failed to create pv")
 
-				// Prebind pv
-				l.Pvc.Spec.VolumeName = l.Pv.Name
-				l.Pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(ctx, l.Pvc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create pvc")
+					// Prebind pv
+					l.Pvc.Spec.VolumeName = l.Pv.Name
+					l.Pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(ctx, l.Pvc, metav1.CreateOptions{})
+					framework.ExpectNoError(err, "Failed to create pvc")
 
-				framework.ExpectNoError(e2epv.WaitOnPVandPVC(ctx, l.cs, f.Timeouts, l.ns.Name, l.Pv, l.Pvc), "Failed to bind pv and pvc")
+					framework.ExpectNoError(e2epv.WaitOnPVandPVC(ctx, l.cs, f.Timeouts, l.ns.Name, l.Pv, l.Pvc), "Failed to bind pv and pvc")
+				} else {
+					l.Pvc = dynamicProvisionedPVC
+				}
 
 				ginkgo.By("Creating pod")
 				podConfig := e2epod.Config{
@@ -358,6 +362,14 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		init(ctx)
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		l.VolumeResource = *storageframework.CreateVolumeResource(ctx, driver, l.config, pattern, testVolumeSizeRange)
+
+		if l.Volume != nil {
+			dynamicProvisionedPVC := l.Volume.GetVolumeClaim(ctx)
+			if dynamicProvisionedPVC != nil {
+				l.Pvc = dynamicProvisionedPVC
+			}
+		}
+
 		ginkgo.DeferCleanup(cleanup)
 
 		ginkgo.By("Creating pod")

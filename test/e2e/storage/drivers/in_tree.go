@@ -46,6 +46,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -81,6 +82,10 @@ type nfsVolume struct {
 	serverHost string
 	serverPod  *v1.Pod
 	f          *framework.Framework
+}
+
+func (v *nfsVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return nil
 }
 
 var _ storageframework.TestDriver = &nfsDriver{}
@@ -227,6 +232,10 @@ type iSCSIVolume struct {
 	serverIP  string
 	f         *framework.Framework
 	iqn       string
+}
+
+func (v *iSCSIVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return nil
 }
 
 var _ storageframework.TestDriver = &iSCSIDriver{}
@@ -412,6 +421,10 @@ type rbdVolume struct {
 	f         *framework.Framework
 }
 
+func (v *rbdVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return nil
+}
+
 var _ storageframework.TestDriver = &rbdDriver{}
 var _ storageframework.PreprovisionedVolumeTestDriver = &rbdDriver{}
 var _ storageframework.InlineVolumeTestDriver = &rbdDriver{}
@@ -540,6 +553,10 @@ type cephVolume struct {
 	serverIP  string
 	secret    *v1.Secret
 	f         *framework.Framework
+}
+
+func (v *cephVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return nil
 }
 
 var _ storageframework.TestDriver = &cephFSDriver{}
@@ -724,6 +741,10 @@ type hostPathSymlinkVolume struct {
 	sourcePath string
 	prepPod    *v1.Pod
 	f          *framework.Framework
+}
+
+func (v *hostPathSymlinkVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return nil
 }
 
 var _ storageframework.TestDriver = &hostPathSymlinkDriver{}
@@ -995,7 +1016,12 @@ type gcePdDriver struct {
 }
 
 type gcePdVolume struct {
-	volumeName string
+	volumeClaim *v1.PersistentVolumeClaim
+	f           *framework.Framework
+}
+
+func (v *gcePdVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return v.volumeClaim
 }
 
 var _ storageframework.TestDriver = &gcePdDriver{}
@@ -1093,9 +1119,11 @@ func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume st
 	if !ok {
 		framework.Failf("Failed to cast test volume of type %T to the GCE PD test volume", e2evolume)
 	}
+
+	volume := gv.volumeClaim.Spec.VolumeName
 	volSource := v1.VolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   gv.volumeName,
+			PDName:   volume,
 			ReadOnly: readOnly,
 		},
 	}
@@ -1110,9 +1138,11 @@ func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 	if !ok {
 		framework.Failf("Failed to cast test volume of type %T to the GCE PD test volume", e2evolume)
 	}
+
+	volume := gv.volumeClaim.Spec.VolumeName
 	pvSource := v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   gv.volumeName,
+			PDName:   volume,
 			ReadOnly: readOnly,
 		},
 	}
@@ -1120,6 +1150,15 @@ func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 		pvSource.GCEPersistentDisk.FSType = fsType
 	}
 	return &pvSource, nil
+}
+
+func getImmediateDynamicProvisionStorageClass(config *storageframework.PerTestConfig, provisioner string) *storagev1.StorageClass {
+	parameters := map[string]string{}
+
+	ns := config.Framework.Namespace.Name
+	delayedBinding := storagev1.VolumeBindingImmediate
+
+	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
 func (g *gcePdDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -1153,26 +1192,27 @@ func (g *gcePdDriver) PrepareTest(ctx context.Context, f *framework.Framework) *
 }
 
 func (g *gcePdDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	zone := getInlineVolumeZone(ctx, config.Framework)
-	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
-		// so pods should be also scheduled there.
-		config.ClientNodeSelection = e2epod.NodeSelection{
-			Selector: map[string]string{
-				v1.LabelTopologyZone: zone,
-			},
-		}
+	ginkgo.By("creating a test gcepd disk volume")
+	provisioner := "kubernetes.io/gce-pd"
+
+	storageClass := getImmediateDynamicProvisionStorageClass(config, provisioner)
+	if storageClass == nil {
+		framework.Failf("Failed to get storage class based on test config")
 	}
-	ginkgo.By("creating a test gce pd volume")
-	vname, err := e2epv.CreatePDWithRetryAndZone(ctx, zone)
-	framework.ExpectNoError(err)
+
+	storageClass, err := config.Framework.ClientSet.StorageV1().StorageClasses().Create(context.TODO(), storageClass, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Failed to create StorageClass")
+
+	pvc := createDynamicProvisionVolumeClaims(ctx, config, storageClass.Name)
+
 	return &gcePdVolume{
-		volumeName: vname,
+		f:           config.Framework,
+		volumeClaim: pvc,
 	}
 }
 
 func (v *gcePdVolume) DeleteVolume(ctx context.Context) {
-	_ = e2epv.DeletePDWithRetry(ctx, v.volumeName)
+	deleteVolume(ctx, v.f, v.volumeClaim)
 }
 
 // vSphere
@@ -1183,6 +1223,10 @@ type vSphereDriver struct {
 type vSphereVolume struct {
 	volumePath string
 	nodeInfo   *vspheretest.NodeInfo
+}
+
+func (v *vSphereVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return nil
 }
 
 var _ storageframework.TestDriver = &vSphereDriver{}
@@ -1322,7 +1366,13 @@ type azureDiskDriver struct {
 }
 
 type azureDiskVolume struct {
-	volumeName string
+	volumeClaim *v1.PersistentVolumeClaim
+	f           *framework.Framework
+	volumeName  string
+}
+
+func (v *azureDiskVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return v.volumeClaim
 }
 
 var _ storageframework.TestDriver = &azureDiskDriver{}
@@ -1377,6 +1427,7 @@ func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, e2evolum
 	if !ok {
 		framework.Failf("Failed to cast test volume of type %T to the Azure test volume", e2evolume)
 	}
+
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
 	kind := v1.AzureManagedDisk
@@ -1439,25 +1490,30 @@ func (a *azureDiskDriver) PrepareTest(ctx context.Context, f *framework.Framewor
 
 func (a *azureDiskDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	ginkgo.By("creating a test azure disk volume")
-	zone := getInlineVolumeZone(ctx, config.Framework)
-	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
-		// so pods should be also scheduled there.
-		config.ClientNodeSelection = e2epod.NodeSelection{
-			Selector: map[string]string{
-				v1.LabelTopologyZone: zone,
-			},
-		}
+
+	provisioner := "kubernetes.io/azure-disk"
+	storageClass := getImmediateDynamicProvisionStorageClass(config, provisioner)
+	if storageClass == nil {
+		framework.Failf("Failed to get storage class based on test config")
 	}
-	volumeName, err := e2epv.CreatePDWithRetryAndZone(ctx, zone)
-	framework.ExpectNoError(err)
+
+	storageClass, err := config.Framework.ClientSet.StorageV1().StorageClasses().Create(ctx, storageClass, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Failed to create StorageClass")
+
+	pvc := createDynamicProvisionVolumeClaims(ctx, config, storageClass.Name)
+
+	pv, err := config.Framework.ClientSet.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get PV")
+
 	return &azureDiskVolume{
-		volumeName: volumeName,
+		volumeName:  pv.Spec.AzureDisk.DataDiskURI,
+		f:           config.Framework,
+		volumeClaim: pvc,
 	}
 }
 
 func (v *azureDiskVolume) DeleteVolume(ctx context.Context) {
-	_ = e2epv.DeletePDWithRetry(ctx, v.volumeName)
+	deleteVolume(ctx, v.f, v.volumeClaim)
 }
 
 // AWS
@@ -1557,6 +1613,10 @@ type localDriver struct {
 type localVolume struct {
 	ltrMgr utils.LocalTestResourceManager
 	ltr    *utils.LocalTestResource
+}
+
+func (v *localVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return nil
 }
 
 var (
@@ -1736,24 +1796,6 @@ func cleanUpVolumeServer(ctx context.Context, f *framework.Framework, serverPod 
 	cleanUpVolumeServerWithSecret(ctx, f, serverPod, nil)
 }
 
-func getInlineVolumeZone(ctx context.Context, f *framework.Framework) string {
-	if framework.TestContext.CloudConfig.Zone != "" {
-		return framework.TestContext.CloudConfig.Zone
-	}
-	// if zone is not specified we will randomly pick a zone from schedulable nodes for inline tests
-	node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-	framework.ExpectNoError(err)
-	zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
-	if ok {
-		return zone
-	}
-	topologyZone, ok := node.Labels[v1.LabelTopologyZone]
-	if ok {
-		return topologyZone
-	}
-	return ""
-}
-
 // cleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.
 func cleanUpVolumeServerWithSecret(ctx context.Context, f *framework.Framework, serverPod *v1.Pod, secret *v1.Secret) {
 	cs := f.ClientSet
@@ -1780,10 +1822,15 @@ type azureFileDriver struct {
 }
 
 type azureFileVolume struct {
-	accountName     string
+	volumeClaim     *v1.PersistentVolumeClaim
+	f               *framework.Framework
 	shareName       string
 	secretName      string
 	secretNamespace string
+}
+
+func (v *azureFileVolume) GetVolumeClaim(ctx context.Context) *v1.PersistentVolumeClaim {
+	return v.volumeClaim
 }
 
 var _ storageframework.TestDriver = &azureFileDriver{}
@@ -1875,36 +1922,32 @@ func (a *azureFileDriver) PrepareTest(ctx context.Context, f *framework.Framewor
 
 func (a *azureFileDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	ginkgo.By("creating a test azure file volume")
-	accountName, accountKey, shareName, err := e2epv.CreateShare()
-	framework.ExpectNoError(err)
 
-	secretName := "azure-storage-account-" + accountName + "-secret"
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: config.Framework.Namespace.Name,
-			Name:      secretName,
-		},
-
-		Data: map[string][]byte{
-			"azurestorageaccountname": []byte(accountName),
-			"azurestorageaccountkey":  []byte(accountKey),
-		},
-		Type: "Opaque",
+	provisioner := "kubernetes.io/azure-file"
+	storageClass := getImmediateDynamicProvisionStorageClass(config, provisioner)
+	if storageClass == nil {
+		framework.Failf("Failed to get storage class based on test config")
 	}
 
-	_, err = config.Framework.ClientSet.CoreV1().Secrets(config.Framework.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	storageClass, err := config.Framework.ClientSet.StorageV1().StorageClasses().Create(ctx, storageClass, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Failed to create storageClass")
+
+	pvc := createDynamicProvisionVolumeClaims(ctx, config, storageClass.Name)
+
+	pv, err := config.Framework.ClientSet.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get PV")
+
 	return &azureFileVolume{
-		accountName:     accountName,
-		shareName:       shareName,
-		secretName:      secretName,
-		secretNamespace: config.Framework.Namespace.Name,
+		f:               config.Framework,
+		volumeClaim:     pvc,
+		shareName:       pv.Spec.AzureFile.ShareName,
+		secretName:      pv.Spec.AzureFile.SecretName,
+		secretNamespace: *pv.Spec.AzureFile.SecretNamespace,
 	}
 }
 
 func (v *azureFileVolume) DeleteVolume(ctx context.Context) {
-	err := e2epv.DeleteShare(v.accountName, v.shareName)
-	framework.ExpectNoError(err)
+	deleteVolume(ctx, v.f, v.volumeClaim)
 }
 
 func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
@@ -1913,4 +1956,42 @@ func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
 	timeouts.PodDelete = time.Minute * 15
 	timeouts.PVDelete = time.Minute * 20
 	return timeouts
+}
+
+// createDynamicProvisionVolumeClaims Create PVs using dynamic provisioning of PVCs.
+func createDynamicProvisionVolumeClaims(ctx context.Context, config *storageframework.PerTestConfig, storageClassName string) *v1.PersistentVolumeClaim {
+	pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+		StorageClassName: &storageClassName,
+	}, config.Framework.Namespace.Name)
+
+	pvc, err := config.Framework.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Failed to create persistentVolumeClaim")
+
+	err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, config.Framework.ClientSet, pvc.Namespace, pvc.Name, framework.Poll, config.Framework.Timeouts.ClaimBound)
+	framework.ExpectNoError(err, "PVC %v did not become Bound", pvc.Name)
+
+	pvc, err = config.Framework.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get PVC")
+
+	return pvc
+}
+
+func deleteVolume(ctx context.Context, f *framework.Framework, volumeClaim *v1.PersistentVolumeClaim) {
+	cs := f.ClientSet
+
+	_, err := cs.CoreV1().PersistentVolumeClaims(volumeClaim.Namespace).Get(ctx, volumeClaim.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		framework.Logf("persistentVolumeClaim: %s has been removed", volumeClaim)
+		return
+	}
+	framework.ExpectNoError(err, "Failed to get PVC")
+
+	err = cs.CoreV1().PersistentVolumeClaims(volumeClaim.Namespace).Delete(ctx, volumeClaim.Name, metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "Failed to delete PVC")
+
+	err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, volumeClaim.Spec.VolumeName, 5*time.Second, f.Timeouts.PVDelete)
+	framework.ExpectNoError(err, "Persistent volume %v not deleted by dynamic provisioner", volumeClaim.Spec.VolumeName)
+
+	err = cs.StorageV1().StorageClasses().Delete(ctx, *volumeClaim.Spec.StorageClassName, metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "Failed to delete StorageClass")
 }
