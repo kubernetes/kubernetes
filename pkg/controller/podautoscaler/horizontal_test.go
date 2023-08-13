@@ -2579,6 +2579,7 @@ func TestTooFewReplicas(t *testing.T) {
 		specReplicas:            2,
 		statusReplicas:          2,
 		expectedDesiredReplicas: 3,
+		scaleUpRules:            generateScalingRules(0, 0, 200, 60, 0),
 		CPUTarget:               90,
 		reportedLevels:          []uint64{},
 		reportedCPURequests:     []resource.Quantity{},
@@ -2601,6 +2602,7 @@ func TestTooManyReplicas(t *testing.T) {
 		specReplicas:            10,
 		statusReplicas:          10,
 		expectedDesiredReplicas: 5,
+		scaleDownRules:          generateScalingRules(0, 0, 200, 60, 0),
 		CPUTarget:               90,
 		reportedLevels:          []uint64{},
 		reportedCPURequests:     []resource.Quantity{},
@@ -3635,6 +3637,7 @@ func TestScaleUpRCImmediately(t *testing.T) {
 		specReplicas:            1,
 		statusReplicas:          1,
 		expectedDesiredReplicas: 2,
+		scaleUpRules:            generateScalingRules(0, 0, 200, 60, 0),
 		verifyCPUCurrent:        false,
 		reportedLevels:          []uint64{0, 0, 0, 0},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -3659,6 +3662,7 @@ func TestScaleDownRCImmediately(t *testing.T) {
 		specReplicas:            6,
 		statusReplicas:          6,
 		expectedDesiredReplicas: 5,
+		scaleDownRules:          generateScalingRules(0, 0, 200, 60, 0),
 		CPUTarget:               50,
 		reportedLevels:          []uint64{8000, 9500, 1000},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
@@ -5328,4 +5332,64 @@ func TestMultipleHPAs(t *testing.T) {
 	}
 
 	assert.Equal(t, hpaCount, len(processedHPA), "Expected to process all HPAs")
+}
+
+func TestScaleUpWithDisabledSelectPolicy(t *testing.T) {
+	policy := autoscalingv2.DisabledPolicySelect
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            1,
+		statusReplicas:          1,
+		initialReplicas:         1,
+		expectedDesiredReplicas: 1,
+		scaleUpRules: &autoscalingv2.HPAScalingRules{
+			SelectPolicy: &policy,
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{
+				Type:   autoscalingv2.AbleToScale,
+				Status: v1.ConditionTrue,
+				Reason: "SucceededGetScale",
+			},
+			{
+				Type:   autoscalingv2.ScalingActive,
+				Status: v1.ConditionFalse,
+				Reason: "ScalingDisabled",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownWithDisabledSelectPolicy(t *testing.T) {
+	policy := autoscalingv2.DisabledPolicySelect
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            8,
+		statusReplicas:          8,
+		initialReplicas:         8,
+		expectedDesiredReplicas: 8,
+		scaleDownRules: &autoscalingv2.HPAScalingRules{
+			SelectPolicy: &policy,
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{
+				Type:   autoscalingv2.AbleToScale,
+				Status: v1.ConditionTrue,
+				Reason: "SucceededGetScale",
+			},
+			{
+				Type:   autoscalingv2.ScalingActive,
+				Status: v1.ConditionFalse,
+				Reason: "ScalingDisabled",
+			},
+		},
+	}
+	tc.runTest(t)
 }

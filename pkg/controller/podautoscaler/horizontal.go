@@ -825,11 +825,21 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		rescale = false
 		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "ScalingDisabled", "scaling is disabled since the replica count of the target is zero")
 	} else if currentReplicas > hpa.Spec.MaxReplicas {
-		rescaleReason = "Current number of replicas above Spec.MaxReplicas"
-		desiredReplicas = hpa.Spec.MaxReplicas
+		if *hpa.Spec.Behavior.ScaleDown.SelectPolicy == autoscalingv2.DisabledPolicySelect {
+			rescale = false
+			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "ScalingDisabled", "scaling is disabled since the scale down select policy is disabled")
+		} else {
+			rescaleReason = "Current number of replicas above Spec.MaxReplicas"
+			desiredReplicas = hpa.Spec.MaxReplicas
+		}
 	} else if currentReplicas < minReplicas {
-		rescaleReason = "Current number of replicas below Spec.MinReplicas"
-		desiredReplicas = minReplicas
+		if *hpa.Spec.Behavior.ScaleUp.SelectPolicy == autoscalingv2.DisabledPolicySelect {
+			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "ScalingDisabled", "scaling is disabled since the scale up select policy is disabled")
+			rescale = false
+		} else {
+			rescaleReason = "Current number of replicas below Spec.MinReplicas"
+			desiredReplicas = minReplicas
+		}
 	} else {
 		var metricTimestamp time.Time
 		metricDesiredReplicas, metricName, metricStatuses, metricTimestamp, err = a.computeReplicasForMetrics(ctx, hpa, scale, hpa.Spec.Metrics)
