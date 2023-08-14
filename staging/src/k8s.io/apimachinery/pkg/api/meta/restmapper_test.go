@@ -452,9 +452,13 @@ func TestKindToResource(t *testing.T) {
 		{Kind: "miss", Plural: "misses", Singular: "miss"},
 		// Add "s" otherwise
 		{Kind: "lowercase", Plural: "lowercases", Singular: "lowercase"},
+		// Take into account Endpoints exception.
+		{Kind: "Endpoints", Plural: "endpoints", Singular: "endpoints"},
 	}
 
-	namer := namer.NewAllLowercasePluralNamer(nil)
+	namer := namer.NewAllLowercasePluralNamer(map[string]string{
+		"Endpoints": "endpoints",
+	})
 	for _, testCase := range testCases {
 		testCase := testCase
 		t.Run(testCase.Kind, func(t *testing.T) {

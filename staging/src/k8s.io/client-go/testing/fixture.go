@@ -218,6 +218,7 @@ type tracker struct {
 	// watchers' channel. Note that too many unhandled events (currently 100,
 	// see apimachinery/pkg/watch.DefaultChanSize) will cause a panic.
 	watchers map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher
+	namer    namer.Namer
 }
 
 var _ ObjectTracker = &tracker{}
@@ -230,6 +231,9 @@ func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracke
 		decoder:  decoder,
 		objects:  make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
 		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
+		namer: namer.NewAllLowercasePluralNamer(map[string]string{
+			"Endpoints": "endpoints",
+		}),
 	}
 }
 
@@ -335,14 +339,13 @@ func (t *tracker) Add(obj runtime.Object) error {
 		return fmt.Errorf("no registered kinds for %v", obj)
 	}
 
-	namer := namer.NewAllLowercasePluralNamer(nil)
 	for _, gvk := range gvks {
 		// NOTE: This is a heuristic and default match.
 		// The actual registration in apiserver can specify arbitrary route for a
 		// gvk. If a test uses such objects, it cannot preset the tracker with
 		// objects via Add(). Instead, it should trigger the Create() function
 		// of the tracker, where an arbitrary gvr can be specified.
-		name := namer.Name(gengotypes.Ref(gvk.GroupKind().String(), gvk.Kind))
+		name := t.namer.Name(gengotypes.Ref(gvk.GroupKind().String(), gvk.Kind))
 		gvr := gvk.GroupVersion().WithResource(name)
 
 		// Resource doesn't have the concept of "__internal" version, just set it to "".
