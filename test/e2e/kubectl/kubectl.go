@@ -59,6 +59,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
@@ -469,10 +470,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		ginkgo.It("should support exec through an HTTP proxy", func(ctx context.Context) {
-			// Fail if the variable isn't set
-			if framework.TestContext.Host == "" {
-				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
-			}
+			testContextHost := getTestContextHost()
 
 			ginkgo.By("Starting http_proxy")
 			var proxyLogs bytes.Buffer
@@ -497,7 +495,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				}
 
 				// Verify the proxy server logs saw the connection
-				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(framework.TestContext.Host, "https://"), "/api"))
+				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(testContextHost, "https://"), "/api"))
 
 				proxyLog := proxyLogs.String()
 				if !strings.Contains(proxyLog, expectedProxyLog) {
@@ -507,10 +505,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		ginkgo.It("should support exec through kubectl proxy", func(ctx context.Context) {
-			// Fail if the variable isn't set
-			if framework.TestContext.Host == "" {
-				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
-			}
+			_ = getTestContextHost()
 
 			ginkgo.By("Starting kubectl proxy")
 			port, proxyCmd, err := startProxyServer(ns)
@@ -2070,6 +2065,27 @@ metadata:
 		})
 	})
 })
+
+func getTestContextHost() string {
+	if len(framework.TestContext.Host) > 0 {
+		return framework.TestContext.Host
+	}
+	// if there is a kubeconfig, pick the first server from it
+	if framework.TestContext.KubeConfig != "" {
+		c, err := clientcmd.LoadFromFile(framework.TestContext.KubeConfig)
+		if err == nil {
+			for _, v := range c.Clusters {
+				if v.Server != "" {
+					framework.Logf("--host variable was not set, picking up the first server from %s",
+						framework.TestContext.KubeConfig)
+					return v.Server
+				}
+			}
+		}
+	}
+	framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
+	return ""
+}
 
 // Checks whether the output split by line contains the required elements.
 func checkOutputReturnError(output string, required [][]string) error {
