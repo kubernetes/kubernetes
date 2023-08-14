@@ -72,14 +72,11 @@ func FromString(val string) IntOrString {
 	return IntOrString{Type: String, StrVal: val}
 }
 
-// Parse the given string and try to convert it to an integer before
+// Parse the given string and try to convert it to an int32 integer before
 // setting it as a string value.
 func Parse(val string) IntOrString {
-	i, err := strconv.Atoi(val)
+	i, err := strconv.ParseInt(val, 10, 32)
 	if err != nil {
-		return FromString(val)
-	}
-	if i > math.MaxInt32 || i < math.MinInt32 {
 		return FromString(val)
 	}
 	return FromInt32(int32(i))
