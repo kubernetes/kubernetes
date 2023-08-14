@@ -39,7 +39,7 @@ import (
 
 var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-placement")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	const (
 		NodeLabelKey = "vsphere_e2e_label_volume_placement"
 	)

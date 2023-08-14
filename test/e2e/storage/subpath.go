@@ -31,7 +31,7 @@ import (
 
 var _ = utils.SIGDescribe("Subpath", func() {
 	f := framework.NewDefaultFramework("subpath")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("Atomic writer volumes", func() {
 		var err error

@@ -120,7 +120,7 @@ func testPath(ctx context.Context, client clientset.Interface, path string, requ
 
 var _ = SIGDescribe("health handlers", func() {
 	f := framework.NewDefaultFramework("health")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should contain necessary checks", func(ctx context.Context) {
 		ginkgo.By("/health")

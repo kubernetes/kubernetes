@@ -58,7 +58,7 @@ var (
 // Serial because the test restarts Kubelet
 var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testDevicePlugin(f, kubeletdevicepluginv1beta1.DevicePluginPath)
 	testDevicePluginNodeReboot(f, kubeletdevicepluginv1beta1.DevicePluginPath)
 })

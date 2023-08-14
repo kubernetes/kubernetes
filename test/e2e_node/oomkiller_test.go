@@ -40,7 +40,7 @@ const PodOOMKilledTimeout = 2 * time.Minute
 
 var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	containerName := "oomkill-target-container"
 	oomPodSpec := getOOMTargetPod("oomkill-target-pod", containerName)

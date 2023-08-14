@@ -70,7 +70,7 @@ type recoveryTest struct {
 
 var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-expansion")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSI Volume expansion", func() {

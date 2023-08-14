@@ -36,7 +36,7 @@ import (
 
 var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 	f := framework.NewDefaultFramework("cpu-resources-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// The Windows 'BusyBox' image is PowerShell plus a collection of scripts and utilities to mimic common busybox commands
 	powershellImage := imageutils.GetConfig(imageutils.BusyBox)

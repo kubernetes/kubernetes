@@ -84,7 +84,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	var RCName string
 	var ns string
 	f := framework.NewDefaultFramework("sched-pred")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.AfterEach(func(ctx context.Context) {
 		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(ctx, RCName, metav1.GetOptions{})

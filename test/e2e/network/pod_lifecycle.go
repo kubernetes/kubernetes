@@ -35,7 +35,7 @@ import (
 var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 
 	fr := framework.NewDefaultFramework("podlifecycle")
-	fr.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	fr.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		cs        clientset.Interface

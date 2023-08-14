@@ -58,7 +58,7 @@ type NodeSelector struct {
 
 var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 	f := framework.NewDefaultFramework("vcp-at-scale")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		client            clientset.Interface

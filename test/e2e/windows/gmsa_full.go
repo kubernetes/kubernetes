@@ -92,7 +92,7 @@ const (
 
 var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 	f := framework.NewDefaultFramework("gmsa-full-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("GMSA support", func() {
 		ginkgo.It("works end to end", func(ctx context.Context) {

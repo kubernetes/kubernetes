@@ -36,7 +36,7 @@ import (
 
 var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManager]", func() {
 	f := framework.NewDefaultFramework("topologymanager-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("when querying /metrics", func() {
 		var oldCfg *kubeletconfig.KubeletConfiguration

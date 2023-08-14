@@ -47,7 +47,7 @@ const (
 
 var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-disksize")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client       clientset.Interface
 		namespace    string

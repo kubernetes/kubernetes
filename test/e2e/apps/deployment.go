@@ -86,7 +86,7 @@ var _ = SIGDescribe("Deployment", func() {
 	})
 
 	f := framework.NewDefaultFramework("deployment")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet

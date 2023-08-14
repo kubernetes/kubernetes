@@ -41,7 +41,7 @@ import (
 
 var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpumanager-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("when querying /metrics", func() {
 		var oldCfg *kubeletconfig.KubeletConfiguration
