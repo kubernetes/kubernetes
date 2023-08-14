@@ -288,7 +288,7 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscaler(refName string, mapping
 	if o.CPUPercent >= 0 {
 		c := int32(o.CPUPercent)
 
-		scaler.Spec.Metrics = []autoscalingv2.MetricSpec{
+		scaler.Spec.Metrics = []autoscalingv2.MetricSpec{ // Reference : https://pkg.go.dev/k8s.io/api/autoscaling/v2beta2#MetricSpec
 			{
 				Type: autoscalingv2.ResourceMetricSourceType,
 				Resource: &autoscalingv2.ResourceMetricSource{
