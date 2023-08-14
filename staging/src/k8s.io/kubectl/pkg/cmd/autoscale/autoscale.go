@@ -288,17 +288,22 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscaler(refName string, mapping
 	if o.CPUPercent >= 0 {
 		c := int32(o.CPUPercent)
 
-		scaler.Spec.Metrics = []autoscalingv2.MetricSpec{ // Reference : https://pkg.go.dev/k8s.io/api/autoscaling/v2beta2#MetricSpec
-			{
-				Type: autoscalingv2.ResourceMetricSourceType,
-				Resource: &autoscalingv2.ResourceMetricSource{
-					Name: "cpu-percent",
-					Target: autoscalingv2.MetricTarget{
-						Type:               autoscalingv2.UtilizationMetricType,
-						AverageUtilization: &c,
-					},
-				},
-			},
+	scaler.Spec.Metrics = []autoscalingv2.MetricSpec{
+    // Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
+    {
+        Type: autoscalingv2.ResourceMetricSourceType,
+        Resource: &autoscalingv2.ResourceMetricSource{
+            // Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+            Name: "cpu-percent",
+            Target: autoscalingv2.MetricTarget{
+				// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+                Type: autoscalingv2.UtilizationMetricType,
+                AverageUtilization: &c,
+            },
+        },
+    },
+};
+
 		}
 	}
 
