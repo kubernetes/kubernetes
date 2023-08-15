@@ -32,8 +32,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/moby/sys/mountinfo"
-
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
@@ -746,21 +744,6 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 // endpoint is called to enumerate all the mountpoints and check if
 // it is mountpoint match or not.
 func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
-	isMnt, sure, isMntErr := mountinfo.MountedFast(file)
-	if sure && isMntErr == nil {
-		return isMnt, nil
-	}
-	if isMntErr != nil {
-		if errors.Is(isMntErr, fs.ErrNotExist) {
-			return false, fs.ErrNotExist
-		}
-		// We were not allowed to do the simple stat() check, e.g. on NFS with
-		// root_squash. Fall back to /proc/mounts check below when
-		// fs.ErrPermission is returned.
-		if !errors.Is(isMntErr, fs.ErrPermission) {
-			return false, isMntErr
-		}
-	}
 	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
 	resolvedFile, err := filepath.EvalSymlinks(file)
 	if err != nil {
