@@ -188,7 +188,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			framework.ExpectNoError(err, "failed to marshal JSON for new data")
 			return jsonpatch.CreateMergePatch(oldBytes, newBytes)
 		}, "status")
-		framework.ExpectEmpty(patched.Status.DisruptedPods, "Expecting the PodDisruptionBudget's be empty")
+		gomega.Expect(patched.Status.DisruptedPods).To(gomega.BeEmpty(), "Expecting the PodDisruptionBudget's be empty")
 	})
 
 	// PDB shouldn't error out when there are unmanaged pods
