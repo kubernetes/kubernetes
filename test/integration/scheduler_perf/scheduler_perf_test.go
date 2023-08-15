@@ -102,7 +102,8 @@ var (
 				label:  resultLabelName,
 				values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
 			},
-			"scheduler_pod_scheduling_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds":     nil,
+			"scheduler_pod_scheduling_sli_duration_seconds": nil,
 		},
 	}
 )

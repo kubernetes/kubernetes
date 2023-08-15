@@ -288,6 +288,7 @@ func (sched *Scheduler) bindingCycle(
 	metrics.PodSchedulingAttempts.Observe(float64(assumedPodInfo.Attempts))
 	if assumedPodInfo.InitialAttemptTimestamp != nil {
 		metrics.PodSchedulingDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
+		metrics.PodSchedulingSLIDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
 	}
 	// Run "postbind" plugins.
 	fwk.RunPostBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
