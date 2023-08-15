@@ -30,7 +30,6 @@ import (
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -355,9 +354,6 @@ type ControllerContext struct {
 	// requested.
 	RESTMapper *restmapper.DeferredDiscoveryRESTMapper
 
-	// AvailableResources is a map listing currently available resources
-	AvailableResources map[schema.GroupVersionResource]bool
-
 	// Cloud is the cloud provider interface for the controllers to use.
 	// It must be initialized and ready to use.
 	Cloud cloudprovider.Interface
@@ -491,35 +487,6 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	return controllers
 }
 
-// GetAvailableResources gets the map which contains all available resources of the apiserver
-// TODO: In general, any controller checking this needs to be dynamic so
-// users don't have to restart their controller manager if they change the apiserver.
-// Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
-func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
-	client := clientBuilder.ClientOrDie("controller-discovery")
-	discoveryClient := client.Discovery()
-	_, resourceMap, err := discoveryClient.ServerGroupsAndResources()
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
-	}
-	if len(resourceMap) == 0 {
-		return nil, fmt.Errorf("unable to get any supported resources from server")
-	}
-
-	allResources := map[schema.GroupVersionResource]bool{}
-	for _, apiResourceList := range resourceMap {
-		version, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
-		if err != nil {
-			return nil, err
-		}
-		for _, apiResource := range apiResourceList.APIResources {
-			allResources[version.WithResource(apiResource.Name)] = true
-		}
-	}
-
-	return allResources, nil
-}
-
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
@@ -544,11 +511,6 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 		restMapper.Reset()
 	}, 30*time.Second, stop)
 
-	availableResources, err := GetAvailableResources(rootClientBuilder)
-	if err != nil {
-		return ControllerContext{}, err
-	}
-
 	cloud, loopMode, err := createCloudProvider(logger, s.ComponentConfig.KubeCloudShared.CloudProvider.Name, s.ComponentConfig.KubeCloudShared.ExternalCloudVolumePlugin,
 		s.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile, s.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
 	if err != nil {
@@ -561,7 +523,6 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
 		ComponentConfig:                 s.ComponentConfig,
 		RESTMapper:                      restMapper,
-		AvailableResources:              availableResources,
 		Cloud:                           cloud,
 		LoopMode:                        loopMode,
 		InformersStarted:                make(chan struct{}),

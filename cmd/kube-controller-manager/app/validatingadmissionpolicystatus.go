@@ -19,7 +19,6 @@ package app
 import (
 	"context"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	pluginvalidatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -28,14 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
-var validatingAdmissionPolicyResource = admissionregistrationv1beta1.SchemeGroupVersion.WithResource("validatingadmissionpolicies")
-
 func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	// intended check against served resource but not feature gate.
 	// KCM won't start the controller without the feature gate set.
-	if !controllerContext.AvailableResources[validatingAdmissionPolicyResource] {
-		return nil, false, nil
-	}
 	typeChecker := &pluginvalidatingadmissionpolicy.TypeChecker{
 		SchemaResolver: resolver.NewDefinitionsSchemaResolver(scheme.Scheme, openapi.GetOpenAPIDefinitions),
 		RestMapper:     controllerContext.RESTMapper,

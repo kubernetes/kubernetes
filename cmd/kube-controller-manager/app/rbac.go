@@ -19,15 +19,11 @@ package app
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
 
 func startClusterRoleAggregrationController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if !controllerContext.AvailableResources[schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"}] {
-		return nil, false, nil
-	}
 	go clusterroleaggregation.NewClusterRoleAggregation(
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
 		controllerContext.ClientBuilder.ClientOrDie("clusterrole-aggregation-controller").RbacV1(),
