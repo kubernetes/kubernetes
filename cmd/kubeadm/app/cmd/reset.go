@@ -104,7 +104,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		return nil, err
 	}
 
-	var initCfg *kubeadmapi.InitConfiguration
+	initCfg := &kubeadmapi.InitConfiguration{}
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal ResetConfiguration and validates cfg.
 	resetCfg, err := configutil.LoadOrDefaultResetConfiguration(opts.cfgPath, opts.externalcfg, allowExperimental)
@@ -123,7 +123,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", opts.kubeconfigPath)
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(opts.ignorePreflightErrors, resetCfg.IgnorePreflightErrors)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(initCfg.FeatureGates, opts.ignorePreflightErrors, resetCfg.IgnorePreflightErrors)
 	if err != nil {
 		return nil, err
 	}
