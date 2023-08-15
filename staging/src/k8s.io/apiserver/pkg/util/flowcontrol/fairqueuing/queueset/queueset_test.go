@@ -209,13 +209,13 @@ func (us uniformScenario) exercise(t *testing.T) {
 type uniformScenarioState struct {
 	t *testing.T
 	uniformScenario
-	startTime                                                    time.Time
-	doSplit                                                      bool
-	execSeatsIntegrators                                         []fq.Integrator
-	seatDemandIntegratorCheck                                    fq.Integrator
-	failedCount                                                  uint64
-	expectedInqueue, expectedExecuting, expectedConcurrencyInUse string
-	executions, rejects                                          []int32
+	startTime                                                                              time.Time
+	doSplit                                                                                bool
+	execSeatsIntegrators                                                                   []fq.Integrator
+	seatDemandIntegratorCheck                                                              fq.Integrator
+	failedCount                                                                            uint64
+	expectedInqueueReqs, expectedInqueueSeats, expectedExecuting, expectedConcurrencyInUse string
+	executions, rejects                                                                    []int32
 }
 
 func (uss *uniformScenarioState) exercise() {
@@ -226,7 +226,8 @@ func (uss *uniformScenarioState) exercise() {
 	for i, uc := range uss.clients {
 		uss.execSeatsIntegrators[i] = fq.NewNamedIntegrator(uss.clk, fmt.Sprintf("%s client %d execSeats", uss.name, i))
 		fsName := fmt.Sprintf("client%d", i)
-		uss.expectedInqueue = uss.expectedInqueue + fmt.Sprintf(`				apiserver_flowcontrol_current_inqueue_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
+		uss.expectedInqueueReqs = uss.expectedInqueueReqs + fmt.Sprintf(`				apiserver_flowcontrol_current_inqueue_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
+		uss.expectedInqueueSeats = uss.expectedInqueueSeats + fmt.Sprintf(`				apiserver_flowcontrol_current_inqueue_seats{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		for j := 0; j < uc.nThreads; j++ {
 			ust := uniformScenarioThread{
 				uss:                 uss,
@@ -412,8 +413,19 @@ func (uss *uniformScenarioState) finalReview() {
 		e := `
 				# HELP apiserver_flowcontrol_current_inqueue_requests [BETA] Number of requests currently pending in queues of the API Priority and Fairness subsystem
 				# TYPE apiserver_flowcontrol_current_inqueue_requests gauge
-` + uss.expectedInqueue
+` + uss.expectedInqueueReqs
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_current_inqueue_requests")
+		if err != nil {
+			uss.t.Error(err)
+		} else {
+			uss.t.Log("Success with" + e)
+		}
+
+		e = `
+				# HELP apiserver_flowcontrol_current_inqueue_seats [ALPHA] Number of seats currently pending in queues of the API Priority and Fairness subsystem
+				# TYPE apiserver_flowcontrol_current_inqueue_seats gauge
+` + uss.expectedInqueueSeats
+		err = metrics.GatherAndCompare(e, "apiserver_flowcontrol_current_inqueue_seats")
 		if err != nil {
 			uss.t.Error(err)
 		} else {
