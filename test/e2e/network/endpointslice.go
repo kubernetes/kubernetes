@@ -268,7 +268,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "example",
 					Port:       80,
-					TargetPort: intstr.FromInt(3000),
+					TargetPort: intstr.FromInt32(3000),
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
@@ -300,7 +300,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "example-no-match",
 					Port:       80,
-					TargetPort: intstr.FromInt(8080),
+					TargetPort: intstr.FromInt32(8080),
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},

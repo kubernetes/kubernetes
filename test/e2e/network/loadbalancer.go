@@ -1037,7 +1037,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		_, err = udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1169,7 +1169,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		_, err = udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1425,7 +1425,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 				// Change service port to avoid collision with opened hostPorts
 				// in other tests that run in parallel.
 				if len(svc.Spec.Ports) != 0 {
-					svc.Spec.Ports[0].TargetPort = intstr.FromInt(int(svc.Spec.Ports[0].Port))
+					svc.Spec.Ports[0].TargetPort = intstr.FromInt32(svc.Spec.Ports[0].Port)
 					svc.Spec.Ports[0].Port = 8081
 				}
 

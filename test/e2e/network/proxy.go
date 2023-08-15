@@ -116,7 +116,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 						{
 							Name:       "portname2",
 							Port:       81,
-							TargetPort: intstr.FromInt(162),
+							TargetPort: intstr.FromInt32(162),
 						},
 						{
 							Name:       "tlsportname1",
@@ -126,7 +126,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 						{
 							Name:       "tlsportname2",
 							Port:       444,
-							TargetPort: intstr.FromInt(462),
+							TargetPort: intstr.FromInt32(462),
 						},
 					},
 				},
@@ -166,7 +166,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				ReadinessProbe: &v1.Probe{
 					ProbeHandler: v1.ProbeHandler{
 						HTTPGet: &v1.HTTPGetAction{
-							Port: intstr.FromInt(80),
+							Port: intstr.FromInt32(80),
 						},
 					},
 					InitialDelaySeconds: 1,
@@ -324,7 +324,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
 						Port:       80,
-						TargetPort: intstr.FromInt(80),
+						TargetPort: intstr.FromInt32(80),
 						Protocol:   v1.ProtocolTCP,
 					}},
 					Selector: map[string]string{
@@ -418,7 +418,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
 						Port:       80,
-						TargetPort: intstr.FromInt(80),
+						TargetPort: intstr.FromInt32(80),
 						Protocol:   v1.ProtocolTCP,
 					}},
 					Selector: map[string]string{

@@ -1100,7 +1100,7 @@ func deployWebhookAndService(ctx context.Context, f *framework.Framework, image 
 				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Port:   intstr.FromInt(int(containerPort)),
+						Port:   intstr.FromInt32(containerPort),
 						Path:   "/readyz",
 					},
 				},
@@ -1139,7 +1139,7 @@ func deployWebhookAndService(ctx context.Context, f *framework.Framework, image 
 				{
 					Protocol:   v1.ProtocolTCP,
 					Port:       servicePort,
-					TargetPort: intstr.FromInt(int(containerPort)),
+					TargetPort: intstr.FromInt32(containerPort),
 				},
 			},
 		},

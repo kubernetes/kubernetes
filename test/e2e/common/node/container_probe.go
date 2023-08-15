@@ -467,7 +467,7 @@ var _ = SIGDescribe("Probing container", func() {
 			ProbeHandler: v1.ProbeHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Path: "/healthz",
-					Port: intstr.FromInt(8080),
+					Port: intstr.FromInt32(8080),
 				},
 			},
 			InitialDelaySeconds:           10,
@@ -1696,7 +1696,7 @@ func (b webserverProbeBuilder) build() *v1.Probe {
 		probe.InitialDelaySeconds = probeTestInitialDelaySeconds
 	}
 	if b.failing {
-		probe.HTTPGet.Port = intstr.FromInt(81)
+		probe.HTTPGet.Port = intstr.FromInt32(81)
 	}
 	return probe
 }

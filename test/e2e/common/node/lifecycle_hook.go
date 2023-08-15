@@ -171,7 +171,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=poststart",
 						Host: targetIP,
-						Port: intstr.FromInt(8080),
+						Port: intstr.FromInt32(8080),
 					},
 				},
 			}
@@ -194,7 +194,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=poststart",
 						Host:   targetIP,
-						Port:   intstr.FromInt(9090),
+						Port:   intstr.FromInt32(9090),
 					},
 				},
 			}
@@ -216,7 +216,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=prestop",
 						Host: targetIP,
-						Port: intstr.FromInt(8080),
+						Port: intstr.FromInt32(8080),
 					},
 				},
 			}
@@ -239,7 +239,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=prestop",
 						Host:   targetIP,
-						Port:   intstr.FromInt(9090),
+						Port:   intstr.FromInt32(9090),
 					},
 				},
 			}

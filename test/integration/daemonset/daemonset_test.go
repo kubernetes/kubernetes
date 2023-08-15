@@ -202,7 +202,7 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 }
 
 func newRollbackStrategy() *apps.DaemonSetUpdateStrategy {
-	one := intstr.FromInt(1)
+	one := intstr.FromInt32(1)
 	return &apps.DaemonSetUpdateStrategy{
 		Type:          apps.RollingUpdateDaemonSetStrategyType,
 		RollingUpdate: &apps.RollingUpdateDaemonSet{MaxUnavailable: &one},
@@ -789,7 +789,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 
 	// Create new DaemonSet with RollingUpdate strategy
 	orgDs := newDaemonSet("foo", ns.Name)
-	oneIntString := intstr.FromInt(1)
+	oneIntString := intstr.FromInt32(1)
 	orgDs.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
 		Type: apps.RollingUpdateDaemonSetStrategyType,
 		RollingUpdate: &apps.RollingUpdateDaemonSet{
@@ -894,7 +894,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 
 	// Create new DaemonSet with RollingUpdate strategy
 	orgDs := newDaemonSet("foo", ns.Name)
-	oneIntString := intstr.FromInt(1)
+	oneIntString := intstr.FromInt32(1)
 	orgDs.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
 		Type: apps.RollingUpdateDaemonSetStrategyType,
 		RollingUpdate: &apps.RollingUpdateDaemonSet{

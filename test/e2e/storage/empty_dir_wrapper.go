@@ -211,7 +211,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 func createGitServer(ctx context.Context, f *framework.Framework) (gitURL string, gitRepo string, cleanup func()) {
 	var err error
 	gitServerPodName := "git-server-" + string(uuid.NewUUID())
-	containerPort := 8000
+	containerPort := int32(8000)
 
 	labels := map[string]string{"name": gitServerPodName}
 
@@ -232,7 +232,7 @@ func createGitServer(ctx context.Context, f *framework.Framework) (gitURL string
 				{
 					Name:       "http-portal",
 					Port:       int32(httpPort),
-					TargetPort: intstr.FromInt(containerPort),
+					TargetPort: intstr.FromInt32(containerPort),
 				},
 			},
 		},
