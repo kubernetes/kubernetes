@@ -18,15 +18,16 @@ package metrics
 
 import (
 	"context"
-
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Counter is our internal representation for our wrapping struct around prometheus
 // counters. Counter implements both kubeCollector and CounterMetric.
 type Counter struct {
+	ctx context.Context
 	CounterMetric
 	*CounterOpts
 	lazyMetric
@@ -93,9 +94,42 @@ func (c *Counter) initializeDeprecatedMetric() {
 	c.initializeMetric()
 }
 
-// WithContext allows the normal Counter metric to pass in context. The context is no-op now.
+// WithContext allows the normal Counter metric to pass in context.
 func (c *Counter) WithContext(ctx context.Context) CounterMetric {
+	c.ctx = ctx
 	return c.CounterMetric
+}
+
+func (c *Counter) Add(v float64) {
+	if _, ok := c.CounterMetric.(prometheus.ExemplarAdder); !ok {
+		c.CounterMetric.Add(v)
+		return
+	}
+	var exemplarLabels prometheus.Labels
+	maybeSpanCtx := trace.SpanContextFromContext(c.ctx)
+	if maybeSpanCtx.IsValid() {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": maybeSpanCtx.TraceID().String(),
+			"span_id":  maybeSpanCtx.SpanID().String(),
+		}
+	}
+	c.CounterMetric.(prometheus.ExemplarAdder).AddWithExemplar(v, exemplarLabels)
+}
+
+func (c *Counter) Inc() {
+	if _, ok := c.CounterMetric.(prometheus.ExemplarAdder); !ok {
+		c.CounterMetric.Inc()
+		return
+	}
+	var exemplarLabels prometheus.Labels
+	maybeSpanCtx := trace.SpanContextFromContext(c.ctx)
+	if maybeSpanCtx.IsValid() {
+		exemplarLabels = prometheus.Labels{
+			"trace_id": maybeSpanCtx.TraceID().String(),
+			"span_id":  maybeSpanCtx.SpanID().String(),
+		}
+	}
+	c.CounterMetric.(prometheus.ExemplarAdder).AddWithExemplar(1, exemplarLabels)
 }
 
 // CounterVec is the internal representation of our wrapping struct around prometheus

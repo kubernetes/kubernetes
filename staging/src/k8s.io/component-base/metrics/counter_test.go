@@ -18,7 +18,16 @@ package metrics
 
 import (
 	"bytes"
+	"context"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel/trace"
+	"io"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"net/http"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/common/expfmt"
@@ -283,5 +292,121 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCounterWithExemplar(t *testing.T) {
+	// Set exemplar.
+	traceID := trace.TraceID{1, 2, 3}
+	spanID := trace.SpanID{4, 5, 6}
+	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: traceID,
+		SpanID:  spanID,
+	}))
+	traceIDStr := traceID.String()
+	spanIDStr := spanID.String()
+	toAdd := float64(41)
+
+	// Create contextual counter.
+	portStr := ":" + strconv.Itoa(8090)
+	counter := NewCounter(&CounterOpts{
+		Name: "metric_exemplar_test",
+		Help: "helpless",
+	})
+	_ = counter.WithContext(ctxForSpanCtx)
+
+	// Register counter.
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.MustRegister(counter)
+
+	// Call underlying exemplar methods.
+	go func() {
+		counter.Add(toAdd)
+		counter.Inc()
+
+		// Synthetic latency.
+		time.Sleep(600 * time.Millisecond)
+	}()
+
+	// Verify value.
+	err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, time.Second, false, func(ctx context.Context) (done bool, err error) {
+		mfs, err := registry.Gather()
+		if err != nil {
+			return false, err
+		}
+		gotValue := mfs[0].GetMetric()[0].GetCounter().GetValue()
+		wantValue := toAdd + 1
+		if gotValue != wantValue {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to verify value: %v", err)
+	}
+
+	// Start an open-metrics-compatible server.
+	http.Handle(
+		"/metrics", promhttp.HandlerFor(
+			registry,
+			promhttp.HandlerOpts{
+				EnableOpenMetrics: true,
+			}),
+	)
+
+	// Serve metrics.
+	errCh := make(chan error, 1)
+	go func(errCh chan error, portStr string) {
+		e := http.ListenAndServe(portStr, nil)
+		if e != nil {
+			errCh <- e
+			return
+		}
+	}(errCh, portStr)
+
+	// Verify exemplar.
+	client := &http.Client{}
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 5*time.Second, false, func(context.Context) (done bool, err error) {
+		req, err := http.NewRequest("GET", "http://localhost"+portStr+"/metrics", nil)
+		if err != nil {
+			return false, err
+		}
+		req.Header.Set("Accept", expfmt.OpenMetricsType)
+		rsp, err := client.Do(req)
+		if err != nil {
+			return false, err
+		}
+		defer rsp.Body.Close()
+
+		body, err := io.ReadAll(rsp.Body)
+		if err != nil {
+			return false, err
+		}
+
+		t.Logf("got body: %s", body)
+
+		if !strings.Contains(string(body), "metric_exemplar_test") {
+			return false, nil
+		}
+
+		if !strings.Contains(string(body), "trace_id=\""+traceIDStr+"\"") {
+			return false, nil
+		}
+
+		if !strings.Contains(string(body), "span_id=\""+spanIDStr+"\"") {
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		if len(errCh) > 0 {
+			t.Fatalf("failed to serve metrics: %v, polling failed: %v", <-errCh, err)
+		}
+		t.Fatal(err)
 	}
 }
