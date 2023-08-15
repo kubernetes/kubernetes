@@ -470,7 +470,7 @@ func (jm *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
 	}
 
 	// if curJob is finished, remove the finalizer as a backup check.
-	if curJob.Status.CompletionTime != nil {
+	if IsJobFinished(curJob) {
 		jm.backupRemovePodFinalizers(curJob)
 	}
 
@@ -1873,20 +1873,16 @@ func onlyReplaceFailedPods(job *batch.Job) bool {
 	return feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil
 }
 
-func (jm *Controller) backupRemovePodFinalizers(obj interface{}) {
-	jobObj, ok := obj.(*batch.Job)
-
-	if !ok {
-		return
-	}
-	selector, err := metav1.LabelSelectorAsSelector(jobObj.Spec.Selector)
+func (jm *Controller) backupRemovePodFinalizers(job *batch.Job) {
+	// Listing pods shouldn't really fail, as we are just querying the informer cache.
+	selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("parsing deleted job selector: %v", err))
 		return
 	}
-	pods, _ := jm.podStore.Pods(jobObj.Namespace).List(selector)
+	pods, _ := jm.podStore.Pods(job.Namespace).List(selector)
 	for _, pod := range pods {
-		if metav1.IsControlledBy(pod, jobObj) && hasJobTrackingFinalizer(pod) {
+		if metav1.IsControlledBy(pod, job) && hasJobTrackingFinalizer(pod) {
 			jm.enqueueOrphanPod(pod)
 		}
 	}
