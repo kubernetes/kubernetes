@@ -209,7 +209,7 @@ func TestNewResetData(t *testing.T) {
 				options.CfgPath:               configFilePath,
 				options.IgnorePreflightErrors: "c,d",
 			},
-			validate: expectedResetIgnorePreflightErrors(sets.New("a", "b", "c", "d")),
+			validate: expectedResetIgnorePreflightErrors(sets.New("c", "d")),
 		},
 	}
 	for _, tc := range testCases {
