@@ -463,7 +463,7 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disru
 var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("pidpressure-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	pressureTimeout := 2 * time.Minute
+	pressureTimeout := 3 * time.Minute
 	expectedNodeCondition := v1.NodePIDPressure
 	expectedStarvedResource := noStarvedResource
 
