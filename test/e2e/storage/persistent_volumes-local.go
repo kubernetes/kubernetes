@@ -529,7 +529,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 									continue
 								}
 								err = config.client.CoreV1().PersistentVolumes().Delete(backgroundCtx, pv.Name, metav1.DeleteOptions{})
-								if errors.Is(err, context.Canceled) {
+								if apierrors.IsNotFound(err) || errors.Is(err, context.Canceled) {
 									continue
 								}
 								framework.ExpectNoError(err)
