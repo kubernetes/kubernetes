@@ -538,7 +538,7 @@ function kube::codegen::gen_client() {
     done < <(
         ( kube::codegen::internal::git_grep -l \
             -e '+genclient' \
-            ":(glob)${in_root}"/'**/types.go' \
+            ":(glob)${in_root}"/'**/*types.go' \
             || true \
         ) | LC_ALL=C sort -u
     )
