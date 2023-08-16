@@ -556,20 +556,25 @@ kube::golang::setup_env() {
 
   # This seems to matter to some tools
   export GO15VENDOREXPERIMENT=1
+}
 
+kube::golang::setup_gomaxprocs() {
   # GOMAXPROCS by default does not reflect the number of cpu(s) available
   # when running in a container, please see https://github.com/golang/go/issues/33803
-  if ! command -v ncpu >/dev/null 2>&1; then
-    # shellcheck disable=SC2164
-    pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-    GO111MODULE=on go install ./ncpu
-    # shellcheck disable=SC2164
-    popd >/dev/null
+  if [[ -z "${GOMAXPROCS:-}" ]]; then
+    if ! command -v ncpu >/dev/null 2>&1; then
+      # shellcheck disable=SC2164
+      pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+      GO111MODULE=on go install ./ncpu || echo "Will not automatically set GOMAXPROCS"
+      # shellcheck disable=SC2164
+      popd >/dev/null
+    fi
+    if command -v ncpu >/dev/null 2>&1; then
+      GOMAXPROCS=$(ncpu)
+      export GOMAXPROCS
+      kube::log::status "Set GOMAXPROCS automatically to ${GOMAXPROCS}"
+    fi
   fi
-
-  GOMAXPROCS=${GOMAXPROCS:-$(ncpu)}
-  export GOMAXPROCS
-  kube::log::status "Setting GOMAXPROCS: ${GOMAXPROCS}"
 }
 
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
