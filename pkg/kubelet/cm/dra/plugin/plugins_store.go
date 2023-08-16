@@ -17,16 +17,58 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
+	"errors"
+	"net"
 	"sync"
+	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog/v2"
 )
 
 // Plugin is a description of a DRA Plugin, defined by an endpoint
 // and the highest DRA version supported.
 type Plugin struct {
+	sync.RWMutex
+	conn                    *grpc.ClientConn
 	endpoint                string
 	highestSupportedVersion *utilversion.Version
+}
+
+func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.conn != nil {
+		return p.conn, nil
+	}
+
+	network := "unix"
+	klog.V(4).InfoS(log("creating new gRPC connection"), "protocol", network, "endpoint", p.endpoint)
+	conn, err := grpc.Dial(
+		p.endpoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, target)
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
+		return nil, errors.New("timed out waiting for gRPC connection to be ready")
+	}
+
+	p.conn = conn
+	return p.conn, nil
 }
 
 // PluginsStore holds a list of DRA Plugins.
