@@ -33,6 +33,7 @@ type FakeImageService struct {
 	Called        []string
 	Errors        map[string][]error
 	Images        map[string]*runtimeapi.Image
+	Pinned        map[string]bool
 
 	pulledImages []*pulledImage
 
@@ -72,6 +73,17 @@ func (r *FakeImageService) SetFakeImageSize(size uint64) {
 	r.FakeImageSize = size
 }
 
+// SetFakeImagePinned sets the image Pinned field for one image.
+func (r *FakeImageService) SetFakeImagePinned(image string, pinned bool) {
+	r.Lock()
+	defer r.Unlock()
+
+	if r.Pinned == nil {
+		r.Pinned = make(map[string]bool)
+	}
+	r.Pinned[image] = pinned
+}
+
 // SetFakeFilesystemUsage sets the FilesystemUsage for FakeImageService.
 func (r *FakeImageService) SetFakeFilesystemUsage(usage []*runtimeapi.FilesystemUsage) {
 	r.Lock()
@@ -95,6 +107,7 @@ func (r *FakeImageService) makeFakeImage(image *runtimeapi.ImageSpec) *runtimeap
 		Size_:    r.FakeImageSize,
 		Spec:     image,
 		RepoTags: []string{image.Image},
+		Pinned:   r.Pinned[image.Image],
 	}
 }
 
