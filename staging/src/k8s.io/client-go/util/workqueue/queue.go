@@ -23,8 +23,10 @@ import (
 	"k8s.io/utils/clock"
 )
 
+// Interface defines the minimal requirements to implement a workqueue.
 type Interface interface {
 	Add(item interface{})
+	IsQueued(item interface{}) bool
 	Len() int
 	Get() (item interface{}, shutdown bool)
 	Done(item interface{})
@@ -179,6 +181,15 @@ func (q *Type) Add(item interface{}) {
 
 	q.queue = append(q.queue, item)
 	q.cond.Signal()
+}
+
+// IsQueued returns a bool to indicate whether `item` is actively queued.
+// It returns true if the item is in the dirty set which means it is
+// queued or about to be queued once processing completes.
+func (q *Type) IsQueued(item interface{}) bool {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+	return q.dirty.has(item)
 }
 
 // Len returns the current queue length, for informational purposes only. You

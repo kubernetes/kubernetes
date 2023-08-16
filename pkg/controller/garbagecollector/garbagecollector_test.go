@@ -2815,6 +2815,10 @@ func (t *trackingWorkqueue) Get() (interface{}, bool) {
 	t.dequeue(item)
 	return item, shutdown
 }
+func (t *trackingWorkqueue) IsQueued(item interface{}) bool {
+	_, ok := t.pendingMap[item]
+	return ok
+}
 func (t *trackingWorkqueue) Done(item interface{}) {
 	t.limiter.Done(item)
 }
