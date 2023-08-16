@@ -50,7 +50,13 @@ type UnwantedStatus struct {
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
 // error if the command failed.
 func runCommand(cmd ...string) (string, error) {
-	output, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+	return runCommandInDir("", cmd)
+}
+
+func runCommandInDir(dir string, cmd []string) (string, error) {
+	c := exec.Command(cmd[0], cmd[1:]...)
+	c.Dir = dir
+	output, err := c.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
 	}
@@ -155,8 +161,6 @@ func parseModule(s string) module {
 
 // option1: dependencyverifier dependencies.json
 // it will run `go mod graph` and check it.
-// option2: dependencyverifier dependencies.json mod.graph
-// it will check the specified mod graph result file.
 func main() {
 	var modeGraphStr string
 	var err error
@@ -166,15 +170,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error running 'go mod graph': %s", err)
 		}
-	} else if len(os.Args) == 3 {
-		modGraphFile := string(os.Args[2])
-		modeGraphStr, err = readFile(modGraphFile)
-		// read file, such as `mod.graph`
-		if err != nil {
-			log.Fatalf("Error reading mod file %s: %s", modGraphFile, err)
-		}
 	} else {
-		log.Fatalf("Usage: %s dependencies.json {mod.graph}", os.Args[0])
+		log.Fatalf("Usage: %s dependencies.json", os.Args[0])
 	}
 
 	dependenciesJSONPath := string(os.Args[1])
@@ -193,6 +190,22 @@ func main() {
 
 	// convert from `go mod graph` to main module and map of from->[]to references
 	mainModules, moduleGraph := convertToMap(modeGraphStr)
+
+	directDependencies := map[string]map[string]bool{}
+	for _, mainModule := range mainModules {
+		dir := ""
+		if mainModule.name != "k8s.io/kubernetes" {
+			dir = "staging/src/" + mainModule.name
+		}
+		listOutput, err := runCommandInDir(dir, []string{"go", "list", "-m", "-f", "{{if not .Indirect}}{{if not .Main}}{{.Path}}{{end}}{{end}}", "all"})
+		if err != nil {
+			log.Fatalf("Error running 'go list' for %s: %s", mainModule.name, err)
+		}
+		directDependencies[mainModule.name] = map[string]bool{}
+		for _, directDependency := range strings.Split(listOutput, "\n") {
+			directDependencies[mainModule.name][directDependency] = true
+		}
+	}
 
 	// gather the effective versions by looking at the versions required by the main modules
 	effectiveVersions := map[string]module{}
@@ -253,6 +266,8 @@ func main() {
 			// record specific names of versioned referents
 			if referencer.version != "" && referencer.version != "v0.0.0" {
 				config.Status.UnwantedReferences[unwanted] = append(config.Status.UnwantedReferences[unwanted], referencer.name)
+			} else if directDependencies[referencer.name][unwanted] {
+				config.Status.UnwantedReferences[unwanted] = append(config.Status.UnwantedReferences[unwanted], referencer.name)
 			}
 		}
 	}
@@ -271,7 +286,7 @@ func main() {
 	if !bytes.Equal(expected, actual) {
 		log.Printf("Expected status of\n%s", string(expected))
 		log.Printf("Got status of\n%s", string(actual))
-		log.Fatal("Status diff:\n", cmp.Diff(actual, expected))
+		log.Fatal("Status diff:\n", cmp.Diff(expected, actual))
 	}
 	for expectedRef, expectedFrom := range configFromFile.Status.UnwantedReferences {
 		actualFrom, ok := config.Status.UnwantedReferences[expectedRef]
