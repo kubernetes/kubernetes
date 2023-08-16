@@ -506,7 +506,7 @@ func listPDBs(ctx context.Context, cs kubernetes.Interface, ns string, labelSele
 	for _, item := range pdbList.Items {
 		pdbNames = append(pdbNames, item.Name)
 	}
-	framework.ExpectConsistOf(pdbNames, expectedPDBNames, "Expecting returned PDBs '%s' in namespace %s", expectedPDBNames, ns)
+	gomega.Expect(pdbNames).To(gomega.ConsistOf(expectedPDBNames), "Expecting returned PDBs '%s' in namespace %s", expectedPDBNames, ns)
 }
 
 func deletePDBCollection(ctx context.Context, cs kubernetes.Interface, ns string) {
