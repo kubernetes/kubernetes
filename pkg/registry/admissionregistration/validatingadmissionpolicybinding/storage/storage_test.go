@@ -37,121 +37,175 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	storage, server := newInsecureStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	configuration := validPolicyBinding()
-	test.TestCreate(
-		// valid
-		configuration,
-		// invalid
-		newPolicyBinding(""),
-	)
+	for _, configuration := range validPolicyBindings() {
+		t.Run(configuration.Name, func(t *testing.T) {
+			storage, server := newInsecureStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+			test := genericregistrytest.New(t, storage.Store).ClusterScope()
+
+			test.TestCreate(
+				// valid
+				configuration,
+				// invalid
+				newPolicyBinding(""),
+			)
+		})
+	}
 }
 
 func TestUpdate(t *testing.T) {
-	storage, server := newInsecureStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-
-	test.TestUpdate(
-		// valid
-		validPolicyBinding(),
-		// updateFunc
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding)
-			object.Labels = map[string]string{"c": "d"}
-			return object
-		},
-		// invalid updateFunc
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding)
-			object.Name = ""
-			return object
-		},
-	)
+	for _, b := range validPolicyBindings() {
+		storage, server := newInsecureStorage(t)
+		defer server.Terminate(t)
+		defer storage.Store.DestroyFunc()
+		t.Run(b.Name, func(t *testing.T) {
+			test := genericregistrytest.New(t, storage.Store).ClusterScope()
+			test.TestUpdate(
+				// valid
+				b,
+				// updateFunc
+				func(obj runtime.Object) runtime.Object {
+					object := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding)
+					object.Labels = map[string]string{"c": "d"}
+					return object
+				},
+				// invalid updateFunc
+				func(obj runtime.Object) runtime.Object {
+					object := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding)
+					object.Name = ""
+					return object
+				},
+			)
+		})
+	}
 }
 
 func TestGet(t *testing.T) {
-	storage, server := newInsecureStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestGet(validPolicyBinding())
+	for _, b := range validPolicyBindings() {
+		t.Run(b.Name, func(t *testing.T) {
+			storage, server := newInsecureStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			test := genericregistrytest.New(t, storage.Store).ClusterScope()
+			test.TestGet(b)
+		})
+	}
 }
 
 func TestList(t *testing.T) {
-	storage, server := newInsecureStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestList(validPolicyBinding())
+	for _, b := range validPolicyBindings() {
+		t.Run(b.Name, func(t *testing.T) {
+			storage, server := newInsecureStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+			test := genericregistrytest.New(t, storage.Store).ClusterScope()
+			test.TestList(b)
+		})
+	}
 }
 
 func TestDelete(t *testing.T) {
-	storage, server := newInsecureStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestDelete(validPolicyBinding())
+	for _, b := range validPolicyBindings() {
+		t.Run(b.Name, func(t *testing.T) {
+			storage, server := newInsecureStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			test := genericregistrytest.New(t, storage.Store).ClusterScope()
+			test.TestDelete(b)
+		})
+	}
 }
 
 func TestWatch(t *testing.T) {
-	storage, server := newInsecureStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestWatch(
-		validPolicyBinding(),
-		[]labels.Set{},
-		[]labels.Set{
-			{"hoo": "bar"},
-		},
-		[]fields.Set{
-			{"metadata.name": "foo"},
-		},
-		[]fields.Set{
-			{"metadata.name": "nomatch"},
-		},
-	)
+	for _, b := range validPolicyBindings() {
+		t.Run(b.Name, func(t *testing.T) {
+			storage, server := newInsecureStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+			test := genericregistrytest.New(t, storage.Store).ClusterScope()
+			test.TestWatch(
+				b,
+				[]labels.Set{},
+				[]labels.Set{
+					{"hoo": "bar"},
+				},
+				[]fields.Set{
+					{"metadata.name": b.Name},
+				},
+				[]fields.Set{
+					{"metadata.name": "nomatch"},
+				},
+			)
+		})
+	}
 }
 
-func validPolicyBinding() *admissionregistration.ValidatingAdmissionPolicyBinding {
-	return &admissionregistration.ValidatingAdmissionPolicyBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
-			PolicyName: "replicalimit-policy.example.com",
-			ParamRef: &admissionregistration.ParamRef{
-				Name: "param-test",
+func validPolicyBindings() []*admissionregistration.ValidatingAdmissionPolicyBinding {
+	denyAction := admissionregistration.DenyAction
+	return []*admissionregistration.ValidatingAdmissionPolicyBinding{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
 			},
-			ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
-			MatchResources: &admissionregistration.MatchResources{
-				MatchPolicy: func() *admissionregistration.MatchPolicyType {
-					r := admissionregistration.MatchPolicyType("Exact")
-					return &r
-				}(),
-				ObjectSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName: "replicalimit-policy.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "replica-limit-test.example.com",
+					ParameterNotFoundAction: &denyAction,
 				},
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo-clusterwide",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName: "replicalimit-policy.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "replica-limit-test.example.com",
+					Namespace:               "default",
+					ParameterNotFoundAction: &denyAction,
 				},
-				ResourceRules: []admissionregistration.NamedRuleWithOperations{
-					{
-						RuleWithOperations: admissionregistration.RuleWithOperations{
-							Operations: []admissionregistration.OperationType{"CREATE"},
-							Rule: admissionregistration.Rule{
-								APIGroups:   []string{"a"},
-								APIVersions: []string{"a"},
-								Resources:   []string{"a"},
-							},
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo-selector",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName: "replicalimit-policy.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"label": "value",
 						},
 					},
+					ParameterNotFoundAction: &denyAction,
 				},
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo-selector-clusterwide",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName: "replicalimit-policy.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Namespace: "mynamespace",
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"label": "value",
+						},
+					},
+					ParameterNotFoundAction: &denyAction,
+				},
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 			},
 		},
 	}
@@ -166,7 +220,8 @@ func newPolicyBinding(name string) *admissionregistration.ValidatingAdmissionPol
 		Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName: "replicalimit-policy.example.com",
 			ParamRef: &admissionregistration.ParamRef{
-				Name: "param-test",
+				Name:      "param-test",
+				Namespace: "default",
 			},
 			ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 			MatchResources:    &admissionregistration.MatchResources{},

@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	v1 "k8s.io/api/core/v1"
 	apitesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/utils/pointer"
@@ -79,7 +81,7 @@ func TestReadLogs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
-	defer os.Remove(file.Name())
+	defer utiltesting.CloseAndRemove(t, file)
 	file.WriteString(`{"log":"line1\n","stream":"stdout","time":"2020-09-27T11:18:01.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line2\n","stream":"stdout","time":"2020-09-27T11:18:02.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line3\n","stream":"stdout","time":"2020-09-27T11:18:03.00000000Z"}` + "\n")

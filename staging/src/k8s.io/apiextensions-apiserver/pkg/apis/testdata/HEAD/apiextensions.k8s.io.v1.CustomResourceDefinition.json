@@ -140,7 +140,9 @@
               {
                 "rule": "ruleValue",
                 "message": "messageValue",
-                "messageExpression": "messageExpressionValue"
+                "messageExpression": "messageExpressionValue",
+                "reason": "reasonValue",
+                "fieldPath": "fieldPathValue"
               }
             ]
           }

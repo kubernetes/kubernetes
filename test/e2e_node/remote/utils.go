@@ -31,6 +31,8 @@ const (
 	cniVersion       = "v1.2.0"
 	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"
+
+	ecrCredentialProviderVersion = "v1.27.1"
 )
 
 const cniConfig = `{
@@ -48,7 +50,7 @@ const cniConfig = `{
 }
 `
 
-const credentialProviderConfig = `kind: CredentialProviderConfig
+const credentialGCPProviderConfig = `kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1
 providers:
   - name: gcp-credential-provider
@@ -59,6 +61,19 @@ providers:
     - "container.cloud.google.com"
     - "*.pkg.dev"
     defaultCacheDuration: 1m`
+
+const credentialAWSProviderConfig = `kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+- name: ecr-credential-provider
+  apiVersion: credentialprovider.kubelet.k8s.io/v1
+  matchImages:
+  - "*.dkr.ecr.*.amazonaws.com"
+  - "*.dkr.ecr.*.amazonaws.com.cn"
+  - "*.dkr.ecr-fips.*.amazonaws.com"
+  - "*.dkr.ecr.us-iso-east-1.c2s.ic.gov"
+  - "*.dkr.ecr.us-isob-east-1.sc2s.sgov.gov"
+  defaultCacheDuration: 12h`
 
 func getCNIURL() string {
 	cniArch := "amd64"
@@ -99,8 +114,37 @@ func setupCNI(host, workspace string) error {
 	return nil
 }
 
+func getECRCredentialProviderURL() string {
+	arch := "amd64"
+	if builder.IsTargetArchArm64() {
+		arch = "arm64"
+	}
+	return fmt.Sprintf("https://artifacts.k8s.io/binaries/cloud-provider-aws/%s/linux/%s/ecr-credential-provider-linux-%s", ecrCredentialProviderVersion, arch, arch)
+}
+
+func setupECRCredentialProvider(host, workspace string) error {
+	klog.V(2).Infof("Install ecr-credential-provider on %q at %q", host, workspace)
+	cmd := getSSHCommand(" ; ",
+		fmt.Sprintf("curl -s -Lo %s/ecr-credential-provider %s", workspace, getECRCredentialProviderURL()),
+		fmt.Sprintf("chmod a+x %s/ecr-credential-provider", workspace),
+	)
+	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
+		return fmt.Errorf("failed to install ecr-credential-provider plugin on %q: %v output: %q", host, err, output)
+	}
+	return nil
+}
+
 func configureCredentialProvider(host, workspace string) error {
 	klog.V(2).Infof("Configuring kubelet credential provider on %q", host)
+
+	credentialProviderConfig := credentialGCPProviderConfig
+	if GetSSHUser() == "ec2-user" {
+		credentialProviderConfig = credentialAWSProviderConfig
+		err := setupECRCredentialProvider(host, workspace)
+		if err != nil {
+			return err
+		}
+	}
 
 	cmd := getSSHCommand(" ; ",
 		fmt.Sprintf("echo %s > %s", quote(credentialProviderConfig), filepath.Join(workspace, "credential-provider.yaml")),

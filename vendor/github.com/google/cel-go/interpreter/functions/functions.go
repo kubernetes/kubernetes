@@ -58,5 +58,5 @@ type UnaryOp func(value ref.Val) ref.Val
 type BinaryOp func(lhs ref.Val, rhs ref.Val) ref.Val
 
 // FunctionOp is a function with accepts zero or more arguments and produces
-// an value (as interface{}) or error as a result.
+// a value or error as a result.
 type FunctionOp func(values ...ref.Val) ref.Val

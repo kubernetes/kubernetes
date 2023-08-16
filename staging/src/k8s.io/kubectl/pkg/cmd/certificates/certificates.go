@@ -45,7 +45,7 @@ func NewCmdCertificate(restClientGetter genericclioptions.RESTClientGetter, ioSt
 	cmd := &cobra.Command{
 		Use:                   "certificate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Modify certificate resources."),
+		Short:                 i18n.T("Modify certificate resources"),
 		Long:                  i18n.T("Modify certificate resources."),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
@@ -132,7 +132,7 @@ func NewCmdCertificateApprove(restClientGetter genericclioptions.RESTClientGette
 
 		kubectl certificate approve allows a cluster admin to approve a certificate
 		signing request (CSR). This action tells a certificate signing controller to
-		issue a certificate to the requestor with the attributes requested in the CSR.
+		issue a certificate to the requester with the attributes requested in the CSR.
 
 		SECURITY NOTICE: Depending on the requested attributes, the issued certificate
 		can potentially grant a requester access to cluster resources or to authenticate
@@ -180,7 +180,7 @@ func NewCmdCertificateDeny(restClientGetter genericclioptions.RESTClientGetter, 
 
 		kubectl certificate deny allows a cluster admin to deny a certificate
 		signing request (CSR). This action tells a certificate signing controller to
-		not to issue a certificate to the requestor.
+		not to issue a certificate to the requester.
 		`)),
 		Example: templates.Examples(i18n.T(`
 			# Deny CSR 'csr-sqgzp'

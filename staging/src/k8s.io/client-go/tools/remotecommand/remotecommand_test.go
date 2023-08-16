@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -416,7 +415,7 @@ func TestStreamRandomData(t *testing.T) {
 		}
 	}
 
-	data, err := ioutil.ReadAll(bytes.NewReader(stdout.Bytes()))
+	data, err := io.ReadAll(bytes.NewReader(stdout.Bytes()))
 	if err != nil {
 		t.Errorf("error reading the stream: %v", err)
 		return

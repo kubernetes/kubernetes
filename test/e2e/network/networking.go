@@ -82,7 +82,7 @@ func checkConnectivityToHost(ctx context.Context, f *framework.Framework, nodeNa
 var _ = common.SIGDescribe("Networking", func() {
 	var svcname = "nettest"
 	f := framework.NewDefaultFramework(svcname)
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func(ctx context.Context) {
 		ginkgo.By("Running container which tries to connect to 8.8.8.8")

@@ -23,6 +23,7 @@ import (
 	"sort"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -76,6 +78,16 @@ var (
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimTemplateName: &claimName}}).
 				Obj()
+	podWithClaimTemplateInStatus = func() *v1.Pod {
+		pod := podWithClaimTemplate.DeepCopy()
+		pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+			{
+				Name:              pod.Spec.ResourceClaims[0].Name,
+				ResourceClaimName: &claimName,
+			},
+		}
+		return pod
+	}()
 	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
@@ -93,6 +105,7 @@ var (
 				AllocationMode(resourcev1alpha2.AllocationModeImmediate).
 				Obj()
 	pendingDelayedClaim = st.FromResourceClaim(claim).
+				OwnerReference(podName, podUID, podKind).
 				AllocationMode(resourcev1alpha2.AllocationModeWaitForFirstConsumer).
 				Obj()
 	pendingDelayedClaim2 = st.FromResourceClaim(pendingDelayedClaim).
@@ -104,10 +117,9 @@ var (
 				Obj()
 	inUseClaim = st.FromResourceClaim(pendingImmediateClaim).
 			Allocation(&resourcev1alpha2.AllocationResult{}).
-			ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{UID: types.UID(podUID)}).
+			ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
 			Obj()
 	allocatedClaim = st.FromResourceClaim(pendingDelayedClaim).
-			OwnerReference(podName, podUID, podKind).
 			Allocation(&resourcev1alpha2.AllocationResult{}).
 			Obj()
 	allocatedDelayedClaimWithWrongTopology = st.FromResourceClaim(allocatedClaim).
@@ -173,6 +185,7 @@ func (p perNodeResult) forNode(nodeName string) result {
 }
 
 type want struct {
+	preenqueue       result
 	preFilterResult  *framework.PreFilterResult
 	prefilter        result
 	filter           perNodeResult
@@ -207,26 +220,85 @@ func TestPlugin(t *testing.T) {
 
 		prepare prepare
 		want    want
+		disable bool
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
+			want: want{
+				prefilter: result{
+					status: framework.NewStatus(framework.Skip),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+				},
+			},
 		},
 		"claim-reference": {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
+			want: want{
+				reserve: result{
+					changes: change{
+						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+							}
+							return claim
+						},
+					},
+				},
+			},
 		},
 		"claim-template": {
-			pod:    podWithClaimTemplate,
+			pod:    podWithClaimTemplateInStatus,
 			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
+			want: want{
+				reserve: result{
+					changes: change{
+						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+							}
+							return claim
+						},
+					},
+				},
+			},
 		},
 		"missing-claim": {
-			pod: podWithClaimTemplate,
+			pod:    podWithClaimTemplate, // status not set
+			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
 			want: want{
-				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim "my-pod-my-resource"`),
+				preenqueue: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `pod "default/my-pod": ResourceClaim not created yet`),
 				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+			},
+		},
+		"deleted-claim": {
+			pod: podWithClaimTemplateInStatus,
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := allocatedClaim.DeepCopy()
+				claim.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			want: want{
+				preenqueue: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim "my-pod-my-resource" is being deleted`),
+				},
+			},
+		},
+		"wrong-claim": {
+			pod: podWithClaimTemplateInStatus,
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := allocatedClaim.DeepCopy()
+				claim.OwnerReferences[0].UID += "123"
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			want: want{
+				preenqueue: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `ResourceClaim default/my-pod-my-resource was not created for pod default/my-pod (pod is not owner)`),
 				},
 			},
 		},
@@ -437,6 +509,16 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha2.ResourceClaim{inUseClaim},
 		},
+		"disable": {
+			pod:    podWithClaimName,
+			claims: []*resourcev1alpha2.ResourceClaim{inUseClaim},
+			want: want{
+				prefilter: result{
+					status: framework.NewStatus(framework.Skip),
+				},
+			},
+			disable: true,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -449,13 +531,25 @@ func TestPlugin(t *testing.T) {
 				nodes = []*v1.Node{workerNode}
 			}
 			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.schedulings)
-
+			testCtx.p.enabled = !tc.disable
 			initialObjects := testCtx.listAll(t)
+
+			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
+			t.Run("PreEnqueue", func(t *testing.T) {
+				testCtx.verify(t, tc.want.preenqueue, initialObjects, nil, status)
+			})
+			if !status.IsSuccess() {
+				return
+			}
+
 			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod)
 			t.Run("prefilter", func(t *testing.T) {
 				assert.Equal(t, tc.want.preFilterResult, result)
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
+			if status.IsSkip() {
+				return
+			}
 			unschedulable := status.Code() != framework.Success
 
 			var potentialNodes []*v1.Node
@@ -535,11 +629,12 @@ func TestPlugin(t *testing.T) {
 }
 
 type testContext struct {
-	ctx       context.Context
-	client    *fake.Clientset
-	p         *dynamicResources
-	nodeInfos []*framework.NodeInfo
-	state     *framework.CycleState
+	ctx             context.Context
+	client          *fake.Clientset
+	informerFactory informers.SharedInformerFactory
+	p               *dynamicResources
+	nodeInfos       []*framework.NodeInfo
+	state           *framework.CycleState
 }
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
@@ -589,11 +684,13 @@ func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	claims, err := tc.client.ResourceV1alpha2().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list claims")
 	for _, claim := range claims.Items {
+		claim := claim
 		objects = append(objects, &claim)
 	}
 	schedulings, err := tc.client.ResourceV1alpha2().PodSchedulingContexts("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list pod scheduling")
 	for _, scheduling := range schedulings.Items {
+		scheduling := scheduling
 		objects = append(objects, &scheduling)
 	}
 
@@ -674,13 +771,13 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 	reactor := createReactor(tc.client.Tracker())
 	tc.client.PrependReactor("*", "*", reactor)
 
-	informerFactory := informers.NewSharedInformerFactory(tc.client, 0)
+	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
-		runtime.WithInformerFactory(informerFactory),
+		runtime.WithInformerFactory(tc.informerFactory),
 	}
-	fh, err := runtime.NewFramework(nil, nil, tc.ctx.Done(), opts...)
+	fh, err := runtime.NewFramework(ctx, nil, nil, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -706,15 +803,15 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 		require.NoError(t, err, "create pod scheduling")
 	}
 
-	informerFactory.Start(tc.ctx.Done())
+	tc.informerFactory.Start(tc.ctx.Done())
 	t.Cleanup(func() {
 		// Need to cancel before waiting for the shutdown.
 		cancel()
 		// Now we can wait for all goroutines to stop.
-		informerFactory.Shutdown()
+		tc.informerFactory.Shutdown()
 	})
 
-	informerFactory.WaitForCacheSync(tc.ctx.Done())
+	tc.informerFactory.WaitForCacheSync(tc.ctx.Done())
 
 	for _, node := range nodes {
 		nodeInfo := framework.NewNodeInfo()
@@ -785,5 +882,219 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 			resourceVersionCounter++
 		}
 		return false, nil, nil
+	}
+}
+
+func Test_isSchedulableAfterClaimChange(t *testing.T) {
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		claims         []*resourcev1alpha2.ResourceClaim
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+	}{
+		"skip-deletes": {
+			pod:          podWithClaimTemplate,
+			oldObj:       allocatedClaim,
+			newObj:       nil,
+			expectedHint: framework.QueueSkip,
+		},
+		"backoff-wrong-new-object": {
+			pod:          podWithClaimTemplate,
+			newObj:       "not-a-claim",
+			expectedHint: framework.QueueAfterBackoff,
+		},
+		"skip-wrong-claim": {
+			pod: podWithClaimTemplate,
+			newObj: func() *resourcev1alpha2.ResourceClaim {
+				claim := allocatedClaim.DeepCopy()
+				claim.OwnerReferences[0].UID += "123"
+				return claim
+			}(),
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-unrelated-claim": {
+			pod:    podWithClaimTemplate,
+			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim},
+			newObj: func() *resourcev1alpha2.ResourceClaim {
+				claim := allocatedClaim.DeepCopy()
+				claim.Name += "-foo"
+				claim.UID += "123"
+				return claim
+			}(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-add": {
+			pod:          podWithClaimName,
+			newObj:       pendingImmediateClaim,
+			expectedHint: framework.QueueImmediately,
+		},
+		"backoff-wrong-old-object": {
+			pod:          podWithClaimName,
+			oldObj:       "not-a-claim",
+			newObj:       pendingImmediateClaim,
+			expectedHint: framework.QueueAfterBackoff,
+		},
+		"skip-adding-finalizer": {
+			pod:    podWithClaimName,
+			claims: []*resourcev1alpha2.ResourceClaim{pendingImmediateClaim},
+			oldObj: pendingImmediateClaim,
+			newObj: func() *resourcev1alpha2.ResourceClaim {
+				claim := pendingImmediateClaim.DeepCopy()
+				claim.Finalizers = append(claim.Finalizers, "foo")
+				return claim
+			}(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-status-change": {
+			pod:    podWithClaimName,
+			claims: []*resourcev1alpha2.ResourceClaim{pendingImmediateClaim},
+			oldObj: pendingImmediateClaim,
+			newObj: func() *resourcev1alpha2.ResourceClaim {
+				claim := pendingImmediateClaim.DeepCopy()
+				claim.Status.Allocation = &resourcev1alpha2.AllocationResult{}
+				return claim
+			}(),
+			expectedHint: framework.QueueImmediately,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			testCtx := setup(t, nil, tc.claims, nil, nil)
+			if claim, ok := tc.newObj.(*resourcev1alpha2.ResourceClaim); ok {
+				// Update the informer because the lister gets called and must have the claim.
+				store := testCtx.informerFactory.Resource().V1alpha2().ResourceClaims().Informer().GetStore()
+				if tc.oldObj == nil {
+					require.NoError(t, store.Add(claim))
+				} else {
+					require.NoError(t, store.Update(claim))
+				}
+			}
+			actualHint := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			require.Equal(t, tc.expectedHint, actualHint)
+		})
+	}
+}
+
+func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		schedulings    []*resourcev1alpha2.PodSchedulingContext
+		claims         []*resourcev1alpha2.ResourceClaim
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+	}{
+		"skip-deleted": {
+			pod:          podWithClaimTemplate,
+			oldObj:       scheduling,
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-missed-deleted": {
+			pod: podWithClaimTemplate,
+			oldObj: cache.DeletedFinalStateUnknown{
+				Obj: scheduling,
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"backoff-wrong-old-object": {
+			pod:          podWithClaimTemplate,
+			oldObj:       "not-a-scheduling-context",
+			newObj:       scheduling,
+			expectedHint: framework.QueueAfterBackoff,
+		},
+		"backoff-missed-wrong-old-object": {
+			pod: podWithClaimTemplate,
+			oldObj: cache.DeletedFinalStateUnknown{
+				Obj: "not-a-scheduling-context",
+			},
+			newObj:       scheduling,
+			expectedHint: framework.QueueAfterBackoff,
+		},
+		"skip-unrelated-object": {
+			pod:    podWithClaimTemplate,
+			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			newObj: func() *resourcev1alpha2.PodSchedulingContext {
+				scheduling := scheduling.DeepCopy()
+				scheduling.Name += "-foo"
+				return scheduling
+			}(),
+			expectedHint: framework.QueueSkip,
+		},
+		"backoff-wrong-new-object": {
+			pod:          podWithClaimTemplate,
+			oldObj:       scheduling,
+			newObj:       "not-a-scheduling-context",
+			expectedHint: framework.QueueAfterBackoff,
+		},
+		"skip-missing-claim": {
+			pod:          podWithClaimTemplate,
+			oldObj:       scheduling,
+			newObj:       schedulingInfo,
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-missing-infos": {
+			pod:          podWithClaimTemplateInStatus,
+			claims:       []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			oldObj:       scheduling,
+			newObj:       scheduling,
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-new-infos": {
+			pod:          podWithClaimTemplateInStatus,
+			claims:       []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			oldObj:       scheduling,
+			newObj:       schedulingInfo,
+			expectedHint: framework.QueueImmediately,
+		},
+		"queue-bad-selected-node": {
+			pod:    podWithClaimTemplateInStatus,
+			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			oldObj: func() *resourcev1alpha2.PodSchedulingContext {
+				scheduling := schedulingInfo.DeepCopy()
+				scheduling.Spec.SelectedNode = workerNode.Name
+				return scheduling
+			}(),
+			newObj: func() *resourcev1alpha2.PodSchedulingContext {
+				scheduling := schedulingInfo.DeepCopy()
+				scheduling.Spec.SelectedNode = workerNode.Name
+				scheduling.Status.ResourceClaims[0].UnsuitableNodes = append(scheduling.Status.ResourceClaims[0].UnsuitableNodes, scheduling.Spec.SelectedNode)
+				return scheduling
+			}(),
+			expectedHint: framework.QueueImmediately,
+		},
+		"skip-spec-changes": {
+			pod:    podWithClaimTemplateInStatus,
+			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			oldObj: schedulingInfo,
+			newObj: func() *resourcev1alpha2.PodSchedulingContext {
+				scheduling := schedulingInfo.DeepCopy()
+				scheduling.Spec.SelectedNode = workerNode.Name
+				return scheduling
+			}(),
+			expectedHint: framework.QueueSkip,
+		},
+		"backoff-other-changes": {
+			pod:    podWithClaimTemplateInStatus,
+			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			oldObj: schedulingInfo,
+			newObj: func() *resourcev1alpha2.PodSchedulingContext {
+				scheduling := schedulingInfo.DeepCopy()
+				scheduling.Finalizers = append(scheduling.Finalizers, "foo")
+				return scheduling
+			}(),
+			expectedHint: framework.QueueAfterBackoff,
+		},
+	}
+
+	for name, tc := range testcases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			logger, _ := ktesting.NewTestContext(t)
+			testCtx := setup(t, nil, tc.claims, nil, tc.schedulings)
+			actualHint := testCtx.p.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			require.Equal(t, tc.expectedHint, actualHint)
+		})
 	}
 }

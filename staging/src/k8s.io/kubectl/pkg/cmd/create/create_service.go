@@ -388,24 +388,25 @@ func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 
 	port, err := utilsnet.ParsePort(portStringSlice[0], true)
 	if err != nil {
-		return 0, intstr.FromInt(0), err
+		return 0, intstr.FromInt32(0), err
 	}
 
 	if len(portStringSlice) == 1 {
-		return int32(port), intstr.FromInt(int(port)), nil
+		port32 := int32(port)
+		return port32, intstr.FromInt32(port32), nil
 	}
 
 	var targetPort intstr.IntOrString
 	if portNum, err := strconv.Atoi(portStringSlice[1]); err != nil {
 		if errs := validation.IsValidPortName(portStringSlice[1]); len(errs) != 0 {
-			return 0, intstr.FromInt(0), fmt.Errorf(strings.Join(errs, ","))
+			return 0, intstr.FromInt32(0), fmt.Errorf(strings.Join(errs, ","))
 		}
 		targetPort = intstr.FromString(portStringSlice[1])
 	} else {
 		if errs := validation.IsValidPortNum(portNum); len(errs) != 0 {
-			return 0, intstr.FromInt(0), fmt.Errorf(strings.Join(errs, ","))
+			return 0, intstr.FromInt32(0), fmt.Errorf(strings.Join(errs, ","))
 		}
-		targetPort = intstr.FromInt(portNum)
+		targetPort = intstr.FromInt32(int32(portNum))
 	}
 	return int32(port), targetPort, nil
 }

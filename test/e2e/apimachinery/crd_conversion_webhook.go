@@ -118,7 +118,7 @@ var alternativeAPIVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]", func() {
 	var certCtx *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	servicePort := int32(9443)
 	containerPort := int32(9444)
 
@@ -291,7 +291,7 @@ func deployCustomResourceWebhookAndService(ctx context.Context, f *framework.Fra
 				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Port:   intstr.FromInt(int(containerPort)),
+						Port:   intstr.FromInt32(containerPort),
 						Path:   "/readyz",
 					},
 				},
@@ -333,7 +333,7 @@ func deployCustomResourceWebhookAndService(ctx context.Context, f *framework.Fra
 				{
 					Protocol:   v1.ProtocolTCP,
 					Port:       servicePort,
-					TargetPort: intstr.FromInt(int(containerPort)),
+					TargetPort: intstr.FromInt32(containerPort),
 				},
 			},
 		},

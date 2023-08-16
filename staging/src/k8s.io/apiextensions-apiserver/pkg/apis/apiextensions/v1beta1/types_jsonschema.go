@@ -16,6 +16,26 @@ limitations under the License.
 
 package v1beta1
 
+// FieldValueErrorReason is a machine-readable value providing more detail about why a field failed the validation.
+// +enum
+type FieldValueErrorReason string
+
+const (
+	// FieldValueRequired is used to report required values that are not
+	// provided (e.g. empty strings, null values, or empty arrays).
+	FieldValueRequired FieldValueErrorReason = "FieldValueRequired"
+	// FieldValueDuplicate is used to report collisions of values that must be
+	// unique (e.g. unique IDs).
+	FieldValueDuplicate FieldValueErrorReason = "FieldValueDuplicate"
+	// FieldValueInvalid is used to report malformed values (e.g. failed regex
+	// match, too long, out of bounds).
+	FieldValueInvalid FieldValueErrorReason = "FieldValueInvalid"
+	// FieldValueForbidden is used to report valid (as per formatting rules)
+	// values which would be accepted under some conditions, but which are not
+	// permitted by the current conditions (such as security policy).
+	FieldValueForbidden FieldValueErrorReason = "FieldValueForbidden"
+)
+
 // JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).
 type JSONSchemaProps struct {
 	ID          string        `json:"id,omitempty" protobuf:"bytes,1,opt,name=id"`
@@ -247,6 +267,24 @@ type ValidationRule struct {
 	// "x must be less than max ("+string(self.max)+")"
 	// +optional
 	MessageExpression string `json:"messageExpression,omitempty" protobuf:"bytes,3,opt,name=messageExpression"`
+	// reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule.
+	// The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule.
+	// The currently supported reasons are: "FieldValueInvalid", "FieldValueForbidden", "FieldValueRequired", "FieldValueDuplicate".
+	// If not set, default to use "FieldValueInvalid".
+	// All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.
+	// +optional
+	Reason *FieldValueErrorReason `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	// fieldPath represents the field path returned when the validation fails.
+	// It must be a relative JSON path (i.e. with array notation) scoped to the location of this x-kubernetes-validations extension in the schema and refer to an existing field.
+	// e.g. when validation checks if a specific attribute `foo` under a map `testMap`, the fieldPath could be set to `.testMap.foo`
+	// If the validation checks two lists must have unique attributes, the fieldPath could be set to either of the list: e.g. `.testList`
+	// It does not support list numeric index.
+	// It supports child operation to refer to an existing field currently. Refer to [JSONPath support in Kubernetes](https://kubernetes.io/docs/reference/kubectl/jsonpath/) for more info.
+	// Numeric index of array is not supported.
+	// For field name which contains special characters, use `['specialName']` to refer the field name.
+	// e.g. for attribute `foo.34$` appears in a list `testList`, the fieldPath could be set to `.testList['foo.34$']`
+	// +optional
+	FieldPath string `json:"fieldPath,omitempty" protobuf:"bytes,5,opt,name=fieldPath"`
 }
 
 // JSON represents any valid JSON value.

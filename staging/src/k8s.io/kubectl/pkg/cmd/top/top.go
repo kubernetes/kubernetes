@@ -37,7 +37,7 @@ var (
 		"v1beta1",
 	}
 	topLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory) usage.
+		Display resource (CPU/memory) usage.
 
 		The top command allows you to see the resource consumption for nodes or pods.
 

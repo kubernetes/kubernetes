@@ -4,7 +4,7 @@ options:
   substitution_option: ALLOW_LOOSE
   machineType: 'N1_HIGHCPU_8'
 steps:
-  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20221007-69e0da97ef'
+  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20230623-56e06d7c18'
     entrypoint: 'bash'
     dir: ./build/pause
     env:

@@ -618,6 +618,13 @@ runTests() {
     record_command run_kubectl_delete_allnamespaces_tests
   fi
 
+  ######################
+  # Delete --interactive   #
+  ######################
+  if kube::test::if_supports_resource "${configmaps}" ; then
+    record_command run_kubectl_delete_interactive_tests
+  fi
+
   ##################
   # Global timeout #
   ##################
@@ -1021,11 +1028,13 @@ runTests() {
     record_command run_kubectl_debug_pod_tests
     record_command run_kubectl_debug_general_tests
     record_command run_kubectl_debug_baseline_tests
+    record_command run_kubectl_debug_restricted_tests
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     record_command run_kubectl_debug_node_tests
     record_command run_kubectl_debug_general_node_tests
     record_command run_kubectl_debug_baseline_node_tests
+    record_command run_kubectl_debug_restricted_node_tests
   fi
 
   cleanup_tests

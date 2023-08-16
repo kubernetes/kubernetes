@@ -37,6 +37,8 @@ import (
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func createLockObject(t *testing.T, objectType, namespace, name string, record *rl.LeaderElectionRecord) (obj runtime.Object) {
@@ -751,6 +753,41 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 			assertEqualEvents(t, test.expectedEvents, recorder.Events)
 		})
 	}
+}
+
+func TestLeaderElectionConfigValidation(t *testing.T) {
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity: "baz",
+	}
+
+	lock := &rl.LeaseLock{
+		LockConfig: resourceLockConfig,
+	}
+
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 2 * time.Second,
+		RetryPeriod:   1 * time.Second,
+
+		ReleaseOnCancel: true,
+
+		Callbacks: LeaderCallbacks{
+			OnNewLeader:      func(identity string) {},
+			OnStoppedLeading: func() {},
+			OnStartedLeading: func(context.Context) {},
+		},
+	}
+
+	_, err := NewLeaderElector(lec)
+	assert.NoError(t, err)
+
+	// Invalid lock identity
+	resourceLockConfig.Identity = ""
+	lock.LockConfig = resourceLockConfig
+	lec.Lock = lock
+	_, err = NewLeaderElector(lec)
+	assert.Error(t, err, fmt.Errorf("Lock identity is empty"))
 }
 
 func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {

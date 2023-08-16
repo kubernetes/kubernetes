@@ -135,7 +135,7 @@ func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfig
 
 		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
 		klog.V(1).Infof("upgrading addons when control plane instances %v have not been upgraded "+
-			"may lead to incompatibility problems. You can disable the UpgradeAddonsBeforeControlPlane feature gate to"+
+			"may lead to incompatibility problems. You can disable the UpgradeAddonsBeforeControlPlane feature gate to "+
 			"ensure that the addons upgrade is executed only when all the control plane instances have been upgraded.", unupgradedControlPlanes)
 	}
 

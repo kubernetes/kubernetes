@@ -229,7 +229,6 @@ func (rdm *resourceDiscoveryManager) AddGroupVersion(source Source, groupName st
 }
 
 func (rdm *resourceDiscoveryManager) addGroupVersionLocked(source Source, groupName string, value apidiscoveryv2beta1.APIVersionDiscovery) {
-	klog.Infof("Adding GroupVersion %s %s to ResourceManager", groupName, value.Version)
 
 	if rdm.apiGroups == nil {
 		rdm.apiGroups = make(map[groupKey]*apidiscoveryv2beta1.APIGroupDiscovery)
@@ -273,6 +272,7 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(source Source, groupN
 		}
 		rdm.apiGroups[key] = group
 	}
+	klog.Infof("Adding GroupVersion %s %s to ResourceManager", groupName, value.Version)
 
 	gv := metav1.GroupVersion{Group: groupName, Version: value.Version}
 	gvKey := groupVersionKey{

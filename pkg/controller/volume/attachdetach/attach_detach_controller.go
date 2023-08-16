@@ -55,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -120,23 +119,21 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
-	timerConfig TimerConfig,
-	filteredDialOptions *proxyutil.FilteredDialOptions) (AttachDetachController, error) {
+	timerConfig TimerConfig) (AttachDetachController, error) {
 
 	adc := &attachDetachController{
-		kubeClient:          kubeClient,
-		pvcLister:           pvcInformer.Lister(),
-		pvcsSynced:          pvcInformer.Informer().HasSynced,
-		pvLister:            pvInformer.Lister(),
-		pvsSynced:           pvInformer.Informer().HasSynced,
-		podLister:           podInformer.Lister(),
-		podsSynced:          podInformer.Informer().HasSynced,
-		podIndexer:          podInformer.Informer().GetIndexer(),
-		nodeLister:          nodeInformer.Lister(),
-		nodesSynced:         nodeInformer.Informer().HasSynced,
-		cloud:               cloud,
-		pvcQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
-		filteredDialOptions: filteredDialOptions,
+		kubeClient:  kubeClient,
+		pvcLister:   pvcInformer.Lister(),
+		pvcsSynced:  pvcInformer.Informer().HasSynced,
+		pvLister:    pvInformer.Lister(),
+		pvsSynced:   pvInformer.Informer().HasSynced,
+		podLister:   podInformer.Lister(),
+		podsSynced:  podInformer.Informer().HasSynced,
+		podIndexer:  podInformer.Informer().GetIndexer(),
+		nodeLister:  nodeInformer.Lister(),
+		nodesSynced: nodeInformer.Informer().HasSynced,
+		cloud:       cloud,
+		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
 	}
 
 	adc.csiNodeLister = csiNodeInformer.Lister()
@@ -325,9 +322,6 @@ type attachDetachController struct {
 
 	// intreeToCSITranslator translates from in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
-
-	// filteredDialOptions configures any dialing done by the controller.
-	filteredDialOptions *proxyutil.FilteredDialOptions
 }
 
 func (adc *attachDetachController) Run(ctx context.Context) {
@@ -880,6 +874,7 @@ func (adc *attachDetachController) GetServiceAccountTokenFunc() func(_, _ string
 
 func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
+		// nolint:logcheck
 		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in attachDetachController")
 	}
 }
@@ -917,10 +912,6 @@ func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
 func (adc *attachDetachController) GetSubpather() subpath.Interface {
 	// Subpaths not needed in attachdetach controller
 	return nil
-}
-
-func (adc *attachDetachController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
-	return adc.filteredDialOptions
 }
 
 func (adc *attachDetachController) GetCSIDriverLister() storagelistersv1.CSIDriverLister {

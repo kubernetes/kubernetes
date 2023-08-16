@@ -117,6 +117,8 @@
           ]
         },
         "backoffLimit": 7,
+        "backoffLimitPerIndex": 12,
+        "maxFailedIndexes": 13,
         "selector": {
           "matchLabels": {
             "matchLabelsKey": "matchLabelsValue"
@@ -631,6 +633,7 @@
                     "restartPolicy": "restartPolicyValue"
                   }
                 ],
+                "restartPolicy": "restartPolicyValue",
                 "volumeMounts": [
                   {
                     "name": "nameValue",
@@ -914,6 +917,7 @@
                     "restartPolicy": "restartPolicyValue"
                   }
                 ],
+                "restartPolicy": "restartPolicyValue",
                 "volumeMounts": [
                   {
                     "name": "nameValue",
@@ -1197,6 +1201,7 @@
                     "restartPolicy": "restartPolicyValue"
                   }
                 ],
+                "restartPolicy": "restartPolicyValue",
                 "volumeMounts": [
                   {
                     "name": "nameValue",
@@ -1758,7 +1763,8 @@
         },
         "ttlSecondsAfterFinished": 8,
         "completionMode": "completionModeValue",
-        "suspend": true
+        "suspend": true,
+        "podReplacementPolicy": "podReplacementPolicyValue"
       }
     },
     "successfulJobsHistoryLimit": 6,

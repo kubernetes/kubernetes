@@ -78,6 +78,61 @@ const (
 	WildCard              GVK = "*"
 )
 
+type ClusterEventWithHint struct {
+	Event ClusterEvent
+	// QueueingHintFn is executed for the plugin rejected by this plugin when the above Event happens,
+	// and filters out events to reduce useless retry of Pod's scheduling.
+	// It's an optional field. If not set,
+	// the scheduling of Pods will be always retried with backoff when this Event happens.
+	// (the same as QueueAfterBackoff)
+	QueueingHintFn QueueingHintFn
+}
+
+// QueueingHintFn returns a hint that signals whether the event can make a Pod,
+// which was rejected by this plugin in the past scheduling cycle, schedulable or not.
+// It's called before a Pod gets moved from unschedulableQ to backoffQ or activeQ.
+//
+// - `pod`: the Pod to be enqueued, which is rejected by this plugin in the past.
+// - `oldObj` `newObj`: the object involved in that event.
+//   - For example, the given event is "Node deleted", the `oldObj` will be that deleted Node.
+//   - `oldObj` is nil if the event is add event.
+//   - `newObj` is nil if the event is delete event.
+type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) QueueingHint
+
+type QueueingHint int
+
+const (
+	// QueueSkip implies that the cluster event has no impact on
+	// scheduling of the pod.
+	QueueSkip QueueingHint = iota
+
+	// QueueAfterBackoff implies that the Pod may be schedulable by the event,
+	// and worth retrying the scheduling again after backoff.
+	QueueAfterBackoff
+
+	// QueueImmediately is returned only when it is highly possible that the Pod gets scheduled in the next scheduling.
+	// You should only return QueueImmediately when there is a high chance that the Pod gets scheduled in the next scheduling.
+	// Otherwise, it's detrimental to scheduling throughput.
+	// For example, when the Pod was rejected as waiting for an external resource to be provisioned, that is directly tied to the Pod,
+	// and the event is that the resource is provisioned, then you can return QueueImmediately.
+	// As a counterexample, when the Pod was rejected due to insufficient memory resource,
+	// and the event is that more memory on Node is available, then you should return QueueAfterBackoff instead of QueueImmediately
+	// because other Pods may be waiting for the same resources and only a few of them would schedule in the next scheduling cycle.
+	QueueImmediately
+)
+
+func (s QueueingHint) String() string {
+	switch s {
+	case QueueSkip:
+		return "QueueSkip"
+	case QueueAfterBackoff:
+		return "QueueAfterBackoff"
+	case QueueImmediately:
+		return "QueueImmediately"
+	}
+	return ""
+}
+
 // ClusterEvent abstracts how a system resource's state gets changed.
 // Resource represents the standard API resources such as Pod, Node, etc.
 // ActionType denotes the specific change such as Add, Update or Delete.
@@ -90,6 +145,20 @@ type ClusterEvent struct {
 // IsWildCard returns true if ClusterEvent follows WildCard semantics
 func (ce ClusterEvent) IsWildCard() bool {
 	return ce.Resource == WildCard && ce.ActionType == All
+}
+
+func UnrollWildCardResource() []ClusterEventWithHint {
+	return []ClusterEventWithHint{
+		{Event: ClusterEvent{Resource: Pod, ActionType: All}},
+		{Event: ClusterEvent{Resource: Node, ActionType: All}},
+		{Event: ClusterEvent{Resource: CSINode, ActionType: All}},
+		{Event: ClusterEvent{Resource: CSIDriver, ActionType: All}},
+		{Event: ClusterEvent{Resource: CSIStorageCapacity, ActionType: All}},
+		{Event: ClusterEvent{Resource: PersistentVolume, ActionType: All}},
+		{Event: ClusterEvent{Resource: PersistentVolumeClaim, ActionType: All}},
+		{Event: ClusterEvent{Resource: StorageClass, ActionType: All}},
+		{Event: ClusterEvent{Resource: PodSchedulingContext, ActionType: All}},
+	}
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to
@@ -106,8 +175,9 @@ type QueuedPodInfo struct {
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
-	InitialAttemptTimestamp time.Time
+	InitialAttemptTimestamp *time.Time
 	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
+	// It's registered only when the Pod is rejected in PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
 	UnschedulablePlugins sets.Set[string]
 	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
 	Gated bool
@@ -244,36 +314,50 @@ const (
 // Error returns detailed information of why the pod failed to fit on each node.
 // A message format is "0/X nodes are available: <PreFilterMsg>. <FilterMsg>. <PostFilterMsg>."
 func (f *FitError) Error() string {
-	reasons := make(map[string]int)
-	for _, status := range f.Diagnosis.NodeToStatusMap {
-		for _, reason := range status.Reasons() {
-			reasons[reason]++
+	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+":", f.NumAllNodes)
+	preFilterMsg := f.Diagnosis.PreFilterMsg
+	if preFilterMsg != "" {
+		// PreFilter plugin returns unschedulable.
+		// Add the messages from PreFilter plugins to reasonMsg.
+		reasonMsg += fmt.Sprintf(SeparatorFormat, preFilterMsg)
+	}
+
+	if preFilterMsg == "" {
+		// the scheduling cycle went through PreFilter extension point successfully.
+		//
+		// When the prefilter plugin returns unschedulable,
+		// the scheduling framework inserts the same unschedulable status to all nodes in NodeToStatusMap.
+		// So, we shouldn't add the message from NodeToStatusMap when the PreFilter failed.
+		// Otherwise, we will have duplicated reasons in the error message.
+		reasons := make(map[string]int)
+		for _, status := range f.Diagnosis.NodeToStatusMap {
+			for _, reason := range status.Reasons() {
+				reasons[reason]++
+			}
+		}
+
+		sortReasonsHistogram := func() []string {
+			var reasonStrings []string
+			for k, v := range reasons {
+				reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
+			}
+			sort.Strings(reasonStrings)
+			return reasonStrings
+		}
+		sortedFilterMsg := sortReasonsHistogram()
+		if len(sortedFilterMsg) != 0 {
+			reasonMsg += fmt.Sprintf(SeparatorFormat, strings.Join(sortedFilterMsg, ", "))
 		}
 	}
 
-	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+":", f.NumAllNodes)
-	// Add the messages from PreFilter plugins to reasonMsg.
-	preFilterMsg := f.Diagnosis.PreFilterMsg
-	if preFilterMsg != "" {
-		reasonMsg += fmt.Sprintf(SeparatorFormat, preFilterMsg)
-	}
-	sortReasonsHistogram := func() []string {
-		var reasonStrings []string
-		for k, v := range reasons {
-			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
-		}
-		sort.Strings(reasonStrings)
-		return reasonStrings
-	}
-	sortedFilterMsg := sortReasonsHistogram()
-	if len(sortedFilterMsg) != 0 {
-		reasonMsg += fmt.Sprintf(SeparatorFormat, strings.Join(sortedFilterMsg, ", "))
-	}
 	// Add the messages from PostFilter plugins to reasonMsg.
+	// We can add this message regardless of whether the scheduling cycle fails at PreFilter or Filter
+	// since we may run PostFilter (if enabled) in both cases.
 	postFilterMsg := f.Diagnosis.PostFilterMsg
 	if postFilterMsg != "" {
 		reasonMsg += fmt.Sprintf(SeparatorFormat, postFilterMsg)
 	}
+
 	return reasonMsg
 }
 

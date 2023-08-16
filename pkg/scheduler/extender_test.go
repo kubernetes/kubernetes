@@ -283,12 +283,13 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(time.Duration(0), ctx.Done())
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, name := range test.nodes {
-				cache.AddNode(createNode(name))
+				cache.AddNode(logger, createNode(name))
 			}
 			fwk, err := st.NewFramework(
-				test.registerPlugins, "", ctx.Done(),
+				ctx,
+				test.registerPlugins, "",
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
@@ -303,6 +304,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				nodeInfoSnapshot:         emptySnapshot,
 				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 				Extenders:                extenders,
+				logger:                   logger,
 			}
 			sched.applyDefaultHandlers()
 

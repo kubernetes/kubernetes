@@ -92,7 +92,10 @@ func (e astNode) ComputedSize() *SizeEstimate {
 	case *exprpb.Expr_ConstExpr:
 		switch ck := ek.ConstExpr.GetConstantKind().(type) {
 		case *exprpb.Constant_StringValue:
-			v = uint64(len(ck.StringValue))
+			// converting to runes here is an O(n) operation, but
+			// this is consistent with how size is computed at runtime,
+			// and how the language definition defines string size
+			v = uint64(len([]rune(ck.StringValue)))
 		case *exprpb.Constant_BytesValue:
 			v = uint64(len(ck.BytesValue))
 		case *exprpb.Constant_BoolValue, *exprpb.Constant_DoubleValue, *exprpb.Constant_DurationValue,
@@ -258,6 +261,8 @@ type coster struct {
 	computedSizes map[int64]SizeEstimate
 	checkedExpr   *exprpb.CheckedExpr
 	estimator     CostEstimator
+	// presenceTestCost will either be a zero or one based on whether has() macros count against cost computations.
+	presenceTestCost CostEstimate
 }
 
 // Use a stack of iterVar -> iterRange Expr Ids to handle shadowed variable names.
@@ -280,16 +285,39 @@ func (vs iterRangeScopes) peek(varName string) (int64, bool) {
 	return 0, false
 }
 
-// Cost estimates the cost of the parsed and type checked CEL expression.
-func Cost(checker *exprpb.CheckedExpr, estimator CostEstimator) CostEstimate {
-	c := coster{
-		checkedExpr:   checker,
-		estimator:     estimator,
-		exprPath:      map[int64][]string{},
-		iterRanges:    map[string][]int64{},
-		computedSizes: map[int64]SizeEstimate{},
+// CostOption configures flags which affect cost computations.
+type CostOption func(*coster) error
+
+// PresenceTestHasCost determines whether presence testing has a cost of one or zero.
+// Defaults to presence test has a cost of one.
+func PresenceTestHasCost(hasCost bool) CostOption {
+	return func(c *coster) error {
+		if hasCost {
+			c.presenceTestCost = selectAndIdentCost
+			return nil
+		}
+		c.presenceTestCost = CostEstimate{Min: 0, Max: 0}
+		return nil
 	}
-	return c.cost(checker.GetExpr())
+}
+
+// Cost estimates the cost of the parsed and type checked CEL expression.
+func Cost(checker *exprpb.CheckedExpr, estimator CostEstimator, opts ...CostOption) (CostEstimate, error) {
+	c := &coster{
+		checkedExpr:      checker,
+		estimator:        estimator,
+		exprPath:         map[int64][]string{},
+		iterRanges:       map[string][]int64{},
+		computedSizes:    map[int64]SizeEstimate{},
+		presenceTestCost: CostEstimate{Min: 1, Max: 1},
+	}
+	for _, opt := range opts {
+		err := opt(c)
+		if err != nil {
+			return CostEstimate{}, err
+		}
+	}
+	return c.cost(checker.GetExpr()), nil
 }
 
 func (c *coster) cost(e *exprpb.Expr) CostEstimate {
@@ -340,6 +368,12 @@ func (c *coster) costSelect(e *exprpb.Expr) CostEstimate {
 	sel := e.GetSelectExpr()
 	var sum CostEstimate
 	if sel.GetTestOnly() {
+		// recurse, but do not add any cost
+		// this is equivalent to how evalTestOnly increments the runtime cost counter
+		// but does not add any additional cost for the qualifier, except here we do
+		// the reverse (ident adds cost)
+		sum = sum.Add(c.presenceTestCost)
+		sum = sum.Add(c.cost(sel.GetOperand()))
 		return sum
 	}
 	sum = sum.Add(c.cost(sel.GetOperand()))
@@ -503,7 +537,10 @@ func (c *coster) functionCost(function, overloadID string, target *AstNode, args
 	}
 	switch overloadID {
 	// O(n) functions
-	case overloads.StartsWithString, overloads.EndsWithString, overloads.StringToBytes, overloads.BytesToString:
+	case overloads.StartsWithString, overloads.EndsWithString, overloads.StringToBytes, overloads.BytesToString, overloads.ExtQuoteString, overloads.ExtFormatString:
+		if overloadID == overloads.ExtFormatString {
+			return CallEstimate{CostEstimate: c.sizeEstimate(*target).MultiplyByCostFactor(common.StringTraversalCostFactor).Add(argCostSum())}
+		}
 		if len(args) == 1 {
 			return CallEstimate{CostEstimate: c.sizeEstimate(args[0]).MultiplyByCostFactor(common.StringTraversalCostFactor).Add(argCostSum())}
 		}

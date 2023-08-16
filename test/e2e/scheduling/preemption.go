@@ -69,7 +69,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	var nodeList *v1.NodeList
 	var ns string
 	f := framework.NewDefaultFramework("sched-preemption")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	lowPriority, mediumPriority, highPriority := int32(1), int32(100), int32(1000)
 	lowPriorityClassName := f.BaseName + "-low-priority"
@@ -542,7 +542,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		var node *v1.Node
 		var ns, nodeHostNameLabel string
 		f := framework.NewDefaultFramework("sched-preemption-path")
-		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+		f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 		priorityPairs := make([]priorityPair, 0)
 
@@ -762,7 +762,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	ginkgo.Context("PriorityClass endpoints", func() {
 		var cs clientset.Interface
 		f := framework.NewDefaultFramework("sched-preemption-path")
-		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 		testUUID := uuid.New().String()
 		var pcs []*schedulingv1.PriorityClass
 
@@ -843,8 +843,8 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			for _, pc := range pcs {
 				livePC, err := cs.SchedulingV1().PriorityClasses().Get(ctx, pc.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				framework.ExpectEqual(livePC.Value, pc.Value)
-				framework.ExpectEqual(livePC.Description, newDesc)
+				gomega.Expect(livePC.Value).To(gomega.Equal(pc.Value))
+				gomega.Expect(livePC.Description).To(gomega.Equal(newDesc))
 			}
 		})
 	})

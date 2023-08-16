@@ -99,6 +99,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	if err := os.WriteFile(proxyCACertFile.Name(), utils.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
+	defer proxyCACertFile.Close()
 	clientSigningKey, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +112,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	if err := os.WriteFile(clientCACertFile.Name(), utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
-
+	defer clientCACertFile.Close()
 	listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {
 		t.Fatal(err)
@@ -121,35 +122,35 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer os.RemoveAll(saSigningKeyFile.Name())
+	defer saSigningKeyFile.Close()
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 
-	kubeAPIServerOptions := options.NewServerRunOptions()
-	kubeAPIServerOptions.SecureServing.Listener = listener
-	kubeAPIServerOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
-	kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-	kubeAPIServerOptions.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
-	kubeAPIServerOptions.Etcd.StorageConfig.Prefix = path.Join("/", uuid.New().String(), "registry")
-	kubeAPIServerOptions.Etcd.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
-	kubeAPIServerOptions.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
-	kubeAPIServerOptions.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
-	kubeAPIServerOptions.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
-	kubeAPIServerOptions.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
-	kubeAPIServerOptions.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
-	kubeAPIServerOptions.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
-	kubeAPIServerOptions.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
-	kubeAPIServerOptions.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
-	kubeAPIServerOptions.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
-	kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
-	kubeAPIServerOptions.Authorization.Modes = []string{"Node", "RBAC"}
+	opts := options.NewServerRunOptions()
+	opts.SecureServing.Listener = listener
+	opts.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
+	opts.SecureServing.ServerCert.CertDirectory = certDir
+	opts.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	opts.Etcd.StorageConfig.Prefix = path.Join("/", uuid.New().String(), "registry")
+	opts.Etcd.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
+	opts.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
+	opts.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
+	opts.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
+	opts.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
+	opts.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
+	opts.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
+	opts.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
+	opts.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	opts.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
+	opts.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
+	opts.Authorization.Modes = []string{"Node", "RBAC"}
 
 	if setup.ModifyServerRunOptions != nil {
-		setup.ModifyServerRunOptions(kubeAPIServerOptions)
+		setup.ModifyServerRunOptions(opts)
 	}
 
-	completedOptions, err := app.Complete(kubeAPIServerOptions)
+	completedOptions, err := opts.Complete()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +167,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	if setup.ModifyServerConfig != nil {
 		setup.ModifyServerConfig(kubeAPIServerConfig)
 	}
-	kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.NewEmptyDelegate())
+	kubeAPIServer, err := kubeAPIServerConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,12 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -44,14 +41,6 @@ const (
 
 	// IPv6ZeroCIDR is the CIDR block for the whole IPv6 address space
 	IPv6ZeroCIDR = "::/0"
-)
-
-var (
-	// ErrAddressNotAllowed indicates the address is not allowed
-	ErrAddressNotAllowed = errors.New("address not allowed")
-
-	// ErrNoAddresses indicates there are no addresses for the hostname
-	ErrNoAddresses = errors.New("no addresses for hostname")
 )
 
 // isValidEndpoint checks that the given host / port pair are valid endpoint
@@ -96,54 +85,9 @@ func IsLoopBack(ip string) bool {
 	return false
 }
 
-// IsProxyableIP checks if a given IP address is permitted to be proxied
-func IsProxyableIP(ip string) error {
-	netIP := netutils.ParseIPSloppy(ip)
-	if netIP == nil {
-		return ErrAddressNotAllowed
-	}
-	return isProxyableIP(netIP)
-}
-
-func isProxyableIP(ip net.IP) error {
-	if !ip.IsGlobalUnicast() {
-		return ErrAddressNotAllowed
-	}
-	return nil
-}
-
 // Resolver is an interface for net.Resolver
 type Resolver interface {
 	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
-}
-
-// IsProxyableHostname checks if the IP addresses for a given hostname are permitted to be proxied
-func IsProxyableHostname(ctx context.Context, resolv Resolver, hostname string) error {
-	resp, err := resolv.LookupIPAddr(ctx, hostname)
-	if err != nil {
-		return err
-	}
-
-	if len(resp) == 0 {
-		return ErrNoAddresses
-	}
-
-	for _, host := range resp {
-		if err := isProxyableIP(host.IP); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// IsAllowedHost checks if the given IP host address is in a network in the denied list.
-func IsAllowedHost(host net.IP, denied []*net.IPNet) error {
-	for _, ipNet := range denied {
-		if ipNet.Contains(host) {
-			return ErrAddressNotAllowed
-		}
-	}
-	return nil
 }
 
 // GetLocalAddrs returns a list of all network addresses on the local system
@@ -238,7 +182,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
 	for _, ip := range ipStrings {
 		// Handle only the valid IPs
-		if ipFamily, err := getIPFamilyFromIP(ip); err == nil {
+		if ipFamily := getIPFamilyFromIP(ip); ipFamily != "" {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
 			// this function is called in multiple places. All of which
@@ -260,7 +204,7 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
 	for _, cidr := range cidrStrings {
 		// Handle only the valid CIDRs
-		if ipFamily, err := getIPFamilyFromCIDR(cidr); err == nil {
+		if ipFamily := getIPFamilyFromCIDR(cidr); ipFamily != "" {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 		} else {
 			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
@@ -269,27 +213,29 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 	return ipFamilyMap
 }
 
-func getIPFamilyFromIP(ipStr string) (v1.IPFamily, error) {
+// Returns the IP family of ipStr, or "" if ipStr can't be parsed as an IP
+func getIPFamilyFromIP(ipStr string) v1.IPFamily {
 	netIP := netutils.ParseIPSloppy(ipStr)
 	if netIP == nil {
-		return "", ErrAddressNotAllowed
+		return ""
 	}
 
 	if netutils.IsIPv6(netIP) {
-		return v1.IPv6Protocol, nil
+		return v1.IPv6Protocol
 	}
-	return v1.IPv4Protocol, nil
+	return v1.IPv4Protocol
 }
 
-func getIPFamilyFromCIDR(cidrStr string) (v1.IPFamily, error) {
+// Returns the IP family of cidrStr, or "" if cidrStr can't be parsed as a CIDR
+func getIPFamilyFromCIDR(cidrStr string) v1.IPFamily {
 	_, netCIDR, err := netutils.ParseCIDRSloppy(cidrStr)
 	if err != nil {
-		return "", ErrAddressNotAllowed
+		return ""
 	}
 	if netutils.IsIPv6CIDR(netCIDR) {
-		return v1.IPv6Protocol, nil
+		return v1.IPv6Protocol
 	}
-	return v1.IPv4Protocol, nil
+	return v1.IPv4Protocol
 }
 
 // OtherIPFamily returns the other ip family
@@ -347,66 +293,6 @@ func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 	return nil
 }
 
-// DialContext is a dial function matching the signature of net.Dialer.DialContext.
-type DialContext = func(context.Context, string, string) (net.Conn, error)
-
-// FilteredDialOptions configures how a DialContext is wrapped by NewFilteredDialContext.
-type FilteredDialOptions struct {
-	// DialHostIPDenylist restricts hosts from being dialed.
-	DialHostCIDRDenylist []*net.IPNet
-	// AllowLocalLoopback controls connections to local loopback hosts (as defined by
-	// IsProxyableIP).
-	AllowLocalLoopback bool
-}
-
-// NewFilteredDialContext returns a DialContext function that filters connections based on a FilteredDialOptions.
-func NewFilteredDialContext(wrapped DialContext, resolv Resolver, opts *FilteredDialOptions) DialContext {
-	if wrapped == nil {
-		wrapped = http.DefaultTransport.(*http.Transport).DialContext
-	}
-	if opts == nil {
-		// Do no filtering
-		return wrapped
-	}
-	if resolv == nil {
-		resolv = net.DefaultResolver
-	}
-	if len(opts.DialHostCIDRDenylist) == 0 && opts.AllowLocalLoopback {
-		// Do no filtering.
-		return wrapped
-	}
-	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		// DialContext is given host:port. LookupIPAddress expects host.
-		addressToResolve, _, err := net.SplitHostPort(address)
-		if err != nil {
-			addressToResolve = address
-		}
-
-		resp, err := resolv.LookupIPAddr(ctx, addressToResolve)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(resp) == 0 {
-			return nil, ErrNoAddresses
-		}
-
-		for _, host := range resp {
-			if !opts.AllowLocalLoopback {
-				if err := isProxyableIP(host.IP); err != nil {
-					return nil, err
-				}
-			}
-			if opts.DialHostCIDRDenylist != nil {
-				if err := IsAllowedHost(host.IP, opts.DialHostCIDRDenylist); err != nil {
-					return nil, err
-				}
-			}
-		}
-		return wrapped(ctx, network, address)
-	}
-}
-
 // GetClusterIPByFamily returns a service clusterip by family
 func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 	// allowing skew
@@ -432,62 +318,6 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 	}
 
 	return ""
-}
-
-type LineBuffer struct {
-	b     bytes.Buffer
-	lines int
-}
-
-// Write takes a list of arguments, each a string or []string, joins all the
-// individual strings with spaces, terminates with newline, and writes to buf.
-// Any other argument type will panic.
-func (buf *LineBuffer) Write(args ...interface{}) {
-	for i, arg := range args {
-		if i > 0 {
-			buf.b.WriteByte(' ')
-		}
-		switch x := arg.(type) {
-		case string:
-			buf.b.WriteString(x)
-		case []string:
-			for j, s := range x {
-				if j > 0 {
-					buf.b.WriteByte(' ')
-				}
-				buf.b.WriteString(s)
-			}
-		default:
-			panic(fmt.Sprintf("unknown argument type: %T", x))
-		}
-	}
-	buf.b.WriteByte('\n')
-	buf.lines++
-}
-
-// WriteBytes writes bytes to buffer, and terminates with newline.
-func (buf *LineBuffer) WriteBytes(bytes []byte) {
-	buf.b.Write(bytes)
-	buf.b.WriteByte('\n')
-	buf.lines++
-}
-
-// Reset clears buf
-func (buf *LineBuffer) Reset() {
-	buf.b.Reset()
-	buf.lines = 0
-}
-
-// Bytes returns the contents of buf as a []byte
-func (buf *LineBuffer) Bytes() []byte {
-	return buf.b.Bytes()
-}
-
-// Lines returns the number of lines in buf. Note that more precisely, this returns the
-// number of times Write() or WriteBytes() was called; it assumes that you never wrote
-// any newlines to the buffer yourself.
-func (buf *LineBuffer) Lines() int {
-	return buf.lines
 }
 
 // RevertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only

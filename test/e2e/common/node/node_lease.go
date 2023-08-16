@@ -40,7 +40,7 @@ import (
 var _ = SIGDescribe("NodeLease", func() {
 	var nodeName string
 	f := framework.NewDefaultFramework("node-lease-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -84,7 +84,7 @@ var _ = SIGDescribe("NodeLease", func() {
 				}
 				return nil
 			}, time.Duration(*lease.Spec.LeaseDurationSeconds)*time.Second,
-				time.Duration(*lease.Spec.LeaseDurationSeconds/4)*time.Second)
+				time.Duration(*lease.Spec.LeaseDurationSeconds/4)*time.Second).Should(gomega.Succeed())
 		})
 
 		ginkgo.It("should have OwnerReferences set", func(ctx context.Context) {

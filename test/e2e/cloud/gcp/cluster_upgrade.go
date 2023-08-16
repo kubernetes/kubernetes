@@ -54,7 +54,7 @@ var upgradeTests = []upgrades.Test{
 
 var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	// Create the frameworks here because we can only create them
@@ -93,7 +93,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 
 var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-downgrade")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("cluster downgrade", func() {

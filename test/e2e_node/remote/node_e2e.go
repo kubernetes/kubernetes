@@ -93,9 +93,9 @@ func prependMemcgNotificationFlag(args string) string {
 	return "--kubelet-flags=--kernel-memcg-notification=true " + args
 }
 
-// prependGCPCredentialProviderFlag prepends the flags for enabling
+// prependCredentialProviderFlag prepends the flags for enabling
 // a credential provider plugin.
-func prependGCPCredentialProviderFlag(args, workspace string) string {
+func prependCredentialProviderFlag(args, workspace string) string {
 	credentialProviderConfig := filepath.Join(workspace, "credential-provider.yaml")
 	featureGateFlag := "--kubelet-flags=--feature-gates=DisableKubeletCloudCredentialProviders=true"
 	configFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-config=%s", credentialProviderConfig)
@@ -115,9 +115,12 @@ func osSpecificActions(args, host, workspace string) (string, error) {
 		return args, setKubeletSELinuxLabels(host, workspace)
 	case strings.Contains(output, "gci"), strings.Contains(output, "cos"):
 		args = prependMemcgNotificationFlag(args)
-		return prependGCPCredentialProviderFlag(args, workspace), nil
+		return prependCredentialProviderFlag(args, workspace), nil
 	case strings.Contains(output, "ubuntu"):
-		args = prependGCPCredentialProviderFlag(args, workspace)
+		args = prependCredentialProviderFlag(args, workspace)
+		return prependMemcgNotificationFlag(args), nil
+	case strings.Contains(output, "amzn"):
+		args = prependCredentialProviderFlag(args, workspace)
 		return prependMemcgNotificationFlag(args), nil
 	}
 	return args, nil

@@ -226,7 +226,7 @@ func (e *Env) setFunction(decl *exprpb.Decl) []errorMsg {
 		newOverloads := []*exprpb.Decl_FunctionDecl_Overload{}
 		for _, overload := range overloads {
 			existing, found := existingOverloads[overload.GetOverloadId()]
-			if !found || !proto.Equal(existing, overload) {
+			if !found || !overloadsEqual(existing, overload) {
 				newOverloads = append(newOverloads, overload)
 			}
 		}
@@ -262,6 +262,31 @@ func (e *Env) addIdent(decl *exprpb.Decl) errorMsg {
 func (e *Env) isOverloadDisabled(overloadID string) bool {
 	_, found := e.filteredOverloadIDs[overloadID]
 	return found
+}
+
+// overloadsEqual returns whether two overloads have identical signatures.
+//
+// type parameter names are ignored as they may be specified in any order and have no bearing on overload
+// equivalence
+func overloadsEqual(o1, o2 *exprpb.Decl_FunctionDecl_Overload) bool {
+	return o1.GetOverloadId() == o2.GetOverloadId() &&
+		o1.GetIsInstanceFunction() == o2.GetIsInstanceFunction() &&
+		paramsEqual(o1.GetParams(), o2.GetParams()) &&
+		proto.Equal(o1.GetResultType(), o2.GetResultType())
+}
+
+// paramsEqual returns whether two lists have equal length and all types are equal
+func paramsEqual(p1, p2 []*exprpb.Type) bool {
+	if len(p1) != len(p2) {
+		return false
+	}
+	for i, a := range p1 {
+		b := p2[i]
+		if !proto.Equal(a, b) {
+			return false
+		}
+	}
+	return true
 }
 
 // sanitizeFunction replaces well-known types referenced by message name with their equivalent

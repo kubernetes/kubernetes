@@ -478,7 +478,7 @@ func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T
 	}
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ignoreWatchCacheTests bool) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 
 	initialRV, preset, err := seedMultiLevelData(ctx, store)
@@ -506,6 +506,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 		pod := obj.(*example.Pod)
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
+	// Use compact to increase etcd global revision without changes to any resources.
+	// The increase in resources version comes from Kubernetes compaction updating hidden key.
+	// Used to test consistent List to confirm it returns latest etcd revision.
+	compaction(ctx, t, initialRV)
+	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
 		name                       string
@@ -706,7 +711,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
-			expectRV:                   list.ResourceVersion,
+			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
 		},
 		{
 			name:   "test List with limit at resource version 0",
@@ -1017,6 +1022,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 			},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+			expectedOut: []example.Pod{},
+		},
+		{
+			name:        "test consistent List",
+			prefix:      "/pods/empty",
+			pred:        storage.Everything,
+			rv:          "",
+			expectRV:    currentRV,
 			expectedOut: []example.Pod{},
 		},
 	}

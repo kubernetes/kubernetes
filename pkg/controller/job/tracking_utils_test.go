@@ -27,10 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 )
 
 func TestUIDTrackingExpectations(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tracks := []struct {
 		job         string
 		firstRound  []string
@@ -62,7 +64,7 @@ func TestUIDTrackingExpectations(t *testing.T) {
 	for i := range tracks {
 		track := tracks[i]
 		go func(errID int) {
-			errs[errID] = expectations.expectFinalizersRemoved(track.job, track.firstRound)
+			errs[errID] = expectations.expectFinalizersRemoved(logger, track.job, track.firstRound)
 			wg.Done()
 		}(i)
 	}
@@ -90,12 +92,12 @@ func TestUIDTrackingExpectations(t *testing.T) {
 		for _, uid := range track.firstRound {
 			uid := uid
 			go func() {
-				expectations.finalizerRemovalObserved(track.job, uid)
+				expectations.finalizerRemovalObserved(logger, track.job, uid)
 				wg.Done()
 			}()
 		}
 		go func(errID int) {
-			errs[errID] = expectations.expectFinalizersRemoved(track.job, track.secondRound)
+			errs[errID] = expectations.expectFinalizersRemoved(logger, track.job, track.secondRound)
 			wg.Done()
 		}(i)
 	}
@@ -116,7 +118,7 @@ func TestUIDTrackingExpectations(t *testing.T) {
 		}
 	}
 	for _, track := range tracks {
-		expectations.deleteExpectations(track.job)
+		expectations.deleteExpectations(logger, track.job)
 		uids := expectations.getSet(track.job)
 		if uids != nil {
 			t.Errorf("Wanted expectations for job %s to be cleared, but they were not", track.job)

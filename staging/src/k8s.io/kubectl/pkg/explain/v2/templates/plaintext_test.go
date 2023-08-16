@@ -41,15 +41,44 @@ var (
 	//go:embed apiextensions.k8s.io_v1.json
 	apiextensionsJSON string
 
+	//go:embed batch.k8s.io_v1.json
+	batchJSON string
+
 	apiExtensionsV1OpenAPI map[string]interface{} = func() map[string]interface{} {
 		var res map[string]interface{}
 		utilruntime.Must(json.Unmarshal([]byte(apiextensionsJSON), &res))
 		return res
 	}()
 
+	apiExtensionsV1OpenAPIWithoutListVerb map[string]interface{} = func() map[string]interface{} {
+		var res map[string]interface{}
+		utilruntime.Must(json.Unmarshal([]byte(apiextensionsJSON), &res))
+		paths := res["paths"].(map[string]interface{})
+		delete(paths, "/apis/apiextensions.k8s.io/v1/customresourcedefinitions")
+		return res
+	}()
+
 	apiExtensionsV1OpenAPISpec spec3.OpenAPI = func() spec3.OpenAPI {
 		var res spec3.OpenAPI
 		utilruntime.Must(json.Unmarshal([]byte(apiextensionsJSON), &res))
+		return res
+	}()
+
+	batchV1OpenAPI map[string]interface{} = func() map[string]interface{} {
+		var res map[string]interface{}
+		utilruntime.Must(json.Unmarshal([]byte(batchJSON), &res))
+		return res
+	}()
+
+	batchV1OpenAPIWithoutListVerb map[string]interface{} = func() map[string]interface{} {
+		var res map[string]interface{}
+		utilruntime.Must(json.Unmarshal([]byte(batchJSON), &res))
+		paths := res["paths"].(map[string]interface{})
+		delete(paths, "/apis/batch/v1/jobs")
+		delete(paths, "/apis/batch/v1/namespaces/{namespace}/jobs")
+
+		delete(paths, "/apis/batch/v1/cronjobs")
+		delete(paths, "/apis/batch/v1/namespaces/{namespace}/cronjobs/{name}")
 		return res
 	}()
 )
@@ -141,6 +170,74 @@ func TestPlaintext(t *testing.T) {
 			},
 			Checks: []check{
 				checkContains("CustomResourceDefinition represents a resource that should be exposed"),
+			},
+		},
+		{
+			// Test basic ability to find a namespaced GVR and print its description
+			Name: "SchemaFoundNamespaced",
+			Context: v2.TemplateContext{
+				Document: batchV1OpenAPI,
+				GVR: schema.GroupVersionResource{
+					Group:    "batch",
+					Version:  "v1",
+					Resource: "jobs",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("Job represents the configuration of a single job"),
+			},
+		},
+		{
+			// Test basic ability to find a GVR without a list verb and print its description
+			Name: "SchemaFoundWithoutListVerb",
+			Context: v2.TemplateContext{
+				Document: apiExtensionsV1OpenAPIWithoutListVerb,
+				GVR: schema.GroupVersionResource{
+					Group:    "apiextensions.k8s.io",
+					Version:  "v1",
+					Resource: "customresourcedefinitions",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("CustomResourceDefinition represents a resource that should be exposed"),
+			},
+		},
+		{
+			// Test basic ability to find a namespaced GVR without a list verb and print its description
+			Name: "SchemaFoundNamespacedWithoutListVerb",
+			Context: v2.TemplateContext{
+				Document: batchV1OpenAPIWithoutListVerb,
+				GVR: schema.GroupVersionResource{
+					Group:    "batch",
+					Version:  "v1",
+					Resource: "jobs",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("Job represents the configuration of a single job"),
+			},
+		},
+		{
+			// Test basic ability to find a namespaced GVR without a top level list verb and print its description
+			Name: "SchemaFoundNamespacedWithoutTopLevelListVerb",
+			Context: v2.TemplateContext{
+				Document: batchV1OpenAPIWithoutListVerb,
+				GVR: schema.GroupVersionResource{
+					Group:    "batch",
+					Version:  "v1",
+					Resource: "cronjobs",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("CronJob represents the configuration of a single cron job"),
 			},
 		},
 		{

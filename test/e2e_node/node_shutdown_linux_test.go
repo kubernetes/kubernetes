@@ -23,7 +23,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/godbus/dbus/v5"
 	v1 "k8s.io/api/core/v1"
@@ -55,7 +59,29 @@ import (
 
 var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.BeforeEach(func() {
+		if _, err := exec.LookPath("systemd-run"); err == nil {
+			if version, verr := exec.Command("systemd-run", "--version").Output(); verr == nil {
+				// sample output from $ systemd-run --version
+				// systemd 245 (245.4-4ubuntu3.13)
+				re := regexp.MustCompile(`systemd (\d+)`)
+				if match := re.FindSubmatch(version); len(match) > 1 {
+					systemdVersion, err := strconv.Atoi(string(match[1]))
+					if err != nil {
+						framework.Logf("failed to parse systemd version with error %v, 'systemd-run --version' output was [%s]", err, version)
+					} else {
+						// See comments in issue 107043, this is a known problem for a long time that this feature does not work on older systemd
+						// https://github.com/kubernetes/kubernetes/issues/107043#issuecomment-997546598
+						if systemdVersion < 245 {
+							e2eskipper.Skipf("skipping GracefulNodeShutdown tests as we are running on an old version of systemd : %d", systemdVersion)
+						}
+					}
+				}
+			}
+		}
+	})
 
 	ginkgo.Context("graceful node shutdown when PodDisruptionConditions are enabled [NodeFeature:PodDisruptionConditions]", func() {
 
@@ -340,14 +366,14 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			err = restartDbus()
 			framework.ExpectNoError(err)
 
-			// Wait a few seconds to ensure dbus is restarted...
-			time.Sleep(5 * time.Second)
-
-			ginkgo.By("Emitting Shutdown signal")
-			err = emitSignalPrepareForShutdown(true)
-			framework.ExpectNoError(err)
-
 			gomega.Eventually(ctx, func(ctx context.Context) error {
+				// re-send the shutdown signal in case the dbus restart is not done
+				ginkgo.By("Emitting Shutdown signal")
+				err = emitSignalPrepareForShutdown(true)
+				if err != nil {
+					return err
+				}
+
 				isReady := getNodeReadyStatus(ctx, f)
 				if isReady {
 					return fmt.Errorf("node did not become shutdown as expected")

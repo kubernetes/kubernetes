@@ -237,7 +237,7 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 					Ports: []v1.ServicePort{
 						{
 							Port:       443,
-							TargetPort: intstr.FromInt(443),
+							TargetPort: intstr.FromInt32(443),
 						},
 					},
 				},
@@ -722,7 +722,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 					Ports: []v1.ServicePort{
 						{
 							Port:       443,
-							TargetPort: intstr.FromInt(443),
+							TargetPort: intstr.FromInt32(443),
 						},
 					},
 				},
@@ -953,7 +953,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 					Ports: []v1.ServicePort{
 						{
 							Port:       443,
-							TargetPort: intstr.FromInt(443),
+							TargetPort: intstr.FromInt32(443),
 						},
 					},
 				},
@@ -1020,7 +1020,7 @@ func TestUpgradeDowngrade(t *testing.T) {
 			Ports: []v1.ServicePort{
 				{
 					Port:       443,
-					TargetPort: intstr.FromInt(443),
+					TargetPort: intstr.FromInt32(443),
 				},
 			},
 		},
@@ -1126,7 +1126,7 @@ func TestConvertToFromExternalName(t *testing.T) {
 			Ports: []v1.ServicePort{
 				{
 					Port:       443,
-					TargetPort: intstr.FromInt(443),
+					TargetPort: intstr.FromInt32(443),
 				},
 			},
 		},
@@ -1215,7 +1215,7 @@ func TestPreferDualStack(t *testing.T) {
 			Ports: []v1.ServicePort{
 				{
 					Port:       443,
-					TargetPort: intstr.FromInt(443),
+					TargetPort: intstr.FromInt32(443),
 				},
 			},
 		},
@@ -1288,7 +1288,7 @@ func TestServiceUpdate(t *testing.T) {
 			Ports: []v1.ServicePort{
 				{
 					Port:       443,
-					TargetPort: intstr.FromInt(443),
+					TargetPort: intstr.FromInt32(443),
 				},
 			},
 		},

@@ -132,8 +132,11 @@ func makeVarArgMacroKey(name string, receiverStyle bool) string {
 	return fmt.Sprintf("%s:*:%v", name, receiverStyle)
 }
 
-// MacroExpander converts a call and its associated arguments into a new CEL abstract syntax tree, or an error
-// if the input arguments are not suitable for the expansion requirements for the macro in question.
+// MacroExpander converts a call and its associated arguments into a new CEL abstract syntax tree.
+//
+// If the MacroExpander determines within the implementation that an expansion is not needed it may return
+// a nil Expr value to indicate a non-match. However, if an expansion is to be performed, but the arguments
+// are not well-formed, the result of the expansion will be an error.
 //
 // The MacroExpander accepts as arguments a MacroExprHelper as well as the arguments used in the function call
 // and produces as output an Expr ast node.
@@ -147,6 +150,9 @@ type MacroExpander func(eh ExprHelper,
 // consistent with the source position and expression id generation code leveraged by both
 // the parser and type-checker.
 type ExprHelper interface {
+	// Copy the input expression with a brand new set of identifiers.
+	Copy(*exprpb.Expr) *exprpb.Expr
+
 	// LiteralBool creates an Expr value for a bool literal.
 	LiteralBool(value bool) *exprpb.Expr
 
@@ -174,14 +180,14 @@ type ExprHelper interface {
 	NewMap(entries ...*exprpb.Expr_CreateStruct_Entry) *exprpb.Expr
 
 	// NewMapEntry creates a Map Entry for the key, value pair.
-	NewMapEntry(key *exprpb.Expr, val *exprpb.Expr) *exprpb.Expr_CreateStruct_Entry
+	NewMapEntry(key *exprpb.Expr, val *exprpb.Expr, optional bool) *exprpb.Expr_CreateStruct_Entry
 
 	// NewObject creates a CreateStruct instruction for an object with a given type name and
 	// optional set of field initializers.
 	NewObject(typeName string, fieldInits ...*exprpb.Expr_CreateStruct_Entry) *exprpb.Expr
 
 	// NewObjectFieldInit creates a new Object field initializer from the field name and value.
-	NewObjectFieldInit(field string, init *exprpb.Expr) *exprpb.Expr_CreateStruct_Entry
+	NewObjectFieldInit(field string, init *exprpb.Expr, optional bool) *exprpb.Expr_CreateStruct_Entry
 
 	// Fold creates a fold comprehension instruction.
 	//
@@ -309,8 +315,10 @@ func MakeExistsOne(eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*ex
 // input to produce an output list.
 //
 // There are two call patterns supported by map:
-//   <iterRange>.map(<iterVar>, <transform>)
-//   <iterRange>.map(<iterVar>, <predicate>, <transform>)
+//
+//	<iterRange>.map(<iterVar>, <transform>)
+//	<iterRange>.map(<iterVar>, <predicate>, <transform>)
+//
 // In the second form only iterVar values which return true when provided to the predicate expression
 // are transformed.
 func MakeMap(eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {

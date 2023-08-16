@@ -166,14 +166,17 @@ aliases:
     - alculquicondor
     - Huang-Wei
     - ahg-g
-    - damemi
+    - kerthcet
+    - sanposhiho
   # emeritus:
+  # - damemi
   # - bsalamat
   # - k82cn
   # - ravisantoshgudimetla
   # - wojtek-t
   sig-scheduling:
     - chendave
+    - damemi
     - denkensk
     - sanposhiho
     - kerthcet
@@ -493,7 +496,6 @@ aliases:
     - logicalhan
   feature-approvers:
     - andrewsykim # Cloud Provider
-    - logicalhan # Instrumentation
     - ahg-g # Scheduling
     - caseydavenport # Network
     - dcbw # Network
@@ -504,19 +506,22 @@ aliases:
     - ehashman # Instrumentation
     - janetkuo # Apps
     - jayunit100 # Windows
+    - jpbetz # API Machinery
     - jsafrane # Storage
     - jsturtevant # Windows
+    - justinsb # Cluster Lifecycle
     - kow3ns # Apps
-    - lavalamp # API Machinery
     - liggitt # Auth
+    - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
     - marosset # Windows
+    - mrunalp # Node
     - msau42 # Storage
     - mwielgus # Autoscaling
     - pwittrock # CLI
-    - justinsb # Cluster Lifecycle
     - saad-ali # Storage
     - seans3 # CLI
+    - sergeykanzhelev # Node
     - soltysh # Apps, CLI
     - tallclair # Auth
     - thockin # Network

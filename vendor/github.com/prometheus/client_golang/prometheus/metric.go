@@ -20,11 +20,9 @@ import (
 	"strings"
 	"time"
 
-	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-	"github.com/golang/protobuf/proto"
-	"github.com/prometheus/common/model"
-
 	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/model"
+	"google.golang.org/protobuf/proto"
 )
 
 var separatorByteSlice = []byte{model.SeparatorByte} // For convenient use with xxhash.

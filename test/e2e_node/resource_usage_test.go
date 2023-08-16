@@ -49,7 +49,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 	)
 
 	f := framework.NewDefaultFramework("resource-usage")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		om = e2ekubelet.NewRuntimeOperationMonitor(ctx, f.ClientSet)

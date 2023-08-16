@@ -19,6 +19,7 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"mime"
 	"net/http"
@@ -30,7 +31,7 @@ import (
 
 	//nolint:staticcheck // SA1019 Keep using module since it's still being maintained and the api of google.golang.org/protobuf/proto differs
 	"github.com/golang/protobuf/proto"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -420,6 +421,16 @@ func (e *ErrGroupDiscoveryFailed) Error() string {
 func IsGroupDiscoveryFailedError(err error) bool {
 	_, ok := err.(*ErrGroupDiscoveryFailed)
 	return err != nil && ok
+}
+
+// GroupDiscoveryFailedErrorGroups returns true if the error is an ErrGroupDiscoveryFailed error,
+// along with the map of group versions that failed discovery.
+func GroupDiscoveryFailedErrorGroups(err error) (map[schema.GroupVersion]error, bool) {
+	var groupDiscoveryError *ErrGroupDiscoveryFailed
+	if err != nil && goerrors.As(err, &groupDiscoveryError) {
+		return groupDiscoveryError.Groups, true
+	}
+	return nil, false
 }
 
 func ServerGroupsAndResources(d DiscoveryInterface) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {

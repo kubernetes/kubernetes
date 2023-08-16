@@ -334,11 +334,9 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 		},
 		stopCh)
 	if err != nil {
-		klog.V(2).Infof("stop requested")
 		return false
 	}
 
-	klog.V(4).Infof("caches populated")
 	return true
 }
 
@@ -459,28 +457,29 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		klog.Warningf("The sharedIndexInformer has started, run more than once is not allowed")
 		return
 	}
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KnownObjects:          s.indexer,
-		EmitDeltaTypeReplaced: true,
-		Transformer:           s.transform,
-	})
-
-	cfg := &Config{
-		Queue:             fifo,
-		ListerWatcher:     s.listerWatcher,
-		ObjectType:        s.objectType,
-		ObjectDescription: s.objectDescription,
-		FullResyncPeriod:  s.resyncCheckPeriod,
-		RetryOnError:      false,
-		ShouldResync:      s.processor.shouldResync,
-
-		Process:           s.HandleDeltas,
-		WatchErrorHandler: s.watchErrorHandler,
-	}
 
 	func() {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
+
+		fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			KnownObjects:          s.indexer,
+			EmitDeltaTypeReplaced: true,
+			Transformer:           s.transform,
+		})
+
+		cfg := &Config{
+			Queue:             fifo,
+			ListerWatcher:     s.listerWatcher,
+			ObjectType:        s.objectType,
+			ObjectDescription: s.objectDescription,
+			FullResyncPeriod:  s.resyncCheckPeriod,
+			RetryOnError:      false,
+			ShouldResync:      s.processor.shouldResync,
+
+			Process:           s.HandleDeltas,
+			WatchErrorHandler: s.watchErrorHandler,
+		}
 
 		s.controller = New(cfg)
 		s.controller.(*controller).clock = s.clock

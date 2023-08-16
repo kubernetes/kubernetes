@@ -38,11 +38,14 @@ func TestCollectResourceMetrics(t *testing.T) {
 		"scrape_error",
 		"node_cpu_usage_seconds_total",
 		"node_memory_working_set_bytes",
+		"node_swap_usage_bytes",
 		"container_cpu_usage_seconds_total",
 		"container_memory_working_set_bytes",
+		"container_swap_usage_bytes",
 		"container_start_time_seconds",
 		"pod_cpu_usage_seconds_total",
 		"pod_memory_working_set_bytes",
+		"pod_swap_usage_bytes",
 	}
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -75,6 +78,10 @@ func TestCollectResourceMetrics(t *testing.T) {
 						Time:            testTime,
 						WorkingSetBytes: uint64Ptr(1000),
 					},
+					Swap: &statsapi.SwapStats{
+						Time:           testTime,
+						SwapUsageBytes: uint64Ptr(500),
+					},
 				},
 			},
 			summaryErr: nil,
@@ -85,6 +92,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP node_memory_working_set_bytes [ALPHA] Current working set of the node in bytes
 				# TYPE node_memory_working_set_bytes gauge
 				node_memory_working_set_bytes 1000 1624396278302
+				# HELP node_swap_usage_bytes [ALPHA] Current swap usage of the node in bytes. Reported only on non-windows systems
+				# TYPE node_swap_usage_bytes gauge
+				node_swap_usage_bytes 500 1624396278302
 				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
 				# TYPE scrape_error gauge
 				scrape_error 0
@@ -131,6 +141,10 @@ func TestCollectResourceMetrics(t *testing.T) {
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
 									WorkingSetBytes: uint64Ptr(1000),
+								},
+								Swap: &statsapi.SwapStats{
+									Time:           testTime,
+									SwapUsageBytes: uint64Ptr(1000),
 								},
 							},
 							{
@@ -189,6 +203,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 				container_start_time_seconds{container="container_a",namespace="namespace_a",pod="pod_a"} 1.6243962483020916e+09 1624396248302
 				container_start_time_seconds{container="container_a",namespace="namespace_b",pod="pod_b"} 1.6243956783020916e+09 1624395678302
 				container_start_time_seconds{container="container_b",namespace="namespace_a",pod="pod_a"} 1.6243961583020916e+09 1624396158302
+        		# HELP container_swap_usage_bytes [ALPHA] Current amount of the container swap usage in bytes. Reported only on non-windows systems
+        		# TYPE container_swap_usage_bytes gauge
+        		container_swap_usage_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 1624396278302
 			`,
 		},
 		{
@@ -310,6 +327,10 @@ func TestCollectResourceMetrics(t *testing.T) {
 							Time:            testTime,
 							WorkingSetBytes: uint64Ptr(1000),
 						},
+						Swap: &statsapi.SwapStats{
+							Time:           testTime,
+							SwapUsageBytes: uint64Ptr(5000),
+						},
 					},
 				},
 			},
@@ -324,6 +345,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP pod_memory_working_set_bytes [ALPHA] Current working set of the pod in bytes
 				# TYPE pod_memory_working_set_bytes gauge
 				pod_memory_working_set_bytes{namespace="namespace_a",pod="pod_a"} 1000 1624396278302
+				# HELP pod_swap_usage_bytes [ALPHA] Current amount of the pod swap usage in bytes. Reported only on non-windows systems
+				# TYPE pod_swap_usage_bytes gauge
+				pod_swap_usage_bytes{namespace="namespace_a",pod="pod_a"} 5000 1624396278302
 			`,
 		},
 		{

@@ -1,3 +1,17 @@
+# The following labels are used in this file:
+# - fast: short execution time, ideally less than 30 seconds
+# - integration-test: used to select workloads that
+#   run in pull-kubernetes-integration. Choosing those tests
+#   is a tradeoff between code coverage and overall runtime.
+# - performance: used to select workloads that run
+#   in ci-benchmark-scheduler-perf. Such workloads
+#   must run long enough (ideally, longer than 10 seconds)
+#   to provide meaningful samples for the pod scheduling
+#   rate.
+#
+# Combining "performance" and "fast" selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
 - name: SchedulingBasic
   defaultPodTemplatePath: config/pod-default.yaml
   workloadTemplate:
@@ -10,7 +24,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -39,7 +53,7 @@
     namespace: sched-1
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 100
@@ -161,7 +175,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -223,7 +237,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 500
@@ -308,7 +322,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 1000
@@ -386,7 +400,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 500
       initPods: 200
@@ -504,7 +518,7 @@
     collectMetrics: true
   workloads:
   - name: 1000Nodes
-    labels: [fast]
+    labels: [integration-test, fast]
     params:
       initNodes: 1000
       measurePods: 1000
@@ -734,6 +748,7 @@
     collectMetrics: true
   workloads:
   - name: fast
+    labels: [integration-test, fast]
     params:
       # This testcase runs through all code paths without
       # taking too long overall.
@@ -743,7 +758,7 @@
       measurePods: 10
       maxClaimsPerNode: 10
   - name: 2000pods_100nodes
-    labels: [performance,fast]
+    labels: [performance, fast]
     params:
       # In this testcase, the number of nodes is smaller
       # than the limit for the PodScheduling slices.

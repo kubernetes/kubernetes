@@ -111,7 +111,12 @@ func (s *droppedRequestsStats) updateHistory(unixTime int64, count int64) {
 	s.history = append(s.history, unixStat{unixTime: unixTime, requests: count})
 
 	startIndex := 0
-	for ; startIndex < len(s.history) && unixTime-s.history[startIndex].unixTime > maxRetryAfter; startIndex++ {
+	// Entries that exceed 2*retryAfter or maxRetryAfter are never going to be needed.
+	maxHistory := 2 * s.retryAfter.Load()
+	if maxHistory > maxRetryAfter {
+		maxHistory = maxRetryAfter
+	}
+	for ; startIndex < len(s.history) && unixTime-s.history[startIndex].unixTime > maxHistory; startIndex++ {
 	}
 	if startIndex > 0 {
 		s.history = s.history[startIndex:]
@@ -138,14 +143,12 @@ func (s *droppedRequestsStats) updateRetryAfterIfNeededLocked(unixTime int64) {
 	retryAfter := s.retryAfter.Load()
 
 	droppedRequests := int64(0)
-	if len(s.history) > 0 {
-		for i := len(s.history) - 1; i >= 0; i-- {
-			if unixTime-s.history[i].unixTime > retryAfter {
-				break
-			}
-			if s.history[i].unixTime < unixTime {
-				droppedRequests += s.history[i].requests
-			}
+	for i := len(s.history) - 1; i >= 0; i-- {
+		if unixTime-s.history[i].unixTime > retryAfter {
+			break
+		}
+		if s.history[i].unixTime < unixTime {
+			droppedRequests += s.history[i].requests
 		}
 	}
 

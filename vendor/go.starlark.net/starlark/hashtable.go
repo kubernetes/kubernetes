@@ -12,6 +12,8 @@ import (
 // hashtable is used to represent Starlark dict and set values.
 // It is a hash table whose key/value entries form a doubly-linked list
 // in the order the entries were inserted.
+//
+// Initialized instances of hashtable must not be copied.
 type hashtable struct {
 	table     []bucket  // len is zero or a power of two
 	bucket0   [1]bucket // inline allocation for small maps.
@@ -20,7 +22,16 @@ type hashtable struct {
 	head      *entry  // insertion order doubly-linked list; may be nil
 	tailLink  **entry // address of nil link at end of list (perhaps &head)
 	frozen    bool
+
+	_ noCopy // triggers vet copylock check on this type.
 }
+
+// noCopy is zero-sized type that triggers vet's copylock check.
+// See https://github.com/golang/go/issues/8005#issuecomment-190753527.
+type noCopy struct{}
+
+func (*noCopy) Lock()   {}
+func (*noCopy) Unlock() {}
 
 const bucketSize = 8
 
@@ -55,26 +66,16 @@ func (ht *hashtable) init(size int) {
 func (ht *hashtable) freeze() {
 	if !ht.frozen {
 		ht.frozen = true
-		for i := range ht.table {
-			for p := &ht.table[i]; p != nil; p = p.next {
-				for i := range p.entries {
-					e := &p.entries[i]
-					if e.hash != 0 {
-						e.key.Freeze()
-						e.value.Freeze()
-					}
-				}
-			}
+		for e := ht.head; e != nil; e = e.next {
+			e.key.Freeze()
+			e.value.Freeze()
 		}
 	}
 }
 
 func (ht *hashtable) insert(k, v Value) error {
-	if ht.frozen {
-		return fmt.Errorf("cannot insert into frozen hash table")
-	}
-	if ht.itercount > 0 {
-		return fmt.Errorf("cannot insert into hash table during iteration")
+	if err := ht.checkMutable("insert into"); err != nil {
+		return err
 	}
 	if ht.table == nil {
 		ht.init(1)
@@ -154,13 +155,12 @@ func overloaded(elems, buckets int) bool {
 
 func (ht *hashtable) grow() {
 	// Double the number of buckets and rehash.
-	// TODO(adonovan): opt:
-	// - avoid reentrant calls to ht.insert, and specialize it.
-	//   e.g. we know the calls to Equals will return false since
-	//   there are no duplicates among the old keys.
-	// - saving the entire hash in the bucket would avoid the need to
-	//   recompute the hash.
-	// - save the old buckets on a free list.
+	//
+	// Even though this makes reentrant calls to ht.insert,
+	// calls Equals unnecessarily (since there can't be duplicate keys),
+	// and recomputes the hash unnecessarily, the gains from
+	// avoiding these steps were found to be too small to justify
+	// the extra logic: -2% on hashtable benchmark.
 	ht.table = make([]bucket, len(ht.table)<<1)
 	oldhead := ht.head
 	ht.head = nil
@@ -230,11 +230,8 @@ func (ht *hashtable) keys() []Value {
 }
 
 func (ht *hashtable) delete(k Value) (v Value, found bool, err error) {
-	if ht.frozen {
-		return nil, false, fmt.Errorf("cannot delete from frozen hash table")
-	}
-	if ht.itercount > 0 {
-		return nil, false, fmt.Errorf("cannot delete from hash table during iteration")
+	if err := ht.checkMutable("delete from"); err != nil {
+		return nil, false, err
 	}
 	if ht.table == nil {
 		return None, false, nil // empty
@@ -277,12 +274,21 @@ func (ht *hashtable) delete(k Value) (v Value, found bool, err error) {
 	return None, false, nil // not found
 }
 
-func (ht *hashtable) clear() error {
+// checkMutable reports an error if the hash table should not be mutated.
+// verb+" dict" should describe the operation.
+func (ht *hashtable) checkMutable(verb string) error {
 	if ht.frozen {
-		return fmt.Errorf("cannot clear frozen hash table")
+		return fmt.Errorf("cannot %s frozen hash table", verb)
 	}
 	if ht.itercount > 0 {
-		return fmt.Errorf("cannot clear hash table during iteration")
+		return fmt.Errorf("cannot %s hash table during iteration", verb)
+	}
+	return nil
+}
+
+func (ht *hashtable) clear() error {
+	if err := ht.checkMutable("clear"); err != nil {
+		return err
 	}
 	if ht.table != nil {
 		for i := range ht.table {
@@ -292,6 +298,15 @@ func (ht *hashtable) clear() error {
 	ht.head = nil
 	ht.tailLink = &ht.head
 	ht.len = 0
+	return nil
+}
+
+func (ht *hashtable) addAll(other *hashtable) error {
+	for e := other.head; e != nil; e = e.next {
+		if err := ht.insert(e.key, e.value); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -349,6 +364,8 @@ func (it *keyIterator) Done() {
 	}
 }
 
+// TODO(adonovan): use go1.19's maphash.String.
+
 // hashString computes the hash of s.
 func hashString(s string) uint32 {
 	if len(s) >= 12 {
@@ -362,9 +379,9 @@ func hashString(s string) uint32 {
 //go:linkname goStringHash runtime.stringHash
 func goStringHash(s string, seed uintptr) uintptr
 
-// softHashString computes the FNV hash of s in software.
+// softHashString computes the 32-bit FNV-1a hash of s in software.
 func softHashString(s string) uint32 {
-	var h uint32
+	var h uint32 = 2166136261
 	for i := 0; i < len(s); i++ {
 		h ^= uint32(s[i])
 		h *= 16777619

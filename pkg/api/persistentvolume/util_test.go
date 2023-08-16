@@ -91,7 +91,7 @@ func TestDropDisabledFields(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeExpandSecret, tc.csiExpansionEnabled)()
 
-			DropDisabledFields(tc.newSpec, tc.oldSpec)
+			DropDisabledSpecFields(tc.newSpec, tc.oldSpec)
 			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {
 				t.Error(cmp.Diff(tc.newSpec, tc.expectNewSpec))
 			}
@@ -174,6 +174,124 @@ func TestWarnings(t *testing.T) {
 			expected: []string{
 				`metadata.annotations[volume.beta.kubernetes.io/storage-class]: deprecated since v1.8; use "storageClassName" attribute instead`,
 				`spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].key: beta.kubernetes.io/os is deprecated since v1.14; use "kubernetes.io/os" instead`,
+			},
+		},
+		{
+			name: "PV CephFS deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						CephFS: &api.CephFSPersistentVolumeSource{
+							Monitors:   nil,
+							Path:       "",
+							User:       "",
+							SecretFile: "",
+							SecretRef:  nil,
+							ReadOnly:   false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.cephfs: deprecated in v1.28, non-functional in v1.31+`,
+			},
+		},
+		{
+			name: "PV PhotonPersistentDisk deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{
+							PdID:   "",
+							FSType: "",
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.photonPersistentDisk: deprecated in v1.11, non-functional in v1.16+`,
+			},
+		},
+		{
+			name: "PV RBD deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						RBD: &api.RBDPersistentVolumeSource{
+							CephMonitors: nil,
+							RBDImage:     "",
+							FSType:       "",
+							RBDPool:      "",
+							RadosUser:    "",
+							Keyring:      "",
+							SecretRef:    nil,
+							ReadOnly:     false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.rbd: deprecated in v1.28, non-functional in v1.31+`},
+		},
+		{
+			name: "PV ScaleIO deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						ScaleIO: &api.ScaleIOPersistentVolumeSource{
+							Gateway:          "",
+							System:           "",
+							SecretRef:        nil,
+							SSLEnabled:       false,
+							ProtectionDomain: "",
+							StoragePool:      "",
+							StorageMode:      "",
+							VolumeName:       "",
+							FSType:           "",
+							ReadOnly:         false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.scaleIO: deprecated in v1.16, non-functional in v1.22+`,
+			},
+		},
+		{
+			name: "PV StorageOS deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						StorageOS: &api.StorageOSPersistentVolumeSource{
+							VolumeName:      "",
+							VolumeNamespace: "",
+							FSType:          "",
+							ReadOnly:        false,
+							SecretRef:       nil,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.storageOS: deprecated in v1.22, non-functional in v1.25+`,
+			},
+		},
+		{
+			name: "PV GlusterFS deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Glusterfs: &api.GlusterfsPersistentVolumeSource{
+							EndpointsName:      "",
+							Path:               "",
+							ReadOnly:           false,
+							EndpointsNamespace: nil,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.glusterfs: deprecated in v1.25, non-functional in v1.26+`,
 			},
 		},
 	}

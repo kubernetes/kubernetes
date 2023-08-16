@@ -67,7 +67,7 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should support pod.Spec.SecurityContext.SupplementalGroups [LinuxOnly]", func(ctx context.Context) {
 		pod := scTestPod(false, false)

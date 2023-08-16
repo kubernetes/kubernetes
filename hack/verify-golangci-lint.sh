@@ -97,6 +97,19 @@ if [ "${golangci_config}" ]; then
     golangci+=(--config="${golangci_config}")
 fi
 
+# Below the output of golangci-lint is going to be piped into sed to add
+# a prefix to each output line. This helps make the output more visible
+# in the Prow log viewer ("error" is a key word there) and ensures that
+# only those lines get included as failure message in a JUnit file
+# by "make verify".
+#
+# The downside is that the automatic detection whether to colorize output
+# doesn't work anymore, so here we force it ourselves when connected to
+# a tty.
+if tty -s; then
+    golangci+=(--color=always)
+fi
+
 if [ "$base" ]; then
     # Must be a something that git can resolve to a commit.
     # "git rev-parse --verify" checks that and prints a detailed
@@ -139,15 +152,15 @@ res=0
 run () {
   if [[ "${#targets[@]}" -gt 0 ]]; then
     echo "running ${golangci[*]} ${targets[*]}" >&2
-    "${golangci[@]}" "${targets[@]}" >&2 || res=$?
+    "${golangci[@]}" "${targets[@]}" 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
   else
     echo "running ${golangci[*]} ./..." >&2
-    "${golangci[@]}" ./... >&2 || res=$?
+    "${golangci[@]}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
     for d in staging/src/k8s.io/*; do
       MODPATH="staging/src/k8s.io/$(basename "${d}")"
       echo "running ( cd ${KUBE_ROOT}/${MODPATH}; ${golangci[*]} --path-prefix ${MODPATH} ./... )"
       pushd "${KUBE_ROOT}/${MODPATH}" >/dev/null
-        "${golangci[@]}" --path-prefix "${MODPATH}" ./... >&2 || res=$?
+        "${golangci[@]}" --path-prefix "${MODPATH}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
       popd >/dev/null
     done
   fi

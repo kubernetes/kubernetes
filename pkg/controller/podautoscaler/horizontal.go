@@ -281,7 +281,7 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	// happens quite often because there is race condition between adding request after resyncPeriod
 	// and removing them from queue. Request can be added by resync before previous request is
 	// removed from queue. If we didn't add request here then in this case one request would be dropped
-	// and HPA would processed after 2 x resyncPeriod.
+	// and HPA would process after 2 x resyncPeriod.
 	if !deleted {
 		a.queue.AddRateLimited(key)
 	}
@@ -819,7 +819,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	rescale := true
 	logger := klog.FromContext(ctx)
 
-	if scale.Spec.Replicas == 0 && minReplicas != 0 {
+	if currentReplicas == 0 && minReplicas != 0 {
 		// Autoscaling is disabled for this resource
 		desiredReplicas = 0
 		rescale = false

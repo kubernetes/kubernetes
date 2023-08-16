@@ -191,8 +191,8 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, false)
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestList(ctx, t, store, compactStorage(client), false)
 }
 
 func TestListWithoutPaging(t *testing.T) {
@@ -258,7 +258,7 @@ func compactStorage(etcdClient *clientv3.Client) storagetesting.Compaction {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := etcdClient.KV.Compact(ctx, int64(rv), clientv3.WithCompactPhysical()); err != nil {
+		if _, _, err = compact(ctx, etcdClient, 0, int64(rv)); err != nil {
 			t.Fatalf("Unable to compact, %v", err)
 		}
 	}

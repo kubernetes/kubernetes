@@ -163,7 +163,7 @@ func TestCreateClusterRole(t *testing.T) {
 		cmd.Run(cmd, []string{clusterRoleName})
 		actual := &rbac.ClusterRole{}
 		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), buf.Bytes(), actual); err != nil {
-			t.Log(string(buf.Bytes()))
+			t.Log(buf.String())
 			t.Fatal(err)
 		}
 		if !equality.Semantic.DeepEqual(test.expectedClusterRole, actual) {

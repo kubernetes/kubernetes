@@ -29,8 +29,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -51,6 +51,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
+	cpnames "k8s.io/cloud-provider/names"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
@@ -73,6 +74,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -135,7 +137,7 @@ controller, and serviceaccounts controller.`,
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
-			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
+			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List(), names.KCMControllerAliases())
 			if err != nil {
 				return err
 			}
@@ -154,7 +156,7 @@ controller, and serviceaccounts controller.`,
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
+	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List(), names.KCMControllerAliases())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	registerLegacyGlobalFlags(namedFlagSets)
@@ -353,9 +355,6 @@ type ControllerContext struct {
 	// requested.
 	RESTMapper *restmapper.DeferredDiscoveryRESTMapper
 
-	// AvailableResources is a map listing currently available resources
-	AvailableResources map[schema.GroupVersionResource]bool
-
 	// Cloud is the cloud provider interface for the controllers to use.
 	// It must be initialized and ready to use.
 	Cloud cloudprovider.Interface
@@ -407,7 +406,7 @@ func KnownControllers() []string {
 	// first to ensure that the SA tokens for future controllers will exist.  Think very carefully before adding
 	// to this list.
 	ret.Insert(
-		saTokenControllerName,
+		names.ServiceAccountTokenController,
 	)
 
 	return ret.List()
@@ -415,12 +414,8 @@ func KnownControllers() []string {
 
 // ControllersDisabledByDefault is the set of controllers which is disabled by default
 var ControllersDisabledByDefault = sets.NewString(
-	"bootstrapsigner",
-	"tokencleaner",
-)
-
-const (
-	saTokenControllerName = "serviceaccount-token"
+	names.BootstrapSignerController,
+	names.TokenCleanerController,
 )
 
 // NewControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
@@ -436,95 +431,80 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 		controllers[name] = fn
 	}
 
-	register("endpoint", startEndpointController)
-	register("endpointslice", startEndpointSliceController)
-	register("endpointslicemirroring", startEndpointSliceMirroringController)
-	register("replicationcontroller", startReplicationController)
-	register("podgc", startPodGCController)
-	register("resourcequota", startResourceQuotaController)
-	register("namespace", startNamespaceController)
-	register("serviceaccount", startServiceAccountController)
-	register("garbagecollector", startGarbageCollectorController)
-	register("daemonset", startDaemonSetController)
-	register("job", startJobController)
-	register("deployment", startDeploymentController)
-	register("replicaset", startReplicaSetController)
-	register("horizontalpodautoscaling", startHPAController)
-	register("disruption", startDisruptionController)
-	register("statefulset", startStatefulSetController)
-	register("cronjob", startCronJobController)
-	register("csrsigning", startCSRSigningController)
-	register("csrapproving", startCSRApprovingController)
-	register("csrcleaner", startCSRCleanerController)
-	register("ttl", startTTLController)
-	register("bootstrapsigner", startBootstrapSignerController)
-	register("tokencleaner", startTokenCleanerController)
-	register("nodeipam", startNodeIpamController)
-	register("nodelifecycle", startNodeLifecycleController)
+	register(names.EndpointsController, startEndpointController)
+	register(names.EndpointSliceController, startEndpointSliceController)
+	register(names.EndpointSliceMirroringController, startEndpointSliceMirroringController)
+	register(names.ReplicationControllerController, startReplicationController)
+	register(names.PodGarbageCollectorController, startPodGCController)
+	register(names.ResourceQuotaController, startResourceQuotaController)
+	register(names.NamespaceController, startNamespaceController)
+	register(names.ServiceAccountController, startServiceAccountController)
+	register(names.GarbageCollectorController, startGarbageCollectorController)
+	register(names.DaemonSetController, startDaemonSetController)
+	register(names.JobController, startJobController)
+	register(names.DeploymentController, startDeploymentController)
+	register(names.ReplicaSetController, startReplicaSetController)
+	register(names.HorizontalPodAutoscalerController, startHPAController)
+	register(names.DisruptionController, startDisruptionController)
+	register(names.StatefulSetController, startStatefulSetController)
+	register(names.CronJobController, startCronJobController)
+	register(names.CertificateSigningRequestSigningController, startCSRSigningController)
+	register(names.CertificateSigningRequestApprovingController, startCSRApprovingController)
+	register(names.CertificateSigningRequestCleanerController, startCSRCleanerController)
+	register(names.TTLController, startTTLController)
+	register(names.BootstrapSignerController, startBootstrapSignerController)
+	register(names.TokenCleanerController, startTokenCleanerController)
+	register(names.NodeIpamController, startNodeIpamController)
+	register(names.NodeLifecycleController, startNodeLifecycleController)
 	if loopMode == IncludeCloudLoops {
-		register("service", startServiceController)
-		register("route", startRouteController)
-		register("cloud-node-lifecycle", startCloudNodeLifecycleController)
-		// TODO: volume controller into the IncludeCloudLoops only set.
+		register(cpnames.ServiceLBController, startServiceController)
+		register(cpnames.NodeRouteController, startRouteController)
+		register(cpnames.CloudNodeLifecycleController, startCloudNodeLifecycleController)
+		// TODO: persistent volume controllers into the IncludeCloudLoops only set.
 	}
-	register("persistentvolume-binder", startPersistentVolumeBinderController)
-	register("attachdetach", startAttachDetachController)
-	register("persistentvolume-expander", startVolumeExpandController)
-	register("clusterrole-aggregation", startClusterRoleAggregrationController)
-	register("pvc-protection", startPVCProtectionController)
-	register("pv-protection", startPVProtectionController)
-	register("ttl-after-finished", startTTLAfterFinishedController)
-	register("root-ca-cert-publisher", startRootCACertPublisher)
-	register("ephemeral-volume", startEphemeralVolumeController)
+	register(names.PersistentVolumeBinderController, startPersistentVolumeBinderController)
+	register(names.PersistentVolumeAttachDetachController, startAttachDetachController)
+	register(names.PersistentVolumeExpanderController, startVolumeExpandController)
+	register(names.ClusterRoleAggregationController, startClusterRoleAggregrationController)
+	register(names.PersistentVolumeClaimProtectionController, startPVCProtectionController)
+	register(names.PersistentVolumeProtectionController, startPVProtectionController)
+	register(names.TTLAfterFinishedController, startTTLAfterFinishedController)
+	register(names.RootCACertificatePublisherController, startRootCACertPublisher)
+	register(names.EphemeralVolumeController, startEphemeralVolumeController)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) &&
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
-		register("storage-version-gc", startStorageVersionGCController)
+		register(names.StorageVersionGarbageCollectorController, startStorageVersionGCController)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		register("resource-claim-controller", startResourceClaimController)
+		register(names.ResourceClaimController, startResourceClaimController)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenCleanUp) {
+		register(names.LegacyServiceAccountTokenCleanerController, startLegacySATokenCleaner)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidatingAdmissionPolicy) {
+		register("validatingadmissionpolicy-status-controller", startValidatingAdmissionPolicyStatusController)
 	}
 
 	return controllers
-}
-
-// GetAvailableResources gets the map which contains all available resources of the apiserver
-// TODO: In general, any controller checking this needs to be dynamic so
-// users don't have to restart their controller manager if they change the apiserver.
-// Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
-func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
-	client := clientBuilder.ClientOrDie("controller-discovery")
-	discoveryClient := client.Discovery()
-	_, resourceMap, err := discoveryClient.ServerGroupsAndResources()
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
-	}
-	if len(resourceMap) == 0 {
-		return nil, fmt.Errorf("unable to get any supported resources from server")
-	}
-
-	allResources := map[schema.GroupVersionResource]bool{}
-	for _, apiResourceList := range resourceMap {
-		version, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
-		if err != nil {
-			return nil, err
-		}
-		for _, apiResource := range apiResourceList.APIResources {
-			allResources[version.WithResource(apiResource.Name)] = true
-		}
-	}
-
-	return allResources, nil
 }
 
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
 func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
+	// Informer transform to trim ManagedFields for memory efficiency.
+	trim := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			accessor.SetManagedFields(nil)
+		}
+		return obj, nil
+	}
+
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
-	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
+	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
 
 	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))
-	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, ResyncPeriod(s)())
+	metadataInformers := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, ResyncPeriod(s)(), metadatainformer.WithTransform(trim))
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
@@ -540,11 +520,6 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 		restMapper.Reset()
 	}, 30*time.Second, stop)
 
-	availableResources, err := GetAvailableResources(rootClientBuilder)
-	if err != nil {
-		return ControllerContext{}, err
-	}
-
 	cloud, loopMode, err := createCloudProvider(logger, s.ComponentConfig.KubeCloudShared.CloudProvider.Name, s.ComponentConfig.KubeCloudShared.ExternalCloudVolumePlugin,
 		s.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile, s.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
 	if err != nil {
@@ -557,7 +532,6 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
 		ComponentConfig:                 s.ComponentConfig,
 		RESTMapper:                      restMapper,
-		AvailableResources:              availableResources,
 		Cloud:                           cloud,
 		LoopMode:                        loopMode,
 		InformersStarted:                make(chan struct{}),
@@ -652,13 +626,13 @@ type serviceAccountTokenControllerStarter struct {
 
 func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
-	if !controllerContext.IsControllerEnabled(saTokenControllerName) {
-		logger.Info("Warning: controller is disabled", "controller", saTokenControllerName)
+	if !controllerContext.IsControllerEnabled(names.ServiceAccountTokenController) {
+		logger.Info("Warning: controller is disabled", "controller", names.ServiceAccountTokenController)
 		return nil, false, nil
 	}
 
 	if len(controllerContext.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
-		logger.Info("Controller is disabled because there is no private key", "controller", saTokenControllerName)
+		logger.Info("Controller is disabled because there is no private key", "controller", names.ServiceAccountTokenController)
 		return nil, false, nil
 	}
 	privateKey, err := keyutil.PrivateKeyFromFile(controllerContext.ComponentConfig.SAController.ServiceAccountKeyFile)

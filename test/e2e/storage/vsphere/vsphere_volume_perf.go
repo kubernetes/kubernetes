@@ -57,7 +57,7 @@ const (
 
 var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-performance")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		client           clientset.Interface
@@ -197,7 +197,7 @@ func invokeVolumeLifeCyclePerformance(ctx context.Context, f *framework.Framewor
 	start = time.Now()
 	for i, pvclaims := range totalpvclaims {
 		nodeSelector := nodeSelectorList[i%len(nodeSelectorList)]
-		pod, err := e2epod.CreatePod(ctx, client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(ctx, client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err)
 		totalpods = append(totalpods, pod)
 

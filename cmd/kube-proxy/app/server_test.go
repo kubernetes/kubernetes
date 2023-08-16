@@ -19,68 +19,25 @@ package app
 import (
 	"errors"
 	"fmt"
-	"reflect"
-	"runtime"
-	"strings"
+	"io/ioutil"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"k8s.io/utils/pointer"
-
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	componentbaseconfig "k8s.io/component-base/config"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/utils/pointer"
 )
-
-func TestGetConntrackMax(t *testing.T) {
-	ncores := runtime.NumCPU()
-	testCases := []struct {
-		min        int32
-		maxPerCore int32
-		expected   int
-		err        string
-	}{
-		{
-			expected: 0,
-		},
-		{
-			maxPerCore: 67890, // use this if Max is 0
-			min:        1,     // avoid 0 default
-			expected:   67890 * ncores,
-		},
-		{
-			maxPerCore: 1, // ensure that Min is considered
-			min:        123456,
-			expected:   123456,
-		},
-		{
-			maxPerCore: 0, // leave system setting
-			min:        123456,
-			expected:   0,
-		},
-	}
-
-	for i, tc := range testCases {
-		cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
-			Min:        pointer.Int32(tc.min),
-			MaxPerCore: pointer.Int32(tc.maxPerCore),
-		}
-		x, e := getConntrackMax(cfg)
-		if e != nil {
-			if tc.err == "" {
-				t.Errorf("[%d] unexpected error: %v", i, e)
-			} else if !strings.Contains(e.Error(), tc.err) {
-				t.Errorf("[%d] expected an error containing %q: %v", i, tc.err, e)
-			}
-		} else if x != tc.expected {
-			t.Errorf("[%d] expected %d, got %d", i, tc.expected, x)
-		}
-	}
-}
 
 // TestLoadConfig tests proper operation of loadConfig()
 func TestLoadConfig(t *testing.T) {
@@ -268,6 +225,10 @@ nodePortAddresses:
 				BridgeInterface:     string("cbr0"),
 				InterfaceNamePrefix: string("veth"),
 			},
+			Logging: logsapi.LoggingConfiguration{
+				Format:         "text",
+				FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
+			},
 		}
 
 		options := NewOptions()
@@ -283,8 +244,8 @@ nodePortAddresses:
 
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 
-		if !reflect.DeepEqual(expected, config) {
-			t.Fatalf("unexpected config for %s, diff = %s", tc.name, cmp.Diff(config, expected))
+		if diff := cmp.Diff(config, expected); diff != "" {
+			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff)
 		}
 	}
 }
@@ -408,6 +369,125 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 	}
 }
 
+// TestOptionsComplete checks that command line flags are combined with a
+// config properly.
+func TestOptionsComplete(t *testing.T) {
+	header := `apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+`
+
+	// Determine default config (depends on platform defaults).
+	o := NewOptions()
+	require.NoError(t, o.Complete(new(pflag.FlagSet)))
+	expected := o.config
+
+	config := header + `logging:
+  format: json
+  flushFrequency: 1s
+  verbosity: 10
+  vmodule:
+  - filePattern: foo.go
+    verbosity: 6
+  - filePattern: bar.go
+    verbosity: 8
+`
+	expectedLoggingConfig := logsapi.LoggingConfiguration{
+		Format:         "json",
+		FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: time.Second}, SerializeAsString: true},
+		Verbosity:      10,
+		VModule: []logsapi.VModuleItem{
+			{
+				FilePattern: "foo.go",
+				Verbosity:   6,
+			},
+			{
+				FilePattern: "bar.go",
+				Verbosity:   8,
+			},
+		},
+		Options: logsapi.FormatOptions{
+			JSON: logsapi.JSONOptions{
+				InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+			},
+		},
+	}
+
+	for name, tc := range map[string]struct {
+		config   string
+		flags    []string
+		expected *kubeproxyconfig.KubeProxyConfiguration
+	}{
+		"empty": {
+			expected: expected,
+		},
+		"empty-config": {
+			config:   header,
+			expected: expected,
+		},
+		"logging-config": {
+			config: config,
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Logging = *expectedLoggingConfig.DeepCopy()
+				return c
+			}(),
+		},
+		"flags": {
+			flags: []string{
+				"-v=7",
+				"--vmodule", "goo.go=8",
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Logging.Verbosity = 7
+				c.Logging.VModule = append(c.Logging.VModule, logsapi.VModuleItem{
+					FilePattern: "goo.go",
+					Verbosity:   8,
+				})
+				return c
+			}(),
+		},
+		"both": {
+			config: config,
+			flags: []string{
+				"-v=7",
+				"--vmodule", "goo.go=8",
+				"--ipvs-scheduler", "some-scheduler", // Overwritten by config.
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Logging = *expectedLoggingConfig.DeepCopy()
+				// Flag wins.
+				c.Logging.Verbosity = 7
+				// Flag and config get merged with command line flags first.
+				c.Logging.VModule = append([]logsapi.VModuleItem{
+					{
+						FilePattern: "goo.go",
+						Verbosity:   8,
+					},
+				}, c.Logging.VModule...)
+				return c
+			}(),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			options := NewOptions()
+			fs := new(pflag.FlagSet)
+			options.AddFlags(fs)
+			flags := tc.flags
+			if len(tc.config) > 0 {
+				tmp := t.TempDir()
+				configFile := path.Join(tmp, "kube-proxy.conf")
+				require.NoError(t, ioutil.WriteFile(configFile, []byte(tc.config), 0666))
+				flags = append(flags, "--config", configFile)
+			}
+			require.NoError(t, fs.Parse(flags))
+			require.NoError(t, options.Complete(fs))
+			assert.Equal(t, tc.expected, options.config)
+		})
+	}
+}
+
 type fakeProxyServerLongRun struct{}
 
 // Run runs the specified ProxyServer.
@@ -510,5 +590,472 @@ func TestAddressFromDeprecatedFlags(t *testing.T) {
 			errFn(testCases[i].name, testCases[i].expMetrics, gotMetrics)
 		}
 
+	}
+}
+
+func makeNodeWithAddresses(name, internal, external string) *v1.Node {
+	if name == "" {
+		return &v1.Node{}
+	}
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{},
+		},
+	}
+
+	if internal != "" {
+		node.Status.Addresses = append(node.Status.Addresses,
+			v1.NodeAddress{Type: v1.NodeInternalIP, Address: internal},
+		)
+	}
+
+	if external != "" {
+		node.Status.Addresses = append(node.Status.Addresses,
+			v1.NodeAddress{Type: v1.NodeExternalIP, Address: external},
+		)
+	}
+
+	return node
+}
+
+func Test_detectNodeIPs(t *testing.T) {
+	cases := []struct {
+		name           string
+		nodeInfo       *v1.Node
+		hostname       string
+		bindAddress    string
+		expectedFamily v1.IPFamily
+		expectedIPv4   string
+		expectedIPv6   string
+	}{
+		{
+			name:           "Bind address IPv4 unicast address and no Node object",
+			nodeInfo:       makeNodeWithAddresses("", "", ""),
+			hostname:       "fakeHost",
+			bindAddress:    "10.0.0.1",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "10.0.0.1",
+			expectedIPv6:   "::",
+		},
+		{
+			name:           "Bind address IPv6 unicast address and no Node object",
+			nodeInfo:       makeNodeWithAddresses("", "", ""),
+			hostname:       "fakeHost",
+			bindAddress:    "fd00:4321::2",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "fd00:4321::2",
+		},
+		{
+			name:           "No Valid IP found",
+			nodeInfo:       makeNodeWithAddresses("", "", ""),
+			hostname:       "fakeHost",
+			bindAddress:    "",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "127.0.0.1",
+			expectedIPv6:   "::",
+		},
+		// Disabled because the GetNodeIP method has a backoff retry mechanism
+		// and the test takes more than 30 seconds
+		// ok  	k8s.io/kubernetes/cmd/kube-proxy/app	34.136s
+		// {
+		//	name:           "No Valid IP found and unspecified bind address",
+		//	nodeInfo:       makeNodeWithAddresses("", "", ""),
+		//	hostname:       "fakeHost",
+		//	bindAddress:    "0.0.0.0",
+		//	expectedFamily: v1.IPv4Protocol,
+		//	expectedIPv4:   "127.0.0.1",
+		//	expectedIPv6:   "::",
+		// },
+		{
+			name:           "Bind address 0.0.0.0 and node with IPv4 InternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "192.168.1.1",
+			expectedIPv6:   "::",
+		},
+		{
+			name:           "Bind address :: and node with IPv4 InternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "::",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "192.168.1.1",
+			expectedIPv6:   "::",
+		},
+		{
+			name:           "Bind address 0.0.0.0 and node with IPv6 InternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "fd00:1234::1",
+		},
+		{
+			name:           "Bind address :: and node with IPv6 InternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "::",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "fd00:1234::1",
+		},
+		{
+			name:           "Bind address 0.0.0.0 and node with only IPv4 ExternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "::",
+		},
+		{
+			name:           "Bind address :: and node with only IPv4 ExternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "::",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "::",
+		},
+		{
+			name:           "Bind address 0.0.0.0 and node with only IPv6 ExternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name:           "Bind address :: and node with only IPv6 ExternalIP set",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "::",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "0.0.0.0",
+			expectedIPv6:   "2001:db8::2",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset(c.nodeInfo)
+			primaryFamily, ips := detectNodeIPs(client, c.hostname, c.bindAddress)
+			if primaryFamily != c.expectedFamily {
+				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
+			}
+			if ips[v1.IPv4Protocol].String() != c.expectedIPv4 {
+				t.Errorf("Expected IPv4 %q got %q", c.expectedIPv4, ips[v1.IPv4Protocol].String())
+			}
+			if ips[v1.IPv6Protocol].String() != c.expectedIPv6 {
+				t.Errorf("Expected IPv6 %q got %q", c.expectedIPv6, ips[v1.IPv6Protocol].String())
+			}
+		})
+	}
+}
+
+func Test_checkIPConfig(t *testing.T) {
+	cases := []struct {
+		name  string
+		proxy *ProxyServer
+		ssErr bool
+		dsErr bool
+		fatal bool
+	}{
+		{
+			name: "empty config",
+			proxy: &ProxyServer{
+				Config:          &kubeproxyconfig.KubeProxyConfiguration{},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+
+		{
+			name: "ok single-stack clusterCIDR",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR: "10.0.0.0/8",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok dual-stack clusterCIDR",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR: "10.0.0.0/8,fd01:2345::/64",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok reversed dual-stack clusterCIDR",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR: "fd01:2345::/64,10.0.0.0/8",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong-family clusterCIDR",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR: "fd01:2345::/64",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: false,
+		},
+		{
+			name: "wrong-family clusterCIDR when using ClusterCIDR LocalDetector",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR:     "fd01:2345::/64",
+					DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: true,
+		},
+
+		{
+			name: "ok single-stack nodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses: []string{"10.0.0.0/8", "192.168.0.0/24"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok dual-stack nodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses: []string{"10.0.0.0/8", "fd01:2345::/64", "fd01:abcd::/64"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok reversed dual-stack nodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses: []string{"fd01:2345::/64", "fd01:abcd::/64", "10.0.0.0/8"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong-family nodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses: []string{"10.0.0.0/8"},
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: false,
+		},
+
+		{
+			name: "ok single-stack node.spec.podCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+				podCIDRs:        []string{"10.0.0.0/8"},
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok dual-stack node.spec.podCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+				podCIDRs:        []string{"10.0.0.0/8", "fd01:2345::/64"},
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok reversed dual-stack node.spec.podCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+				podCIDRs:        []string{"fd01:2345::/64", "10.0.0.0/8"},
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong-family node.spec.podCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+				podCIDRs:        []string{"fd01:2345::/64"},
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: true,
+		},
+
+		{
+			name: "ok winkernel.sourceVip",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					Winkernel: kubeproxyconfig.KubeProxyWinkernelConfiguration{
+						SourceVip: "10.0.0.1",
+					},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong family winkernel.sourceVip",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					Winkernel: kubeproxyconfig.KubeProxyWinkernelConfiguration{
+						SourceVip: "fd01:2345::1",
+					},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: false,
+		},
+
+		{
+			name: "ok IPv4 metricsBindAddress",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					MetricsBindAddress: "10.0.0.1:9999",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok IPv6 metricsBindAddress",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					MetricsBindAddress: "[fd01:2345::1]:9999",
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok unspecified wrong-family metricsBindAddress",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					MetricsBindAddress: "0.0.0.0:9999",
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong family metricsBindAddress",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					MetricsBindAddress: "10.0.0.1:9999",
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: true,
+			dsErr: false,
+			fatal: false,
+		},
+
+		{
+			name: "ok ipvs.excludeCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+						ExcludeCIDRs: []string{"10.0.0.0/8"},
+					},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong family ipvs.excludeCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+						ExcludeCIDRs: []string{"10.0.0.0/8", "192.168.0.0/24"},
+					},
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: true,
+			dsErr: false,
+			fatal: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err, fatal := checkIPConfig(c.proxy, false)
+			if err != nil && !c.ssErr {
+				t.Errorf("unexpected error in single-stack case: %v", err)
+			} else if err == nil && c.ssErr {
+				t.Errorf("unexpected lack of error in single-stack case")
+			} else if fatal != c.fatal {
+				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			}
+
+			err, fatal = checkIPConfig(c.proxy, true)
+			if err != nil && !c.dsErr {
+				t.Errorf("unexpected error in dual-stack case: %v", err)
+			} else if err == nil && c.dsErr {
+				t.Errorf("unexpected lack of error in dual-stack case")
+			} else if fatal != c.fatal {
+				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			}
+		})
 	}
 }
