@@ -250,7 +250,7 @@ dependencies:
 
   # GCB docker gcloud image
   - name: "gcb-docker-gcloud: dependents"
-    version: v20221007-69e0da97ef
+    version: v20230623-56e06d7c18
     refPaths:
     - path: build/pause/cloudbuild.yaml
       match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud
