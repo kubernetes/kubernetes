@@ -34,6 +34,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var loggingSoak struct {
@@ -85,7 +86,7 @@ func RunLogPodsWithSleepOf(ctx context.Context, f *framework.Framework, sleep ti
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
 	totalPods := len(nodes.Items)
-	framework.ExpectNotEqual(totalPods, 0)
+	gomega.Expect(totalPods).NotTo(gomega.HaveValue(gomega.Equal(0)))
 
 	kilobyte := strings.Repeat("logs-123", 128) // 8*128=1024 = 1KB of text.
 

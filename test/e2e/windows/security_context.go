@@ -167,7 +167,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		ginkgo.By("Waiting for pod to finish")
 		event, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, podInvalid)
 		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(event, nil, "event should not be empty")
+		gomega.Expect(event).NotTo(gomega.BeNil(), "event should not be empty")
 		framework.Logf("Got event: %v", event)
 		expectedEventError := "container's runAsUserName (ContainerAdministrator) which will be regarded as root identity and will break non-root policy"
 		gomega.Expect(event.Message).Should(gomega.ContainSubstring(expectedEventError), "Event error should indicate non-root policy caused container to not start")
@@ -185,7 +185,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		ginkgo.By("Waiting for pod to finish")
 		event, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, podInvalid)
 		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(event, nil, "event should not be empty")
+		gomega.Expect(event).NotTo(gomega.BeNil(), "event should not be empty")
 		framework.Logf("Got event: %v", event)
 		expectedEventError := "container's runAsUserName (CONTAINERADMINISTRATOR) which will be regarded as root identity and will break non-root policy"
 		gomega.Expect(event.Message).Should(gomega.ContainSubstring(expectedEventError), "Event error should indicate non-root policy caused container to not start")

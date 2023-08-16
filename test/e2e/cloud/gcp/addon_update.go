@@ -251,7 +251,7 @@ var _ = SIGDescribe("Addon update", func() {
 		e2eskipper.SkipUnlessProviderIs("gce")
 
 		//these tests are long, so I squeezed several cases in one scenario
-		framework.ExpectNotEqual(sshClient, nil)
+		gomega.Expect(sshClient).NotTo(gomega.BeNil())
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 
 		temporaryRemotePathPrefix := "addon-test-dir"

@@ -131,7 +131,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 					break
 				}
 			}
-			framework.ExpectNotEqual(group, nil, "admissionregistration.k8s.io API group not found in /apis discovery document")
+			gomega.Expect(group).NotTo(gomega.BeNil(), "admissionregistration.k8s.io API group not found in /apis discovery document")
 
 			ginkgo.By("finding the admissionregistration.k8s.io/v1 API group/version in the /apis discovery document")
 			var version *metav1.GroupVersionForDiscovery
@@ -141,7 +141,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 					break
 				}
 			}
-			framework.ExpectNotEqual(version, nil, "admissionregistration.k8s.io/v1 API group version not found in /apis discovery document")
+			gomega.Expect(version).NotTo(gomega.BeNil(), "admissionregistration.k8s.io/v1 API group version not found in /apis discovery document")
 		}
 
 		{
@@ -159,7 +159,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 					break
 				}
 			}
-			framework.ExpectNotEqual(version, nil, "admissionregistration.k8s.io/v1 API group version not found in /apis/admissionregistration.k8s.io discovery document")
+			gomega.Expect(version).NotTo(gomega.BeNil(), "admissionregistration.k8s.io/v1 API group version not found in /apis/admissionregistration.k8s.io discovery document")
 		}
 
 		{
@@ -182,8 +182,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 					validatingWebhookResource = &apiResourceList.APIResources[i]
 				}
 			}
-			framework.ExpectNotEqual(mutatingWebhookResource, nil, "mutatingwebhookconfigurations resource not found in /apis/admissionregistration.k8s.io/v1 discovery document")
-			framework.ExpectNotEqual(validatingWebhookResource, nil, "validatingwebhookconfigurations resource not found in /apis/admissionregistration.k8s.io/v1 discovery document")
+			gomega.Expect(mutatingWebhookResource).NotTo(gomega.BeNil(), "mutatingwebhookconfigurations resource not found in /apis/admissionregistration.k8s.io/v1 discovery document")
+			gomega.Expect(validatingWebhookResource).NotTo(gomega.BeNil(), "validatingwebhookconfigurations resource not found in /apis/admissionregistration.k8s.io/v1 discovery document")
 		}
 	})
 

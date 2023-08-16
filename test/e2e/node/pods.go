@@ -138,8 +138,8 @@ var _ = SIGDescribe("Pods Extended", func() {
 			})
 			framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
-			framework.ExpectNotEqual(lastPod.DeletionTimestamp, nil)
-			framework.ExpectNotEqual(lastPod.Spec.TerminationGracePeriodSeconds, 0)
+			gomega.Expect(lastPod.DeletionTimestamp).NotTo(gomega.BeNil())
+			gomega.Expect(lastPod.Spec.TerminationGracePeriodSeconds).NotTo(gomega.HaveValue(gomega.Equal(0)))
 
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}

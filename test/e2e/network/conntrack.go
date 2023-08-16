@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -113,7 +114,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 
 		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(len(ips), 0)
+		gomega.Expect(ips).NotTo(gomega.BeEmpty())
 
 		clientNodeInfo = nodeInfo{
 			name:   nodes.Items[0].Name,
@@ -121,7 +122,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 
 		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(len(ips), 0)
+		gomega.Expect(ips).NotTo(gomega.BeEmpty())
 
 		serverNodeInfo = nodeInfo{
 			name:   nodes.Items[1].Name,

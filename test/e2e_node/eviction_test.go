@@ -711,7 +711,7 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 			}
 		}
 		gomega.Expect(priorityPod).NotTo(gomega.BeNil())
-		framework.ExpectNotEqual(priorityPod.Status.Phase, v1.PodSucceeded,
+		gomega.Expect(priorityPod.Status.Phase).NotTo(gomega.Equal(v1.PodSucceeded),
 			fmt.Sprintf("pod: %s succeeded unexpectedly", priorityPod.Name))
 
 		// Check eviction ordering.
@@ -726,7 +726,7 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 			}
 			gomega.Expect(lowPriorityPod).NotTo(gomega.BeNil())
 			if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == v1.PodRunning {
-				framework.ExpectNotEqual(priorityPod.Status.Phase, v1.PodFailed,
+				gomega.Expect(priorityPod.Status.Phase).NotTo(gomega.Equal(v1.PodFailed),
 					fmt.Sprintf("priority %d pod: %s failed before priority %d pod: %s",
 						priorityPodSpec.evictionPriority, priorityPodSpec.pod.Name, lowPriorityPodSpec.evictionPriority, lowPriorityPodSpec.pod.Name))
 			}
@@ -739,7 +739,7 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 
 		// EvictionPriority 0 pods should not fail
 		if priorityPodSpec.evictionPriority == 0 {
-			framework.ExpectNotEqual(priorityPod.Status.Phase, v1.PodFailed,
+			gomega.Expect(&priorityPod.Status.Phase).NotTo(gomega.Equal(v1.PodFailed),
 				fmt.Sprintf("priority 0 pod: %s failed", priorityPod.Name))
 		}
 

@@ -25,6 +25,8 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,7 +140,8 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		}
 
 		l.resource.Sc = dDriver.GetDynamicProvisionStorageClass(ctx, l.config, pattern.FsType)
-		framework.ExpectNotEqual(l.resource.Sc, nil, "driver failed to provide a StorageClass")
+		gomega.Expect(l.resource.Sc).NotTo(gomega.BeNil(), "driver failed to provide a StorageClass")
+
 		l.resource.Sc.VolumeBindingMode = &pattern.BindingMode
 
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange

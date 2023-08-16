@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -122,7 +123,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 						expected = e
 					}
 				}
-				framework.ExpectNotEqual(expected, nil)
+				gomega.Expect(expected).NotTo(gomega.BeNil())
 				if !equality.Semantic.DeepEqual(actual.Spec, expected.Spec) {
 					framework.Failf("Expected CustomResourceDefinition in list with name %s to match crd created with same name, but got different specs:\n%s",
 						actual.Name, cmp.Diff(expected.Spec, actual.Spec))
@@ -210,7 +211,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 					break
 				}
 			}
-			framework.ExpectNotEqual(group, nil, "apiextensions.k8s.io API group not found in /apis discovery document")
+			gomega.Expect(group).NotTo(gomega.BeNil(), "apiextensions.k8s.io API group not found in /apis discovery document")
 
 			ginkgo.By("finding the apiextensions.k8s.io/v1 API group/version in the /apis discovery document")
 			var version *metav1.GroupVersionForDiscovery
@@ -220,7 +221,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 					break
 				}
 			}
-			framework.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis discovery document")
+			gomega.Expect(version).NotTo(gomega.BeNil(), "apiextensions.k8s.io/v1 API group version not found in /apis discovery document")
 		}
 
 		{
@@ -238,7 +239,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 					break
 				}
 			}
-			framework.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis/apiextensions.k8s.io discovery document")
+			gomega.Expect(version).NotTo(gomega.BeNil(), "apiextensions.k8s.io/v1 API group version not found in /apis/apiextensions.k8s.io discovery document")
 		}
 
 		{
@@ -255,7 +256,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 					crdResource = &apiResourceList.APIResources[i]
 				}
 			}
-			framework.ExpectNotEqual(crdResource, nil, "customresourcedefinitions resource not found in /apis/apiextensions.k8s.io/v1 discovery document")
+			gomega.Expect(crdResource).NotTo(gomega.BeNil(), "customresourcedefinitions resource not found in /apis/apiextensions.k8s.io/v1 discovery document")
 		}
 	})
 
