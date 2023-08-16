@@ -603,7 +603,7 @@ func (jm *Controller) orphanWorker(ctx context.Context) {
 	}
 }
 
-func (jm Controller) processNextOrphanPod(ctx context.Context) bool {
+func (jm *Controller) processNextOrphanPod(ctx context.Context) bool {
 	key, quit := jm.orphanQueue.Get()
 	if quit {
 		return false
@@ -621,7 +621,7 @@ func (jm Controller) processNextOrphanPod(ctx context.Context) bool {
 }
 
 // syncOrphanPod removes the tracking finalizer from an orphan pod if found.
-func (jm Controller) syncOrphanPod(ctx context.Context, key string) error {
+func (jm *Controller) syncOrphanPod(ctx context.Context, key string) error {
 	startTime := jm.clock.Now()
 	logger := klog.FromContext(ctx)
 	defer func() {
