@@ -843,8 +843,8 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			for _, pc := range pcs {
 				livePC, err := cs.SchedulingV1().PriorityClasses().Get(ctx, pc.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				framework.ExpectEqual(livePC.Value, pc.Value)
-				framework.ExpectEqual(livePC.Description, newDesc)
+				gomega.Expect(livePC.Value).To(gomega.Equal(pc.Value))
+				gomega.Expect(livePC.Description).To(gomega.Equal(newDesc))
 			}
 		})
 	})
