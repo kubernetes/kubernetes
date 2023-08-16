@@ -109,6 +109,7 @@ func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) 
 			RepoTags:    img.RepoTags,
 			RepoDigests: img.RepoDigests,
 			Spec:        toKubeContainerImageSpec(img),
+			Pinned:      img.Pinned,
 		})
 	}
 
