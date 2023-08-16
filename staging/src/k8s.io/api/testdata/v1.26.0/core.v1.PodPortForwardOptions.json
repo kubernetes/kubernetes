@@ -1,7 +1,0 @@
-{
-  "kind": "PodPortForwardOptions",
-  "apiVersion": "v1",
-  "ports": [
-    1
-  ]
-}
