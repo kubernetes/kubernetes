@@ -478,7 +478,7 @@ func isIPv6Endpoint(e *v1.Endpoints) bool {
 				continue
 			}
 			// Endpoints are single family, so it is enough to check only one address
-			return netutils.IsIPv6String(sub.Addresses[0].IP)
+			return netutils.IsIPv6String(addr.IP)
 		}
 	}
 	// default to IPv4 an Endpoint without IP addresses
