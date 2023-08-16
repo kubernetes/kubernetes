@@ -30,6 +30,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	"k8s.io/kubernetes/test/e2e/node"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -53,7 +54,7 @@ var _ = SIGDescribe("SeccompDefault [Serial] [Feature:SeccompDefault] [LinuxOnly
 						{
 							Name:            name,
 							Image:           busyboxImage,
-							Command:         []string{"grep", "Seccomp:", "/proc/self/status"},
+							Command:         []string{"grep", node.SeccompProcStatusField, node.ProcSelfStatusPath},
 							SecurityContext: securityContext,
 						},
 					},

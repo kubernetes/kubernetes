@@ -40,6 +40,12 @@ import (
 	"github.com/onsi/gomega"
 )
 
+// SeccompProcStatusField is the field of /proc/$PID/status referencing the seccomp filter type.
+const SeccompProcStatusField = "Seccomp:"
+
+// ProcSelfStatusPath is the path to /proc/self/status.
+const ProcSelfStatusPath = "/proc/self/status"
+
 func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 	podName := "security-context-" + string(uuid.NewUUID())
 	pod := &v1.Pod{
@@ -196,27 +202,27 @@ var _ = SIGDescribe("Security Context", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
-		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
+		pod.Spec.Containers[0].Command = []string{"grep", SeccompProcStatusField, ProcSelfStatusPath}
 		e2eoutput.TestContainerOutput(ctx, f, "seccomp unconfined container", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	ginkgo.It("should support seccomp unconfined on the pod [LinuxOnly]", func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
-		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
+		pod.Spec.Containers[0].Command = []string{"grep", SeccompProcStatusField, ProcSelfStatusPath}
 		e2eoutput.TestContainerOutput(ctx, f, "seccomp unconfined pod", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	ginkgo.It("should support seccomp runtime/default [LinuxOnly]", func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
-		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
+		pod.Spec.Containers[0].Command = []string{"grep", SeccompProcStatusField, ProcSelfStatusPath}
 		e2eoutput.TestContainerOutput(ctx, f, "seccomp runtime/default", pod, 0, []string{"2"}) // seccomp filtered
 	})
 
 	ginkgo.It("should support seccomp default which is unconfined [LinuxOnly]", func(ctx context.Context) {
 		pod := scTestPod(false, false)
-		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
+		pod.Spec.Containers[0].Command = []string{"grep", SeccompProcStatusField, ProcSelfStatusPath}
 		e2eoutput.TestContainerOutput(ctx, f, "seccomp default unconfined", pod, 0, []string{"0"}) // seccomp disabled
 	})
 })
