@@ -222,7 +222,7 @@ func (t *dnsTestCommon) createUtilPodLabel(ctx context.Context, baseName string)
 				{
 					Protocol:   v1.ProtocolTCP,
 					Port:       servicePort,
-					TargetPort: intstr.FromInt(servicePort),
+					TargetPort: intstr.FromInt32(servicePort),
 				},
 			},
 		},

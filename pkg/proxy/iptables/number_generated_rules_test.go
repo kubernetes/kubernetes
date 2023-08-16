@@ -414,7 +414,7 @@ func generateServiceEndpoints(nServices, nEndpoints int, epsFunc func(eps *disco
 				Name:       fmt.Sprintf("%d", epPort),
 				Protocol:   v1.ProtocolTCP,
 				Port:       int32(basePort + i),
-				TargetPort: intstr.FromInt(epPort),
+				TargetPort: intstr.FromInt32(int32(epPort)),
 			},
 		}
 

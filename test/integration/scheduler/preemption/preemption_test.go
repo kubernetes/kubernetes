@@ -1231,7 +1231,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 }
 
 func mkMinAvailablePDB(name, namespace string, uid types.UID, minAvailable int, matchLabels map[string]string) *policy.PodDisruptionBudget {
-	intMinAvailable := intstr.FromInt(minAvailable)
+	intMinAvailable := intstr.FromInt32(int32(minAvailable))
 	return &policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

@@ -187,7 +187,7 @@ func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 }
 
 func intOrStrP(num int) *intstr.IntOrString {
-	intstr := intstr.FromInt(num)
+	intstr := intstr.FromInt32(int32(num))
 	return &intstr
 }
 
