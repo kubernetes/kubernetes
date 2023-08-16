@@ -29,10 +29,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/moby/sys/mountinfo"
+	"golang.org/x/sys/unix"
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
@@ -385,28 +385,55 @@ func (*Mounter) List() ([]MountPoint, error) {
 	return ListProcMounts(procMountsPath)
 }
 
-// IsLikelyNotMountPoint determines if a directory is not a mountpoint.
-// It is fast but not necessarily ALWAYS correct. If the path is in fact
-// a bind mount from one part of a mount to another it will not be detected.
-// It also can not distinguish between mountpoints and symbolic links.
-// mkdir /tmp/a /tmp/b; mount --bind /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
-// will return true. When in fact /tmp/b is a mount point. If this situation
-// is of interest to you, don't use this function...
-func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	stat, err := os.Stat(file)
-	if err != nil {
-		return true, err
-	}
-	rootStat, err := os.Stat(filepath.Dir(strings.TrimSuffix(file, "/")))
-	if err != nil {
-		return true, err
-	}
-	// If the directory has a different device as parent, then it is a mountpoint.
-	if stat.Sys().(*syscall.Stat_t).Dev != rootStat.Sys().(*syscall.Stat_t).Dev {
-		return false, nil
+// statx support since Linux 4.11, glibc 2.28
+// refer: https://man7.org/linux/man-pages/man2/statx.2.html
+var errNotSupport = errors.New("The statx syscall is not supported. At least Linux kernel 4.11 is needed")
+
+func statx(file string) (unix.Statx_t, error) {
+	var stat unix.Statx_t
+	if err := unix.Statx(0, file, unix.AT_STATX_DONT_SYNC, 0, &stat); err != nil {
+		if err == unix.ENOSYS {
+			return stat, errNotSupport
+		}
+
+		return stat, err
 	}
 
-	return true, nil
+	return stat, nil
+}
+
+// IsLikelyNotMountPoint determines if a directory is not a mountpoint.
+// If fast check failed, fall back to slow path. If the path is in fact
+// a bind mount from one part of a mount to another it will be detected.
+// It also can distinguish between mountpoints and symbolic links.
+// mkdir /tmp/a /tmp/b; mount --bind /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
+// will return false. When in fact /tmp/b is a mount point.
+
+// TODO(j4ckstraw) add test
+func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	var stat, rootStat unix.Statx_t
+	var err error
+
+	if stat, err = statx(file); err != nil {
+		if errors.Is(err, errNotSupport) {
+			// not support statx, go slow path
+			mnt, mntErr := mounter.IsMountPoint(file)
+			return !mnt, mntErr
+		}
+
+		return false, err
+	}
+
+	root := filepath.Dir(strings.TrimSuffix(file, "/"))
+	if rootStat, err = statx(root); err != nil {
+		return false, err
+	}
+
+	// TODO add STATX_ATTR_MOUNT_ROOT support, which can check mountpoint correctly.
+	// Linux 5.8 commit 80340fe3605c0e78cfe496c3b3878be828cfdbfe
+	// stat->attributes |= STATX_ATTR_MOUNT_ROOT;
+	// stat->attributes_mask |= STATX_ATTR_MOUNT_ROOT;
+	return !(stat.Dev_major == rootStat.Dev_major && stat.Dev_minor == rootStat.Dev_minor), nil
 }
 
 // CanSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
