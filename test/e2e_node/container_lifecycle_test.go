@@ -540,10 +540,10 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 			}
 		}
 
-		// To account for the time it takes to delete the pod, we add a 10 second
-		// buffer. The 10 second buffer is arbitrary, but it should be enough to
-		// account for the time it takes to delete the pod.
-		bufferSeconds := int64(10)
+		// To account for the time it takes to delete the pod, we add a buffer. Its sized
+		// so that we allow up to 2x the grace time to delete the pod. Its extra large to
+		// reduce test flakes.
+		bufferSeconds := int64(30)
 
 		ginkgo.It("should respect termination grace period seconds [NodeConformance]", func() {
 			client := e2epod.NewPodClient(f)
