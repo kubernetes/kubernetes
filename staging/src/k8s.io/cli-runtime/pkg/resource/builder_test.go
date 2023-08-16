@@ -205,7 +205,7 @@ func (v *testVisitor) Objects() []runtime.Object {
 	return objects
 }
 
-var aPod string = `
+var aPod = `
 {
     "kind": "Pod",
 		"apiVersion": "` + corev1GV.String() + `",
@@ -231,7 +231,7 @@ var aPod string = `
     }
 }
 `
-var aPodBadAnnotations string = `
+var aPodBadAnnotations = `
 {
     "kind": "Pod",
     "apiVersion": "` + corev1GV.String() + `",
@@ -261,7 +261,43 @@ var aPodBadAnnotations string = `
 }
 `
 
-var aRC string = `
+var aPodBadAnnotationsList = `
+{
+  "apiVersion": "` + corev1GV.String() + `",
+  "items": [
+    {
+      "kind": "Pod",
+      "apiVersion": "` + corev1GV.String() + `",
+      "metadata": {
+        "name": "busybox{id}",
+        "labels": {
+          "name": "busybox{id}"
+        },
+        "annotations": {
+          "name": 0
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "busybox",
+            "image": "busybox",
+            "command": [
+              "sleep",
+              "3600"
+            ],
+            "imagePullPolicy": "IfNotPresent"
+          }
+        ],
+        "restartPolicy": "Always"
+      }
+    }
+  ],
+  "kind": "List"
+}
+`
+
+var aRC = `
 {
     "kind": "ReplicationController",
 		"apiVersion": "` + corev1GV.String() + `",
@@ -1460,8 +1496,8 @@ func TestResourceTuple(t *testing.T) {
 					continue
 				}
 				switch {
-				case (r.singleItemImplied && len(tt.args) != 1),
-					(!r.singleItemImplied && len(tt.args) == 1):
+				case r.singleItemImplied && len(tt.args) != 1,
+					!r.singleItemImplied && len(tt.args) == 1:
 					t.Errorf("%s: result had unexpected singleItemImplied value", k)
 				}
 				info, err := r.Infos()
@@ -1900,6 +1936,7 @@ func TestUnstructured(t *testing.T) {
 	// create test files
 	writeTestFile(t, fmt.Sprintf("%s/pod.json", tmpDir), aPod)
 	writeTestFile(t, fmt.Sprintf("%s/badpod.json", tmpDir), aPodBadAnnotations)
+	writeTestFile(t, fmt.Sprintf("%s/badpodlist.json", tmpDir), aPodBadAnnotationsList)
 
 	tests := []struct {
 		name          string
@@ -1914,6 +1951,11 @@ func TestUnstructured(t *testing.T) {
 		{
 			name:          "badpod",
 			file:          "badpod.json",
+			expectedError: "ObjectMeta.",
+		},
+		{
+			name:          "badpodlist",
+			file:          "badpodlist.json",
 			expectedError: "ObjectMeta.",
 		},
 	}
