@@ -63,6 +63,7 @@ aliases:
     - smarterclayton
     - enj
   sig-auth-encryption-at-rest-reviewers:
+    - aramase
     - enj
     - lavalamp
     - liggitt
