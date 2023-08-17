@@ -1,3 +1,0 @@
-apiVersion: v1
-kind: PodProxyOptions
-path: pathValue

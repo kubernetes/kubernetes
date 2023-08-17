@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: APIVersions
-serverAddressByClientCIDRs:
-- clientCIDR: clientCIDRValue
-  serverAddress: serverAddressValue
-versions:
-- versionsValue
