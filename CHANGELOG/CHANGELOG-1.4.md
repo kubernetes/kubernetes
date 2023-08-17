@@ -799,7 +799,7 @@ This is the first release tracked via the use of the [kubernetes/features](https
   - [beta] AppArmor profiles can be specified & applied to pod containers ([docs](http://kubernetes.io/docs/admin/apparmor/)) ([kubernetes/features#24](https://github.com/kubernetes/enhancements/issues/24))
   - [beta] Cluster policy to control access and defaults of security related features ([docs](http://kubernetes.io/docs/user-guide/pod-security-policy/)) ([kubernetes/features#5](https://github.com/kubernetes/enhancements/issues/5))
   - [stable] kubelet is able to evict pods when it observes disk pressure ([docs](http://kubernetes.io/docs/admin/out-of-resource/)) ([kubernetes/features#39](https://github.com/kubernetes/enhancements/issues/39))
-  - [stable] Automated docker validation results posted to https://testgrid.k8s.io/docker [kubernetes/features#57](https://github.com/kubernetes/enhancements/issues/57)
+  - [stable] Automated docker validation results posted to https://k8s-testgrid.appspot.com/docker [kubernetes/features#57](https://github.com/kubernetes/enhancements/issues/57)
 - **Scheduling**
   - [alpha] Allows pods to require or prohibit (or prefer or prefer not) co-scheduling on the same node (or zone or other topology domain) as another set of pods. ([docs](http://kubernetes.io/docs/user-guide/node-selection/) ([kubernetes/features#51](https://github.com/kubernetes/enhancements/issues/51))
 - **Storage**
