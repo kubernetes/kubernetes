@@ -55,7 +55,7 @@ func Expand(input string, mapping func(string) string) string {
 				buf.WriteString(mapping(read))
 			} else {
 				// Not a variable name; copy the read bytes into the buffer
-				buf.WriteString(read)
+				buf.WriteString(string(input[cursor]) + read)
 			}
 
 			// Advance the cursor in the input string to account for
