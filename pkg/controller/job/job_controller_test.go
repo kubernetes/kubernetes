@@ -4872,6 +4872,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 
 			// run
 			err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
+
 			if err != nil {
 				t.Errorf("unexpected error syncing job.  Got %#v", err)
 			}
