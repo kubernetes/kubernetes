@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -285,27 +286,25 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscaler(refName string, mapping
 		v := int32(o.Min)
 		scaler.Spec.MinReplicas = &v
 	}
+
 	if o.CPUPercent >= 0 {
 		c := int32(o.CPUPercent)
 
-	scaler.Spec.Metrics = []autoscalingv2.MetricSpec{
-    // Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
-    {
-        Type: autoscalingv2.ResourceMetricSourceType,
-        Resource: &autoscalingv2.ResourceMetricSource{
-            // Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
-            Name: "cpu-percent",
-            Target: autoscalingv2.MetricTarget{
-				// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
-                Type: autoscalingv2.UtilizationMetricType,
-                AverageUtilization: &c,
-            },
-        },
-    },
-};
-
+		scaler.Spec.Metrics = []autoscalingv2.MetricSpec{
+			// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
+			{
+				Type: autoscalingv2.ResourceMetricSourceType,
+				Resource: &autoscalingv2.ResourceMetricSource{
+					// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+					Name: corev1.ResourceCPU,
+					Target: autoscalingv2.MetricTarget{
+						// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+						Type:               autoscalingv2.UtilizationMetricType,
+						AverageUtilization: &c,
+					},
+				},
+			},
 		}
 	}
-
 	return &scaler
 }
