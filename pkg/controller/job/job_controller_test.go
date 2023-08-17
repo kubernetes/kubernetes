@@ -626,7 +626,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:         2,
 			expectedCreatedIndexes: sets.New(0, 1),
 		},
-		"indexed job with some pods deleted, podRecreationPolicy Failed": {
+		"indexed job with some pods deleted, podReplacementPolicy Failed": {
 			parallelism:             2,
 			completions:             5,
 			backoffLimit:            6,
@@ -639,7 +639,7 @@ func TestControllerSyncJob(t *testing.T) {
 			terminatingPods:         1,
 			expectedTerminating:     pointer.Int32(1),
 		},
-		"indexed job with some pods deleted, podRecreationPolicy TerminatingOrFailed": {
+		"indexed job with some pods deleted, podReplacementPolicy TerminatingOrFailed": {
 			parallelism:             2,
 			completions:             5,
 			backoffLimit:            6,
