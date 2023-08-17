@@ -357,7 +357,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
-			framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
+			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
@@ -366,7 +366,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating a new revision")
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
+			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
 
 			ginkgo.By("Not applying an update when the partition is greater than the number of replicas")
 			for i := range pods.Items {
@@ -553,7 +553,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
-			framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
+			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
@@ -562,7 +562,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating a new revision")
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
+			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
 
 			ginkgo.By("Recreating Pods at the new revision")
 			deleteStatefulPodAtIndex(ctx, c, 0, ss)
@@ -1869,7 +1869,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 	ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
-	framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
+	gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
 	ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = newImage
 	})
@@ -1878,7 +1878,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	ginkgo.By("Creating a new revision")
 	ss = waitForStatus(ctx, c, ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-	framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
+	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
 
 	ginkgo.By("Updating Pods in reverse ordinal order")
 	pods = e2estatefulset.GetPodList(ctx, c, ss)
@@ -1917,7 +1917,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	ss = waitForStatus(ctx, c, ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	framework.ExpectEqual(priorRevision, updateRevision, "Prior revision should equal update revision during roll back")
-	framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during roll back")
+	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during roll back")
 
 	ginkgo.By("Rolling back update in reverse ordinal order")
 	pods = e2estatefulset.GetPodList(ctx, c, ss)
