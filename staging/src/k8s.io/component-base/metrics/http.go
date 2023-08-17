@@ -60,6 +60,7 @@ type HandlerOpts promhttp.HandlerOpts
 
 func (ho *HandlerOpts) toPromhttpHandlerOpts() promhttp.HandlerOpts {
 	ho.ProcessStartTime = processStartedAt
+	ho.EnableOpenMetrics = true
 	return promhttp.HandlerOpts(*ho)
 }
 
