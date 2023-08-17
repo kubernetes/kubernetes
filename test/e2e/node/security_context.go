@@ -186,7 +186,7 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	ginkgo.It("should support volume SELinux relabeling [Flaky] [LinuxOnly]", func(ctx context.Context) {
+	ginkgo.It("should support volume SELinux relabeling [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		testPodSELinuxLabeling(ctx, f, false, false)
 	})
 
@@ -249,6 +249,7 @@ func testPodSELinuxLabeling(ctx context.Context, f *framework.Framework, hostIPC
 			},
 		},
 	}
+	pod.Spec.Containers[0].Image = "registry.k8s.io/e2e-test-images/busybox:1.29-4"
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c0,c1",
 	}
@@ -258,11 +259,17 @@ func testPodSELinuxLabeling(ctx context.Context, f *framework.Framework, hostIPC
 	pod, err := client.Create(ctx, pod, metav1.CreateOptions{})
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
+
+	err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+	cmd := tk.KubectlCmd("describe", "pod", pod.Name)
+	_, _, cmdErr := framework.StartCmdAndStreamOutput(cmd)
+	framework.ExpectNoError(cmdErr)
+	framework.ExpectNoError(err)
 
 	testContent := "hello"
 	testFilePath := mountPath + "/TEST"
-	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
 	err = tk.WriteFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath, testContent)
 	framework.ExpectNoError(err)
 	content, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath)
