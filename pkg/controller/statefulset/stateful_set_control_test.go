@@ -1066,7 +1066,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		// Setup the statefulSet controller
-		totalPods := 6
+		var totalPods int32 = 6
 		var partition int32 = 3
 		var maxUnavailable = intstr.FromInt32(2)
 		set := setupPodManagementPolicy(tc.policyType, newStatefulSet(totalPods))
@@ -1128,7 +1128,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		tc.verifyFn(set, spc, ssc, pods, totalPods, selector)
+		tc.verifyFn(set, spc, ssc, pods, int(totalPods), selector)
 
 		// pods 3/4/5 ready, should not update other pods
 		spc.setPodRunning(set, 3)
@@ -1151,8 +1151,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 
 }
 
-func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, StatefulSetControlInterface, intstr.IntOrString, int) {
-	totalPods := 6
+func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, StatefulSetControlInterface, intstr.IntOrString, int32) {
+	var totalPods int32 = 6
 	set := newStatefulSet(totalPods)
 	// update all pods >=3(3,4,5)
 	var partition int32 = 3
@@ -1247,7 +1247,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 				expecteddPodsToBeDeleted = 0
 			}
 
-			expectedPodsAfterUpdate := totalPods - expecteddPodsToBeDeleted
+			expectedPodsAfterUpdate := int(totalPods) - expecteddPodsToBeDeleted
 
 			if len(pods) != expectedPodsAfterUpdate {
 				t.Errorf("Expected pods %v, got pods %v", expectedPodsAfterUpdate, len(pods))
