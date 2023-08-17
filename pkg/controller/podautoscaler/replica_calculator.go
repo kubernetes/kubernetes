@@ -425,7 +425,13 @@ func calculatePodRequests(pods []*v1.Pod, container string, resource v1.Resource
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
 		podSum := int64(0)
-		for _, c := range pod.Spec.Containers {
+		containers := append([]v1.Container{}, pod.Spec.Containers...)
+		for _, c := range pod.Spec.InitContainers {
+			if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
+				containers = append(containers, c)
+			}
+		}
+		for _, c := range containers {
 			if container == "" || container == c.Name {
 				if containerRequest, ok := c.Resources.Requests[resource]; ok {
 					podSum += containerRequest.MilliValue()
