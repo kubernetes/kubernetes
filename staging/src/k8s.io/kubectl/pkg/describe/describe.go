@@ -1667,6 +1667,10 @@ func getPodsForPVC(c corev1client.PodInterface, pvcName string, settings Describ
 		for _, volume := range pod.Spec.Volumes {
 			if volume.VolumeSource.PersistentVolumeClaim != nil && volume.VolumeSource.PersistentVolumeClaim.ClaimName == pvcName {
 				pods = append(pods, pod)
+				continue
+			}
+			if volume.Ephemeral != nil && volume.Ephemeral.VolumeClaimTemplate != nil && pod.Name+"-"+volume.Name == pvcName {
+				pods = append(pods, pod)
 			}
 		}
 	}
