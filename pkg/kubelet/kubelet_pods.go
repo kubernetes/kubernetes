@@ -1684,11 +1684,13 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		// preserve the reason and message which is associated with the phase
 		s.Reason = oldPodStatus.Reason
 		s.Message = oldPodStatus.Message
-		if len(s.Reason) == 0 {
-			s.Reason = pod.Status.Reason
-		}
-		if len(s.Message) == 0 {
-			s.Message = pod.Status.Message
+		if s.Phase == pod.Status.Phase {
+			if len(s.Reason) == 0 {
+				s.Reason = pod.Status.Reason
+			}
+			if len(s.Message) == 0 {
+				s.Message = pod.Status.Message
+			}
 		}
 	}
 

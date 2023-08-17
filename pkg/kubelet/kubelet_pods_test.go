@@ -3751,6 +3751,67 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Status: v1.ConditionTrue,
 			},
 		},
+		{
+			// pod.Status.Phase == Pending, s.Phase == Running, and oldPodStatus.Phase == Running
+			name: "reason and message are cleared when phase changes 2",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+					ContainerStatuses: []v1.ContainerStatus{
+						waitingState("containerA"),
+						waitingState("containerB"),
+					},
+					Reason:  "Test",
+					Message: "test",
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				SandboxStatuses: sandboxReadyStatus.SandboxStatuses,
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:        kubecontainer.ContainerID{ID: "c1"},
+						Name:      "containerA",
+						StartedAt: time.Unix(1, 0).UTC(),
+						State:     kubecontainer.ContainerStateRunning,
+					},
+					{
+						ID:        kubecontainer.ContainerID{ID: "c2"},
+						Name:      "containerB",
+						StartedAt: time.Unix(2, 0).UTC(),
+						State:     kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+			},
+			enablePodHostIPs: true,
+			expected: v1.PodStatus{
+				Phase:    v1.PodRunning,
+				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(withID(runningStateWithStartedAt("containerA", time.Unix(1, 0).UTC()), "://c1")),
+					ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2")),
+				},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+		},
 	}
 	for _, test := range tests {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
