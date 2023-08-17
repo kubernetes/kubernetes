@@ -5172,7 +5172,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	}
 }
 
-func TestBackupFinalizers(t *testing.T) {
+func TestBackupFinalizerRemoval(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
@@ -5206,7 +5206,7 @@ func TestBackupFinalizers(t *testing.T) {
 	})
 
 	// 5. Start the workers.
-	go manager.Run(context.TODO(), 1)
+	go manager.Run(context.TODO(), 0)
 
 	// Check if the finalizer has been removed from the pod.
 	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
