@@ -62,16 +62,12 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-var (
-	realClock   = &clock.RealClock{}
-	alwaysReady = func() bool { return true }
-)
+var realClock = &clock.RealClock{}
+var alwaysReady = func() bool { return true }
 
-const (
-	fastSyncJobBatchPeriod = 10 * time.Millisecond
-	fastJobApiBackoff      = 10 * time.Millisecond
-	fastRequeue            = 10 * time.Millisecond
-)
+const fastSyncJobBatchPeriod = 10 * time.Millisecond
+const fastJobApiBackoff = 10 * time.Millisecond
+const fastRequeue = 10 * time.Millisecond
 
 // testFinishedAt represents time one second later than unix epoch
 // this will be used in various test cases where we don't want back-off to kick in
@@ -2155,6 +2151,7 @@ func TestSingleJobFailedCondition(t *testing.T) {
 	if failedConditions[0].Status != v1.ConditionTrue {
 		t.Errorf("Unexpected status for the failed condition. Expected: %v, saw %v\n", v1.ConditionTrue, failedConditions[0].Status)
 	}
+
 }
 
 func TestSyncJobComplete(t *testing.T) {
@@ -4705,12 +4702,10 @@ func (f *fakeRateLimitingQueue) Forget(item interface{}) {
 func (f *fakeRateLimitingQueue) NumRequeues(item interface{}) int {
 	return f.requeues
 }
-
 func (f *fakeRateLimitingQueue) AddAfter(item interface{}, duration time.Duration) {
 	f.item = item
 	f.duration = duration
 }
-
 func TestJobBackoff(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
@@ -4792,80 +4787,47 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 		expectedConditionReason string
 	}{
 		"backoffLimit 0 should have 1 pod active": {
-			1, 1, 0,
-			false,
-			[]int32{0},
-			v1.PodRunning,
+			1, 1, 0, false, []int32{0}, v1.PodRunning,
 			1, 0, 0, nil, "",
 		},
 		"backoffLimit 1 with restartCount 0 should have 1 pod active": {
-			1, 1, 1,
-			false,
-			[]int32{0},
-			v1.PodRunning,
+			1, 1, 1, false, []int32{0}, v1.PodRunning,
 			1, 0, 0, nil, "",
 		},
 		"backoffLimit 1 with restartCount 1 and podRunning should have 0 pod active": {
-			1, 1, 1,
-			false,
-			[]int32{1},
-			v1.PodRunning,
+			1, 1, 1, false, []int32{1}, v1.PodRunning,
 			0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"backoffLimit 1 with restartCount 1 and podPending should have 0 pod active": {
-			1, 1, 1,
-			false,
-			[]int32{1},
-			v1.PodPending,
+			1, 1, 1, false, []int32{1}, v1.PodPending,
 			0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"too many job failures with podRunning - single pod": {
-			1, 5, 2,
-			false,
-			[]int32{2},
-			v1.PodRunning,
+			1, 5, 2, false, []int32{2}, v1.PodRunning,
 			0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"too many job failures with podPending - single pod": {
-			1, 5, 2,
-			false,
-			[]int32{2},
-			v1.PodPending,
+			1, 5, 2, false, []int32{2}, v1.PodPending,
 			0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"too many job failures with podRunning - multiple pods": {
-			2, 5, 2,
-			false,
-			[]int32{1, 1},
-			v1.PodRunning,
+			2, 5, 2, false, []int32{1, 1}, v1.PodRunning,
 			0, 0, 2, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"too many job failures with podPending - multiple pods": {
-			2, 5, 2,
-			false,
-			[]int32{1, 1},
-			v1.PodPending,
+			2, 5, 2, false, []int32{1, 1}, v1.PodPending,
 			0, 0, 2, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"not enough failures": {
-			2, 5, 3,
-			false,
-			[]int32{1, 1},
-			v1.PodRunning,
+			2, 5, 3, false, []int32{1, 1}, v1.PodRunning,
 			2, 0, 0, nil, "",
 		},
 		"suspending a job": {
-			2, 4, 6,
-			true,
-			[]int32{1, 1},
-			v1.PodRunning,
+			2, 4, 6, true, []int32{1, 1}, v1.PodRunning,
 			0, 0, 0, &jobConditionSuspended, "JobSuspended",
 		},
 		"finshed job": {
-			2, 4, 6,
-			true,
-			[]int32{1, 1, 2, 0},
-			v1.PodSucceeded,
+			2, 4, 6, true, []int32{1, 1, 2, 0}, v1.PodSucceeded,
 			0, 4, 0, &jobConditionComplete, "",
 		},
 	}
