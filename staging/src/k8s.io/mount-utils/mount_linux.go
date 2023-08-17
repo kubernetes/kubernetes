@@ -55,6 +55,11 @@ const (
 	errNotMounted = "not mounted"
 )
 
+var (
+	// Error statx support since Linux 4.11, https://man7.org/linux/man-pages/man2/statx.2.html
+	errStatxNotSupport = errors.New("the statx syscall is not supported. At least Linux kernel 4.11 is needed")
+)
+
 // Mounter provides the default implementation of mount.Interface
 // for the linux platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
@@ -385,15 +390,11 @@ func (*Mounter) List() ([]MountPoint, error) {
 	return ListProcMounts(procMountsPath)
 }
 
-// statx support since Linux 4.11, glibc 2.28
-// refer: https://man7.org/linux/man-pages/man2/statx.2.html
-var errNotSupport = errors.New("The statx syscall is not supported. At least Linux kernel 4.11 is needed")
-
 func statx(file string) (unix.Statx_t, error) {
 	var stat unix.Statx_t
 	if err := unix.Statx(0, file, unix.AT_STATX_DONT_SYNC, 0, &stat); err != nil {
 		if err == unix.ENOSYS {
-			return stat, errNotSupport
+			return stat, errStatxNotSupport
 		}
 
 		return stat, err
@@ -408,14 +409,12 @@ func statx(file string) (unix.Statx_t, error) {
 // It also can distinguish between mountpoints and symbolic links.
 // mkdir /tmp/a /tmp/b; mount --bind /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
 // will return false. When in fact /tmp/b is a mount point.
-
-// TODO(j4ckstraw) add test
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	var stat, rootStat unix.Statx_t
 	var err error
 
 	if stat, err = statx(file); err != nil {
-		if errors.Is(err, errNotSupport) {
+		if errors.Is(err, errStatxNotSupport) {
 			// not support statx, go slow path
 			mnt, mntErr := mounter.IsMountPoint(file)
 			return !mnt, mntErr
@@ -424,15 +423,23 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		return false, err
 	}
 
+	if stat.Attributes_mask != 0 {
+		if stat.Attributes_mask&unix.STATX_ATTR_MOUNT_ROOT != 0 {
+			if stat.Attributes&unix.STATX_ATTR_MOUNT_ROOT != 0 {
+				// file is a mountpoint
+				return false, nil
+			} else {
+				// no need to check rootStat if unix.STATX_ATTR_MOUNT_ROOT supported
+				return true, nil
+			}
+		}
+	}
+
 	root := filepath.Dir(strings.TrimSuffix(file, "/"))
 	if rootStat, err = statx(root); err != nil {
 		return false, err
 	}
 
-	// TODO add STATX_ATTR_MOUNT_ROOT support, which can check mountpoint correctly.
-	// Linux 5.8 commit 80340fe3605c0e78cfe496c3b3878be828cfdbfe
-	// stat->attributes |= STATX_ATTR_MOUNT_ROOT;
-	// stat->attributes_mask |= STATX_ATTR_MOUNT_ROOT;
 	return !(stat.Dev_major == rootStat.Dev_major && stat.Dev_minor == rootStat.Dev_minor), nil
 }
 
