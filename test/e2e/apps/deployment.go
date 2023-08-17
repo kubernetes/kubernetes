@@ -737,7 +737,7 @@ func testDeleteDeployment(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 	newRS, err := testutil.GetNewReplicaSet(deployment, c)
 	framework.ExpectNoError(err)
-	framework.ExpectNotEqual(newRS, nilRs)
+	gomega.Expect(newRS).NotTo(gomega.Equal(nilRs))
 	stopDeployment(ctx, c, ns, deploymentName)
 }
 
