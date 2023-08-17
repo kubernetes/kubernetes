@@ -33,6 +33,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -54,7 +55,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
-		framework.ExpectNotEqual(len(nodeList.Items), 0)
+		gomega.Expect(nodeList.Items).NotTo(gomega.BeEmpty())
 		nodeName = nodeList.Items[0].Name
 		asUser = nodeNamePrefix + nodeName
 		ginkgo.By("Creating a kubernetes client that impersonates a node")
