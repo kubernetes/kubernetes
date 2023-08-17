@@ -186,7 +186,7 @@ current-context: cluster
 				t.Errorf("expected error=%v, got %v", tc.expectError, err)
 			}
 			if (c.Authenticator != nil) != tc.expectAuthenticator {
-				t.Errorf("expected authenticator=%v, got %#v", tc.expectError, c.Authenticator)
+				t.Errorf("expected authenticator=%v, got %#v", tc.expectAuthenticator, c.Authenticator)
 			}
 			if c.Authenticator != nil {
 				{
