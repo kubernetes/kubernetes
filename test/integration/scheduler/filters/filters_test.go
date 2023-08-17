@@ -832,7 +832,8 @@ func TestInterPodAffinity(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Error while creating pod: %v", err)
 				}
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+				err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, false,
+					testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 				if err != nil {
 					t.Errorf("Error while creating pod: %v", err)
 				}
@@ -849,9 +850,11 @@ func TestInterPodAffinity(t *testing.T) {
 			}
 
 			if test.fits {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+				err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, false,
+					testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
 			} else {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podUnschedulable(cs, testPod.Namespace, testPod.Name))
 			}
 			if err != nil {
 				t.Errorf("Error while trying to fit a pod: %v", err)
@@ -1016,7 +1019,8 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error while creating pod: %v", err)
 			}
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+				testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 			if err != nil {
 				t.Errorf("Error while creating pod: %v", err)
 			}
@@ -1033,9 +1037,11 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 			}
 
 			if test.fits {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
 			} else {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podUnschedulable(cs, testPod.Namespace, testPod.Name))
 			}
 			if err != nil {
 				t.Errorf("Error while trying to fit a pod: %v", err)
@@ -1517,7 +1523,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Error while creating pod during test: %v", err)
 				}
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 				if err != nil {
 					t.Errorf("Error while waiting for pod during test: %v", err)
 				}
@@ -1528,9 +1535,11 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 			}
 
 			if tt.fits {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.candidateNodes))
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.candidateNodes))
 			} else {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podUnschedulable(cs, testPod.Namespace, testPod.Name))
 			}
 			if err != nil {
 				t.Errorf("Test Failed: %v", err)

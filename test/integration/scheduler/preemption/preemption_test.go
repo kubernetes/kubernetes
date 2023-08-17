@@ -78,8 +78,8 @@ const filterPluginName = "filter-plugin"
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
 
 func waitForNominatedNodeNameWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	if err := wait.Poll(100*time.Millisecond, timeout, func() (bool, error) {
-		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, timeout, false, func(ctx context.Context) (bool, error) {
+		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -504,7 +504,8 @@ func TestPreemption(t *testing.T) {
 			// Wait for preemption of pods and make sure the other ones are not preempted.
 			for i, p := range pods {
 				if _, found := test.preemptedPodIndexes[i]; found {
-					if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
+					if err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, wait.ForeverTestTimeout, false,
+						podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
 						t.Errorf("Pod %v/%v is not getting evicted.", p.Namespace, p.Name)
 					}
 					pod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
@@ -883,7 +884,7 @@ func TestPreemptionStarvation(t *testing.T) {
 			}
 			// Make sure that all pending pods are being marked unschedulable.
 			for _, p := range pendingPods {
-				if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout,
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 					podUnschedulable(cs, p.Namespace, p.Name)); err != nil {
 					t.Errorf("Pod %v/%v didn't get marked unschedulable: %v", p.Namespace, p.Name, err)
 				}
@@ -1214,8 +1215,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 			}
 
 			// Verify if .status.nominatedNodeName is cleared.
-			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				pod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), "medium", metav1.GetOptions{})
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+				pod, err := cs.CoreV1().Pods(ns).Get(ctx, "medium", metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Error getting the medium pod: %v", err)
 				}
@@ -1485,7 +1486,8 @@ func TestPDBInPreemption(t *testing.T) {
 			// Wait for preemption of pods and make sure the other ones are not preempted.
 			for i, p := range pods {
 				if _, found := test.preemptedPodIndexes[i]; found {
-					if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
+					if err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, wait.ForeverTestTimeout, false,
+						podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
 						t.Errorf("Test [%v]: Pod %v/%v is not getting evicted.", test.name, p.Namespace, p.Name)
 					}
 				} else {
@@ -1622,8 +1624,8 @@ func TestPreferNominatedNode(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error while creating high priority pod: %v", err)
 			}
-			err = wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				preemptor, err = cs.CoreV1().Pods(test.pod.Namespace).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+				preemptor, err = cs.CoreV1().Pods(test.pod.Namespace).Get(ctx, test.pod.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Error getting the preemptor pod info: %v", err)
 				}
@@ -1975,7 +1977,8 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 			// Wait for preemption of pods and make sure the other ones are not preempted.
 			for i, p := range pods {
 				if _, found := test.preemptedPodIndexes[i]; found {
-					if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
+					if err = wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, wait.ForeverTestTimeout, false,
+						podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
 						t.Errorf("Pod %v/%v is not getting evicted.", p.Namespace, p.Name)
 					}
 				} else {
