@@ -74,6 +74,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	utilcsr "k8s.io/client-go/util/certificate/csr"
+	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/certificate"
@@ -1668,6 +1669,10 @@ func getPodsForPVC(c corev1client.PodInterface, pvc *corev1.PersistentVolumeClai
 	for _, pod := range nsPods.Items {
 		for _, volume := range pod.Spec.Volumes {
 			if volume.VolumeSource.PersistentVolumeClaim != nil && volume.VolumeSource.PersistentVolumeClaim.ClaimName == pvc.Name {
+				pods = append(pods, pod)
+				continue
+			}
+			if volume.Ephemeral != nil && volume.Ephemeral.VolumeClaimTemplate != nil && ephemeral.VolumeIsForPod(&pod, pvc) == nil {
 				pods = append(pods, pod)
 			}
 		}

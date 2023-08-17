@@ -1771,6 +1771,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	testCases := []struct {
 		name               string
 		pvc                *corev1.PersistentVolumeClaim
+		pod                *corev1.Pod
 		describerSettings  *DescriberSettings
 		expectedElements   []string
 		unexpectedElements []string
@@ -1987,13 +1988,52 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 			unexpectedElements: []string{"Events"},
 			describerSettings:  &DescriberSettings{ShowEvents: false},
 		},
+		{
+			name: "pod with ephemeral volume",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar-ephemeral"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{
+						{
+							Name: "ephemeral",
+							VolumeSource: corev1.VolumeSource{
+								Ephemeral: &corev1.EphemeralVolumeSource{
+									VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+										Spec: corev1.PersistentVolumeClaimSpec{
+											VolumeName:       "volume1",
+											StorageClassName: &goldClassName,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedElements: []string{"Used By", "bar"},
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			fake := fake.NewSimpleClientset(test.pvc)
+			if test.pod != nil {
+				err := fake.Tracker().Add(test.pod)
+				if err != nil {
+					t.Errorf("Unexpected error add pod to Tracker for test %s: %v", test.name, err)
+				}
+			}
 			c := PersistentVolumeClaimDescriber{fake}
-
 			var describerSettings DescriberSettings
 			if test.describerSettings != nil {
 				describerSettings = *test.describerSettings
@@ -2001,7 +2041,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				describerSettings = *defaultDescriberSettings
 			}
 
-			str, err := c.Describe("foo", "bar", describerSettings)
+			str, err := c.Describe("foo", test.pvc.Name, describerSettings)
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", test.name, err)
 			}
