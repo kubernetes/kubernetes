@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -288,7 +289,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 
 		ginkgo.By("Reading file content from the nginx-container")
 		result := e2epod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
-		framework.ExpectEqual(result, message, "failed to match expected string %s with %s", message, resultString)
+		gomega.Expect(result).To(gomega.Equal(message), "failed to match expected string %s with %s", message, resultString)
 	})
 
 	/*
@@ -355,7 +356,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 
 		ginkgo.By("Reading empty dir size")
 		result := e2epod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
-		framework.ExpectEqual(result, expectedResult, "failed to match expected string %s with %s", expectedResult, result)
+		gomega.Expect(result).To(gomega.Equal(expectedResult), "failed to match expected string %s with %s", expectedResult, result)
 	})
 })
 
