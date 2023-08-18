@@ -1080,7 +1080,7 @@ var _ = common.SIGDescribe("Services", func() {
 		for _, pausePod := range pausePods.Items {
 			sourceIP, execPodIP := execSourceIPTest(pausePod, serviceAddress)
 			ginkgo.By("Verifying the preserved source ip")
-			framework.ExpectEqual(sourceIP, execPodIP)
+			gomega.Expect(sourceIP).To(gomega.Equal(execPodIP))
 		}
 	})
 
@@ -1398,7 +1398,7 @@ var _ = common.SIGDescribe("Services", func() {
 		err = jig.CheckServiceReachability(ctx, nodePortService, execPod)
 		framework.ExpectNoError(err)
 		nodePortCounts := len(nodePortService.Spec.Ports)
-		framework.ExpectEqual(nodePortCounts, 2, "updated service should have two Ports but found %d Ports", nodePortCounts)
+		gomega.Expect(nodePortCounts).To(gomega.Equal(2), "updated service should have two Ports but found %d Ports", nodePortCounts)
 
 		for _, port := range nodePortService.Spec.Ports {
 			framework.ExpectNotEqual(port.NodePort, 0, "NodePort service failed to allocate NodePort for Port %s", port.Name)
@@ -3231,7 +3231,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("fetching the Endpoint")
 		endpoints, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch Endpoint")
-		framework.ExpectEqual(foundEndpoint.ObjectMeta.Labels["test-service"], "updated", "failed to update Endpoint %v in namespace %v label not updated", testEndpointName, testNamespaceName)
+		gomega.Expect(foundEndpoint.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-service", "updated"), "failed to update Endpoint %v in namespace %v label not updated", testEndpointName, testNamespaceName)
 
 		endpointPatch, err := json.Marshal(map[string]interface{}{
 			"metadata": map[string]interface{}{
@@ -3279,13 +3279,13 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("fetching the Endpoint")
 		endpoints, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch Endpoint")
-		framework.ExpectEqual(endpoints.ObjectMeta.Labels["test-service"], "patched", "failed to patch Endpoint with Label")
+		gomega.Expect(endpoints.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-service", "patched"), "failed to patch Endpoint with Label")
 		endpointSubsetOne := endpoints.Subsets[0]
 		endpointSubsetOneAddresses := endpointSubsetOne.Addresses[0]
 		endpointSubsetOnePorts := endpointSubsetOne.Ports[0]
-		framework.ExpectEqual(endpointSubsetOneAddresses.IP, "10.0.0.25", "failed to patch Endpoint")
-		framework.ExpectEqual(endpointSubsetOnePorts.Name, "http-test", "failed to patch Endpoint")
-		framework.ExpectEqual(endpointSubsetOnePorts.Port, int32(8080), "failed to patch Endpoint")
+		gomega.Expect(endpointSubsetOneAddresses.IP).To(gomega.Equal("10.0.0.25"), "failed to patch Endpoint")
+		gomega.Expect(endpointSubsetOnePorts.Name).To(gomega.Equal("http-test"), "failed to patch Endpoint")
+		gomega.Expect(endpointSubsetOnePorts.Port).To(gomega.Equal(int32(8080)), "failed to patch Endpoint")
 
 		ginkgo.By("deleting the Endpoint by Collection")
 		err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-endpoint-static=true"})
@@ -3610,7 +3610,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		svcList, err := cs.CoreV1().Services(ns).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list Services")
-		framework.ExpectEqual(len(svcList.Items), 3, "Required count of services out of sync")
+		gomega.Expect(svcList.Items).To(gomega.HaveLen(3), "Required count of services out of sync")
 
 		ginkgo.By("deleting service collection")
 		err = svcDynamicClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: deleteLabel})
@@ -3618,7 +3618,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		svcList, err = cs.CoreV1().Services(ns).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list Services")
-		framework.ExpectEqual(len(svcList.Items), 1, "Required count of services out of sync")
+		gomega.Expect(svcList.Items).To(gomega.HaveLen(1), "Required count of services out of sync")
 
 		framework.Logf("Collection of services has been deleted")
 	})
@@ -3918,7 +3918,9 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 	framework.ExpectNoError(err)
 
 	// the service should be sticky until the timeout expires
-	framework.ExpectEqual(checkAffinity(ctx, cs, execPod, svcIP, servicePort, true), true)
+	if !checkAffinity(ctx, cs, execPod, svcIP, servicePort, true) {
+		framework.Failf("the service %s (%s:%d) should be sticky until the timeout expires", svc.Name, svcIP, servicePort)
+	}
 	// but it should return different hostnames after the timeout expires
 	// try several times to avoid the probability that we hit the same pod twice
 	hosts := sets.NewString()
@@ -3999,19 +4001,25 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(ctx context.Context, 
 	framework.ExpectNoError(err)
 
 	if !isTransitionTest {
-		framework.ExpectEqual(checkAffinity(ctx, cs, execPod, svcIP, servicePort, true), true)
+		if !checkAffinity(ctx, cs, execPod, svcIP, servicePort, true) {
+			framework.Failf("Failed to check affinity for service %s/%s", ns, svc.Name)
+		}
 	}
 	if isTransitionTest {
 		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(checkAffinity(ctx, cs, execPod, svcIP, servicePort, false), true)
+		if !checkAffinity(ctx, cs, execPod, svcIP, servicePort, false) {
+			framework.Failf("Failed to check affinity for service %s/%s without session affinity", ns, svc.Name)
+		}
 		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(checkAffinity(ctx, cs, execPod, svcIP, servicePort, true), true)
+		if !checkAffinity(ctx, cs, execPod, svcIP, servicePort, true) {
+			framework.Failf("Failed to check affinity for service %s/%s with session affinity", ns, svc.Name)
+		}
 	}
 }
 
@@ -4049,19 +4057,25 @@ func execAffinityTestForLBServiceWithOptionalTransition(ctx context.Context, f *
 	port := int(svc.Spec.Ports[0].Port)
 
 	if !isTransitionTest {
-		framework.ExpectEqual(checkAffinity(ctx, cs, nil, ingressIP, port, true), true)
+		if !checkAffinity(ctx, cs, nil, ingressIP, port, true) {
+			framework.Failf("Failed to verify affinity for loadbalance service %s/%s", ns, serviceName)
+		}
 	}
 	if isTransitionTest {
 		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(checkAffinity(ctx, cs, nil, ingressIP, port, false), true)
+		if !checkAffinity(ctx, cs, nil, ingressIP, port, false) {
+			framework.Failf("Failed to verify affinity for loadbalance service %s/%s without session affinity ", ns, serviceName)
+		}
 		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(checkAffinity(ctx, cs, nil, ingressIP, port, true), true)
+		if !checkAffinity(ctx, cs, nil, ingressIP, port, true) {
+			framework.Failf("Failed to verify affinity for loadbalance service %s/%s with session affinity ", ns, serviceName)
+		}
 	}
 }
 

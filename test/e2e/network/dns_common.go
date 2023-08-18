@@ -497,7 +497,7 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 
 		return false, nil
 	}))
-	framework.ExpectEqual(len(failed), 0)
+	gomega.Expect(failed).To(gomega.BeEmpty())
 }
 
 func validateDNSResults(ctx context.Context, f *framework.Framework, pod *v1.Pod, fileNames []string) {
