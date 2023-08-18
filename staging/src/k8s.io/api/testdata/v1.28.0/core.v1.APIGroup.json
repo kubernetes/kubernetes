@@ -1,0 +1,21 @@
+{
+  "kind": "APIGroup",
+  "apiVersion": "v1",
+  "name": "nameValue",
+  "versions": [
+    {
+      "groupVersion": "groupVersionValue",
+      "version": "versionValue"
+    }
+  ],
+  "preferredVersion": {
+    "groupVersion": "groupVersionValue",
+    "version": "versionValue"
+  },
+  "serverAddressByClientCIDRs": [
+    {
+      "clientCIDR": "clientCIDRValue",
+      "serverAddress": "serverAddressValue"
+    }
+  ]
+}

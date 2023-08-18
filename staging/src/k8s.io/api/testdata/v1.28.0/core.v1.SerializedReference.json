@@ -1,0 +1,13 @@
+{
+  "kind": "SerializedReference",
+  "apiVersion": "v1",
+  "reference": {
+    "kind": "kindValue",
+    "namespace": "namespaceValue",
+    "name": "nameValue",
+    "uid": "uidValue",
+    "apiVersion": "apiVersionValue",
+    "resourceVersion": "resourceVersionValue",
+    "fieldPath": "fieldPathValue"
+  }
+}
