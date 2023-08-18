@@ -364,7 +364,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	kubeConfigFlags := o.ConfigFlags
 	if kubeConfigFlags == nil {
-		kubeConfigFlags = defaultConfigFlags
+		kubeConfigFlags = DefaultConfigFlags
 	}
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
