@@ -74,6 +74,56 @@
   stabilityLevel: STABLE
   labels:
   - zone
+- name: container_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the container in core-seconds
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - container
+  - pod
+  - namespace
+- name: container_memory_working_set_bytes
+  help: Current working set of the container in bytes
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - container
+  - pod
+  - namespace
+- name: container_start_time_seconds
+  help: Start time of the container since unix epoch in seconds
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - container
+  - pod
+  - namespace
+- name: node_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the node in core-seconds
+  type: Custom
+  stabilityLevel: STABLE
+- name: node_memory_working_set_bytes
+  help: Current working set of the node in bytes
+  type: Custom
+  stabilityLevel: STABLE
+- name: pod_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the pod in core-seconds
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - pod
+  - namespace
+- name: pod_memory_working_set_bytes
+  help: Current working set of the pod in bytes
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - pod
+  - namespace
+- name: resource_scrape_error
+  help: 1 if there was an error while getting container metrics, 0 otherwise
+  type: Custom
+  stabilityLevel: STABLE
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
