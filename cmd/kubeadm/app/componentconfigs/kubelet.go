@@ -69,7 +69,7 @@ var kubeletHandler = handler{
 	fromCluster: kubeletConfigFromCluster,
 }
 
-func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, clusterCfg *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
+func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
 	configMapName := constants.KubeletBaseConfigurationConfigMap
 	klog.V(1).Infof("attempting to download the KubeletConfiguration from ConfigMap %q", configMapName)
 	cm, err := h.fromConfigMap(clientset, configMapName, constants.KubeletBaseConfigurationConfigMapKey, true)
