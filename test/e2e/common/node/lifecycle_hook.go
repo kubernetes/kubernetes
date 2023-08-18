@@ -544,3 +544,52 @@ func getSidecarPodWithHook(name string, image string, lifecycle *v1.Lifecycle) *
 		},
 	}
 }
+
+var _ = SIGDescribe("[Feature:PodLifecycleSleepAction]", func() {
+	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	var podClient *e2epod.PodClient
+
+	ginkgo.Context("when create a pod with lifecycle hook using sleep action", func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			podClient = e2epod.NewPodClient(f)
+		})
+		ginkgo.It("valid prestop hook using sleep action", func(ctx context.Context) {
+			lifecycle := &v1.Lifecycle{
+				PreStop: &v1.LifecycleHandler{
+					Sleep: &v1.SleepAction{Seconds: 5},
+				},
+			}
+			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook", imageutils.GetPauseImageName(), lifecycle)
+			ginkgo.By("create the pod with lifecycle hook using sleep action")
+			podClient.CreateSync(ctx, podWithHook)
+			ginkgo.By("delete the pod with lifecycle hook using sleep action")
+			start := time.Now()
+			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			cost := time.Since(start)
+			// verify that deletion was delayed by sleep seconds
+			if cost < time.Second*5 || cost > time.Second*10 {
+				framework.Failf("unexpected delay duration before killing the pod")
+			}
+		})
+
+		ginkgo.It("reduce GracePeriodSeconds during runtime", func(ctx context.Context) {
+			lifecycle := &v1.Lifecycle{
+				PreStop: &v1.LifecycleHandler{
+					Sleep: &v1.SleepAction{Seconds: 10},
+				},
+			}
+			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook", imageutils.GetPauseImageName(), lifecycle)
+			ginkgo.By("create the pod with lifecycle hook using sleep action")
+			podClient.CreateSync(ctx, podWithHook)
+			ginkgo.By("delete the pod with lifecycle hook using sleep action")
+			start := time.Now()
+			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(2), e2epod.DefaultPodDeletionTimeout)
+			cost := time.Since(start)
+			// verify that deletion was delayed by sleep seconds
+			if cost <= time.Second || cost >= time.Second*5 {
+				framework.Failf("unexpected delay duration before killing the pod")
+			}
+		})
+	})
+})
