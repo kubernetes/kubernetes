@@ -578,7 +578,7 @@ type decisionVal struct {
 // any object type that has receiver functions but does not expose any fields to
 // CEL.
 type receiverOnlyObjectVal struct {
-	typeValue *types.TypeValue
+	typeValue *types.Type
 }
 
 // receiverOnlyVal returns a receiverOnlyObjectVal for the given type.
