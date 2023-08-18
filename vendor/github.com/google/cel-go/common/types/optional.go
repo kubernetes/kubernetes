@@ -24,7 +24,7 @@ import (
 
 var (
 	// OptionalType indicates the runtime type of an optional value.
-	OptionalType = NewTypeValue("optional")
+	OptionalType = NewOpaqueType("optional")
 
 	// OptionalNone is a sentinel value which is used to indicate an empty optional value.
 	OptionalNone = &Optional{}
