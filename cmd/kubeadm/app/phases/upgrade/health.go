@@ -82,10 +82,8 @@ func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfi
 			f:      controlPlaneNodesReady,
 		},
 		&healthCheck{
-			name:   "StaticPodManifest",
-			client: client,
-			cfg:    cfg,
-			f:      staticPodManifestHealth,
+			name: "StaticPodManifest",
+			f:    staticPodManifestHealth,
 		},
 	}
 
