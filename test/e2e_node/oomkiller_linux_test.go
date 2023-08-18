@@ -37,7 +37,10 @@ type testCase struct {
 	oomTargetContainerName string
 }
 
-var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
+// Marked as [Serial] since currently the runtime can miss the OOM event if the pod is killed too quickly. This seems
+// to occur more often when the node is highly loaded.
+
+var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance] [Serial]", func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
