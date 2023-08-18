@@ -636,6 +636,13 @@ const (
 	// Adds pod.status.hostIPs and downward API
 	PodHostIPs featuregate.Feature = "PodHostIPs"
 
+	// owner: @AxeZhan
+	// kep: http://kep.k8s.io/3960
+	// alpha: v1.29
+	//
+	// Enables SleepAction in container lifecycle hooks
+	PodLifecycleSleepAction featuregate.Feature = "PodLifecycleSleepAction"
+
 	// owner: @Huang-Wei
 	// kep: https://kep.k8s.io/3521
 	// alpha: v1.26
@@ -1062,6 +1069,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodReadyToStartContainersCondition: {Default: true, PreRelease: featuregate.Beta},
 
 	PodHostIPs: {Default: false, PreRelease: featuregate.Alpha},
+
+	PodLifecycleSleepAction: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodSchedulingReadiness: {Default: true, PreRelease: featuregate.Beta},
 
