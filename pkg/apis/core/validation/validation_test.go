@@ -52,6 +52,7 @@ const (
 	dnsLabelErrMsg          = "a lowercase RFC 1123 label must consist of"
 	dnsSubdomainLabelErrMsg = "a lowercase RFC 1123 subdomain"
 	envVarNameErrMsg        = "a valid environment variable name must consist of"
+	defaultGracePeriod      = int64(30)
 )
 
 var (
@@ -6616,7 +6617,7 @@ func TestValidateProbe(t *testing.T) {
 	}
 
 	for _, p := range successCases {
-		if errs := validateProbe(p, field.NewPath("field")); len(errs) != 0 {
+		if errs := validateProbe(p, defaultGracePeriod, field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -6628,7 +6629,7 @@ func TestValidateProbe(t *testing.T) {
 		errorCases = append(errorCases, probe)
 	}
 	for _, p := range errorCases {
-		if errs := validateProbe(p, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateProbe(p, defaultGracePeriod, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %v", p)
 		}
 	}
@@ -6734,7 +6735,7 @@ func Test_validateProbe(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateProbe(tt.args.probe, tt.args.fldPath)
+			got := validateProbe(tt.args.probe, defaultGracePeriod, tt.args.fldPath)
 			if len(got) != len(tt.want) {
 				t.Errorf("validateProbe() = %v, want %v", got, tt.want)
 				return
@@ -6759,7 +6760,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4"}, {Name: "X-Forwarded-For", Value: "5.6.7.8"}}}},
 	}
 	for _, h := range successCases {
-		if errs := validateHandler(handlerFromProbe(&h), field.NewPath("field")); len(errs) != 0 {
+		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -6774,7 +6775,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X_Forwarded_For", Value: "foo.example.com"}}}},
 	}
 	for _, h := range errorCases {
-		if errs := validateHandler(handlerFromProbe(&h), field.NewPath("field")); len(errs) == 0 {
+		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %#v", h)
 		}
 	}
@@ -7694,7 +7695,7 @@ func TestValidateContainers(t *testing.T) {
 
 	var PodRestartPolicy core.RestartPolicy
 	PodRestartPolicy = "Always"
-	if errs := validateContainers(successCase, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -8308,7 +8309,7 @@ func TestValidateContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, volumeDevices, nil, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy)
+			errs := validateContainers(tc.containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -8398,7 +8399,7 @@ func TestValidateInitContainers(t *testing.T) {
 	}
 	var PodRestartPolicy core.RestartPolicy
 	PodRestartPolicy = "Never"
-	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -8777,7 +8778,7 @@ func TestValidateInitContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy)
+			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -23698,6 +23699,60 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 			errs := ValidateLoadBalancerStatus(&status, field.NewPath("status"), &spec)
 			if len(errs) != tc.numErrs {
 				t.Errorf("Unexpected error list for case %q(expected:%v got %v) - Errors:\n %v", tc.name, tc.numErrs, len(errs), errs.ToAggregate())
+			}
+		})
+	}
+}
+
+func TestValidateSleepAction(t *testing.T) {
+	fldPath := field.NewPath("root")
+	getInvalidStr := func(gracePeriod int64) string {
+		return fmt.Sprintf("must be greater than 0 and less than terminationGracePeriodSeconds (%d)", gracePeriod)
+	}
+
+	testCases := []struct {
+		name        string
+		action      *core.SleepAction
+		gracePeriod int64
+		expectErr   field.ErrorList
+	}{
+		{
+			name: "valid setting",
+			action: &core.SleepAction{
+				Seconds: 5,
+			},
+			gracePeriod: 30,
+		},
+		{
+			name: "negative seconds",
+			action: &core.SleepAction{
+				Seconds: -1,
+			},
+			gracePeriod: 30,
+			expectErr:   field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
+		},
+		{
+			name: "longer than gracePeriod",
+			action: &core.SleepAction{
+				Seconds: 5,
+			},
+			gracePeriod: 3,
+			expectErr:   field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateSleepAction(tc.action, tc.gracePeriod, fldPath)
+
+			if len(tc.expectErr) > 0 && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			} else if len(tc.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			} else if len(tc.expectErr) > 0 {
+				if tc.expectErr[0].Error() != errs[0].Error() {
+					t.Errorf("Unexpected error(s): %v", errs)
+				}
 			}
 		})
 	}
