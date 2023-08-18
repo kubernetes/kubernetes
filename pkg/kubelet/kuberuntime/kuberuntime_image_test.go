@@ -101,6 +101,30 @@ func TestListImages(t *testing.T) {
 	assert.Equal(t, expected.List(), actual.List())
 }
 
+func TestListImagesPinnedField(t *testing.T) {
+	ctx := context.Background()
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	imagesPinned := map[string]bool{
+		"1111": false,
+		"2222": true,
+		"3333": false,
+	}
+	imageList := []string{}
+	for image, pinned := range imagesPinned {
+		fakeImageService.SetFakeImagePinned(image, pinned)
+		imageList = append(imageList, image)
+	}
+	fakeImageService.SetFakeImages(imageList)
+
+	actualImages, err := fakeManager.ListImages(ctx)
+	assert.NoError(t, err)
+	for _, image := range actualImages {
+		assert.Equal(t, imagesPinned[image.ID], image.Pinned)
+	}
+}
+
 func TestListImagesWithError(t *testing.T) {
 	ctx := context.Background()
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
