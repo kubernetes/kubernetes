@@ -3357,6 +3357,7 @@ var _ = common.SIGDescribe("Services", func() {
 					Port:       int32(80),
 					TargetPort: intstr.FromInt(80),
 				}},
+				LoadBalancerClass: utilpointer.String("example.com/internal-vip"),
 			},
 		}
 		_, err = cs.CoreV1().Services(ns).Create(ctx, &testService, metav1.CreateOptions{})
