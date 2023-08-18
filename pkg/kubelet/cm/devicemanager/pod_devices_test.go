@@ -181,7 +181,7 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 			expected: &DeviceRunContainerOptions{},
 		},
 		{
-			description: "cdi devices are ingored when feature gate is disabled",
+			description: "cdi devices are ignored when feature gate is disabled",
 			gate:        false,
 			responsesPerResource: map[string]*pluginapi.ContainerAllocateResponse{
 				resource1: newContainerAllocateResponse(

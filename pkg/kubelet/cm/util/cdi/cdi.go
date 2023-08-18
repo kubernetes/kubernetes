@@ -116,7 +116,7 @@ func annotationKey(pluginName, deviceID string) (string, error) {
 			case isAlphaNumeric(c):
 			case c == '_' || c == '-' || c == '.':
 			default:
-				return "", fmt.Errorf("invalid name %q, invalid charcter '%c'", name, c)
+				return "", fmt.Errorf("invalid name %q, invalid character '%c'", name, c)
 			}
 		}
 	}

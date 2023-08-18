@@ -171,7 +171,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 			secretRef = pvSrc.NodePublishSecretRef
 		}
 
-		//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+		// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 		if c.spec.PersistentVolume.Spec.AccessModes != nil {
 			accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
 		}
@@ -235,7 +235,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	// Inject pod service account token into volume attributes
 	serviceAccountTokenAttrs, err := c.podServiceAccountTokenAttrs()
 	if err != nil {
-		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service account token attributes: %v", err))
 	}
 	volAttribs = mergeMap(volAttribs, serviceAccountTokenAttrs)
 
