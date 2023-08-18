@@ -859,3 +859,59 @@ func TestIsHTTPResponseError(t *testing.T) {
 		t.Errorf("unexpected http response error: %v", err)
 	}
 }
+
+func TestRunSleepHandler(t *testing.T) {
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil, nil)
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	containerName := "containerFoo"
+	container := v1.Container{
+		Name: containerName,
+		Lifecycle: &v1.Lifecycle{
+			PreStop: &v1.LifecycleHandler{},
+		},
+	}
+	pod := v1.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []v1.Container{container}
+
+	tests := []struct {
+		name                          string
+		sleepSeconds                  int64
+		terminationGracePeriodSeconds int64
+		expectErr                     bool
+		expectedErr                   string
+	}{
+		{
+			name:                          "valid seconds",
+			sleepSeconds:                  5,
+			terminationGracePeriodSeconds: 30,
+		},
+		{
+			name:                          "longer than TerminationGracePeriodSeconds",
+			sleepSeconds:                  3,
+			terminationGracePeriodSeconds: 2,
+			expectErr:                     true,
+			expectedErr:                   "container terminated before sleep hook finished",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, true)()
+
+			pod.Spec.Containers[0].Lifecycle.PreStop.Sleep = &v1.SleepAction{Seconds: tt.sleepSeconds}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(tt.terminationGracePeriodSeconds)*time.Second)
+			defer cancel()
+
+			_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PreStop)
+
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected success")
+			}
+			if tt.expectErr && err.Error() != tt.expectedErr {
+				t.Errorf("%s: expected error want %s, got %s", tt.name, tt.expectedErr, err.Error())
+			}
+		})
+	}
+}

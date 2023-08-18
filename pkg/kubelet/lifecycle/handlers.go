@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -86,6 +87,14 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 			klog.V(1).ErrorS(err, "HTTP lifecycle hook for Container in Pod failed", "path", handler.HTTPGet.Path, "containerName", container.Name, "pod", klog.KObj(pod))
 		}
 		return msg, err
+	case handler.Sleep != nil:
+		err := hr.runSleepHandler(ctx, handler.Sleep.Seconds)
+		var msg string
+		if err != nil {
+			msg = fmt.Sprintf("Sleep lifecycle hook (%d) for Container %q in Pod %q failed - error: %v", handler.Sleep.Seconds, container.Name, format.Pod(pod), err)
+			klog.V(1).ErrorS(err, "Sleep lifecycle hook for Container in Pod failed", "sleepSeconds", handler.Sleep.Seconds, "containerName", container.Name, "pod", klog.KObj(pod))
+		}
+		return msg, err
 	default:
 		err := fmt.Errorf("invalid handler: %v", handler)
 		msg := fmt.Sprintf("Cannot run handler: %v", err)
@@ -115,6 +124,20 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 		}
 	}
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
+}
+
+func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) {
+		return nil
+	}
+	c := time.After(time.Duration(seconds) * time.Second)
+	select {
+	case <-ctx.Done():
+		// unexpected termination
+		return fmt.Errorf("container terminated before sleep hook finished")
+	case <-c:
+		return nil
+	}
 }
 
 func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, eventRecorder record.EventRecorder) error {
