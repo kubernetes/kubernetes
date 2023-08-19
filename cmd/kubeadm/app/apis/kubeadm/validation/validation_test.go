@@ -455,6 +455,42 @@ func TestValidateAPIEndpoint(t *testing.T) {
 	}
 }
 
+func TestValidateCertificateKey(t *testing.T) {
+	var tests = []struct {
+		name           string
+		certificateKey string
+		expected       bool
+	}{
+		{
+			name:           "Valid certificate key",
+			certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204",
+			expected:       true,
+		},
+		{
+			name:           "Invalid hex encoded string",
+			certificateKey: "z6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204",
+			expected:       false,
+		},
+		{
+			name:           "Invalid AES key size",
+			certificateKey: "e6a2",
+			expected:       false,
+		},
+	}
+	for _, rt := range tests {
+		actual := ValidateCertificateKey(rt.certificateKey, nil)
+		t.Log(actual)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"%s test case failed:\n\texpected: %t\n\t  actual: %t",
+				rt.name,
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 // TODO: Create a separated test for ValidateClusterConfiguration
 func TestValidateInitConfiguration(t *testing.T) {
 	nodename := "valid-nodename"
