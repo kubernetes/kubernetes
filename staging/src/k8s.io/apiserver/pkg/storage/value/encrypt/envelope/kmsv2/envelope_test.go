@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -61,11 +62,11 @@ type testEnvelopeService struct {
 	disabled     bool
 	keyVersion   string
 	ciphertext   []byte
-	decryptCalls int
+	decryptCalls int32
 }
 
 func (t *testEnvelopeService) Decrypt(ctx context.Context, uid string, req *kmsservice.DecryptRequest) ([]byte, error) {
-	t.decryptCalls++
+	atomic.AddInt32(&t.decryptCalls, 1)
 	if t.disabled {
 		return nil, fmt.Errorf("Envelope service was disabled")
 	}
@@ -225,7 +226,7 @@ func TestEnvelopeCaching(t *testing.T) {
 					}
 				}
 			}
-			if envelopeService.decryptCalls != tt.expectedDecryptCalls {
+			if int(envelopeService.decryptCalls) != tt.expectedDecryptCalls {
 				t.Fatalf("expected %d decrypt calls, got %d", tt.expectedDecryptCalls, envelopeService.decryptCalls)
 			}
 		})
@@ -883,6 +884,91 @@ func TestEnvelopeMetrics(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// TestEnvelopeMetricsCache validates the correctness of the apiserver_envelope_encryption_dek_source_cache_size metric
+// and asserts that all of the associated logic is go routine safe.
+// 1. Multiple transformers are created, which should result in unique cache size for each provider
+// 2. A transformer with known number of states was created to encrypt, then on restart, another transformer
+// was created, which should result in expected number of cache keys for all the decryption calls for each
+// state used previously for encryption.
+func TestEnvelopeMetricsCache(t *testing.T) {
+	envelopeService := newTestEnvelopeService()
+	envelopeService.keyVersion = testKeyVersion
+	state, err := testStateFunc(testContext(t), envelopeService, clock.RealClock{}, randomBool())()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := testContext(t)
+	dataCtx := value.DefaultContext(testContextText)
+	provider1 := "one"
+	provider2 := "two"
+	numOfStates := 10
+
+	testCases := []struct {
+		desc    string
+		metrics []string
+		want    string
+	}{
+		{
+			desc: "dek source cache size",
+			metrics: []string{
+				"apiserver_envelope_encryption_dek_source_cache_size",
+			},
+			want: fmt.Sprintf(`
+				# HELP apiserver_envelope_encryption_dek_source_cache_size [ALPHA] Number of records in data encryption key (DEK) source cache. On a restart, this value is an approximation of the number of decrypt RPC calls the server will make to the KMS plugin.
+				# TYPE apiserver_envelope_encryption_dek_source_cache_size gauge
+        		apiserver_envelope_encryption_dek_source_cache_size{provider_name="%s"} %d
+        		apiserver_envelope_encryption_dek_source_cache_size{provider_name="%s"} 1
+				`, provider1, numOfStates, provider2),
+		},
+	}
+	transformer1 := NewEnvelopeTransformer(envelopeService, provider1, func() (State, error) {
+		// return different states to ensure we get expected number of cache keys after restart on decryption
+		return testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool())()
+	})
+	transformer2 := NewEnvelopeTransformer(envelopeService, provider2, func() (State, error) { return state, nil })
+	// used for restart
+	transformer3 := NewEnvelopeTransformer(envelopeService, provider1, func() (State, error) { return state, nil })
+	var transformedDatas [][]byte
+	for j := 0; j < numOfStates; j++ {
+		transformedData, err := transformer1.TransformToStorage(ctx, []byte(testText), dataCtx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		transformedDatas = append(transformedDatas, transformedData)
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			metrics.DekSourceCacheSize.Reset()
+			var wg sync.WaitGroup
+			wg.Add(2 * numOfStates)
+			for i := 0; i < numOfStates; i++ {
+				i := i
+				go func() {
+					defer wg.Done()
+					// mimick a restart, the server will make decrypt RPC calls to the KMS plugin
+					// check cache metrics for the decrypt / read flow, which should repopulate the cache
+					if _, _, err := transformer3.TransformFromStorage(ctx, transformedDatas[i], dataCtx); err != nil {
+						panic(err)
+					}
+				}()
+				go func() {
+					defer wg.Done()
+					// check cache metrics for the encrypt / write flow
+					_, err := transformer2.TransformToStorage(ctx, []byte(testText), dataCtx)
+					if err != nil {
+						panic(err)
+					}
+				}()
+			}
+			wg.Wait()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
 				t.Fatal(err)
 			}
