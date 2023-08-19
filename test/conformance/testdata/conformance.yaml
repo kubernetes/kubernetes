@@ -1745,6 +1745,16 @@
     pods are deleted the endpoints from the service MUST be empty.
   release: v1.9
   file: test/e2e/network/service.go
+- testname: Service, should serve endpoints on same port and different protocols.
+  codename: '[sig-network] Services should serve endpoints on same port and different
+    protocols [Conformance]'
+  description: Create one service with two ports, same port number and different protocol
+    TCP and UDP. It MUST be able to forward traffic to both ports. Update the Service
+    to expose only the TCP port, it MUST succeed to connect to the TCP port and fail
+    to connect to the UDP port. Update the Service to expose only the UDP port, it
+    MUST succeed to connect to the UDP port and fail to connect to the TCP port.
+  release: v1.29
+  file: test/e2e/network/service.go
 - testname: Service, endpoints with multiple ports
   codename: '[sig-network] Services should serve multiport endpoints from pods  [Conformance]'
   description: Create a service with two ports but no Pods are added to the service
