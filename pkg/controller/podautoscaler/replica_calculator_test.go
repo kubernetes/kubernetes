@@ -2021,7 +2021,7 @@ func TestCalculatePodRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name: "one pod",
+			name: "pod with regular containers",
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPod,
@@ -2059,7 +2059,7 @@ func TestCalculatePodRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name: "pod missing requests",
+			name: "container missing requests",
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPod,
@@ -2077,7 +2077,7 @@ func TestCalculatePodRequests(t *testing.T) {
 			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
 		},
 		{
-			name: "pod with sidecar containers",
+			name: "pod with restartable init containers",
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPod,
@@ -2089,7 +2089,7 @@ func TestCalculatePodRequests(t *testing.T) {
 					},
 					InitContainers: []v1.Container{
 						{Name: "init-container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(20, resource.DecimalSI)}}},
-						{Name: "sidecar1", RestartPolicy: &containerRestartPolicyAlways, Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+						{Name: "restartable-container1", RestartPolicy: &containerRestartPolicyAlways, Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
 					},
 				},
 			}},
