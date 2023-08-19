@@ -425,6 +425,7 @@ func calculatePodRequests(pods []*v1.Pod, container string, resource v1.Resource
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
 		podSum := int64(0)
+		// Calculate all regular containers and restartable init containers requests.
 		containers := append([]v1.Container{}, pod.Spec.Containers...)
 		for _, c := range pod.Spec.InitContainers {
 			if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
