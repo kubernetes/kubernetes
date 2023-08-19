@@ -213,7 +213,19 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		if ing.IP == "" {
 			continue
 		}
-		if ipFamily := proxyutil.GetIPFamilyFromIP(ing.IP); ipFamily == sct.ipFamily && proxyutil.IsVIPMode(ing) {
+
+		// proxy mode load balancers do not need to track the IPs in the service cache
+		// and they can also implement IP family translation, so no need to check if
+		// the status ingress.IP and the ClusterIP belong to the same family.
+		if !proxyutil.IsVIPMode(ing) {
+			klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IP for given Service as it using Proxy mode",
+				"ipFamily", sct.ipFamily, "loadBalancerIngressIP", ing.IP, "service", klog.KObj(service))
+			continue
+		}
+
+		// kube-proxy does not implement IP family translation, skip addresses with
+		// different IP family
+		if ipFamily := proxyutil.GetIPFamilyFromIP(ing.IP); ipFamily == sct.ipFamily {
 			info.loadBalancerVIPs = append(info.loadBalancerVIPs, ing.IP)
 		} else {
 			invalidIPs = append(invalidIPs, ing.IP)
