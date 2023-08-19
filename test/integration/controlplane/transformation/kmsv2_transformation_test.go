@@ -870,14 +870,6 @@ resources:
        name: kms-provider
        endpoint: unix:///@kms-provider.sock
 `
-	// TOODO: This test requires changes in the apiserver lifecycle code to correctly clean up goroutines after a server failure.
-	// When feature flag is not enabled, loading a encryptionConfig with KMSv2 should fail
-	// defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, false)()
-	// _, err := newTransformTest(t, encryptionConfig, true, "", nil)
-	// if err == nil || !strings.Contains(err.Error(), "KMSv2 feature is not enabled") {
-	// 	t.Fatalf("when feature flag is not enabled, loading a encryptionConfig with KMSv2 should have failed with: KMSv2 feature is not enabled, encryptionConfig:\n%s\n actual error: %v", encryptionConfig, err)
-	// }
-
 	providerName := "kms-provider"
 	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 	storageConfig := framework.SharedEtcd()

@@ -351,6 +351,155 @@ func TestKMSv1Deprecation(t *testing.T) {
 	}
 }
 
+func TestKMSvsEnablement(t *testing.T) {
+	testCases := []struct {
+		name         string
+		kmsv2Enabled bool
+		filePath     string
+		expectedErr  string
+	}{
+		{
+			name:         "config with kmsv2 and kmsv1, KMSv2=false",
+			kmsv2Enabled: false,
+			filePath:     "testdata/valid-configs/kms/multiple-providers-kmsv2.yaml",
+			expectedErr:  "KMSv2 feature is not enabled",
+		},
+		{
+			name:         "config with kmsv2 and kmsv1, KMSv2=true",
+			kmsv2Enabled: true,
+			filePath:     "testdata/valid-configs/kms/multiple-providers-kmsv2.yaml",
+			expectedErr:  "",
+		},
+		{
+			name:         "config with kmsv1, KMSv2=false",
+			kmsv2Enabled: false,
+			filePath:     "testdata/valid-configs/kms/multiple-providers.yaml",
+			expectedErr:  "",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Just testing KMSv2 feature flag
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, testCase.kmsv2Enabled)()
+			_, err := LoadEncryptionConfig(testContext(t), testCase.filePath, false)
+
+			if !strings.Contains(errString(err), testCase.expectedErr) {
+				t.Fatalf("expected error %q, got %q", testCase.expectedErr, errString(err))
+			}
+
+		})
+	}
+	tts := []struct {
+		name            string
+		kmsv2Enabled    bool
+		expectedErr     string
+		expectedTimeout time.Duration
+		config          apiserverconfig.EncryptionConfiguration
+		wantV2Used      bool
+	}{
+		{
+			name:         "with kmsv1 and kmsv2, KMSv2=false",
+			kmsv2Enabled: false,
+			config: apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout: &metav1.Duration{
+										Duration: 1 * time.Second,
+									},
+									Endpoint:  "unix:///tmp/testprovider.sock",
+									CacheSize: pointer.Int32(1000),
+								},
+							},
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v2",
+									Timeout: &metav1.Duration{
+										Duration: 1 * time.Second,
+									},
+									Endpoint:  "unix:///tmp/anothertestprovider.sock",
+									CacheSize: pointer.Int32(1000),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: "KMSv2 feature is not enabled",
+			wantV2Used:  false,
+		},
+		{
+			name:         "with kmsv1 and kmsv2, KMSv2=true",
+			kmsv2Enabled: true,
+			config: apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout: &metav1.Duration{
+										Duration: 1 * time.Second,
+									},
+									Endpoint:  "unix:///tmp/testprovider.sock",
+									CacheSize: pointer.Int32(1000),
+								},
+							},
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v2",
+									Timeout: &metav1.Duration{
+										Duration: 1 * time.Second,
+									},
+									Endpoint:  "unix:///tmp/anothertestprovider.sock",
+									CacheSize: pointer.Int32(1000),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: "",
+			wantV2Used:  true,
+		},
+	}
+
+	for _, tt := range tts {
+		t.Run(tt.name, func(t *testing.T) {
+			// Just testing KMSv2 feature flag
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, tt.kmsv2Enabled)()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel() // cancel this upfront so the kms v2 checks do not block
+
+			_, _, kmsUsed, err := getTransformerOverridesAndKMSPluginHealthzCheckers(ctx, &tt.config)
+			if err == nil {
+				if kmsUsed == nil || kmsUsed.v2Used != tt.wantV2Used {
+					t.Fatalf("unexpected kmsUsed value, expected: %v, got: %v", tt.wantV2Used, kmsUsed)
+				}
+
+			}
+			if !strings.Contains(errString(err), tt.expectedErr) {
+				t.Fatalf("expecting error calling prefixTransformersAndProbes, expected: %s, got: %s", tt.expectedErr, errString(err))
+			}
+		})
+	}
+}
+
 func TestKMSMaxTimeout(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
 
