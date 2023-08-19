@@ -3350,13 +3350,14 @@ var _ = common.SIGDescribe("Services", func() {
 				Labels: testSvcLabels,
 			},
 			Spec: v1.ServiceSpec{
-				Type: "ClusterIP",
+				Type: "LoadBalancer",
 				Ports: []v1.ServicePort{{
 					Name:       "http",
 					Protocol:   v1.ProtocolTCP,
 					Port:       int32(80),
 					TargetPort: intstr.FromInt32(80),
 				}},
+				LoadBalancerClass: utilpointer.String("example.com/internal-vip"),
 			},
 		}
 		_, err = cs.CoreV1().Services(ns).Create(ctx, &testService, metav1.CreateOptions{})
