@@ -337,10 +337,11 @@ func computeReplicaStatus(pods []*v1.Pod, minReadySeconds int32, currentRevision
 
 		// count the number of current and update replicas
 		if isCreated(pod) && !isTerminating(pod) {
-			if getPodRevision(pod) == currentRevision.Name {
+			revision := getPodRevision(pod)
+			if revision == currentRevision.Name {
 				status.currentReplicas++
 			}
-			if getPodRevision(pod) == updateRevision.Name {
+			if revision == updateRevision.Name {
 				status.updatedReplicas++
 			}
 		}
