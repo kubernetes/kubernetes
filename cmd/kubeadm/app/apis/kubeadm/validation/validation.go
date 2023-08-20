@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/url"
@@ -54,7 +55,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
 	// TODO(Arvinderpal): update advertiseAddress validation for dual-stack once it's implemented.
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, field.NewPath("localAPIEndpoint"))...)
-	// TODO: Maybe validate that .CertificateKey is a valid hex encoded AES key
+	allErrs = append(allErrs, ValidateCertificateKey(c.CertificateKey, field.NewPath("certificateKey"))...)
 	return allErrs
 }
 
@@ -98,7 +99,7 @@ func ValidateJoinControlPlane(c *kubeadm.JoinControlPlane, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 	if c != nil {
 		allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, fldPath.Child("localAPIEndpoint"))...)
-		// TODO: Maybe validate that .CertificateKey is a valid hex encoded AES key
+		allErrs = append(allErrs, ValidateCertificateKey(c.CertificateKey, field.NewPath("certificateKey"))...)
 	}
 	return allErrs
 }
@@ -591,6 +592,25 @@ func ValidateAPIEndpoint(c *kubeadm.APIEndpoint, fldPath *field.Path) field.Erro
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateIPFromString(c.AdvertiseAddress, fldPath.Child("advertiseAddress"))...)
 	allErrs = append(allErrs, ValidatePort(c.BindPort, fldPath.Child("bindPort"))...)
+	return allErrs
+}
+
+// ValidateCertificateKey validates the certificate key is a valid hex encoded AES key
+func ValidateCertificateKey(certificateKey string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(certificateKey) > 0 {
+		decodedKey, err := hex.DecodeString(certificateKey)
+		if err != nil {
+			return append(allErrs, field.Invalid(fldPath, certificateKey, fmt.Sprintf("certificate key decoding error: %v", err)))
+		}
+
+		k := len(decodedKey)
+		if k != constants.CertificateKeySize {
+			allErrs = append(allErrs, field.Invalid(fldPath, certificateKey, fmt.Sprintf("invalid certificate key size %d, the key must be an AES key of size %d", k, constants.CertificateKeySize)))
+		}
+	}
+
 	return allErrs
 }
 
