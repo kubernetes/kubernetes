@@ -99,7 +99,7 @@ func ValidateJoinControlPlane(c *kubeadm.JoinControlPlane, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 	if c != nil {
 		allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, fldPath.Child("localAPIEndpoint"))...)
-		allErrs = append(allErrs, ValidateCertificateKey(c.CertificateKey, field.NewPath("certificateKey"))...)
+		allErrs = append(allErrs, ValidateCertificateKey(c.CertificateKey, fldPath.Child("certificateKey"))...)
 	}
 	return allErrs
 }
