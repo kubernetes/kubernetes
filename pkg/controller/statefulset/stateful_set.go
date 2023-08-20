@@ -42,6 +42,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 
 	"k8s.io/klog/v2"
 )
@@ -141,6 +142,8 @@ func NewStatefulSetController(
 	)
 	ssc.setLister = setInformer.Lister()
 	ssc.setListerSynced = setInformer.Informer().HasSynced
+
+	metrics.Register()
 
 	// TODO: Watch volumes
 	return ssc

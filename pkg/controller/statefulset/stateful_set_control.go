@@ -20,6 +20,7 @@ import (
 	"context"
 	"sort"
 	"sync"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/integer"
 )
@@ -89,6 +91,13 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(ctx context.Context, set
 		return nil, err
 	}
 	history.SortControllerRevisions(revisions)
+
+	start := time.Now()
+	defer func() {
+		if set.Spec.UpdateStrategy.RollingUpdate != nil {
+			metrics.StsRollingUpdateDuratationSeconds.Observe(float64(time.Since(start).Milliseconds())/1000)
+		}
+	}()
 
 	currentRevision, updateRevision, status, err := ssc.performUpdate(ctx, set, pods, revisions)
 	if err != nil {
