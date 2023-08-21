@@ -107,14 +107,14 @@ func newWatcher(client *clientv3.Client, codec runtime.Codec, groupResource sche
 // If rev is zero, it will return the existing object(s) and then start watching from
 // the maximum revision+1 from returned objects.
 // If rev is non-zero, it will watch events happened after given revision.
-// If recursive is false, it watches on given key.
-// If recursive is true, it watches any children and directories under the key, excluding the root key itself.
-// pred must be non-nil. Only if pred matches the change, it will be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, progressNotify bool, transformer value.Transformer, pred storage.SelectionPredicate) (watch.Interface, error) {
-	if recursive && !strings.HasSuffix(key, "/") {
+// If opts.Recursive is false, it watches on given key.
+// If opts.Recursive is true, it watches any children and directories under the key, excluding the root key itself.
+// pred must be non-nil. Only if opts.Predicate matches the change, it will be returned.
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, transformer value.Transformer, opts storage.ListOptions) (watch.Interface, error) {
+	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
-	wc := w.createWatchChan(ctx, key, rev, recursive, progressNotify, transformer, pred)
+	wc := w.createWatchChan(ctx, key, rev, opts.Recursive, opts.ProgressNotify, transformer, opts.Predicate)
 	go wc.run()
 
 	// For etcd watch we don't have an easy way to answer whether the watch
