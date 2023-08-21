@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -336,10 +337,12 @@ func TestManager(t *testing.T) {
 
 			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
+			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{})
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 			manager, _ := NewManager(&Config{
 				Logger:                          logger,
 				ProbeManager:                    proberManager,
+				VolumeManager:                   fakeVolumeManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
@@ -440,11 +443,13 @@ func TestFeatureEnabled(t *testing.T) {
 
 			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
+			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{})
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager, _ := NewManager(&Config{
 				Logger:                          logger,
 				ProbeManager:                    proberManager,
+				VolumeManager:                   fakeVolumeManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
@@ -497,10 +502,12 @@ func TestRestart(t *testing.T) {
 
 	proberManager := probetest.FakeManager{}
 	fakeRecorder := &record.FakeRecorder{}
+	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{})
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager, _ := NewManager(&Config{
 		Logger:                          logger,
 		ProbeManager:                    proberManager,
+		VolumeManager:                   fakeVolumeManager,
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
 		GetPodsFunc:                     activePodsFunc,
@@ -726,17 +733,19 @@ func Test_groupByPriority(t *testing.T) {
 
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	var (
-		probeManager   = probetest.FakeManager{}
-		fakeRecorder   = &record.FakeRecorder{}
-		syncNodeStatus = func() {}
-		nodeRef        = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
-		fakeclock      = testingclock.NewFakeClock(time.Now())
+		probeManager      = probetest.FakeManager{}
+		fakeRecorder      = &record.FakeRecorder{}
+		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{})
+		syncNodeStatus    = func() {}
+		nodeRef           = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+		fakeclock         = testingclock.NewFakeClock(time.Now())
 	)
 
 	type fields struct {
 		recorder                         record.EventRecorder
 		nodeRef                          *v1.ObjectReference
 		probeManager                     prober.Manager
+		volumeManager                    volumemanager.VolumeManager
 		shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 		getPods                          eviction.ActivePodsFunc
 		killPodFunc                      eviction.KillPodFunc
@@ -755,9 +764,10 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 		{
 			name: "kill pod func take too long",
 			fields: fields{
-				recorder:     fakeRecorder,
-				nodeRef:      nodeRef,
-				probeManager: probeManager,
+				recorder:      fakeRecorder,
+				nodeRef:       nodeRef,
+				probeManager:  probeManager,
+				volumeManager: fakeVolumeManager,
 				shutdownGracePeriodByPodPriority: []kubeletconfig.ShutdownGracePeriodByPodPriority{
 					{
 						Priority:                   1,
@@ -796,6 +806,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 			)
 			m := &managerImpl{
 				logger:                           logger,
+				volumeManager:                    tt.fields.volumeManager,
 				recorder:                         tt.fields.recorder,
 				nodeRef:                          tt.fields.nodeRef,
 				probeManager:                     tt.fields.probeManager,
