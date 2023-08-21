@@ -158,8 +158,16 @@ func (rc *reconciler) Run(stopCh <-chan struct{}) {
 }
 
 func (rc *reconciler) unmountVolumes() {
-	// Ensure volumes that should be unmounted are unmounted.
+	mountedVolumes := []cache.MountedVolume{}
 	for _, mountedVolume := range rc.actualStateOfWorld.GetAllMountedVolumes() {
+		if rc.operationExecutor.IsOperationPending(mountedVolume.VolumeName, mountedVolume.PodName, nestedpendingoperations.EmptyNodeName) {
+			continue
+		}
+		mountedVolumes = append(mountedVolumes, mountedVolume)
+	}
+
+	// Ensure volumes that should be unmounted are unmounted.
+	for _, mountedVolume := range mountedVolumes {
 		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName, mountedVolume.SELinuxMountContext) {
 			// Volume is mounted, unmount it
 			klog.V(5).InfoS(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
@@ -178,6 +186,9 @@ func (rc *reconciler) unmountVolumes() {
 func (rc *reconciler) mountOrAttachVolumes() {
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
+		if rc.operationExecutor.IsOperationPending(volumeToMount.VolumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
+			continue
+		}
 		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.DesiredPersistentVolumeSize, volumeToMount.SELinuxLabel)
 		volumeToMount.DevicePath = devicePath
 		if cache.IsSELinuxMountMismatchError(err) {
@@ -277,10 +288,17 @@ func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
 }
 
 func (rc *reconciler) unmountDetachDevices() {
+	attachedVolumes := []cache.AttachedVolume{}
 	for _, attachedVolume := range rc.actualStateOfWorld.GetUnmountedVolumes() {
+		if rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
+			continue
+		}
+		attachedVolumes = append(attachedVolumes, attachedVolume)
+	}
+
+	for _, attachedVolume := range attachedVolumes {
 		// Check IsOperationPending to avoid marking a volume as detached if it's in the process of mounting.
-		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName, attachedVolume.SELinuxMountContext) &&
-			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
+		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName, attachedVolume.SELinuxMountContext) {
 			if attachedVolume.DeviceMayBeMounted() {
 				// Volume is globally mounted to device, unmount it
 				klog.V(5).InfoS(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
