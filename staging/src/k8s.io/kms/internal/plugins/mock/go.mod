@@ -1,6 +1,8 @@
 module k8s.io/kms/plugins/mock
 
-go 1.19
+go 1.21
+
+toolchain go1.21.0
 
 require (
 	k8s.io/klog/v2 v2.100.1
