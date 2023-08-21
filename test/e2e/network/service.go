@@ -1113,6 +1113,57 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
+	// Hairpinning is complex to implement and is possible that different implementation leaks resources
+	// and break the functionality after a long number of requests
+	ginkgo.It("should allow pods to hairpin back to themselves through services uninterruptedly", func(ctx context.Context) {
+		serviceName := "hairpin-test"
+		ns := f.Namespace.Name
+
+		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		jig.ExternalIPs = false
+		servicePort := 80
+		svc, err := jig.CreateTCPServiceWithPort(ctx, nil, int32(servicePort))
+		framework.ExpectNoError(err)
+		serviceIP := svc.Spec.ClusterIP
+		framework.Logf("hairpin-test cluster ip: %s", serviceIP)
+
+		ginkgo.By("creating a client/server pod")
+		serverPodName := "hairpin"
+		podTemplate := e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   serverPodName,
+				Labels: jig.Labels,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  serverPodName,
+						Image: imageutils.GetE2EImage(imageutils.Httpd),
+					},
+				},
+			},
+		})
+		pod, err := cs.CoreV1().Pods(ns).Create(ctx, podTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
+
+		ginkgo.By("waiting for the service to expose an endpoint")
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{serverPodName: {servicePort}})
+
+		ginkgo.By("Checking if the pod can reach itself")
+		err = jig.CheckServiceReachability(ctx, svc, pod)
+		framework.ExpectNoError(err)
+
+		// Create 100k connections with a parallelism of 100 wait 5 seconds per connection and 60 in total
+		cmd := fmt.Sprintf(`ab -n 100000 -c 100 -s 5 -t 100 http://%s/`, net.JoinHostPort(serviceIP, strconv.Itoa(servicePort)))
+		_, err = e2eoutput.RunHostCmd(pod.Namespace, pod.Name, cmd)
+		if err != nil {
+			framework.Failf("unexpected error when trying to connect to Service %s: %v", net.JoinHostPort(serviceIP, strconv.Itoa(servicePort)), err)
+		}
+
+	})
+
 	ginkgo.It("should be able to up and down services", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
