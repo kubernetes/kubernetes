@@ -53,7 +53,7 @@ type queueSetFactory struct {
 // - whose Set method is invoked with the queueSet locked, and
 // - whose Get method is invoked with the queueSet not locked.
 // The parameters are the same as for `promise.NewWriteOnce`.
-type promiseFactory func(initial interface{}, doneCh <-chan struct{}, doneVal interface{}) promise.WriteOnce
+type promiseFactory func(initial interface{}, doneCtx context.Context, doneVal interface{}) promise.WriteOnce
 
 // promiseFactoryFactory returns the promiseFactory to use for the given queueSet
 type promiseFactoryFactory func(*queueSet) promiseFactory
@@ -584,7 +584,7 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 		fsName:            fsName,
 		flowDistinguisher: flowDistinguisher,
 		ctx:               ctx,
-		decision:          qs.promiseFactory(nil, ctx.Done(), decisionCancel),
+		decision:          qs.promiseFactory(nil, ctx, decisionCancel),
 		arrivalTime:       qs.clock.Now(),
 		arrivalR:          qs.currentR,
 		queue:             queue,
@@ -725,7 +725,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 		flowDistinguisher: flowDistinguisher,
 		ctx:               ctx,
 		startTime:         now,
-		decision:          qs.promiseFactory(decisionExecute, ctx.Done(), decisionCancel),
+		decision:          qs.promiseFactory(decisionExecute, ctx, decisionCancel),
 		arrivalTime:       now,
 		arrivalR:          qs.currentR,
 		descr1:            descr1,
