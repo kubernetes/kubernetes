@@ -29,13 +29,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 func GetPluginCommandGroup(kubectl *cobra.Command) templates.CommandGroup {
 	// Find root level
 	return templates.CommandGroup{
-		Message:  "User-Installed Plugin Commands:",
+		Message:  i18n.T("Subcommands provided by plugins:"),
 		Commands: registerPluginCommands(kubectl, 1, false),
 	}
 }
@@ -91,7 +92,6 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 // registerPluginCommand allows adding Cobra command to the command tree or extracting them for usage in
 // e.g. the help function or for registering the completion function
 func registerPluginCommands(kubectl *cobra.Command, depth int, register bool) (cmds []*cobra.Command) {
-
 	userDefinedCommands := []*cobra.Command{}
 
 	streams := genericclioptions.IOStreams{
