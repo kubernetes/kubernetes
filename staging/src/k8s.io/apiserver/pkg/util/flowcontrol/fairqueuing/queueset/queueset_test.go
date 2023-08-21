@@ -545,7 +545,7 @@ func TestBaseline(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestBaseline",
 		DesiredNumQueues: 9,
@@ -584,7 +584,7 @@ func TestExampt(t *testing.T) {
 		t.Run(fmt.Sprintf("concurrency=%d", concurrencyLimit), func(t *testing.T) {
 			now := time.Now()
 			clk, counter := testeventclock.NewFake(now, 0, nil)
-			qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+			qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 			qCfg := fq.QueuingConfig{
 				Name:             "TestBaseline",
 				DesiredNumQueues: -1,
@@ -657,7 +657,7 @@ func TestSeparations(t *testing.T) {
 			now := time.Now()
 
 			clk, counter := testeventclock.NewFake(now, 0, nil)
-			qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+			qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 			qCfg := fq.QueuingConfig{
 				Name:             "TestSeparations/" + caseName,
 				DesiredNumQueues: 9,
@@ -698,7 +698,7 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlowsHandSize1",
 		DesiredNumQueues: 9,
@@ -737,7 +737,7 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlowsHandSize3",
 		DesiredNumQueues: 8,
@@ -775,7 +775,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "DiffFlowsExpectEqual",
 		DesiredNumQueues: 9,
@@ -817,7 +817,7 @@ func TestSeatSecondsRollover(t *testing.T) {
 	const Quarter = 91 * 24 * time.Hour
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestSeatSecondsRollover",
 		DesiredNumQueues: 9,
@@ -857,7 +857,7 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "DiffFlowsExpectUnequal",
 		DesiredNumQueues: 9,
@@ -896,7 +896,7 @@ func TestDifferentWidths(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentWidths",
 		DesiredNumQueues: 64,
@@ -934,7 +934,7 @@ func TestTooWide(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestTooWide",
 		DesiredNumQueues: 64,
@@ -997,7 +997,7 @@ func TestWindup(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			now := time.Now()
 			clk, counter := testeventclock.NewFake(now, 0, nil)
-			qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+			qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 			qCfg := fq.QueuingConfig{
 				Name:             "TestWindup/" + testCase.name,
 				DesiredNumQueues: 9,
@@ -1037,7 +1037,7 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentFlowsWithoutQueuing",
 		DesiredNumQueues: 0,
@@ -1072,7 +1072,7 @@ func TestTimeout(t *testing.T) {
 	now := time.Now()
 
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestTimeout",
 		DesiredNumQueues: 128,
@@ -1125,7 +1125,7 @@ func TestContextCancel(t *testing.T) {
 	metrics.Reset()
 	now := time.Now()
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestContextCancel",
 		DesiredNumQueues: 11,
@@ -1234,7 +1234,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	metrics.Reset()
 	now := time.Now()
 	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter), test.NewFakeQueueWait())
 	qCfg := fq.QueuingConfig{
 		Name:             "TestTotalRequestsExecutingWithPanic",
 		DesiredNumQueues: 0,

@@ -45,8 +45,9 @@ const nsTimeFmt = "2006-01-02 15:04:05.000000000"
 // queueSetFactory implements the QueueSetFactory interface
 // queueSetFactory makes QueueSet objects.
 type queueSetFactory struct {
-	clock                 eventclock.Interface
-	promiseFactoryFactory promiseFactoryFactory
+	clock                   eventclock.Interface
+	promiseFactoryFactory   promiseFactoryFactory
+	queueWaitContextFactory queueWaitContextFactory
 }
 
 // promiseFactory returns a WriteOnce
@@ -57,6 +58,19 @@ type promiseFactory func(initial interface{}, doneCtx context.Context, doneVal i
 
 // promiseFactoryFactory returns the promiseFactory to use for the given queueSet
 type promiseFactoryFactory func(*queueSet) promiseFactory
+
+// queueWaitContextFactory returns a new context with a deadline of how
+// long the request is allowed to wait before it is removed from its
+// queue and rejcted.
+// The context.CancelFunc returned must never be nil and the caller is
+// responsible for calling the CancelFunc function for cleanup.
+//   - ctx: the context associated with the request (it may or may
+//     not have a deadline).
+//   - defaultQueueWaitTime: the default wait duration that is used if
+//     the request context does not have any deadline.
+type queueWaitContextFactory interface {
+	GetQueueWaitContext(ctx context.Context, defaultQueueWaitTime time.Duration) (context.Context, context.CancelFunc)
+}
 
 // `*queueSetCompleter` implements QueueSetCompleter.  Exactly one of
 // the fields `factory` and `theSet` is non-nil.
@@ -98,6 +112,11 @@ type queueSet struct {
 	seatDemandIntegrator metrics.Gauge
 
 	promiseFactory promiseFactory
+
+	// queueWaitContextFactory creates a new context with a deadline
+	// that dictates how long this request can wait before
+	// it is removed from its queue and rejected.
+	queueWaitContextFactory queueWaitContextFactory
 
 	lock sync.Mutex
 
@@ -173,14 +192,15 @@ type queueSet struct {
 
 // NewQueueSetFactory creates a new QueueSetFactory object
 func NewQueueSetFactory(c eventclock.Interface) fq.QueueSetFactory {
-	return newTestableQueueSetFactory(c, ordinaryPromiseFactoryFactory)
+	return newTestableQueueSetFactory(c, ordinaryPromiseFactoryFactory, newQueueWaitContextFactory(c))
 }
 
 // newTestableQueueSetFactory creates a new QueueSetFactory object with the given promiseFactoryFactory
-func newTestableQueueSetFactory(c eventclock.Interface, promiseFactoryFactory promiseFactoryFactory) fq.QueueSetFactory {
+func newTestableQueueSetFactory(c eventclock.Interface, promiseFactoryFactory promiseFactoryFactory, queueWaitContextFactory queueWaitContextFactory) fq.QueueSetFactory {
 	return &queueSetFactory{
-		clock:                 c,
-		promiseFactoryFactory: promiseFactoryFactory,
+		clock:                   c,
+		promiseFactoryFactory:   promiseFactoryFactory,
+		queueWaitContextFactory: queueWaitContextFactory,
 	}
 }
 
@@ -227,6 +247,7 @@ func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 			requestsExecutingSet:     sets.New[*request](),
 		}
 		qs.promiseFactory = qsc.factory.promiseFactoryFactory(qs)
+		qs.queueWaitContextFactory = qsc.factory.queueWaitContextFactory
 	}
 	qs.setConfiguration(context.Background(), qsc.qCfg, qsc.dealer, dCfg)
 	return qs
@@ -300,9 +321,6 @@ const (
 	// Serve this one
 	decisionExecute requestDecision = iota
 
-	// Reject this one due to APF queuing considerations
-	decisionReject
-
 	// This one's context timed out / was canceled
 	decisionCancel
 )
@@ -341,7 +359,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.Wo
 	// 3) Reject current request if there is not enough concurrency shares and
 	// we are at max queue length
 	// 4) If not rejected, create a request and enqueue
-	req = qs.timeoutOldRequestsAndRejectOrEnqueueLocked(ctx, workEstimate, hashValue, flowDistinguisher, fsName, descr1, descr2, queueNoteFn)
+	req = qs.rejectOrEnqueueLocked(ctx, workEstimate, hashValue, flowDistinguisher, fsName, descr1, descr2, queueNoteFn)
 	// req == nil means that the request was rejected - no remaining
 	// concurrency shares and at max queue length already
 	if req == nil {
@@ -412,6 +430,11 @@ func (req *request) wait() (bool, bool) {
 	// The final step is to wait on a decision from
 	// somewhere and then act on it.
 	decisionAny := req.decision.Get()
+
+	if req.queueWaitDeadlineCtxCancel != nil {
+		req.queueWaitDeadlineCtxCancel()
+	}
+
 	qs.lockAndSyncTime(req.ctx)
 	defer qs.lock.Unlock()
 	if req.waitStarted {
@@ -422,13 +445,8 @@ func (req *request) wait() (bool, bool) {
 	}
 	req.waitStarted = true
 	switch decisionAny {
-	case decisionReject:
-		klog.V(5).Infof("QS(%s): request %#+v %#+v timed out after being enqueued\n", qs.qCfg.Name, req.descr1, req.descr2)
-		qs.totRequestsRejected++
-		qs.totRequestsTimedout++
-		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "time-out")
-		return false, qs.isIdleLocked()
 	case decisionCancel:
+		klog.V(5).Infof("QS(%s): request %#+v %#+v queue wait time exceeded after being enqueued\n", qs.qCfg.Name, req.descr1, req.descr2)
 	case decisionExecute:
 		klog.V(5).Infof("QS(%s): Dispatching request %#+v %#+v from its queue", qs.qCfg.Name, req.descr1, req.descr2)
 		return true, false
@@ -438,7 +456,7 @@ func (req *request) wait() (bool, bool) {
 	}
 	// TODO(aaron-prindle) add metrics for this case
 	klog.V(5).Infof("QS(%s): Ejecting request %#+v %#+v from its queue", qs.qCfg.Name, req.descr1, req.descr2)
-	// remove the request from the queue as it has timed out
+	// remove the request from the queue as its queue wait time has exceeded
 	queue := req.queue
 	if req.removeFromQueueLocked() != nil {
 		defer qs.boundNextDispatchLocked(queue)
@@ -446,7 +464,7 @@ func (req *request) wait() (bool, bool) {
 		qs.totSeatsWaiting -= req.MaxSeats()
 		qs.totRequestsRejected++
 		qs.totRequestsCancelled++
-		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "cancelled")
+		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "time-out")
 		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 		metrics.AddSeatsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -req.MaxSeats())
 		req.NoteQueued(false)
@@ -556,44 +574,41 @@ func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 	return math.Min(float64(seatsRequested), float64(qs.dCfg.ConcurrencyLimit)) / float64(activeQueues)
 }
 
-// timeoutOldRequestsAndRejectOrEnqueueLocked encapsulates the logic required
+// rejectOrEnqueueLocked encapsulates the logic required
 // to validate and enqueue a request for the queueSet/QueueSet:
 // 1) Start with shuffle sharding, to pick a queue.
-// 2) Reject old requests that have been waiting too long
-// 3) Reject current request if there is not enough concurrency shares and
+// 2) Reject current request if there is not enough concurrency shares and
 // we are at max queue length
-// 4) If not rejected, create a request and enqueue
+// 3) If not rejected, create a request and enqueue
 // returns the enqueud request on a successful enqueue
 // returns nil in the case that there is no available concurrency or
 // the queuelengthlimit has been reached
-func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Context, workEstimate *fqrequest.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) *request {
+func (qs *queueSet) rejectOrEnqueueLocked(ctx context.Context, workEstimate *fqrequest.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) *request {
 	// Start with the shuffle sharding, to pick a queue.
 	queueIdx := qs.shuffleShardLocked(hashValue, descr1, descr2)
 	queue := qs.queues[queueIdx]
-	// The next step is the logic to reject requests that have been waiting too long
-	qs.removeTimedOutRequestsFromQueueToBoundLocked(queue, fsName)
-	// NOTE: currently timeout is only checked for each new request.  This means that there can be
-	// requests that are in the queue longer than the timeout if there are no new requests
-	// We prefer the simplicity over the promptness, at least for now.
 
 	defer qs.boundNextDispatchLocked(queue)
 
+	queueWaitDeadlineCtx, queueWaitDeadlineCtxCancel := qs.queueWaitContextFactory.GetQueueWaitContext(ctx, qs.qCfg.RequestWaitLimit)
 	// Create a request and enqueue
 	req := &request{
-		qs:                qs,
-		fsName:            fsName,
-		flowDistinguisher: flowDistinguisher,
-		ctx:               ctx,
-		decision:          qs.promiseFactory(nil, ctx, decisionCancel),
-		arrivalTime:       qs.clock.Now(),
-		arrivalR:          qs.currentR,
-		queue:             queue,
-		descr1:            descr1,
-		descr2:            descr2,
-		queueNoteFn:       queueNoteFn,
-		workEstimate:      qs.completeWorkEstimate(workEstimate),
+		qs:                         qs,
+		fsName:                     fsName,
+		flowDistinguisher:          flowDistinguisher,
+		ctx:                        ctx,
+		decision:                   qs.promiseFactory(nil, queueWaitDeadlineCtx, decisionCancel),
+		queueWaitDeadlineCtxCancel: queueWaitDeadlineCtxCancel,
+		arrivalTime:                qs.clock.Now(),
+		arrivalR:                   qs.currentR,
+		queue:                      queue,
+		descr1:                     descr1,
+		descr2:                     descr2,
+		queueNoteFn:                queueNoteFn,
+		workEstimate:               qs.completeWorkEstimate(workEstimate),
 	}
 	if ok := qs.rejectOrEnqueueToBoundLocked(req); !ok {
+		queueWaitDeadlineCtxCancel()
 		return nil
 	}
 	metrics.ObserveQueueLength(ctx, qs.qCfg.Name, fsName, queue.requestsWaiting.Length())
@@ -631,44 +646,6 @@ func (qs *queueSet) shuffleShardLocked(hashValue uint64, descr1, descr2 interfac
 		klogV.Infof("QS(%s) at t=%s R=%v: For request %#+v %#+v chose queue %d, with sum: %#v & %d seats in use & nextDispatchR=%v", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.currentR, descr1, descr2, bestQueueIdx, chosenQueue.requestsWaiting.QueueSum(), chosenQueue.seatsInUse, chosenQueue.nextDispatchR)
 	}
 	return bestQueueIdx
-}
-
-// removeTimedOutRequestsFromQueueToBoundLocked rejects old requests that have been enqueued
-// past the requestWaitLimit
-func (qs *queueSet) removeTimedOutRequestsFromQueueToBoundLocked(queue *queue, fsName string) {
-	timeoutCount := 0
-	disqueueSeats := 0
-	now := qs.clock.Now()
-	reqs := queue.requestsWaiting
-	// reqs are sorted oldest -> newest
-	// can short circuit loop (break) if oldest requests are not timing out
-	// as newer requests also will not have timed out
-
-	// now - requestWaitLimit = arrivalLimit
-	arrivalLimit := now.Add(-qs.qCfg.RequestWaitLimit)
-	reqs.Walk(func(req *request) bool {
-		if arrivalLimit.After(req.arrivalTime) {
-			if req.decision.Set(decisionReject) && req.removeFromQueueLocked() != nil {
-				timeoutCount++
-				disqueueSeats += req.MaxSeats()
-				req.NoteQueued(false)
-				metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
-				metrics.AddSeatsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -req.MaxSeats())
-			}
-			// we need to check if the next request has timed out.
-			return true
-		}
-		// since reqs are sorted oldest -> newest, we are done here.
-		return false
-	})
-
-	// remove timed out requests from queue
-	if timeoutCount > 0 {
-		qs.totRequestsWaiting -= timeoutCount
-		qs.totSeatsWaiting -= disqueueSeats
-		qs.reqsGaugePair.RequestsWaiting.Add(float64(-timeoutCount))
-		qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
-	}
 }
 
 // rejectOrEnqueueToBoundLocked rejects or enqueues the newly arrived

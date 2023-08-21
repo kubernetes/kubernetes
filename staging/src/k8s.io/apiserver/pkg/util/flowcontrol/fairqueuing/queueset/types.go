@@ -54,6 +54,13 @@ type request struct {
 	// decision.Get is called without the queueSet locked.
 	decision promise.WriteOnce
 
+	// queueWaitDeadlineCtxCancel is the context.CancelFunc
+	// associated with the queue wait deadline context.
+	// It is nil if a request is not enqueued.
+	// This should be called as soon as the request queue wait
+	// is over in order to prevent memory leaking.
+	queueWaitDeadlineCtxCancel context.CancelFunc
+
 	// arrivalTime is the real time when the request entered this system
 	arrivalTime time.Time
 
