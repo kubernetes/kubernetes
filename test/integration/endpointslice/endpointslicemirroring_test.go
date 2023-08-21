@@ -613,6 +613,196 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 	}
 }
 
+func TestEndpointSliceMirroringSelectorTransition2(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	resyncPeriod := 12 * time.Hour
+	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
+
+	epsController := endpointslice.NewController(
+		ctx,
+		informers.Core().V1().Pods(),
+		informers.Core().V1().Services(),
+		informers.Core().V1().Nodes(),
+		informers.Discovery().V1().EndpointSlices(),
+		int32(100),
+		client,
+		1*time.Second)
+
+	epsmController := endpointslicemirroring.NewController(
+		ctx,
+		informers.Core().V1().Endpoints(),
+		informers.Discovery().V1().EndpointSlices(),
+		informers.Core().V1().Services(),
+		int32(100),
+		client,
+		1*time.Second)
+
+	// Start informer and controllers
+	defer cancel()
+	informers.Start(ctx.Done())
+	go epsController.Run(ctx, 5)
+	go epsmController.Run(ctx, 5)
+
+	testCases := []struct {
+		testName               string
+		startingSelector       map[string]string
+		startingSlices         int
+		startingMirroredSlices int
+		updatingSelector       map[string]string
+		updatingSlices         int
+		updatingMirroredSlices int
+		endingSelector         map[string]string
+		endingSlices           int
+		endingMirroredSlices   int
+	}{
+		{
+			testName:               "nil -> {foo: bar} selector -> nil",
+			startingSelector:       nil,
+			startingSlices:         0,
+			startingMirroredSlices: 1,
+			updatingSelector:       map[string]string{"foo": "bar"},
+			updatingSlices:         1,
+			updatingMirroredSlices: 0,
+			endingSelector:         nil,
+			endingSlices:           0,
+			endingMirroredSlices:   1,
+		},
+		{
+			testName:               "{foo: bar} -> nil selector -> {foo: bar}",
+			startingSelector:       map[string]string{"foo": "bar"},
+			startingSlices:         1,
+			startingMirroredSlices: 0,
+			updatingSelector:       nil,
+			updatingSlices:         0,
+			updatingMirroredSlices: 1,
+			endingSelector:         map[string]string{"foo": "bar"},
+			endingSlices:           1,
+			endingMirroredSlices:   0,
+		},
+		{
+			testName:               "{} -> {foo: bar} selector -> {}",
+			startingSelector:       map[string]string{},
+			startingSlices:         0,
+			startingMirroredSlices: 1,
+			updatingSelector:       map[string]string{"foo": "bar"},
+			updatingSlices:         1,
+			updatingMirroredSlices: 0,
+			endingSelector:         map[string]string{},
+			endingSlices:           0,
+			endingMirroredSlices:   1,
+		},
+		{
+			testName:               "{foo: bar} -> {} selector -> {foo: bar}",
+			startingSelector:       map[string]string{"foo": "bar"},
+			startingSlices:         1,
+			startingMirroredSlices: 0,
+			updatingSelector:       map[string]string{},
+			updatingSlices:         0,
+			updatingMirroredSlices: 1,
+			endingSelector:         map[string]string{"foo": "bar"},
+			endingSlices:           1,
+			endingMirroredSlices:   0,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			ns := framework.CreateNamespaceOrDie(client, fmt.Sprintf("test-endpointslice-mirroring-%d", i), t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
+			meta := metav1.ObjectMeta{Name: "test-123", Namespace: ns.Name}
+
+			service := &corev1.Service{
+				ObjectMeta: meta,
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{{
+						Port: int32(80),
+					}},
+					Selector: tc.startingSelector,
+				},
+			}
+
+			customEndpoints := &corev1.Endpoints{
+				ObjectMeta: meta,
+				Subsets: []corev1.EndpointSubset{{
+					Ports: []corev1.EndpointPort{{
+						Port: 80,
+					}},
+					Addresses: []corev1.EndpointAddress{{
+						IP: "10.0.0.1",
+					}},
+				}},
+			}
+
+			_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Error creating service: %v", err)
+			}
+
+			_, err = client.CoreV1().Endpoints(ns.Name).Create(context.TODO(), customEndpoints, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Error creating endpoints: %v", err)
+			}
+
+			// verify the expected number of slices exist
+			err = waitForSlices(context.Background(), t, client, ns.Name, service.Name, tc.startingSlices)
+			if err != nil {
+				t.Fatalf("Timed out waiting for initial mirrored slices to match expectations: %v", err)
+			}
+
+			// verify the expected number of mirrored slices exist
+			err = waitForMirroredSlices(t, client, ns.Name, service.Name, tc.startingMirroredSlices)
+			if err != nil {
+				t.Fatalf("Timed out waiting for initial mirrored slices to match expectations: %v", err)
+			}
+
+			service.Spec.Selector = tc.updatingSelector
+			_, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("Error updating service: %v", err)
+			}
+
+			// verify the expected number of slices exist
+			err = waitForSlices(context.Background(), t, client, ns.Name, service.Name, tc.updatingSlices)
+			if err != nil {
+				t.Fatalf("Timed out waiting for initial mirrored slices to match expectations: %v", err)
+			}
+
+			// verify the expected number of mirrored slices exist
+			err = waitForMirroredSlices(t, client, ns.Name, service.Name, tc.updatingMirroredSlices)
+			if err != nil {
+				t.Fatalf("Timed out waiting for initial mirrored slices to match expectations: %v", err)
+			}
+
+			service.Spec.Selector = tc.endingSelector
+			_, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("Error updating service: %v", err)
+			}
+
+			// verify the expected number of slices exist
+			err = waitForSlices(context.Background(), t, client, ns.Name, service.Name, tc.endingSlices)
+			if err != nil {
+				t.Fatalf("Timed out waiting for initial mirrored slices to match expectations: %v", err)
+			}
+
+			// verify the expected number of mirrored slices exist
+			err = waitForMirroredSlices(t, client, ns.Name, service.Name, tc.endingMirroredSlices)
+			if err != nil {
+				t.Fatalf("Timed out waiting for final mirrored slices to match expectations: %v", err)
+			}
+		})
+	}
+}
+
 func waitForMirroredSlices(t *testing.T, client *clientset.Clientset, nsName, svcName string, num int) error {
 	t.Helper()
 	return wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
@@ -626,6 +816,26 @@ func waitForMirroredSlices(t *testing.T, client *clientset.Clientset, nsName, sv
 
 		if len(esList.Items) != num {
 			t.Logf("Expected %d slices to be mirrored, got %d", num, len(esList.Items))
+			return false, nil
+		}
+
+		return true, nil
+	})
+}
+
+func waitForSlices(ctx context.Context, t *testing.T, client *clientset.Clientset, nsName, svcName string, num int) error {
+	t.Helper()
+	return wait.PollUntilContextTimeout(ctx, time.Second*1, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+		lSelector := discovery.LabelServiceName + "=" + svcName
+		lSelector += "," + discovery.LabelManagedBy + "=endpointslice-controller.k8s.io"
+		esList, err := client.DiscoveryV1().EndpointSlices(nsName).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
+		if err != nil {
+			t.Logf("Error listing EndpointSlices: %v", err)
+			return false, err
+		}
+
+		if len(esList.Items) != num {
+			t.Logf("Expected %d slices to be created, but got %d", num, len(esList.Items))
 			return false, nil
 		}
 

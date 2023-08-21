@@ -347,12 +347,6 @@ func (c *Controller) syncService(logger klog.Logger, key string) error {
 		return nil
 	}
 
-	if service.Spec.Selector == nil {
-		// services without a selector receive no endpoint slices from this controller;
-		// these services will receive endpoint slices that are created out-of-band via the REST API.
-		return nil
-	}
-
 	logger.V(5).Info("About to update endpoint slices for service", "key", key)
 
 	podLabelSelector := labels.Set(service.Spec.Selector).AsSelectorPreValidated()

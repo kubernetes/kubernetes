@@ -74,6 +74,14 @@ func (r *Reconciler) Reconcile(logger klog.Logger, service *corev1.Service, pods
 	// addresses that this service supports [o(1) find]
 	serviceSupportedAddressesTypes := getAddressTypesForService(logger, service)
 
+	if service.Spec.Selector == nil {
+		// Ensure existing endpoint slices managed by service are deleted when selector
+		// is made to be empty for the service.
+		// services without a selector receive no endpoint slices from this controller;
+		// these services will receive endpoint slices that are created out-of-band via the REST API.
+		return r.DeleteEndpointSlices(service, existingSlices)
+	}
+
 	// loop through slices identifying their address type.
 	// slices that no longer match address type supported by services
 	// go to delete, other slices goes to the Reconciler machinery
@@ -585,4 +593,18 @@ func (r *Reconciler) ManagedByChanged(endpointSlice1, endpointSlice2 *discovery.
 func (r *Reconciler) ManagedByController(endpointSlice *discovery.EndpointSlice) bool {
 	managedBy := endpointSlice.Labels[discovery.LabelManagedBy]
 	return managedBy == r.controllerName
+}
+
+func (r *Reconciler) DeleteEndpointSlices(service *corev1.Service, slicesToDelete []*discovery.EndpointSlice) error {
+	errs := []error{}
+	for _, sliceToDelete := range slicesToDelete {
+		err := r.client.DiscoveryV1().EndpointSlices(service.Namespace).Delete(context.TODO(), sliceToDelete.Name, metav1.DeleteOptions{})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error deleting %s EndpointSlice for Service %s/%s: %w", sliceToDelete.Name, service.Namespace, service.Name, err))
+		} else {
+			r.endpointSliceTracker.ExpectDeletion(sliceToDelete)
+			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }

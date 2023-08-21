@@ -19,6 +19,7 @@ package network
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -27,6 +28,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -730,6 +732,214 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 	})
 
+	ginkgo.It("should delete EndpointSlices and create mirrored EndpointSlices when Service selector is made to empty", func(ctx context.Context) {
+		pod := podClient.Create(ctx, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod1",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "container1",
+						Image: imageutils.GetE2EImage(imageutils.Nginx),
+						Ports: []v1.ContainerPort{{
+							Name:          "example-name",
+							ContainerPort: int32(3000),
+						}},
+					},
+				},
+			},
+		})
+
+		// Expect pod is up and running.
+		gomega.Eventually(ctx, func() error {
+			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if len(pod.Status.PodIPs) == 0 {
+				return fmt.Errorf("PodIP not assigned for pod %s", pod.Name)
+			}
+			return nil
+		}, 3*time.Minute, 5*time.Second).Should(gomega.BeNil())
+
+		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-empty-selector",
+			},
+			Spec: v1.ServiceSpec{
+				Selector: map[string]string{
+					"foo": "bar",
+				},
+				Ports: []v1.ServicePort{{
+					Name:     "example",
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+				}},
+			},
+		})
+
+		// Expect Endpoints resource to be created.
+		gomega.Eventually(ctx, func() error {
+			_, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+			return err
+		}, wait.ForeverTestTimeout, 2*time.Second).Should(gomega.BeNil())
+
+		// Expect EndpointSlice resource to be created.
+		var endpointSlice discoveryv1.EndpointSlice
+		gomega.Eventually(ctx, func() error {
+			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
+			})
+			if err != nil {
+				return err
+			}
+			if len(endpointSliceList.Items) == 0 {
+				return errors.New("endpoint slice is not created yet")
+			}
+			endpointSlice = endpointSliceList.Items[0]
+			return nil
+		}, wait.ForeverTestTimeout, 2*time.Second).Should(gomega.BeNil())
+
+		// Ensure EndpointSlice has expected values.
+		managedBy, ok := endpointSlice.Labels[discoveryv1.LabelManagedBy]
+		expectedManagedBy := "endpointslice-controller.k8s.io"
+		if !ok {
+			framework.Failf("Expected EndpointSlice to have %s label, got %#v", discoveryv1.LabelManagedBy, endpointSlice.Labels)
+		} else if managedBy != expectedManagedBy {
+			framework.Failf("Expected EndpointSlice to have %s label with %s value, got %s", discoveryv1.LabelManagedBy, expectedManagedBy, managedBy)
+		}
+		if len(endpointSlice.Endpoints) != 1 {
+			framework.Failf("Expected EndpointSlice to have 1 endpoint, got %d: %#v", len(endpointSlice.Endpoints), endpointSlice.Endpoints)
+		}
+
+		// Update the service with empty selector
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			serviceToUpdate, err := cs.CoreV1().Services(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			serviceToUpdate.Spec.Selector = nil
+			_, err = cs.CoreV1().Services(svc.Namespace).Update(ctx, serviceToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+
+		// Expect Endpoints resource to be still available.
+		gomega.Eventually(ctx, func() error {
+			_, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+			return err
+		}, wait.ForeverTestTimeout, 2*time.Second).Should(gomega.BeNil())
+
+		// Expect EndpointSlice resource mananged by endpointslice-controller.k8s.io to be deleted
+		// when Service is is updated with empty selector. Wait for up to 90 seconds since garbage
+		// collector only polls every 30 seconds and may need to retry informer resync at some point
+		// during an e2e run.
+		label := make(map[string]string)
+		label[discoveryv1.LabelManagedBy] = "endpointslice-controller.k8s.io"
+		label["kubernetes.io/service-name"] = svc.Name
+		selector := labels.Set(label).AsSelector()
+		gomega.Eventually(ctx, func() error {
+			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: selector.String(),
+			})
+			if err != nil {
+				return err
+			}
+			if len(endpointSliceList.Items) == 0 {
+				return nil
+			}
+			return errors.New("endpointslice object still exists")
+		}, wait.ForeverTestTimeout, 2*time.Second).Should(gomega.BeNil())
+
+		// Expect ownership of EndpointSlice is transferred by endpointslicemirroring-controller for the endpoints.
+		gomega.Eventually(ctx, func() error {
+			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
+			})
+			if err != nil {
+				return err
+			}
+			if len(endpointSliceList.Items) == 0 {
+				return errors.New("endpoint slice is not created yet")
+			}
+			endpointSlice = endpointSliceList.Items[0]
+			return nil
+		}, wait.ForeverTestTimeout, 2*time.Second).Should(gomega.BeNil())
+
+		// Ensure mirrored EndpointSlice has expected values.
+		managedBy, ok = endpointSlice.Labels[discoveryv1.LabelManagedBy]
+		expectedManagedBy = "endpointslicemirroring-controller.k8s.io"
+		if !ok {
+			framework.Failf("Expected EndpointSlice to have %s label, got %#v", discoveryv1.LabelManagedBy, endpointSlice.Labels)
+		} else if managedBy != expectedManagedBy {
+			framework.Failf("Expected EndpointSlice to have %s label with %s value, got %s", discoveryv1.LabelManagedBy, expectedManagedBy, managedBy)
+		}
+		if len(endpointSlice.Endpoints) != 1 {
+			framework.Failf("Expected EndpointSlice to have 1 endpoint, got %d: %#v", len(endpointSlice.Endpoints), endpointSlice.Endpoints)
+		}
+
+		// Update the service with non empty selector
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			serviceToUpdate, err := cs.CoreV1().Services(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			serviceToUpdate.Spec.Selector = map[string]string{"foo": "bar"}
+			_, err = cs.CoreV1().Services(svc.Namespace).Update(ctx, serviceToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+
+		// Expect EndpointSlice mirroing resource mananged by endpointslicemirroring-controller.k8s.io to be deleted
+		// when Service is updated back with selector labels.
+		label = make(map[string]string)
+		label[discoveryv1.LabelManagedBy] = "endpointslicemirroring-controller.k8s.io"
+		label["kubernetes.io/service-name"] = svc.Name
+		selector = labels.Set(label).AsSelector()
+		gomega.Eventually(ctx, func() error {
+			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: selector.String(),
+			})
+			if err != nil {
+				return err
+			}
+			if len(endpointSliceList.Items) == 0 {
+				return nil
+			}
+			return errors.New("endpointslice mirror object still exists")
+		}, wait.ForeverTestTimeout, 2*time.Second).Should(gomega.BeNil())
+
+		// Expect EndpointSlice resource to be recreated.
+		gomega.Eventually(ctx, func() error {
+			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
+			})
+			if err != nil {
+				return err
+			}
+			if len(endpointSliceList.Items) == 0 {
+				return errors.New("endpoint slice is not created yet")
+			}
+			endpointSlice = endpointSliceList.Items[0]
+			return nil
+		}, wait.ForeverTestTimeout, 2*time.Second).Should(gomega.BeNil())
+
+		// Ensure EndpointSlice has expected values.
+		managedBy, ok = endpointSlice.Labels[discoveryv1.LabelManagedBy]
+		expectedManagedBy = "endpointslice-controller.k8s.io"
+		if !ok {
+			framework.Failf("Expected EndpointSlice to have %s label, got %#v", discoveryv1.LabelManagedBy, endpointSlice.Labels)
+		} else if managedBy != expectedManagedBy {
+			framework.Failf("Expected EndpointSlice to have %s label with %s value, got %s", discoveryv1.LabelManagedBy, expectedManagedBy, managedBy)
+		}
+		if len(endpointSlice.Endpoints) != 1 {
+			framework.Failf("Expected EndpointSlice to have 1 endpoint, got %d: %#v", len(endpointSlice.Endpoints), endpointSlice.Endpoints)
+		}
+	})
 })
 
 // expectEndpointsAndSlices verifies that Endpoints and EndpointSlices exist for
