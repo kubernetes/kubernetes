@@ -440,7 +440,7 @@ type PersistentVolumeClaimSpec struct {
 	// that are lower than previous value but must still be higher than capacity recorded in the
 	// status field of the claim.
 	// +optional
-	Resources ResourceRequirements
+	Resources VolumeResourceRequirements
 	// VolumeName is the binding reference to the PersistentVolume backing this
 	// claim. When set to non-empty value Selector is not evaluated
 	// +optional
@@ -2280,6 +2280,18 @@ type ResourceRequirements struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	Claims []ResourceClaim
+}
+
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
+type VolumeResourceRequirements struct {
+	// Limits describes the maximum amount of compute resources allowed.
+	// +optional
+	Limits ResourceList
+	// Requests describes the minimum amount of compute resources required.
+	// If Request is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value
+	// +optional
+	Requests ResourceList
 }
 
 // ResourceClaim references one entry in PodSpec.ResourceClaims.

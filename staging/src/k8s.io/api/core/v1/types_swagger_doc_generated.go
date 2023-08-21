@@ -2573,6 +2573,16 @@ func (VolumeProjection) SwaggerDoc() map[string]string {
 	return map_VolumeProjection
 }
 
+var map_VolumeResourceRequirements = map[string]string{
+	"":         "VolumeResourceRequirements describes the storage resource requirements for a volume.",
+	"limits":   "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+	"requests": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+}
+
+func (VolumeResourceRequirements) SwaggerDoc() map[string]string {
+	return map_VolumeResourceRequirements
+}
+
 var map_VolumeSource = map[string]string{
 	"":                      "Represents the source of a volume to mount. Only one of its members may be specified.",
 	"hostPath":              "hostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",

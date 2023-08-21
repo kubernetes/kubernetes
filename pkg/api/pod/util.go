@@ -608,16 +608,6 @@ func dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec *api.PodSpe
 		dropEphemeralResourceClaimRequests(podSpec.EphemeralContainers)
 		podSpec.ResourceClaims = nil
 	}
-
-	// Setting VolumeClaimTemplate.Resources.Claims should have been
-	// treated as an error by validation when extending
-	// ResourceRequirements in 1.26. Now we can only accept it and drop the
-	// field.
-	for i := range podSpec.Volumes {
-		if podSpec.Volumes[i].Ephemeral != nil && podSpec.Volumes[i].Ephemeral.VolumeClaimTemplate != nil {
-			podSpec.Volumes[i].Ephemeral.VolumeClaimTemplate.Spec.Resources.Claims = nil
-		}
-	}
 }
 
 func dynamicResourceAllocationInUse(podSpec *api.PodSpec) bool {
