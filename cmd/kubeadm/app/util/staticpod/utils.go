@@ -295,7 +295,7 @@ func GetAPIServerProbeAddress(endpoint *kubeadmapi.APIEndpoint) string {
 
 // GetControllerManagerProbeAddress returns the kubernetes controller manager probe address
 func GetControllerManagerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
-	if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerBindAddressArg]; exists {
+	if addr, idx := kubeadmapi.GetArgValue(cfg.ControllerManager.ExtraArgs, kubeControllerManagerBindAddressArg, -1); idx > -1 {
 		return getProbeAddress(addr)
 	}
 	return "127.0.0.1"
@@ -303,7 +303,7 @@ func GetControllerManagerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) stri
 
 // GetSchedulerProbeAddress returns the kubernetes scheduler probe address
 func GetSchedulerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
-	if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerBindAddressArg]; exists {
+	if addr, idx := kubeadmapi.GetArgValue(cfg.Scheduler.ExtraArgs, kubeSchedulerBindAddressArg, -1); idx > -1 {
 		return getProbeAddress(addr)
 	}
 	return "127.0.0.1"
@@ -320,7 +320,7 @@ func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd, isIPv6 bool) (string, int32, v1.
 	if cfg.Local == nil || cfg.Local.ExtraArgs == nil {
 		return localhost, kubeadmconstants.EtcdMetricsPort, v1.URISchemeHTTP
 	}
-	if arg, exists := cfg.Local.ExtraArgs["listen-metrics-urls"]; exists {
+	if arg, idx := kubeadmapi.GetArgValue(cfg.Local.ExtraArgs, "listen-metrics-urls", -1); idx > -1 {
 		// Use the first url in the listen-metrics-urls if multiple URL's are specified.
 		arg = strings.Split(arg, ",")[0]
 		parsedURL, err := url.Parse(arg)

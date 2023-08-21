@@ -375,11 +375,11 @@ func TestGetAPIServerCommand(t *testing.T) {
 				CertificatesDir: testCertsDir,
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
-						ExtraArgs: map[string]string{
-							"service-cluster-ip-range": "baz",
-							"advertise-address":        "9.9.9.9",
-							"audit-policy-file":        "/etc/config/audit.yaml",
-							"audit-log-path":           "/var/log/kubernetes",
+						ExtraArgs: []kubeadmapi.Arg{
+							{Name: "service-cluster-ip-range", Value: "baz"},
+							{Name: "advertise-address", Value: "9.9.9.9"},
+							{Name: "audit-policy-file", Value: "/etc/config/audit.yaml"},
+							{Name: "audit-log-path", Value: "/var/log/kubernetes"},
 						},
 					},
 				},
@@ -425,8 +425,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				CertificatesDir: testCertsDir,
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
-						ExtraArgs: map[string]string{
-							"authorization-mode": kubeadmconstants.ModeABAC,
+						ExtraArgs: []kubeadmapi.Arg{
+							{Name: "authorization-mode", Value: kubeadmconstants.ModeABAC},
 						},
 					},
 				},
@@ -470,12 +470,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				CertificatesDir: testCertsDir,
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
-						ExtraArgs: map[string]string{
-							"authorization-mode": strings.Join([]string{
+						ExtraArgs: []kubeadmapi.Arg{
+							{Name: "authorization-mode", Value: strings.Join([]string{
 								kubeadmconstants.ModeNode,
 								kubeadmconstants.ModeRBAC,
 								kubeadmconstants.ModeWebhook,
-							}, ","),
+							}, ",")},
 						},
 					},
 				},
@@ -660,7 +660,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking: kubeadmapi.Networking{PodSubnet: "10.0.1.15/16", DNSDomain: "cluster.local"},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
+					ExtraArgs: []kubeadmapi.Arg{{Name: "node-cidr-mask-size", Value: "20"}},
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
@@ -726,7 +726,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 					DNSDomain:     "cluster.local",
 				},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"allocate-node-cidrs": "false"},
+					ExtraArgs: []kubeadmapi.Arg{{Name: "allocate-node-cidrs", Value: "false"}},
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
@@ -790,7 +790,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 					DNSDomain: "cluster.local",
 				},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv4": "20", "node-cidr-mask-size-ipv6": "80"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "node-cidr-mask-size-ipv4", Value: "20"},
+						{Name: "node-cidr-mask-size-ipv6", Value: "80"},
+					},
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,

@@ -176,7 +176,7 @@ func TestGetEtcdCommand(t *testing.T) {
 		name             string
 		advertiseAddress string
 		nodeName         string
-		extraArgs        map[string]string
+		extraArgs        []kubeadmapi.Arg
 		initialCluster   []etcdutil.Member
 		expected         []string
 	}{
@@ -243,9 +243,9 @@ func TestGetEtcdCommand(t *testing.T) {
 			name:             "Extra args",
 			advertiseAddress: "1.2.3.4",
 			nodeName:         "bar",
-			extraArgs: map[string]string{
-				"listen-client-urls":    "https://10.0.1.10:2379",
-				"advertise-client-urls": "https://10.0.1.10:2379",
+			extraArgs: []kubeadmapi.Arg{
+				{Name: "listen-client-urls", Value: "https://10.0.1.10:2379"},
+				{Name: "advertise-client-urls", Value: "https://10.0.1.10:2379"},
 			},
 			expected: []string{
 				"etcd",

@@ -254,24 +254,24 @@ func TestValidatePodSubnetNodeMask(t *testing.T) {
 	var tests = []struct {
 		name        string
 		subnet      string
-		cmExtraArgs map[string]string
+		cmExtraArgs []kubeadmapi.Arg
 		expected    bool
 	}{
 		// dual-stack:
 		{"dual IPv4 only, but mask too small. Default node-mask", "10.0.0.16/29", nil, false},
-		{"dual IPv4 only, but mask too small. Configured node-mask", "10.0.0.16/24", map[string]string{"node-cidr-mask-size-ipv4": "23"}, false},
+		{"dual IPv4 only, but mask too small. Configured node-mask", "10.0.0.16/24", []kubeadmapi.Arg{{Name: "node-cidr-mask-size-ipv4", Value: "23"}}, false},
 		{"dual IPv6 only, but mask too small. Default node-mask", "2001:db8::1/112", nil, false},
-		{"dual IPv6 only, but mask too small. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, false},
+		{"dual IPv6 only, but mask too small. Configured node-mask", "2001:db8::1/64", []kubeadmapi.Arg{{Name: "node-cidr-mask-size-ipv6", Value: "24"}}, false},
 		{"dual IPv6 only, but mask difference greater than 16. Default node-mask", "2001:db8::1/12", nil, false},
-		{"dual IPv6 only, but mask difference greater than 16. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, false},
+		{"dual IPv6 only, but mask difference greater than 16. Configured node-mask", "2001:db8::1/64", []kubeadmapi.Arg{{Name: "node-cidr-mask-size-ipv6", Value: "120"}}, false},
 		{"dual IPv4 only CIDR", "10.0.0.16/12", nil, true},
 		{"dual IPv6 only CIDR", "2001:db8::/48", nil, true},
 		{"dual, but IPv4 mask too small. Default node-mask", "10.0.0.16/29,2001:db8::/48", nil, false},
-		{"dual, but IPv4 mask too small. Configured node-mask", "10.0.0.16/24,2001:db8::/48", map[string]string{"node-cidr-mask-size-ipv4": "23"}, false},
+		{"dual, but IPv4 mask too small. Configured node-mask", "10.0.0.16/24,2001:db8::/48", []kubeadmapi.Arg{{Name: "node-cidr-mask-size-ipv4", Value: "23"}}, false},
 		{"dual, but IPv6 mask too small. Default node-mask", "2001:db8::1/112,10.0.0.16/16", nil, false},
-		{"dual, but IPv6 mask too small. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, false},
+		{"dual, but IPv6 mask too small. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", []kubeadmapi.Arg{{Name: "node-cidr-mask-size-ipv6", Value: "24"}}, false},
 		{"dual, but mask difference greater than 16. Default node-mask", "2001:db8::1/12,10.0.0.16/16", nil, false},
-		{"dual, but mask difference greater than 16. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, false},
+		{"dual, but mask difference greater than 16. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", []kubeadmapi.Arg{{Name: "node-cidr-mask-size-ipv6", Value: "120"}}, false},
 		{"dual IPv4 IPv6", "2001:db8::/48,10.0.0.16/12", nil, true},
 		{"dual IPv6 IPv4", "2001:db8::/48,10.0.0.16/12", nil, true},
 	}
@@ -1205,7 +1205,10 @@ func TestGetClusterNodeMask(t *testing.T) {
 			name: "dual ipv4 custom mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size": "21", "node-cidr-mask-size-ipv4": "23"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "node-cidr-mask-size", Value: "21"},
+						{Name: "node-cidr-mask-size-ipv4", Value: "23"},
+					},
 				},
 			},
 			isIPv6:       false,
@@ -1221,7 +1224,9 @@ func TestGetClusterNodeMask(t *testing.T) {
 			name: "dual ipv6 custom mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv6": "83"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "node-cidr-mask-size-ipv6", Value: "83"},
+					},
 				},
 			},
 			isIPv6:       true,
@@ -1231,7 +1236,9 @@ func TestGetClusterNodeMask(t *testing.T) {
 			name: "dual ipv4 custom mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv4": "23"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "node-cidr-mask-size-ipv4", Value: "23"},
+					},
 				},
 			},
 			isIPv6:       false,
@@ -1241,7 +1248,9 @@ func TestGetClusterNodeMask(t *testing.T) {
 			name: "dual ipv4 wrong mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv4": "aa"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "node-cidr-mask-size-ipv4", Value: "aa"},
+					},
 				},
 			},
 			isIPv6:        false,
@@ -1251,7 +1260,9 @@ func TestGetClusterNodeMask(t *testing.T) {
 			name: "dual ipv6 default mask and legacy flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size": "23"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "node-cidr-mask-size", Value: "23"},
+					},
 				},
 			},
 			isIPv6:       true,
@@ -1261,7 +1272,10 @@ func TestGetClusterNodeMask(t *testing.T) {
 			name: "dual ipv6 custom mask and legacy flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size": "23", "node-cidr-mask-size-ipv6": "83"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "node-cidr-mask-size", Value: "23"},
+						{Name: "node-cidr-mask-size-ipv6", Value: "83"},
+					},
 				},
 			},
 			isIPv6:       true,
@@ -1271,7 +1285,10 @@ func TestGetClusterNodeMask(t *testing.T) {
 			name: "dual ipv6 custom mask and wrong flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{"node-cidr-mask-size": "23", "node-cidr-mask-size-ipv6": "a83"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "node-cidr-mask-size", Value: "23"},
+						{Name: "node-cidr-mask-size-ipv6", Value: "a83"},
+					},
 				},
 			},
 			isIPv6:        true,
@@ -1387,6 +1404,37 @@ func TestValidateAbsolutePath(t *testing.T) {
 		actualErrors := len(actual) > 0
 		if actualErrors != tc.expectedErrors {
 			t.Errorf("error: validate absolute path: %q\n\texpected: %t\n\t  actual: %t", tc.path, tc.expectedErrors, actualErrors)
+		}
+	}
+}
+
+func TestValidateExtraArgs(t *testing.T) {
+	var tests = []struct {
+		name           string
+		args           []kubeadmapi.Arg
+		expectedErrors int
+	}{
+		{
+			name:           "valid argument",
+			args:           []kubeadmapi.Arg{{Name: "foo", Value: "bar"}},
+			expectedErrors: 0,
+		},
+		{
+			name:           "invalid one argument",
+			args:           []kubeadmapi.Arg{{Name: "", Value: "bar"}},
+			expectedErrors: 1,
+		},
+		{
+			name:           "invalid two arguments",
+			args:           []kubeadmapi.Arg{{Name: "", Value: "foo"}, {Name: "", Value: "bar"}},
+			expectedErrors: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		actual := ValidateExtraArgs(tc.args, nil)
+		if len(actual) != tc.expectedErrors {
+			t.Errorf("case %q:\n\t expected errors: %v\n\t got: %v\n\t errors: %v", tc.name, tc.expectedErrors, len(actual), actual)
 		}
 	}
 }

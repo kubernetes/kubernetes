@@ -144,12 +144,11 @@ type ClusterConfiguration struct {
 // ControlPlaneComponent holds settings common to control plane component of the cluster
 type ControlPlaneComponent struct {
 	// ExtraArgs is an extra set of flags to pass to the control plane component.
-	// A key in this map is the flag name as it appears on the
-	// command line except without leading dash(es).
-	// TODO: This is temporary and ideally we would like to switch all components to
-	// use ComponentConfig + ConfigMaps.
+	// An argument name in this list is the flag name as it appears on the
+	// command line except without leading dash(es). Extra arguments will override existing
+	// default arguments. Duplicate extra arguments are allowed.
 	// +optional
-	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
+	ExtraArgs []Arg `json:"extraArgs,omitempty"`
 
 	// ExtraVolumes is an extra set of host volumes, mounted to the control plane component.
 	// +optional
@@ -232,10 +231,10 @@ type NodeRegistrationOptions struct {
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config ConfigMap
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
-	// A key in this map is the flag name as it appears on the
-	// command line except without leading dash(es).
+	// An argument name in this list is the flag name as it appears on the command line except without leading dash(es).
+	// Extra arguments will override existing default arguments. Duplicate extra arguments are allowed.
 	// +optional
-	KubeletExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
+	KubeletExtraArgs []Arg `json:"kubeletExtraArgs,omitempty"`
 
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered, e.g. 'IsPrivilegedUser,Swap'.
 	// Value 'all' ignores errors from all checks.
@@ -287,10 +286,11 @@ type LocalEtcd struct {
 
 	// ExtraArgs are extra arguments provided to the etcd binary
 	// when run inside a static pod.
-	// A key in this map is the flag name as it appears on the
-	// command line except without leading dash(es).
+	// An argument name in this list is the flag name as it appears on the
+	// command line except without leading dash(es). Extra arguments will override existing
+	// default arguments. Duplicate extra arguments are allowed.
 	// +optional
-	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
+	ExtraArgs []Arg `json:"extraArgs,omitempty"`
 
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
 	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
@@ -499,4 +499,10 @@ type ResetConfiguration struct {
 	// The list of phases can be obtained with the "kubeadm reset phase --help" command.
 	// +optional
 	SkipPhases []string `json:"skipPhases,omitempty"`
+}
+
+// Arg represents an argument with a name and a value.
+type Arg struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }

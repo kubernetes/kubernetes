@@ -107,7 +107,7 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "no controller manager extra args leads to 127.0.0.1 being used",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{},
+					ExtraArgs: []kubeadmapi.Arg{},
 				},
 			},
 			expected: "127.0.0.1",
@@ -116,8 +116,8 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "setting controller manager extra address arg to something acknowledges it",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeControllerManagerBindAddressArg: "10.10.10.10",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeControllerManagerBindAddressArg, Value: "10.10.10.10"},
 					},
 				},
 			},
@@ -127,8 +127,8 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "setting controller manager extra ipv6 address arg to something acknowledges it",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeControllerManagerBindAddressArg: "2001:abcd:bcda::1",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeControllerManagerBindAddressArg, Value: "2001:abcd:bcda::1"},
 					},
 				},
 			},
@@ -138,8 +138,8 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "setting controller manager extra address arg to 0.0.0.0 returns empty",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeControllerManagerBindAddressArg: "0.0.0.0",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeControllerManagerBindAddressArg, Value: "0.0.0.0"},
 					},
 				},
 			},
@@ -149,8 +149,8 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			desc: "setting controller manager extra ipv6 address arg to :: returns empty",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeControllerManagerBindAddressArg: "::",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeControllerManagerBindAddressArg, Value: "::"},
 					},
 				},
 			},
@@ -178,7 +178,7 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "no scheduler extra args leads to 127.0.0.1 being used",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{},
+					ExtraArgs: []kubeadmapi.Arg{},
 				},
 			},
 			expected: "127.0.0.1",
@@ -187,8 +187,8 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "setting scheduler extra address arg to something acknowledges it",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeSchedulerBindAddressArg: "10.10.10.10",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeSchedulerBindAddressArg, Value: "10.10.10.10"},
 					},
 				},
 			},
@@ -198,8 +198,8 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "setting scheduler extra ipv6 address arg to something acknowledges it",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeSchedulerBindAddressArg: "2001:abcd:bcda::1",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeSchedulerBindAddressArg, Value: "2001:abcd:bcda::1"},
 					},
 				},
 			},
@@ -209,8 +209,8 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "setting scheduler extra ipv6 address arg to 0.0.0.0 returns empty",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeSchedulerBindAddressArg: "0.0.0.0",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeSchedulerBindAddressArg, Value: "0.0.0.0"},
 					},
 				},
 			},
@@ -220,8 +220,8 @@ func TestGetSchedulerProbeAddress(t *testing.T) {
 			desc: "setting scheduler extra ipv6 address arg to :: returns empty",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Scheduler: kubeadmapi.ControlPlaneComponent{
-					ExtraArgs: map[string]string{
-						kubeSchedulerBindAddressArg: "::",
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: kubeSchedulerBindAddressArg, Value: "::"},
 					},
 				},
 			},
@@ -251,8 +251,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe URL from two URLs",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://1.2.3.4:1234,https://4.3.2.1:2381"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "https://1.2.3.4:1234,https://4.3.2.1:2381"},
+					},
 				},
 			},
 			isIPv6:           false,
@@ -264,8 +265,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe URL with HTTP scheme",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "http://1.2.3.4:1234"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "http://1.2.3.4:1234"},
+					},
 				},
 			},
 			isIPv6:           false,
@@ -277,8 +279,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe URL without scheme should result in defaults",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "1.2.3.4"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "1.2.3.4"},
+					},
 				},
 			},
 			isIPv6:           false,
@@ -290,8 +293,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe URL without port",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://1.2.3.4"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "https://1.2.3.4"},
+					},
 				},
 			},
 			isIPv6:           false,
@@ -303,8 +307,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe URL from two IPv6 URLs",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://[2001:abcd:bcda::1]:1234,https://[2001:abcd:bcda::2]:2381"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "https://[2001:abcd:bcda::1]:1234,https://[2001:abcd:bcda::2]:2381"},
+					},
 				},
 			},
 			isIPv6:           true,
@@ -316,8 +321,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe localhost IPv6 URL with HTTP scheme",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "http://[::1]:1234"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "http://[::1]:1234"},
+					},
 				},
 			},
 			isIPv6:           true,
@@ -329,8 +335,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe IPv6 URL with HTTP scheme",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "http://[2001:abcd:bcda::1]:1234"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "http://[2001:abcd:bcda::1]:1234"},
+					},
 				},
 			},
 			isIPv6:           true,
@@ -342,8 +349,9 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			name: "etcd probe IPv6 URL without port",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-metrics-urls": "https://[2001:abcd:bcda::1]"},
+					ExtraArgs: []kubeadmapi.Arg{
+						{Name: "listen-metrics-urls", Value: "https://[2001:abcd:bcda::1]"},
+					},
 				},
 			},
 			isIPv6:           true,

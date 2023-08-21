@@ -65,6 +65,8 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateDNS(&c.DNS, field.NewPath("dns"))...)
 	allErrs = append(allErrs, ValidateNetworking(c, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateAPIServer(&c.APIServer, field.NewPath("apiServer"))...)
+	allErrs = append(allErrs, ValidateControllerManager(&c.ControllerManager, field.NewPath("controllerManager"))...)
+	allErrs = append(allErrs, ValidateScheduler(&c.Scheduler, field.NewPath("scheduler"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
@@ -78,6 +80,21 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 func ValidateAPIServer(a *kubeadm.APIServer, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateCertSANs(a.CertSANs, fldPath.Child("certSANs"))...)
+	allErrs = append(allErrs, ValidateExtraArgs(a.ExtraArgs, fldPath.Child("extraArgs"))...)
+	return allErrs
+}
+
+// ValidateControllerManager validates the controller manager object and collects all encountered errors
+func ValidateControllerManager(a *kubeadm.ControlPlaneComponent, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateExtraArgs(a.ExtraArgs, fldPath.Child("extraArgs"))...)
+	return allErrs
+}
+
+// ValidateScheduler validates the scheduler object and collects all encountered errors
+func ValidateScheduler(a *kubeadm.ControlPlaneComponent, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateExtraArgs(a.ExtraArgs, fldPath.Child("extraArgs"))...)
 	return allErrs
 }
 
@@ -116,6 +133,7 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 		}
 	}
 	allErrs = append(allErrs, ValidateSocketPath(nro.CRISocket, fldPath.Child("criSocket"))...)
+	allErrs = append(allErrs, ValidateExtraArgs(nro.KubeletExtraArgs, fldPath.Child("kubeletExtraArgs"))...)
 	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
 	return allErrs
 }
@@ -288,6 +306,7 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 		if len(e.Local.ImageRepository) > 0 {
 			allErrs = append(allErrs, ValidateImageRepository(e.Local.ImageRepository, localPath.Child("imageRepository"))...)
 		}
+		allErrs = append(allErrs, ValidateExtraArgs(e.Local.ExtraArgs, localPath.Child("extraArgs"))...)
 	}
 	if e.External != nil {
 		requireHTTPS := true
@@ -479,9 +498,10 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 		maskArg = "node-cidr-mask-size-ipv4"
 	}
 
-	if v, ok := c.ControllerManager.ExtraArgs[maskArg]; ok && v != "" {
+	maskValue, _ := kubeadm.GetArgValue(c.ControllerManager.ExtraArgs, maskArg, -1)
+	if len(maskValue) != 0 {
 		// assume it is an integer, if not it will fail later
-		maskSize, err = strconv.Atoi(v)
+		maskSize, err = strconv.Atoi(maskValue)
 		if err != nil {
 			return 0, errors.Wrapf(err, "could not parse the value of the kube-controller-manager flag %s as an integer", maskArg)
 		}
@@ -519,7 +539,8 @@ func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) fi
 	}
 	if len(c.Networking.PodSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInPodSubnet, fldPath.Child("podSubnet"))...)
-		if c.ControllerManager.ExtraArgs["allocate-node-cidrs"] != "false" {
+		val, _ := kubeadm.GetArgValue(c.ControllerManager.ExtraArgs, "allocate-node-cidrs", -1)
+		if val != "false" {
 			// Pod subnet was already validated, we need to validate now against the node-mask
 			allErrs = append(allErrs, ValidatePodSubnetNodeMask(c.Networking.PodSubnet, c, fldPath.Child("podSubnet"))...)
 		}
@@ -674,5 +695,18 @@ func ValidateResetConfiguration(c *kubeadm.ResetConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateSocketPath(c.CRISocket, field.NewPath("criSocket"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
+	return allErrs
+}
+
+// ValidateExtraArgs validates a set of arguments and collects all encountered errors
+func ValidateExtraArgs(args []kubeadm.Arg, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for idx, arg := range args {
+		if len(arg.Name) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("index %d", idx), "argument has no name"))
+		}
+	}
+
 	return allErrs
 }
