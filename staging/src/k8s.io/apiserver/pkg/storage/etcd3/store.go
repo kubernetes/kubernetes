@@ -120,6 +120,7 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		groupResource: groupResource,
 		newFunc:       newFunc,
 		versioner:     versioner,
+		transformer:   transformer,
 	}
 	if newFunc == nil {
 		w.objectType = "<unknown>"
@@ -904,7 +905,7 @@ func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions)
 	if err != nil {
 		return nil, err
 	}
-	return s.watcher.Watch(s.watchContext(ctx), preparedKey, int64(rev), s.transformer, opts)
+	return s.watcher.Watch(s.watchContext(ctx), preparedKey, int64(rev), opts)
 }
 
 func (s *store) watchContext(ctx context.Context) context.Context {

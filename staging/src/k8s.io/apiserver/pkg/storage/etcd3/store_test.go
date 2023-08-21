@@ -155,8 +155,10 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 	originalTransformer := s.transformer.(*storagetesting.PrefixTransformer)
 	transformer := *originalTransformer
 	s.transformer = modifier(&transformer)
+	s.watcher.transformer = modifier(&transformer)
 	return func() {
 		s.transformer = originalTransformer
+		s.watcher.transformer = originalTransformer
 	}
 }
 
