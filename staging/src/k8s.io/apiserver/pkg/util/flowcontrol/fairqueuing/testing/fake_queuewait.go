@@ -19,6 +19,8 @@ package testing
 import (
 	"context"
 	"time"
+
+	testingpromise "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/promise"
 )
 
 func NewFakeQueueWait() fakeQueueWait {
@@ -28,5 +30,17 @@ func NewFakeQueueWait() fakeQueueWait {
 type fakeQueueWait struct{}
 
 func (qw fakeQueueWait) GetQueueWaitContext(parent context.Context, defaultQueueWaitTime time.Duration) (context.Context, context.CancelFunc) {
-	return parent, func() {}
+	// if the context already has a queue wait time associated then
+	// it takes precedence
+	if _, ok := testingpromise.GetQueueWaitTimeFromContext(parent); ok {
+		return parent, func() {}
+	}
+	// the tests use context.Background() as the context associated with the requests
+	if defaultQueueWaitTime == 0 {
+		// the test does not want to set a context with queue wait time
+		return parent, func() {}
+	}
+
+	ctx := testingpromise.NewQueueWaitTimeWithContext(parent, defaultQueueWaitTime)
+	return ctx, func() {}
 }

@@ -36,109 +36,114 @@ func TestMain(m *testing.M) {
 }
 
 func TestCountingWriteOnceSet(t *testing.T) {
-	oldTime := time.Now()
-	cval := &oldTime
-	doneCh := make(chan struct{})
+	doneCtx := NewQueueWaitTimeWithContext(context.Background(), time.Second)
 	now := time.Now()
 	clock, counter := testeventclock.NewFake(now, 0, nil)
 	var lock sync.Mutex
-	wr := NewCountingWriteOnce(counter, &lock, nil, doneCh, cval)
-	gots := make(chan interface{}, 1)
-	goGetExpectNotYet(t, clock, counter, wr, gots, "Set")
-	aval := &now
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if !wr.Set(aval) {
-			t.Error("Set() returned false")
-		}
-	}()
-	clock.Run(nil)
-	expectGotValue(t, gots, aval)
-	goGetAndExpect(t, clock, counter, wr, gots, aval)
-	later := time.Now()
-	bval := &later
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if wr.Set(bval) {
-			t.Error("second Set() returned true")
-		}
-	}()
-	goGetAndExpect(t, clock, counter, wr, gots, aval)
-	counter.Add(1) // account for unblocking the receive on doneCh
-	close(doneCh)
-	time.Sleep(time.Second) // give it a chance to misbehave
-	goGetAndExpect(t, clock, counter, wr, gots, aval)
-}
-func TestCountingWriteOnceCancel(t *testing.T) {
-	oldTime := time.Now()
-	cval := &oldTime
-	clock, counter := testeventclock.NewFake(oldTime, 0, nil)
-	ctx, cancel := context.WithCancel(context.Background())
-	var lock sync.Mutex
-	wr := NewCountingWriteOnce(counter, &lock, nil, ctx.Done(), cval)
-	gots := make(chan interface{}, 1)
-	goGetExpectNotYet(t, clock, counter, wr, gots, "cancel")
-	counter.Add(1) // account for unblocking the receive on doneCh
-	cancel()
-	clock.Run(nil)
-	expectGotValue(t, gots, cval)
-	goGetAndExpect(t, clock, counter, wr, gots, cval)
-	later := time.Now()
-	bval := &later
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if wr.Set(bval) {
-			t.Error("Set() after cancel returned true")
-		}
-	}()
-	goGetAndExpect(t, clock, counter, wr, gots, cval)
-}
+	wr := NewCountingWriteOnce(doneCtx, clock, counter, &lock, nil, "canceled")
 
-func TestCountingWriteOnceInitial(t *testing.T) {
-	oldTime := time.Now()
-	cval := &oldTime
-	clock, counter := testeventclock.NewFake(oldTime, 0, nil)
-	ctx, cancel := context.WithCancel(context.Background())
-	var lock sync.Mutex
-	now := time.Now()
-	aval := &now
-	wr := NewCountingWriteOnce(counter, &lock, aval, ctx.Done(), cval)
-	gots := make(chan interface{}, 1)
-	goGetAndExpect(t, clock, counter, wr, gots, aval)
-	goGetAndExpect(t, clock, counter, wr, gots, aval) // check that a set value stays set
-	later := time.Now()
-	bval := &later
-	func() {
-		lock.Lock()
-		defer lock.Unlock()
-		if wr.Set(bval) {
-			t.Error("Set of initialized promise returned true")
-		}
-	}()
-	goGetAndExpect(t, clock, counter, wr, gots, aval)
-	counter.Add(1) // account for unblocking receive on doneCh
-	cancel()
-	time.Sleep(time.Second) // give it a chance to misbehave
-	goGetAndExpect(t, clock, counter, wr, gots, aval)
-}
+	beforeCanceled := now.Add(time.Second).Add(-time.Millisecond)
+	clock.Run(&beforeCanceled)
 
-func goGetExpectNotYet(t *testing.T, clk *testeventclock.Fake, grc counter.GoRoutineCounter, wr promise.WriteOnce, gots chan interface{}, trigger string) {
-	grc.Add(1) // count the following goroutine
+	gots := make(chan interface{}, 1)
+	counter.Add(1)
 	go func() {
-		defer grc.Add(-1) // count completion of this goroutine
+		defer counter.Add(-1)
 		gots <- wr.Get()
 	}()
-	clk.Run(nil)
 	select {
 	case <-gots:
-		t.Errorf("Get returned before %s", trigger)
+		t.Errorf("Get returned before Set")
 	case <-time.After(time.Second):
 		t.Log("Good: Get did not return yet")
 	}
 
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if !wr.Set("execute") {
+			t.Error("Set() returned false")
+		}
+	}()
+	clock.Run(nil)
+
+	expectGotValue(t, gots, "execute")
+	goGetAndExpect(t, clock, counter, wr, gots, "execute")
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if wr.Set("second time") {
+			t.Error("second Set() returned true")
+		}
+	}()
+	goGetAndExpect(t, clock, counter, wr, gots, "execute")
+}
+
+func TestCountingWriteOnceCancel(t *testing.T) {
+	doneCtx := NewQueueWaitTimeWithContext(context.Background(), time.Second)
+	now := time.Now()
+	clock, counter := testeventclock.NewFake(now, 0, nil)
+	var lock sync.Mutex
+	wr := NewCountingWriteOnce(doneCtx, clock, counter, &lock, nil, "canceled")
+
+	gots := make(chan interface{}, 1)
+	counter.Add(1)
+	go func() {
+		defer counter.Add(-1)
+		gots <- wr.Get()
+	}()
+	select {
+	case <-gots:
+		t.Errorf("Get returned before Set")
+	default:
+		t.Log("Good: Get did not return yet")
+	}
+
+	clock.Run(nil)
+
+	expectGotValue(t, gots, "canceled")
+	goGetAndExpect(t, clock, counter, wr, gots, "canceled")
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if wr.Set("should fail") {
+			t.Error("Set() after cancel returned true")
+		}
+	}()
+	goGetAndExpect(t, clock, counter, wr, gots, "canceled")
+}
+
+func TestCountingWriteOnceInitial(t *testing.T) {
+	doneCtx := NewQueueWaitTimeWithContext(context.Background(), time.Second)
+	now := time.Now()
+	clock, counter := testeventclock.NewFake(now, 0, nil)
+	var lock sync.Mutex
+	wr := NewCountingWriteOnce(doneCtx, clock, counter, &lock, "execute", "canceled")
+
+	if got := wr.Get(); got != "execute" {
+		t.Errorf("Expected initial value to be set")
+	}
+
+	clock.Run(nil)
+
+	gots := make(chan interface{}, 1)
+	counter.Add(1)
+	go func() {
+		defer counter.Add(-1)
+		gots <- wr.Get()
+	}()
+	expectGotValue(t, gots, "execute")
+
+	goGetAndExpect(t, clock, counter, wr, gots, "execute")
+	goGetAndExpect(t, clock, counter, wr, gots, "execute") // check that a set value stays set
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		if wr.Set("should fail") {
+			t.Error("Set of initialized promise returned true")
+		}
+	}()
+	goGetAndExpect(t, clock, counter, wr, gots, "execute")
 }
 
 func goGetAndExpect(t *testing.T, clk *testeventclock.Fake, grc counter.GoRoutineCounter, wr promise.WriteOnce, gots chan interface{}, expected interface{}) {
