@@ -87,7 +87,7 @@ var _ = SIGDescribe("Swap [NodeConformance][LinuxOnly]", func() {
 		pod = runPodAndWaitUntilScheduled(f, pod)
 
 		isCgroupV2 := isPodCgroupV2(f, pod)
-		isLimitedSwap := isLimitedSwap(f, pod)
+		isLimitedSwap := isLimitedSwap()
 
 		if !isSwapFeatureGateEnabled() || !isCgroupV2 || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
 			ginkgo.By(fmt.Sprintf("Expecting no swap. feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
@@ -209,18 +209,18 @@ func expectLimitedSwap(f *framework.Framework, pod *v1.Pod, expectedSwapLimit in
 	)
 }
 
-func getSwapCapacity(f *framework.Framework, pod *v1.Pod) int64 {
+func getSwapCapacity(f *framework.Framework, pod *v1.Pod) *resource.Quantity {
 	output := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-ec", "free -b | grep Swap | xargs | cut -d\" \" -f2")
 
-	swapCapacity, err := strconv.Atoi(output)
+	swapCapacityBytes, err := strconv.Atoi(output)
 	framework.ExpectNoError(err, "cannot convert swap size to int")
 
-	ginkgo.By(fmt.Sprintf("providing swap capacity: %d", swapCapacity))
+	ginkgo.By(fmt.Sprintf("providing swap capacity: %d", swapCapacityBytes))
 
-	return int64(swapCapacity)
+	return resource.NewQuantity(int64(swapCapacityBytes), resource.BinarySI)
 }
 
-func getMemoryCapacity(f *framework.Framework, pod *v1.Pod) int64 {
+func getMemoryCapacity(f *framework.Framework, pod *v1.Pod) *resource.Quantity {
 	nodes, err := f.ClientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "failed listing nodes")
 
@@ -230,16 +230,16 @@ func getMemoryCapacity(f *framework.Framework, pod *v1.Pod) int64 {
 		}
 
 		memCapacity := node.Status.Capacity[v1.ResourceMemory]
-		return memCapacity.Value()
+		return &memCapacity
 	}
 
 	framework.ExpectNoError(fmt.Errorf("node %s wasn't found", pod.Spec.NodeName))
-	return 0
+	return nil
 }
 
 func calcSwapForBurstablePod(f *framework.Framework, pod *v1.Pod) int64 {
-	nodeMemoryCapacity := getMemoryCapacity(f, pod)
-	nodeSwapCapacity := getSwapCapacity(f, pod)
+	nodeMemoryCapacity := getMemoryCapacity(f, pod).Value()
+	nodeSwapCapacity := getSwapCapacity(f, pod).Value()
 	containerMemoryRequest := pod.Spec.Containers[0].Resources.Requests.Memory().Value()
 
 	containerMemoryProportion := float64(containerMemoryRequest) / float64(nodeMemoryCapacity)
@@ -250,7 +250,7 @@ func calcSwapForBurstablePod(f *framework.Framework, pod *v1.Pod) int64 {
 	return int64(swapAllocation)
 }
 
-func isLimitedSwap(f *framework.Framework, pod *v1.Pod) bool {
+func isLimitedSwap() bool {
 	kubeletCfg, err := getCurrentKubeletConfig(context.Background())
 	framework.ExpectNoError(err, "cannot get kubelet config")
 
