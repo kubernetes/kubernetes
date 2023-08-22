@@ -57,42 +57,6 @@ issues:
         - gocritic
       text: "ifElseChain: rewrite if-else to switch statement"
 
-    # The following issues were deemed "might be worth fixing, needs to be
-    # decided on a case-by-case basis".  This was initially decided by a
-    # majority of the developers who voted in
-    # https://github.com/kubernetes/kubernetes/issues/117288 and may evolve
-    # over time.
-
-    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
-    - linters:
-        - gocritic
-      text: "assignOp:"
-
-    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507016854
-    - linters:
-        - gosimple
-      text: "S1002: should omit comparison to bool constant"
-
-    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507023980
-    - linters:
-        - gosimple
-      text: "S1016: should convert opts .* instead of using struct literal"
-
-    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507026758
-    - linters:
-        - gosimple
-      text: "S1033: unnecessary guard around call to delete"
-
-    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507030071
-    - linters:
-        - stylecheck
-      text: "ST1012: error var .* should have name of the form ErrFoo"
-
-    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507031224
-    - linters:
-        - stylecheck
-      text: "ST1023: should omit type .* from declaration; it will be inferred from the right-hand side"
-
 linters:
   disable-all: false
   enable: # please keep this alphabetized
@@ -105,9 +69,6 @@ linters:
     - staticcheck
     - stylecheck
     - unused
-  disable:
-    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
-    - errcheck
 
 linters-settings: # please keep this alphabetized
   custom:

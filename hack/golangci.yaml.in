@@ -37,6 +37,15 @@ issues:
       text: should not be used because managedFields was removed
       path: _test.go$
 
+    {{- if .Base}}
+
+    # TODO(oscr) Remove these excluded directories and fix findings. Due to large amount of findings in different components
+    # with different owners it's hard to fix everything in a single pr. This will therefore be done in multiple prs.
+    - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
+      linters:
+        - gocritic
+    {{- end}}
+
     # The Kubernetes naming convention for conversion functions uses underscores
     # and intentionally deviates from normal Go conventions to make those function
     # names more readable. Same for SetDefaults_*.
@@ -56,6 +65,8 @@ issues:
     - linters:
         - gocritic
       text: "ifElseChain: rewrite if-else to switch statement"
+
+    {{- if not .Hints}}
 
     # The following issues were deemed "might be worth fixing, needs to be
     # decided on a case-by-case basis".  This was initially decided by a
@@ -92,9 +103,10 @@ issues:
     - linters:
         - stylecheck
       text: "ST1023: should omit type .* from declaration; it will be inferred from the right-hand side"
+    {{- end}}
 
 linters:
-  disable-all: false
+  disable-all: {{if .Base -}} true {{- else -}} false {{- end}}
   enable: # please keep this alphabetized
     - forbidigo
     - ginkgolinter
@@ -105,9 +117,11 @@ linters:
     - staticcheck
     - stylecheck
     - unused
+  {{- if .Strict}}
   disable:
     # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
     - errcheck
+  {{- end}}
 
 linters-settings: # please keep this alphabetized
   custom:
@@ -125,6 +139,21 @@ linters-settings: # please keep this alphabetized
     - p: \.Extract
       pkg: ^k8s\.io/client-go/applyconfigurations/
       msg: should not be used because managedFields was removed
+  {{- if .Base }}
+  gocritic:
+    enabled-checks:
+      - equalFold
+      - boolExprSimplify
+  {{- end}}
   staticcheck:
     checks:
       - "all"
+      {{- if .Base }}
+      - "-SA1019"  # TODO(fix) Using a deprecated function, variable, constant or field
+      - "-SA2002"  # TODO(fix) Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed
+      {{- end}}
+  {{- if .Base }}
+  stylecheck:
+    checks:
+      - "ST1019"   # Importing the same package multiple times
+  {{- end}}
