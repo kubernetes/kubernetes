@@ -5190,7 +5190,7 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 	// This is done above by initializing the manager and not calling manager.Run() yet.
 
 	// 2. Create a job.
-	job := newJob(2, 2, 6, batch.NonIndexedCompletion)
+	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
 
 	// 3. Create the pods.
 	podBuilder := buildPod().name("test_pod").deletionTimestamp().trackingFinalizer().job(job)
@@ -5207,6 +5207,11 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 
 	// 5. Start the workers.
 	go manager.Run(context.TODO(), 0)
+
+	err = manager.syncJob(context.TODO(), testutil.GetKey(job, t))
+	if err != nil {
+		t.Errorf("Unexpected error when syncing jobs %v", err)
+	}
 
 	// Check if the finalizer has been removed from the pod.
 	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
