@@ -38,6 +38,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 // TODO: it would probably be slightly better to build up the objects
@@ -250,7 +251,7 @@ var _ = SIGDescribe("Addon update", func() {
 		e2eskipper.SkipUnlessProviderIs("gce")
 
 		//these tests are long, so I squeezed several cases in one scenario
-		framework.ExpectNotEqual(sshClient, nil)
+		gomega.Expect(sshClient).NotTo(gomega.BeNil())
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 
 		temporaryRemotePathPrefix := "addon-test-dir"
