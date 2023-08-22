@@ -150,6 +150,82 @@ func TestClientCache(t *testing.T) {
 	assertCacheLen(t, cache, 2)
 }
 
+func TestNewClient(t *testing.T) {
+	tests := []struct {
+		name         string
+		config       map[string]string
+		wantErr      string
+		wantProvider bool
+	}{
+		{
+			name:         "no issuer",
+			config:       map[string]string{},
+			wantErr:      "Must provide idp-issuer-url",
+			wantProvider: false,
+		},
+		{
+			name: "no client id",
+			config: map[string]string{
+				cfgIssuerURL: "https://issuer",
+			},
+			wantErr:      "Must provide client-id",
+			wantProvider: false,
+		},
+		{
+			name: "invalid ca data",
+			config: map[string]string{
+				cfgIssuerURL:                "https://issuer",
+				cfgClientID:                 "client",
+				cfgCertificateAuthorityData: "fake",
+				cfgExtraScopes:              "fake",
+			},
+			wantErr:      "unable to load root certificates: unable to parse bytes as PEM block",
+			wantProvider: false,
+		},
+		{
+			name: "valid config",
+			config: map[string]string{
+				cfgIssuerURL: "https://issuer",
+				cfgClientID:  "client",
+			},
+			wantErr:      "",
+			wantProvider: true,
+		},
+		{
+			name: "exist client",
+			config: map[string]string{
+				cfgIssuerURL: "https://issuer",
+				cfgClientID:  "client",
+			},
+			wantErr:      "",
+			wantProvider: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			provider, err := newOIDCAuthProvider("", test.config, nil)
+			if test.wantErr != "" {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if test.wantErr != err.Error() {
+					t.Errorf("unexpected error want '%s', but got %v", test.wantErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v, no error wantted", err)
+				}
+			}
+
+			if test.wantProvider && provider == nil {
+				t.Errorf("no provider created")
+			}
+			if !test.wantProvider && provider != nil {
+				t.Errorf("provider created but shouldn't have been")
+			}
+		})
+	}
+}
+
 func assertCacheLen(t *testing.T, cache *clientCache, length int) {
 	t.Helper()
 	if len(cache.cache) != length {
