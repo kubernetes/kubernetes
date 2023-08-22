@@ -690,9 +690,9 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 				HostNetwork: true,
 				Containers: []v1.Container{
 					{
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Name:  "hpc-agnhost",
-						Args:  []string{"inclusterclient"},
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:    "hpc-agnhost",
+						Command: []string{"cmd", "/C", "c:\\hpc\\agnhost", "inclusterclient"},
 					},
 				},
 				RestartPolicy: v1.RestartPolicyNever,
