@@ -43,7 +43,9 @@ type HostNetworkService interface {
 	deleteLoadBalancer(hnsID string) error
 }
 
-type hns struct{}
+type hns struct {
+	hcn HcnService
+}
 
 var (
 	// LoadBalancerFlagsIPv6 enables IPV6.
@@ -53,7 +55,7 @@ var (
 )
 
 func (hns hns) getNetworkByName(name string) (*hnsNetworkInfo, error) {
-	hnsnetwork, err := hcn.GetNetworkByName(name)
+	hnsnetwork, err := hns.hcn.GetNetworkByName(name)
 	if err != nil {
 		klog.ErrorS(err, "Error getting network by name")
 		return nil, err
@@ -86,12 +88,12 @@ func (hns hns) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 }
 
 func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointsInfo), error) {
-	hcnnetwork, err := hcn.GetNetworkByName(networkName)
+	hcnnetwork, err := hns.hcn.GetNetworkByName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "failed to get HNS network by name", "name", networkName)
 		return nil, err
 	}
-	endpoints, err := hcn.ListEndpointsOfNetwork(hcnnetwork.Id)
+	endpoints, err := hns.hcn.ListEndpointsOfNetwork(hcnnetwork.Id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list endpoints: %w", err)
 	}
@@ -144,7 +146,7 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 }
 
 func (hns hns) getEndpointByID(id string) (*endpointsInfo, error) {
-	hnsendpoint, err := hcn.GetEndpointByID(id)
+	hnsendpoint, err := hns.hcn.GetEndpointByID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -157,13 +159,13 @@ func (hns hns) getEndpointByID(id string) (*endpointsInfo, error) {
 	}, nil
 }
 func (hns hns) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
-	hnsnetwork, err := hcn.GetNetworkByName(networkName)
+	hnsnetwork, err := hns.hcn.GetNetworkByName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "Error getting network by name")
 		return nil, err
 	}
 
-	endpoints, err := hcn.ListEndpoints()
+	endpoints, err := hns.hcn.ListEndpoints()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list endpoints: %w", err)
 	}
@@ -189,7 +191,7 @@ func (hns hns) getEndpointByIpAddress(ip string, networkName string) (*endpoints
 	return nil, fmt.Errorf("Endpoint %v not found on network %s", ip, networkName)
 }
 func (hns hns) getEndpointByName(name string) (*endpointsInfo, error) {
-	hnsendpoint, err := hcn.GetEndpointByName(name)
+	hnsendpoint, err := hns.hcn.GetEndpointByName(name)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +204,7 @@ func (hns hns) getEndpointByName(name string) (*endpointsInfo, error) {
 	}, nil
 }
 func (hns hns) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
-	hnsNetwork, err := hcn.GetNetworkByName(networkName)
+	hnsNetwork, err := hns.hcn.GetNetworkByName(networkName)
 	if err != nil {
 		return nil, err
 	}
@@ -239,12 +241,12 @@ func (hns hns) createEndpoint(ep *endpointsInfo, networkName string) (*endpoints
 			}
 			hnsEndpoint.Policies = append(hnsEndpoint.Policies, paPolicy)
 		}
-		createdEndpoint, err = hnsNetwork.CreateRemoteEndpoint(hnsEndpoint)
+		createdEndpoint, err = hns.hcn.CreateRemoteEndpoint(hnsNetwork, hnsEndpoint)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		createdEndpoint, err = hnsNetwork.CreateEndpoint(hnsEndpoint)
+		createdEndpoint, err = hns.hcn.CreateEndpoint(hnsNetwork, hnsEndpoint)
 		if err != nil {
 			return nil, err
 		}
@@ -259,11 +261,11 @@ func (hns hns) createEndpoint(ep *endpointsInfo, networkName string) (*endpoints
 	}, nil
 }
 func (hns hns) deleteEndpoint(hnsID string) error {
-	hnsendpoint, err := hcn.GetEndpointByID(hnsID)
+	hnsendpoint, err := hns.hcn.GetEndpointByID(hnsID)
 	if err != nil {
 		return err
 	}
-	err = hnsendpoint.Delete()
+	err = hns.hcn.DeleteEndpoint(hnsendpoint)
 	if err == nil {
 		klog.V(3).InfoS("Remote endpoint resource deleted", "hnsID", hnsID)
 	}
@@ -285,7 +287,7 @@ func findLoadBalancerID(endpoints []endpointsInfo, vip string, protocol, interna
 }
 
 func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
-	lbs, err := hcn.ListLoadBalancers()
+	lbs, err := hns.hcn.ListLoadBalancers()
 	var id loadBalancerIdentifier
 	if err != nil {
 		return nil, err
@@ -389,7 +391,7 @@ func (hns hns) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlag
 		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, ep.hnsID)
 	}
 
-	lb, err := loadBalancer.Create()
+	lb, err := hns.hcn.CreateLoadBalancer(loadBalancer)
 
 	if err != nil {
 		return nil, err
@@ -405,18 +407,18 @@ func (hns hns) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlag
 }
 
 func (hns hns) deleteLoadBalancer(hnsID string) error {
-	lb, err := hcn.GetLoadBalancerByID(hnsID)
+	lb, err := hns.hcn.GetLoadBalancerByID(hnsID)
 	if err != nil {
 		// Return silently
 		return nil
 	}
 
-	err = lb.Delete()
+	err = hns.hcn.DeleteLoadBalancer(lb)
 	if err != nil {
 		// There is a bug in Windows Server 2019, that can cause the delete call to fail sometimes. We retry one more time.
 		// TODO: The logic in syncProxyRules  should be rewritten in the future to better stage and handle a call like this failing using the policyApplied fields.
 		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource. Attempting one more time...", "loadBalancer", lb)
-		return lb.Delete()
+		return hns.hcn.DeleteLoadBalancer(lb)
 	}
 	return err
 }
