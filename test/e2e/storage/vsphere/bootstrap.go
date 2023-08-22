@@ -51,7 +51,7 @@ func bootstrapOnce(f *framework.Framework) {
 	if err != nil {
 		framework.Failf("Failed to get nodes: %v", err)
 	}
-	TestContext = Context{NodeMapper: &NodeMapper{}, VSphereInstances: vsphereInstances}
+	TestContext = Context{NodeMapper: NewNodeMapper(), VSphereInstances: vsphereInstances}
 	// 3. Get Node to VSphere mapping
 	err = TestContext.NodeMapper.GenerateNodeMap(vsphereInstances, *nodeList)
 	if err != nil {
