@@ -5192,9 +5192,14 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 	// 2. Create a job.
 	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
 
+	_, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Creating job: %v", err)
+	}
+
 	// 3. Create the pods.
 	podBuilder := buildPod().name("test_pod").deletionTimestamp().trackingFinalizer().job(job)
-	pod, err := clientset.CoreV1().Pods("default").Create(context.Background(), podBuilder.Pod, metav1.CreateOptions{})
+	pod, err := clientset.CoreV1().Pods(podBuilder.Pod.GetNamespace()).Create(ctx, podBuilder.Pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating pod: %v", err)
 	}
