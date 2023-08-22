@@ -131,8 +131,10 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			// find the longest replacement:
 			if toReplaceSz.Min == 0 {
 				// if the string being replaced is empty, replace surrounds all characters in the input string with the replacement.
-				if replaceCount.Max < math.MaxUint64 {
+				if sz.Max < math.MaxUint64 {
 					replaceCount.Max = sz.Max + 1
+				} else {
+					replaceCount.Max = sz.Max
 				}
 				// Include the length of the longest possible original string length.
 				retainedSz.Max = sz.Max
@@ -149,8 +151,10 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			// find the shortest replacement:
 			if toReplaceSz.Max == 0 {
 				// if the string being replaced is empty, replace surrounds all characters in the input string with the replacement.
-				if replaceCount.Min < math.MaxUint64 {
+				if sz.Min < math.MaxUint64 {
 					replaceCount.Min = sz.Min + 1
+				} else {
+					replaceCount.Min = sz.Min
 				}
 				// Include the length of the shortest possible original string length.
 				retainedSz.Min = sz.Min
