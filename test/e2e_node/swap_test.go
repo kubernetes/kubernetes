@@ -47,9 +47,43 @@ var _ = SIGDescribe("Swap [NodeConformance][LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("swap-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
+	// Note that memoryRequestEqualLimit is effective only when qosClass is PodQOSBestEffort.
+	getSwapTestPod := func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) *v1.Pod {
+		podMemoryAmount := resource.MustParse("128Mi")
+
+		var resources v1.ResourceRequirements
+		switch qosClass {
+		case v1.PodQOSBestEffort:
+			// nothing to do in this case
+		case v1.PodQOSBurstable:
+			resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: podMemoryAmount,
+				},
+			}
+
+			if memoryRequestEqualLimit {
+				resources.Limits = resources.Requests
+			}
+		case v1.PodQOSGuaranteed:
+			resources = v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: podMemoryAmount,
+				},
+			}
+			resources.Requests = resources.Limits
+		}
+
+		pod := getSleepingPod(f.Namespace.Name)
+		pod.Spec.Containers[0].Resources = resources
+
+		return pod
+	}
+
 	ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
 		ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
-		pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
+		pod := getSwapTestPod(qosClass, memoryRequestEqualLimit)
 		pod = runPodAndWaitUntilScheduled(f, pod)
 
 		isCgroupV2 := isPodCgroupV2(f, pod)
@@ -78,53 +112,23 @@ var _ = SIGDescribe("Swap [NodeConformance][LinuxOnly]", func() {
 	)
 })
 
-// Note that memoryRequestEqualLimit is effective only when qosClass is PodQOSBestEffort.
-func getSwapTestPod(f *framework.Framework, qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) *v1.Pod {
-	podMemoryAmount := resource.MustParse("128Mi")
-
-	var resources v1.ResourceRequirements
-	switch qosClass {
-	case v1.PodQOSBestEffort:
-		// nothing to do in this case
-	case v1.PodQOSBurstable:
-		resources = v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceMemory: podMemoryAmount,
-			},
-		}
-
-		if memoryRequestEqualLimit {
-			resources.Limits = resources.Requests
-		}
-	case v1.PodQOSGuaranteed:
-		resources = v1.ResourceRequirements{
-			Limits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("200m"),
-				v1.ResourceMemory: podMemoryAmount,
-			},
-		}
-		resources.Requests = resources.Limits
-	}
-
-	pod := &v1.Pod{
+func getSleepingPod(namespace string) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod-swap-" + rand.String(5),
-			Namespace: f.Namespace.Name,
+			Name:      "sleeping-test-pod-swap-" + rand.String(5),
+			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyAlways,
 			Containers: []v1.Container{
 				{
-					Name:      "busybox-container",
-					Image:     busyboxImage,
-					Command:   []string{"sleep", "600"},
-					Resources: resources,
+					Name:    "busybox-container",
+					Image:   busyboxImage,
+					Command: []string{"sleep", "600"},
 				},
 			},
 		},
 	}
-
-	return pod
 }
 
 func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
