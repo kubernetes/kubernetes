@@ -86,7 +86,7 @@ type APIServiceSpec struct {
 
 	// ScopedResources declares a range of scoped resources to tell what resources to provide by the APIService. there can be more resources provided
 	// by the servicebackend. k8s aggregator focuses on the resources declared by ScopedResources, if it is defined.
-	ScopedResources []ScopedResource `json:"scopedResources,omitempty" protobuf:"bytes,7,opt,name=scopedResources"`
+	ScopedResources []ScopedResource 
 }
 
 type ResourceScope string
@@ -97,18 +97,18 @@ const (
 )
 
 type ScopedResource struct {
-	ResourceScope ResourceScope `json:"resourceScope" protobuf:"bytes,2,name=resourceScope"`
+	ResourceScope ResourceScope 
 	// plural is the plural name of the resource to serve.
 	// The custom resources are served under `/apis/<group>/<version>/.../<plural>`.
 	// Must match the name of the CustomResourceDefinition (in the form `<names.plural>.<group>`).
 	// Must be all lowercase.
-	Plural string `json:"plural" protobuf:"bytes,1,opt,name=plural"`
+	Plural string 
 	// singular is the singular name of the resource. It must be all lowercase. Defaults to lowercased `kind`.
 	// +optional
-	Singular string `json:"singular,omitempty" protobuf:"bytes,2,opt,name=singular"`
+	Singular string 
 	// kind is the serialized kind of the resource. It is normally CamelCase and singular.
 	// kube aggregator will use this value as the `kind` attribute in API calls.
-	Kind string `json:"kind" protobuf:"bytes,4,opt,name=kind"`
+	Kind string 
 }
 
 // ConditionStatus indicates the status of a condition (true, false, or unknown).
