@@ -692,11 +692,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 					{
 						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Name:  "hpc-agnhost",
-						// TODO: Figure out why we need to copy agnhost as agnhost.exe here
-						// Possibly related to https://github.com/microsoft/hcsshim/issues/1128 and
-						// https://github.com/microsoft/hcsshim/pull/1174 updating PATHEXT here doesn't
-						// seem address the issue.
-						Command: []string{"cmd", "/C", "copy", "c:\\hpc\\agnhost", "c:\\hpc\\agnhost.exe", "&&", "c:\\hpc\\agnhost.exe", "inclusterclient"},
+						Command: []string{"c:\\hpc\\agnhost", "inclusterclient"},
 					},
 				},
 				RestartPolicy: v1.RestartPolicyNever,
