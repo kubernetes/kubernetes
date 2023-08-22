@@ -41,7 +41,7 @@ import (
 // desirable because it means that CEL expressions are portable across a wider range
 // of Kubernetes versions.
 func DefaultCompatibilityVersion() *version.Version {
-	return version.MajorMinor(1, 27)
+	return version.MajorMinor(1, 28)
 }
 
 var baseOpts = []VersionedOptions{
@@ -57,7 +57,6 @@ var baseOpts = []VersionedOptions{
 			cel.EagerlyValidateDeclarations(true),
 			cel.DefaultUTCTimeZone(true),
 
-			ext.Strings(ext.StringsVersion(0)),
 			library.URLs(),
 			library.Regex(),
 			library.Lists(),
@@ -65,6 +64,13 @@ var baseOpts = []VersionedOptions{
 		ProgramOptions: []cel.ProgramOption{
 			cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost),
 			cel.CostLimit(celconfig.PerCallLimit),
+		},
+	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		RemovedVersion:    version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			ext.Strings(ext.StringsVersion(0)),
 		},
 	},
 	{
@@ -81,7 +87,12 @@ var baseOpts = []VersionedOptions{
 			library.Quantity(),
 		},
 	},
-	// TODO: switch to ext.Strings version 2 once format() is fixed to work with HomogeneousAggregateLiterals.
+	{
+		IntroducedVersion: version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			ext.Strings(ext.StringsVersion(2)),
+		},
+	},
 }
 
 // MustBaseEnvSet returns the common CEL base environments for Kubernetes for Version, or panics

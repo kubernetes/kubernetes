@@ -102,7 +102,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			// of estimating the additional comparison cost.
 			if elNode := l.listElementNode(*target); elNode != nil {
 				k := elNode.Type().Kind()
-				if k == types.StructKind || k == types.BytesKind {
+				if k == types.StringKind || k == types.BytesKind {
 					sz := l.sizeEstimate(elNode)
 					elCost = elCost.Add(sz.MultiplyByCostFactor(common.StringTraversalCostFactor))
 				}

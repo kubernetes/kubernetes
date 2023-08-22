@@ -21,11 +21,11 @@ import (
 	"testing"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/ext"
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -66,10 +66,10 @@ func testQuantity(t *testing.T, expr string, expectResult ref.Val, expectRuntime
 			if !didMatch {
 				missingCompileErrs = append(missingCompileErrs, expectedCompileErr)
 			} else if len(matchedCompileErrs) != len(issues.Errors()) {
-				unmatchedErrs := []common.Error{}
+				unmatchedErrs := []cel.Error{}
 				for i, issue := range issues.Errors() {
 					if !matchedCompileErrs.Has(i) {
-						unmatchedErrs = append(unmatchedErrs, issue)
+						unmatchedErrs = append(unmatchedErrs, *issue)
 					}
 				}
 				require.Empty(t, unmatchedErrs, "unexpected compilation errors")
