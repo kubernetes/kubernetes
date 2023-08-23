@@ -54,5 +54,9 @@ function get-windows-node-instance-metadata {
 function create-windows-node-instance-template {
   local template_name="$1"
   local scopes_flag="$2"
+  if [[ "${KUBE_IMAGE_FAMILY}" == *"arm64"* ]]; then
+    echo "Skipping the creation of windows node-pools as ${KUBE_IMAGE_FAMILY} is set to an arm64 image"
+    return 
+  fi
   create-node-template "${template_name}" "${scopes_flag}" "$(get-windows-node-instance-metadata-from-file)" "$(get-windows-node-instance-metadata)" "windows" "${NODE_SIZE}"
 }
