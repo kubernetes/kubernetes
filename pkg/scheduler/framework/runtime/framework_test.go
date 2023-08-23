@@ -952,7 +952,8 @@ func TestRunPreScorePlugins(t *testing.T) {
 					inj:  injectedResult{PreScoreStatus: int(framework.Error)},
 				},
 			},
-			wantStatusCode: framework.Error,
+			wantSkippedPlugins: sets.New("skip"),
+			wantStatusCode:     framework.Error,
 		},
 		{
 			name: "all PreScore plugins returned skip",
