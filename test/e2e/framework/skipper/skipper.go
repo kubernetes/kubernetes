@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -53,50 +52,6 @@ func Skipf(format string, args ...interface{}) {
 func SkipUnlessAtLeast(value int, minValue int, message string) {
 	if value < minValue {
 		skipInternalf(1, message)
-	}
-}
-
-var featureGate featuregate.FeatureGate
-
-// InitFeatureGates must be called in test suites that have a --feature-gates parameter.
-// If not called, SkipUnlessFeatureGateEnabled and SkipIfFeatureGateEnabled will
-// record a test failure.
-func InitFeatureGates(defaults featuregate.FeatureGate, overrides map[string]bool) error {
-	clone := defaults.DeepCopy()
-	if err := clone.SetFromMap(overrides); err != nil {
-		return err
-	}
-	featureGate = clone
-	return nil
-}
-
-// SkipUnlessFeatureGateEnabled skips if the feature is disabled.
-//
-// Beware that this only works in test suites that have a --feature-gate
-// parameter and call InitFeatureGates. In test/e2e, the `Feature: XYZ` tag
-// has to be used instead and invocations have to make sure that they
-// only run tests that work with the given test cluster.
-func SkipUnlessFeatureGateEnabled(gate featuregate.Feature) {
-	if featureGate == nil {
-		framework.Failf("Feature gate checking is not enabled, don't use SkipUnlessFeatureGateEnabled(%v). Instead use the Feature tag.", gate)
-	}
-	if !featureGate.Enabled(gate) {
-		skipInternalf(1, "Only supported when %v feature is enabled", gate)
-	}
-}
-
-// SkipIfFeatureGateEnabled skips if the feature is enabled.
-//
-// Beware that this only works in test suites that have a --feature-gate
-// parameter and call InitFeatureGates. In test/e2e, the `Feature: XYZ` tag
-// has to be used instead and invocations have to make sure that they
-// only run tests that work with the given test cluster.
-func SkipIfFeatureGateEnabled(gate featuregate.Feature) {
-	if featureGate == nil {
-		framework.Failf("Feature gate checking is not enabled, don't use SkipFeatureGateEnabled(%v). Instead use the Feature tag.", gate)
-	}
-	if featureGate.Enabled(gate) {
-		skipInternalf(1, "Only supported when %v feature is disabled", gate)
 	}
 }
 

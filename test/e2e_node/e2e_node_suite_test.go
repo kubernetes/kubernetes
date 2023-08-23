@@ -46,7 +46,6 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -136,10 +135,6 @@ func TestMain(m *testing.M) {
 	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
 	if err := initFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
-		os.Exit(1)
-	}
-	if err := e2eskipper.InitFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
 		os.Exit(1)
 	}
