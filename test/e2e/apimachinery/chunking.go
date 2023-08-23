@@ -19,7 +19,6 @@ package apimachinery
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"reflect"
 	"time"
 
@@ -30,17 +29,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
-
-func shouldCheckRemainingItem() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.RemainingItemCount)
-}
 
 const numberOfTotalResources = 400
 
@@ -76,7 +69,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		})
 	})
 
-	ginkgo.It("should return chunks of results for list calls", func(ctx context.Context) {
+	framework.ConformanceIt("should return chunks of results for list calls", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)
@@ -86,7 +79,9 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			found := 0
 			var lastRV string
 			for {
-				opts.Limit = int64(rand.Int31n(numberOfTotalResources/10) + 1)
+				// With numberOfTotalResources=400, we want to ensure that both
+				// number of items per page and number of pages are non-trivial.
+				opts.Limit = 17
 				list, err := client.List(ctx, opts)
 				framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 				framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
@@ -96,13 +91,11 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 					lastRV = list.ResourceVersion
 				}
 				framework.ExpectEqual(list.ResourceVersion, lastRV)
-				if shouldCheckRemainingItem() {
-					if list.GetContinue() == "" {
-						gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
-					} else {
-						gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
-						gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
-					}
+				if list.GetContinue() == "" {
+					gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
+				} else {
+					gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
+					gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
 				}
 				for _, item := range list.Items {
 					framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
@@ -123,7 +116,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		gomega.Expect(list.Items).To(gomega.HaveLen(numberOfTotalResources))
 	})
 
-	ginkgo.It("should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent [Slow]", func(ctx context.Context) {
+	framework.ConformanceIt("should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent [Slow]", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)
@@ -136,13 +129,11 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 		firstToken := list.Continue
 		firstRV := list.ResourceVersion
-		if shouldCheckRemainingItem() {
-			if list.GetContinue() == "" {
-				gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
-			} else {
-				gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
-				gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items)).To(gomega.BeNumerically("==", numberOfTotalResources))
-			}
+		if list.GetContinue() == "" {
+			gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
+		} else {
+			gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
+			gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items)).To(gomega.BeNumerically("==", numberOfTotalResources))
 		}
 		framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, firstToken)
 
@@ -179,13 +170,11 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		gomega.Expect(len(list.Items)).To(gomega.BeNumerically("==", opts.Limit))
 		found := int(oneTenth)
 
-		if shouldCheckRemainingItem() {
-			if list.GetContinue() == "" {
-				gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
-			} else {
-				gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
-				gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
-			}
+		if list.GetContinue() == "" {
+			gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
+		} else {
+			gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
+			gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
 		}
 		for _, item := range list.Items {
 			framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
@@ -198,13 +187,11 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		for {
 			list, err := client.List(ctx, opts)
 			framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
-			if shouldCheckRemainingItem() {
-				if list.GetContinue() == "" {
-					gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
-				} else {
-					gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
-					gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
-				}
+			if list.GetContinue() == "" {
+				gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
+			} else {
+				gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
+				gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
 			}
 			framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 			gomega.Expect(len(list.Items)).To(gomega.BeNumerically("<=", opts.Limit))

@@ -36,11 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -479,8 +476,6 @@ func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T
 }
 
 func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
-
 	initialRV, preset, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -1113,8 +1108,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 }
 
 func RunTestListWithoutPaging(ctx context.Context, t *testing.T, store storage.Interface) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
-
 	_, preset, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)

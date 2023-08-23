@@ -39,11 +39,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -840,11 +838,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		// getResp.Count counts in objects that do not match the pred.
 		// Instead of returning inaccurate count for non-empty selectors, we return nil.
 		// Only set remainingItemCount if the predicate is empty.
-		if utilfeature.DefaultFeatureGate.Enabled(features.RemainingItemCount) {
-			if pred.Empty() {
-				c := int64(getResp.Count - pred.Limit)
-				remainingItemCount = &c
-			}
+		if pred.Empty() {
+			c := int64(getResp.Count - pred.Limit)
+			remainingItemCount = &c
 		}
 		return s.versioner.UpdateList(listObj, uint64(returnedRV), next, remainingItemCount)
 	}
