@@ -275,7 +275,7 @@ func TestFormatAndMount(t *testing.T) {
 			Exec:      fakeExec,
 		}
 		target := filepath.Join(t.TempDir(), test.target)
-		err = mounter.FormatAndMount(test.device, target, test.fstype, test.mountOptions)
+		err := mounter.FormatAndMount(test.device, target, test.fstype, test.mountOptions)
 		if test.expectError {
 			assert.NotNil(t, err, "Expect error during FormatAndMount(%s, %s, %s, %v)", test.device, test.target, test.fstype, test.mountOptions)
 		} else {
