@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Use first item in KUBE_BUILD_PLATFORMS as server platform
+KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-"linux/amd64"}
+SERVER_PLATFORM=$(cut -d' ' -f1 <<< "${KUBE_BUILD_PLATFORMS}")
+OS=$(cut -d'/' -f1 <<< "${SERVER_PLATFORM}")
+ARCH=$(cut -d'/' -f2 <<< "${SERVER_PLATFORM}")
+
 # Returns the total number of Linux and Windows nodes in the cluster.
 #
 # Vars assumed:
