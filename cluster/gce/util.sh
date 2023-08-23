@@ -2286,11 +2286,18 @@ function create-node-template() {
     "${ENABLE_IP_ALIASES:-}" \
     "${IP_ALIAS_SIZE:-}")
 
+  local image_args=""
+  if [[ -n "${MASTER_IMAGE}" ]]; then
+    image_args="--image=${MASTER_IMAGE}"
+  elif [[ -n "${MASTER_IMAGE_FAMILY}" ]]; then
+    image_args="--image-family=${MASTER_IMAGE_FAMILY}"
+  fi
+
   local node_image_flags=()
   if [[ "${os}" == 'linux' ]]; then
-      node_image_flags+=(--image-project "${NODE_IMAGE_PROJECT}" --image "${NODE_IMAGE}")
+      node_image_flags+=(--image-project "${NODE_IMAGE_PROJECT}" "${image_args}")
   elif [[ "${os}" == 'windows' ]]; then
-      node_image_flags+=(--image-project "${WINDOWS_NODE_IMAGE_PROJECT}" --image "${WINDOWS_NODE_IMAGE}")
+      node_image_flags+=(--image-project "${WINDOWS_NODE_IMAGE_PROJECT}" "${image_args}")
   else
       echo "Unknown OS ${os}" >&2
       exit 1

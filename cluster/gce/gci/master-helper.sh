@@ -167,6 +167,13 @@ function create-master-instance-internal() {
   disk="${disk},boot=no"
   disk="${disk},auto-delete=no"
 
+  local image_args=""
+  if [[ -n "${MASTER_IMAGE}" ]]; then
+    image_args="--image=${MASTER_IMAGE}"
+  elif [[ -n "${MASTER_IMAGE_FAMILY}" ]]; then
+    image_args="--image-family=${MASTER_IMAGE_FAMILY}"
+  fi
+
   for ((i=0; i<retries; i++)); do
     # We expect ZONE to be set and deliberately do not quote preemptible_master
     # and network
@@ -176,7 +183,7 @@ function create-master-instance-internal() {
       --zone "${ZONE}" \
       --machine-type "${MASTER_SIZE}" \
       --image-project="${MASTER_IMAGE_PROJECT}" \
-      --image "${MASTER_IMAGE}" \
+      ${image_args} \
       --tags "${MASTER_TAG}" \
       --scopes "storage-ro,compute-rw,monitoring,logging-write" \
       --metadata-from-file "${metadata}" \
