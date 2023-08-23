@@ -36,7 +36,7 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("failed to start job controller: %v", err)
+		return nil, true, fmt.Errorf("error creating Job controller: %v", err)
 	}
 	go jobController.Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
 	return nil, true, nil
