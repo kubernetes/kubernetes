@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/ext"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 
@@ -538,11 +539,11 @@ func (t testSizeNode) Path() []string {
 	return nil // not needed
 }
 
-func (t testSizeNode) Type() *expr.Type {
+func (t testSizeNode) Type() *types.Type {
 	return nil // not needed
 }
 
-func (t testSizeNode) Expr() *expr.Expr {
+func (t testSizeNode) Expr() *exprpb.Expr {
 	return nil // not needed
 }
 

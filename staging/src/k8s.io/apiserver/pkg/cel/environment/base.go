@@ -67,13 +67,6 @@ var baseOpts = []VersionedOptions{
 		},
 	},
 	{
-		IntroducedVersion: version.MajorMinor(1, 0),
-		RemovedVersion:    version.MajorMinor(1, 29),
-		EnvOptions: []cel.EnvOption{
-			ext.Strings(ext.StringsVersion(0)),
-		},
-	},
-	{
 		IntroducedVersion: version.MajorMinor(1, 27),
 		EnvOptions: []cel.EnvOption{
 			library.Authz(),
@@ -85,6 +78,15 @@ var baseOpts = []VersionedOptions{
 			cel.CrossTypeNumericComparisons(true),
 			cel.OptionalTypes(),
 			library.Quantity(),
+		},
+	},
+
+	// String library
+	{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		RemovedVersion:    version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			ext.Strings(ext.StringsVersion(0)),
 		},
 	},
 	{

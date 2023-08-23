@@ -202,6 +202,10 @@ var authzLib = &authz{}
 
 type authz struct{}
 
+func (*authz) LibraryName() string {
+	return "k8s.authz"
+}
+
 var authzLibraryDecls = map[string][]cel.FunctionOpt{
 	"path": {
 		cel.MemberOverload("authorizer_path", []*cel.Type{AuthorizerType, cel.StringType}, PathCheckType,
