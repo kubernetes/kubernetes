@@ -19,7 +19,6 @@ package apimachinery
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"reflect"
 	"time"
 
@@ -80,7 +79,9 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			found := 0
 			var lastRV string
 			for {
-				opts.Limit = int64(rand.Int31n(numberOfTotalResources/10) + 1)
+				// With numberOfTotalResources=400, we want to ensure that both
+				// number of items per page and number of pages are non-trivial.
+				opts.Limit = 17
 				list, err := client.List(ctx, opts)
 				framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 				framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
