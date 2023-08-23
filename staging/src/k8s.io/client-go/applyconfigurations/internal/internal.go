@@ -11693,7 +11693,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             scalar: string
-          elementRelationship: associative
+          elementRelationship: atomic
     - name: selectedNode
       type:
         scalar: string
@@ -11772,7 +11772,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             scalar: string
-          elementRelationship: associative
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha2.ResourceClaimSpec
   map:
     fields:
