@@ -265,6 +265,7 @@ func initializeCSINode(host volume.VolumeHost) error {
 		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINode initialization, not running on kubelet")
 		return nil
 	}
+
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
 		// Kubelet running in standalone mode. Skip CSINode initialization
@@ -293,8 +294,14 @@ func initializeCSINode(host volume.VolumeHost) error {
 			Jitter:   0.1,
 		}
 		err = wait.ExponentialBackoff(initBackoff, func() (bool, error) {
+			err := kvh.WaitForNodeRegistrationCompleted(context.TODO())
+			if err != nil {
+				klog.Errorf("Failed to wait for node registration completed: %v", err)
+				return false, nil
+			}
+
 			klog.V(4).Infof("Initializing migrated drivers on CSINode")
-			err := nim.InitializeCSINodeWithAnnotation()
+			err = nim.InitializeCSINodeWithAnnotation()
 			if err != nil {
 				kvh.SetKubeletError(fmt.Errorf("failed to initialize CSINode: %v", err))
 				klog.Errorf("Failed to initialize CSINode: %v", err)

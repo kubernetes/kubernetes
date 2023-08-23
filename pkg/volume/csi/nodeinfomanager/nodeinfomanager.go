@@ -420,6 +420,25 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 		return err
 	}
 
+	// Compare the node UID with csinode's ownerReference node UID
+	node, err := csiKubeClient.CoreV1().Nodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, v := range nodeInfo.OwnerReferences {
+		if v.Name == node.Name && v.UID != node.UID {
+			// Delete the out dated csinode
+			err := csiKubeClient.StorageV1().CSINodes().Delete(context.TODO(), string(nim.nodeName), metav1.DeleteOptions{})
+			if err != nil {
+				return err
+			}
+			// Recreate CSINode
+			_, err = nim.CreateCSINode()
+			return err
+		}
+	}
+
 	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
 
 	if annotationModified {

@@ -234,6 +234,10 @@ func (f *fakeVolumeHost) GetNodeName() types.NodeName {
 	return types.NodeName(f.nodeName)
 }
 
+func (f *fakeVolumeHost) WaitForNodeRegistrationCompleted(ctx context.Context) error {
+	return nil
+}
+
 func (f *fakeVolumeHost) GetEventRecorder() record.EventRecorder {
 	return nil
 }

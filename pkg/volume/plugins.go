@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -333,6 +334,8 @@ type KubeletVolumeHost interface {
 	WaitForCacheSync() error
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
+	// WaitForNodeRegistrationCompleted is a helper function that waits for node is in registrationCompleted state
+	WaitForNodeRegistrationCompleted(ctx context.Context) error
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
