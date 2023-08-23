@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/pflag"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -101,7 +102,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
+			_, _, _, _, err := enforceRequirements(&pflag.FlagSet{}, &tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
 
 			if err == nil && len(tt.expectedErr) != 0 {
 				t.Error("Expected error, but got success")
