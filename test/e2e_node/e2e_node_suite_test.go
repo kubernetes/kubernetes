@@ -135,6 +135,10 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
+	if err := initFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
+		os.Exit(1)
+	}
 	if err := e2eskipper.InitFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
 		os.Exit(1)
