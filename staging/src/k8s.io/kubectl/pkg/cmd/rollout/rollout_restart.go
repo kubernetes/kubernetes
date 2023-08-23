@@ -63,6 +63,9 @@ var (
 	        Resource rollout will be restarted.`))
 
 	restartExample = templates.Examples(`
+		# Restart all deployments in the default namespace
+		kubectl rollout restart deployment
+
 		# Restart a deployment
 		kubectl rollout restart deployment/nginx
 
