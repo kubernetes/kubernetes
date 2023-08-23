@@ -26,6 +26,7 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION='v1.3.0'
 DEFAULT_CNI_HASH='5d0324ca8a3c90c680b6e1fddb245a2255582fa15949ba1f3c6bb7323df9d3af754dae98d6e40ac9ccafb2999c932df2c4288d418949a4915d928eb23c090540'
+DEFAULT_CNI_HASH_ARM64='b2b7fb74f1b3cb8928f49e5bf9d4bc686e057e837fac3caf1b366d54757921dba80d70cc010399b274d136e8dee9a25b1ad87cdfdc4ffcf42cf88f3e8f99587a'
 DEFAULT_NPD_VERSION='v0.8.9'
 DEFAULT_NPD_HASH_AMD64='4919c47447c5f3871c1dc3171bbb817a38c8c8d07a6ce55a77d43cadc098e9ad608ceeab121eec00c13c0b6a2cc3488544d61ce84cdade1823f3fd5163a952de'
 # TODO (SergeyKanzhelev): fill up for npd 0.8.9+
@@ -313,9 +314,20 @@ function install-cni-binaries {
   if [[ -n "${CNI_VERSION:-}" ]]; then
       local -r cni_hash="${CNI_HASH:-}"
   else
-      local -r cni_hash="${DEFAULT_CNI_HASH}"
+    case "${HOST_PLATFORM}/${HOST_ARCH}" in
+      linux/amd64)
+        local -r cni_hash="${DEFAULT_CNI_HASH}"
+        ;;
+      linux/arm64)
+        local -r cni_hash="${DEFAULT_CNI_HASH_ARM64}"
+        ;;
+      *)
+        echo "Unrecognized version and platform/arch combination:"
+        echo "$DEFAULT_CNI_VERSION $HOST_PLATFORM/$HOST_ARCH"
+        echo "Set CNI_VERSION and CNI_VERSION_HASH or CNI_VERSION_HASH_ARM64 to overwrite"
+        exit 1
+    esac
   fi
-
   local -r cni_tar="${CNI_TAR_PREFIX}${cni_version}.tgz"
   local -r cni_url="${CNI_STORAGE_URL_BASE}/${cni_version}/${cni_tar}"
 
