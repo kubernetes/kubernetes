@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -178,15 +177,10 @@ func (s *objectStore) Get(namespace, name string) (runtime.Object, error) {
 	data.Lock()
 	defer data.Unlock()
 	if data.err != nil || !s.isObjectFresh(data) {
-		opts := metav1.GetOptions{}
-		if data.object != nil && data.err == nil {
-			// This is just a periodic refresh of an object we successfully fetched previously.
-			// In this case, server data from apiserver cache to reduce the load on both
-			// etcd and apiserver (the cache is eventually consistent).
-			util.FromApiserverCache(&opts)
-		}
-
-		object, err := s.getObject(namespace, name, opts)
+		// This is just a periodic refresh of an object we successfully fetched previously.
+		// In this case, server data from apiserver cache to reduce the load on both
+		// etcd and apiserver (the cache is eventually consistent).
+		object, err := s.getObject(namespace, name, metav1.GetOptions{ResourceVersion: "0"})
 		if err != nil && !apierrors.IsNotFound(err) && data.object == nil && data.err == nil {
 			// Couldn't fetch the latest object, but there is no cached data to return.
 			// Return the fetch result instead.
