@@ -529,7 +529,6 @@ func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 	if result, ok := m.state.GetCPUSet(podUID, containerName); ok {
 		return result
 	}
-
 	return cpuset.CPUSet{}
 }
 
@@ -540,6 +539,5 @@ func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 func (m *manager) setPodPendingAdmission(pod *v1.Pod) {
 	m.Lock()
 	defer m.Unlock()
-
 	m.pendingAdmissionPod = pod
 }

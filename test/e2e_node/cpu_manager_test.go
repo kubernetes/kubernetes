@@ -645,6 +645,10 @@ func runCPUManagerTests(f *framework.Framework) {
 		runSMTAlignmentPositiveTests(ctx, f, smtLevel)
 	})
 
+	ginkgo.It("should fail", func(ctx context.Context) {
+		framework.Failf("this will always fail")
+	})
+
 	ginkgo.AfterEach(func(ctx context.Context) {
 		updateKubeletConfig(ctx, f, oldCfg, true)
 	})
