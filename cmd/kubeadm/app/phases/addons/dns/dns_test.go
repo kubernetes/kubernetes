@@ -698,7 +698,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: daocloud.io/coredns:v1.10.1
+        image: daocloud.io/coredns:v1.11.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -964,7 +964,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: daocloud.io/coredns:v1.10.1
+        image: daocloud.io/coredns:v1.11.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:
