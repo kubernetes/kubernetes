@@ -710,11 +710,15 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
 	if runtime.GOOS == "windows" {
-		cmd := fmt.Sprintf("Get-Volume -FilePath %s | Write-Volumecache", deviceMountPath)
-		output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-		klog.Infof("command (%q) execeuted: %v, output: %q", cmd, err, string(output))
+		cmdString := "Get-Volume -FilePath $env:mountpath | Write-Volumecache"
+		cmd := exec.Command("powershell", "/c", cmdString)
+		env := append(os.Environ(), fmt.Sprintf("mountpath=%s", deviceMountPath))
+		cmd.SetEnv(env)
+		klog.V(8).Infof("Executing command: %q", cmdString)
+		output, err := cmd.CombinedOutput()
+		klog.Infof("command (%q) execeuted: %v, output: %q", cmdString, err, string(output))
 		if err != nil {
-			return fmt.Errorf("command (%q) failed: %v, output: %q", cmd, err, string(output))
+			return fmt.Errorf("command (%q) failed: %v, output: %q", cmdString, err, string(output))
 		}
 	}
 	// For linux runtime, it skips because unmount will automatically flush disk data
