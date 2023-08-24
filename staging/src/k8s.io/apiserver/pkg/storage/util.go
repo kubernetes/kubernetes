@@ -122,3 +122,22 @@ func GetCurrentResourceVersionFromStorage(ctx context.Context, storage Interface
 	}
 	return uint64(currentResourceVersion), nil
 }
+
+// AnnotateInitialEventsEndBookmark adds a special annotation to the given object
+// which indicates that the initial events have been sent.
+//
+// Note that this function assumes that the obj's annotation
+// field is a reference type (i.e. a map).
+func AnnotateInitialEventsEndBookmark(obj runtime.Object) error {
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	objAnnotations := objMeta.GetAnnotations()
+	if objAnnotations == nil {
+		objAnnotations = map[string]string{}
+	}
+	objAnnotations["k8s.io/initial-events-end"] = "true"
+	objMeta.SetAnnotations(objAnnotations)
+	return nil
+}
