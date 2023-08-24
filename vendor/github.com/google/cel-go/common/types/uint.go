@@ -21,7 +21,6 @@ import (
 	"strconv"
 
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -32,15 +31,6 @@ import (
 type Uint uint64
 
 var (
-	// UintType singleton.
-	UintType = NewTypeValue("uint",
-		traits.AdderType,
-		traits.ComparerType,
-		traits.DividerType,
-		traits.ModderType,
-		traits.MultiplierType,
-		traits.SubtractorType)
-
 	uint32WrapperType = reflect.TypeOf(&wrapperspb.UInt32Value{})
 
 	uint64WrapperType = reflect.TypeOf(&wrapperspb.UInt64Value{})

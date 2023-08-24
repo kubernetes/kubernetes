@@ -22,9 +22,22 @@ import (
 
 // parseErrors is a specialization of Errors.
 type parseErrors struct {
-	*common.Errors
+	errs *common.Errors
+}
+
+// errorCount indicates the number of errors reported.
+func (e *parseErrors) errorCount() int {
+	return len(e.errs.GetErrors())
+}
+
+func (e *parseErrors) internalError(message string) {
+	e.errs.ReportErrorAtID(0, common.NoLocation, message)
 }
 
 func (e *parseErrors) syntaxError(l common.Location, message string) {
-	e.ReportError(l, fmt.Sprintf("Syntax error: %s", message))
+	e.errs.ReportErrorAtID(0, l, fmt.Sprintf("Syntax error: %s", message))
+}
+
+func (e *parseErrors) reportErrorAtID(id int64, l common.Location, message string, args ...any) {
+	e.errs.ReportErrorAtID(id, l, message, args...)
 }

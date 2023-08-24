@@ -9,7 +9,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "decls.go",
-        "scopes.go",
     ],
     importpath = "github.com/google/cel-go/checker/decls",
     deps = [

@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package decls
+package checker
 
-import exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+import (
+	"github.com/google/cel-go/common/decls"
+)
 
 // Scopes represents nested Decl sets where the Scopes value contains a Groups containing all
 // identifiers in scope and an optional parent representing outer scopes.
@@ -25,9 +27,9 @@ type Scopes struct {
 	scopes *Group
 }
 
-// NewScopes creates a new, empty Scopes.
+// newScopes creates a new, empty Scopes.
 // Some operations can't be safely performed until a Group is added with Push.
-func NewScopes() *Scopes {
+func newScopes() *Scopes {
 	return &Scopes{
 		scopes: newGroup(),
 	}
@@ -35,7 +37,7 @@ func NewScopes() *Scopes {
 
 // Copy creates a copy of the current Scopes values, including a copy of its parent if non-nil.
 func (s *Scopes) Copy() *Scopes {
-	cpy := NewScopes()
+	cpy := newScopes()
 	if s == nil {
 		return cpy
 	}
@@ -66,14 +68,14 @@ func (s *Scopes) Pop() *Scopes {
 
 // AddIdent adds the ident Decl in the current scope.
 // Note: If the name collides with an existing identifier in the scope, the Decl is overwritten.
-func (s *Scopes) AddIdent(decl *exprpb.Decl) {
-	s.scopes.idents[decl.Name] = decl
+func (s *Scopes) AddIdent(decl *decls.VariableDecl) {
+	s.scopes.idents[decl.Name()] = decl
 }
 
 // FindIdent finds the first ident Decl with a matching name in Scopes, or nil if one cannot be
 // found.
 // Note: The search is performed from innermost to outermost.
-func (s *Scopes) FindIdent(name string) *exprpb.Decl {
+func (s *Scopes) FindIdent(name string) *decls.VariableDecl {
 	if ident, found := s.scopes.idents[name]; found {
 		return ident
 	}
@@ -86,7 +88,7 @@ func (s *Scopes) FindIdent(name string) *exprpb.Decl {
 // FindIdentInScope finds the first ident Decl with a matching name in the current Scopes value, or
 // nil if one does not exist.
 // Note: The search is only performed on the current scope and does not search outer scopes.
-func (s *Scopes) FindIdentInScope(name string) *exprpb.Decl {
+func (s *Scopes) FindIdentInScope(name string) *decls.VariableDecl {
 	if ident, found := s.scopes.idents[name]; found {
 		return ident
 	}
@@ -95,14 +97,14 @@ func (s *Scopes) FindIdentInScope(name string) *exprpb.Decl {
 
 // SetFunction adds the function Decl to the current scope.
 // Note: Any previous entry for a function in the current scope with the same name is overwritten.
-func (s *Scopes) SetFunction(fn *exprpb.Decl) {
-	s.scopes.functions[fn.Name] = fn
+func (s *Scopes) SetFunction(fn *decls.FunctionDecl) {
+	s.scopes.functions[fn.Name()] = fn
 }
 
 // FindFunction finds the first function Decl with a matching name in Scopes.
 // The search is performed from innermost to outermost.
 // Returns nil if no such function in Scopes.
-func (s *Scopes) FindFunction(name string) *exprpb.Decl {
+func (s *Scopes) FindFunction(name string) *decls.FunctionDecl {
 	if fn, found := s.scopes.functions[name]; found {
 		return fn
 	}
@@ -116,16 +118,16 @@ func (s *Scopes) FindFunction(name string) *exprpb.Decl {
 // Contains separate namespaces for identifier and function Decls.
 // (Should be named "Scope" perhaps?)
 type Group struct {
-	idents    map[string]*exprpb.Decl
-	functions map[string]*exprpb.Decl
+	idents    map[string]*decls.VariableDecl
+	functions map[string]*decls.FunctionDecl
 }
 
 // copy creates a new Group instance with a shallow copy of the variables and functions.
 // If callers need to mutate the exprpb.Decl definitions for a Function, they should copy-on-write.
 func (g *Group) copy() *Group {
 	cpy := &Group{
-		idents:    make(map[string]*exprpb.Decl, len(g.idents)),
-		functions: make(map[string]*exprpb.Decl, len(g.functions)),
+		idents:    make(map[string]*decls.VariableDecl, len(g.idents)),
+		functions: make(map[string]*decls.FunctionDecl, len(g.functions)),
 	}
 	for n, id := range g.idents {
 		cpy.idents[n] = id
@@ -139,7 +141,7 @@ func (g *Group) copy() *Group {
 // newGroup creates a new Group with empty maps for identifiers and functions.
 func newGroup() *Group {
 	return &Group{
-		idents:    make(map[string]*exprpb.Decl),
-		functions: make(map[string]*exprpb.Decl),
+		idents:    make(map[string]*decls.VariableDecl),
+		functions: make(map[string]*decls.FunctionDecl),
 	}
 }

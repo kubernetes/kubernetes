@@ -22,7 +22,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -34,12 +33,6 @@ import (
 type Bytes []byte
 
 var (
-	// BytesType singleton.
-	BytesType = NewTypeValue("bytes",
-		traits.AdderType,
-		traits.ComparerType,
-		traits.SizerType)
-
 	// byteWrapperType golang reflected type for protobuf bytes wrapper type.
 	byteWrapperType = reflect.TypeOf(&wrapperspb.BytesValue{})
 )

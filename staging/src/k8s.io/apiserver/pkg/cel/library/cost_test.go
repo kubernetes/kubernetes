@@ -23,8 +23,9 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/ext"
-	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
@@ -411,7 +412,7 @@ func TestAuthzLibrary(t *testing.T) {
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	env, err := cel.NewEnv(
-		ext.Strings(),
+		ext.Strings(ext.StringsVersion(2)),
 		URLs(),
 		Regex(),
 		Lists(),
@@ -538,11 +539,11 @@ func (t testSizeNode) Path() []string {
 	return nil // not needed
 }
 
-func (t testSizeNode) Type() *expr.Type {
+func (t testSizeNode) Type() *types.Type {
 	return nil // not needed
 }
 
-func (t testSizeNode) Expr() *expr.Expr {
+func (t testSizeNode) Expr() *exprpb.Expr {
 	return nil // not needed
 }
 
@@ -554,14 +555,15 @@ type testCostEstimator struct {
 }
 
 func (t *testCostEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {
-	switch t := element.Type().TypeKind.(type) {
-	case *expr.Type_Primitive:
-		switch t.Primitive {
-		case expr.Type_STRING:
-			return &checker.SizeEstimate{Min: 0, Max: 12}
-		case expr.Type_BYTES:
-			return &checker.SizeEstimate{Min: 0, Max: 12}
-		}
+	expr, err := cel.TypeToExprType(element.Type())
+	if err != nil {
+		return nil
+	}
+	switch expr.GetPrimitive() {
+	case exprpb.Type_STRING:
+		return &checker.SizeEstimate{Min: 0, Max: 12}
+	case exprpb.Type_BYTES:
+		return &checker.SizeEstimate{Min: 0, Max: 12}
 	}
 	return nil
 }

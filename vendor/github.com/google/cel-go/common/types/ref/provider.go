@@ -23,34 +23,34 @@ import (
 
 // TypeProvider specifies functions for creating new object instances and for
 // resolving enum values by name.
+//
+// Deprecated: use types.Provider
 type TypeProvider interface {
 	// EnumValue returns the numeric value of the given enum value name.
 	EnumValue(enumName string) Val
 
-	// FindIdent takes a qualified identifier name and returns a Value if one
-	// exists.
+	// FindIdent takes a qualified identifier name and returns a Value if one exists.
 	FindIdent(identName string) (Val, bool)
 
-	// FindType looks up the Type given a qualified typeName. Returns false
-	// if not found.
-	//
-	// Used during type-checking only.
+	// FindType looks up the Type given a qualified typeName. Returns false if not found.
 	FindType(typeName string) (*exprpb.Type, bool)
 
-	// FieldFieldType returns the field type for a checked type value. Returns
-	// false if the field could not be found.
-	FindFieldType(messageType string, fieldName string) (*FieldType, bool)
+	// FieldFieldType returns the field type for a checked type value. Returns false if
+	// the field could not be found.
+	FindFieldType(messageType, fieldName string) (*FieldType, bool)
 
-	// NewValue creates a new type value from a qualified name and map of field
-	// name to value.
+	// NewValue creates a new type value from a qualified name and map of field name
+	// to value.
 	//
-	// Note, for each value, the Val.ConvertToNative function will be invoked
-	// to convert the Val to the field's native type. If an error occurs during
-	// conversion, the NewValue will be a types.Err.
+	// Note, for each value, the Val.ConvertToNative function will be invoked to convert
+	// the Val to the field's native type. If an error occurs during conversion, the
+	// NewValue will be a types.Err.
 	NewValue(typeName string, fields map[string]Val) Val
 }
 
 // TypeAdapter converts native Go values of varying type and complexity to equivalent CEL values.
+//
+// Deprecated: use types.Adapter
 type TypeAdapter interface {
 	// NativeToValue converts the input `value` to a CEL `ref.Val`.
 	NativeToValue(value any) Val
@@ -60,6 +60,8 @@ type TypeAdapter interface {
 // implementations support type-customization, so these features are optional. However, a
 // `TypeRegistry` should be a `TypeProvider` and a `TypeAdapter` to ensure that types
 // which are registered can be converted to CEL representations.
+//
+// Deprecated: use types.Registry
 type TypeRegistry interface {
 	TypeAdapter
 	TypeProvider
@@ -76,15 +78,14 @@ type TypeRegistry interface {
 	// If a type is provided more than once with an alternative definition, the
 	// call will result in an error.
 	RegisterType(types ...Type) error
-
-	// Copy the TypeRegistry and return a new registry whose mutable state is isolated.
-	Copy() TypeRegistry
 }
 
 // FieldType represents a field's type value and whether that field supports
 // presence detection.
+//
+// Deprecated: use types.FieldType
 type FieldType struct {
-	// Type of the field.
+	// Type of the field as a protobuf type value.
 	Type *exprpb.Type
 
 	// IsSet indicates whether the field is set on an input object.
