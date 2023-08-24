@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -364,17 +363,10 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 	if event.Type == watch.Bookmark {
 		e := &watch.Event{Type: watch.Bookmark, Object: event.Object.DeepCopyObject()}
 		if !c.wasBookmarkAfterRvSent() {
-			objMeta, err := meta.Accessor(e.Object)
-			if err != nil {
+			if err := storage.AnnotateInitialEventsEndBookmark(e.Object); err != nil {
 				utilruntime.HandleError(fmt.Errorf("error while accessing object's metadata gr: %v, identifier: %v, obj: %#v, err: %v", c.groupResource, c.identifier, e.Object, err))
 				return nil
 			}
-			objAnnotations := objMeta.GetAnnotations()
-			if objAnnotations == nil {
-				objAnnotations = map[string]string{}
-			}
-			objAnnotations["k8s.io/initial-events-end"] = "true"
-			objMeta.SetAnnotations(objAnnotations)
 		}
 		return e
 	}
