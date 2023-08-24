@@ -32,7 +32,7 @@
         ]
       }
     },
-    "image": "{{pillar['kube_docker_registry']}}/kube-controller-manager-amd64:{{pillar['kube-controller-manager_docker_tag']}}",
+    "image": "{{pillar['kube_docker_registry']}}/kube-controller-manager:{{pillar['kube-controller-manager_docker_tag']}}",
     "resources": {
       "requests": {
         "cpu": "{{cpurequest}}"
