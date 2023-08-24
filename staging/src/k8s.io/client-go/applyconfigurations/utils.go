@@ -171,20 +171,50 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.ValidatingAdmissionPolicyStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Validation"):
 		return &admissionregistrationv1alpha1.ValidationApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Variable"):
+		return &admissionregistrationv1alpha1.VariableApplyConfiguration{}
 
 		// Group=admissionregistration.k8s.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithKind("AuditAnnotation"):
+		return &admissionregistrationv1beta1.AuditAnnotationApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ExpressionWarning"):
+		return &admissionregistrationv1beta1.ExpressionWarningApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("MatchCondition"):
 		return &admissionregistrationv1beta1.MatchConditionApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("MatchResources"):
+		return &admissionregistrationv1beta1.MatchResourcesApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("MutatingWebhook"):
 		return &admissionregistrationv1beta1.MutatingWebhookApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("MutatingWebhookConfiguration"):
 		return &admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("NamedRuleWithOperations"):
+		return &admissionregistrationv1beta1.NamedRuleWithOperationsApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ParamKind"):
+		return &admissionregistrationv1beta1.ParamKindApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ParamRef"):
+		return &admissionregistrationv1beta1.ParamRefApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ServiceReference"):
 		return &admissionregistrationv1beta1.ServiceReferenceApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("TypeChecking"):
+		return &admissionregistrationv1beta1.TypeCheckingApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicy"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicyApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyBinding"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyBindingSpec"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpecApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicySpec"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicySpecApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyStatus"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicyStatusApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ValidatingWebhook"):
 		return &admissionregistrationv1beta1.ValidatingWebhookApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ValidatingWebhookConfiguration"):
 		return &admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("Validation"):
+		return &admissionregistrationv1beta1.ValidationApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("Variable"):
+		return &admissionregistrationv1beta1.VariableApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("WebhookClientConfig"):
 		return &admissionregistrationv1beta1.WebhookClientConfigApplyConfiguration{}
 
@@ -675,6 +705,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.GRPCActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostAlias"):
 		return &applyconfigurationscorev1.HostAliasApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("HostIP"):
+		return &applyconfigurationscorev1.HostIPApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostPathVolumeSource"):
 		return &applyconfigurationscorev1.HostPathVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HTTPGetAction"):
@@ -789,6 +821,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodReadinessGateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodResourceClaim"):
 		return &applyconfigurationscorev1.PodResourceClaimApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodResourceClaimStatus"):
+		return &applyconfigurationscorev1.PodResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSchedulingGate"):
 		return &applyconfigurationscorev1.PodSchedulingGateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSecurityContext"):
@@ -911,6 +945,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.VolumeNodeAffinityApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeProjection"):
 		return &applyconfigurationscorev1.VolumeProjectionApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("VolumeResourceRequirements"):
+		return &applyconfigurationscorev1.VolumeResourceRequirementsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeSource"):
 		return &applyconfigurationscorev1.VolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VsphereVirtualDiskVolumeSource"):
@@ -1037,6 +1073,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.ScaleApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1alpha1
+	case flowcontrolv1alpha1.SchemeGroupVersion.WithKind("ExemptPriorityLevelConfiguration"):
+		return &applyconfigurationsflowcontrolv1alpha1.ExemptPriorityLevelConfigurationApplyConfiguration{}
 	case flowcontrolv1alpha1.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &applyconfigurationsflowcontrolv1alpha1.FlowDistinguisherMethodApplyConfiguration{}
 	case flowcontrolv1alpha1.SchemeGroupVersion.WithKind("FlowSchema"):
@@ -1079,6 +1117,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1alpha1.UserSubjectApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta1
+	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("ExemptPriorityLevelConfiguration"):
+		return &applyconfigurationsflowcontrolv1beta1.ExemptPriorityLevelConfigurationApplyConfiguration{}
 	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &applyconfigurationsflowcontrolv1beta1.FlowDistinguisherMethodApplyConfiguration{}
 	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("FlowSchema"):
@@ -1121,6 +1161,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1beta1.UserSubjectApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta2
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("ExemptPriorityLevelConfiguration"):
+		return &applyconfigurationsflowcontrolv1beta2.ExemptPriorityLevelConfigurationApplyConfiguration{}
 	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &applyconfigurationsflowcontrolv1beta2.FlowDistinguisherMethodApplyConfiguration{}
 	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("FlowSchema"):
@@ -1163,6 +1205,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1beta2.UserSubjectApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta3
+	case v1beta3.SchemeGroupVersion.WithKind("ExemptPriorityLevelConfiguration"):
+		return &flowcontrolv1beta3.ExemptPriorityLevelConfigurationApplyConfiguration{}
 	case v1beta3.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &flowcontrolv1beta3.FlowDistinguisherMethodApplyConfiguration{}
 	case v1beta3.SchemeGroupVersion.WithKind("FlowSchema"):
@@ -1375,40 +1419,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationspolicyv1.PodDisruptionBudgetStatusApplyConfiguration{}
 
 		// Group=policy, Version=v1beta1
-	case policyv1beta1.SchemeGroupVersion.WithKind("AllowedCSIDriver"):
-		return &applyconfigurationspolicyv1beta1.AllowedCSIDriverApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("AllowedFlexVolume"):
-		return &applyconfigurationspolicyv1beta1.AllowedFlexVolumeApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("AllowedHostPath"):
-		return &applyconfigurationspolicyv1beta1.AllowedHostPathApplyConfiguration{}
 	case policyv1beta1.SchemeGroupVersion.WithKind("Eviction"):
 		return &applyconfigurationspolicyv1beta1.EvictionApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("FSGroupStrategyOptions"):
-		return &applyconfigurationspolicyv1beta1.FSGroupStrategyOptionsApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("HostPortRange"):
-		return &applyconfigurationspolicyv1beta1.HostPortRangeApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("IDRange"):
-		return &applyconfigurationspolicyv1beta1.IDRangeApplyConfiguration{}
 	case policyv1beta1.SchemeGroupVersion.WithKind("PodDisruptionBudget"):
 		return &applyconfigurationspolicyv1beta1.PodDisruptionBudgetApplyConfiguration{}
 	case policyv1beta1.SchemeGroupVersion.WithKind("PodDisruptionBudgetSpec"):
 		return &applyconfigurationspolicyv1beta1.PodDisruptionBudgetSpecApplyConfiguration{}
 	case policyv1beta1.SchemeGroupVersion.WithKind("PodDisruptionBudgetStatus"):
 		return &applyconfigurationspolicyv1beta1.PodDisruptionBudgetStatusApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("PodSecurityPolicy"):
-		return &applyconfigurationspolicyv1beta1.PodSecurityPolicyApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("PodSecurityPolicySpec"):
-		return &applyconfigurationspolicyv1beta1.PodSecurityPolicySpecApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("RunAsGroupStrategyOptions"):
-		return &applyconfigurationspolicyv1beta1.RunAsGroupStrategyOptionsApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("RunAsUserStrategyOptions"):
-		return &applyconfigurationspolicyv1beta1.RunAsUserStrategyOptionsApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("RuntimeClassStrategyOptions"):
-		return &applyconfigurationspolicyv1beta1.RuntimeClassStrategyOptionsApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("SELinuxStrategyOptions"):
-		return &applyconfigurationspolicyv1beta1.SELinuxStrategyOptionsApplyConfiguration{}
-	case policyv1beta1.SchemeGroupVersion.WithKind("SupplementalGroupsStrategyOptions"):
-		return &applyconfigurationspolicyv1beta1.SupplementalGroupsStrategyOptionsApplyConfiguration{}
 
 		// Group=rbac.authorization.k8s.io, Version=v1
 	case rbacv1.SchemeGroupVersion.WithKind("AggregationRule"):

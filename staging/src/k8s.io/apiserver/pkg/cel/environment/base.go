@@ -41,7 +41,7 @@ import (
 // desirable because it means that CEL expressions are portable across a wider range
 // of Kubernetes versions.
 func DefaultCompatibilityVersion() *version.Version {
-	return version.MajorMinor(1, 27)
+	return version.MajorMinor(1, 28)
 }
 
 var baseOpts = []VersionedOptions{
@@ -57,7 +57,6 @@ var baseOpts = []VersionedOptions{
 			cel.EagerlyValidateDeclarations(true),
 			cel.DefaultUTCTimeZone(true),
 
-			ext.Strings(),
 			library.URLs(),
 			library.Regex(),
 			library.Lists(),
@@ -77,7 +76,23 @@ var baseOpts = []VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 28),
 		EnvOptions: []cel.EnvOption{
 			cel.CrossTypeNumericComparisons(true),
-			// TODO: Add CEL Optionals once we bump cel-go
+			cel.OptionalTypes(),
+			library.Quantity(),
+		},
+	},
+
+	// String library
+	{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		RemovedVersion:    version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			ext.Strings(ext.StringsVersion(0)),
+		},
+	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
+			ext.Strings(ext.StringsVersion(2)),
 		},
 	},
 }

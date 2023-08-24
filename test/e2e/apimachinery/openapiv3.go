@@ -46,7 +46,7 @@ import (
 
 var _ = SIGDescribe("OpenAPIV3", func() {
 	f := framework.NewDefaultFramework("openapiv3")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release : v1.27

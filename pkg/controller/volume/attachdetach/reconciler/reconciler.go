@@ -28,14 +28,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
-	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -143,17 +141,13 @@ func (rc *reconciler) syncStates() {
 	rc.attacherDetacher.VerifyVolumesAreAttached(volumesPerNode, rc.actualStateOfWorld)
 }
 
-// hasOutOfServiceTaint returns true if the node has out-of-service taint present
-// and `NodeOutOfServiceVolumeDetach` feature gate is enabled.
+// hasOutOfServiceTaint returns true if the node has out-of-service taint present.
 func (rc *reconciler) hasOutOfServiceTaint(nodeName types.NodeName) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeOutOfServiceVolumeDetach) {
-		node, err := rc.nodeLister.Get(string(nodeName))
-		if err != nil {
-			return false, err
-		}
-		return taints.TaintKeyExists(node.Spec.Taints, v1.TaintNodeOutOfService), nil
+	node, err := rc.nodeLister.Get(string(nodeName))
+	if err != nil {
+		return false, err
 	}
-	return false, nil
+	return taints.TaintKeyExists(node.Spec.Taints, v1.TaintNodeOutOfService), nil
 }
 
 // nodeIsHealthy returns true if the node looks healthy.
@@ -269,14 +263,21 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			verifySafeToDetach := !(timeout || hasOutOfServiceTaint)
 			err = rc.attacherDetacher.DetachVolume(logger, attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
-				if !timeout {
+				if verifySafeToDetach { // normal detach
 					logger.Info("attacherDetacher.DetachVolume started", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
-				} else {
-					metrics.RecordForcedDetachMetric()
-					logger.Info("attacherDetacher.DetachVolume started: this volume is not safe to detach, but maxWaitForUnmountDuration expired, force detaching",
-						"duration", rc.maxWaitForUnmountDuration,
-						"node", klog.KRef("", string(attachedVolume.NodeName)),
-						"volumeName", attachedVolume.VolumeName)
+				} else { // force detach
+					if timeout {
+						metrics.RecordForcedDetachMetric(metrics.ForceDetachReasonTimeout)
+						logger.Info("attacherDetacher.DetachVolume started: this volume is not safe to detach, but maxWaitForUnmountDuration expired, force detaching",
+							"duration", rc.maxWaitForUnmountDuration,
+							"node", klog.KRef("", string(attachedVolume.NodeName)),
+							"volumeName", attachedVolume.VolumeName)
+					} else {
+						metrics.RecordForcedDetachMetric(metrics.ForceDetachReasonOutOfService)
+						logger.Info("attacherDetacher.DetachVolume started: node has out-of-service taint, force detaching",
+							"node", klog.KRef("", string(attachedVolume.NodeName)),
+							"volumeName", attachedVolume.VolumeName)
+					}
 				}
 			}
 			if err != nil {

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,12 +68,12 @@ type watcher struct {
 	objectType    string
 	groupResource schema.GroupResource
 	versioner     storage.Versioner
+	transformer   value.Transformer
 }
 
 // watchChan implements watch.Interface.
 type watchChan struct {
 	watcher           *watcher
-	transformer       value.Transformer
 	key               string
 	initialRev        int64
 	recursive         bool
@@ -87,34 +86,18 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, groupResource schema.GroupResource, newFunc func() runtime.Object, versioner storage.Versioner) *watcher {
-	res := &watcher{
-		client:        client,
-		codec:         codec,
-		groupResource: groupResource,
-		newFunc:       newFunc,
-		versioner:     versioner,
-	}
-	if newFunc == nil {
-		res.objectType = "<unknown>"
-	} else {
-		res.objectType = reflect.TypeOf(newFunc()).String()
-	}
-	return res
-}
-
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
 // If rev is zero, it will return the existing object(s) and then start watching from
 // the maximum revision+1 from returned objects.
 // If rev is non-zero, it will watch events happened after given revision.
-// If recursive is false, it watches on given key.
-// If recursive is true, it watches any children and directories under the key, excluding the root key itself.
-// pred must be non-nil. Only if pred matches the change, it will be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, progressNotify bool, transformer value.Transformer, pred storage.SelectionPredicate) (watch.Interface, error) {
-	if recursive && !strings.HasSuffix(key, "/") {
+// If opts.Recursive is false, it watches on given key.
+// If opts.Recursive is true, it watches any children and directories under the key, excluding the root key itself.
+// pred must be non-nil. Only if opts.Predicate matches the change, it will be returned.
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage.ListOptions) (watch.Interface, error) {
+	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
-	wc := w.createWatchChan(ctx, key, rev, recursive, progressNotify, transformer, pred)
+	wc := w.createWatchChan(ctx, key, rev, opts.Recursive, opts.ProgressNotify, opts.Predicate)
 	go wc.run()
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -127,10 +110,9 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, p
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, transformer value.Transformer, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
-		transformer:       transformer,
 		key:               key,
 		initialRev:        rev,
 		recursive:         recursive,
@@ -144,15 +126,7 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		// The filter doesn't filter out any object.
 		wc.internalPred = storage.Everything
 	}
-
-	// The etcd server waits until it cannot find a leader for 3 election
-	// timeouts to cancel existing streams. 3 is currently a hard coded
-	// constant. The election timeout defaults to 1000ms. If the cluster is
-	// healthy, when the leader is stopped, the leadership transfer should be
-	// smooth. (leader transfers its leadership before stopping). If leader is
-	// hard killed, other servers will take an election timeout to realize
-	// leader lost and start campaign.
-	wc.ctx, wc.cancel = context.WithCancel(clientv3.WithRequireLeader(ctx))
+	wc.ctx, wc.cancel = context.WithCancel(ctx)
 	return wc
 }
 
@@ -221,6 +195,10 @@ func (wc *watchChan) Stop() {
 
 func (wc *watchChan) ResultChan() <-chan watch.Event {
 	return wc.resultChan
+}
+
+func (wc *watchChan) RequestWatchProgress() error {
+	return wc.watcher.client.RequestProgress(wc.ctx)
 }
 
 // sync tries to retrieve existing data and send them to process.
@@ -451,7 +429,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	}
 
 	if !e.isDeleted {
-		data, _, err := wc.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -466,7 +444,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}

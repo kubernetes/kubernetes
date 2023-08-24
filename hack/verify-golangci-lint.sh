@@ -26,6 +26,8 @@ Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flag
    -a: automatically select the common base of origin/master and HEAD
        as revision
    -s: select a strict configuration for new code
+   -n: in addition to strict checking, also enable hints (aka nits) that may are may not
+       be useful
    -g <github action file>: also write results with --out-format=github-actions
        to a separate file
    -c <config|"none">: use the specified configuration or none instead of the default hack/golangci.yaml
@@ -48,6 +50,12 @@ PATH="${GOBIN}:${PATH}"
 
 invocation=(./hack/verify-golangci-lint.sh "$@")
 
+# Disable warnings about the logcheck plugin using the old API
+# (https://github.com/golangci/golangci-lint/issues/4001).
+# Can be removed once logcheck gets updated to a newer release
+# which uses the new plugin API
+export GOLANGCI_LINT_HIDE_WARNING_ABOUT_PLUGIN_API_DEPRECATION=1
+
 # The logcheck plugin currently has to be configured via env variables
 # (https://github.com/golangci/golangci-lint/issues/1512).
 #
@@ -59,8 +67,9 @@ golangci=(env LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf" "${GOBIN}/golang
 golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 strict=
+hints=
 githubactions=
-while getopts "ar:sg:c:" o; do
+while getopts "ar:sng:c:" o; do
   case "${o}" in
     a)
       base="$(git merge-base origin/master HEAD)"
@@ -76,6 +85,10 @@ while getopts "ar:sg:c:" o; do
     s)
       golangci_config="${KUBE_ROOT}/hack/golangci-strict.yaml"
       strict=1
+      ;;
+    n)
+      golangci_config="${KUBE_ROOT}/hack/golangci-hints.yaml"
+      hints=1
       ;;
     g)
       githubactions="${OPTARG}"
@@ -95,6 +108,19 @@ done
 
 if [ "${golangci_config}" ]; then
     golangci+=(--config="${golangci_config}")
+fi
+
+# Below the output of golangci-lint is going to be piped into sed to add
+# a prefix to each output line. This helps make the output more visible
+# in the Prow log viewer ("error" is a key word there) and ensures that
+# only those lines get included as failure message in a JUnit file
+# by "make verify".
+#
+# The downside is that the automatic detection whether to colorize output
+# doesn't work anymore, so here we force it ourselves when connected to
+# a tty.
+if tty -s; then
+    golangci+=(--color=always)
 fi
 
 if [ "$base" ]; then
@@ -139,15 +165,15 @@ res=0
 run () {
   if [[ "${#targets[@]}" -gt 0 ]]; then
     echo "running ${golangci[*]} ${targets[*]}" >&2
-    "${golangci[@]}" "${targets[@]}" >&2 || res=$?
+    "${golangci[@]}" "${targets[@]}" 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
   else
     echo "running ${golangci[*]} ./..." >&2
-    "${golangci[@]}" ./... >&2 || res=$?
+    "${golangci[@]}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
     for d in staging/src/k8s.io/*; do
       MODPATH="staging/src/k8s.io/$(basename "${d}")"
       echo "running ( cd ${KUBE_ROOT}/${MODPATH}; ${golangci[*]} --path-prefix ${MODPATH} ./... )"
       pushd "${KUBE_ROOT}/${MODPATH}" >/dev/null
-        "${golangci[@]}" --path-prefix "${MODPATH}" ./... >&2 || res=$?
+        "${golangci[@]}" --path-prefix "${MODPATH}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
       popd >/dev/null
     done
   fi
@@ -173,9 +199,17 @@ else
     echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
     echo ' (if your reviewer is okay with it).'
     if [ "$strict" ]; then
-        echo 'The more strict golangci-strict.yaml was used. If you feel that this warns about issues'
-        echo 'that should be ignored by default, then please discuss with your reviewer and propose'
-        echo 'a change for hack/golangci-strict.yaml as part of your PR.'
+        echo 'The more strict golangci-strict.yaml was used.'
+    elif [ "$hints" ]; then
+        echo 'The golangci-hints.yaml was used. Some of the reported issues may have to be fixed'
+        echo 'while others can be ignored, depending on the circumstances and/or personal'
+        echo 'preferences. To determine which issues have to be fixed, check the report that'
+        echo 'uses golangci-strict.yaml.'
+    fi
+    if [ "$strict" ] || [ "$hints" ]; then
+        echo 'If you feel that this warns about issues that should be ignored by default,'
+        echo 'then please discuss with your reviewer and propose'
+        echo 'a change for hack/golangci.yaml.in as part of your PR.'
     fi
     echo 'In general please prefer to fix the error, we have already disabled specific lints'
     echo ' that the project chooses to ignore.'

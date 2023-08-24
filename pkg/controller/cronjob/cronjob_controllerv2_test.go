@@ -18,6 +18,7 @@ package cronjob
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -1156,6 +1157,26 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectedRequeueDuration:    1*time.Hour - time.Second*time.Duration(shortDead+1) + nextScheduleDelta,
 			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
+		},
+		"do nothing if the namespace is terminating": {
+			jobCreateError: &errors.StatusError{ErrStatus: metav1.Status{Details: &metav1.StatusDetails{Causes: []metav1.StatusCause{
+				{
+					Type:    v1.NamespaceTerminatingCause,
+					Message: fmt.Sprintf("namespace %s is being terminated", metav1.NamespaceDefault),
+					Field:   "metadata.namespace",
+				}}}}},
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectActive:               0,
+			expectRequeueAfter:         false,
+			expectUpdateStatus:         false,
+			expectErr:                  true,
+			jobPresentInCJActiveStatus: false,
 		},
 	}
 	for name, tc := range testCases {

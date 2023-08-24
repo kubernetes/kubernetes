@@ -30,8 +30,13 @@ import (
 	celgo "github.com/google/cel-go/cel"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,12 +46,6 @@ import (
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/util/webhook"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
 var (
@@ -60,6 +59,13 @@ const (
 	StaticEstimatedCostLimit = 10000000
 	// StaticEstimatedCRDCostLimit represents the largest-allowed total cost for the x-kubernetes-validations rules of a CRD.
 	StaticEstimatedCRDCostLimit = 100000000
+)
+
+var supportedValidationReason = sets.NewString(
+	string(apiextensions.FieldValueRequired),
+	string(apiextensions.FieldValueForbidden),
+	string(apiextensions.FieldValueInvalid),
+	string(apiextensions.FieldValueDuplicate),
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -212,7 +218,7 @@ func ValidateCustomResourceDefinitionStoredVersions(storedVersions []string, ver
 	for _, v := range versions {
 		_, ok := storedVersionsMap[v.Name]
 		if v.Storage && !ok {
-			allErrs = append(allErrs, field.Invalid(fldPath, v, "must have the storage version "+v.Name))
+			allErrs = append(allErrs, field.Invalid(fldPath, storedVersions, "must have the storage version "+v.Name))
 		}
 		if ok {
 			delete(storedVersionsMap, v.Name)
@@ -825,7 +831,7 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 
 	// if validation passed otherwise, make sure we can actually construct a schema validator from this custom resource validation.
 	if len(allErrs) == 0 {
-		if _, _, err := apiservervalidation.NewSchemaValidator(customResourceValidation); err != nil {
+		if _, _, err := apiservervalidation.NewSchemaValidator(customResourceValidation.OpenAPIV3Schema); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", fmt.Sprintf("error building validator: %v", err)))
 		}
 	}
@@ -1074,6 +1080,22 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			if len(rule.MessageExpression) > 0 && len(trimmedMsgExpr) == 0 {
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("messageExpression"), "messageExpression must be non-empty if specified"))
 			}
+			if rule.Reason != nil && !supportedValidationReason.Has(string(*rule.Reason)) {
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.NotSupported(fldPath.Child("x-kubernetes-validations").Index(i).Child("reason"), *rule.Reason, supportedValidationReason.List()))
+			}
+			trimmedFieldPath := strings.TrimSpace(rule.FieldPath)
+			if len(rule.FieldPath) > 0 && len(trimmedFieldPath) == 0 {
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must be non-empty if specified"))
+			}
+			if hasNewlines(rule.FieldPath) {
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must not contain line breaks"))
+			}
+			if len(rule.FieldPath) > 0 {
+				if !pathValid(schema, rule.FieldPath) {
+					allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must be a valid path"))
+				}
+
+			}
 		}
 
 		// If any schema related validation errors have been found at this level or deeper, skip CEL expression validation.
@@ -1132,6 +1154,15 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	}
 
 	return allErrs
+}
+
+func pathValid(schema *apiextensions.JSONSchemaProps, path string) bool {
+	// To avoid duplicated code and better maintain, using ValidaFieldPath func to check if the path is valid
+	if ss, err := structuralschema.NewStructural(schema); err == nil {
+		_, err := cel.ValidFieldPath(path, ss)
+		return err == nil
+	}
+	return true
 }
 
 // multiplyWithOverflowGuard returns the product of baseCost and cardinality unless that product

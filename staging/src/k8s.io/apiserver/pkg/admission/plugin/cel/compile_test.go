@@ -50,6 +50,11 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 			hasParams:   true,
 		},
 		{
+			name:        "namespaceObject",
+			expressions: []string{"namespaceObject.metadata.name.startsWith('test')"},
+			hasParams:   true,
+		},
+		{
 			name:             "without params",
 			errorExpressions: map[string]string{"object.foo < params.x": "undeclared reference to 'params'"},
 			hasParams:        false,
@@ -134,6 +139,41 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 				"test() == true": "undeclared reference to 'test'",
 			},
 			envType: environment.NewExpressions,
+		},
+		{
+			name: "valid namespaceObject",
+			expressions: []string{
+				"namespaceObject.metadata != null",
+				"namespaceObject.metadata.name == 'test'",
+				"namespaceObject.metadata.generateName == 'test'",
+				"namespaceObject.metadata.namespace == 'testns'",
+				"'test' in namespaceObject.metadata.labels",
+				"'test' in namespaceObject.metadata.annotations",
+				"namespaceObject.metadata.UID == '12345'",
+				"type(namespaceObject.metadata.creationTimestamp) == google.protobuf.Timestamp",
+				"type(namespaceObject.metadata.deletionTimestamp) == google.protobuf.Timestamp",
+				"namespaceObject.metadata.deletionGracePeriodSeconds == 5",
+				"namespaceObject.metadata.generation == 2",
+				"namespaceObject.metadata.resourceVersion == 'v1'",
+				"namespaceObject.metadata.finalizers[0] == 'testEnv'",
+				"namespaceObject.spec.finalizers[0] == 'testEnv'",
+				"namespaceObject.status.phase == 'Active'",
+				"namespaceObject.status.conditions[0].status == 'True'",
+				"namespaceObject.status.conditions[0].type == 'NamespaceDeletionDiscoveryFailure'",
+				"type(namespaceObject.status.conditions[0].lastTransitionTime) == google.protobuf.Timestamp",
+				"namespaceObject.status.conditions[0].message == 'Unknow'",
+				"namespaceObject.status.conditions[0].reason == 'Invalid'",
+			},
+		},
+		{
+			name: "invalid namespaceObject",
+			errorExpressions: map[string]string{
+				"namespaceObject.foo1 == 'nope'":                      "undefined field 'foo1'",
+				"namespaceObject.metadata.foo2 == 'nope'":             "undefined field 'foo2'",
+				"namespaceObject.spec.foo3 == 'nope'":                 "undefined field 'foo3'",
+				"namespaceObject.status.foo4 == 'nope'":               "undefined field 'foo4'",
+				"namespaceObject.status.conditions[0].foo5 == 'nope'": "undefined field 'foo5'",
+			},
 		},
 	}
 

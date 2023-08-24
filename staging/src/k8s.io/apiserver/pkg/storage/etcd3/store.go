@@ -32,19 +32,16 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -85,6 +82,12 @@ type store struct {
 	leaseManager        *leaseManager
 }
 
+func (s *store) RequestWatchProgress(ctx context.Context) error {
+	// Use watchContext to match ctx metadata provided when creating the watch.
+	// In best case scenario we would use the same context that watch was created, but there is no way access it from watchCache.
+	return s.client.RequestProgress(s.watchContext(ctx))
+}
+
 type objState struct {
 	obj   runtime.Object
 	meta  *storage.ResponseMeta
@@ -94,11 +97,11 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
-	return newStore(c, codec, newFunc, prefix, groupResource, transformer, pagingEnabled, leaseManagerConfig)
+func New(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
+	return newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, pagingEnabled, leaseManagerConfig)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
+func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
 	versioner := storage.APIObjectVersioner{}
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
@@ -108,7 +111,23 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		// Ensure the pathPrefix ends in "/" here to simplify key concatenation later.
 		pathPrefix += "/"
 	}
-	result := &store{
+
+	// TODO(p0lyn0mial): pass newListFunc and resourcePrefix to the watcher
+	w := &watcher{
+		client:        c,
+		codec:         codec,
+		groupResource: groupResource,
+		newFunc:       newFunc,
+		versioner:     versioner,
+		transformer:   transformer,
+	}
+	if newFunc == nil {
+		w.objectType = "<unknown>"
+	} else {
+		w.objectType = reflect.TypeOf(newFunc()).String()
+	}
+
+	s := &store{
 		client:              c,
 		codec:               codec,
 		versioner:           versioner,
@@ -117,10 +136,10 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		pathPrefix:          pathPrefix,
 		groupResource:       groupResource,
 		groupResourceString: groupResource.String(),
-		watcher:             newWatcher(c, codec, groupResource, newFunc, versioner),
+		watcher:             w,
 		leaseManager:        newDefaultLeaseManager(c, leaseManagerConfig),
 	}
-	return result
+	return s
 }
 
 // Versioner implements storage.Interface.Versioner.
@@ -820,11 +839,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		// getResp.Count counts in objects that do not match the pred.
 		// Instead of returning inaccurate count for non-empty selectors, we return nil.
 		// Only set remainingItemCount if the predicate is empty.
-		if utilfeature.DefaultFeatureGate.Enabled(features.RemainingItemCount) {
-			if pred.Empty() {
-				c := int64(getResp.Count - pred.Limit)
-				remainingItemCount = &c
-			}
+		if pred.Empty() {
+			c := int64(getResp.Count - pred.Limit)
+			remainingItemCount = &c
 		}
 		return s.versioner.UpdateList(listObj, uint64(returnedRV), next, remainingItemCount)
 	}
@@ -885,7 +902,18 @@ func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions)
 	if err != nil {
 		return nil, err
 	}
-	return s.watcher.Watch(ctx, preparedKey, int64(rev), opts.Recursive, opts.ProgressNotify, s.transformer, opts.Predicate)
+	return s.watcher.Watch(s.watchContext(ctx), preparedKey, int64(rev), opts)
+}
+
+func (s *store) watchContext(ctx context.Context) context.Context {
+	// The etcd server waits until it cannot find a leader for 3 election
+	// timeouts to cancel existing streams. 3 is currently a hard coded
+	// constant. The election timeout defaults to 1000ms. If the cluster is
+	// healthy, when the leader is stopped, the leadership transfer should be
+	// smooth. (leader transfers its leadership before stopping). If leader is
+	// hard killed, other servers will take an election timeout to realize
+	// leader lost and start campaign.
+	return clientv3.WithRequireLeader(ctx)
 }
 
 func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {

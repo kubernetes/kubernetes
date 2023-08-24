@@ -41,7 +41,10 @@ var (
 		TimeZone:          pointer.String("Asia/Shanghai"),
 		JobTemplate: batch.JobTemplateSpec{
 			Spec: batch.JobSpec{
-				Template: validPodTemplateSpec,
+				Template:       validPodTemplateSpec,
+				CompletionMode: completionModePtr(batch.IndexedCompletion),
+				Completions:    pointer.Int32(10),
+				Parallelism:    pointer.Int32(10),
 			},
 		},
 	}
@@ -56,6 +59,10 @@ var (
 		},
 	}
 )
+
+func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
+	return &m
+}
 
 func TestCronJobStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
@@ -222,14 +229,14 @@ func TestStrategy_ResetFields(t *testing.T) {
 	}
 }
 
-func TestJobStatusStrategy_ResetFields(t *testing.T) {
+func TestCronJobStatusStrategy_ResetFields(t *testing.T) {
 	resetFields := StatusStrategy.GetResetFields()
 	if len(resetFields) != 2 {
 		t.Errorf("ResetFields should have 2 elements, but have %d", len(resetFields))
 	}
 }
 
-func TestJobStrategy_WarningsOnCreate(t *testing.T) {
+func TestCronJobStrategy_WarningsOnCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	now := metav1.Now()
@@ -291,7 +298,7 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 	}
 }
 
-func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
+func TestCronJobStrategy_WarningsOnUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	now := metav1.Now()
 
@@ -380,7 +387,7 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 					JobTemplate: batch.JobTemplateSpec{
 						Spec: batch.JobSpec{
 							Template: api.PodTemplateSpec{
-								Spec: api.PodSpec{Volumes: []api.Volume{{Name: "volume-name"}, {Name: "volume-name"}}},
+								Spec: api.PodSpec{ImagePullSecrets: []api.LocalObjectReference{{Name: ""}}},
 							},
 						},
 					},

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -64,7 +65,7 @@ var (
 // We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.
 var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.It("Should be able to send traffic between Pods without SNAT", func(ctx context.Context) {
 		cs := f.ClientSet
 		pc := cs.CoreV1().Pods(f.Namespace.Name)
@@ -116,7 +117,7 @@ var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 				targetAddr := net.JoinHostPort(targetPod.Status.PodIP, testPodPort)
 				sourceIP, execPodIP := execSourceIPTest(sourcePod, targetAddr)
 				ginkgo.By("Verifying the preserved source ip")
-				framework.ExpectEqual(sourceIP, execPodIP)
+				gomega.Expect(sourceIP).To(gomega.Equal(execPodIP))
 			}
 		}
 	})

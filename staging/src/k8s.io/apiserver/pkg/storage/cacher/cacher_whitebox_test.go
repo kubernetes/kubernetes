@@ -30,7 +30,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,37 +37,18 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
 )
-
-var (
-	scheme   = runtime.NewScheme()
-	codecs   = serializer.NewCodecFactory(scheme)
-	errDummy = fmt.Errorf("dummy error")
-)
-
-func init() {
-	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	utilruntime.Must(example.AddToScheme(scheme))
-	utilruntime.Must(examplev1.AddToScheme(scheme))
-	utilruntime.Must(example2v1.AddToScheme(scheme))
-}
 
 func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 	prefix := "pods"
@@ -104,6 +84,10 @@ type dummyStorage struct {
 	err       error
 	getListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
 	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
+}
+
+func (d *dummyStorage) RequestWatchProgress(ctx context.Context) error {
+	return nil
 }
 
 type dummyWatch struct {
@@ -170,6 +154,49 @@ func (d *dummyStorage) injectError(err error) {
 }
 
 func TestGetListCacheBypass(t *testing.T) {
+	type testCase struct {
+		opts         storage.ListOptions
+		expectBypass bool
+	}
+	commonTestCases := []testCase{
+		{opts: storage.ListOptions{ResourceVersion: "0"}, expectBypass: false},
+		{opts: storage.ListOptions{ResourceVersion: "1"}, expectBypass: false},
+
+		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
+
+		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: false},
+		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
+
+		{opts: storage.ListOptions{ResourceVersion: "", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
+	}
+
+	t.Run("ConsistentListFromStorage", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+		testCases := append(commonTestCases,
+			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
+		)
+		for _, tc := range testCases {
+			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+		}
+
+	})
+	t.Run("ConsistentListFromCache", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+		testCases := append(commonTestCases,
+			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
+		)
+		for _, tc := range testCases {
+			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+		}
+	})
+}
+
+func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectBypass bool) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -177,34 +204,37 @@ func TestGetListCacheBypass(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-	pred := storage.SelectionPredicate{
-		Limit: 500,
-	}
 	result := &example.PodList{}
 
 	// Wait until cacher is initialized.
 	if err := cacher.ready.wait(context.Background()); err != nil {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
-
 	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
-	err = cacher.GetList(context.TODO(), "pods/ns", storage.ListOptions{
-		ResourceVersion: "0",
-		Predicate:       pred,
-		Recursive:       true,
-	}, result)
-	if err != nil {
-		t.Errorf("GetList with Limit and RV=0 should be served from cache: %v", err)
+	backingStorage.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+		currentResourceVersion := "42"
+		switch {
+		// request made by getCurrentResourceVersionFromStorage by checking Limit
+		case key == cacher.resourcePrefix:
+			podList := listObj.(*example.PodList)
+			podList.ResourceVersion = currentResourceVersion
+			return nil
+		// request made by storage.GetList with revision from original request or
+		// returned by getCurrentResourceVersionFromStorage
+		case opts.ResourceVersion == options.ResourceVersion || opts.ResourceVersion == currentResourceVersion:
+			return errDummy
+		default:
+			t.Fatalf("Unexpected request %+v", opts)
+			return nil
+		}
 	}
-
-	err = cacher.GetList(context.TODO(), "pods/ns", storage.ListOptions{
-		ResourceVersion: "",
-		Predicate:       pred,
-		Recursive:       true,
-	}, result)
-	if err != errDummy {
-		t.Errorf("GetList with Limit without RV=0 should bypass cacher: %v", err)
+	err = cacher.GetList(context.TODO(), "pods/ns", options, result)
+	if err != nil && err != errDummy {
+		t.Fatalf("Unexpected error for List request with options: %v, err: %v", options, err)
+	}
+	gotBypass := err == errDummy
+	if gotBypass != expectBypass {
+		t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", options, expectBypass, gotBypass)
 	}
 }
 
@@ -312,7 +342,7 @@ func TestWatchCacheBypass(t *testing.T) {
 }
 
 func TestEmptyWatchEventCache(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix(), true)
 	defer server.Terminate(t)
 
 	// add a few objects
@@ -760,27 +790,6 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 		}
 		t.Errorf("unexpected bookmark watchers %v", numWatchers)
 	}
-}
-
-func TestWatchInitializationSignal(t *testing.T) {
-	backingStorage := &dummyStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	initSignal := utilflowcontrol.NewInitializationSignal()
-	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
-
-	_, err = cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Failed to create watch: %v", err)
-	}
-
-	initSignal.Wait()
 }
 
 func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBookmarks bool) {
@@ -1799,76 +1808,6 @@ func TestCacherWatchSemantics(t *testing.T) {
 			verifyNoEvents(t, w)
 		})
 	}
-}
-
-func TestGetCurrentResourceVersionFromStorage(t *testing.T) {
-	// test data
-	newEtcdTestStorage := func(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
-		server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-		storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion, example2v1.SchemeGroupVersion), func() runtime.Object { return &example.Pod{} }, prefix, schema.GroupResource{Resource: "pods"}, identity.NewEncryptCheckTransformer(), true, etcd3.NewDefaultLeaseManagerConfig())
-		return server, storage
-	}
-	server, etcdStorage := newEtcdTestStorage(t, "")
-	defer server.Terminate(t)
-	podCacher, versioner, err := newTestCacher(etcdStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create podCacher: %v", err)
-	}
-	defer podCacher.Stop()
-
-	makePod := func(name string) *example.Pod {
-		return &example.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
-		}
-	}
-	createPod := func(obj *example.Pod) *example.Pod {
-		key := "pods/" + obj.Namespace + "/" + obj.Name
-		out := &example.Pod{}
-		err := etcdStorage.Create(context.TODO(), key, obj, out, 0)
-		require.NoError(t, err)
-		return out
-	}
-	getPod := func(name, ns string) *example.Pod {
-		key := "pods/" + ns + "/" + name
-		out := &example.Pod{}
-		err := etcdStorage.Get(context.TODO(), key, storage.GetOptions{}, out)
-		require.NoError(t, err)
-		return out
-	}
-	makeReplicaSet := func(name string) *example2v1.ReplicaSet {
-		return &example2v1.ReplicaSet{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
-		}
-	}
-	createReplicaSet := func(obj *example2v1.ReplicaSet) *example2v1.ReplicaSet {
-		key := "replicasets/" + obj.Namespace + "/" + obj.Name
-		out := &example2v1.ReplicaSet{}
-		err := etcdStorage.Create(context.TODO(), key, obj, out, 0)
-		require.NoError(t, err)
-		return out
-	}
-
-	// create a pod and make sure its RV is equal to the one maintained by etcd
-	pod := createPod(makePod("pod-1"))
-	currentStorageRV, err := podCacher.getCurrentResourceVersionFromStorage(context.TODO())
-	require.NoError(t, err)
-	podRV, err := versioner.ParseResourceVersion(pod.ResourceVersion)
-	require.NoError(t, err)
-	require.Equal(t, currentStorageRV, podRV, "expected the global etcd RV to be equal to pod's RV")
-
-	// now create a replicaset (new resource) and make sure the target function returns global etcd RV
-	rs := createReplicaSet(makeReplicaSet("replicaset-1"))
-	currentStorageRV, err = podCacher.getCurrentResourceVersionFromStorage(context.TODO())
-	require.NoError(t, err)
-	rsRV, err := versioner.ParseResourceVersion(rs.ResourceVersion)
-	require.NoError(t, err)
-	require.Equal(t, currentStorageRV, rsRV, "expected the global etcd RV to be equal to replicaset's RV")
-
-	// ensure that the pod's RV hasn't been changed
-	currentPod := getPod(pod.Name, pod.Namespace)
-	currentPodRV, err := versioner.ParseResourceVersion(currentPod.ResourceVersion)
-	require.NoError(t, err)
-	require.Equal(t, currentPodRV, podRV, "didn't expect to see the pod's RV changed")
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {

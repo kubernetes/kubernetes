@@ -22,10 +22,16 @@ import (
 	"golang.org/x/text/width"
 )
 
-// Error type which references a location within source and a message.
+// NewError creates an error associated with an expression id with the given message at the given location.
+func NewError(id int64, message string, location Location) *Error {
+	return &Error{Message: message, Location: location, ExprID: id}
+}
+
+// Error type which references an expression id, a location within source, and a message.
 type Error struct {
 	Location Location
 	Message  string
+	ExprID   int64
 }
 
 const (

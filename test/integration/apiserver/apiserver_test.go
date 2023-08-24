@@ -53,16 +53,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -381,8 +378,6 @@ func TestListOptions(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
-
 			var storageTransport *storagebackend.TransportConfig
 			clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
@@ -576,9 +571,8 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 
 	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
 	// the limit is respected when testing here.
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(opts.Continue) > 0
-	hasLimit := pagingEnabled && opts.Limit > 0 && opts.ResourceVersion != "0"
+	hasContinuation := len(opts.Continue) > 0
+	hasLimit := opts.Limit > 0 && opts.ResourceVersion != "0"
 	skipWatchCache := opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
 	usingWatchCache := watchCacheEnabled && !skipWatchCache
 
@@ -626,8 +620,6 @@ func TestListResourceVersion0(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 
 			clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
@@ -685,7 +677,6 @@ func TestListResourceVersion0(t *testing.T) {
 }
 
 func TestAPIListChunking(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 	ctx, clientSet, _, tearDownFn := setup(t)
 	defer tearDownFn()
 
@@ -753,7 +744,6 @@ func TestAPIListChunking(t *testing.T) {
 }
 
 func TestAPIListChunkingWithLabelSelector(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 	ctx, clientSet, _, tearDownFn := setup(t)
 	defer tearDownFn()
 

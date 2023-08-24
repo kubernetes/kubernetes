@@ -31,7 +31,7 @@ import (
 
 var _ = SIGDescribe("crictl", func() {
 	f := framework.NewDefaultFramework("crictl")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// `crictl` is not available on all cloud providers.

@@ -1688,6 +1688,40 @@ func TestGenerateService(t *testing.T) {
 				},
 			},
 		},
+		// Fixed #114402 kubectl expose fails for apps with same-port, different-protocol
+		"test #114402": {
+			selector:  "foo=bar,baz=blah",
+			name:      "test",
+			clusterIP: "None",
+			protocols: "53/TCP,53/UDP",
+			port:      "53",
+			expected: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []corev1.ServicePort{
+						{
+							Name:       "port-1-tcp",
+							Port:       53,
+							Protocol:   corev1.ProtocolTCP,
+							TargetPort: intstr.FromInt32(53),
+						},
+						{
+							Name:       "port-1-udp",
+							Port:       53,
+							Protocol:   corev1.ProtocolUDP,
+							TargetPort: intstr.FromInt32(53),
+						},
+					},
+					ClusterIP: corev1.ClusterIPNone,
+				},
+			},
+		},
 		"check selector": {
 			name:       "test",
 			protocol:   "SCTP",

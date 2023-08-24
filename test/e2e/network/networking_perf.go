@@ -140,7 +140,7 @@ func iperf2ClientDaemonSet(ctx context.Context, client clientset.Interface, name
 var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
 	// this test runs iperf2: one pod as a server, and a daemonset of clients
 	f := framework.NewDefaultFramework("network-perf")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should run iperf2", func(ctx context.Context) {
 		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)

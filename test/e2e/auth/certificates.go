@@ -47,7 +47,7 @@ import (
 
 var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("certificates")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.19

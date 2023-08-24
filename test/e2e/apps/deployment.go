@@ -86,7 +86,7 @@ var _ = SIGDescribe("Deployment", func() {
 	})
 
 	f := framework.NewDefaultFramework("deployment")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -194,6 +194,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeploymentDefaultReplicas := int32(2)
 		testDeploymentMinimumReplicas := int32(1)
 		testDeploymentNoReplicas := int32(0)
+		testDeploymentAvailableReplicas := int32(0)
 		testDeploymentLabels := map[string]string{"test-deployment-static": "true"}
 		testDeploymentLabelsFlat := "test-deployment-static=true"
 		w := &cache.ListWatch{
@@ -399,14 +400,14 @@ var _ = SIGDescribe("Deployment", func() {
 				"labels": map[string]string{"test-deployment": "patched-status"},
 			},
 			"status": map[string]interface{}{
-				"readyReplicas": testDeploymentNoReplicas,
+				"readyReplicas":     testDeploymentNoReplicas,
+				"availableReplicas": testDeploymentAvailableReplicas,
 			},
 		})
 		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
-		// This test is broken, patching fails with:
-		// Deployment.apps "test-deployment" is invalid: status.availableReplicas: Invalid value: 2: cannot be greater than readyReplicas
-		// https://github.com/kubernetes/kubernetes/issues/113259
-		_, _ = dc.Resource(deploymentResource).Namespace(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentStatusPatch), metav1.PatchOptions{}, "status")
+
+		_, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentStatusPatch), metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err)
 
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
@@ -670,7 +671,7 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 }
 
 func intOrStrP(num int) *intstr.IntOrString {
-	intstr := intstr.FromInt(num)
+	intstr := intstr.FromInt32(int32(num))
 	return &intstr
 }
 
@@ -694,7 +695,7 @@ func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentNa
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rss, err := c.AppsV1().ReplicaSets(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	gomega.Expect(rss.Items).Should(gomega.HaveLen(0))
+	gomega.Expect(rss.Items).Should(gomega.BeEmpty())
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
 	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {

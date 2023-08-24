@@ -42,6 +42,10 @@ type LatencyMetric interface {
 	Observe(ctx context.Context, verb string, u url.URL, latency time.Duration)
 }
 
+type ResolverLatencyMetric interface {
+	Observe(ctx context.Context, host string, latency time.Duration)
+}
+
 // SizeMetric observes client response size partitioned by verb and host.
 type SizeMetric interface {
 	Observe(ctx context.Context, verb string, host string, size float64)
@@ -82,6 +86,8 @@ var (
 	ClientCertRotationAge DurationMetric = noopDuration{}
 	// RequestLatency is the latency metric that rest clients will update.
 	RequestLatency LatencyMetric = noopLatency{}
+	// ResolverLatency is the latency metric that DNS resolver will update
+	ResolverLatency ResolverLatencyMetric = noopResolverLatency{}
 	// RequestSize is the request size metric that rest clients will update.
 	RequestSize SizeMetric = noopSize{}
 	// ResponseSize is the response size metric that rest clients will update.
@@ -109,6 +115,7 @@ type RegisterOpts struct {
 	ClientCertExpiry      ExpiryMetric
 	ClientCertRotationAge DurationMetric
 	RequestLatency        LatencyMetric
+	ResolverLatency       ResolverLatencyMetric
 	RequestSize           SizeMetric
 	ResponseSize          SizeMetric
 	RateLimiterLatency    LatencyMetric
@@ -131,6 +138,9 @@ func Register(opts RegisterOpts) {
 		}
 		if opts.RequestLatency != nil {
 			RequestLatency = opts.RequestLatency
+		}
+		if opts.ResolverLatency != nil {
+			ResolverLatency = opts.ResolverLatency
 		}
 		if opts.RequestSize != nil {
 			RequestSize = opts.RequestSize
@@ -170,6 +180,11 @@ func (noopExpiry) Set(*time.Time) {}
 type noopLatency struct{}
 
 func (noopLatency) Observe(context.Context, string, url.URL, time.Duration) {}
+
+type noopResolverLatency struct{}
+
+func (n noopResolverLatency) Observe(ctx context.Context, host string, latency time.Duration) {
+}
 
 type noopSize struct{}
 

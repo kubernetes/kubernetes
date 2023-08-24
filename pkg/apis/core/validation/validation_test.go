@@ -54,6 +54,14 @@ const (
 	envVarNameErrMsg        = "a valid environment variable name must consist of"
 )
 
+var (
+	containerRestartPolicyAlways    = core.ContainerRestartPolicyAlways
+	containerRestartPolicyOnFailure = core.ContainerRestartPolicy("OnFailure")
+	containerRestartPolicyNever     = core.ContainerRestartPolicy("Never")
+	containerRestartPolicyInvalid   = core.ContainerRestartPolicy("invalid")
+	containerRestartPolicyEmpty     = core.ContainerRestartPolicy("")
+)
+
 type topologyPair struct {
 	key   string
 	value string
@@ -1471,7 +1479,7 @@ func testVolumeSnapshotDataSourceInSpec(name string, kind string, apiGroup strin
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -1557,7 +1565,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -1714,7 +1722,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 			enableReadWriteOncePod: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -1726,7 +1734,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 			enableReadWriteOncePod: false,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -1738,7 +1746,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 			enableReadWriteOncePod: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod", "ReadWriteMany"},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -1758,7 +1766,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 					core.ReadWriteOnce,
 					core.ReadOnlyMany,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("0G"),
 					},
@@ -1780,7 +1788,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 					core.ReadWriteOnce,
 					core.ReadOnlyMany,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -1791,7 +1799,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{"fakemode"},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -1801,7 +1809,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 		"no-access-modes": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -1822,7 +1830,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				AccessModes: []core.PersistentVolumeAccessMode{
 					core.ReadWriteOnce,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 					},
@@ -1842,7 +1850,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 					core.ReadWriteOnce,
 					core.ReadOnlyMany,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("-10G"),
 					},
@@ -1862,7 +1870,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 					core.ReadWriteOnce,
 					core.ReadOnlyMany,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("0G"),
 					},
@@ -1882,7 +1890,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 					core.ReadWriteOnce,
 					core.ReadOnlyMany,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -1897,7 +1905,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 					core.ReadWriteOnce,
 					core.ReadOnlyMany,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -1911,7 +1919,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				AccessModes: []core.PersistentVolumeAccessMode{
 					core.ReadWriteOnce,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -2055,7 +2063,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2068,7 +2076,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2078,7 +2086,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2089,7 +2097,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2101,7 +2109,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("20G"),
 			},
@@ -2112,7 +2120,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2124,7 +2132,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 		},
 		VolumeMode: &file,
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2136,7 +2144,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 		},
 		VolumeMode: &block,
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2148,7 +2156,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 		},
 		VolumeMode: nil,
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2159,7 +2167,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2170,7 +2178,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2182,7 +2190,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2194,7 +2202,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("15G"),
 			},
@@ -2208,7 +2216,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("5G"),
 			},
@@ -2222,7 +2230,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("12G"),
 			},
@@ -2235,7 +2243,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2246,7 +2254,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2257,7 +2265,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2268,7 +2276,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2280,7 +2288,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadOnlyMany,
 			},
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 				},
@@ -2292,7 +2300,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadOnlyMany,
 			},
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 				},
@@ -2304,7 +2312,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadOnlyMany,
 			},
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 				},
@@ -2315,7 +2323,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOncePod,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2327,7 +2335,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOncePod,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -2339,7 +2347,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("15G"),
 			},
@@ -2356,7 +2364,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("12G"),
 			},
@@ -2373,7 +2381,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceStorage: resource.MustParse("13G"),
 			},
@@ -2390,7 +2398,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceStorage: resource.MustParse("10G"),
 			},
@@ -2407,7 +2415,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceStorage: resource.MustParse("3G"),
 			},
@@ -2420,11 +2428,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	})
 
 	scenarios := map[string]struct {
-		isExpectedFailure                    bool
-		oldClaim                             *core.PersistentVolumeClaim
-		newClaim                             *core.PersistentVolumeClaim
-		enableRecoverFromExpansion           bool
-		enableRetroactiveDefaultStorageClass bool
+		isExpectedFailure          bool
+		oldClaim                   *core.PersistentVolumeClaim
+		newClaim                   *core.PersistentVolumeClaim
+		enableRecoverFromExpansion bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
@@ -2536,67 +2543,34 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			newClaim:          validClaimStorageClassInSpec,
 		},
 		"valid-upgrade-nil-storage-class-spec-to-spec": {
-			isExpectedFailure:                    false,
-			oldClaim:                             validClaimStorageClassNil,
-			newClaim:                             validClaimStorageClassInSpec,
-			enableRetroactiveDefaultStorageClass: true,
-			// Feature enabled - change from nil sc name is valid if there is no beta annotation.
-		},
-		"invalid-upgrade-nil-storage-class-spec-to-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassNil,
-			newClaim:                             validClaimStorageClassInSpec,
-			enableRetroactiveDefaultStorageClass: false,
-			// Feature disabled - change from nil sc name is invalid if there is no beta annotation.
+			isExpectedFailure: false,
+			oldClaim:          validClaimStorageClassNil,
+			newClaim:          validClaimStorageClassInSpec,
 		},
 		"invalid-upgrade-not-nil-storage-class-spec-to-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInSpec,
-			newClaim:                             validClaimStorageClassInSpecChanged,
-			enableRetroactiveDefaultStorageClass: true,
-			// Feature enablement must not allow non nil value change.
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInSpec,
+			newClaim:          validClaimStorageClassInSpecChanged,
 		},
 		"invalid-upgrade-to-nil-storage-class-spec-to-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInSpec,
-			newClaim:                             validClaimStorageClassNil,
-			enableRetroactiveDefaultStorageClass: true,
-			// Feature enablement must not allow change to nil value change.
-		},
-		"valid-upgrade-storage-class-annotation-and-nil-spec-to-spec": {
-			isExpectedFailure:                    false,
-			oldClaim:                             validClaimStorageClassInAnnotationAndNilInSpec,
-			newClaim:                             validClaimStorageClassInAnnotationAndSpec,
-			enableRetroactiveDefaultStorageClass: false,
-			// Change from nil sc name is valid if annotations match.
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInSpec,
+			newClaim:          validClaimStorageClassNil,
 		},
 		"valid-upgrade-storage-class-annotation-and-nil-spec-to-spec-retro": {
-			isExpectedFailure:                    false,
-			oldClaim:                             validClaimStorageClassInAnnotationAndNilInSpec,
-			newClaim:                             validClaimStorageClassInAnnotationAndSpec,
-			enableRetroactiveDefaultStorageClass: true,
-			// Change from nil sc name is valid if annotations match, feature enablement must not break this old behavior.
-		},
-		"invalid-upgrade-storage-class-annotation-and-spec-to-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInAnnotationAndSpec,
-			newClaim:                             validClaimStorageClassInSpecChanged,
-			enableRetroactiveDefaultStorageClass: false,
-			// Change from non nil sc name is invalid if annotations don't match.
+			isExpectedFailure: false,
+			oldClaim:          validClaimStorageClassInAnnotationAndNilInSpec,
+			newClaim:          validClaimStorageClassInAnnotationAndSpec,
 		},
 		"invalid-upgrade-storage-class-annotation-and-spec-to-spec-retro": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInAnnotationAndSpec,
-			newClaim:                             validClaimStorageClassInSpecChanged,
-			enableRetroactiveDefaultStorageClass: true,
-			// Change from non nil sc name is invalid if annotations don't match, feature enablement must not break this old behavior.
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInAnnotationAndSpec,
+			newClaim:          validClaimStorageClassInSpecChanged,
 		},
 		"invalid-upgrade-storage-class-annotation-and-no-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInAnnotationAndNilInSpec,
-			newClaim:                             validClaimStorageClassInSpecChanged,
-			enableRetroactiveDefaultStorageClass: true,
-			// Change from nil sc name is invalid if annotations don't match, feature enablement must not break this old behavior.
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInAnnotationAndNilInSpec,
+			newClaim:          validClaimStorageClassInSpecChanged,
 		},
 		"invalid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: true,
@@ -2662,7 +2636,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, scenario.enableRetroactiveDefaultStorageClass)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			opts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
@@ -2687,45 +2660,40 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                 nil,
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                true,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop allowed because feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                true,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop not allowed because not used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                false,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             false,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop allowed because used and feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                true,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop allowed because used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                true,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 	}
@@ -2736,7 +2704,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
 			if opts != tc.expectValidationOpts {
-				t.Errorf("Expected opts: %+v, received: %+v", opts, tc.expectValidationOpts)
+				t.Errorf("Expected opts: %+v, received: %+v", tc.expectValidationOpts, opts)
 			}
 		})
 	}
@@ -5378,7 +5346,7 @@ func createTestVolModePVC(vmode *core.PersistentVolumeMode) *core.PersistentVolu
 			Namespace: "default",
 		},
 		Spec: core.PersistentVolumeClaimSpec{
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 				},
@@ -5954,7 +5922,7 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
+		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
 	}, {
 		name: "metadata.annotations without subscript",
 		envs: []core.EnvVar{{
@@ -5966,7 +5934,7 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
+		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
 	}, {
 		name: "metadata.annotations with invalid key",
 		envs: []core.EnvVar{{
@@ -6002,7 +5970,7 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		}},
-		expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
+		expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
 	},
 	}
 	for _, tc := range errorCases {
@@ -6157,7 +6125,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 				AccessModes: []core.PersistentVolumeAccessMode{
 					core.ReadWriteOnce,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -6465,7 +6433,7 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 				AccessModes: []core.PersistentVolumeAccessMode{
 					core.ReadWriteOnce,
 				},
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 					},
@@ -6554,8 +6522,6 @@ func TestValidateProbe(t *testing.T) {
 }
 
 func Test_validateProbe(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProbeTerminationGracePeriod, true)()
-
 	fldPath := field.NewPath("test")
 	type args struct {
 		probe   *core.Probe
@@ -7169,6 +7135,71 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 		}},
 		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].resizePolicy"}},
+	}, {
+		"Forbidden RestartPolicy: Always",
+		line(),
+		[]core.EphemeralContainer{{
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "foo",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				RestartPolicy:            &containerRestartPolicyAlways,
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
+	}, {
+		"Forbidden RestartPolicy: OnFailure",
+		line(),
+		[]core.EphemeralContainer{{
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "foo",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				RestartPolicy:            &containerRestartPolicyOnFailure,
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
+	}, {
+		"Forbidden RestartPolicy: Never",
+		line(),
+		[]core.EphemeralContainer{{
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "foo",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				RestartPolicy:            &containerRestartPolicyNever,
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
+	}, {
+		"Forbidden RestartPolicy: invalid",
+		line(),
+		[]core.EphemeralContainer{{
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "foo",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				RestartPolicy:            &containerRestartPolicyInvalid,
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
+	}, {
+		"Forbidden RestartPolicy: empty",
+		line(),
+		[]core.EphemeralContainer{{
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "foo",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				RestartPolicy:            &containerRestartPolicyEmpty,
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].restartPolicy"}},
 	},
 	}
 
@@ -8026,6 +8057,61 @@ func TestValidateContainers(t *testing.T) {
 			},
 		}},
 		field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "containers[0].resizePolicy"}},
+	}, {
+		"Forbidden RestartPolicy: Always",
+		line(),
+		[]core.Container{{
+			Name:                     "foo",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
+	}, {
+		"Forbidden RestartPolicy: OnFailure",
+		line(),
+		[]core.Container{{
+			Name:                     "foo",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyOnFailure,
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
+	}, {
+		"Forbidden RestartPolicy: Never",
+		line(),
+		[]core.Container{{
+			Name:                     "foo",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyNever,
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
+	}, {
+		"Forbidden RestartPolicy: invalid",
+		line(),
+		[]core.Container{{
+			Name:                     "foo",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyInvalid,
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
+	}, {
+		"Forbidden RestartPolicy: empty",
+		line(),
+		[]core.Container{{
+			Name:                     "foo",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyEmpty,
+		}},
+		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].restartPolicy"}},
 	},
 	}
 	for _, tc := range errorCases {
@@ -8075,6 +8161,47 @@ func TestValidateInitContainers(t *testing.T) {
 		},
 		ImagePullPolicy:          "IfNotPresent",
 		TerminationMessagePolicy: "File",
+	}, {
+		Name:                     "container-3-restart-always-with-lifecycle-hook-and-probes",
+		Image:                    "image",
+		ImagePullPolicy:          "IfNotPresent",
+		TerminationMessagePolicy: "File",
+		RestartPolicy:            &containerRestartPolicyAlways,
+		Lifecycle: &core.Lifecycle{
+			PostStart: &core.LifecycleHandler{
+				Exec: &core.ExecAction{
+					Command: []string{"echo", "post start"},
+				},
+			},
+			PreStop: &core.LifecycleHandler{
+				Exec: &core.ExecAction{
+					Command: []string{"echo", "pre stop"},
+				},
+			},
+		},
+		LivenessProbe: &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt32(80),
+				},
+			},
+			SuccessThreshold: 1,
+		},
+		ReadinessProbe: &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt32(80),
+				},
+			},
+		},
+		StartupProbe: &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt32(80),
+				},
+			},
+			SuccessThreshold: 1,
+		},
 	},
 	}
 	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
@@ -8231,6 +8358,226 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 		}},
 		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
+	}, {
+		"Not supported RestartPolicy: OnFailure",
+		line(),
+		[]core.Container{{
+			Name:                     "init",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyOnFailure,
+		}},
+		field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].restartPolicy", BadValue: containerRestartPolicyOnFailure}},
+	}, {
+		"Not supported RestartPolicy: Never",
+		line(),
+		[]core.Container{{
+			Name:                     "init",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyNever,
+		}},
+		field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].restartPolicy", BadValue: containerRestartPolicyNever}},
+	}, {
+		"Not supported RestartPolicy: invalid",
+		line(),
+		[]core.Container{{
+			Name:                     "init",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyInvalid,
+		}},
+		field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].restartPolicy", BadValue: containerRestartPolicyInvalid}},
+	}, {
+		"Not supported RestartPolicy: empty",
+		line(),
+		[]core.Container{{
+			Name:                     "init",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyEmpty,
+		}},
+		field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].restartPolicy", BadValue: containerRestartPolicyEmpty}},
+	}, {
+		"invalid startup probe in restartable container, successThreshold != 1",
+		line(),
+		[]core.Container{{
+			Name:                     "restartable-init",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			StartupProbe: &core.Probe{
+				ProbeHandler: core.ProbeHandler{
+					TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
+				},
+				SuccessThreshold: 2,
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].startupProbe.successThreshold", BadValue: int32(2)}},
+	}, {
+		"invalid readiness probe, terminationGracePeriodSeconds set.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			ReadinessProbe: &core.Probe{
+				ProbeHandler: core.ProbeHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(80),
+					},
+				},
+				TerminationGracePeriodSeconds: utilpointer.Int64(10),
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].readinessProbe.terminationGracePeriodSeconds", BadValue: utilpointer.Int64(10)}},
+	}, {
+		"invalid liveness probe, successThreshold != 1",
+		line(),
+		[]core.Container{{
+			Name:                     "live-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			LivenessProbe: &core.Probe{
+				ProbeHandler: core.ProbeHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(80),
+					},
+				},
+				SuccessThreshold: 2,
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].livenessProbe.successThreshold", BadValue: int32(2)}},
+	}, {
+		"invalid lifecycle, no exec command.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					Exec: &core.ExecAction{},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop.exec.command", BadValue: ""}},
+	}, {
+		"invalid lifecycle, no http path.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					HTTPGet: &core.HTTPGetAction{
+						Port:   intstr.FromInt32(80),
+						Scheme: "HTTP",
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop.httpGet.path", BadValue: ""}},
+	}, {
+		"invalid lifecycle, no http port.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					HTTPGet: &core.HTTPGetAction{
+						Path:   "/",
+						Scheme: "HTTP",
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle.preStop.httpGet.port", BadValue: 0}},
+	}, {
+		"invalid lifecycle, no http scheme.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					HTTPGet: &core.HTTPGetAction{
+						Path: "/",
+						Port: intstr.FromInt32(80),
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].lifecycle.preStop.httpGet.scheme", BadValue: core.URIScheme("")}},
+	}, {
+		"invalid lifecycle, no tcp socket port.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					TCPSocket: &core.TCPSocketAction{},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle.preStop.tcpSocket.port", BadValue: 0}},
+	}, {
+		"invalid lifecycle, zero tcp socket port.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(0),
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle.preStop.tcpSocket.port", BadValue: 0}},
+	}, {
+		"invalid lifecycle, no action.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop", BadValue: ""}},
 	},
 	}
 	for _, tc := range errorCases {
@@ -8353,9 +8700,6 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
 			Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local.", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
 		},
-		opts: PodValidationOptions{
-			AllowExpandedDNSConfig: true,
-		},
 		expectedError: false,
 	}, {
 		desc: "valid: 256 characters in search path list(legacy)",
@@ -8410,9 +8754,6 @@ func TestValidatePodDNSConfig(t *testing.T) {
 				generateTestSearchPathFunc(63),
 			},
 		},
-		opts: PodValidationOptions{
-			AllowExpandedDNSConfig: true,
-		},
 		expectedError: false,
 	}, {
 		desc: "valid: ipv6 nameserver",
@@ -8427,22 +8768,18 @@ func TestValidatePodDNSConfig(t *testing.T) {
 		},
 		expectedError: true,
 	}, {
-		desc: "invalid: 7 search paths(legacy)",
+		desc: "valid: 7 search paths",
 		dnsConfig: &core.PodDNSConfig{
 			Searches: []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local", "exceeded"},
 		},
-		expectedError: true,
 	}, {
 		desc: "invalid: 33 search paths",
 		dnsConfig: &core.PodDNSConfig{
 			Searches: []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local.", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33"},
 		},
-		opts: PodValidationOptions{
-			AllowExpandedDNSConfig: true,
-		},
 		expectedError: true,
 	}, {
-		desc: "invalid: 257 characters in search path list",
+		desc: "valid: 257 characters in search path list",
 		dnsConfig: &core.PodDNSConfig{
 			// We can have 256 - (6 - 1) = 251 characters in total for 6 search paths.
 			Searches: []string{
@@ -8454,7 +8791,6 @@ func TestValidatePodDNSConfig(t *testing.T) {
 				generateTestSearchPathFunc(50),
 			},
 		},
-		expectedError: true,
 	}, {
 		desc: "invalid: 2049 characters in search path list",
 		dnsConfig: &core.PodDNSConfig{
@@ -8493,9 +8829,6 @@ func TestValidatePodDNSConfig(t *testing.T) {
 				generateTestSearchPathFunc(63),
 				generateTestSearchPathFunc(63),
 			},
-		},
-		opts: PodValidationOptions{
-			AllowExpandedDNSConfig: true,
 		},
 		expectedError: true,
 	}, {
@@ -9085,7 +9418,7 @@ func TestValidatePod(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -13482,6 +13815,113 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Container statuses all containers terminated",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "no-such-claim", ResourceClaimName: utilpointer.String("my-claim")},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+		},
+		"status.resourceClaimStatuses[0].name: Invalid value: \"no-such-claim\": must match the name of an entry in `spec.resourceClaims`",
+		"Non-existent PodResourceClaim",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: utilpointer.String("%$!#")},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+		},
+		`status.resourceClaimStatuses[0].name: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
+		"Invalid ResourceClaim name",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+					{Name: "my-other-claim"},
+				},
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+		},
+		`status.resourceClaimStatuses[2].name: Duplicate value: "my-other-claim"`,
+		"Duplicate ResourceClaimStatuses.Name",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+					{Name: "my-other-claim"},
+				},
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+		},
+		"",
+		"ResourceClaimStatuses okay",
 	},
 	}
 
@@ -17976,7 +18416,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -17987,7 +18427,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -18003,7 +18443,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -18023,7 +18463,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -18042,7 +18482,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -18053,15 +18493,60 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ResourceName(core.ResourceCPU): resource.MustParse("10G"),
 		},
 	})
-	progressResizeStatus := core.PersistentVolumeClaimControllerExpansionInProgress
-	invalidResizeStatus := core.PersistentVolumeClaimResizeStatus("foo")
+	progressResizeStatus := core.PersistentVolumeClaimControllerResizeInProgress
+
+	invalidResizeStatus := core.ClaimResourceStatus("foo")
+	validResizeKeyCustom := core.ResourceName("example.com/foo")
+	invalidNativeResizeKey := core.ResourceName("kubernetes.io/foo")
 
 	validResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},
 	}, core.PersistentVolumeClaimStatus{
-		ResizeStatus: &progressResizeStatus,
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: progressResizeStatus,
+		},
+	})
+
+	validResizeStatusControllerResizeFailed := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+		},
+	})
+
+	validNodeResizePending := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizePending,
+		},
+	})
+
+	validNodeResizeInProgress := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeInProgress,
+		},
+	})
+
+	validNodeResizeFailed := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeFailed,
+		},
 	})
 
 	invalidResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
@@ -18069,63 +18554,201 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 		},
 	}, core.PersistentVolumeClaimStatus{
-		ResizeStatus: &invalidResizeStatus,
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: invalidResizeStatus,
+		},
+	})
+
+	invalidNativeResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			invalidNativeResizeKey: core.PersistentVolumeClaimNodeResizePending,
+		},
+	})
+
+	validExternalResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			validResizeKeyCustom: core.PersistentVolumeClaimNodeResizePending,
+		},
+	})
+
+	multipleResourceStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResources: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("5Gi"),
+			validResizeKeyCustom: resource.MustParse("10Gi"),
+		},
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+			validResizeKeyCustom: core.PersistentVolumeClaimControllerResizeInProgress,
+		},
+	})
+
+	invalidNativeResourceAllocatedKey := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			invalidNativeResizeKey: resource.MustParse("14G"),
+		},
+	})
+
+	validExternalAllocatedResource := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			validResizeKeyCustom: resource.MustParse("14G"),
+		},
 	})
 
 	scenarios := map[string]struct {
 		isExpectedFailure          bool
 		oldClaim                   *core.PersistentVolumeClaim
 		newClaim                   *core.PersistentVolumeClaim
-		enableResize               bool
 		enableRecoverFromExpansion bool
 	}{
 		"condition-update-with-enabled-feature-gate": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validConditionUpdate,
-			enableResize:      true,
 		},
 		"status-update-with-valid-allocatedResources-feature-enabled": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validAllocatedResources,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
+		"status-update-with-invalid-allocatedResources-native-key-feature-enabled": {
+			isExpectedFailure:          true,
+			oldClaim:                   validClaim,
+			newClaim:                   invalidNativeResourceAllocatedKey,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-valid-allocatedResources-external-key-feature-enabled": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validExternalAllocatedResource,
+			enableRecoverFromExpansion: true,
+		},
+
 		"status-update-with-invalid-allocatedResources-feature-enabled": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
 			newClaim:                   invalidAllocatedResources,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
 		"status-update-with-no-storage-update": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
 			newClaim:                   noStoraegeClaimStatus,
-			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-controller-resize-failed": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validResizeStatusControllerResizeFailed,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-node-resize-pending": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validNodeResizePending,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-node-resize-inprogress": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validNodeResizeInProgress,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-node-resize-failed": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validNodeResizeFailed,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-invalid-native-resource-status-key": {
+			isExpectedFailure:          true,
+			oldClaim:                   validClaim,
+			newClaim:                   invalidNativeResizeStatusPVC,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-valid-external-resource-status-key": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validExternalResizeStatusPVC,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-multiple-resources-key": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   multipleResourceStatusPVC,
 			enableRecoverFromExpansion: true,
 		},
 		"status-update-with-valid-pvc-resize-status": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validResizeStatusPVC,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
 		"status-update-with-invalid-pvc-resize-status": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
 			newClaim:                   invalidResizeStatusPVC,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-old-pvc-valid-resourcestatus-newpvc-invalid-recovery-disabled": {
+			isExpectedFailure:          true,
+			oldClaim:                   validResizeStatusPVC,
+			newClaim:                   invalidResizeStatusPVC,
+			enableRecoverFromExpansion: false,
+		},
+		"status-update-with-old-pvc-valid-allocatedResource-newpvc-invalid-recovery-disabled": {
+			isExpectedFailure:          true,
+			oldClaim:                   validExternalAllocatedResource,
+			newClaim:                   invalidNativeResourceAllocatedKey,
+			enableRecoverFromExpansion: false,
 		},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			validateOpts := PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: scenario.enableRecoverFromExpansion,
-			}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
+
+			validateOpts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
+
 			// ensure we have a resource version specified for updates
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
@@ -19377,6 +20000,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].Resources",
 		"Containers[*].ResizePolicy[*].RestartPolicy",
 		"Containers[*].ResizePolicy[*].ResourceName",
+		"Containers[*].RestartPolicy",
 		"Containers[*].SecurityContext.RunAsNonRoot",
 		"Containers[*].Stdin",
 		"Containers[*].StdinOnce",
@@ -19403,6 +20027,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.Resources",
 		"EphemeralContainers[*].EphemeralContainerCommon.ResizePolicy[*].RestartPolicy",
 		"EphemeralContainers[*].EphemeralContainerCommon.ResizePolicy[*].ResourceName",
+		"EphemeralContainers[*].EphemeralContainerCommon.RestartPolicy",
 		"EphemeralContainers[*].EphemeralContainerCommon.Stdin",
 		"EphemeralContainers[*].EphemeralContainerCommon.StdinOnce",
 		"EphemeralContainers[*].EphemeralContainerCommon.TTY",
@@ -19431,6 +20056,7 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].Resources",
 		"InitContainers[*].ResizePolicy[*].RestartPolicy",
 		"InitContainers[*].ResizePolicy[*].ResourceName",
+		"InitContainers[*].RestartPolicy",
 		"InitContainers[*].Stdin",
 		"InitContainers[*].StdinOnce",
 		"InitContainers[*].TTY",
@@ -20521,7 +21147,7 @@ func testDataSourceInSpec(name, kind, apiGroup string) *core.PersistentVolumeCla
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -20646,7 +21272,7 @@ func pvcSpecWithCrossNamespaceSource(apiGroup *string, kind string, namespace *s
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
+		Resources: core.VolumeResourceRequirements{
 			Requests: core.ResourceList{
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
@@ -21071,6 +21697,113 @@ func TestPodIPsValidation(t *testing.T) {
 		}, {
 			expectError: true,
 			pod:         makePod("dualstack-duplicate-ip-family-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::1"}}),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.pod.Name, func(t *testing.T) {
+			for _, oldTestCase := range testCases {
+				newPod := testCase.pod.DeepCopy()
+				newPod.ResourceVersion = "1"
+
+				oldPod := oldTestCase.pod.DeepCopy()
+				oldPod.ResourceVersion = "1"
+				oldPod.Name = newPod.Name
+
+				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
+
+				if len(errs) == 0 && testCase.expectError {
+					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+				}
+				if len(errs) != 0 && !testCase.expectError {
+					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+				}
+			}
+		})
+	}
+}
+
+func makePodWithHostIPs(podName string, podNamespace string, hostIPs []core.HostIP) core.Pod {
+	hostIP := ""
+	if len(hostIPs) > 0 {
+		hostIP = hostIPs[0].IP
+	}
+	return core.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace},
+		Spec: core.PodSpec{
+			Containers: []core.Container{
+				{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				},
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		Status: core.PodStatus{
+			HostIP:  hostIP,
+			HostIPs: hostIPs,
+		},
+	}
+}
+
+func TestHostIPsValidation(t *testing.T) {
+	testCases := []struct {
+		pod         core.Pod
+		expectError bool
+	}{
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("nil-ips", "ns", nil),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("empty-HostIPs-list", "ns", []core.HostIP{}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("single-ip-family-6", "ns", []core.HostIP{{IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("single-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("dual-stack-4-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("dual-stack-6-4", "ns", []core.HostIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		},
+		/* failure cases start here */
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("invalid-pod-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-same-ip-family-6", "ns", []core.HostIP{{IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-same-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-repeated-ip-family-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-repeated-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "2.2.2.2"}}),
+		},
+
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-duplicate-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-duplicate-ip-family-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::1"}}),
 		},
 	}
 
@@ -21794,8 +22527,8 @@ func TestValidateHostUsers(t *testing.T) {
 			}},
 		},
 	}, {
-		name:    "hostUsers=false - unsupported volume",
-		success: false,
+		name:    "hostUsers=false - stateful volume",
+		success: true,
 		spec: &core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
 				HostUsers: &falseVar,
@@ -21808,7 +22541,6 @@ func TestValidateHostUsers(t *testing.T) {
 			}},
 		},
 	}, {
-		// It should ignore unsupported volumes with hostUsers=true.
 		name:    "hostUsers=true - unsupported volume",
 		success: true,
 		spec: &core.PodSpec{
@@ -22308,6 +23040,53 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 	}
 }
 
+func TestValidateDownwardAPIHostIPs(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		fieldSel       *core.ObjectFieldSelector
+	}{
+		{
+			name:           "has no hostIPs field, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
+		},
+		{
+			name:           "has hostIPs field, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
+		},
+		{
+			name:           "has no hostIPs field, featuregate disabled",
+			expectError:    false,
+			featureEnabled: false,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
+		},
+		{
+			name:           "has hostIPs field, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, testCase.featureEnabled)()
+
+			errs := validateDownwardAPIHostIPs(testCase.fieldSel, field.NewPath("fieldSel"), PodValidationOptions{AllowHostIPsField: testCase.featureEnabled})
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
 func TestValidatePVSecretReference(t *testing.T) {
 	rootFld := field.NewPath("name")
 	type args struct {
@@ -22588,4 +23367,118 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestValidateLoadBalancerStatus(t *testing.T) {
+	ipModeVIP := core.LoadBalancerIPModeVIP
+	ipModeProxy := core.LoadBalancerIPModeProxy
+	ipModeDummy := core.LoadBalancerIPMode("dummy")
+
+	testCases := []struct {
+		name          string
+		ipModeEnabled bool
+		nonLBAllowed  bool
+		tweakLBStatus func(s *core.LoadBalancerStatus)
+		tweakSvcSpec  func(s *core.ServiceSpec)
+		numErrs       int
+	}{
+		{
+			name:         "type is not LB",
+			nonLBAllowed: false,
+			tweakSvcSpec: func(s *core.ServiceSpec) {
+				s.Type = core.ServiceTypeClusterIP
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP: "1.2.3.4",
+				}}
+			},
+			numErrs: 1,
+		}, {
+			name:         "type is not LB. back-compat",
+			nonLBAllowed: true,
+			tweakSvcSpec: func(s *core.ServiceSpec) {
+				s.Type = core.ServiceTypeClusterIP
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP: "1.2.3.4",
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name:          "valid vip ipMode",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name:          "valid proxy ipMode",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeProxy,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name:          "invalid ipMode",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeDummy,
+				}}
+			},
+			numErrs: 1,
+		}, {
+			name:          "missing ipMode with LoadbalancerIPMode enabled",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP: "1.2.3.4",
+				}}
+			},
+			numErrs: 1,
+		}, {
+			name:          "missing ipMode with LoadbalancerIPMode disabled",
+			ipModeEnabled: false,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP: "1.2.3.4",
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name:          "missing ip with ipMode present",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IPMode: &ipModeProxy,
+				}}
+			},
+			numErrs: 1,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)()
+			status := core.LoadBalancerStatus{}
+			tc.tweakLBStatus(&status)
+			spec := core.ServiceSpec{Type: core.ServiceTypeLoadBalancer}
+			if tc.tweakSvcSpec != nil {
+				tc.tweakSvcSpec(&spec)
+			}
+			errs := ValidateLoadBalancerStatus(&status, field.NewPath("status"), &spec)
+			if len(errs) != tc.numErrs {
+				t.Errorf("Unexpected error list for case %q(expected:%v got %v) - Errors:\n %v", tc.name, tc.numErrs, len(errs), errs.ToAggregate())
+			}
+		})
+	}
 }

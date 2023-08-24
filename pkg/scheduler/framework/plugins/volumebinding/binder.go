@@ -523,7 +523,7 @@ func (b *volumeBinder) BindPodVolumes(ctx context.Context, assumedPod *v1.Pod, p
 		return err
 	}
 
-	err = wait.Poll(time.Second, b.bindTimeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, time.Second, b.bindTimeout, false, func(ctx context.Context) (bool, error) {
 		b, err := b.checkBindings(assumedPod, bindings, claimsToProvision)
 		return b, err
 	})
@@ -1088,7 +1088,7 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 	case csiplugins.AWSEBSInTreePluginName:
 		return true
 	case csiplugins.GCEPDInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+		return true
 	case csiplugins.AzureDiskInTreePluginName:
 		return true
 	case csiplugins.CinderInTreePluginName:

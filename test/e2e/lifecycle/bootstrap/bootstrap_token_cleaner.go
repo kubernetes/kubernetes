@@ -36,7 +36,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 	var c clientset.Interface
 
 	f := framework.NewDefaultFramework("bootstrap-token-cleaner")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet

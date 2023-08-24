@@ -75,6 +75,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 	m := map[string]interface{}{
 		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
+		"cacheTransformFunc":             c.Universe.Type(cacheTransformFunc),
 		"groupVersions":                  g.groupVersions,
 		"gvInterfaces":                   gvInterfaces,
 		"gvNewFuncs":                     gvNewFuncs,
@@ -109,6 +110,7 @@ type sharedInformerFactory struct {
 	lock {{.syncMutex|raw}}
 	defaultResync {{.timeDuration|raw}}
 	customResync map[{{.reflectType|raw}}]{{.timeDuration|raw}}
+	transform {{.cacheTransformFunc|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
 	// startedInformers is used for tracking which informers have been started.
@@ -143,6 +145,14 @@ func WithTweakListOptions(tweakListOptions internalinterfaces.TweakListOptionsFu
 func WithNamespace(namespace string) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.namespace = namespace
+		return factory
+	}
+}
+
+// WithTransform sets a transform on all informers.
+func WithTransform(transform {{.cacheTransformFunc|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.transform = transform
 		return factory
 	}
 }
@@ -252,11 +262,11 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   }
 
   informer = newFunc(f.client, resyncPeriod)
+  informer.SetTransform(f.transform)
   f.informers[informerType] = informer
 
   return informer
 }
-
 `
 
 var sharedInformerFactoryInterface = `

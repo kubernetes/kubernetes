@@ -1307,6 +1307,8 @@ func autoConvert_v1beta1_ValidationRule_To_apiextensions_ValidationRule(in *Vali
 	out.Rule = in.Rule
 	out.Message = in.Message
 	out.MessageExpression = in.MessageExpression
+	out.Reason = (*apiextensions.FieldValueErrorReason)(unsafe.Pointer(in.Reason))
+	out.FieldPath = in.FieldPath
 	return nil
 }
 
@@ -1319,6 +1321,8 @@ func autoConvert_apiextensions_ValidationRule_To_v1beta1_ValidationRule(in *apie
 	out.Rule = in.Rule
 	out.Message = in.Message
 	out.MessageExpression = in.MessageExpression
+	out.Reason = (*FieldValueErrorReason)(unsafe.Pointer(in.Reason))
+	out.FieldPath = in.FieldPath
 	return nil
 }
 

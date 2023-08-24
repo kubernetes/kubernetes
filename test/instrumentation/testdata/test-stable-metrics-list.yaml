@@ -122,6 +122,24 @@
     certificate is invalid or unused, the value will be +INF.
   type: Gauge
   stabilityLevel: BETA
+- name: cgroup_manager_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds for cgroup manager operations. Broken down by method.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - operation_type
+  buckets:
+  - 0.01
+  - 0.02154434690031884
+  - 0.046415888336127795
+  - 0.10000000000000002
+  - 0.21544346900318842
+  - 0.46415888336127803
+  - 1.0000000000000002
+  - 2.1544346900318847
+  - 4.641588833612781
+  - 10.000000000000005
 - name: device_plugin_alloc_duration_seconds
   subsystem: kubelet
   help: Duration in seconds to serve a device plugin Allocation request. Broken down
@@ -192,6 +210,23 @@
   labels:
   - namespace
   - persistentvolumeclaim
+- name: healthcheck
+  namespace: kubernetes
+  help: This metric records the result of a single healthcheck.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+  - type
+- name: healthchecks_total
+  namespace: kubernetes
+  help: This metric records the results of all healthcheck.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+  - status
+  - type
 - name: priority_level_seat_utilization
   subsystem: subsystem
   namespace: namespace

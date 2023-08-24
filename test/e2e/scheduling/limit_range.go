@@ -43,6 +43,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -51,7 +52,7 @@ const (
 
 var _ = SIGDescribe("LimitRange", func() {
 	f := framework.NewDefaultFramework("limitrange")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.18
@@ -77,7 +78,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(ctx, options)
 		framework.ExpectNoError(err, "failed to query for limitRanges")
-		framework.ExpectEqual(len(limitRanges.Items), 0)
+		gomega.Expect(limitRanges.Items).To(gomega.BeEmpty())
 
 		lw := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -176,7 +177,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying LimitRange updating is effective")
-		err = wait.Poll(time.Second*2, time.Second*20, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second*2, time.Second*20, false, func(ctx context.Context) (bool, error) {
 			limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(ctx, limitRange.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			return reflect.DeepEqual(limitRange.Spec.Limits[0].Min, newMin), nil
@@ -198,7 +199,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying the LimitRange was deleted")
-		err = wait.Poll(time.Second*5, e2eservice.RespondingTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second*5, e2eservice.RespondingTimeout, false, func(ctx context.Context) (bool, error) {
 			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 
 			if err != nil {
@@ -291,7 +292,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By(fmt.Sprintf("Listing all LimitRanges with label %q", e2eLabelSelector))
 		limitRangeList, err := f.ClientSet.CoreV1().LimitRanges("").List(ctx, metav1.ListOptions{LabelSelector: e2eLabelSelector})
 		framework.ExpectNoError(err, "Failed to list any limitRanges: %v", err)
-		framework.ExpectEqual(len(limitRangeList.Items), 2, "Failed to find the correct limitRange count")
+		gomega.Expect(limitRangeList.Items).To(gomega.HaveLen(2), "Failed to find the correct limitRange count")
 		framework.Logf("Found %d limitRanges", len(limitRangeList.Items))
 
 		ginkgo.By(fmt.Sprintf("Patching LimitRange %q in %q namespace", lrName, ns))
@@ -313,7 +314,7 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		patchedLimitRange, err := lrClient.Patch(ctx, lrName, types.StrategicMergePatchType, []byte(limitRangePayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "Failed to patch limitRange %q", lrName)
-		framework.ExpectEqual(patchedLimitRange.Labels[lrName], "patched", "%q label didn't have value 'patched' for this limitRange. Current labels: %v", lrName, patchedLimitRange.Labels)
+		gomega.Expect(patchedLimitRange.Labels[lrName]).To(gomega.Equal("patched"), "%q label didn't have value 'patched' for this limitRange. Current labels: %v", lrName, patchedLimitRange.Labels)
 		checkMinLimitRange := apiequality.Semantic.DeepEqual(patchedLimitRange.Spec.Limits[0].Min, newMin)
 		if !checkMinLimitRange {
 			framework.Failf("LimitRange does not have the correct min limitRange. Currently is %#v ", patchedLimitRange.Spec.Limits[0].Min)
@@ -332,7 +333,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By(fmt.Sprintf("Confirm that a single LimitRange still exists with label %q", e2eLabelSelector))
 		limitRangeList, err = f.ClientSet.CoreV1().LimitRanges("").List(ctx, metav1.ListOptions{LabelSelector: e2eLabelSelector})
 		framework.ExpectNoError(err, "Failed to list any limitRanges: %v", err)
-		framework.ExpectEqual(len(limitRangeList.Items), 1, "Failed to find the correct limitRange count")
+		gomega.Expect(limitRangeList.Items).To(gomega.HaveLen(1), "Failed to find the correct limitRange count")
 		framework.Logf("Found %d limitRange", len(limitRangeList.Items))
 	})
 })

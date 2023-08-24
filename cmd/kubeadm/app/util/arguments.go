@@ -24,41 +24,54 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-// BuildArgumentListFromMap takes two string-string maps, one with the base arguments and one
+// ArgumentsToCommand takes two Arg slices, one with the base arguments and one
 // with optional override arguments. In the return list override arguments will precede base
-// arguments
-func BuildArgumentListFromMap(baseArguments map[string]string, overrideArguments map[string]string) []string {
+// arguments. If an argument is present in the overrides, it will cause
+// all instances of the same argument in the base list to be discarded, leaving
+// only the instances of this argument in the overrides to be applied.
+func ArgumentsToCommand(base []kubeadmapi.Arg, overrides []kubeadmapi.Arg) []string {
 	var command []string
-	var keys []string
+	// Copy the base arguments into a new slice.
+	args := make([]kubeadmapi.Arg, len(base))
+	copy(args, base)
 
-	argsMap := make(map[string]string)
-
-	for k, v := range baseArguments {
-		argsMap[k] = v
+	// Go trough the override arguments and delete all instances of arguments with the same name
+	// in the base list of arguments.
+	for i := 0; i < len(overrides); i++ {
+	repeat:
+		for j := 0; j < len(args); j++ {
+			if overrides[i].Name == args[j].Name {
+				// Remove this existing argument and search for another argument
+				// with the same name in base.
+				args = append(args[:j], args[j+1:]...)
+				goto repeat
+			}
+		}
 	}
 
-	for k, v := range overrideArguments {
-		argsMap[k] = v
-	}
+	// Concatenate the overrides and the base arguments and then sort them.
+	args = append(args, overrides...)
+	sort.Slice(args, func(i, j int) bool {
+		if args[i].Name == args[j].Name {
+			return args[i].Value < args[j].Value
+		}
+		return args[i].Name < args[j].Name
+	})
 
-	for k := range argsMap {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
-	for _, k := range keys {
-		command = append(command, fmt.Sprintf("--%s=%s", k, argsMap[k]))
+	for _, arg := range args {
+		command = append(command, fmt.Sprintf("--%s=%s", arg.Name, arg.Value))
 	}
 
 	return command
 }
 
-// ParseArgumentListToMap parses a CLI argument list in the form "--foo=bar" to a string-string map
-func ParseArgumentListToMap(arguments []string) map[string]string {
-	resultingMap := map[string]string{}
-	for i, arg := range arguments {
+// ArgumentsFromCommand parses a CLI command in the form "--foo=bar" to an Arg slice
+func ArgumentsFromCommand(command []string) []kubeadmapi.Arg {
+	args := []kubeadmapi.Arg{}
+	for i, arg := range command {
 		key, val, err := parseArgument(arg)
 
 		// Ignore if the first argument doesn't satisfy the criteria, it's most often the binary name
@@ -70,24 +83,16 @@ func ParseArgumentListToMap(arguments []string) map[string]string {
 			continue
 		}
 
-		resultingMap[key] = val
+		args = append(args, kubeadmapi.Arg{Name: key, Value: val})
 	}
-	return resultingMap
-}
 
-// ReplaceArgument gets a command list; converts it to a map for easier modification, runs the provided function that
-// returns a new modified map, and then converts the map back to a command string slice
-func ReplaceArgument(command []string, argMutateFunc func(map[string]string) map[string]string) []string {
-	argMap := ParseArgumentListToMap(command)
-
-	// Save the first command (the executable) if we're sure it's not an argument (i.e. no --)
-	var newCommand []string
-	if len(command) > 0 && !strings.HasPrefix(command[0], "--") {
-		newCommand = append(newCommand, command[0])
-	}
-	newArgMap := argMutateFunc(argMap)
-	newCommand = append(newCommand, BuildArgumentListFromMap(newArgMap, map[string]string{})...)
-	return newCommand
+	sort.Slice(args, func(i, j int) bool {
+		if args[i].Name == args[j].Name {
+			return args[i].Value < args[j].Value
+		}
+		return args[i].Name < args[j].Name
+	})
+	return args
 }
 
 // parseArgument parses the argument "--foo=bar" to "foo" and "bar"

@@ -229,6 +229,31 @@ func TestSingleZone(t *testing.T) {
 			},
 			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
+		{
+			name: "pv with beta label,node with ga label, matched",
+			Pod:  createPodWithVolume("pod_1", "Vol_1", "PVC_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "host1",
+					Labels: map[string]string{
+						v1.LabelTopologyZone: "us-west1-a",
+					},
+				},
+			},
+		},
+		{
+			name: "pv with beta label,node with ga label, don't match",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "host1",
+					Labels: map[string]string{
+						v1.LabelTopologyZone: "us-west1-b",
+					},
+				},
+			},
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+		},
 	}
 
 	for _, test := range tests {

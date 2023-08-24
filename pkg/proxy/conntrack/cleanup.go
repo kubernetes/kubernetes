@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -50,7 +50,7 @@ func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, sv
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				conntrackCleanupServiceIPs.Insert(extIP)
 			}
-			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+			for _, lbIP := range svcInfo.LoadBalancerVIPStrings() {
 				conntrackCleanupServiceIPs.Insert(lbIP)
 			}
 			nodePort := svcInfo.NodePort()
@@ -81,7 +81,7 @@ func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, sv
 func deleteStaleEndpointConntrackEntries(exec utilexec.Interface, svcPortMap proxy.ServicePortMap, endpointUpdateResult proxy.UpdateEndpointMapResult) {
 	for _, epSvcPair := range endpointUpdateResult.DeletedUDPEndpoints {
 		if svcInfo, ok := svcPortMap[epSvcPair.ServicePortName]; ok {
-			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
+			endpointIP := proxyutil.IPPart(epSvcPair.Endpoint)
 			nodePort := svcInfo.NodePort()
 			var err error
 			if nodePort != 0 {
@@ -100,7 +100,7 @@ func deleteStaleEndpointConntrackEntries(exec utilexec.Interface, svcPortMap pro
 					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "externalIP", extIP)
 				}
 			}
-			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+			for _, lbIP := range svcInfo.LoadBalancerVIPStrings() {
 				err := ClearEntriesForNAT(exec, lbIP, endpointIP, v1.ProtocolUDP)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName, "loadBalancerIP", lbIP)

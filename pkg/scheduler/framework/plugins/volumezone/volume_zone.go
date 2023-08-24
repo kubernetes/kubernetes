@@ -83,6 +83,16 @@ var topologyLabels = []string{
 	v1.LabelTopologyRegion,
 }
 
+func translateToGALabel(label string) string {
+	if label == v1.LabelFailureDomainBetaRegion {
+		return v1.LabelTopologyRegion
+	}
+	if label == v1.LabelFailureDomainBetaZone {
+		return v1.LabelTopologyZone
+	}
+	return label
+}
+
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeZone) Name() string {
 	return Name
@@ -227,6 +237,10 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 
 	for _, pvTopology := range podPVTopologies {
 		v, ok := node.Labels[pvTopology.key]
+		if !ok {
+			// if we can't match the beta label, try to match pv's beta label with node's ga label
+			v, ok = node.Labels[translateToGALabel(pvTopology.key)]
+		}
 		if !ok || !pvTopology.values.Has(v) {
 			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
@@ -260,18 +274,18 @@ func getErrorAsStatus(err error) *framework.Status {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeZone) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
+func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
-		{Resource: framework.StorageClass, ActionType: framework.Add},
+		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}},
 		// A new node or updating a node's volume zone labels may make a pod schedulable.
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel}},
 		// A new pvc may make a pod schedulable.
 		// Due to fields are immutable except `spec.resources`, pvc update events are ignored.
-		{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
 		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
-		{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
 	}
 }
 

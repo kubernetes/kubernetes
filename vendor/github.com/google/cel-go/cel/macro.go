@@ -15,8 +15,8 @@
 package cel
 
 import (
-	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/parser"
+
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
@@ -26,8 +26,11 @@ import (
 // a Macro should be created per arg-count or as a var arg macro.
 type Macro = parser.Macro
 
-// MacroExpander converts a call and its associated arguments into a new CEL abstract syntax tree, or an error
-// if the input arguments are not suitable for the expansion requirements for the macro in question.
+// MacroExpander converts a call and its associated arguments into a new CEL abstract syntax tree.
+//
+// If the MacroExpander determines within the implementation that an expansion is not needed it may return
+// a nil Expr value to indicate a non-match. However, if an expansion is to be performed, but the arguments
+// are not well-formed, the result of the expansion will be an error.
 //
 // The MacroExpander accepts as arguments a MacroExprHelper as well as the arguments used in the function call
 // and produces as output an Expr ast node.
@@ -59,21 +62,21 @@ func NewReceiverVarArgMacro(function string, expander MacroExpander) Macro {
 }
 
 // HasMacroExpander expands the input call arguments into a presence test, e.g. has(<operand>.field)
-func HasMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
+func HasMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *Error) {
 	return parser.MakeHas(meh, target, args)
 }
 
 // ExistsMacroExpander expands the input call arguments into a comprehension that returns true if any of the
 // elements in the range match the predicate expressions:
 // <iterRange>.exists(<iterVar>, <predicate>)
-func ExistsMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
+func ExistsMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *Error) {
 	return parser.MakeExists(meh, target, args)
 }
 
 // ExistsOneMacroExpander expands the input call arguments into a comprehension that returns true if exactly
 // one of the elements in the range match the predicate expressions:
 // <iterRange>.exists_one(<iterVar>, <predicate>)
-func ExistsOneMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
+func ExistsOneMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *Error) {
 	return parser.MakeExistsOne(meh, target, args)
 }
 
@@ -81,18 +84,20 @@ func ExistsOneMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*ex
 // input to produce an output list.
 //
 // There are two call patterns supported by map:
-//   <iterRange>.map(<iterVar>, <transform>)
-//   <iterRange>.map(<iterVar>, <predicate>, <transform>)
+//
+//	<iterRange>.map(<iterVar>, <transform>)
+//	<iterRange>.map(<iterVar>, <predicate>, <transform>)
+//
 // In the second form only iterVar values which return true when provided to the predicate expression
 // are transformed.
-func MapMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
+func MapMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *Error) {
 	return parser.MakeMap(meh, target, args)
 }
 
 // FilterMacroExpander expands the input call arguments into a comprehension which produces a list which contains
 // only elements which match the provided predicate expression:
 // <iterRange>.filter(<iterVar>, <predicate>)
-func FilterMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
+func FilterMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *Error) {
 	return parser.MakeFilter(meh, target, args)
 }
 

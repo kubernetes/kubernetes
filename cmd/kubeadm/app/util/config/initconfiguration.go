@@ -287,17 +287,17 @@ func BytesToInitConfiguration(b []byte) (*kubeadmapi.InitConfiguration, error) {
 		return nil, err
 	}
 
-	return documentMapToInitConfiguration(gvkmap, false, false)
+	return documentMapToInitConfiguration(gvkmap, false, false, false)
 }
 
 // documentMapToInitConfiguration converts a map of GVKs and YAML documents to defaulted and validated configuration object.
-func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, strictErrors bool) (*kubeadmapi.InitConfiguration, error) {
+func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, allowExperimental, strictErrors bool) (*kubeadmapi.InitConfiguration, error) {
 	var initcfg *kubeadmapi.InitConfiguration
 	var clustercfg *kubeadmapi.ClusterConfiguration
 
 	for gvk, fileContent := range gvkmap {
 		// first, check if this GVK is supported and possibly not deprecated
-		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated); err != nil {
+		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated, allowExperimental); err != nil {
 			return nil, err
 		}
 

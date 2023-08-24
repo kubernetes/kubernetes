@@ -440,10 +440,12 @@ func (rq *Controller) Sync(ctx context.Context, discoveryFunc NamespacedResource
 		if err != nil {
 			utilruntime.HandleError(err)
 
-			if discovery.IsGroupDiscoveryFailedError(err) && len(newResources) > 0 {
-				// In partial discovery cases, don't remove any existing informers, just add new ones
+			if groupLookupFailures, isLookupFailure := discovery.GroupDiscoveryFailedErrorGroups(err); isLookupFailure && len(newResources) > 0 {
+				// In partial discovery cases, preserve existing informers for resources in the failed groups, so resyncMonitors will only add informers for newly seen resources
 				for k, v := range oldResources {
-					newResources[k] = v
+					if _, failed := groupLookupFailures[k.GroupVersion()]; failed {
+						newResources[k] = v
+					}
 				}
 			} else {
 				// short circuit in non-discovery error cases or if discovery returned zero resources
@@ -474,6 +476,10 @@ func (rq *Controller) Sync(ctx context.Context, discoveryFunc NamespacedResource
 			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
 			return
 		}
+
+		// at this point, we've synced the new resources to our monitors, so record that fact.
+		oldResources = newResources
+
 		// wait for caches to fill for a while (our sync period).
 		// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
 		// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
@@ -488,8 +494,6 @@ func (rq *Controller) Sync(ctx context.Context, discoveryFunc NamespacedResource
 			return
 		}
 
-		// success, remember newly synced resources
-		oldResources = newResources
 		logger.V(2).Info("synced quota controller")
 	}, period)
 }

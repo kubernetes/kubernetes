@@ -41,3 +41,18 @@ func GetProxyEnvVars() []v1.EnvVar {
 	}
 	return envs
 }
+
+// MergeEnv merges values of environment variable slices. The values defined in later slices overwrite values in previous ones.
+func MergeEnv(envList ...[]v1.EnvVar) []v1.EnvVar {
+	m := make(map[string]v1.EnvVar)
+	merged := []v1.EnvVar{}
+	for _, envs := range envList {
+		for _, env := range envs {
+			m[env.Name] = env
+		}
+	}
+	for _, v := range m {
+		merged = append(merged, v)
+	}
+	return merged
+}

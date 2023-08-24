@@ -50,6 +50,8 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
+var containerRestartPolicyAlways = api.ContainerRestartPolicyAlways
+
 func TestFormatResourceName(t *testing.T) {
 	tests := []struct {
 		kind schema.GroupKind
@@ -1519,6 +1521,200 @@ func TestPrintPod(t *testing.T) {
 				},
 			},
 			[]metav1.TableRow{{Cells: []interface{}{"test15", "0/2", api.PodReasonSchedulingGated, "0", "<unknown>"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printPod(&test.pod, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expect, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expect, rows))
+		}
+	}
+}
+
+func TestPrintPodWithRestartableInitContainer(t *testing.T) {
+	tests := []struct {
+		pod    api.Pod
+		expect []metav1.TableRow
+	}{
+		{
+			// Test pod has 2 restartable init containers, the first one running but not started.
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+						{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+					}, Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "Pending",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Name:                 "restartable-init-1",
+							Ready:                false,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							Started:              utilpointer.Bool(false),
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+						},
+						{
+							Name:    "restartable-init-2",
+							Ready:   false,
+							State:   api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
+							Started: utilpointer.Bool(false),
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:        false,
+							RestartCount: 0,
+							State:        api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
+						},
+					},
+					Conditions: []api.PodCondition{
+						{Type: api.PodInitialized, Status: api.ConditionFalse},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "0/3", "Init:0/2", "3 (10s ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 2 restartable init containers, the first one started and the second one running but not started.
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+						{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+					}, Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "Pending",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Name:                 "restartable-init-1",
+							Ready:                false,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							Started:              utilpointer.Bool(true),
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+						},
+						{
+							Name:    "restartable-init-2",
+							Ready:   false,
+							State:   api.ContainerState{Running: &api.ContainerStateRunning{}},
+							Started: utilpointer.Bool(false),
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:        false,
+							RestartCount: 0,
+							State:        api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
+						},
+					},
+					Conditions: []api.PodCondition{
+						{Type: api.PodInitialized, Status: api.ConditionFalse},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "0/3", "Init:1/2", "3 (10s ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 2 restartable init containers started and 1 container running
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+						{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+					}, Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "Running",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Name:                 "restartable-init-1",
+							Ready:                false,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							Started:              utilpointer.Bool(true),
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+						},
+						{
+							Name:    "restartable-init-2",
+							Ready:   false,
+							State:   api.ContainerState{Running: &api.ContainerStateRunning{}},
+							Started: utilpointer.Bool(true),
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:                true,
+							RestartCount:         4,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
+						},
+					},
+					Conditions: []api.PodCondition{
+						{Type: api.PodInitialized, Status: api.ConditionTrue},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/3", "Running", "7 (10s ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 2 restartable init containers completed with non-zero and 1 container completed
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test3"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+						{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+					}, Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "Succeeded",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Name:                 "restartable-init-1",
+							Ready:                false,
+							RestartCount:         3,
+							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Error", ExitCode: 137}},
+							Started:              utilpointer.Bool(false),
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+						},
+						{
+							Name:    "restartable-init-2",
+							Ready:   false,
+							State:   api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Error", ExitCode: 137}},
+							Started: utilpointer.Bool(false),
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:                false,
+							RestartCount:         4,
+							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
+						},
+					},
+					Conditions: []api.PodCondition{
+						{Type: api.PodInitialized, Status: api.ConditionTrue},
+					},
+				},
+			},
+			[]metav1.TableRow{
+				{
+					Cells: []interface{}{"test3", "0/3", "Completed", "7 (10s ago)", "<unknown>"},
+					Conditions: []metav1.TableRowCondition{
+						{Type: metav1.RowCompleted, Status: metav1.ConditionTrue, Reason: "Succeeded", Message: "The pod has completed successfully."},
+					},
+				},
+			},
 		},
 	}
 

@@ -532,6 +532,6 @@ func getPartition(partition int32) *int32 {
 }
 
 func getMaxUnavailable(maxUnavailable int) *intstr.IntOrString {
-	maxUnavailableIntOrStr := intstr.FromInt(maxUnavailable)
+	maxUnavailableIntOrStr := intstr.FromInt32(int32(maxUnavailable))
 	return &maxUnavailableIntOrStr
 }

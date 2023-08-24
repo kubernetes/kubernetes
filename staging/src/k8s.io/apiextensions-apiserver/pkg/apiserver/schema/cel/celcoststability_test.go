@@ -115,6 +115,7 @@ func TestCelCostStability(t *testing.T) {
 				"self.val1.substring(4, 10).trim() == 'takes'":     6,
 				"self.val1.upperAscii() == 'ROOK TAKES 👑'":         6,
 				"self.val1.lowerAscii() == 'rook takes 👑'":         6,
+				"self.val1.lowerAscii() == self.val1.lowerAscii()": 10,
 			},
 		},
 		{name: "escaped strings",
@@ -1079,6 +1080,41 @@ func TestCelCostStability(t *testing.T) {
 				"self.listOfMap[0]['z'] == 'g'":                               5,
 				"self.listOfObj[0].field3 == 'h'":                             5,
 				"self.listOfListMap[0].exists(e, e.k3 == '3' && e.v3 == 'i')": 14,
+			},
+		},
+		{name: "optionals",
+			obj: map[string]interface{}{
+				"obj": map[string]interface{}{
+					"field": "a",
+				},
+				"m": map[string]interface{}{
+					"k": "v",
+				},
+				"l": []interface{}{
+					"a",
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"obj": objectType(map[string]schema.Structural{
+					"field":       stringType,
+					"absentField": stringType,
+				}),
+				"m": mapType(&stringType),
+				"l": listType(&stringType),
+			}),
+			expectCost: map[string]int64{
+				"optional.of('a') != optional.of('b')":                3,
+				"optional.of('a') != optional.none()":                 3,
+				"optional.of('a').hasValue()":                         2,
+				"optional.of('a').or(optional.of('a')).hasValue()":    2, // or() is short-circuited
+				"optional.none().or(optional.of('a')).hasValue()":     3,
+				"optional.of('a').optMap(v, v == 'value').hasValue()": 8,
+				"self.obj.?field == optional.of('a')":                 5,
+				"self.obj.?absentField == optional.none()":            4,
+				"self.obj.?field.orValue('v') == 'a'":                 4,
+				"self.m[?'k'] == optional.of('v')":                    5,
+				"self.l[?0] == optional.of('a')":                      5,
+				"optional.ofNonZeroValue(1).hasValue()":               2,
 			},
 		},
 	}

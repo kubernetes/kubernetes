@@ -1701,9 +1701,9 @@ func TestPreempt(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(time.Duration(0), ctx.Done())
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, pod := range test.pods {
-				cache.AddPod(pod)
+				cache.AddPod(logger, pod)
 			}
 			cachedNodeInfoMap := map[string]*framework.NodeInfo{}
 			nodes := make([]*v1.Node, len(test.nodeNames))
@@ -1716,7 +1716,7 @@ func TestPreempt(t *testing.T) {
 					node.ObjectMeta.Labels[labelKeys[i]] = label
 				}
 				node.Name = node.ObjectMeta.Labels["hostname"]
-				cache.AddNode(node)
+				cache.AddNode(logger, node)
 				nodes[i] = node
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.

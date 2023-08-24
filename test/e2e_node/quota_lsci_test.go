@@ -98,7 +98,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 // file; if du is used to monitor, it will not detect this.
 var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolationQuota][NodeFeature:LSCIQuotaMonitoring]", func() {
 	f := framework.NewDefaultFramework("localstorage-quota-monitoring-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	runOneQuotaTest(f, true)
 	runOneQuotaTest(f, false)
 })

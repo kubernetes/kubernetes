@@ -49,7 +49,7 @@ func TestValidate(t *testing.T) {
 		{probe.Success, "foo", nil, probe.Success, "foo", false, nil},
 	}
 
-	s := Server{Addr: "foo.com", Port: 8080, Path: "/healthz"}
+	s := HttpServer{Addr: "foo.com", Port: 8080, Path: "/healthz"}
 
 	for _, test := range tests {
 		fakeProber := &fakeHttpProber{

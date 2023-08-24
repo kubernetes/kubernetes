@@ -44,15 +44,6 @@ const (
 	maxTimeout = 15 * time.Minute
 )
 
-var allClusterEvents = []framework.ClusterEvent{
-	{Resource: framework.Pod, ActionType: framework.All},
-	{Resource: framework.Node, ActionType: framework.All},
-	{Resource: framework.CSINode, ActionType: framework.All},
-	{Resource: framework.PersistentVolume, ActionType: framework.All},
-	{Resource: framework.PersistentVolumeClaim, ActionType: framework.All},
-	{Resource: framework.StorageClass, ActionType: framework.All},
-}
-
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
 type frameworkImpl struct {
@@ -61,6 +52,7 @@ type frameworkImpl struct {
 	waitingPods          *waitingPodsMap
 	scorePluginWeight    map[string]int
 	preEnqueuePlugins    []framework.PreEnqueuePlugin
+	enqueueExtensions    []framework.EnqueueExtensions
 	queueSortPlugins     []framework.QueueSortPlugin
 	preFilterPlugins     []framework.PreFilterPlugin
 	filterPlugins        []framework.FilterPlugin
@@ -133,7 +125,6 @@ type frameworkOptions struct {
 	podNominator           framework.PodNominator
 	extenders              []framework.Extender
 	captureProfile         CaptureProfile
-	clusterEventMap        map[framework.ClusterEvent]sets.Set[string]
 	parallelizer           parallelize.Parallelizer
 	logger                 *klog.Logger
 }
@@ -217,13 +208,6 @@ func WithCaptureProfile(c CaptureProfile) Option {
 	}
 }
 
-// WithClusterEventMap sets clusterEventMap for the scheduling frameworkImpl.
-func WithClusterEventMap(m map[framework.ClusterEvent]sets.Set[string]) Option {
-	return func(o *frameworkOptions) {
-		o.clusterEventMap = m
-	}
-}
-
 // WithMetricsRecorder sets metrics recorder for the scheduling frameworkImpl.
 func WithMetricsRecorder(r *metrics.MetricAsyncRecorder) Option {
 	return func(o *frameworkOptions) {
@@ -242,7 +226,6 @@ func WithLogger(logger klog.Logger) Option {
 func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
-		clusterEventMap: make(map[framework.ClusterEvent]sets.Set[string]),
 		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
 	}
 }
@@ -325,8 +308,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		}
 		pluginsMap[name] = p
 
-		// Update ClusterEventMap in place.
-		fillEventToPluginMap(logger, p, options.clusterEventMap)
+		f.fillEnqueueExtensions(p)
 	}
 
 	// initialize plugins per individual extension points
@@ -373,6 +355,12 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		options.captureProfile(outputProfile)
 	}
 
+	f.setInstrumentedPlugins()
+	return f, nil
+}
+
+// setInstrumentedPlugins initializes instrumented plugins from current plugins that frameworkImpl has.
+func (f *frameworkImpl) setInstrumentedPlugins() {
 	// Cache metric streams for prefilter and filter plugins.
 	for i, pl := range f.preFilterPlugins {
 		f.preFilterPlugins[i] = &instrumentedPreFilterPlugin{
@@ -387,7 +375,19 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		}
 	}
 
-	return f, nil
+	// Cache metric streams for prescore and score plugins.
+	for i, pl := range f.preScorePlugins {
+		f.preScorePlugins[i] = &instrumentedPreScorePlugin{
+			PreScorePlugin: f.preScorePlugins[i],
+			metric:         metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), metrics.PreScore, f.profileName),
+		}
+	}
+	for i, pl := range f.scorePlugins {
+		f.scorePlugins[i] = &instrumentedScorePlugin{
+			ScorePlugin: f.scorePlugins[i],
+			metric:      metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), metrics.Score, f.profileName),
+		}
+	}
 }
 
 func (f *frameworkImpl) SetPodNominator(n framework.PodNominator) {
@@ -545,35 +545,31 @@ func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *con
 	return nil
 }
 
-func fillEventToPluginMap(logger klog.Logger, p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.Set[string]) {
+func (f *frameworkImpl) fillEnqueueExtensions(p framework.Plugin) {
 	ext, ok := p.(framework.EnqueueExtensions)
 	if !ok {
-		// If interface EnqueueExtensions is not implemented, register the default events
-		// to the plugin. This is to ensure backward compatibility.
-		registerClusterEvents(p.Name(), eventToPlugins, allClusterEvents)
+		// If interface EnqueueExtensions is not implemented, register the default enqueue extensions
+		// to the plugin because we don't know which events the plugin is interested in.
+		// This is to ensure backward compatibility.
+		f.enqueueExtensions = append(f.enqueueExtensions, &defaultEnqueueExtension{pluginName: p.Name()})
 		return
 	}
 
-	events := ext.EventsToRegister()
-	// It's rare that a plugin implements EnqueueExtensions but returns nil.
-	// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
-	// cannot be moved by any regular cluster event.
-	if len(events) == 0 {
-		logger.Info("Plugin's EventsToRegister() returned nil", "plugin", p.Name())
-		return
-	}
-	// The most common case: a plugin implements EnqueueExtensions and returns non-nil result.
-	registerClusterEvents(p.Name(), eventToPlugins, events)
+	f.enqueueExtensions = append(f.enqueueExtensions, ext)
 }
 
-func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEvent]sets.Set[string], evts []framework.ClusterEvent) {
-	for _, evt := range evts {
-		if eventToPlugins[evt] == nil {
-			eventToPlugins[evt] = sets.New(name)
-		} else {
-			eventToPlugins[evt].Insert(name)
-		}
-	}
+// defaultEnqueueExtension is used when a plugin does not implement EnqueueExtensions interface.
+type defaultEnqueueExtension struct {
+	pluginName string
+}
+
+func (p *defaultEnqueueExtension) Name() string { return p.pluginName }
+func (p *defaultEnqueueExtension) EventsToRegister() []framework.ClusterEventWithHint {
+	// need to return all specific cluster events with framework.All action instead of wildcard event
+	// because the returning values are used to register event handlers.
+	// If we return the wildcard here, it won't affect the event handlers registered by the plugin
+	// and some events may not be registered in the event handlers.
+	return framework.UnrollWildCardResource()
 }
 
 func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, pluginsMap map[string]framework.Plugin) error {
@@ -602,9 +598,14 @@ func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, plugin
 	return nil
 }
 
-// EnqueuePlugins returns the registered enqueue plugins.
+// PreEnqueuePlugins returns the registered preEnqueue plugins.
 func (f *frameworkImpl) PreEnqueuePlugins() []framework.PreEnqueuePlugin {
 	return f.preEnqueuePlugins
+}
+
+// EnqueueExtensions returns the registered reenqueue plugins.
+func (f *frameworkImpl) EnqueueExtensions() []framework.EnqueueExtensions {
+	return f.enqueueExtensions
 }
 
 // QueueSortFunc returns the function to sort pods in scheduling queue
@@ -631,12 +632,13 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 // If a non-success status is returned, then the scheduling cycle is aborted.
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
 	startTime := time.Now()
+	skipPlugins := sets.New[string]()
 	defer func() {
+		state.SkipFilterPlugins = skipPlugins
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	var result *framework.PreFilterResult
 	var pluginsWithNodes []string
-	skipPlugins := sets.New[string]()
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithName(logger, "PreFilter")
 	// TODO(knelasevero): Remove duplicated keys from log entry calls
@@ -670,7 +672,6 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			return nil, framework.NewStatus(framework.Unschedulable, msg)
 		}
 	}
-	state.SkipFilterPlugins = skipPlugins
 	return result, nil
 }
 
@@ -1270,6 +1271,11 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state *fra
 		ctx := klog.NewContext(ctx, logger)
 		status = f.runReservePluginReserve(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
+			if status.IsUnschedulable() {
+				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
+				status.SetFailedPlugin(pl.Name())
+				return status
+			}
 			err := status.AsError()
 			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
 			return framework.AsStatus(fmt.Errorf("running Reserve plugin %q: %w", pl.Name(), err))
@@ -1346,8 +1352,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
 				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
-				status.SetFailedPlugin(pl.Name())
-				return status
+				return status.WithFailedPlugin(pl.Name())
 			}
 			if status.IsWait() {
 				// Not allowed to be greater than maxTimeout.

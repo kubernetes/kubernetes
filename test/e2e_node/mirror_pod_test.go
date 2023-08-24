@@ -45,7 +45,7 @@ import (
 
 var _ = SIGDescribe("MirrorPod", func() {
 	f := framework.NewDefaultFramework("mirror-pod")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
 		ginkgo.BeforeEach(func(ctx context.Context) {
@@ -348,7 +348,7 @@ func createStaticPodUsingNfs(nfsIP string, nodeName string, cmd string, dir stri
 					VolumeSource: v1.VolumeSource{
 						NFS: &v1.NFSVolumeSource{
 							Server:   nfsIP,
-							Path:     "/exports",
+							Path:     "/",
 							ReadOnly: false,
 						},
 					},

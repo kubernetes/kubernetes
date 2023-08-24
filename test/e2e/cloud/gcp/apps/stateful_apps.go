@@ -38,7 +38,7 @@ var upgradeTests = []upgrades.Test{
 
 var _ = SIGDescribe("stateful Upgrade [Feature:StatefulUpgrade]", func() {
 	f := framework.NewDefaultFramework("stateful-upgrade")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("stateful upgrade", func() {

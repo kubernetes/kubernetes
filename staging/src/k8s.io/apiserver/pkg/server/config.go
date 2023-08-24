@@ -65,6 +65,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
@@ -83,6 +84,13 @@ import (
 
 	// install apis
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
+)
+
+// hostnameFunc is a function to set the hostnameFunc of this apiserver.
+// To be used for testing purpose only, to simulate scenarios where multiple apiservers
+// exist. In such cases we want to ensure unique apiserver IDs which are a hash of hostnameFunc.
+var (
+	hostnameFunc = os.Hostname
 )
 
 const (
@@ -190,6 +198,8 @@ type Config struct {
 	// SkipOpenAPIInstallation avoids installing the OpenAPI handler if set to true.
 	SkipOpenAPIInstallation bool
 
+	// ResourceTransformers are used to transform resources from and to etcd, e.g. encryption.
+	ResourceTransformers storagevalue.ResourceTransformers
 	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
@@ -364,7 +374,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	var id string
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
-		hostname, err := os.Hostname()
+		hostname, err := hostnameFunc()
 		if err != nil {
 			klog.Fatalf("error getting hostname for apiserver identity: %v", err)
 		}
@@ -894,14 +904,16 @@ func BuildHandlerChainWithStorageVersionPrecondition(apiHandler http.Handler, c 
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
-	handler := filterlatency.TrackCompleted(apiHandler)
+	handler := apiHandler
+
+	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authorization")
 
 	if c.FlowControl != nil {
 		workEstimatorCfg := flowcontrolrequest.DefaultWorkEstimatorConfig()
 		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(
-			c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount, workEstimatorCfg)
+			c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount, workEstimatorCfg, c.FlowControl.GetMaxSeats)
 		handler = filterlatency.TrackCompleted(handler)
 		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, requestWorkEstimator)
 		handler = filterlatency.TrackStarted(handler, c.TracerProvider, "priorityandfairness")
@@ -1066,4 +1078,13 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens, authn.APIAudiences)
 	authn.Authenticator = authenticatorunion.New(tokenAuthenticator, authn.Authenticator)
+}
+
+// For testing purpose only
+func SetHostnameFuncForTests(name string) {
+	hostnameFunc = func() (host string, err error) {
+		host = name
+		err = nil
+		return
+	}
 }

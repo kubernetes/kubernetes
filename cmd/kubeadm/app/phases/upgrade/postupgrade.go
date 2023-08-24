@@ -135,7 +135,7 @@ func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfig
 
 		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
 		klog.V(1).Infof("upgrading addons when control plane instances %v have not been upgraded "+
-			"may lead to incompatibility problems. You can disable the UpgradeAddonsBeforeControlPlane feature gate to"+
+			"may lead to incompatibility problems. You can disable the UpgradeAddonsBeforeControlPlane feature gate to "+
 			"ensure that the addons upgrade is executed only when all the control plane instances have been upgraded.", unupgradedControlPlanes)
 	}
 
@@ -295,27 +295,4 @@ func GetKubeletDir(dryRun bool) (string, error) {
 		return kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
 	}
 	return kubeadmconstants.KubeletRunDirectory, nil
-}
-
-// moveFiles moves files from one directory to another.
-func moveFiles(files map[string]string) error {
-	filesToRecover := make(map[string]string, len(files))
-	for from, to := range files {
-		if err := os.Rename(from, to); err != nil {
-			return rollbackFiles(filesToRecover, err)
-		}
-		filesToRecover[to] = from
-	}
-	return nil
-}
-
-// rollbackFiles moves the files back to the original directory.
-func rollbackFiles(files map[string]string, originalErr error) error {
-	errs := []error{originalErr}
-	for from, to := range files {
-		if err := os.Rename(from, to); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
 }

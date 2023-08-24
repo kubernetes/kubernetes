@@ -54,7 +54,7 @@ For the number of schedulable nodes:
 */
 var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vsphere][Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart-vpxd")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	type node struct {
 		name     string

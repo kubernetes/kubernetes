@@ -38,7 +38,7 @@ const (
 // This test requires that --feature-gates=APIServerIdentity=true,StorageVersionAPI=true be set on the apiserver and the controller manager
 var _ = SIGDescribe("StorageVersion resources [Feature:StorageVersionAPI]", func() {
 	f := framework.NewDefaultFramework("storage-version")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("storage version with non-existing id should be GC'ed", func(ctx context.Context) {
 		client := f.ClientSet

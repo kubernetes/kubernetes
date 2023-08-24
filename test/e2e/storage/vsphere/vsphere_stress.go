@@ -48,7 +48,7 @@ The following actions will be performed as part of this test.
 */
 var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-stress")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client        clientset.Interface
 		namespace     string
@@ -153,7 +153,7 @@ func PerformVolumeLifeCycleInParallel(ctx context.Context, f *framework.Framewor
 
 		ginkgo.By(fmt.Sprintf("%v Creating Pod using the claim: %v", logPrefix, pvclaim.Name))
 		// Create pod to attach Volume to Node
-		pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Waiting for the Pod: %v to be in the running state", logPrefix, pod.Name))

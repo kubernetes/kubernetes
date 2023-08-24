@@ -170,6 +170,21 @@ func getCurrentKubeletConfig(ctx context.Context) (*kubeletconfig.KubeletConfigu
 	return e2enodekubelet.GetCurrentKubeletConfig(ctx, framework.TestContext.NodeName, "", false, framework.TestContext.StandaloneMode)
 }
 
+func cleanupPods(f *framework.Framework) {
+	ginkgo.AfterEach(func(ctx context.Context) {
+		ginkgo.By("Deleting any Pods created by the test in namespace: " + f.Namespace.Name)
+		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, p := range l.Items {
+			if p.Namespace != f.Namespace.Name {
+				continue
+			}
+			framework.Logf("Deleting pod: %s", p.Name)
+			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, 2*time.Minute)
+		}
+	})
+}
+
 // Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
 // The change is reverted in the AfterEach of the context.
 // Returns true on success.
@@ -289,7 +304,7 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", framework.TestContext.NodeName, ports.KubeletReadOnlyPort), "/metrics")
+	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(), ports.KubeletReadOnlyPort), "/metrics")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
@@ -378,7 +393,7 @@ const (
 )
 
 func performContainerRuntimeUnitOp(op containerRuntimeUnitOp) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	conn, err := dbus.NewWithContext(ctx)
@@ -394,12 +409,13 @@ func performContainerRuntimeUnitOp(op containerRuntimeUnitOp) error {
 
 	switch op {
 	case startContainerRuntimeUnitOp:
-		conn.StartUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
+		_, err = conn.StartUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
 	case stopContainerRuntimeUnitOp:
-		conn.StopUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
+		_, err = conn.StopUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
 	default:
 		framework.Failf("Unexpected container runtime op: %v", op)
 	}
+	framework.ExpectNoError(err, "dbus connection error")
 
 	job := <-reschan
 	framework.ExpectEqual(job, "done", "Expected job to complete with done")
@@ -622,4 +638,8 @@ func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, n
 		}
 		return false, nil
 	})
+}
+
+func nodeNameOrIP() string {
+	return "localhost"
 }

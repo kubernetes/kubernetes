@@ -47,17 +47,19 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 CGROUP_ROOT=${CGROUP_ROOT:-""}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
+# if true, limited swap is being used instead of unlimited swap (default)
+LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.2.0"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.3.0"}
 CNI_TARGETARCH=${CNI_TARGETARCH:-amd64}
 CNI_PLUGINS_TARBALL="${CNI_PLUGINS_VERSION}/cni-plugins-linux-${CNI_TARGETARCH}-${CNI_PLUGINS_VERSION}.tgz"
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_TARBALL}"
-CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"f3a841324845ca6bf0d4091b4fc7f97e18a623172158b72fc3fdcdb9d42d2d37"}
-CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"525e2b62ba92a1b6f3dc9612449a84aa61652e680f7ebf4eff579795fe464b57"}
-CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"4960283b88d53b8c45ff7a938a6b398724005313e0388e0a36bd6d0b2bb5acdc"}
-CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"1524d1e6cc237ef756040ec1b4c397659bc14df25865bfcc5ea647357ef974f2"}
+CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"754a71ed60a4bd08726c3af705a7d55ee3df03122b12e389fdba4bea35d7dd7e"}
+CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"86c4c866a01a8073ad14f6feec74de1fd63669786850c7be47521433f9570902"}
+CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"8ceff026f4eccf33c261b4153af6911e10784ac169d08c1d86cf6887b9f4e99b"}
+CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"2f1f65ac33e961bcdc633e14c376656455824e22cc45d3ca7e31eb2750a7ebc4"}
 
 # enables testing eviction scenarios locally.
 EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
@@ -685,6 +687,10 @@ function wait_node_ready(){
   local system_node_wait_time=60
   local interval_time=2
   kube::util::wait_for_success "$system_node_wait_time" "$interval_time" "$nodes_stats | grep $node_name"
+  if [ $? == "1" ]; then
+    echo "time out on waiting $node_name exist"
+    exit 1
+  fi
 
   local system_node_ready_time=300
   local node_ready="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Ready --timeout=60s nodes $node_name"
@@ -825,6 +831,13 @@ EOF
 tracing:
   endpoint: localhost:4317 # the default value
   samplingRatePerMillion: 1000000 # sample always
+EOF
+    fi
+
+    if [[ "$LIMITED_SWAP" == "true" ]]; then
+        cat <<EOF >> "${TMP_DIR}"/kubelet.yaml
+memorySwap:
+  swapBehavior: LimitedSwap
 EOF
     fi
 

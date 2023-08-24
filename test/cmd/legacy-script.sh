@@ -618,6 +618,13 @@ runTests() {
     record_command run_kubectl_delete_allnamespaces_tests
   fi
 
+  ######################
+  # Delete --interactive   #
+  ######################
+  if kube::test::if_supports_resource "${configmaps}" ; then
+    record_command run_kubectl_delete_interactive_tests
+  fi
+
   ##################
   # Global timeout #
   ##################

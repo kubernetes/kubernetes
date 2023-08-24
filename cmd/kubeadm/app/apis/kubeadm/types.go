@@ -44,6 +44,9 @@ type InitConfiguration struct {
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
 	BootstrapTokens []bootstraptokenv1.BootstrapToken
 
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	DryRun bool
+
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	NodeRegistration NodeRegistrationOptions
 
@@ -142,14 +145,18 @@ type ClusterConfiguration struct {
 // ControlPlaneComponent holds settings common to control plane component of the cluster
 type ControlPlaneComponent struct {
 	// ExtraArgs is an extra set of flags to pass to the control plane component.
-	// A key in this map is the flag name as it appears on the
-	// command line except without leading dash(es).
-	// TODO: This is temporary and ideally we would like to switch all components to
-	// use ComponentConfig + ConfigMaps.
-	ExtraArgs map[string]string
+	// An argument name in this list is the flag name as it appears on the
+	// command line except without leading dash(es). Extra arguments will override existing
+	// default arguments. Duplicate extra arguments are allowed.
+	ExtraArgs []Arg
 
 	// ExtraVolumes is an extra set of host volumes, mounted to the control plane component.
 	ExtraVolumes []HostPathMount
+
+	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
+	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
+	// +optional
+	ExtraEnvs []v1.EnvVar
 }
 
 // APIServer holds settings necessary for API server deployments in the cluster
@@ -212,11 +219,12 @@ type NodeRegistrationOptions struct {
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config ConfigMap
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
-	// A key in this map is the flag name as it appears on the
-	// command line except without leading dash(es).
-	KubeletExtraArgs map[string]string
+	// An argument name in this list is the flag name as it appears on the command line except without leading dash(es).
+	// Extra arguments will override existing default arguments. Duplicate extra arguments are allowed.
+	KubeletExtraArgs []Arg
 
-	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered.
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
 	IgnorePreflightErrors []string
 
 	// ImagePullPolicy specifies the policy for image pulling during kubeadm "init" and "join" operations.
@@ -258,9 +266,15 @@ type LocalEtcd struct {
 
 	// ExtraArgs are extra arguments provided to the etcd binary
 	// when run inside a static pod.
-	// A key in this map is the flag name as it appears on the
-	// command line except without leading dash(es).
-	ExtraArgs map[string]string
+	// An argument name in this list is the flag name as it appears on the
+	// command line except without leading dash(es). Extra arguments will override existing
+	// default arguments. Duplicate extra arguments are allowed.
+	ExtraArgs []Arg
+
+	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
+	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
+	// +optional
+	ExtraEnvs []v1.EnvVar
 
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
 	ServerCertSANs []string
@@ -287,6 +301,9 @@ type ExternalEtcd struct {
 // JoinConfiguration contains elements describing a particular node.
 type JoinConfiguration struct {
 	metav1.TypeMeta
+
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	DryRun bool
 
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	NodeRegistration NodeRegistrationOptions
@@ -455,5 +472,42 @@ type ComponentConfig interface {
 	Get() interface{}
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResetConfiguration contains a list of fields that are specifically "kubeadm reset"-only runtime information.
+type ResetConfiguration struct {
+	metav1.TypeMeta
+
+	// CertificatesDir specifies the directory where the certificates are stored. If specified, it will be cleaned during the reset process.
+	CertificatesDir string
+
+	// CleanupTmpDir specifies whether the "/etc/kubernetes/tmp" directory should be cleaned during the reset process.
+	CleanupTmpDir bool
+
+	// CRISocket is used to retrieve container runtime info and used for the removal of the containers.
+	// If CRISocket is not specified by flag or config file, kubeadm will try to detect one valid CRISocket instead.
+	CRISocket string
+
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	DryRun bool
+
+	// Force flag instructs kubeadm to reset the node without prompting for confirmation.
+	Force bool
+
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored during the reset process, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
+	IgnorePreflightErrors []string
+
+	// SkipPhases is a list of phases to skip during command execution.
+	// The list of phases can be obtained with the "kubeadm reset phase --help" command.
+	SkipPhases []string
+}
+
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig
 type ComponentConfigMap map[string]ComponentConfig
+
+// Arg represents an argument with a name and a value.
+type Arg struct {
+	Name  string
+	Value string
+}

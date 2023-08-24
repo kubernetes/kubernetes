@@ -43,7 +43,7 @@ import (
 
 var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	f := framework.NewDefaultFramework("multi-az")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var zoneCount int
 	var err error
 	var zoneNames sets.Set[string]
@@ -93,7 +93,7 @@ func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCou
 			},
 			Ports: []v1.ServicePort{{
 				Port:       80,
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt32(80),
 			}},
 		},
 	}

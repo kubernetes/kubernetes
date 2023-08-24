@@ -121,7 +121,7 @@ func getReadySchedulableWorkerNode(ctx context.Context, c clientset.Interface) (
 
 var _ = common.SIGDescribe("LoadBalancers", func() {
 	f := framework.NewDefaultFramework("loadbalancers")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var subnetPrefix *net.IPNet
@@ -550,7 +550,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// Make sure acceptPod is running. There are certain chances that pod might be terminated due to unexpected reasons.
 		acceptPod, err = cs.CoreV1().Pods(namespace).Get(ctx, acceptPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", acceptPod.Name)
-		framework.ExpectEqual(acceptPod.Status.Phase, v1.PodRunning)
+		gomega.Expect(acceptPod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 		framework.ExpectNotEqual(acceptPod.Status.PodIP, "")
 
 		// Create loadbalancer service with source range from node[0] and podAccept
@@ -580,7 +580,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// Make sure dropPod is running. There are certain chances that the pod might be terminated due to unexpected reasons.
 		dropPod, err = cs.CoreV1().Pods(namespace).Get(ctx, dropPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", dropPod.Name)
-		framework.ExpectEqual(acceptPod.Status.Phase, v1.PodRunning)
+		gomega.Expect(acceptPod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 		framework.ExpectNotEqual(acceptPod.Status.PodIP, "")
 
 		ginkgo.By("Update service LoadBalancerSourceRange and check reachability")
@@ -735,7 +735,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 				framework.Failf("Loadbalancer IP not changed to internal.")
 			}
 			// should have the given static internal IP.
-			framework.ExpectEqual(e2eservice.GetIngressPoint(lbIngress), internalStaticIP)
+			gomega.Expect(e2eservice.GetIngressPoint(lbIngress)).To(gomega.Equal(internalStaticIP))
 		}
 	})
 
@@ -782,7 +782,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		if err != nil {
 			framework.Failf("gceCloud.GetHttpHealthCheck(%q) = _, %v; want nil", hcName, err)
 		}
-		framework.ExpectEqual(hc.CheckIntervalSec, gceHcCheckIntervalSeconds)
+		gomega.Expect(hc.CheckIntervalSec).To(gomega.Equal(gceHcCheckIntervalSeconds))
 
 		ginkgo.By("modify the health check interval")
 		hc.CheckIntervalSec = gceHcCheckIntervalSeconds - 1
@@ -1037,7 +1037,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		_, err = udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1169,7 +1169,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		_, err = udpJig.CreateUDPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
+				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt32(80)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1301,7 +1301,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 	f := framework.NewDefaultFramework("esipp")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var loadBalancerCreateTimeout time.Duration
 
 	var cs clientset.Interface
@@ -1425,7 +1425,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 				// Change service port to avoid collision with opened hostPorts
 				// in other tests that run in parallel.
 				if len(svc.Spec.Ports) != 0 {
-					svc.Spec.Ports[0].TargetPort = intstr.FromInt(int(svc.Spec.Ports[0].Port))
+					svc.Spec.Ports[0].TargetPort = intstr.FromInt32(svc.Spec.Ports[0].Port)
 					svc.Spec.Ports[0].Port = 8081
 				}
 

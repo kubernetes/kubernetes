@@ -44,7 +44,7 @@ import (
 // to test kubelet starting without the API server.
 var _ = utils.SIGDescribe("StaticPods [Feature:Kind]", func() {
 	f := framework.NewDefaultFramework("static-pods-csi")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// global vars for the ginkgo.BeforeEach() / It()'s below
 	var (

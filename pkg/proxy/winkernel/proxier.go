@@ -47,7 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 )
@@ -692,7 +692,7 @@ func NewProxier(
 	}
 
 	// windows listens to all node addresses
-	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nil)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	hns, supportedFeatures := newHostNetworkService()
@@ -809,7 +809,7 @@ func NewDualStackProxier(
 	minSyncPeriod time.Duration,
 	clusterCIDR string,
 	hostname string,
-	nodeIP [2]net.IP,
+	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	config config.KubeProxyWinkernelConfiguration,
@@ -818,16 +818,18 @@ func NewDualStackProxier(
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(syncPeriod, minSyncPeriod,
-		clusterCIDR, hostname, nodeIP[0], recorder, healthzServer, config, healthzPort)
+		clusterCIDR, hostname, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
+		config, healthzPort)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIP[0])
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIPs[v1.IPv4Protocol])
 	}
 
 	ipv6Proxier, err := NewProxier(syncPeriod, minSyncPeriod,
-		clusterCIDR, hostname, nodeIP[1], recorder, healthzServer, config, healthzPort)
+		clusterCIDR, hostname, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
+		config, healthzPort)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIP[1])
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIPs[v1.IPv6Protocol])
 	}
 
 	// Return a meta-proxier that dispatch calls between the two

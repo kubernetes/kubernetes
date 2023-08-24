@@ -41,7 +41,7 @@ import (
 
 var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpumanager-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("when querying /metrics", func() {
 		var oldCfg *kubeletconfig.KubeletConfiguration
@@ -164,7 +164,7 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 
 func getKubeletMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
 	ginkgo.By("getting Kubelet metrics from the metrics API")
-	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, framework.TestContext.NodeName+":10255", "/metrics")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, nodeNameOrIP()+":10255", "/metrics")
 }
 
 func makeGuaranteedCPUExclusiveSleeperPod(name string, cpus int) *v1.Pod {
@@ -201,5 +201,6 @@ func timelessSample(value interface{}) types.GomegaMatcher {
 		"Metric":    gstruct.Ignore(),
 		"Value":     gomega.BeNumerically("==", value),
 		"Timestamp": gstruct.Ignore(),
+		"Histogram": gstruct.Ignore(),
 	}))
 }

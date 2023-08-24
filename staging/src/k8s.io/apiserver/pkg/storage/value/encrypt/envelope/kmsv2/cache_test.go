@@ -31,7 +31,7 @@ import (
 
 func TestSimpleCacheSetError(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	cache := newSimpleCache(fakeClock, time.Second)
+	cache := newSimpleCache(fakeClock, time.Second, "providerName")
 
 	tests := []struct {
 		name        string
@@ -64,10 +64,10 @@ func TestSimpleCacheSetError(t *testing.T) {
 
 func TestKeyFunc(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	cache := newSimpleCache(fakeClock, time.Second)
+	cache := newSimpleCache(fakeClock, time.Second, "providerName")
 
 	t.Run("AllocsPerRun test", func(t *testing.T) {
-		key, err := generateKey(encryptedDEKMaxSize) // simulate worst case EDEK
+		key, err := generateKey(encryptedDEKSourceMaxSize) // simulate worst case EDEK
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +99,7 @@ func TestKeyFunc(t *testing.T) {
 
 func TestSimpleCache(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	cache := newSimpleCache(fakeClock, 5*time.Second)
+	cache := newSimpleCache(fakeClock, 5*time.Second, "providerName")
 	transformer := &envelopeTransformer{}
 
 	wg := sync.WaitGroup{}

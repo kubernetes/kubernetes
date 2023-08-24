@@ -46,6 +46,7 @@ func NewPreflightPhase() workflow.Phase {
 		Run:     runPreflight,
 		InheritFlags: []string{
 			options.CfgPath,
+			options.ImageRepository,
 			options.NodeCRISocket,
 			options.IgnorePreflightErrors,
 			options.DryRun,

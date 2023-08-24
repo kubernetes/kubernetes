@@ -26,7 +26,7 @@ import (
 
 func TestLibraryCompatibility(t *testing.T) {
 	var libs []map[string][]cel.FunctionOpt
-	libs = append(libs, authzLibraryDecls, listsLibraryDecls, regexLibraryDecls, urlLibraryDecls)
+	libs = append(libs, authzLibraryDecls, listsLibraryDecls, regexLibraryDecls, urlLibraryDecls, quantityLibraryDecls)
 	functionNames := sets.New[string]()
 	for _, lib := range libs {
 		for name := range lib {
@@ -37,12 +37,16 @@ func TestLibraryCompatibility(t *testing.T) {
 	// WARN: All library changes must follow
 	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/2876-crd-validation-expression-language#function-library-updates
 	// and must track the functions here along with which Kubernetes version introduced them.
-	knownFunctions := sets.New[string](
+	knownFunctions := sets.New(
 		// Kubernetes 1.24:
 		"isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "find", "findAll", "url", "getScheme", "getHost", "getHostname",
 		"getPort", "getEscapedPath", "getQuery", "isURL",
 		// Kubernetes <1.27>:
 		"path", "group", "serviceAccount", "resource", "subresource", "namespace", "name", "check", "allowed", "reason",
+		// Kubernetes <1.28>:
+		"errored", "error",
+		// Kubernetes <1.29>:
+		"add", "asApproximateFloat", "asInteger", "compareTo", "isGreaterThan", "isInteger", "isLessThan", "isQuantity", "quantity", "sign", "sub",
 		// Kubernetes <1.??>:
 	)
 

@@ -45,14 +45,14 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
+	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
 
 const (
@@ -268,19 +268,19 @@ type Proxier struct {
 	// that are significantly impacting performance.
 	iptablesData     *bytes.Buffer
 	filterChainsData *bytes.Buffer
-	natChains        utilproxy.LineBuffer
-	filterChains     utilproxy.LineBuffer
-	natRules         utilproxy.LineBuffer
-	filterRules      utilproxy.LineBuffer
+	natChains        proxyutil.LineBuffer
+	filterChains     proxyutil.LineBuffer
+	natRules         proxyutil.LineBuffer
+	filterRules      proxyutil.LineBuffer
 	// Added as a member to the struct to allow injection for testing.
 	netlinkHandle NetLinkHandle
 	// ipsetList is the list of ipsets that ipvs proxier used.
 	ipsetList map[string]*IPSet
 	// nodePortAddresses selects the interfaces where nodePort works.
-	nodePortAddresses *utilproxy.NodePortAddresses
+	nodePortAddresses *proxyutil.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
-	networkInterfacer     utilproxy.NetworkInterfacer
+	networkInterfacer     proxyutil.NetworkInterfacer
 	gracefuldeleteManager *GracefulTerminationManager
 	// serviceNoLocalEndpointsInternal represents the set of services that couldn't be applied
 	// due to the absence of local endpoints when the internal traffic policy is "Local".
@@ -338,7 +338,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	}
 
 	// Set the conntrack sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlVSConnTrack, 1); err != nil {
+	if err := proxyutil.EnsureSysctl(sysctl, sysctlVSConnTrack, 1); err != nil {
 		return nil, err
 	}
 
@@ -357,34 +357,34 @@ func NewProxier(ipFamily v1.IPFamily,
 		klog.V(2).InfoS("Left as-is", "sysctl", sysctlConnReuse)
 	} else {
 		// Set the connection reuse mode
-		if err := utilproxy.EnsureSysctl(sysctl, sysctlConnReuse, 0); err != nil {
+		if err := proxyutil.EnsureSysctl(sysctl, sysctlConnReuse, 0); err != nil {
 			return nil, err
 		}
 	}
 
 	// Set the expire_nodest_conn sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlExpireNoDestConn, 1); err != nil {
+	if err := proxyutil.EnsureSysctl(sysctl, sysctlExpireNoDestConn, 1); err != nil {
 		return nil, err
 	}
 
 	// Set the expire_quiescent_template sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlExpireQuiescentTemplate, 1); err != nil {
+	if err := proxyutil.EnsureSysctl(sysctl, sysctlExpireQuiescentTemplate, 1); err != nil {
 		return nil, err
 	}
 
 	// Set the ip_forward sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlForward, 1); err != nil {
+	if err := proxyutil.EnsureSysctl(sysctl, sysctlForward, 1); err != nil {
 		return nil, err
 	}
 
 	if strictARP {
 		// Set the arp_ignore sysctl we need for
-		if err := utilproxy.EnsureSysctl(sysctl, sysctlArpIgnore, 1); err != nil {
+		if err := proxyutil.EnsureSysctl(sysctl, sysctlArpIgnore, 1); err != nil {
 			return nil, err
 		}
 
 		// Set the arp_announce sysctl we need for
-		if err := utilproxy.EnsureSysctl(sysctl, sysctlArpAnnounce, 2); err != nil {
+		if err := proxyutil.EnsureSysctl(sysctl, sysctlArpAnnounce, 2); err != nil {
 			return nil, err
 		}
 	}
@@ -409,7 +409,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		scheduler = defaultScheduler
 	}
 
-	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
@@ -440,14 +440,14 @@ func NewProxier(ipFamily v1.IPFamily,
 		ipvsScheduler:         scheduler,
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
-		natChains:             utilproxy.LineBuffer{},
-		natRules:              utilproxy.LineBuffer{},
-		filterChains:          utilproxy.LineBuffer{},
-		filterRules:           utilproxy.LineBuffer{},
+		natChains:             proxyutil.NewLineBuffer(),
+		natRules:              proxyutil.NewLineBuffer(),
+		filterChains:          proxyutil.NewLineBuffer(),
+		filterRules:           proxyutil.NewLineBuffer(),
 		netlinkHandle:         NewNetLinkHandle(ipFamily == v1.IPv6Protocol),
 		ipset:                 ipset,
 		nodePortAddresses:     nodePortAddresses,
-		networkInterfacer:     utilproxy.RealNetwork{},
+		networkInterfacer:     proxyutil.RealNetwork{},
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
 	}
 	// initialize ipsetList with all sets we needed
@@ -480,7 +480,7 @@ func NewDualStackProxier(
 	masqueradeBit int,
 	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
 	hostname string,
-	nodeIP [2]net.IP,
+	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
@@ -494,7 +494,7 @@ func NewDualStackProxier(
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[0], hostname, nodeIP[0],
+		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol],
 		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
@@ -503,7 +503,7 @@ func NewDualStackProxier(
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[1], hostname, nodeIP[1],
+		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol],
 		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
@@ -902,6 +902,7 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.hostname)
 		return
 	}
+
 	proxier.mu.Lock()
 	proxier.nodeLabels = nil
 	proxier.mu.Unlock()
@@ -1171,7 +1172,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
+		for _, ingress := range svcInfo.LoadBalancerVIPStrings() {
 			// ipset call
 			entry = &utilipset.Entry{
 				IP:       ingress,
@@ -1691,11 +1692,6 @@ func (proxier *Proxier) writeIptablesRules() {
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
-
-	// NOTE: kubelet creates identical copies of these rules. If you want to change
-	// these rules in the future, you MUST do so in a way that will interoperate
-	// correctly with skewed versions of the rules created by kubelet. (Remove this
-	// comment once IPTablesOwnershipCleanup is GA.)
 
 	proxier.natRules.Write(
 		"-A", string(kubePostroutingChain),

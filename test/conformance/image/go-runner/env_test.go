@@ -32,7 +32,7 @@ func TestEnv(t *testing.T) {
 			desc: "OS env",
 			env:  &osEnv{},
 			preHook: func() {
-				os.Setenv("key1", "1")
+				t.Setenv("key1", "1")
 			},
 			expect: map[string]string{"key1": "1"},
 		}, {

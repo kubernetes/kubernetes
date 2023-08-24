@@ -42,6 +42,74 @@ import (
 
 var podTopologySpreadFunc = frameworkruntime.FactoryAdapter(feature.Features{}, New)
 
+// TestPreScoreSkip tests the cases that TopologySpread#PreScore returns the Skip status.
+func TestPreScoreSkip(t *testing.T) {
+	tests := []struct {
+		name   string
+		pod    *v1.Pod
+		nodes  []*v1.Node
+		objs   []runtime.Object
+		config config.PodTopologySpreadArgs
+	}{
+		{
+			name: "the pod doesn't have soft topology spread Constraints",
+			pod:  st.MakePod().Name("p").Namespace("default").Obj(),
+			config: config.PodTopologySpreadArgs{
+				DefaultingType: config.ListDefaulting,
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
+			},
+		},
+		{
+			name: "default constraints and a replicaset that doesn't match",
+			pod:  st.MakePod().Name("p").Namespace("default").Label("foo", "bar").Label("baz", "sup").OwnerReference("rs2", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).Obj(),
+			config: config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           2,
+						TopologyKey:       "planet",
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+					},
+				},
+				DefaultingType: config.ListDefaulting,
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("planet", "mars").Obj(),
+			},
+			objs: []runtime.Object{
+				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("tar").Obj()}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
+			f, err := frameworkruntime.NewFramework(ctx, nil, nil,
+				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
+				frameworkruntime.WithInformerFactory(informerFactory))
+			if err != nil {
+				t.Fatalf("Failed creating framework runtime: %v", err)
+			}
+			pl, err := New(&tt.config, f, feature.Features{})
+			if err != nil {
+				t.Fatalf("Failed creating plugin: %v", err)
+			}
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+			p := pl.(*PodTopologySpread)
+			cs := framework.NewCycleState()
+			if s := p.PreScore(context.Background(), cs, tt.pod, tt.nodes); !s.IsSkip() {
+				t.Fatalf("Expected skip but got %v", s.AsError())
+			}
+		})
+	}
+}
+
 func TestPreScoreStateEmptyNodes(t *testing.T) {
 	tests := []struct {
 		name                      string
@@ -256,29 +324,6 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "planet", value: "mars"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
-			},
-		},
-		{
-			name: "default constraints and a replicaset that doesn't match",
-			pod:  st.MakePod().Name("p").Namespace("default").Label("foo", "bar").Label("baz", "sup").OwnerReference("rs2", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).Obj(),
-			config: config.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						MaxSkew:           2,
-						TopologyKey:       "planet",
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-					},
-				},
-				DefaultingType: config.ListDefaulting,
-			},
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label("planet", "mars").Obj(),
-			},
-			objs: []runtime.Object{
-				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("tar").Obj()}},
-			},
-			want: &preScoreState{
-				TopologyPairToPodCounts: make(map[topologyPair]*int64),
 			},
 		},
 		{
@@ -545,7 +590,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-			if s := p.PreScore(context.Background(), cs, tt.pod, tt.nodes); !s.IsSuccess() {
+			if s := p.PreScore(ctx, cs, tt.pod, tt.nodes); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 

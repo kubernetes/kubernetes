@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,7 @@ import (
 
 var _ = SIGDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -211,7 +212,7 @@ var _ = SIGDescribe("Secrets", func() {
 		secretDecodedstring, err := base64.StdEncoding.DecodeString(string(secret.Data["key"]))
 		framework.ExpectNoError(err, "failed to decode secret from Base64")
 
-		framework.ExpectEqual(string(secretDecodedstring), "value1", "found secret, but the data wasn't updated from the patch")
+		gomega.Expect(string(secretDecodedstring)).To(gomega.Equal("value1"), "found secret, but the data wasn't updated from the patch")
 
 		ginkgo.By("deleting the secret using a LabelSelector")
 		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{

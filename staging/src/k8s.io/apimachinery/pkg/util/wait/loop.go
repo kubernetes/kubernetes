@@ -27,9 +27,11 @@ import (
 // the provided timer until the provided context is cancelled, the condition returns
 // true, or the condition returns an error. If sliding is true, the period is computed
 // after condition runs. If it is false then period includes the runtime for condition.
-// If immediate is false the first delay happens before any call to condition. The
-// returned error is the error returned by the last condition or the context error if
-// the context was terminated.
+// If immediate is false the first delay happens before any call to condition, if
+// immediate is true the condition will be invoked before waiting and guarantees that
+// the condition is invoked at least once, regardless of whether the context has been
+// cancelled. The returned error is the error returned by the last condition or the
+// context error if the context was terminated.
 //
 // This is the common loop construct for all polling in the wait package.
 func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding bool, condition ConditionWithContextFunc) error {
@@ -38,8 +40,17 @@ func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding 
 	var timeCh <-chan time.Time
 	doneCh := ctx.Done()
 
+	// if immediate is true the condition is
+	// guaranteed to be executed at least once,
 	// if we haven't requested immediate execution, delay once
-	if !immediate {
+	if immediate {
+		if ok, err := func() (bool, error) {
+			defer runtime.HandleCrash()
+			return condition(ctx)
+		}(); err != nil || ok {
+			return err
+		}
+	} else {
 		timeCh = t.C()
 		select {
 		case <-doneCh:

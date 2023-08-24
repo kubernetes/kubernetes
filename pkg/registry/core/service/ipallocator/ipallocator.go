@@ -484,11 +484,21 @@ func (dry dryRunAllocator) EnableMetrics() {
 // TODO: move it to k8s.io/utils/net, this is the same as current AddIPOffset()
 // but using netip.Addr instead of net.IP
 func addOffsetAddress(address netip.Addr, offset uint64) (netip.Addr, error) {
-	addressBig := big.NewInt(0).SetBytes(address.AsSlice())
-	r := big.NewInt(0).Add(addressBig, big.NewInt(int64(offset)))
-	addr, ok := netip.AddrFromSlice(r.Bytes())
+	addressBytes := address.AsSlice()
+	addressBig := big.NewInt(0).SetBytes(addressBytes)
+	r := big.NewInt(0).Add(addressBig, big.NewInt(int64(offset))).Bytes()
+	// r must be 4 or 16 bytes depending of the ip family
+	// bigInt conversion to bytes will not take this into consideration
+	// and drop the leading zeros, so we have to take this into account.
+	lenDiff := len(addressBytes) - len(r)
+	if lenDiff > 0 {
+		r = append(make([]byte, lenDiff), r...)
+	} else if lenDiff < 0 {
+		return netip.Addr{}, fmt.Errorf("invalid address %v", r)
+	}
+	addr, ok := netip.AddrFromSlice(r)
 	if !ok {
-		return netip.Addr{}, fmt.Errorf("invalid address %v", r.Bytes())
+		return netip.Addr{}, fmt.Errorf("invalid address %v", r)
 	}
 	return addr, nil
 }

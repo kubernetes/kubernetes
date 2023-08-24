@@ -150,7 +150,7 @@ func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 	}
 }
 
-func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
+func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj runtime.Object) {
 	testCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
 		ExpectNoDiff(t, "incorrect object", expectObj, object)
 		return nil

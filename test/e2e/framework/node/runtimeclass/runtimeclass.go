@@ -55,7 +55,7 @@ func NewRuntimeClassPod(runtimeClassName string) *v1.Pod {
 	}
 }
 
-// Check if test-handler is configured by reading the configuration from container runtime config.
+// NodeSupportsPreconfiguredRuntimeClassHandler checks if test-handler is configured by reading the configuration from container runtime config.
 // If no error is returned, the container runtime is assumed to support the test-handler, otherwise an error will be returned.
 func NodeSupportsPreconfiguredRuntimeClassHandler(ctx context.Context, f *framework.Framework) error {
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)

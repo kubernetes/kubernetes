@@ -38,16 +38,19 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
-	utilproxytest "k8s.io/kubernetes/pkg/proxy/util/testing"
+	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -56,6 +59,12 @@ import (
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )
+
+// (Note that we don't use UDP ports in most of the tests here, because if you create UDP
+// services you have to deal with setting up the FakeExec correctly for the conntrack
+// cleanup calls.)
+var tcpProtocol = v1.ProtocolTCP
+var sctpProtocol = v1.ProtocolSCTP
 
 func TestDeleteEndpointConnections(t *testing.T) {
 	const (
@@ -175,7 +184,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 				fexec.CommandScript = append(fexec.CommandScript, execFunc)
 			}
 
-			endpointIP := utilproxy.IPPart(tc.endpoint)
+			endpointIP := proxyutil.IPPart(tc.endpoint)
 			isIPv6 := netutils.IsIPv6String(endpointIP)
 
 			var ipt utiliptables.Interface
@@ -291,9 +300,9 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		ipfamily = v1.IPv6Protocol
 		podCIDR = "fd00::/64"
 	}
-	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR(podCIDR, ipt)
+	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR(podCIDR)
 
-	networkInterfacer := utilproxytest.NewFakeNetwork()
+	networkInterfacer := proxyutiltest.NewFakeNetwork()
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
 	addrs := []net.Addr{
 		&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)},
@@ -324,13 +333,13 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
 		existingFilterChainsData: bytes.NewBuffer(nil),
-		filterChains:             utilproxy.LineBuffer{},
-		filterRules:              utilproxy.LineBuffer{},
-		natChains:                utilproxy.LineBuffer{},
-		natRules:                 utilproxy.LineBuffer{},
+		filterChains:             proxyutil.NewLineBuffer(),
+		filterRules:              proxyutil.NewLineBuffer(),
+		natChains:                proxyutil.NewLineBuffer(),
+		natRules:                 proxyutil.NewLineBuffer(),
 		nodeIP:                   netutils.ParseIPSloppy(testNodeIP),
 		localhostNodePorts:       true,
-		nodePortAddresses:        utilproxy.NewNodePortAddresses(ipfamily, nil),
+		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipfamily, nil),
 		networkInterfacer:        networkInterfacer,
 	}
 	p.setInitialized(true)
@@ -602,6 +611,24 @@ func countRules(tableName utiliptables.Table, ruleData string) int {
 		rules += len(c.Rules)
 	}
 	return rules
+}
+
+func countRulesFromMetric(tableName utiliptables.Table) int {
+	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(tableName)))
+	if err != nil {
+		klog.ErrorS(err, "metrics are not registered?")
+		return -1
+	}
+	return int(numRulesFloat)
+}
+
+func countRulesFromLastSyncMetric(tableName utiliptables.Table) int {
+	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesLastSync.WithLabelValues(string(tableName)))
+	if err != nil {
+		klog.ErrorS(err, "metrics are not registered?")
+		return -1
+	}
+	return int(numRulesFloat)
 }
 
 // findAllMatches takes an array of lines and a pattern with one parenthesized group, and
@@ -1714,7 +1741,6 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	metrics.RegisterMetrics()
-	tcpProtocol := v1.ProtocolTCP
 
 	makeServiceMap(fp,
 		// create ClusterIP service
@@ -1962,12 +1988,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	natRulesMetric, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nNatRules := int(natRulesMetric)
-
+	nNatRules := countRulesFromMetric(utiliptables.TableNAT)
 	expectedNatRules := countRules(utiliptables.TableNAT, fp.iptablesData.String())
 
 	if nNatRules != expectedNatRules {
@@ -2060,7 +2081,6 @@ func TestClusterIPEndpointsMore(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
-	sctpProtocol := v1.ProtocolSCTP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -2169,7 +2189,6 @@ func TestLoadBalancer(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -2370,7 +2389,6 @@ func TestNodePort(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -2464,7 +2482,7 @@ func TestNodePort(t *testing.T) {
 func TestHealthCheckNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
 	svcIP := "172.30.0.42"
 	svcPort := 80
@@ -2608,7 +2626,7 @@ func TestExternalIPsReject(t *testing.T) {
 				Name:       svcPortName.Port,
 				Port:       int32(svcPort),
 				Protocol:   v1.ProtocolTCP,
-				TargetPort: intstr.FromInt(svcPort),
+				TargetPort: intstr.FromInt32(int32(svcPort)),
 			}}
 		}),
 	)
@@ -2683,13 +2701,12 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 				Name:       svcPortName.Port,
 				Port:       int32(svcPort),
 				Protocol:   v1.ProtocolTCP,
-				TargetPort: intstr.FromInt(svcPort),
+				TargetPort: intstr.FromInt32(int32(svcPort)),
 			}}
 		}),
 	)
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -2796,13 +2813,12 @@ func TestNonLocalExternalIPs(t *testing.T) {
 				Name:       svcPortName.Port,
 				Port:       int32(svcPort),
 				Protocol:   v1.ProtocolTCP,
-				TargetPort: intstr.FromInt(svcPort),
+				TargetPort: intstr.FromInt32(int32(svcPort)),
 			}}
 		}),
 	)
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3098,7 +3114,6 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3270,7 +3285,6 @@ func TestEnableLocalhostNodePortsIPv4(t *testing.T) {
 
 	epIP1 := "10.244.0.1"
 	epIP2 := "10.244.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3364,7 +3378,6 @@ func TestDisableLocalhostNodePortsIPv4(t *testing.T) {
 
 	epIP1 := "10.244.0.1"
 	epIP2 := "10.244.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3393,7 +3406,7 @@ func TestDisableLocalhostNodePortsIPv4WithNodeAddress(t *testing.T) {
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
 	fp.localhostNodePorts = false
 	fp.networkInterfacer.InterfaceAddrs()
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
 	expected := dedent.Dedent(`
 		*filter
@@ -3459,7 +3472,6 @@ func TestDisableLocalhostNodePortsIPv4WithNodeAddress(t *testing.T) {
 
 	epIP1 := "10.244.0.1"
 	epIP2 := "10.244.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3553,7 +3565,6 @@ func TestEnableLocalhostNodePortsIPv6(t *testing.T) {
 
 	epIP1 := "ff06::c1"
 	epIP2 := "ff06::c2"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv6
@@ -3647,7 +3658,6 @@ func TestDisableLocalhostNodePortsIPv6(t *testing.T) {
 
 	epIP1 := "ff06::c1"
 	epIP2 := "ff06::c2"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv6
@@ -3674,7 +3684,7 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
 	fp.localhostNodePorts = false
 
 	expected := dedent.Dedent(`
@@ -3723,7 +3733,7 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
 	fp.localhostNodePorts = false
 
 	expected := dedent.Dedent(`
@@ -3797,7 +3807,6 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3926,7 +3935,7 @@ func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port
 		Protocol:   protocol,
 		Port:       port,
 		NodePort:   nodeport,
-		TargetPort: intstr.FromInt(targetPort),
+		TargetPort: intstr.FromInt32(int32(targetPort)),
 	}
 	return append(array, svcPort)
 }
@@ -5080,109 +5089,6 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	}
 }
 
-// The majority of EndpointSlice specific tests are not iptables specific and focus on
-// the shared EndpointChangeTracker and EndpointSliceCache. This test ensures that the
-// iptables proxier supports translating EndpointSlices to iptables output.
-func TestEndpointSliceE2E(t *testing.T) {
-	expectedIPTablesWithSlice := dedent.Dedent(`
-		*filter
-		:KUBE-NODEPORTS - [0:0]
-		:KUBE-SERVICES - [0:0]
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FIREWALL - [0:0]
-		:KUBE-FORWARD - [0:0]
-		:KUBE-PROXY-FIREWALL - [0:0]
-		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-		COMMIT
-		*nat
-		:KUBE-NODEPORTS - [0:0]
-		:KUBE-SERVICES - [0:0]
-		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-POSTROUTING - [0:0]
-		:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
-		:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
-		:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-		:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
-		-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
-		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
-		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
-		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
-		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
-		-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
-		-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
-		-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 0 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.1:80" -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
-		-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.2:80" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
-		-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.3:80" -j KUBE-SEP-XGJFVO3L2O5SRFNT
-		COMMIT
-		`)
-
-	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
-	fp.OnServiceSynced()
-	fp.OnEndpointSlicesSynced()
-
-	serviceName := "svc1"
-	namespaceName := "ns1"
-
-	fp.OnServiceAdd(&v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
-		Spec: v1.ServiceSpec{
-			ClusterIP: "172.30.1.1",
-			Selector:  map[string]string{"foo": "bar"},
-			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}},
-		},
-	})
-
-	tcpProtocol := v1.ProtocolTCP
-	endpointSlice := &discovery.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-1", serviceName),
-			Namespace: namespaceName,
-			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
-		},
-		Ports: []discovery.EndpointPort{{
-			Name:     pointer.String(""),
-			Port:     pointer.Int32(80),
-			Protocol: &tcpProtocol,
-		}},
-		AddressType: discovery.AddressTypeIPv4,
-		Endpoints: []discovery.Endpoint{{
-			Addresses:  []string{"10.0.1.1"},
-			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-			NodeName:   pointer.String(testHostname),
-		}, {
-			Addresses:  []string{"10.0.1.2"},
-			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-			NodeName:   pointer.String("node2"),
-		}, {
-			Addresses:  []string{"10.0.1.3"},
-			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
-			NodeName:   pointer.String("node3"),
-		}, {
-			Addresses:  []string{"10.0.1.4"},
-			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
-			NodeName:   pointer.String("node4"),
-		}},
-	}
-
-	fp.OnEndpointSliceAdd(endpointSlice)
-	fp.syncProxyRules()
-	assertIPTablesRulesEqual(t, getLine(), true, expectedIPTablesWithSlice, fp.iptablesData.String())
-
-	fp.OnEndpointSliceDelete(endpointSlice)
-	fp.syncProxyRules()
-	assertIPTablesRulesNotEqual(t, getLine(), expectedIPTablesWithSlice, fp.iptablesData.String())
-}
-
 // TestHealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
 func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 	ipt := iptablestest.NewFake()
@@ -5202,7 +5108,6 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 		},
 	})
 
-	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-1", serviceName),
@@ -5434,7 +5339,6 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	tcpProtocol := v1.ProtocolTCP
 
 	metrics.RegisterMetrics()
 
@@ -5461,22 +5365,14 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	fp.syncProxyRules()
 	iptablesData := fp.iptablesData.String()
 
-	nFilterRulesMetric, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nFilterRules := int(nFilterRulesMetric)
+	nFilterRules := countRulesFromMetric(utiliptables.TableFilter)
 	expectedFilterRules := countRules(utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
 	}
 
-	nNatRulesMetric, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nNatRules := int(nNatRulesMetric)
+	nNatRules := countRulesFromMetric(utiliptables.TableNAT)
 	expectedNatRules := countRules(utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
@@ -5502,22 +5398,14 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	fp.syncProxyRules()
 	iptablesData = fp.iptablesData.String()
 
-	nFilterRulesMetric, err = testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nFilterRules = int(nFilterRulesMetric)
+	nFilterRules = countRulesFromMetric(utiliptables.TableFilter)
 	expectedFilterRules = countRules(utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
 	}
 
-	nNatRulesMetric, err = testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nNatRules = int(nNatRulesMetric)
+	nNatRules = countRulesFromMetric(utiliptables.TableNAT)
 	expectedNatRules = countRules(utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
@@ -5583,7 +5471,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 		name                      string
 		line                      int
 		internalTrafficPolicy     *v1.ServiceInternalTrafficPolicy
-		featureGateOn             bool
 		endpoints                 []endpoint
 		expectEndpointRule        bool
 		expectedIPTablesWithSlice string
@@ -5593,7 +5480,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is cluster",
 			line:                  getLine(),
 			internalTrafficPolicy: &cluster,
-			featureGateOn:         true,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
 				{"10.0.1.2", "host1"},
@@ -5616,7 +5502,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is local and there are local endpoints",
 			line:                  getLine(),
 			internalTrafficPolicy: &local,
-			featureGateOn:         true,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
 				{"10.0.1.2", "host1"},
@@ -5670,7 +5555,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is local and there are no local endpoints",
 			line:                  getLine(),
 			internalTrafficPolicy: &local,
-			featureGateOn:         true,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
 				{"10.0.1.2", "host1"},
@@ -5739,7 +5623,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 
 			fp.OnServiceAdd(svc)
 
-			tcpProtocol := v1.ProtocolTCP
 			endpointSlice := &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", serviceName),
@@ -5786,10 +5669,9 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 	}
 }
 
-// TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal tests that when there are local ready and ready + terminating
-// endpoints, only the ready endpoints are used.
-func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
-	tcpProtocol := v1.ProtocolTCP
+// TestTerminatingEndpointsTrafficPolicyLocal tests that when there are local ready and
+// ready + terminating endpoints, only the ready endpoints are used.
+func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 	timeout := v1.DefaultClientIPServiceAffinitySeconds
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
@@ -5824,18 +5706,16 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 	}
 
 	testcases := []struct {
-		name                   string
-		line                   int
-		terminatingFeatureGate bool
-		endpointslice          *discovery.EndpointSlice
-		expectedIPTables       string
-		noUsableEndpoints      bool
-		flowTests              []packetFlowTest
+		name              string
+		line              int
+		endpointslice     *discovery.EndpointSlice
+		expectedIPTables  string
+		noUsableEndpoints bool
+		flowTests         []packetFlowTest
 	}{
 		{
-			name:                   "ready endpoints exist",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "ready endpoints exist",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -5974,9 +5854,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 		},
 		{
-			name:                   "only terminating endpoints exist",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "only terminating endpoints exist",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6103,9 +5982,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 		},
 		{
-			name:                   "terminating endpoints on remote node",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "terminating endpoints on remote node",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6190,9 +6068,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 		},
 		{
-			name:                   "no usable endpoints on any node",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "no usable endpoints on any node",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6318,10 +6195,9 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 	}
 }
 
-// TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster tests that when there are cluster-wide ready and ready + terminating
-// endpoints, only the ready endpoints are used.
-func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
-	tcpProtocol := v1.ProtocolTCP
+// TestTerminatingEndpointsTrafficPolicyCluster tests that when there are cluster-wide
+// ready and ready + terminating endpoints, only the ready endpoints are used.
+func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 	timeout := v1.DefaultClientIPServiceAffinitySeconds
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
@@ -6356,18 +6232,16 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 	}
 
 	testcases := []struct {
-		name                   string
-		line                   int
-		terminatingFeatureGate bool
-		endpointslice          *discovery.EndpointSlice
-		expectedIPTables       string
-		noUsableEndpoints      bool
-		flowTests              []packetFlowTest
+		name              string
+		line              int
+		endpointslice     *discovery.EndpointSlice
+		expectedIPTables  string
+		noUsableEndpoints bool
+		flowTests         []packetFlowTest
 	}{
 		{
-			name:                   "ready endpoints exist",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "ready endpoints exist",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6497,9 +6371,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 			},
 		},
 		{
-			name:                   "only terminating endpoints exist",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "only terminating endpoints exist",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6622,9 +6495,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 			},
 		},
 		{
-			name:                   "terminating endpoints on remote node",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "terminating endpoints on remote node",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6706,9 +6578,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 			},
 		},
 		{
-			name:                   "no usable endpoints on any node",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "no usable endpoints on any node",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6839,7 +6710,6 @@ func TestInternalExternalMasquerade(t *testing.T) {
 	// top, before the test cases that will be run against it.)
 	setupTest := func(fp *Proxier) {
 		local := v1.ServiceInternalTrafficPolicyLocal
-		tcpProtocol := v1.ProtocolTCP
 
 		makeServiceMap(fp,
 			makeTestService("ns1", "svc1", func(svc *v1.Service) {
@@ -7048,10 +6918,12 @@ func TestInternalExternalMasquerade(t *testing.T) {
 			destIP:   testNodeIP,
 			destPort: 3002,
 
-			// FIXME: The short-circuit rule means we potentially send to a remote
-			// endpoint without masquerading, which is inconsistent with the
-			// eTP:Cluster case. We should either be masquerading here, or NOT
-			// masquerading in the "pod to NodePort" case above.
+			// See the comment below in the "pod to LB with eTP:Local" case.
+			// It doesn't actually make sense to short-circuit here, since if
+			// you connect directly to a NodePort from outside the cluster,
+			// you only get the local endpoints. But it's simpler for us and
+			// slightly more convenient for users to have this case get
+			// short-circuited too.
 			output: "10.180.0.2:80, 10.180.1.2:80",
 			masq:   false,
 		},
@@ -7061,10 +6933,13 @@ func TestInternalExternalMasquerade(t *testing.T) {
 			destIP:   "5.6.7.8",
 			destPort: 80,
 
-			// FIXME: The short-circuit rule means we potentially send to a remote
-			// endpoint without masquerading, which is inconsistent with the
-			// eTP:Cluster case. We should either be masquerading here, or NOT
-			// masquerading in the "pod to LB" case above.
+			// The short-circuit rule is supposed to make this behave the same
+			// way it would if the packet actually went out to the LB and then
+			// came back into the cluster. So it gets routed to all endpoints,
+			// not just local ones. In reality, if the packet actually left
+			// the cluster, it would have to get masqueraded, but since we can
+			// avoid doing that in the short-circuit case, and not masquerading
+			// is more useful, we avoid masquerading.
 			output: "10.180.0.2:80, 10.180.1.2:80",
 			masq:   false,
 		},
@@ -7455,7 +7330,6 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 		}),
 	)
 
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -7636,7 +7510,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		}),
 	)
 
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -7705,6 +7578,18 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
+	rulesSynced := countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric := countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	rulesTotal := rulesSynced
+	rulesTotalMetric := countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
+
 	// Add a new service and its endpoints. (This will only sync the SVC and SEP rules
 	// for the new service, not the existing ones.)
 	makeServiceMap(fp,
@@ -7771,6 +7656,20 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	// We added 1 KUBE-SERVICES rule, 2 KUBE-SVC-X27LE4BHSL4DOUIK rules, and 2
+	// KUBE-SEP-BSWRHOQ77KEXZLNL rules.
+	rulesTotal += 5
+	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
+
 	// Delete a service. (Won't update the other services.)
 	fp.OnServiceDelete(svc2)
 	fp.syncProxyRules()
@@ -7807,6 +7706,20 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	// We deleted 1 KUBE-SERVICES rule, 2 KUBE-SVC-2VJB64SDSIJUP5T6 rules, and 2
+	// KUBE-SEP-UHEGFW77JX3KXTOV rules
+	rulesTotal -= 5
+	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
 
 	// Add a service, sync, then add its endpoints. (The first sync will be a no-op other
 	// than adding the REJECT rule. The second sync will create the new service.)
@@ -7853,6 +7766,19 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	// The REJECT rule is in "filter", not NAT, so the number of NAT rules hasn't
+	// changed.
+	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
 
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns4", "svc4", 1, func(eps *discovery.EndpointSlice) {
@@ -7904,6 +7830,20 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	// We added 1 KUBE-SERVICES rule, 2 KUBE-SVC-4SW47YFZTEDKD3PK rules, and
+	// 2 KUBE-SEP-AYCN5HPXMIRJNJXU rules
+	rulesTotal += 5
+	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
+
 	// Change an endpoint of an existing service. This will cause its SVC and SEP
 	// chains to be rewritten.
 	eps3update := eps3.DeepCopy()
@@ -7948,6 +7888,18 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	// We rewrote existing rules but did not change the overall number of rules.
+	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
 
 	// Add an endpoint to a service. This will cause its SVC and SEP chains to be rewritten.
 	eps3update2 := eps3update.DeepCopy()
@@ -7995,6 +7947,21 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	// We added 2 KUBE-SEP-JVVZVJ7BSEPPRNBS rules and 1 KUBE-SVC-X27LE4BHSL4DOUIK rule
+	// jumping to the new SEP chain. The other rules related to svc3 got rewritten,
+	// but that does not change the count of rules.
+	rulesTotal += 3
+	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
+
 	// Sync with no new changes... This will not rewrite any SVC or SEP chains
 	fp.syncProxyRules()
 
@@ -8027,6 +7994,18 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	// (No changes)
+	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
 
 	// Now force a partial resync error and ensure that it recovers correctly
 	if fp.needFullSync {
@@ -8125,6 +8104,20 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
+	// We deleted 1 KUBE-SERVICES rule, 2 KUBE-SVC-4SW47YFZTEDKD3PK rules, and 2
+	// KUBE-SEP-AYCN5HPXMIRJNJXU rules
+	rulesTotal -= 5
+	rulesTotalMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesTotalMetric != rulesTotal {
+		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
+	}
 }
 
 func TestNoEndpointsMetric(t *testing.T) {
@@ -8243,7 +8236,6 @@ func TestNoEndpointsMetric(t *testing.T) {
 
 			fp.OnServiceAdd(svc)
 
-			tcpProtocol := v1.ProtocolTCP
 			endpointSlice := &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", serviceName),
@@ -8283,6 +8275,131 @@ func TestNoEndpointsMetric(t *testing.T) {
 
 			if tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal != int(syncProxyRulesNoLocalEndpointsTotalExternal) {
 				t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(internal): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalExternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal)
+			}
+		})
+	}
+}
+
+func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
+	ipModeProxy := v1.LoadBalancerIPModeProxy
+	ipModeVIP := v1.LoadBalancerIPModeVIP
+
+	testCases := []struct {
+		name          string
+		ipModeEnabled bool
+		svcIP         string
+		svcLBIP       string
+		ipMode        *v1.LoadBalancerIPMode
+		expectedRule  bool
+	}{
+		/* LoadBalancerIPMode disabled */
+		{
+			name:          "LoadBalancerIPMode disabled, ipMode Proxy",
+			ipModeEnabled: false,
+			svcIP:         "10.20.30.41",
+			svcLBIP:       "1.2.3.4",
+			ipMode:        &ipModeProxy,
+			expectedRule:  true,
+		},
+		{
+			name:          "LoadBalancerIPMode disabled, ipMode VIP",
+			ipModeEnabled: false,
+			svcIP:         "10.20.30.42",
+			svcLBIP:       "1.2.3.5",
+			ipMode:        &ipModeVIP,
+			expectedRule:  true,
+		},
+		{
+			name:          "LoadBalancerIPMode disabled, ipMode nil",
+			ipModeEnabled: false,
+			svcIP:         "10.20.30.43",
+			svcLBIP:       "1.2.3.6",
+			ipMode:        nil,
+			expectedRule:  true,
+		},
+		/* LoadBalancerIPMode enabled */
+		{
+			name:          "LoadBalancerIPMode enabled, ipMode Proxy",
+			ipModeEnabled: true,
+			svcIP:         "10.20.30.41",
+			svcLBIP:       "1.2.3.4",
+			ipMode:        &ipModeProxy,
+			expectedRule:  false,
+		},
+		{
+			name:          "LoadBalancerIPMode enabled, ipMode VIP",
+			ipModeEnabled: true,
+			svcIP:         "10.20.30.42",
+			svcLBIP:       "1.2.3.5",
+			ipMode:        &ipModeVIP,
+			expectedRule:  true,
+		},
+		{
+			name:          "LoadBalancerIPMode enabled, ipMode nil",
+			ipModeEnabled: true,
+			svcIP:         "10.20.30.43",
+			svcLBIP:       "1.2.3.6",
+			ipMode:        nil,
+			expectedRule:  true,
+		},
+	}
+
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)()
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			makeServiceMap(fp,
+				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+					svc.Spec.Type = "LoadBalancer"
+					svc.Spec.ClusterIP = testCase.svcIP
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
+						NodePort: int32(svcNodePort),
+					}}
+					svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+						IP:     testCase.svcLBIP,
+						IPMode: testCase.ipMode,
+					}}
+				}),
+			)
+
+			tcpProtocol := v1.ProtocolTCP
+			populateEndpointSlices(fp,
+				makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+					eps.AddressType = discovery.AddressTypeIPv4
+					eps.Endpoints = []discovery.Endpoint{{
+						Addresses: []string{"10.180.0.1"},
+					}}
+					eps.Ports = []discovery.EndpointPort{{
+						Name:     pointer.String("p80"),
+						Port:     pointer.Int32(80),
+						Protocol: &tcpProtocol,
+					}}
+				}),
+			)
+
+			fp.syncProxyRules()
+
+			c, _ := ipt.Dump.GetChain(utiliptables.TableNAT, kubeServicesChain)
+			ruleExists := false
+			for _, r := range c.Rules {
+				if r.DestinationAddress != nil && r.DestinationAddress.Value == testCase.svcLBIP {
+					ruleExists = true
+				}
+			}
+			if ruleExists != testCase.expectedRule {
+				t.Errorf("unexpected rule for %s", testCase.svcLBIP)
 			}
 		})
 	}

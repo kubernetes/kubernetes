@@ -48,13 +48,14 @@ import (
 	utilptr "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const rootCAConfigMapName = "kube-root-ca.crt"
 
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("no secret-based service account token should be auto-generated", func(ctx context.Context) {
 		{
@@ -62,7 +63,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			time.Sleep(10 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(ctx, "default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEmpty(sa.Secrets)
+			gomega.Expect(sa.Secrets).To(gomega.BeEmpty())
 		}
 	})
 

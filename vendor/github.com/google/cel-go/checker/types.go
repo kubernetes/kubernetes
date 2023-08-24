@@ -15,119 +15,54 @@
 package checker
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/google/cel-go/checker/decls"
-
-	"google.golang.org/protobuf/proto"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	"github.com/google/cel-go/common/types"
 )
-
-const (
-	kindUnknown = iota + 1
-	kindError
-	kindFunction
-	kindDyn
-	kindPrimitive
-	kindWellKnown
-	kindWrapper
-	kindNull
-	kindAbstract
-	kindType
-	kindList
-	kindMap
-	kindObject
-	kindTypeParam
-)
-
-// FormatCheckedType converts a type message into a string representation.
-func FormatCheckedType(t *exprpb.Type) string {
-	switch kindOf(t) {
-	case kindDyn:
-		return "dyn"
-	case kindFunction:
-		return formatFunction(t.GetFunction().GetResultType(),
-			t.GetFunction().GetArgTypes(),
-			false)
-	case kindList:
-		return fmt.Sprintf("list(%s)", FormatCheckedType(t.GetListType().GetElemType()))
-	case kindObject:
-		return t.GetMessageType()
-	case kindMap:
-		return fmt.Sprintf("map(%s, %s)",
-			FormatCheckedType(t.GetMapType().GetKeyType()),
-			FormatCheckedType(t.GetMapType().GetValueType()))
-	case kindNull:
-		return "null"
-	case kindPrimitive:
-		switch t.GetPrimitive() {
-		case exprpb.Type_UINT64:
-			return "uint"
-		case exprpb.Type_INT64:
-			return "int"
-		}
-		return strings.Trim(strings.ToLower(t.GetPrimitive().String()), " ")
-	case kindType:
-		if t.GetType() == nil {
-			return "type"
-		}
-		return fmt.Sprintf("type(%s)", FormatCheckedType(t.GetType()))
-	case kindWellKnown:
-		switch t.GetWellKnown() {
-		case exprpb.Type_ANY:
-			return "any"
-		case exprpb.Type_DURATION:
-			return "duration"
-		case exprpb.Type_TIMESTAMP:
-			return "timestamp"
-		}
-	case kindWrapper:
-		return fmt.Sprintf("wrapper(%s)",
-			FormatCheckedType(decls.NewPrimitiveType(t.GetWrapper())))
-	case kindError:
-		return "!error!"
-	case kindTypeParam:
-		return t.GetTypeParam()
-	}
-	return t.String()
-}
 
 // isDyn returns true if the input t is either type DYN or a well-known ANY message.
-func isDyn(t *exprpb.Type) bool {
+func isDyn(t *types.Type) bool {
 	// Note: object type values that are well-known and map to a DYN value in practice
 	// are sanitized prior to being added to the environment.
-	switch kindOf(t) {
-	case kindDyn:
+	switch t.Kind() {
+	case types.DynKind, types.AnyKind:
 		return true
-	case kindWellKnown:
-		return t.GetWellKnown() == exprpb.Type_ANY
 	default:
 		return false
 	}
 }
 
 // isDynOrError returns true if the input is either an Error, DYN, or well-known ANY message.
-func isDynOrError(t *exprpb.Type) bool {
-	switch kindOf(t) {
-	case kindError:
-		return true
-	default:
-		return isDyn(t)
+func isDynOrError(t *types.Type) bool {
+	return isError(t) || isDyn(t)
+}
+
+func isError(t *types.Type) bool {
+	return t.Kind() == types.ErrorKind
+}
+
+func isOptional(t *types.Type) bool {
+	if t.Kind() == types.OpaqueKind {
+		return t.TypeName() == "optional"
 	}
+	return false
+}
+
+func maybeUnwrapOptional(t *types.Type) (*types.Type, bool) {
+	if isOptional(t) {
+		return t.Parameters()[0], true
+	}
+	return t, false
 }
 
 // isEqualOrLessSpecific checks whether one type is equal or less specific than the other one.
 // A type is less specific if it matches the other type using the DYN type.
-func isEqualOrLessSpecific(t1 *exprpb.Type, t2 *exprpb.Type) bool {
-	kind1, kind2 := kindOf(t1), kindOf(t2)
+func isEqualOrLessSpecific(t1, t2 *types.Type) bool {
+	kind1, kind2 := t1.Kind(), t2.Kind()
 	// The first type is less specific.
-	if isDyn(t1) || kind1 == kindTypeParam {
+	if isDyn(t1) || kind1 == types.TypeParamKind {
 		return true
 	}
 	// The first type is not less specific.
-	if isDyn(t2) || kind2 == kindTypeParam {
+	if isDyn(t2) || kind2 == types.TypeParamKind {
 		return false
 	}
 	// Types must be of the same kind to be equal.
@@ -138,38 +73,34 @@ func isEqualOrLessSpecific(t1 *exprpb.Type, t2 *exprpb.Type) bool {
 	// With limited exceptions for ANY and JSON values, the types must agree and be equivalent in
 	// order to return true.
 	switch kind1 {
-	case kindAbstract:
-		a1 := t1.GetAbstractType()
-		a2 := t2.GetAbstractType()
-		if a1.GetName() != a2.GetName() ||
-			len(a1.GetParameterTypes()) != len(a2.GetParameterTypes()) {
+	case types.OpaqueKind:
+		if t1.TypeName() != t2.TypeName() ||
+			len(t1.Parameters()) != len(t2.Parameters()) {
 			return false
 		}
-		for i, p1 := range a1.GetParameterTypes() {
-			if !isEqualOrLessSpecific(p1, a2.GetParameterTypes()[i]) {
+		for i, p1 := range t1.Parameters() {
+			if !isEqualOrLessSpecific(p1, t2.Parameters()[i]) {
 				return false
 			}
 		}
 		return true
-	case kindList:
-		return isEqualOrLessSpecific(t1.GetListType().GetElemType(), t2.GetListType().GetElemType())
-	case kindMap:
-		m1 := t1.GetMapType()
-		m2 := t2.GetMapType()
-		return isEqualOrLessSpecific(m1.GetKeyType(), m2.GetKeyType()) &&
-			isEqualOrLessSpecific(m1.GetValueType(), m2.GetValueType())
-	case kindType:
+	case types.ListKind:
+		return isEqualOrLessSpecific(t1.Parameters()[0], t2.Parameters()[0])
+	case types.MapKind:
+		return isEqualOrLessSpecific(t1.Parameters()[0], t2.Parameters()[0]) &&
+			isEqualOrLessSpecific(t1.Parameters()[1], t2.Parameters()[1])
+	case types.TypeKind:
 		return true
 	default:
-		return proto.Equal(t1, t2)
+		return t1.IsExactType(t2)
 	}
 }
 
 // / internalIsAssignable returns true if t1 is assignable to t2.
-func internalIsAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) bool {
+func internalIsAssignable(m *mapping, t1, t2 *types.Type) bool {
 	// Process type parameters.
-	kind1, kind2 := kindOf(t1), kindOf(t2)
-	if kind2 == kindTypeParam {
+	kind1, kind2 := t1.Kind(), t2.Kind()
+	if kind2 == types.TypeParamKind {
 		// If t2 is a valid type substitution for t1, return true.
 		valid, t2HasSub := isValidTypeSubstitution(m, t1, t2)
 		if valid {
@@ -182,7 +113,7 @@ func internalIsAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) bool {
 		}
 		// Otherwise, fall through to check whether t1 is a possible substitution for t2.
 	}
-	if kind1 == kindTypeParam {
+	if kind1 == types.TypeParamKind {
 		// Return whether t1 is a valid substitution for t2. If not, do no additional checks as the
 		// possible type substitutions have been searched in both directions.
 		valid, _ := isValidTypeSubstitution(m, t2, t1)
@@ -193,40 +124,25 @@ func internalIsAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) bool {
 	if isDynOrError(t1) || isDynOrError(t2) {
 		return true
 	}
+	// Preserve the nullness checks of the legacy type-checker.
+	if kind1 == types.NullTypeKind {
+		return internalIsAssignableNull(t2)
+	}
+	if kind2 == types.NullTypeKind {
+		return internalIsAssignableNull(t1)
+	}
 
 	// Test for when the types do not need to agree, but are more specific than dyn.
 	switch kind1 {
-	case kindNull:
-		return internalIsAssignableNull(t2)
-	case kindPrimitive:
-		return internalIsAssignablePrimitive(t1.GetPrimitive(), t2)
-	case kindWrapper:
-		return internalIsAssignable(m, decls.NewPrimitiveType(t1.GetWrapper()), t2)
-	default:
-		if kind1 != kind2 {
-			return false
-		}
-	}
-
-	// Test for when the types must agree.
-	switch kind1 {
-	// ERROR, TYPE_PARAM, and DYN handled above.
-	case kindAbstract:
-		return internalIsAssignableAbstractType(m, t1.GetAbstractType(), t2.GetAbstractType())
-	case kindFunction:
-		return internalIsAssignableFunction(m, t1.GetFunction(), t2.GetFunction())
-	case kindList:
-		return internalIsAssignable(m, t1.GetListType().GetElemType(), t2.GetListType().GetElemType())
-	case kindMap:
-		return internalIsAssignableMap(m, t1.GetMapType(), t2.GetMapType())
-	case kindObject:
-		return t1.GetMessageType() == t2.GetMessageType()
-	case kindType:
-		// A type is a type is a type, any additional parameterization of the
-		// type cannot affect method resolution or assignability.
-		return true
-	case kindWellKnown:
-		return t1.GetWellKnown() == t2.GetWellKnown()
+	case types.BoolKind, types.BytesKind, types.DoubleKind, types.IntKind, types.StringKind, types.UintKind,
+		types.AnyKind, types.DurationKind, types.TimestampKind,
+		types.StructKind:
+		return t1.IsAssignableType(t2)
+	case types.TypeKind:
+		return kind2 == types.TypeKind
+	case types.OpaqueKind, types.ListKind, types.MapKind:
+		return t1.Kind() == t2.Kind() && t1.TypeName() == t2.TypeName() &&
+			internalIsAssignableList(m, t1.Parameters(), t2.Parameters())
 	default:
 		return false
 	}
@@ -236,19 +152,19 @@ func internalIsAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) bool {
 // substitution for t1, and whether t2 has a type substitution in mapping m.
 //
 // The type t2 is a valid substitution for t1 if any of the following statements is true
-// - t2 has a type substitition (t2sub) equal to t1
+// - t2 has a type substitution (t2sub) equal to t1
 // - t2 has a type substitution (t2sub) assignable to t1
 // - t2 does not occur within t1.
-func isValidTypeSubstitution(m *mapping, t1, t2 *exprpb.Type) (valid, hasSub bool) {
+func isValidTypeSubstitution(m *mapping, t1, t2 *types.Type) (valid, hasSub bool) {
 	// Early return if the t1 and t2 are the same instance.
-	kind1, kind2 := kindOf(t1), kindOf(t2)
-	if kind1 == kind2 && (t1 == t2 || proto.Equal(t1, t2)) {
+	kind1, kind2 := t1.Kind(), t2.Kind()
+	if kind1 == kind2 && t1.IsExactType(t2) {
 		return true, true
 	}
 	if t2Sub, found := m.find(t2); found {
 		// Early return if t1 and t2Sub are the same instance as otherwise the mapping
 		// might mark a type as being a subtitution for itself.
-		if kind1 == kindOf(t2Sub) && (t1 == t2Sub || proto.Equal(t1, t2Sub)) {
+		if kind1 == t2Sub.Kind() && t1.IsExactType(t2Sub) {
 			return true, true
 		}
 		// If the types are compatible, pick the more general type and return true
@@ -270,28 +186,10 @@ func isValidTypeSubstitution(m *mapping, t1, t2 *exprpb.Type) (valid, hasSub boo
 	return false, false
 }
 
-// internalIsAssignableAbstractType returns true if the abstract type names agree and all type
-// parameters are assignable.
-func internalIsAssignableAbstractType(m *mapping, a1 *exprpb.Type_AbstractType, a2 *exprpb.Type_AbstractType) bool {
-	return a1.GetName() == a2.GetName() &&
-		internalIsAssignableList(m, a1.GetParameterTypes(), a2.GetParameterTypes())
-}
-
-// internalIsAssignableFunction returns true if the function return type and arg types are
-// assignable.
-func internalIsAssignableFunction(m *mapping, f1 *exprpb.Type_FunctionType, f2 *exprpb.Type_FunctionType) bool {
-	f1ArgTypes := flattenFunctionTypes(f1)
-	f2ArgTypes := flattenFunctionTypes(f2)
-	if internalIsAssignableList(m, f1ArgTypes, f2ArgTypes) {
-		return true
-	}
-	return false
-}
-
 // internalIsAssignableList returns true if the element types at each index in the list are
 // assignable from l1[i] to l2[i]. The list lengths must also agree for the lists to be
 // assignable.
-func internalIsAssignableList(m *mapping, l1 []*exprpb.Type, l2 []*exprpb.Type) bool {
+func internalIsAssignableList(m *mapping, l1, l2 []*types.Type) bool {
 	if len(l1) != len(l2) {
 		return false
 	}
@@ -303,41 +201,22 @@ func internalIsAssignableList(m *mapping, l1 []*exprpb.Type, l2 []*exprpb.Type) 
 	return true
 }
 
-// internalIsAssignableMap returns true if map m1 may be assigned to map m2.
-func internalIsAssignableMap(m *mapping, m1 *exprpb.Type_MapType, m2 *exprpb.Type_MapType) bool {
-	if internalIsAssignableList(m,
-		[]*exprpb.Type{m1.GetKeyType(), m1.GetValueType()},
-		[]*exprpb.Type{m2.GetKeyType(), m2.GetValueType()}) {
+// internalIsAssignableNull returns true if the type is nullable.
+func internalIsAssignableNull(t *types.Type) bool {
+	return isLegacyNullable(t) || t.IsAssignableType(types.NullType)
+}
+
+// isLegacyNullable preserves the null-ness compatibility of the original type-checker implementation.
+func isLegacyNullable(t *types.Type) bool {
+	switch t.Kind() {
+	case types.OpaqueKind, types.StructKind, types.AnyKind, types.DurationKind, types.TimestampKind:
 		return true
 	}
 	return false
 }
 
-// internalIsAssignableNull returns true if the type is nullable.
-func internalIsAssignableNull(t *exprpb.Type) bool {
-	switch kindOf(t) {
-	case kindAbstract, kindObject, kindNull, kindWellKnown, kindWrapper:
-		return true
-	default:
-		return false
-	}
-}
-
-// internalIsAssignablePrimitive returns true if the target type is the same or if it is a wrapper
-// for the primitive type.
-func internalIsAssignablePrimitive(p exprpb.Type_PrimitiveType, target *exprpb.Type) bool {
-	switch kindOf(target) {
-	case kindPrimitive:
-		return p == target.GetPrimitive()
-	case kindWrapper:
-		return p == target.GetWrapper()
-	default:
-		return false
-	}
-}
-
 // isAssignable returns an updated type substitution mapping if t1 is assignable to t2.
-func isAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) *mapping {
+func isAssignable(m *mapping, t1, t2 *types.Type) *mapping {
 	mCopy := m.copy()
 	if internalIsAssignable(mCopy, t1, t2) {
 		return mCopy
@@ -346,7 +225,7 @@ func isAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) *mapping {
 }
 
 // isAssignableList returns an updated type substitution mapping if l1 is assignable to l2.
-func isAssignableList(m *mapping, l1 []*exprpb.Type, l2 []*exprpb.Type) *mapping {
+func isAssignableList(m *mapping, l1, l2 []*types.Type) *mapping {
 	mCopy := m.copy()
 	if internalIsAssignableList(mCopy, l1, l2) {
 		return mCopy
@@ -354,44 +233,8 @@ func isAssignableList(m *mapping, l1 []*exprpb.Type, l2 []*exprpb.Type) *mapping
 	return nil
 }
 
-// kindOf returns the kind of the type as defined in the checked.proto.
-func kindOf(t *exprpb.Type) int {
-	if t == nil || t.TypeKind == nil {
-		return kindUnknown
-	}
-	switch t.GetTypeKind().(type) {
-	case *exprpb.Type_Error:
-		return kindError
-	case *exprpb.Type_Function:
-		return kindFunction
-	case *exprpb.Type_Dyn:
-		return kindDyn
-	case *exprpb.Type_Primitive:
-		return kindPrimitive
-	case *exprpb.Type_WellKnown:
-		return kindWellKnown
-	case *exprpb.Type_Wrapper:
-		return kindWrapper
-	case *exprpb.Type_Null:
-		return kindNull
-	case *exprpb.Type_Type:
-		return kindType
-	case *exprpb.Type_ListType_:
-		return kindList
-	case *exprpb.Type_MapType_:
-		return kindMap
-	case *exprpb.Type_MessageType:
-		return kindObject
-	case *exprpb.Type_TypeParam:
-		return kindTypeParam
-	case *exprpb.Type_AbstractType_:
-		return kindAbstract
-	}
-	return kindUnknown
-}
-
 // mostGeneral returns the more general of two types which are known to unify.
-func mostGeneral(t1 *exprpb.Type, t2 *exprpb.Type) *exprpb.Type {
+func mostGeneral(t1, t2 *types.Type) *types.Type {
 	if isEqualOrLessSpecific(t1, t2) {
 		return t1
 	}
@@ -401,32 +244,25 @@ func mostGeneral(t1 *exprpb.Type, t2 *exprpb.Type) *exprpb.Type {
 // notReferencedIn checks whether the type doesn't appear directly or transitively within the other
 // type. This is a standard requirement for type unification, commonly referred to as the "occurs
 // check".
-func notReferencedIn(m *mapping, t *exprpb.Type, withinType *exprpb.Type) bool {
-	if proto.Equal(t, withinType) {
+func notReferencedIn(m *mapping, t, withinType *types.Type) bool {
+	if t.IsExactType(withinType) {
 		return false
 	}
-	withinKind := kindOf(withinType)
+	withinKind := withinType.Kind()
 	switch withinKind {
-	case kindTypeParam:
+	case types.TypeParamKind:
 		wtSub, found := m.find(withinType)
 		if !found {
 			return true
 		}
 		return notReferencedIn(m, t, wtSub)
-	case kindAbstract:
-		for _, pt := range withinType.GetAbstractType().GetParameterTypes() {
+	case types.OpaqueKind, types.ListKind, types.MapKind:
+		for _, pt := range withinType.Parameters() {
 			if !notReferencedIn(m, t, pt) {
 				return false
 			}
 		}
 		return true
-	case kindList:
-		return notReferencedIn(m, t, withinType.GetListType().GetElemType())
-	case kindMap:
-		mt := withinType.GetMapType()
-		return notReferencedIn(m, t, mt.GetKeyType()) && notReferencedIn(m, t, mt.GetValueType())
-	case kindWrapper:
-		return notReferencedIn(m, t, decls.NewPrimitiveType(withinType.GetWrapper()))
 	default:
 		return true
 	}
@@ -434,39 +270,25 @@ func notReferencedIn(m *mapping, t *exprpb.Type, withinType *exprpb.Type) bool {
 
 // substitute replaces all direct and indirect occurrences of bound type parameters. Unbound type
 // parameters are replaced by DYN if typeParamToDyn is true.
-func substitute(m *mapping, t *exprpb.Type, typeParamToDyn bool) *exprpb.Type {
+func substitute(m *mapping, t *types.Type, typeParamToDyn bool) *types.Type {
 	if tSub, found := m.find(t); found {
 		return substitute(m, tSub, typeParamToDyn)
 	}
-	kind := kindOf(t)
-	if typeParamToDyn && kind == kindTypeParam {
-		return decls.Dyn
+	kind := t.Kind()
+	if typeParamToDyn && kind == types.TypeParamKind {
+		return types.DynType
 	}
 	switch kind {
-	case kindAbstract:
-		at := t.GetAbstractType()
-		params := make([]*exprpb.Type, len(at.GetParameterTypes()))
-		for i, p := range at.GetParameterTypes() {
-			params[i] = substitute(m, p, typeParamToDyn)
-		}
-		return decls.NewAbstractType(at.GetName(), params...)
-	case kindFunction:
-		fn := t.GetFunction()
-		rt := substitute(m, fn.ResultType, typeParamToDyn)
-		args := make([]*exprpb.Type, len(fn.GetArgTypes()))
-		for i, a := range fn.ArgTypes {
-			args[i] = substitute(m, a, typeParamToDyn)
-		}
-		return decls.NewFunctionType(rt, args...)
-	case kindList:
-		return decls.NewListType(substitute(m, t.GetListType().GetElemType(), typeParamToDyn))
-	case kindMap:
-		mt := t.GetMapType()
-		return decls.NewMapType(substitute(m, mt.GetKeyType(), typeParamToDyn),
-			substitute(m, mt.GetValueType(), typeParamToDyn))
-	case kindType:
-		if t.GetType() != nil {
-			return decls.NewTypeType(substitute(m, t.GetType(), typeParamToDyn))
+	case types.OpaqueKind:
+		return types.NewOpaqueType(t.TypeName(), substituteParams(m, t.Parameters(), typeParamToDyn)...)
+	case types.ListKind:
+		return types.NewListType(substitute(m, t.Parameters()[0], typeParamToDyn))
+	case types.MapKind:
+		return types.NewMapType(substitute(m, t.Parameters()[0], typeParamToDyn),
+			substitute(m, t.Parameters()[1], typeParamToDyn))
+	case types.TypeKind:
+		if len(t.Parameters()) > 0 {
+			return types.NewTypeTypeWithParam(substitute(m, t.Parameters()[0], typeParamToDyn))
 		}
 		return t
 	default:
@@ -474,21 +296,14 @@ func substitute(m *mapping, t *exprpb.Type, typeParamToDyn bool) *exprpb.Type {
 	}
 }
 
-func typeKey(t *exprpb.Type) string {
-	return FormatCheckedType(t)
+func substituteParams(m *mapping, typeParams []*types.Type, typeParamToDyn bool) []*types.Type {
+	subParams := make([]*types.Type, len(typeParams))
+	for i, tp := range typeParams {
+		subParams[i] = substitute(m, tp, typeParamToDyn)
+	}
+	return subParams
 }
 
-// flattenFunctionTypes takes a function with arg types T1, T2, ..., TN and result type TR
-// and returns a slice containing {T1, T2, ..., TN, TR}.
-func flattenFunctionTypes(f *exprpb.Type_FunctionType) []*exprpb.Type {
-	argTypes := f.GetArgTypes()
-	if len(argTypes) == 0 {
-		return []*exprpb.Type{f.GetResultType()}
-	}
-	flattend := make([]*exprpb.Type, len(argTypes)+1, len(argTypes)+1)
-	for i, at := range argTypes {
-		flattend[i] = at
-	}
-	flattend[len(argTypes)] = f.GetResultType()
-	return flattend
+func newFunctionType(resultType *types.Type, argTypes ...*types.Type) *types.Type {
+	return types.NewOpaqueType("function", append([]*types.Type{resultType}, argTypes...)...)
 }

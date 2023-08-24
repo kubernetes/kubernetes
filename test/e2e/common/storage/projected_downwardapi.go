@@ -37,7 +37,7 @@ import (
 
 var _ = SIGDescribe("Projected downwardAPI", func() {
 	f := framework.NewDefaultFramework("projected")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// How long to wait for a log pod to be displayed
 	const podLogTimeout = 2 * time.Minute

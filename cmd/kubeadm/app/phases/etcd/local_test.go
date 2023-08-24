@@ -29,6 +29,7 @@ import (
 
 	"github.com/lithammer/dedent"
 
+	v1 "k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
@@ -43,6 +44,9 @@ func TestGetEtcdPodSpec(t *testing.T) {
 		Etcd: kubeadmapi.Etcd{
 			Local: &kubeadmapi.LocalEtcd{
 				DataDir: "/var/lib/etcd",
+				ExtraEnvs: []v1.EnvVar{
+					{Name: "Foo", Value: "Bar"},
+				},
 			},
 		},
 	}
@@ -54,6 +58,10 @@ func TestGetEtcdPodSpec(t *testing.T) {
 	// Assert each specs refers to the right pod
 	if spec.Spec.Containers[0].Name != kubeadmconstants.Etcd {
 		t.Errorf("getKubeConfigSpecs spec for etcd contains pod %s, expects %s", spec.Spec.Containers[0].Name, kubeadmconstants.Etcd)
+	}
+	env := []v1.EnvVar{{Name: "Foo", Value: "Bar"}}
+	if !reflect.DeepEqual(spec.Spec.Containers[0].Env, env) {
+		t.Errorf("expected env: %v, got: %v", env, spec.Spec.Containers[0].Env)
 	}
 }
 
@@ -168,7 +176,7 @@ func TestGetEtcdCommand(t *testing.T) {
 		name             string
 		advertiseAddress string
 		nodeName         string
-		extraArgs        map[string]string
+		extraArgs        []kubeadmapi.Arg
 		initialCluster   []etcdutil.Member
 		expected         []string
 	}{
@@ -235,9 +243,9 @@ func TestGetEtcdCommand(t *testing.T) {
 			name:             "Extra args",
 			advertiseAddress: "1.2.3.4",
 			nodeName:         "bar",
-			extraArgs: map[string]string{
-				"listen-client-urls":    "https://10.0.1.10:2379",
-				"advertise-client-urls": "https://10.0.1.10:2379",
+			extraArgs: []kubeadmapi.Arg{
+				{Name: "listen-client-urls", Value: "https://10.0.1.10:2379"},
+				{Name: "advertise-client-urls", Value: "https://10.0.1.10:2379"},
 			},
 			expected: []string{
 				"etcd",

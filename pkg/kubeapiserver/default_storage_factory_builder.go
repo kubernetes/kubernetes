@@ -69,8 +69,8 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		//
 		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
 		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
-		admissionregistration.Resource("validatingadmissionpolicies").WithVersion("v1alpha1"),
-		admissionregistration.Resource("validatingadmissionpolicybindings").WithVersion("v1alpha1"),
+		admissionregistration.Resource("validatingadmissionpolicies").WithVersion("v1beta1"),
+		admissionregistration.Resource("validatingadmissionpolicybindings").WithVersion("v1beta1"),
 		networking.Resource("clustercidrs").WithVersion("v1alpha1"),
 		networking.Resource("ipaddresses").WithVersion("v1alpha1"),
 		certificates.Resource("clustertrustbundles").WithVersion("v1alpha1"),

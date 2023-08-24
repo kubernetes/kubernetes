@@ -36,11 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -478,9 +475,7 @@ func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T
 	}
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ignoreWatchCacheTests bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
-
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
 	initialRV, preset, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -506,6 +501,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 		pod := obj.(*example.Pod)
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
+	// Use compact to increase etcd global revision without changes to any resources.
+	// The increase in resources version comes from Kubernetes compaction updating hidden key.
+	// Used to test consistent List to confirm it returns latest etcd revision.
+	compaction(ctx, t, initialRV)
+	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
 		name                       string
@@ -706,7 +706,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
-			expectRV:                   list.ResourceVersion,
+			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
 		},
 		{
 			name:   "test List with limit at resource version 0",
@@ -1019,6 +1019,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{},
 		},
+		{
+			name:        "test consistent List",
+			prefix:      "/pods/empty",
+			pred:        storage.Everything,
+			rv:          "",
+			expectRV:    currentRV,
+			expectedOut: []example.Pod{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1100,8 +1108,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 }
 
 func RunTestListWithoutPaging(ctx context.Context, t *testing.T, store storage.Interface) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
-
 	_, preset, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)

@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -29,6 +29,7 @@ const (
 	DeprecatedRollbackTo           = "deprecated.deployment.rollback.to"
 	DeprecatedTemplateGeneration   = "deprecated.daemonset.template.generation"
 	StatefulSetPodNameLabel        = "statefulset.kubernetes.io/pod-name"
+	PodIndexLabel                  = "apps.kubernetes.io/pod-index"
 )
 
 // +genclient

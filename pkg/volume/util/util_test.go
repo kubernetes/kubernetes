@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"runtime"
@@ -93,7 +92,7 @@ spec:
 	}
 
 	for _, test := range tests {
-		tempFile, err := ioutil.TempFile("", "podfile")
+		tempFile, err := os.CreateTemp("", "podfile")
 		defer os.Remove(tempFile.Name())
 		if err != nil {
 			t.Fatalf("cannot create temporary file: %v", err)

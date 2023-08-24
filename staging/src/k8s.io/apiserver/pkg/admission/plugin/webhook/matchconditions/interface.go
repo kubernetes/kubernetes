@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 type MatchResult struct {
@@ -32,5 +33,5 @@ type MatchResult struct {
 // Matcher contains logic for converting Evaluations to bool of matches or does not match
 type Matcher interface {
 	// Match is used to take cel evaluations and convert into decisions
-	Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object) MatchResult
+	Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) MatchResult
 }

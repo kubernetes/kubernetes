@@ -34,7 +34,25 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 		expected runtime.Object
 	}{
 		{
-			name: "LendablePercent is not specified, should default to zero",
+			name: "Defaulting for Exempt",
+			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type:   flowcontrolv1beta3.PriorityLevelEnablementExempt,
+					Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{},
+				},
+			},
+			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
+				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1beta3.PriorityLevelEnablementExempt,
+					Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{
+						NominalConcurrencyShares: pointer.Int32(0),
+						LendablePercent:          pointer.Int32(0),
+					},
+				},
+			},
+		},
+		{
+			name: "LendablePercent is not specified in Limited, should default to zero",
 			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
 				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
 					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,

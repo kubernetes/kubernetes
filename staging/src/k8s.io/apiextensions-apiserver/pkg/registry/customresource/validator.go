@@ -22,23 +22,26 @@ import (
 	"math"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	apiextensionsvalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
 type customResourceValidator struct {
 	namespaceScoped       bool
 	kind                  schema.GroupVersionKind
-	schemaValidator       *validate.SchemaValidator
-	statusSchemaValidator *validate.SchemaValidator
+	schemaValidator       apiextensionsvalidation.SchemaValidator
+	statusSchemaValidator apiextensionsvalidation.SchemaValidator
 }
 
 func (a customResourceValidator) Validate(ctx context.Context, obj runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
@@ -58,7 +61,7 @@ func (a customResourceValidator) Validate(ctx context.Context, obj runtime.Objec
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessor(accessor, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
+	allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
@@ -70,6 +73,10 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 	if !ok {
 		return field.ErrorList{field.Invalid(field.NewPath(""), u, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", u))}
 	}
+	oldU, ok := old.(*unstructured.Unstructured)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath(""), old, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", u))}
+	}
 	objAccessor, err := meta.Accessor(obj)
 	if err != nil {
 		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
@@ -86,16 +93,30 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
+	allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResourceUpdate(nil, u.UnstructuredContent(), oldU.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
 	return allErrs
 }
 
-// WarningsOnUpdate returns warnings for the given update.
-func (customResourceValidator) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+var standardFinalizers = sets.NewString(
+	metav1.FinalizerOrphanDependents,
+	metav1.FinalizerDeleteDependents,
+	string(corev1.FinalizerKubernetes),
+)
+
+func validateKubeFinalizerName(stringValue string, fldPath *field.Path) []string {
+	var allWarnings []string
+	for _, msg := range apimachineryvalidation.IsQualifiedName(stringValue) {
+		allWarnings = append(allWarnings, fmt.Sprintf("%s: %q: %s", fldPath.String(), stringValue, msg))
+	}
+	if len(strings.Split(stringValue, "/")) == 1 {
+		if !standardFinalizers.Has(stringValue) {
+			allWarnings = append(allWarnings, fmt.Sprintf("%s: %q: prefer a domain-qualified finalizer name to avoid accidental conflicts with other finalizer writers", fldPath.String(), stringValue))
+		}
+	}
+	return allWarnings
 }
 
 func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
@@ -103,6 +124,10 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 	if !ok {
 		return field.ErrorList{field.Invalid(field.NewPath(""), u, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", u))}
 	}
+	oldU, ok := old.(*unstructured.Unstructured)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath(""), old, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", u))}
+	}
 	objAccessor, err := meta.Accessor(obj)
 	if err != nil {
 		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
@@ -119,7 +144,9 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
+	if status, hasStatus := u.UnstructuredContent()["status"]; hasStatus {
+		allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResourceUpdate(nil, status, oldU.UnstructuredContent()["status"], a.statusSchemaValidator)...)
+	}
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
 	return allErrs

@@ -19,6 +19,7 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,17 +27,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/record"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
-	"k8s.io/kubernetes/pkg/features"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -50,6 +51,8 @@ const (
 	maxLongWaitForUnmountDuration = 4200 * time.Second
 	volumeAttachedCheckTimeout    = 5 * time.Second
 )
+
+var registerMetrics sync.Once
 
 // Calls Run()
 // Verifies there are no calls to attach or detach.
@@ -221,6 +224,9 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 // Deletes the node/volume/pod tuple from desiredStateOfWorld cache without first marking the node/volume as unmounted.
 // Verifies there is one detach call and no (new) attach calls.
 func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *testing.T) {
+	registerMetrics.Do(func() {
+		legacyregistry.MustRegister(metrics.ForceDetachMetricCounter)
+	})
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
@@ -287,6 +293,9 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 1 /* expectedDetachCallCount */, fakePlugin)
+
+	// Force detach metric due to timeout
+	testForceDetachMetric(t, 1, metrics.ForceDetachReasonTimeout)
 }
 
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
@@ -851,7 +860,9 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 // Deletes the pod from desiredStateOfWorld cache without first marking the node/volume as unmounted.
 // Verifies there is one detach call and no (new) attach calls.
 func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeOutOfServiceVolumeDetach, true)()
+	registerMetrics.Do(func() {
+		legacyregistry.MustRegister(metrics.ForceDetachMetricCounter)
+	})
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
@@ -920,6 +931,9 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
 	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
 	waitForDetachCallCount(t, 1 /* expectedDetachCallCount */, fakePlugin)
+
+	// Force detach metric due to out-of-service taint
+	testForceDetachMetric(t, 1, metrics.ForceDetachReasonOutOfService)
 }
 
 // Populates desiredStateOfWorld cache with one node/volume/pod tuple.
@@ -933,7 +947,6 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 // Deletes the pod from desiredStateOfWorld cache without first marking the node/volume as unmounted.
 // Verifies there is no detach call and no (new) attach calls.
 func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeOutOfServiceVolumeDetach, true)()
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
@@ -1665,4 +1678,17 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 		Steps:    6,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+// verifies the force detach metric with reason
+func testForceDetachMetric(t *testing.T, inputForceDetachMetricCounter int, reason string) {
+	t.Helper()
+
+	actualForceDetachMericCounter, err := metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(reason))
+	if err != nil {
+		t.Errorf("Error getting actualForceDetachMericCounter")
+	}
+	if actualForceDetachMericCounter != float64(inputForceDetachMetricCounter) {
+		t.Errorf("Expected desiredForceDetachMericCounter to be %d, got %v", inputForceDetachMetricCounter, actualForceDetachMericCounter)
+	}
 }

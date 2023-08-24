@@ -202,7 +202,7 @@ func getHugepagesTestPod(f *framework.Framework, limits v1.ResourceList, mounts 
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:HugePages]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should remove resources for huge page sizes no longer supported", func(ctx context.Context) {
 		ginkgo.By("mimicking support for 9Mi of 3Mi huge page memory by patching the node status")
@@ -227,7 +227,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-3Mi"]
 			return isPresent
-		}, 30*time.Second, framework.Poll).Should(gomega.Equal(false))
+		}, 30*time.Second, framework.Poll).Should(gomega.BeFalse())
 	})
 
 	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func(ctx context.Context) {
@@ -247,7 +247,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-2Mi"]
 			return isPresent
-		}, 30*time.Second, framework.Poll).Should(gomega.Equal(true))
+		}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 	})
 
 	ginkgo.When("start the pod", func() {

@@ -131,7 +131,7 @@ func NewCloudCIDRAllocator(logger klog.Logger, client clientset.Interface, cloud
 			}
 			return nil
 		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
 			return ca.ReleaseCIDR(logger, node)
 		}),
 	})
@@ -272,11 +272,11 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName 
 
 	cidrStrings, err := ca.cloud.AliasRangesByProviderID(node.Spec.ProviderID)
 	if err != nil {
-		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		controllerutil.RecordNodeStatusChange(logger, ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to get cidr(s) from provider: %v", err)
 	}
 	if len(cidrStrings) == 0 {
-		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		controllerutil.RecordNodeStatusChange(logger, ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
 	}
 	//Can have at most 2 ips (one for v4 and one for v6)
@@ -311,7 +311,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName 
 		}
 	}
 	if err != nil {
-		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
+		controllerutil.RecordNodeStatusChange(logger, ca.recorder, node, "CIDRAssignmentFailed")
 		logger.Error(err, "Failed to update the node PodCIDR after multiple attempts", "node", klog.KObj(node), "cidrStrings", cidrStrings)
 		return err
 	}

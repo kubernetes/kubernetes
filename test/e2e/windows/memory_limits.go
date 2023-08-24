@@ -42,7 +42,7 @@ import (
 var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 
 	f := framework.NewDefaultFramework("memory-limit-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// NOTE(vyta): these tests are Windows specific
@@ -168,7 +168,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 			}
 		}
 		return false
-	}, 3*time.Minute, 10*time.Second).Should(gomega.Equal(true))
+	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 }
 

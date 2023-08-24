@@ -101,8 +101,8 @@ var (
 
 		# Update a container's image using a JSON patch with positional arrays
 		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
-		
-		# Update a deployment's replicas through the scale subresource using a merge patch.
+
+		# Update a deployment's replicas through the 'scale' subresource using a merge patch
 		kubectl patch deployment nginx-deployment --subresource='scale' --type='merge' -p '{"spec":{"replicas":2}}'`))
 )
 

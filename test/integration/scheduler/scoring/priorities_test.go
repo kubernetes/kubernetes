@@ -17,6 +17,7 @@ limitations under the License.
 package scoring
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -72,11 +73,16 @@ const (
 )
 
 // This file tests the scheduler priority functions.
-func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
-	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+func initTestSchedulerForPriorityTest(t *testing.T, preScorePluginName, scorePluginName string) *testutils.TestContext {
+	cc := configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
+				PreScore: configv1.PluginSet{
+					Disabled: []configv1.Plugin{
+						{Name: "*"},
+					},
+				},
 				Score: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
 						{Name: scorePluginName, Weight: pointer.Int32(1)},
@@ -87,7 +93,11 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 				},
 			},
 		}},
-	})
+	}
+	if preScorePluginName != "" {
+		cc.Profiles[0].Plugins.PreScore.Enabled = append(cc.Profiles[0].Plugins.PreScore.Enabled, configv1.Plugin{Name: preScorePluginName})
+	}
+	cfg := configtesting.V1ToInternalWithDefaults(t, cc)
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
 		testutils.InitTestAPIServer(t, strings.ToLower(scorePluginName), nil),
@@ -201,7 +211,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 // TestNodeAffinityScoring verifies that scheduler's node affinity priority function
 // works correctly.
 func TestNodeAffinityScoring(t *testing.T) {
-	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name)
+	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name, nodeaffinity.Name)
 	// Add a few nodes.
 	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode(), 4)
 	if err != nil {
@@ -320,7 +330,7 @@ func TestPodAffinityScoring(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
+			testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name, interpodaffinity.Name)
 			// Add a few nodes.
 			nodesInTopology, err := createAndWaitForNodesInCache(testCtx, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
 			if err != nil {
@@ -364,7 +374,7 @@ func TestPodAffinityScoring(t *testing.T) {
 // TestImageLocalityScoring verifies that the scheduler's image locality priority function
 // works correctly, i.e., the pod gets scheduled to the node where its container images are ready.
 func TestImageLocalityScoring(t *testing.T) {
-	testCtx := initTestSchedulerForPriorityTest(t, imagelocality.Name)
+	testCtx := initTestSchedulerForPriorityTest(t, "", imagelocality.Name)
 
 	// Create a node with the large image.
 	// We use a fake large image as the test image used by the pod, which has
@@ -596,7 +606,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
 
-			testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
+			testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name, podtopologyspread.Name)
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name
 
@@ -619,7 +629,8 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 				}
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 				if err != nil {
 					t.Errorf("Test Failed: error while waiting for pod during test: %v", err)
 				}
@@ -631,9 +642,11 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			}
 
 			if tt.fits {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.want))
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.want))
 			} else {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podUnschedulable(cs, testPod.Namespace, testPod.Name))
 			}
 			if err != nil {
 				t.Errorf("Test Failed: %v", err)
@@ -646,7 +659,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 // with the system default spreading spreads Pods belonging to a Service.
 // The setup has 300 nodes over 3 zones.
 func TestDefaultPodTopologySpreadScoring(t *testing.T) {
-	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
+	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name, podtopologyspread.Name)
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
 
@@ -673,7 +686,7 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 			},
 			Ports: []v1.ServicePort{{
 				Port:       80,
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt32(80),
 			}},
 		},
 	}
@@ -697,8 +710,8 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 			}
 			var pods []v1.Pod
 			// Wait for all Pods scheduled.
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, func() (bool, error) {
-				podList, err := cs.CoreV1().Pods(ns).List(testCtx.Ctx, metav1.ListOptions{})
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+				podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					t.Fatalf("Cannot list pods to verify scheduling: %v", err)
 				}

@@ -47,7 +47,7 @@ import (
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	netutils "k8s.io/utils/net"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -398,8 +398,8 @@ func ResourceLocation(ctx context.Context, getter ResourceGetter, rt http.RoundT
 		}
 	}
 	podIP := getPodIP(pod)
-	if err := proxyutil.IsProxyableIP(podIP); err != nil {
-		return nil, nil, errors.NewBadRequest(err.Error())
+	if ip := netutils.ParseIPSloppy(podIP); ip == nil || !ip.IsGlobalUnicast() {
+		return nil, nil, errors.NewBadRequest("address not allowed")
 	}
 
 	loc := &url.URL{

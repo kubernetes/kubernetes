@@ -20,7 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -88,15 +88,12 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	}
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
+	storageConfig.StorageObjectCountTracker = config.GenericConfig.StorageObjectCountTracker
 	resourceEncoding := resourceconfig.MergeResourceEncodingConfigs(storageFactoryConfig.DefaultResourceEncoding, storageFactoryConfig.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
-
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
 	etcdOptions.EnableWatchCache = false
-	if err := etcdOptions.Complete(config.GenericConfig.StorageObjectCountTracker, config.GenericConfig.DrainedNotify(), config.GenericConfig.AddPostStartHook); err != nil {
-		t.Fatal(err)
-	}
 	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -155,18 +152,27 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 	_, etcdserver, apiserverCfg, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	storageProvider := corerest.LegacyRESTStorageProvider{
-		StorageFactory:       apiserverCfg.ExtraConfig.StorageFactory,
-		ProxyTransport:       apiserverCfg.ExtraConfig.ProxyTransport,
-		KubeletClientConfig:  apiserverCfg.ExtraConfig.KubeletClientConfig,
-		EventTTL:             apiserverCfg.ExtraConfig.EventTTL,
-		ServiceIPRange:       apiserverCfg.ExtraConfig.ServiceIPRange,
-		ServiceNodePortRange: apiserverCfg.ExtraConfig.ServiceNodePortRange,
-		LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
-		Informers:            apiserverCfg.ExtraConfig.VersionedInformers,
+	storageProvider, err := corerest.New(corerest.Config{
+		GenericConfig: corerest.GenericConfig{
+			StorageFactory:       apiserverCfg.ExtraConfig.StorageFactory,
+			EventTTL:             apiserverCfg.ExtraConfig.EventTTL,
+			LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
+			Informers:            apiserverCfg.ExtraConfig.VersionedInformers,
+		},
+		Proxy: corerest.ProxyConfig{
+			Transport:           apiserverCfg.ExtraConfig.ProxyTransport,
+			KubeletClientConfig: apiserverCfg.ExtraConfig.KubeletClientConfig,
+		},
+		Services: corerest.ServicesConfig{
+			ClusterIPRange: apiserverCfg.ExtraConfig.ServiceIPRange,
+			NodePortRange:  apiserverCfg.ExtraConfig.ServiceNodePortRange,
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 
-	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
@@ -231,7 +237,7 @@ func TestVersion(t *testing.T) {
 func decodeResponse(resp *http.Response, obj interface{}) error {
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
