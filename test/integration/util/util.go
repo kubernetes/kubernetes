@@ -48,7 +48,7 @@ import (
 	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
@@ -650,12 +650,12 @@ func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Op
 // InitTestDisablePreemption initializes a test environment and creates API server and scheduler with default
 // configuration but with pod preemption disabled.
 func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
+	cfg := configtesting.V1ToInternalWithDefaults(t, kubeschedulerconfigv1.KubeSchedulerConfiguration{
+		Profiles: []kubeschedulerconfigv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.String(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				PostFilter: v1beta3.PluginSet{
-					Disabled: []v1beta3.Plugin{
+			Plugins: &kubeschedulerconfigv1.Plugins{
+				PostFilter: kubeschedulerconfigv1.PluginSet{
+					Disabled: []kubeschedulerconfigv1.Plugin{
 						{Name: defaultpreemption.Name},
 					},
 				},
