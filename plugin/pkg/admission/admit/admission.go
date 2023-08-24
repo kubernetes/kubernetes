@@ -63,3 +63,9 @@ func NewAlwaysAdmit() admission.Interface {
 		"Please remove this controller from your configuration files and scripts.", PluginName)
 	return new(alwaysAdmit)
 }
+
+type AdmitMaker struct{}
+
+func AdmitMake(a AdmitMaker) int {
+	return 0
+}
