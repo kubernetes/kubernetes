@@ -22,11 +22,15 @@ import (
 	"math"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -96,9 +100,23 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 	return allErrs
 }
 
-// WarningsOnUpdate returns warnings for the given update.
-func (customResourceValidator) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+var standardFinalizers = sets.NewString(
+	metav1.FinalizerOrphanDependents,
+	metav1.FinalizerDeleteDependents,
+	string(corev1.FinalizerKubernetes),
+)
+
+func validateKubeFinalizerName(stringValue string, fldPath *field.Path) []string {
+	var allWarnings []string
+	for _, msg := range apimachineryvalidation.IsQualifiedName(stringValue) {
+		allWarnings = append(allWarnings, fmt.Sprintf("%s: %q: %s", fldPath.String(), stringValue, msg))
+	}
+	if len(strings.Split(stringValue, "/")) == 1 {
+		if !standardFinalizers.Has(stringValue) {
+			allWarnings = append(allWarnings, fmt.Sprintf("%s: %q: prefer a domain-qualified finalizer name to avoid accidental conflicts with other finalizer writers", fldPath.String(), stringValue))
+		}
+	}
+	return allWarnings
 }
 
 func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
