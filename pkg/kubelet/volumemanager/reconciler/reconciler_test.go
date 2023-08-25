@@ -2316,6 +2316,9 @@ func TestSyncStates(t *testing.T) {
 				if len(mountedPods) != 2 {
 					return fmt.Errorf("expected 2 pods to in asw got %d", len(mountedPods))
 				}
+				if len(rcInstance.actualStateOfWorld.GetMountedVolumes()) != 0 {
+					return fmt.Errorf("expected 0 pod to in asw got %d", len(mountedPods))
+				}
 				return nil
 			},
 		},
