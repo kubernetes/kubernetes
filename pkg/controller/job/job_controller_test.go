@@ -5192,7 +5192,7 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 	// 2. Create a job.
 	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
 
-	_, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
+	job, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating job: %v", err)
 	}
@@ -5200,7 +5200,7 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 	pod := newPod("test-pod", job)
 	// pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
 
-	_, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
+	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating pod: %v", err)
 	}
@@ -5210,7 +5210,10 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 		Status: v1.ConditionTrue,
 	})
 
-	clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+	job, err = clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Updating job status: %v", err)
+	}
 
 	go manager.Run(context.TODO(), 0)
 
