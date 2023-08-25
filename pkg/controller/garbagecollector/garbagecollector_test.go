@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -60,9 +62,11 @@ import (
 	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metricsutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	c "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -846,7 +850,6 @@ func TestGarbageCollectorSync(t *testing.T) {
 		PreferredResources: serverResources,
 		Error:              nil,
 		Lock:               sync.Mutex{},
-		InterfaceUsedCount: 0,
 	}
 
 	testHandler := &fakeActionHandler{
@@ -865,7 +868,24 @@ func TestGarbageCollectorSync(t *testing.T) {
 			},
 		},
 	}
-	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+
+	testHandler2 := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/secrets": {
+				200,
+				[]byte("{}"),
+			},
+		},
+	}
+	var secretSyncOK atomic.Bool
+	var alternativeTestHandler = func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/v1/secrets" && secretSyncOK.Load() {
+			testHandler2.ServeHTTP(response, request)
+			return
+		}
+		testHandler.ServeHTTP(response, request)
+	}
+	srv, clientConfig := testServerAndClientConfig(alternativeTestHandler)
 	defer srv.Close()
 	clientConfig.ContentConfig.NegotiatedSerializer = nil
 	client, err := kubernetes.NewForConfig(clientConfig)
@@ -885,7 +905,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	defer tCtx.Cancel("test has completed")
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
@@ -913,30 +933,49 @@ func TestGarbageCollectorSync(t *testing.T) {
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
+	}
 	assertMonitors(t, gc, "pods", "deployments")
 
 	// Simulate the discovery client returning an error
 	fakeDiscoveryClient.setPreferredResources(nil, fmt.Errorf("error calling discoveryClient.ServerPreferredResources()"))
+
+	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
+	// No monitor changes
 	assertMonitors(t, gc, "pods", "deployments")
 
 	// Remove the error from being returned and see if the garbage collector sync is still working
 	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
-	time.Sleep(1 * time.Second)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
+	}
 	assertMonitors(t, gc, "pods", "deployments")
 
 	// Simulate the discovery client returning a resource the restmapper can resolve, but will not sync caches
 	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources, nil)
+
+	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
 	assertMonitors(t, gc, "pods", "secrets")
 
 	// Put the resources back to normal and ensure garbage collector sync recovers
 	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
-	time.Sleep(1 * time.Second)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
+	}
 	assertMonitors(t, gc, "pods", "deployments")
 
 	// Partial discovery failure
 	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources, appsV1Error)
+	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
 	// Deployments monitor kept
 	assertMonitors(t, gc, "pods", "deployments", "secrets")
@@ -945,35 +984,33 @@ func TestGarbageCollectorSync(t *testing.T) {
 	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
+	}
 	// Unsyncable monitor removed
 	assertMonitors(t, gc, "pods", "deployments")
 
-	// Add fake controller simulate the initial not-synced informer which will be synced at the end.
-	fc := fakeController{}
-	gc.dependencyGraphBuilder.monitors[schema.GroupVersionResource{
-		Version:  "v1",
-		Resource: "secrets",
-	}] = &monitor{controller: &fc}
-	if gc.IsSynced(logger) {
-		t.Fatal("cache from garbage collector should not be synced")
-	}
-
+	// Simulate initial not-synced informer which will be synced at the end.
+	metrics.GarbageCollectorResourcesSyncError.Reset()
 	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources, nil)
 	time.Sleep(1 * time.Second)
 	assertMonitors(t, gc, "pods", "secrets")
-
-	// The informer is synced now.
-	fc.SetSynced(true)
-	time.Sleep(1 * time.Second)
-	assertMonitors(t, gc, "pods", "secrets")
-
-	if !gc.IsSynced(logger) {
-		t.Fatal("cache from garbage collector should be synced")
+	if gc.IsSynced(logger) {
+		t.Fatal("cache from garbage collector should not be synced")
+	}
+	val, _ := metricsutil.GetCounterMetricValue(metrics.GarbageCollectorResourcesSyncError)
+	if val < 1 {
+		t.Fatalf("expect sync error metric > 0")
 	}
 
-	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
-	time.Sleep(1 * time.Second)
-	assertMonitors(t, gc, "pods", "deployments")
+	// The informer is synced now.
+	secretSyncOK.Store(true)
+	if err := wait.PollUntilContextTimeout(tCtx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		return gc.IsSynced(logger), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func assertMonitors(t *testing.T, gc *GarbageCollector, resources ...string) {
@@ -986,6 +1023,17 @@ func assertMonitors(t *testing.T, gc *GarbageCollector, resources ...string) {
 	if !actual.Equal(expected) {
 		t.Fatalf("expected monitors %v, got %v", expected.List(), actual.List())
 	}
+}
+
+func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources) error {
+	before := fakeDiscoveryClient.getInterfaceUsedCount()
+	t := 1 * time.Second
+	time.Sleep(t)
+	after := fakeDiscoveryClient.getInterfaceUsedCount()
+	if before == after {
+		return fmt.Errorf("discoveryClient.ServerPreferredResources() not called over %v", t)
+	}
+	return nil
 }
 
 type fakeServerResources struct {
@@ -1015,6 +1063,12 @@ func (f *fakeServerResources) setPreferredResources(resources []*metav1.APIResou
 	defer f.Lock.Unlock()
 	f.PreferredResources = resources
 	f.Error = err
+}
+
+func (f *fakeServerResources) getInterfaceUsedCount() int {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	return f.InterfaceUsedCount
 }
 
 func (*fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
@@ -2752,28 +2806,6 @@ func assertState(s state) step {
 		},
 	}
 
-}
-
-type fakeController struct {
-	synced bool
-	lock   sync.Mutex
-}
-
-func (f *fakeController) Run(stopCh <-chan struct{}) {
-}
-
-func (f *fakeController) HasSynced() bool {
-	return f.synced
-}
-
-func (f *fakeController) SetSynced(synced bool) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.synced = synced
-}
-
-func (f *fakeController) LastSyncResourceVersion() string {
-	return ""
 }
 
 // trackingWorkqueue implements RateLimitingInterface,
