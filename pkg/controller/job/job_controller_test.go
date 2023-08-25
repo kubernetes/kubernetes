@@ -5198,7 +5198,7 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 	}
 
 	pod := newPod("test-pod", job)
-	// pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
+	pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
 
 	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
