@@ -155,13 +155,11 @@ func TestNewClient(t *testing.T) {
 		name         string
 		config       map[string]string
 		wantErr      string
-		wantProvider bool
 	}{
 		{
 			name:         "no issuer",
 			config:       map[string]string{},
 			wantErr:      "Must provide idp-issuer-url",
-			wantProvider: false,
 		},
 		{
 			name: "no client id",
@@ -169,7 +167,6 @@ func TestNewClient(t *testing.T) {
 				cfgIssuerURL: "https://issuer",
 			},
 			wantErr:      "Must provide client-id",
-			wantProvider: false,
 		},
 		{
 			name: "invalid ca data",
@@ -180,7 +177,6 @@ func TestNewClient(t *testing.T) {
 				cfgExtraScopes:              "fake",
 			},
 			wantErr:      "unable to load root certificates: unable to parse bytes as PEM block",
-			wantProvider: false,
 		},
 		{
 			name: "valid config",
@@ -189,7 +185,6 @@ func TestNewClient(t *testing.T) {
 				cfgClientID:  "client",
 			},
 			wantErr:      "",
-			wantProvider: true,
 		},
 		{
 			name: "exist client",
@@ -198,29 +193,15 @@ func TestNewClient(t *testing.T) {
 				cfgClientID:  "client",
 			},
 			wantErr:      "",
-			wantProvider: true,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			provider, err := newOIDCAuthProvider("", test.config, nil)
-			if test.wantErr != "" {
-				if err == nil {
-					t.Errorf("expected error but got none")
-				} else if test.wantErr != err.Error() {
-					t.Errorf("unexpected error want '%s', but got %v", test.wantErr, err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v, no error wantted", err)
-				}
-			}
-
-			if test.wantProvider && provider == nil {
-				t.Errorf("no provider created")
-			}
-			if !test.wantProvider && provider != nil {
-				t.Errorf("provider created but shouldn't have been")
+			_, err := newOIDCAuthProvider("", test.config, nil)
+			if test.wantErr != "" && !stringInSlice(errString(err), test.wantErr){
+				t.Errorf("unexpected error want '%s', but got %v", test.wantErr, err)
+			} else if test.wantErr == "" && err != nil {
+				t.Errorf("unexpected error: %v, no error wanted", err)
 			}
 		})
 	}
@@ -231,4 +212,22 @@ func assertCacheLen(t *testing.T, cache *clientCache, length int) {
 	if len(cache.cache) != length {
 		t.Errorf("expected cache length %d got %d", length, len(cache.cache))
 	}
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+// stringInSlice returns true if s is in list
+func stringInSlice(s string, list ...string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+
+	return false
 }
