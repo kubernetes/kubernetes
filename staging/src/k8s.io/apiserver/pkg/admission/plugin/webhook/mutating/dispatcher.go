@@ -20,6 +20,7 @@ package mutating
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -170,7 +171,10 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			case *webhookutil.ErrCallingWebhook:
 				if !ignoreClientCallFailures {
 					rejected = true
-					admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, int(err.Status.ErrStatus.Code))
+					// Ignore context cancelled from webhook metrics
+					if !errors.Is(err.Reason, context.Canceled) {
+						admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, int(err.Status.ErrStatus.Code))
+					}
 				}
 				admissionmetrics.Metrics.ObserveWebhook(ctx, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", int(err.Status.ErrStatus.Code))
 			case *webhookutil.ErrWebhookRejection:
@@ -199,10 +203,14 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 
 		if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
-				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
-				admissionmetrics.Metrics.ObserveWebhookFailOpen(ctx, hook.Name, "admit")
-				annotator.addFailedOpenAnnotation()
-
+				// Ignore context cancelled from webhook metrics
+				if errors.Is(callErr.Reason, context.Canceled) {
+					klog.Warningf("Context canceled when calling webhook %v", hook.Name)
+				} else {
+					klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
+					admissionmetrics.Metrics.ObserveWebhookFailOpen(ctx, hook.Name, "admit")
+					annotator.addFailedOpenAnnotation()
+				}
 				utilruntime.HandleError(callErr)
 
 				select {
