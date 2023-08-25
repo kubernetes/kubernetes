@@ -2083,7 +2083,7 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 			// Make the job controller significantly slower to trigger race condition.
 			restConfig.QPS = 1
 			restConfig.Burst = 1
-			jc, ctx, cancel := createJobControllerWithSharedInformers(restConfig, informerSet, t)
+			jc, ctx, cancel := createJobControllerWithSharedInformers(t, restConfig, informerSet)
 			resetMetrics()
 			defer cancel()
 			restConfig.QPS = 200
@@ -2921,7 +2921,7 @@ func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient
 
 func startJobControllerAndWaitForCaches(restConfig *restclient.Config, t testing.TB) (context.Context, context.CancelFunc) {
 	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-informers")), 0)
-	jc, ctx, cancel := createJobControllerWithSharedInformers(restConfig, informerSet, t)
+	jc, ctx, cancel := createJobControllerWithSharedInformers(t, restConfig, informerSet)
 	informerSet.Start(ctx.Done())
 	go jc.Run(ctx, 1)
 
@@ -2940,12 +2940,13 @@ func resetMetrics() {
 	metrics.PodFailuresHandledByFailurePolicy.Reset()
 }
 
-func createJobControllerWithSharedInformers(restConfig *restclient.Config, informerSet informers.SharedInformerFactory, t testing.TB) (*jobcontroller.Controller, context.Context, context.CancelFunc) {
+func createJobControllerWithSharedInformers(tb testing.TB, restConfig *restclient.Config, informerSet informers.SharedInformerFactory) (*jobcontroller.Controller, context.Context, context.CancelFunc) {
+	tb.Helper()
 	clientSet := clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-controller"))
 	ctx, cancel := context.WithCancel(context.Background())
 	jc, err := jobcontroller.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 	if err != nil {
-		t.Fatalf("Error creating Job controller: %v", err)
+		tb.Fatalf("Error creating Job controller: %v", err)
 	}
 	return jc, ctx, cancel
 }
