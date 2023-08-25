@@ -177,7 +177,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		}, cs.PolicyV1().PodDisruptionBudgets(ns).UpdateStatus)
 		// fetch again to make sure the update from API was effective
 		updated := getPDBStatusOrDie(ctx, dc, ns, defaultName)
-		framework.ExpectHaveKey(updated.Status.DisruptedPods, pod.Name, "Expecting the DisruptedPods have %s", pod.Name)
+		gomega.Expect(updated.Status.DisruptedPods).To(gomega.HaveKey(pod.Name), "Expecting the DisruptedPods have %s", pod.Name)
 
 		ginkgo.By("Patching PodDisruptionBudget status")
 		patched := patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
