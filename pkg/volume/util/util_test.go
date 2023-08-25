@@ -285,6 +285,53 @@ func TestGenerateVolumeName(t *testing.T) {
 	}
 }
 
+func TestFilterMountRefs(t *testing.T) {
+	testCases := map[string]struct {
+		mountRefs                []string
+		expectOldCSIPVMountPaths []string
+		expectOtherRefs          []string
+	}{
+		"no old CSI pv mount": {
+			mountRefs: []string{
+				"/home/somewhere/var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/local/data/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+			},
+			expectOldCSIPVMountPaths: nil,
+			expectOtherRefs: []string{
+				"/home/somewhere/var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/local/data/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+			},
+		},
+		"have old CSI pv mount": {
+			mountRefs: []string{
+				"/home/somewhere/var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-230ac950-e2c6-46ee-add4-bc3138858b4a/globalmount",
+				"/mnt/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+			},
+			expectOldCSIPVMountPaths: []string{"/var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-230ac950-e2c6-46ee-add4-bc3138858b4a/globalmount"},
+			expectOtherRefs: []string{
+				"/home/somewhere/var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+			},
+		},
+	}
+	for name, test := range testCases {
+		ActualOldCSIPVMountPaths, ActualOtherRefs := FilterMountRefs(test.mountRefs)
+		if !reflect.DeepEqual(ActualOldCSIPVMountPaths, test.expectOldCSIPVMountPaths) {
+			t.Errorf("for %s expected oldCSIPVMountPaths %v but got %v", name, test.expectOldCSIPVMountPaths, ActualOldCSIPVMountPaths)
+		}
+		if !reflect.DeepEqual(ActualOtherRefs, test.expectOtherRefs) {
+			t.Errorf("for %s expected otherRefs %v but got %v", name, test.expectOtherRefs, ActualOtherRefs)
+		}
+	}
+}
+
 func TestHasMountRefs(t *testing.T) {
 	testCases := map[string]struct {
 		mountPath string

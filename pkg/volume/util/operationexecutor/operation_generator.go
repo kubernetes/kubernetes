@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -949,27 +950,39 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 				"GetDeviceMountPath failed, but unmount operation will proceed using deviceMountPath=%s: %v", deviceMountPath, err), ""))
 		}
 		refs, err := deviceMountableVolumePlugin.GetDeviceMountRefs(deviceMountPath)
+		if err != nil {
+			eventErr, detailedErr := deviceToDetach.GenerateError("GetDeviceMountRefs check failed", err)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
 
-		if err != nil || util.HasMountRefs(deviceMountPath, refs) {
-			if err == nil {
-				err = fmt.Errorf("the device mount path %q is still mounted by other references %v", deviceMountPath, refs)
-			}
+		// When upgrade kubelet to version above 1.24, global stagingPath of csi pv changed.
+		// And csi pv UmountDevice will block here because refs contains old global stagingPath,
+		// so we should do some compatible operations here.
+		// See issue #121134 for more details.
+		var shouldUmountPaths []string
+		if deviceMountableVolumePlugin.GetPluginName() == csi.CSIPluginName {
+			shouldUmountPaths, refs = util.FilterMountRefs(refs)
+		}
+		shouldUmountPaths = append(shouldUmountPaths, deviceMountPath)
+		if util.HasMountRefs(deviceMountPath, refs) {
+			err = fmt.Errorf("the device mount path %q is still mounted by other references %v", deviceMountPath, refs)
 			eventErr, detailedErr := deviceToDetach.GenerateError("GetDeviceMountRefs check failed", err)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 		// Execute unmount
-		unmountDeviceErr := volumeDeviceUnmounter.UnmountDevice(deviceMountPath)
-		if unmountDeviceErr != nil {
-			// Mark the device as uncertain, so MountDevice is called for new pods. UnmountDevice may be already in progress.
-			markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(deviceToDetach.VolumeName, deviceToDetach.DevicePath, deviceMountPath, deviceToDetach.SELinuxMountContext)
-			if markDeviceUncertainErr != nil {
-				// There is nothing else we can do. Hope that UnmountDevice will be re-tried shortly.
-				klog.Errorf(deviceToDetach.GenerateErrorDetailed("UnmountDevice.MarkDeviceAsUncertain failed", markDeviceUncertainErr).Error())
+		for _, umountPath := range shouldUmountPaths {
+			unmountDeviceErr := volumeDeviceUnmounter.UnmountDevice(umountPath)
+			if unmountDeviceErr != nil {
+				// Mark the device as uncertain, so MountDevice is called for new pods. UnmountDevice may be already in progress.
+				markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(deviceToDetach.VolumeName, deviceToDetach.DevicePath, deviceMountPath, deviceToDetach.SELinuxMountContext)
+				if markDeviceUncertainErr != nil {
+					// There is nothing else we can do. Hope that UnmountDevice will be re-tried shortly.
+					klog.Errorf(deviceToDetach.GenerateErrorDetailed("UnmountDevice.MarkDeviceAsUncertain failed", markDeviceUncertainErr).Error())
+				}
+				// On failure, return error. Caller will log and retry.
+				eventErr, detailedErr := deviceToDetach.GenerateError("UnmountDevice failed", unmountDeviceErr)
+				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
-
-			// On failure, return error. Caller will log and retry.
-			eventErr, detailedErr := deviceToDetach.GenerateError("UnmountDevice failed", unmountDeviceErr)
-			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 		// Before logging that UnmountDevice succeeded and moving on,
 		// use hostutil.PathIsDevice to check if the path is a device,

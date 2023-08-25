@@ -77,6 +77,9 @@ const (
 
 	// kubernetesPluginPathPrefix is the prefix of kubernetes plugin mount paths.
 	kubernetesPluginPathPrefix = "/plugins/kubernetes.io/"
+
+	// oldKubernetesCSIVolumePathPrefix is the prefix of csi pv mount paths in kubernetes version below 1.24.
+	oldKubernetesCSIVolumePathPrefix = kubernetesPluginPathPrefix + "csi/pv/"
 )
 
 // IsReady checks for the existence of a regular file
@@ -668,6 +671,20 @@ func FsUserFrom(pod *v1.Pod) *int64 {
 		return true
 	})
 	return fsUser
+}
+
+// FilterMountRefs filters the mountRefs into oldCSIPVMountPaths and otherRefs,
+// oldCSIPVMountPaths should be umount when UmountDevices.
+func FilterMountRefs(mountRefs []string) ([]string, []string) {
+	var oldCSIPVMountPaths, otherRefs []string
+	for _, ref := range mountRefs {
+		if strings.Contains(ref, oldKubernetesCSIVolumePathPrefix) {
+			oldCSIPVMountPaths = append(oldCSIPVMountPaths, ref)
+		} else {
+			otherRefs = append(otherRefs, ref)
+		}
+	}
+	return oldCSIPVMountPaths, otherRefs
 }
 
 // HasMountRefs checks if the given mountPath has mountRefs.
