@@ -43,73 +43,75 @@ const (
 	cgroupV1MemLimitFile  = "/memory/memory.limit_in_bytes"
 )
 
-var _ = SIGDescribe("Swap [NodeConformance][LinuxOnly]", func() {
+var _ = SIGDescribe("Swap [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("swap-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	// Note that memoryRequestEqualLimit is effective only when qosClass is PodQOSBestEffort.
-	getSwapTestPod := func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) *v1.Pod {
-		podMemoryAmount := resource.MustParse("128Mi")
+	ginkgo.Context("[NodeConformance]", func() {
+		// Note that memoryRequestEqualLimit is effective only when qosClass is PodQOSBestEffort.
+		getSwapTestPod := func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) *v1.Pod {
+			podMemoryAmount := resource.MustParse("128Mi")
 
-		var resources v1.ResourceRequirements
-		switch qosClass {
-		case v1.PodQOSBestEffort:
-			// nothing to do in this case
-		case v1.PodQOSBurstable:
-			resources = v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceMemory: podMemoryAmount,
-				},
+			var resources v1.ResourceRequirements
+			switch qosClass {
+			case v1.PodQOSBestEffort:
+				// nothing to do in this case
+			case v1.PodQOSBurstable:
+				resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: podMemoryAmount,
+					},
+				}
+
+				if memoryRequestEqualLimit {
+					resources.Limits = resources.Requests
+				}
+			case v1.PodQOSGuaranteed:
+				resources = v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: podMemoryAmount,
+					},
+				}
+				resources.Requests = resources.Limits
 			}
 
-			if memoryRequestEqualLimit {
-				resources.Limits = resources.Requests
+			pod := getSleepingPod(f.Namespace.Name)
+			pod.Spec.Containers[0].Resources = resources
+
+			return pod
+		}
+
+		ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
+			ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
+			pod := getSwapTestPod(qosClass, memoryRequestEqualLimit)
+			pod = runPodAndWaitUntilScheduled(f, pod)
+
+			isCgroupV2 := isPodCgroupV2(f, pod)
+			isLimitedSwap := isLimitedSwap()
+
+			if !isSwapFeatureGateEnabled() || !isCgroupV2 || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
+				ginkgo.By(fmt.Sprintf("Expecting no swap. feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
+				expectNoSwap(f, pod, isCgroupV2)
+				return
 			}
-		case v1.PodQOSGuaranteed:
-			resources = v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("200m"),
-					v1.ResourceMemory: podMemoryAmount,
-				},
+
+			if !isLimitedSwap {
+				ginkgo.By("expecting unlimited swap")
+				expectUnlimitedSwap(f, pod, isCgroupV2)
+				return
 			}
-			resources.Requests = resources.Limits
-		}
 
-		pod := getSleepingPod(f.Namespace.Name)
-		pod.Spec.Containers[0].Resources = resources
-
-		return pod
-	}
-
-	ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
-		ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
-		pod := getSwapTestPod(qosClass, memoryRequestEqualLimit)
-		pod = runPodAndWaitUntilScheduled(f, pod)
-
-		isCgroupV2 := isPodCgroupV2(f, pod)
-		isLimitedSwap := isLimitedSwap()
-
-		if !isSwapFeatureGateEnabled() || !isCgroupV2 || (isLimitedSwap && (qosClass != v1.PodQOSBurstable || memoryRequestEqualLimit)) {
-			ginkgo.By(fmt.Sprintf("Expecting no swap. feature gate on? %t isCgroupV2? %t is QoS burstable? %t", isSwapFeatureGateEnabled(), isCgroupV2, qosClass == v1.PodQOSBurstable))
-			expectNoSwap(f, pod, isCgroupV2)
-			return
-		}
-
-		if !isLimitedSwap {
-			ginkgo.By("expecting unlimited swap")
-			expectUnlimitedSwap(f, pod, isCgroupV2)
-			return
-		}
-
-		ginkgo.By("expecting limited swap")
-		expectedSwapLimit := calcSwapForBurstablePod(f, pod)
-		expectLimitedSwap(f, pod, expectedSwapLimit)
-	},
-		ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
-		ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
-		ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
-		ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
-	)
+			ginkgo.By("expecting limited swap")
+			expectedSwapLimit := calcSwapForBurstablePod(f, pod)
+			expectLimitedSwap(f, pod, expectedSwapLimit)
+		},
+			ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
+			ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
+			ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
+			ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
+		)
+	})
 })
 
 func getSleepingPod(namespace string) *v1.Pod {
