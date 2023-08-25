@@ -1400,7 +1400,7 @@ func TestRunScorePlugins(t *testing.T) {
 
 			state := framework.NewCycleState()
 			state.SkipScorePlugins = tt.skippedPlugins
-			res, status := f.RunScorePlugins(ctx, state, pod, nodes)
+			res, status := f.RunScorePlugins(ctx, state, pod, newNodeInfos(nodes))
 
 			if tt.err {
 				if status.IsSuccess() {
@@ -2708,7 +2708,7 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 		{
 			name:               "Score - Success",
-			action:             func(f framework.Framework) { f.RunScorePlugins(context.Background(), state, pod, nodes) },
+			action:             func(f framework.Framework) { f.RunScorePlugins(context.Background(), state, pod, newNodeInfos(nodes)) },
 			wantExtensionPoint: "Score",
 			wantStatus:         framework.Success,
 		},
@@ -2765,7 +2765,7 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 		{
 			name:               "Score - Error",
-			action:             func(f framework.Framework) { f.RunScorePlugins(context.Background(), state, pod, nodes) },
+			action:             func(f framework.Framework) { f.RunScorePlugins(context.Background(), state, pod, newNodeInfos(nodes)) },
 			inject:             injectedResult{ScoreStatus: int(framework.Error)},
 			wantExtensionPoint: "Score",
 			wantStatus:         framework.Error,
@@ -3243,4 +3243,14 @@ func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
 		t.Fatal(err)
 	}
 	return podInfo
+}
+
+func newNodeInfos(nodes []*v1.Node) []*framework.NodeInfo {
+	var nodeInfos []*framework.NodeInfo
+	for _, node := range nodes {
+		nodeInfo := framework.NewNodeInfo()
+		nodeInfo.SetNode(node)
+		nodeInfos = append(nodeInfos, nodeInfo)
+	}
+	return nodeInfos
 }

@@ -709,14 +709,19 @@ func prioritizeNodes(
 		return result, nil
 	}
 
+	nodeInfos, err := fwk.SnapshotSharedLister().NodeInfos().GetNodeInfos(nodes)
+	if err != nil {
+		return nil, err
+	}
+
 	// Run PreScore plugins.
-	preScoreStatus := fwk.RunPreScorePlugins(ctx, state, pod, nodes)
+	preScoreStatus := fwk.RunPreScorePlugins(ctx, state, pod, nodeInfos)
 	if !preScoreStatus.IsSuccess() {
 		return nil, preScoreStatus.AsError()
 	}
 
 	// Run the Score plugins.
-	nodesScores, scoreStatus := fwk.RunScorePlugins(ctx, state, pod, nodes)
+	nodesScores, scoreStatus := fwk.RunScorePlugins(ctx, state, pod, nodeInfos)
 	if !scoreStatus.IsSuccess() {
 		return nil, scoreStatus.AsError()
 	}

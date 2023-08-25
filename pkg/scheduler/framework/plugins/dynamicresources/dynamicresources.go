@@ -745,7 +745,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 // PreScore is passed a list of all nodes that would fit the pod. Not all
 // claims are necessarily allocated yet, so here we can set the SuitableNodes
 // field for those which are pending.
-func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfos []*framework.NodeInfo) *framework.Status {
 	if !pl.enabled {
 		return nil
 	}
@@ -768,22 +768,22 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 			pending = true
 		}
 	}
-	if pending && !haveAllNodes(schedulingCtx.Spec.PotentialNodes, nodes) {
+	if pending && !haveAllNodes(schedulingCtx.Spec.PotentialNodes, nodeInfos) {
 		// Remember the potential nodes. The object will get created or
 		// updated in Reserve. This is both an optimization and
 		// covers the case that PreScore doesn't get called when there
 		// is only a single node.
-		logger.V(5).Info("remembering potential nodes", "pod", klog.KObj(pod), "potentialnodes", klog.KObjSlice(nodes))
+		logger.V(5).Info("remembering potential nodes", "pod", klog.KObj(pod), "potentialnodes", klog.KObjSlice(nodeInfos))
 		schedulingCtx = schedulingCtx.DeepCopy()
-		numNodes := len(nodes)
+		numNodes := len(nodeInfos)
 		if numNodes > resourcev1alpha2.PodSchedulingNodeListMaxSize {
 			numNodes = resourcev1alpha2.PodSchedulingNodeListMaxSize
 		}
 		schedulingCtx.Spec.PotentialNodes = make([]string, 0, numNodes)
-		if numNodes == len(nodes) {
+		if numNodes == len(nodeInfos) {
 			// Copy all node names.
-			for _, node := range nodes {
-				schedulingCtx.Spec.PotentialNodes = append(schedulingCtx.Spec.PotentialNodes, node.Name)
+			for _, nodeInfo := range nodeInfos {
+				schedulingCtx.Spec.PotentialNodes = append(schedulingCtx.Spec.PotentialNodes, nodeInfo.Node().Name)
 			}
 		} else {
 			// Select a random subset of the nodes to comply with
@@ -791,8 +791,8 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 			// done for us by Go which iterates over map entries
 			// randomly.
 			nodeNames := map[string]struct{}{}
-			for _, node := range nodes {
-				nodeNames[node.Name] = struct{}{}
+			for _, nodeInfo := range nodeInfos {
+				nodeNames[nodeInfo.Node().Name] = struct{}{}
 			}
 			for nodeName := range nodeNames {
 				if len(schedulingCtx.Spec.PotentialNodes) >= resourcev1alpha2.PodSchedulingNodeListMaxSize {
@@ -804,13 +804,13 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 		sort.Strings(schedulingCtx.Spec.PotentialNodes)
 		state.storePodSchedulingContexts(schedulingCtx)
 	}
-	logger.V(5).Info("all potential nodes already set", "pod", klog.KObj(pod), "potentialnodes", klog.KObjSlice(nodes))
+	logger.V(5).Info("all potential nodes already set", "pod", klog.KObj(pod), "potentialnodes", klog.KObjSlice(nodeInfos))
 	return nil
 }
 
-func haveAllNodes(nodeNames []string, nodes []*v1.Node) bool {
-	for _, node := range nodes {
-		if !haveNode(nodeNames, node.Name) {
+func haveAllNodes(nodeNames []string, nodeInfos []*framework.NodeInfo) bool {
+	for _, node := range nodeInfos {
+		if !haveNode(nodeNames, node.Node().Name) {
 			return false
 		}
 	}

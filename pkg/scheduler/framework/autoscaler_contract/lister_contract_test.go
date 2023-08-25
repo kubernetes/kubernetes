@@ -21,6 +21,7 @@ limitations under the License.
 package contract
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -43,6 +44,10 @@ func (c *nodeInfoListerContract) HavePodsWithRequiredAntiAffinityList() ([]*fram
 }
 
 func (c *nodeInfoListerContract) Get(_ string) (*framework.NodeInfo, error) {
+	return nil, nil
+}
+
+func (c *nodeInfoListerContract) GetNodeInfos(_ []*v1.Node) ([]*framework.NodeInfo, error) {
 	return nil, nil
 }
 

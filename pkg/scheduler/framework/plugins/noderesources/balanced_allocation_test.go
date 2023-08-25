@@ -391,9 +391,10 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			p, _ := NewBalancedAllocation(&test.args, fh, feature.Features{})
 			state := framework.NewCycleState()
+			nodeInfos, _ := snapshot.NodeInfos().List()
 			for i := range test.nodes {
 				if test.runPreScore {
-					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, nodeInfos)
 					if !status.IsSuccess() {
 						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 					}

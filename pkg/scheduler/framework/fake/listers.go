@@ -254,6 +254,25 @@ func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*framework
 	return nodes, nil
 }
 
+// GetNodeInfos returns the NodeInfos of the given node list.
+func (nodes NodeInfoLister) GetNodeInfos(givenNodes []*v1.Node) ([]*framework.NodeInfo, error) {
+	var nodeInfos []*framework.NodeInfo
+	for _, givenNode := range givenNodes {
+		found := false
+		for _, node := range nodes {
+			if node != nil && node.Node().Name == givenNode.Name {
+				nodeInfos = append(nodeInfos, node)
+				found = true
+			}
+		}
+
+		if !found {
+			return nil, fmt.Errorf("unable to find node: %s", givenNode.Name)
+		}
+	}
+	return nodeInfos, nil
+}
+
 var _ storagelisters.CSINodeLister = CSINodeLister{}
 
 // CSINodeLister declares a storagev1.CSINode type for testing.

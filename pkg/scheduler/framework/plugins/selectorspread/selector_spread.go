@@ -178,7 +178,7 @@ func (pl *SelectorSpread) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
-func (pl *SelectorSpread) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (pl *SelectorSpread) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfos []*framework.NodeInfo) *framework.Status {
 	if skipSelectorSpread(pod) {
 		return nil
 	}

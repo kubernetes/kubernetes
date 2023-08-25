@@ -552,7 +552,7 @@ func TestPlugin(t *testing.T) {
 			}
 			unschedulable := status.Code() != framework.Success
 
-			var potentialNodes []*v1.Node
+			var potentialNodes []*framework.NodeInfo
 
 			initialObjects = testCtx.listAll(t)
 			testCtx.updateAPIServer(t, initialObjects, tc.prepare.filter)
@@ -567,7 +567,7 @@ func TestPlugin(t *testing.T) {
 					if status.Code() != framework.Success {
 						unschedulable = true
 					} else {
-						potentialNodes = append(potentialNodes, nodeInfo.Node())
+						potentialNodes = append(potentialNodes, nodeInfo)
 					}
 				}
 			}
@@ -586,7 +586,7 @@ func TestPlugin(t *testing.T) {
 
 			var selectedNode *v1.Node
 			if !unschedulable && len(potentialNodes) > 0 {
-				selectedNode = potentialNodes[0]
+				selectedNode = potentialNodes[0].Node()
 
 				initialObjects = testCtx.listAll(t)
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.reserve)

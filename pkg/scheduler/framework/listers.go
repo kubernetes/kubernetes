@@ -16,6 +16,8 @@ limitations under the License.
 
 package framework
 
+import v1 "k8s.io/api/core/v1"
+
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
 type NodeInfoLister interface {
 	// List returns the list of NodeInfos.
@@ -26,6 +28,8 @@ type NodeInfoLister interface {
 	HavePodsWithRequiredAntiAffinityList() ([]*NodeInfo, error)
 	// Get returns the NodeInfo of the given node name.
 	Get(nodeName string) (*NodeInfo, error)
+	// GetNodeInfos returns the NodeInfos of the given node list.
+	GetNodeInfos(nodes []*v1.Node) ([]*NodeInfo, error)
 }
 
 // StorageInfoLister interface represents anything that handles storage-related operations and resources.

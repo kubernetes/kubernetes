@@ -417,7 +417,8 @@ func TestSelectorSpreadScore(t *testing.T) {
 			}
 			plugin := pl.(*SelectorSpread)
 
-			status := plugin.PreScore(ctx, state, test.pod, nodes)
+			nodeInfos, _ := snapshot.NodeInfos().List()
+			status := plugin.PreScore(ctx, state, test.pod, nodeInfos)
 			if !status.IsSuccess() {
 				t.Fatalf("unexpected error: %v", status)
 			}
@@ -675,7 +676,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			plugin := pl.(*SelectorSpread)
 
 			state := framework.NewCycleState()
-			status := plugin.PreScore(ctx, state, test.pod, nodes)
+			nodeInfos, _ := snapshot.NodeInfos().List()
+			status := plugin.PreScore(ctx, state, test.pod, nodeInfos)
 			if !status.IsSuccess() {
 				t.Fatalf("unexpected error: %v", status)
 			}

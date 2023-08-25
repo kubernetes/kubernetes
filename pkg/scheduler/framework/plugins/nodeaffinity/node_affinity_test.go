@@ -1140,14 +1140,16 @@ func TestNodeAffinityPriority(t *testing.T) {
 			defer cancel()
 
 			state := framework.NewCycleState()
-			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
+			snapshot := cache.NewSnapshot(nil, test.nodes)
+			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			p, err := New(&test.args, fh)
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}
+			nodeInfos, _ := snapshot.NodeInfos().List()
 			var status *framework.Status
 			if test.runPreScore {
-				status = p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+				status = p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, nodeInfos)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}

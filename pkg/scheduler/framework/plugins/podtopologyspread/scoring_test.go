@@ -88,9 +88,10 @@ func TestPreScoreSkip(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			snapshot := cache.NewSnapshot(nil, tt.nodes)
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			f, err := frameworkruntime.NewFramework(ctx, nil, nil,
-				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Fatalf("Failed creating framework runtime: %v", err)
@@ -103,7 +104,8 @@ func TestPreScoreSkip(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-			if s := p.PreScore(context.Background(), cs, tt.pod, tt.nodes); !s.IsSkip() {
+			nodeInfos, _ := snapshot.NodeInfos().List()
+			if s := p.PreScore(context.Background(), cs, tt.pod, nodeInfos); !s.IsSkip() {
 				t.Fatalf("Expected skip but got %v", s.AsError())
 			}
 		})
@@ -575,9 +577,10 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			snapshot := cache.NewSnapshot(nil, tt.nodes)
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			f, err := frameworkruntime.NewFramework(ctx, nil, nil,
-				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Fatalf("Failed creating framework runtime: %v", err)
@@ -590,7 +593,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-			if s := p.PreScore(ctx, cs, tt.pod, tt.nodes); !s.IsSuccess() {
+			nodeInfos, _ := snapshot.NodeInfos().List()
+			if s := p.PreScore(ctx, cs, tt.pod, nodeInfos); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 
@@ -1341,12 +1345,14 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
-			pl := plugintesting.SetupPluginWithInformers(ctx, t, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes), tt.objs)
+			snapshot := cache.NewSnapshot(tt.existingPods, allNodes)
+			pl := plugintesting.SetupPluginWithInformers(ctx, t, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, snapshot, tt.objs)
 			p := pl.(*PodTopologySpread)
 			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			p.enableMatchLabelKeysInPodTopologySpread = tt.enableMatchLabelKeys
 
-			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes)
+			nodeInfos, _ := snapshot.GetNodeInfos(tt.nodes)
+			status := p.PreScore(context.Background(), state, tt.pod, nodeInfos)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -1414,10 +1420,12 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 			_, ctx := ktesting.NewTestContext(b)
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			state := framework.NewCycleState()
-			pl := plugintesting.SetupPlugin(ctx, b, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			snapshot := cache.NewSnapshot(existingPods, allNodes)
+			pl := plugintesting.SetupPlugin(ctx, b, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 
-			status := p.PreScore(ctx, state, tt.pod, filteredNodes)
+			nodeInfos, _ := snapshot.GetNodeInfos(filteredNodes)
+			status := p.PreScore(ctx, state, tt.pod, nodeInfos)
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}
@@ -1502,8 +1510,9 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			b.ResetTimer()
 
+			nodeInfos, _ := snapshot.GetNodeInfos(filteredNodes)
 			for i := 0; i < b.N; i++ {
-				status := p.PreScore(ctx, state, pod, filteredNodes)
+				status := p.PreScore(ctx, state, pod, nodeInfos)
 				if !status.IsSuccess() {
 					b.Fatalf("unexpected error: %v", status)
 				}

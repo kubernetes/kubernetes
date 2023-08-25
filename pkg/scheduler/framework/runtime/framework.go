@@ -966,7 +966,7 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	ctx context.Context,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	nodes []*v1.Node,
+	nodes []*framework.NodeInfo,
 ) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
@@ -995,7 +995,7 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	return nil
 }
 
-func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreScorePlugin, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreScorePlugin, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreScore(ctx, state, pod, nodes)
 	}
@@ -1009,12 +1009,12 @@ func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreS
 // It returns a list that stores scores from each plugin and total score for each Node.
 // It also returns *Status, which is set to non-success if any of the plugins returns
 // a non-success status.
-func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) (ns []framework.NodePluginScores, status *framework.Status) {
+func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfos []*framework.NodeInfo) (ns []framework.NodePluginScores, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	allNodePluginScores := make([]framework.NodePluginScores, len(nodes))
+	allNodePluginScores := make([]framework.NodePluginScores, len(nodeInfos))
 	numPlugins := len(f.scorePlugins) - state.SkipScorePlugins.Len()
 	plugins := make([]framework.ScorePlugin, 0, numPlugins)
 	pluginToNodeScores := make(map[string]framework.NodeScoreList, numPlugins)
@@ -1023,7 +1023,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 			continue
 		}
 		plugins = append(plugins, pl)
-		pluginToNodeScores[pl.Name()] = make(framework.NodeScoreList, len(nodes))
+		pluginToNodeScores[pl.Name()] = make(framework.NodeScoreList, len(nodeInfos))
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -1037,8 +1037,8 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		// https://github.com/kubernetes/kubernetes/issues/111672
 		logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 		// Run Score method for each node in parallel.
-		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
-			nodeName := nodes[index].Name
+		f.Parallelizer().Until(ctx, len(nodeInfos), func(index int) {
+			nodeName := nodeInfos[index].Node().Name
 			logger := klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 			for _, pl := range plugins {
 				logger := klog.LoggerWithName(logger, pl.Name())
@@ -1080,9 +1080,9 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 
 	// Apply score weight for each ScorePlugin in parallel,
 	// and then, build allNodePluginScores.
-	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
+	f.Parallelizer().Until(ctx, len(nodeInfos), func(index int) {
 		nodePluginScores := framework.NodePluginScores{
-			Name:   nodes[index].Name,
+			Name:   nodeInfos[index].Node().Name,
 			Scores: make([]framework.PluginScore, len(plugins)),
 		}
 

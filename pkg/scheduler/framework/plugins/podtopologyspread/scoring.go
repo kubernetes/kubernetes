@@ -56,7 +56,7 @@ func (s *preScoreState) Clone() framework.StateData {
 // 1) s.TopologyPairToPodCounts: keyed with both eligible topology pair and node names.
 // 2) s.IgnoredNodes: the set of nodes that shouldn't be scored.
 // 3) s.TopologyNormalizingWeight: The weight to be given to each constraint based on the number of values in a topology.
-func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, filteredNodes []*v1.Node, requireAllTopologies bool) error {
+func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, filteredNodeInfos []*framework.NodeInfo, requireAllTopologies bool) error {
 	var err error
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		s.Constraints, err = pl.filterTopologySpreadConstraints(
@@ -77,7 +77,8 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 		return nil
 	}
 	topoSize := make([]int, len(s.Constraints))
-	for _, node := range filteredNodes {
+	for _, nodeInfo := range filteredNodeInfos {
+		node := nodeInfo.Node()
 		if requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
 			// Nodes which don't have all required topologyKeys present are ignored
 			// when scoring later.
@@ -101,7 +102,7 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 	for i, c := range s.Constraints {
 		sz := topoSize[i]
 		if c.TopologyKey == v1.LabelHostname {
-			sz = len(filteredNodes) - len(s.IgnoredNodes)
+			sz = len(filteredNodeInfos) - len(s.IgnoredNodes)
 		}
 		s.TopologyNormalizingWeight[i] = topologyNormalizingWeight(sz)
 	}
@@ -113,7 +114,7 @@ func (pl *PodTopologySpread) PreScore(
 	ctx context.Context,
 	cycleState *framework.CycleState,
 	pod *v1.Pod,
-	filteredNodes []*v1.Node,
+	filteredNodeInfos []*framework.NodeInfo,
 ) *framework.Status {
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
@@ -133,7 +134,7 @@ func (pl *PodTopologySpread) PreScore(
 	// non-system-default spreading rules. This allows nodes that don't have a
 	// zone label to still have hostname spreading.
 	requireAllTopologies := len(pod.Spec.TopologySpreadConstraints) > 0 || !pl.systemDefaulted
-	err = pl.initPreScoreState(state, pod, filteredNodes, requireAllTopologies)
+	err = pl.initPreScoreState(state, pod, filteredNodeInfos, requireAllTopologies)
 	if err != nil {
 		return framework.AsStatus(fmt.Errorf("calculating preScoreState: %w", err))
 	}

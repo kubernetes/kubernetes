@@ -193,6 +193,19 @@ func (s *Snapshot) Get(nodeName string) (*framework.NodeInfo, error) {
 	return nil, fmt.Errorf("nodeinfo not found for node name %q", nodeName)
 }
 
+// GetNodeInfos returns the NodeInfos of the given node list.
+func (s *Snapshot) GetNodeInfos(nodes []*v1.Node) ([]*framework.NodeInfo, error) {
+	var nodeInfos []*framework.NodeInfo
+	for _, node := range nodes {
+		if v, ok := s.nodeInfoMap[node.Name]; ok && v.Node() != nil {
+			nodeInfos = append(nodeInfos, v)
+		} else {
+			return nil, fmt.Errorf("nodeinfo not found for node name %q", node.Name)
+		}
+	}
+	return nodeInfos, nil
+}
+
 func (s *Snapshot) IsPVCUsedByPods(key string) bool {
 	return s.usedPVCSet.Has(key)
 }

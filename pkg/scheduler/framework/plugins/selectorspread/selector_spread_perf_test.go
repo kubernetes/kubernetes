@@ -81,7 +81,8 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				state := framework.NewCycleState()
-				status := plugin.PreScore(ctx, state, pod, allNodes)
+				nodeInfos, _ := snapshot.NodeInfos().List()
+				status := plugin.PreScore(ctx, state, pod, nodeInfos)
 				if !status.IsSuccess() {
 					b.Fatalf("unexpected error: %v", status)
 				}

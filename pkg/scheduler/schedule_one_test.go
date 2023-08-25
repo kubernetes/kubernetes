@@ -2663,7 +2663,9 @@ func TestZeroRequest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
-			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
+
+			nodeInfos, _ := snapshot.NodeInfos().List()
+			fwk.RunPreScorePlugins(ctx, state, test.pod, nodeInfos)
 			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
