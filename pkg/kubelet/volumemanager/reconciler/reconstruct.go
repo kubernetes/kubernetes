@@ -78,10 +78,6 @@ func (rc *reconciler) syncStates(kubeletPodDir string) {
 			devicePath:        reconstructedVolume.devicePath,
 			deviceMounter:     reconstructedVolume.deviceMounter,
 			blockVolumeMapper: reconstructedVolume.blockVolumeMapper,
-			mounter:           reconstructedVolume.mounter,
-		}
-		if cachedInfo, ok := volumesNeedUpdate[reconstructedVolume.volumeName]; ok {
-			gvl = cachedInfo
 		}
 		if volumeInDSW {
 			// Some pod needs the volume. And it exists on disk. Some previous
@@ -90,16 +86,23 @@ func (rc *reconciler) syncStates(kubeletPodDir string) {
 			// this new kubelet so reconcile() calls SetUp and re-mounts the
 			// volume if it's necessary.
 			volumeNeedReport = append(volumeNeedReport, reconstructedVolume.volumeName)
+			if cachedInfo, ok := rc.skippedDuringReconstruction[reconstructedVolume.volumeName]; ok {
+				gvl = cachedInfo
+			}
+			gvl.addPodVolume(reconstructedVolume)
 			rc.skippedDuringReconstruction[reconstructedVolume.volumeName] = gvl
 			klog.V(4).InfoS("Volume exists in desired state, marking as InUse", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 			continue
 		}
-		gvl.addPodVolume(reconstructedVolume)
 		// There is no pod that uses the volume.
 		if rc.operationExecutor.IsOperationPending(reconstructedVolume.volumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
 			klog.InfoS("Volume is in pending operation, skip cleaning up mounts")
 		}
 		klog.V(2).InfoS("Reconciler sync states: could not find pod information in desired state, update it in actual state", "reconstructedVolume", reconstructedVolume)
+		if cachedInfo, ok := volumesNeedUpdate[reconstructedVolume.volumeName]; ok {
+			gvl = cachedInfo
+		}
+		gvl.addPodVolume(reconstructedVolume)
 		volumesNeedUpdate[reconstructedVolume.volumeName] = gvl
 	}
 
