@@ -124,10 +124,12 @@ func newJob(parallelism, completions, backoffLimit int32, completionMode batch.C
 }
 
 func newControllerFromClient(ctx context.Context, t *testing.T, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*Controller, informers.SharedInformerFactory) {
+	t.Helper()
 	return newControllerFromClientWithClock(ctx, t, kubeClient, resyncPeriod, realClock)
 }
 
 func newControllerFromClientWithClock(ctx context.Context, t *testing.T, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, clock clock.WithTicker) (*Controller, informers.SharedInformerFactory) {
+	t.Helper()
 	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
 	jm, err := newControllerWithClock(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient, clock)
 	if err != nil {
