@@ -29,7 +29,7 @@ import (
 // Error is an implementation of the 'error' interface, which represents a
 // field-level validation error.
 type Error struct {
-	Type     ErrorType
+	Type     ErrorTypeInterface
 	Field    string
 	BadValue interface{}
 	Detail   string
@@ -96,6 +96,14 @@ func (v *Error) ErrorBody() string {
 	return s
 }
 
+// ErrorTypeInterface is an interface for representing an error type and detail message.
+type ErrorTypeInterface interface {
+	Type() string
+	String() string
+}
+
+var _ ErrorTypeInterface = (*ErrorType)(nil)
+
 // ErrorType is a machine readable value providing more detail about why
 // a field is invalid.  These values are expected to match 1-1 with
 // CauseType in api/types.go.
@@ -138,6 +146,11 @@ const (
 	// ErrorTypeTypeInvalid is for the value did not match the schema type for that field
 	ErrorTypeTypeInvalid ErrorType = "FieldValueTypeInvalid"
 )
+
+// Type returns the ErrorType string value.
+func (t ErrorType) Type() string {
+	return string(t)
+}
 
 // String converts a ErrorType into its corresponding canonical error message.
 func (t ErrorType) String() string {
@@ -278,7 +291,7 @@ type ErrorList []*Error
 
 // NewErrorTypeMatcher returns an errors.Matcher that returns true
 // if the provided error is a Error and has the provided ErrorType.
-func NewErrorTypeMatcher(t ErrorType) utilerrors.Matcher {
+func NewErrorTypeMatcher(t ErrorTypeInterface) utilerrors.Matcher {
 	return func(err error) bool {
 		if e, ok := err.(*Error); ok {
 			return e.Type == t

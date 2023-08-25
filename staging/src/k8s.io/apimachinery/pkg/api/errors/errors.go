@@ -284,7 +284,7 @@ func NewInvalid(qualifiedKind schema.GroupKind, name string, errs field.ErrorLis
 	for i := range errs {
 		err := errs[i]
 		causes = append(causes, metav1.StatusCause{
-			Type:    metav1.CauseType(err.Type),
+			Type:    metav1.CauseType(err.Type.Type()),
 			Message: err.ErrorBody(),
 			Field:   err.Field,
 		})
