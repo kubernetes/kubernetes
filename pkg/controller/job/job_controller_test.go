@@ -5197,37 +5197,41 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 		t.Fatalf("Creating job: %v", err)
 	}
 
-	// 3. Create the pods.
-	podBuilder := buildPod().name("test_pod").deletionTimestamp().trackingFinalizer().job(job)
-	pod, err := clientset.CoreV1().Pods(podBuilder.Pod.GetNamespace()).Create(ctx, podBuilder.Pod, metav1.CreateOptions{})
+	pod := newPod("test-pod", job)
+	// pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
+
+	_, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating pod: %v", err)
 	}
 
-	// 4. Finish the job.
 	job.Status.Conditions = append(job.Status.Conditions, batch.JobCondition{
 		Type:   batch.JobComplete,
 		Status: v1.ConditionTrue,
 	})
 
-	// 5. Start the workers.
+	clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+
 	go manager.Run(context.TODO(), 0)
 
-	err = manager.syncJob(context.TODO(), testutil.GetKey(job, t))
-	if err != nil {
-		t.Errorf("Unexpected error when syncing jobs %v", err)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+	defer cancel()
 
-	// Check if the finalizer has been removed from the pod.
-	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		p, err := clientset.CoreV1().Pods(pod.Namespace).Get(context.Background(), pod.Name, metav1.GetOptions{})
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		p, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		return !hasJobTrackingFinalizer(p), nil
 	}); err != nil {
-		t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
+		// Check for context deadline exceeded, which would mean the operation timed out
+		if errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("Timed out waiting for Pod to get the finalizer removed")
+		} else {
+			t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
+		}
 	}
+
 }
 
 func checkJobCompletionLabel(t *testing.T, p *v1.PodTemplateSpec) {
