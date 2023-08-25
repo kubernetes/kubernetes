@@ -535,6 +535,23 @@ const (
 	JobFailureTarget JobConditionType = "FailureTarget"
 )
 
+type JobReasonType string
+
+const (
+	// PodFailurePolicy reason indicates a job failure condition is added due to
+	// a failed pod matching a pod failure policy rule
+	// https://kep.k8s.io/3329
+	// This is currently a beta field.
+	PodFailurePolicyMatched JobReasonType = "PodFailurePolicy"
+	// BackOffLimitExceeded reason indicates that pods within a job have failed a number of
+	// times higher than backOffLimit times.
+	BackoffLimitExceeded JobReasonType = "BackoffLimitExceeded"
+	// DeadlineExceeded means job duration is past ActiveDeadline
+	DeadlineExceeded JobReasonType = "DeadlineExceeded"
+	// FailedIndexes means Job has failed indexes.
+	FailedIndexes JobReasonType = "FailedIndexes"
+)
+
 // JobCondition describes current state of a job.
 type JobCondition struct {
 	// Type of job condition, Complete or Failed.
