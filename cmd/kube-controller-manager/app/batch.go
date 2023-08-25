@@ -36,7 +36,7 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating Job controller: %v", err)
+		return nil, true, fmt.Errorf("creating Job controller: %v", err)
 	}
 	go jobController.Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
 	return nil, true, nil
@@ -48,7 +48,7 @@ func startCronJobController(ctx context.Context, controllerContext ControllerCon
 		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating CronJob controller V2: %v", err)
+		return nil, true, fmt.Errorf("creating CronJob controller V2: %v", err)
 	}
 
 	go cj2c.Run(ctx, int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs))

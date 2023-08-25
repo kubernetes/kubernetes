@@ -187,7 +187,7 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 			jm.deleteJob(logger, obj)
 		},
 	}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("adding Job event handler: %w", err)
 	}
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
@@ -203,7 +203,7 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 			jm.deletePod(logger, obj, true)
 		},
 	}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("adding Pod event handler: %w", err)
 	}
 	jm.podStore = podInformer.Lister()
 	jm.podStoreSynced = podInformer.Informer().HasSynced
