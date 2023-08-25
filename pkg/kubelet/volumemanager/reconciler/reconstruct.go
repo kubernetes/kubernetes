@@ -78,6 +78,7 @@ func (rc *reconciler) syncStates(kubeletPodDir string) {
 			devicePath:        reconstructedVolume.devicePath,
 			deviceMounter:     reconstructedVolume.deviceMounter,
 			blockVolumeMapper: reconstructedVolume.blockVolumeMapper,
+			mounter:           reconstructedVolume.mounter,
 		}
 		if volumeInDSW {
 			// Some pod needs the volume. And it exists on disk. Some previous
