@@ -81,6 +81,12 @@ type FakeVersion struct {
 	Version string
 }
 
+func snapshot(imageList []kubecontainer.Image) []kubecontainer.Image {
+	result := make([]kubecontainer.Image, len(imageList))
+	copy(result, imageList)
+	return result
+}
+
 func (fv *FakeVersion) String() string {
 	return fv.Version
 }
@@ -362,7 +368,7 @@ func (f *FakeRuntime) ListImages(_ context.Context) ([]kubecontainer.Image, erro
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "ListImages")
-	return f.ImageList, f.Err
+	return snapshot(f.ImageList), f.Err
 }
 
 func (f *FakeRuntime) RemoveImage(_ context.Context, image kubecontainer.ImageSpec) error {
