@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -62,19 +63,11 @@ var _ = SIGDescribe("Kubectl rollout", func() {
 			// create deployment
 			e2ekubectl.RunKubectlOrDieInput(ns, deploymentYaml, "apply", "-f", "-")
 
-			replica := int32(1)
-			d := &appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pause-deployment",
-					Namespace: ns,
-				},
-				Spec: appsv1.DeploymentSpec{Replicas: &replica},
-			}
-
-			if err = e2edeployment.WaitForDeploymentComplete(c, d); err != nil {
+			if err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, "pause-deployment", "1", imageutils.GetE2EImage(imageutils.Pause)); err != nil {
 				framework.Failf("created deployment not ready")
 			}
 
+			var d *appsv1.Deployment
 			if d, err = c.AppsV1().Deployments(ns).Get(ctx, "pause-deployment", metav1.GetOptions{}); err != nil {
 				framework.Failf("get deployment failed")
 			}
