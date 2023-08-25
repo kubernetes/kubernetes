@@ -340,7 +340,7 @@ func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 			continue
 		}
 
-		result = append(result, int64(iGroup))
+		result = append(result, iGroup)
 	}
 
 	return result
@@ -579,7 +579,7 @@ func getExtraSupplementalGid(volumeGidValue string, pod *v1.Pod) (int64, bool) {
 
 	if pod.Spec.SecurityContext != nil {
 		for _, existingGid := range pod.Spec.SecurityContext.SupplementalGroups {
-			if gid == int64(existingGid) {
+			if gid == existingGid {
 				return 0, false
 			}
 		}

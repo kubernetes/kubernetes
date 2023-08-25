@@ -2977,7 +2977,7 @@ func (kl *Kubelet) CheckpointContainer(
 		),
 	)
 
-	options.ContainerId = string(container.ID.ID)
+	options.ContainerId = container.ID.ID
 
 	if err := kl.containerRuntime.CheckpointContainer(ctx, options); err != nil {
 		return err
