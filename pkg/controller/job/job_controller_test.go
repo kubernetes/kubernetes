@@ -124,10 +124,10 @@ func newJob(parallelism, completions, backoffLimit int32, completionMode batch.C
 }
 
 func newControllerFromClient(ctx context.Context, t *testing.T, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*Controller, informers.SharedInformerFactory) {
-	return newControllerFromClientWithClock(ctx, kubeClient, resyncPeriod, realClock, t)
+	return newControllerFromClientWithClock(ctx, t, kubeClient, resyncPeriod, realClock)
 }
 
-func newControllerFromClientWithClock(ctx context.Context, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, clock clock.WithTicker, t *testing.T) (*Controller, informers.SharedInformerFactory) {
+func newControllerFromClientWithClock(ctx context.Context, t *testing.T, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, clock clock.WithTicker) (*Controller, informers.SharedInformerFactory) {
 	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
 	jm, err := newControllerWithClock(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient, clock)
 	if err != nil {
@@ -882,7 +882,7 @@ func TestControllerSyncJob(t *testing.T) {
 				fakeClock = clocktesting.NewFakeClock(time.Now())
 			}
 
-			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, clientSet, controller.NoResyncPeriodFunc, fakeClock, t)
+			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientSet, controller.NoResyncPeriodFunc, fakeClock)
 			fakePodControl := controller.FakePodControl{Err: tc.podControllerError, CreateLimit: tc.podLimit}
 			manager.podControl = &fakePodControl
 			manager.podStoreSynced = alwaysReady
@@ -2041,7 +2041,7 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := fake.NewSimpleClientset()
 	fakeClock := clocktesting.NewFakeClock(time.Now().Truncate(time.Second))
-	manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+	manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 	manager.expectations = FakeJobExpectations{
@@ -3778,7 +3778,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			fakeClock := clocktesting.NewFakeClock(now)
-			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 			fakePodControl := controller.FakePodControl{}
 			manager.podControl = &fakePodControl
 			manager.podStoreSynced = alwaysReady
@@ -3836,7 +3836,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Cleanup(setDurationDuringTest(&DefaultJobApiBackOff, fastJobApiBackoff))
 			fakeClient := clocktesting.NewFakeClock(time.Now())
-			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClient, t)
+			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClient)
 			fakePodControl := controller.FakePodControl{}
 			manager.podControl = &fakePodControl
 			manager.podStoreSynced = alwaysReady
@@ -3958,7 +3958,7 @@ func TestGetPodCreationInfoForIndependentIndexes(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			fakeClock := clocktesting.NewFakeClock(now)
-			manager, _ := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+			manager, _ := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 			gotIndexesToAdd, gotRemainingTime := manager.getPodCreationInfoForIndependentIndexes(logger, tc.indexesToAdd, tc.podsWithDelayedDeletionPerIndex)
 			if diff := cmp.Diff(tc.wantIndexesToAdd, gotIndexesToAdd); diff != "" {
 				t.Fatalf("Unexpected indexes to add: %s", diff)
@@ -4161,7 +4161,7 @@ func TestAddPod(t *testing.T) {
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
-	jm, informer := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+	jm, informer := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
@@ -4205,7 +4205,7 @@ func TestAddPodOrphan(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
-	jm, informer := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+	jm, informer := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
@@ -4235,7 +4235,7 @@ func TestUpdatePod(t *testing.T) {
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
-	jm, informer := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+	jm, informer := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
@@ -4283,7 +4283,7 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
-	jm, informer := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+	jm, informer := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
@@ -4312,7 +4312,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
-	jm, informer := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+	jm, informer := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
@@ -4340,7 +4340,7 @@ func TestUpdatePodRelease(t *testing.T) {
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
-	jm, informer := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+	jm, informer := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
@@ -4367,7 +4367,7 @@ func TestDeletePod(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
-	jm, informer := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+	jm, informer := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
@@ -4661,7 +4661,7 @@ func TestJobApiBackoffReset(t *testing.T) {
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
-	manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, clientset, controller.NoResyncPeriodFunc, fakeClock, t)
+	manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
