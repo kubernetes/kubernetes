@@ -60,7 +60,7 @@ func runControlPlane() func(c workflow.RunData) error {
 		}
 
 		// otherwise, retrieve all the info required for control plane upgrade
-		cfg := data.Cfg()
+		cfg := data.InitCfg()
 		client := data.Client()
 		dryRun := data.DryRun()
 		etcdUpgrade := data.EtcdUpgrade()

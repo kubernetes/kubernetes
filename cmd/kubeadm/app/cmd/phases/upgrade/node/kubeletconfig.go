@@ -57,7 +57,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		}
 
 		// otherwise, retrieve all the info required for kubelet config upgrade
-		cfg := data.Cfg()
+		cfg := data.InitCfg()
 		dryRun := data.DryRun()
 
 		// Write the configuration for the kubelet down to disk and print the generated manifests instead if dry-running.
