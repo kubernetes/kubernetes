@@ -32,11 +32,9 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -46,6 +44,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	certutil "k8s.io/client-go/util/cert"
@@ -59,49 +59,16 @@ var (
 )
 
 type Options struct {
-	// IssuerURL is the URL the provider signs ID Tokens as. This will be the "iss"
-	// field of all tokens produced by the provider and is used for configuration
-	// discovery.
-	//
-	// The URL is usually the provider's URL without a path, for example
-	// "https://accounts.google.com" or "https://login.salesforce.com".
-	//
-	// The provider must implement configuration discovery.
-	// See: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
-	IssuerURL string
-
+	// JWTAuthenticator is the authenticator that will be used to verify the JWT.
+	JWTAuthenticator apiserver.JWTAuthenticator
 	// Optional KeySet to allow for synchronous initialization instead of fetching from the remote issuer.
 	KeySet oidc.KeySet
-
-	// ClientID the JWT must be issued for, the "sub" field. This plugin only trusts a single
-	// client to ensure the plugin can be used with public providers.
-	//
-	// The plugin supports the "authorized party" OpenID Connect claim, which allows
-	// specialized providers to issue tokens to a client for a different client.
-	// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
-	ClientID string
 
 	// PEM encoded root certificate contents of the provider.  Mutually exclusive with Client.
 	CAContentProvider CAContentProvider
 
 	// Optional http.Client used to make all requests to the remote issuer.  Mutually exclusive with CAContentProvider.
 	Client *http.Client
-
-	// UsernameClaim is the JWT field to use as the user's username.
-	UsernameClaim string
-
-	// UsernamePrefix, if specified, causes claims mapping to username to be prefix with
-	// the provided value. A value "oidc:" would result in usernames like "oidc:john".
-	UsernamePrefix string
-
-	// GroupsClaim, if specified, causes the OIDCAuthenticator to try to populate the user's
-	// groups with an ID Token field. If the GroupsClaim field is present in an ID Token the value
-	// must be a string or list of strings.
-	GroupsClaim string
-
-	// GroupsPrefix, if specified, causes claims mapping to group names to be prefixed with the
-	// value. A value "oidc:" would result in groups like "oidc:engineering" and "oidc:marketing".
-	GroupsPrefix string
 
 	// SupportedSigningAlgs sets the accepted set of JOSE signing algorithms that
 	// can be used by the provider to sign tokens.
@@ -113,10 +80,6 @@ type Options struct {
 	//
 	// https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 	SupportedSigningAlgs []string
-
-	// RequiredClaims, if specified, causes the OIDCAuthenticator to verify that all the
-	// required claims key value pairs are present in the ID Token.
-	RequiredClaims map[string]string
 
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
@@ -192,13 +155,7 @@ func (a *asyncIDTokenVerifier) verifier() *oidc.IDTokenVerifier {
 }
 
 type Authenticator struct {
-	issuerURL string
-
-	usernameClaim  string
-	usernamePrefix string
-	groupsClaim    string
-	groupsPrefix   string
-	requiredClaims map[string]string
+	jwtAuthenticator apiserver.JWTAuthenticator
 
 	// Contains an *oidc.IDTokenVerifier. Do not access directly use the
 	// idTokenVerifier method.
@@ -240,17 +197,8 @@ var allowedSigningAlgs = map[string]bool{
 }
 
 func New(opts Options) (*Authenticator, error) {
-	url, err := url.Parse(opts.IssuerURL)
-	if err != nil {
+	if err := apiservervalidation.ValidateJWTAuthenticator(opts.JWTAuthenticator).ToAggregate(); err != nil {
 		return nil, err
-	}
-
-	if url.Scheme != "https" {
-		return nil, fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'", opts.IssuerURL, url.Scheme)
-	}
-
-	if opts.UsernameClaim == "" {
-		return nil, errors.New("no username claim provided")
 	}
 
 	supportedSigningAlgs := opts.SupportedSigningAlgs
@@ -273,6 +221,7 @@ func New(opts Options) (*Authenticator, error) {
 
 	if client == nil {
 		var roots *x509.CertPool
+		var err error
 		if opts.CAContentProvider != nil {
 			// TODO(enj): make this reload CA data dynamically
 			roots, err = certutil.NewPoolFromBytes(opts.CAContentProvider.CurrentCABundleContent())
@@ -302,35 +251,30 @@ func New(opts Options) (*Authenticator, error) {
 	}
 
 	verifierConfig := &oidc.Config{
-		ClientID:             opts.ClientID,
+		ClientID:             opts.JWTAuthenticator.Issuer.Audiences[0],
 		SupportedSigningAlgs: supportedSigningAlgs,
 		Now:                  now,
 	}
 
 	var resolver *claimResolver
-	if opts.GroupsClaim != "" {
-		resolver = newClaimResolver(opts.GroupsClaim, client, verifierConfig)
+	if opts.JWTAuthenticator.ClaimMappings.Groups.Claim != "" {
+		resolver = newClaimResolver(opts.JWTAuthenticator.ClaimMappings.Groups.Claim, client, verifierConfig)
 	}
 
 	authenticator := &Authenticator{
-		issuerURL:      opts.IssuerURL,
-		usernameClaim:  opts.UsernameClaim,
-		usernamePrefix: opts.UsernamePrefix,
-		groupsClaim:    opts.GroupsClaim,
-		groupsPrefix:   opts.GroupsPrefix,
-		requiredClaims: opts.RequiredClaims,
-		cancel:         cancel,
-		resolver:       resolver,
+		jwtAuthenticator: opts.JWTAuthenticator,
+		cancel:           cancel,
+		resolver:         resolver,
 	}
 
 	if opts.KeySet != nil {
 		// We already have a key set, synchronously initialize the verifier.
-		authenticator.setVerifier(oidc.NewVerifier(opts.IssuerURL, opts.KeySet, verifierConfig))
+		authenticator.setVerifier(oidc.NewVerifier(opts.JWTAuthenticator.Issuer.URL, opts.KeySet, verifierConfig))
 	} else {
 		// Asynchronously attempt to initialize the authenticator. This enables
 		// self-hosted providers, providers that run on top of Kubernetes itself.
 		go wait.PollImmediateUntil(10*time.Second, func() (done bool, err error) {
-			provider, err := oidc.NewProvider(ctx, opts.IssuerURL)
+			provider, err := oidc.NewProvider(ctx, opts.JWTAuthenticator.Issuer.URL)
 			if err != nil {
 				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
 				return false, nil
@@ -552,7 +496,7 @@ func (r *claimResolver) resolve(ctx context.Context, endpoint endpoint, allClaim
 }
 
 func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-	if !hasCorrectIssuer(a.issuerURL, token) {
+	if !hasCorrectIssuer(a.jwtAuthenticator.Issuer.URL, token) {
 		return nil, false, nil
 	}
 
@@ -577,11 +521,11 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 	}
 
 	var username string
-	if err := c.unmarshalClaim(a.usernameClaim, &username); err != nil {
-		return nil, false, fmt.Errorf("oidc: parse username claims %q: %v", a.usernameClaim, err)
+	if err := c.unmarshalClaim(a.jwtAuthenticator.ClaimMappings.Username.Claim, &username); err != nil {
+		return nil, false, fmt.Errorf("oidc: parse username claims %q: %v", a.jwtAuthenticator.ClaimMappings.Username.Claim, err)
 	}
 
-	if a.usernameClaim == "email" {
+	if a.jwtAuthenticator.ClaimMappings.Username.Claim == "email" {
 		// If the email_verified claim is present, ensure the email is valid.
 		// https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
 		if hasEmailVerified := c.hasClaim("email_verified"); hasEmailVerified {
@@ -597,33 +541,36 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 		}
 	}
 
-	if a.usernamePrefix != "" {
-		username = a.usernamePrefix + username
+	if a.jwtAuthenticator.ClaimMappings.Username.Prefix != nil && *a.jwtAuthenticator.ClaimMappings.Username.Prefix != "" {
+		username = *a.jwtAuthenticator.ClaimMappings.Username.Prefix + username
 	}
 
 	info := &user.DefaultInfo{Name: username}
-	if a.groupsClaim != "" {
-		if _, ok := c[a.groupsClaim]; ok {
+	if a.jwtAuthenticator.ClaimMappings.Groups.Claim != "" {
+		if _, ok := c[a.jwtAuthenticator.ClaimMappings.Groups.Claim]; ok {
 			// Some admins want to use string claims like "role" as the group value.
 			// Allow the group claim to be a single string instead of an array.
 			//
 			// See: https://github.com/kubernetes/kubernetes/issues/33290
 			var groups stringOrArray
-			if err := c.unmarshalClaim(a.groupsClaim, &groups); err != nil {
-				return nil, false, fmt.Errorf("oidc: parse groups claim %q: %v", a.groupsClaim, err)
+			if err := c.unmarshalClaim(a.jwtAuthenticator.ClaimMappings.Groups.Claim, &groups); err != nil {
+				return nil, false, fmt.Errorf("oidc: parse groups claim %q: %v", a.jwtAuthenticator.ClaimMappings.Groups.Claim, err)
 			}
 			info.Groups = []string(groups)
 		}
 	}
 
-	if a.groupsPrefix != "" {
+	if a.jwtAuthenticator.ClaimMappings.Groups.Prefix != nil && *a.jwtAuthenticator.ClaimMappings.Groups.Prefix != "" {
 		for i, group := range info.Groups {
-			info.Groups[i] = a.groupsPrefix + group
+			info.Groups[i] = *a.jwtAuthenticator.ClaimMappings.Groups.Prefix + group
 		}
 	}
 
 	// check to ensure all required claims are present in the ID token and have matching values.
-	for claim, value := range a.requiredClaims {
+	for _, claimValidationRule := range a.jwtAuthenticator.ClaimValidationRules {
+		claim := claimValidationRule.Claim
+		value := claimValidationRule.RequiredValue
+
 		if !c.hasClaim(claim) {
 			return nil, false, fmt.Errorf("oidc: required claim %s not present in ID token", claim)
 		}

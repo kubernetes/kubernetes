@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -28,6 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -41,6 +44,7 @@ import (
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
+	"k8s.io/utils/pointer"
 )
 
 // BuiltInAuthenticationOptions contains all build-in authentication options for API Server
@@ -397,16 +401,68 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		}
 	}
 
-	if o.OIDC != nil {
-		ret.OIDCCAFile = o.OIDC.CAFile
-		ret.OIDCClientID = o.OIDC.ClientID
-		ret.OIDCGroupsClaim = o.OIDC.GroupsClaim
-		ret.OIDCGroupsPrefix = o.OIDC.GroupsPrefix
-		ret.OIDCIssuerURL = o.OIDC.IssuerURL
-		ret.OIDCUsernameClaim = o.OIDC.UsernameClaim
-		ret.OIDCUsernamePrefix = o.OIDC.UsernamePrefix
+	if o.OIDC != nil && len(o.OIDC.IssuerURL) > 0 && len(o.OIDC.ClientID) > 0 {
+		usernamePrefix := o.OIDC.UsernamePrefix
+
+		if o.OIDC.UsernamePrefix == "" && o.OIDC.UsernameClaim != "email" {
+			// Legacy CLI flag behavior. If a usernamePrefix isn't provided, prefix all claims other than "email"
+			// with the issuerURL.
+			//
+			// See https://github.com/kubernetes/kubernetes/issues/31380
+			usernamePrefix = o.OIDC.IssuerURL + "#"
+		}
+		if o.OIDC.UsernamePrefix == "-" {
+			// Special value indicating usernames shouldn't be prefixed.
+			usernamePrefix = ""
+		}
+
+		jwtAuthenticator := apiserver.JWTAuthenticator{
+			Issuer: apiserver.Issuer{
+				URL:       o.OIDC.IssuerURL,
+				Audiences: []string{o.OIDC.ClientID},
+			},
+			ClaimMappings: apiserver.ClaimMappings{
+				Username: apiserver.PrefixedClaimOrExpression{
+					Prefix: pointer.String(usernamePrefix),
+					Claim:  o.OIDC.UsernameClaim,
+				},
+			},
+		}
+
+		if len(o.OIDC.GroupsClaim) > 0 {
+			jwtAuthenticator.ClaimMappings.Groups = apiserver.PrefixedClaimOrExpression{
+				Prefix: pointer.String(o.OIDC.GroupsPrefix),
+				Claim:  o.OIDC.GroupsClaim,
+			}
+		}
+
+		if len(o.OIDC.CAFile) != 0 {
+			caContent, err := os.ReadFile(o.OIDC.CAFile)
+			if err != nil {
+				return kubeauthenticator.Config{}, err
+			}
+			jwtAuthenticator.Issuer.CertificateAuthority = string(caContent)
+		}
+
+		if len(o.OIDC.RequiredClaims) > 0 {
+			claimValidationRules := make([]apiserver.ClaimValidationRule, 0, len(o.OIDC.RequiredClaims))
+			for claim, value := range o.OIDC.RequiredClaims {
+				claimValidationRules = append(claimValidationRules, apiserver.ClaimValidationRule{
+					Claim:         claim,
+					RequiredValue: value,
+				})
+			}
+			jwtAuthenticator.ClaimValidationRules = claimValidationRules
+		}
+
+		authConfig := &apiserver.AuthenticationConfiguration{
+			JWT: []apiserver.JWTAuthenticator{jwtAuthenticator},
+		}
+		if err := apiservervalidation.ValidateAuthenticationConfiguration(authConfig).ToAggregate(); err != nil {
+			return kubeauthenticator.Config{}, err
+		}
+		ret.AuthenticationConfig = authConfig
 		ret.OIDCSigningAlgs = o.OIDC.SigningAlgs
-		ret.OIDCRequiredClaims = o.OIDC.RequiredClaims
 	}
 
 	if o.RequestHeader != nil {

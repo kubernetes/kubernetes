@@ -19,11 +19,11 @@ package authenticator
 import (
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/group"
@@ -55,15 +55,8 @@ type Config struct {
 	BootstrapToken bool
 
 	TokenAuthFile               string
-	OIDCIssuerURL               string
-	OIDCClientID                string
-	OIDCCAFile                  string
-	OIDCUsernameClaim           string
-	OIDCUsernamePrefix          string
-	OIDCGroupsClaim             string
-	OIDCGroupsPrefix            string
+	AuthenticationConfig        *apiserver.AuthenticationConfiguration
 	OIDCSigningAlgs             []string
-	OIDCRequiredClaims          map[string]string
 	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
 	ServiceAccountIssuers       []string
@@ -153,33 +146,28 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	// cache misses for all requests using the other. While the service account plugin
 	// simply returns an error, the OpenID Connect plugin may query the provider to
 	// update the keys, causing performance hits.
-	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
-		// TODO(enj): wire up the Notifier and ControllerRunner bits when OIDC supports CA reload
-		var oidcCAContent oidc.CAContentProvider
-		if len(config.OIDCCAFile) != 0 {
-			var oidcCAErr error
-			oidcCAContent, oidcCAErr = staticCAContentProviderFromFile("oidc-authenticator", config.OIDCCAFile)
-			if oidcCAErr != nil {
-				return nil, nil, oidcCAErr
+	if config.AuthenticationConfig != nil {
+		for _, jwtAuthenticator := range config.AuthenticationConfig.JWT {
+			var oidcCAContent oidc.CAContentProvider
+			if len(jwtAuthenticator.Issuer.CertificateAuthority) > 0 {
+				var oidcCAError error
+				oidcCAContent, oidcCAError = dynamiccertificates.NewStaticCAContent("oidc-authenticator", []byte(jwtAuthenticator.Issuer.CertificateAuthority))
+				if oidcCAError != nil {
+					return nil, nil, oidcCAError
+				}
 			}
+			oidcAuth, err := oidc.New(oidc.Options{
+				JWTAuthenticator:     jwtAuthenticator,
+				CAContentProvider:    oidcCAContent,
+				SupportedSigningAlgs: config.OIDCSigningAlgs,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, oidcAuth))
 		}
-
-		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(oidc.Options{
-			IssuerURL:            config.OIDCIssuerURL,
-			ClientID:             config.OIDCClientID,
-			CAContentProvider:    oidcCAContent,
-			UsernameClaim:        config.OIDCUsernameClaim,
-			UsernamePrefix:       config.OIDCUsernamePrefix,
-			GroupsClaim:          config.OIDCGroupsClaim,
-			GroupsPrefix:         config.OIDCGroupsPrefix,
-			SupportedSigningAlgs: config.OIDCSigningAlgs,
-			RequiredClaims:       config.OIDCRequiredClaims,
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, oidcAuth))
 	}
+
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
 		webhookTokenAuth, err := newWebhookTokenAuthenticator(config)
 		if err != nil {
@@ -243,31 +231,6 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Token, e
 	return tokenAuthenticator, nil
 }
 
-// newAuthenticatorFromOIDCIssuerURL returns an authenticator.Token or an error.
-func newAuthenticatorFromOIDCIssuerURL(opts oidc.Options) (authenticator.Token, error) {
-	const noUsernamePrefix = "-"
-
-	if opts.UsernamePrefix == "" && opts.UsernameClaim != "email" {
-		// Old behavior. If a usernamePrefix isn't provided, prefix all claims other than "email"
-		// with the issuerURL.
-		//
-		// See https://github.com/kubernetes/kubernetes/issues/31380
-		opts.UsernamePrefix = opts.IssuerURL + "#"
-	}
-
-	if opts.UsernamePrefix == noUsernamePrefix {
-		// Special value indicating usernames shouldn't be prefixed.
-		opts.UsernamePrefix = ""
-	}
-
-	tokenAuthenticator, err := oidc.New(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokenAuthenticator, nil
-}
-
 // newLegacyServiceAccountAuthenticator returns an authenticator.Token or an error
 func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter, secretsWriter typedv1core.SecretsGetter) (authenticator.Token, error) {
 	allPublicKeys := []interface{}{}
@@ -317,13 +280,4 @@ func newWebhookTokenAuthenticator(config Config) (authenticator.Token, error) {
 	}
 
 	return tokencache.New(webhookTokenAuthenticator, false, config.WebhookTokenAuthnCacheTTL, config.WebhookTokenAuthnCacheTTL), nil
-}
-
-func staticCAContentProviderFromFile(purpose, filename string) (dynamiccertificates.CAContentProvider, error) {
-	fileBytes, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	return dynamiccertificates.NewStaticCAContent(purpose, fileBytes)
 }
