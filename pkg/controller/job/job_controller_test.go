@@ -5210,7 +5210,7 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 		Status: v1.ConditionTrue,
 	})
 
-	job, err = clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+	_, err = clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Updating job status: %v", err)
 	}
