@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"sort"
+	"sync"
 )
 
 type (
@@ -62,6 +63,12 @@ var (
 			iface: [0]KeyValue{},
 		},
 	}
+
+	// sortables is a pool of Sortables used to create Sets with a user does
+	// not provide one.
+	sortables = sync.Pool{
+		New: func() interface{} { return new(Sortable) },
+	}
 )
 
 // EmptySet returns a reference to a Set with no elements.
@@ -91,7 +98,7 @@ func (l *Set) Len() int {
 
 // Get returns the KeyValue at ordered position idx in this set.
 func (l *Set) Get(idx int) (KeyValue, bool) {
-	if l == nil {
+	if l == nil || !l.equivalent.Valid() {
 		return KeyValue{}, false
 	}
 	value := l.equivalent.reflectValue()
@@ -107,7 +114,7 @@ func (l *Set) Get(idx int) (KeyValue, bool) {
 
 // Value returns the value of a specified key in this set.
 func (l *Set) Value(k Key) (Value, bool) {
-	if l == nil {
+	if l == nil || !l.equivalent.Valid() {
 		return Value{}, false
 	}
 	rValue := l.equivalent.reflectValue()
@@ -191,7 +198,9 @@ func NewSet(kvs ...KeyValue) Set {
 	if len(kvs) == 0 {
 		return empty()
 	}
-	s, _ := NewSetWithSortableFiltered(kvs, new(Sortable), nil)
+	srt := sortables.Get().(*Sortable)
+	s, _ := NewSetWithSortableFiltered(kvs, srt, nil)
+	sortables.Put(srt)
 	return s
 }
 
@@ -218,7 +227,10 @@ func NewSetWithFiltered(kvs []KeyValue, filter Filter) (Set, []KeyValue) {
 	if len(kvs) == 0 {
 		return empty(), nil
 	}
-	return NewSetWithSortableFiltered(kvs, new(Sortable), filter)
+	srt := sortables.Get().(*Sortable)
+	s, filtered := NewSetWithSortableFiltered(kvs, srt, filter)
+	sortables.Put(srt)
+	return s, filtered
 }
 
 // NewSetWithSortableFiltered returns a new Set.

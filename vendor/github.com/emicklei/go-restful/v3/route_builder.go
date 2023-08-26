@@ -7,6 +7,7 @@ package restful
 import (
 	"fmt"
 	"os"
+	"path"
 	"reflect"
 	"runtime"
 	"strings"
@@ -46,11 +47,12 @@ type RouteBuilder struct {
 // Do evaluates each argument with the RouteBuilder itself.
 // This allows you to follow DRY principles without breaking the fluent programming style.
 // Example:
-// 		ws.Route(ws.DELETE("/{name}").To(t.deletePerson).Do(Returns200, Returns500))
 //
-//		func Returns500(b *RouteBuilder) {
-//			b.Returns(500, "Internal Server Error", restful.ServiceError{})
-//		}
+//	ws.Route(ws.DELETE("/{name}").To(t.deletePerson).Do(Returns200, Returns500))
+//
+//	func Returns500(b *RouteBuilder) {
+//		b.Returns(500, "Internal Server Error", restful.ServiceError{})
+//	}
 func (b *RouteBuilder) Do(oneArgBlocks ...func(*RouteBuilder)) *RouteBuilder {
 	for _, each := range oneArgBlocks {
 		each(b)
@@ -351,8 +353,28 @@ func (b *RouteBuilder) Build() Route {
 	return route
 }
 
-func concatPath(path1, path2 string) string {
-	return strings.TrimRight(path1, "/") + "/" + strings.TrimLeft(path2, "/")
+type MergePathStrategyFunc func(rootPath, routePath string) string
+
+var (
+	// behavior >= 3.10
+	PathJoinStrategy = func(rootPath, routePath string) string {
+		return path.Join(rootPath, routePath)
+	}
+
+	// behavior <= 3.9
+	TrimSlashStrategy = func(rootPath, routePath string) string {
+		return strings.TrimRight(rootPath, "/") + "/" + strings.TrimLeft(routePath, "/")
+	}
+
+	// MergePathStrategy is the active strategy for merging a Route path when building the routing of all WebServices.
+	// The value is set to PathJoinStrategy
+	// PathJoinStrategy is a strategy that is more strict [Security - PRISMA-2022-0227]
+	MergePathStrategy = PathJoinStrategy
+)
+
+// merge two paths using the current (package global) merge path strategy.
+func concatPath(rootPath, routePath string) string {
+	return MergePathStrategy(rootPath, routePath)
 }
 
 var anonymousFuncCount int32

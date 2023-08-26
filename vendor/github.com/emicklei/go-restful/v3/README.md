@@ -96,6 +96,10 @@ There are several hooks to customize the behavior of the go-restful package.
 - Compression
 - Encoders for other serializers
 - Use [jsoniter](https://github.com/json-iterator/go) by building this package using a build tag, e.g. `go build -tags=jsoniter .` 
+- Use the variable `MergePathStrategy` to change the behaviour of composing the Route path given a root path and a local route path	
+	- versions >= 3.10.1 has set the value to `PathJoinStrategy` that fixes a reported [security issue](https://github.com/advisories/GHSA-r48q-9g5r-8q2h) but may cause your services not to work correctly anymore.
+	- versions <= 3.9 had the behaviour that can be restored in newer versions by setting the value to `TrimSlashStrategy`.
+	- you can set value to a custom implementation (must implement MergePathStrategyFunc)
 
 ## Resources
 
