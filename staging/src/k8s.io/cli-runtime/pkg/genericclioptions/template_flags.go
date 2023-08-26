@@ -18,7 +18,7 @@ package genericclioptions
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 
@@ -89,7 +89,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (printers.Resour
 	}
 
 	if templateFormat == "templatefile" || templateFormat == "go-template-file" {
-		data, err := ioutil.ReadFile(templateValue)
+		data, err := os.ReadFile(templateValue)
 		if err != nil {
 			return nil, fmt.Errorf("error reading --template %s, %v", templateValue, err)
 		}
