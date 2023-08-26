@@ -2029,6 +2029,24 @@ func newPodMemoryStats(pod *v1.Pod, workingSet resource.Quantity) statsapi.PodSt
 		Memory: &statsapi.MemoryStats{
 			WorkingSetBytes: &workingSetBytes,
 		},
+		VolumeStats: []statsapi.VolumeStats{
+			{
+				FsStats: statsapi.FsStats{
+					UsedBytes: &workingSetBytes,
+				},
+				Name: "local-volume",
+			},
+		},
+		Containers: []statsapi.ContainerStats{
+			{
+				Name: pod.Name,
+				Logs: &statsapi.FsStats{
+					UsedBytes: &workingSetBytes,
+				},
+				Rootfs: &statsapi.FsStats{UsedBytes: &workingSetBytes},
+			},
+		},
+		EphemeralStorage: &statsapi.FsStats{UsedBytes: &workingSetBytes},
 	}
 }
 
