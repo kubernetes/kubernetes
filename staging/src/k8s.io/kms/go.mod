@@ -6,7 +6,7 @@ go 1.20
 
 require (
 	github.com/gogo/protobuf v1.3.2
-	google.golang.org/grpc v1.54.0
+	google.golang.org/grpc v1.55.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/klog/v2 v2.100.1
