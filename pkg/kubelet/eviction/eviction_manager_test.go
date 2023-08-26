@@ -117,6 +117,32 @@ func makePodWithDiskStats(name string, priority int32, requests v1.ResourceList,
 	return pod, podStats
 }
 
+func makePodWithLocalStorageCapacityIsolationOpen(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
+	vol := newVolume("local-volume", v1.VolumeSource{
+		EmptyDir: &v1.EmptyDirVolumeSource{
+			SizeLimit: resource.NewQuantity(requests.Memory().Value(), resource.BinarySI),
+		},
+	})
+	var vols []v1.Volume
+	vols = append(vols, vol)
+	pod := newPod(name, priority, []v1.Container{
+		newContainer(name, requests, limits),
+	}, vols)
+
+	var podStats statsapi.PodStats
+	switch name {
+	case "empty-dir":
+		podStats = newPodMemoryStats(pod, *resource.NewQuantity(requests.Memory().Value()*2, resource.BinarySI))
+	case "container-ephemeral-storage-limit":
+		podStats = newPodMemoryStats(pod, *resource.NewQuantity(limits.StorageEphemeral().Value(), resource.BinarySI))
+	case "pod-ephemeral-storage-limit":
+		podStats = newPodMemoryStats(pod, *resource.NewQuantity(limits.StorageEphemeral().Value()*2, resource.BinarySI))
+	default:
+		podStats = newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
+	}
+	return pod, podStats
+}
+
 func makeMemoryStats(nodeAvailableBytes string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
 	val := resource.MustParse(nodeAvailableBytes)
 	availableBytes := uint64(val.Value())
@@ -1783,4 +1809,71 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	// The Description method should be called because UpdateThreshold returned an error
 	fakeClock.Step(2 * notifierRefreshInterval)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
+}
+
+func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
+	podMaker := makePodWithLocalStorageCapacityIsolationOpen
+	summaryStatsMaker := makeDiskStats
+	podsToMake := []podToMake{
+		{name: "empty-dir", requests: newResourceList("", "900Mi", ""), limits: newResourceList("", "1Gi", "")},
+		{name: "container-ephemeral-storage-limit", requests: newResourceList("", "", "900Mi"), limits: newResourceList("", "", "800Mi")},
+		{name: "pod-ephemeral-storage-limit", requests: newResourceList("", "", "1Gi"), limits: newResourceList("", "", "800Mi")},
+	}
+
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1Gi", "200Mi", podStats)}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+		},
+	}
+
+	podKiller := &mockPodKiller{}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+
+	mgr := &managerImpl{
+		clock:                         fakeClock,
+		killPodFunc:                   podKiller.killPodNow,
+		imageGC:                       diskGC,
+		containerGC:                   diskGC,
+		config:                        config,
+		recorder:                      &record.FakeRecorder{},
+		summaryProvider:               summaryProvider,
+		nodeRef:                       nodeRef,
+		localStorageCapacityIsolation: true,
+		dedicatedImageFs:              &diskInfoProvider.dedicatedImageFs,
+	}
+
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	evictedPods := mgr.synchronize(diskInfoProvider, activePodsFunc)
+
+	if podKiller.pod == nil {
+		t.Fatalf("Manager should have selected a pod for eviction")
+	}
+
+	if diff := cmp.Diff(pods, evictedPods); diff != "" {
+		t.Fatalf("Unexpected evicted pod (-want,+got):\n%s", diff)
+	}
 }
