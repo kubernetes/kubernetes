@@ -261,7 +261,9 @@ func (jm *ControllerV2) getJobsToBeReconciled(cronJob *batchv1.CronJob) ([]*batc
 
 	for _, job := range jobList {
 		// If it has a ControllerRef, that's all that matters.
-		if controllerRef := metav1.GetControllerOf(job); controllerRef != nil && controllerRef.Name == cronJob.Name {
+		controllerRef := metav1.GetControllerOf(job)
+		if controllerRef != nil && controllerRef.Name == cronJob.Name &&
+			(controllerRef.Kind == "" || controllerRef.Kind == controllerKind.Kind) {
 			// this job is needs to be reconciled
 			jobsToBeReconciled = append(jobsToBeReconciled, job)
 		}

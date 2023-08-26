@@ -1663,6 +1663,26 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}},
 			}},
 		},
+		{
+			name:    "test getting jobs in namespace with a controller reference and if kind is present, should be CronJob",
+			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
+			jobs: []runtime.Object{
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef, Kind: "FakeController"}}}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo3", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef, Kind: "CronJob"}}}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo4", Namespace: "foo-ns"}},
+			},
+			expected: []*batchv1.Job{
+				{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "foo3", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef, Kind: "CronJob"}}}},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
