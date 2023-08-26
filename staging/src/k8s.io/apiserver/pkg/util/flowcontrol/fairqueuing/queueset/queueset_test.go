@@ -281,7 +281,11 @@ func (ust *uniformScenarioThread) callK(k int) {
 	maxWidth := float64(uint64max(ust.uc.initialSeats, ust.uc.finalSeats))
 	ust.uss.seatDemandIntegratorCheck.Add(maxWidth)
 	returnSeatDemand := func(time.Time) { ust.uss.seatDemandIntegratorCheck.Add(-maxWidth) }
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	ust.uss.clk.EventAfterDuration(func(time.Time) {
+		ust.uss.counter.Add(1)
+		cancel()
+	}, ust.uc.execDuration/4)
 	username := fmt.Sprintf("%d:%d:%d", ust.i, ust.j, k)
 	ctx = genericrequest.WithUser(ctx, &user.DefaultInfo{Name: username})
 	req, idle := ust.uss.qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: ust.uc.initialSeats, FinalSeats: ust.uc.finalSeats, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
