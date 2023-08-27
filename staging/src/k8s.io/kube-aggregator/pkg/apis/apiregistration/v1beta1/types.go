@@ -107,7 +107,7 @@ const (
 )
 
 type ScopedResource struct {
-	ResourceScope ResourceScope `json:"resourceScope" protobuf:"bytes,2,name=resourceScope"`
+	ResourceScope ResourceScope `json:"resourceScope" protobuf:"bytes,2,2,name=resourceScope"`
 	// plural is the plural name of the resource to serve.
 	// The custom resources are served under `/apis/<group>/<version>/.../<plural>`.
 	// Must match the name of the CustomResourceDefinition (in the form `<names.plural>.<group>`).
