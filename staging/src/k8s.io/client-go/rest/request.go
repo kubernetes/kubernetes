@@ -320,11 +320,7 @@ func (r *Request) ResourceVersion(resourceVersion string) *Request {
 	if r.err != nil {
 		return r
 	}
-	if r.params == nil {
-		r.params = make(url.Values)
-	}
-	r.params.Set("resourceVersion", resourceVersion)
-	return r
+	return r.setParam("resourceVersion", resourceVersion)
 }
 
 // AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
