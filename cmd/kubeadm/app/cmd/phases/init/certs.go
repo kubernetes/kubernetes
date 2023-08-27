@@ -188,7 +188,7 @@ func runCertsSa(c workflow.RunData) error {
 	}
 
 	// create the new service account key (or use existing)
-	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir(), data.Cfg().ClusterConfiguration.PublicKeyAlgorithm())
+	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir(), data.Cfg().ClusterConfiguration.EncryptionAlgorithmType())
 }
 
 func runCerts(c workflow.RunData) error {

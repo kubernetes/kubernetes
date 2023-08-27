@@ -32,6 +32,9 @@ limitations under the License.
 //   - Replace the existing string/string extra argument maps with structured extra arguments that support duplicates.
 //     The change applies to `ClusterConfiguration` - `APIServer.ExtraArgs, `ControllerManager.ExtraArgs`,
 //     `Scheduler.ExtraArgs`, `Etcd.Local.ExtraArgs`. Also to `NodeRegistrationOptions.KubeletExtraArgs`.
+//   - Add `ClusterConfiguration.EncryptionAlgorithm` that can be used to set the asymmetric encryption algorithm
+//     used for this cluster's keys and certificates. Can be "RSA" (default algorithm, key size is 2048) or
+//     "ECDSA" (uses the P-256 eliptic curve).
 //
 // Migration from old kubeadm config versions
 //

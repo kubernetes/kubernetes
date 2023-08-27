@@ -60,7 +60,7 @@ func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*pkiutil.Cert
 		}
 	}
 
-	k.config.PublicKeyAlgorithm = ic.ClusterConfiguration.PublicKeyAlgorithm()
+	k.config.EncryptionAlgorithm = ic.ClusterConfiguration.EncryptionAlgorithmType()
 	return &k.config, nil
 }
 

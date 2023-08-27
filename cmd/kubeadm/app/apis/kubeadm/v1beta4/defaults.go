@@ -60,6 +60,9 @@ const (
 
 	// DefaultImagePullPolicy is the default image pull policy in kubeadm
 	DefaultImagePullPolicy = corev1.PullIfNotPresent
+
+	// DefaultEncryptionAlgorithm is the default encryption algorithm.
+	DefaultEncryptionAlgorithm = EncryptionAlgorithmRSA
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -97,6 +100,10 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
+	}
+
+	if obj.EncryptionAlgorithm == "" {
+		obj.EncryptionAlgorithm = DefaultEncryptionAlgorithm
 	}
 
 	SetDefaults_Etcd(obj)
