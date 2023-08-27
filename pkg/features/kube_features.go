@@ -201,15 +201,6 @@ const (
 	// Set the scheduled time as an annotation in the job.
 	CronJobsScheduledAnnotation featuregate.Feature = "CronJobsScheduledAnnotation"
 
-	// owner: @deejross, @soltysh
-	// kep: https://kep.k8s.io/3140
-	// alpha: v1.24
-	// beta: v1.25
-	// GA: 1.27
-	//
-	// Enables support for time zones in CronJobs.
-	CronJobTimeZone featuregate.Feature = "CronJobTimeZone"
-
 	// owner: @thockin
 	// deprecated: v1.28
 	//
@@ -396,15 +387,6 @@ const (
 	// Allows users to specify counting of failed pods per index.
 	JobBackoffLimitPerIndex featuregate.Feature = "JobBackoffLimitPerIndex"
 
-	// owner: @ahg
-	// beta: v1.23
-	// stable: v1.27
-	//
-	// Allow updating node scheduling directives in the pod template of jobs. Specifically,
-	// node affinity, selector and tolerations. This is allowed only for suspended jobs
-	// that have never been unsuspended before.
-	JobMutableNodeSchedulingDirectives featuregate.Feature = "JobMutableNodeSchedulingDirectives"
-
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/3329
 	// alpha: v1.25
@@ -500,14 +482,6 @@ const (
 	// Implement connection draining for terminating nodes for
 	// `externalTrafficPolicy: Cluster` services.
 	KubeProxyDrainingTerminatingNodes featuregate.Feature = "KubeProxyDrainingTerminatingNodes"
-
-	// owner: @zshihang
-	// kep: https://kep.k8s.io/2800
-	// beta: v1.24
-	// ga: v1.26
-	//
-	// Stop auto-generation of secret-based service account tokens.
-	LegacyServiceAccountTokenNoAutoGeneration featuregate.Feature = "LegacyServiceAccountTokenNoAutoGeneration"
 
 	// owner: @zshihang
 	// kep: http://kep.k8s.io/2800
@@ -1006,8 +980,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CronJobsScheduledAnnotation: {Default: true, PreRelease: featuregate.Beta},
 
-	CronJobTimeZone: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Deprecated},
 
 	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
@@ -1058,8 +1030,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobBackoffLimitPerIndex: {Default: false, PreRelease: featuregate.Alpha},
 
-	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
 	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	JobPodReplacementPolicy: {Default: false, PreRelease: featuregate.Alpha},
@@ -1083,8 +1053,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletTracing: {Default: true, PreRelease: featuregate.Beta},
 
 	KubeProxyDrainingTerminatingNodes: {Default: false, PreRelease: featuregate.Alpha},
-
-	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	LegacyServiceAccountTokenTracking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
