@@ -140,6 +140,11 @@ type ClusterConfiguration struct {
 	// The cluster name
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
+
+	// EncryptionAlgorithm holds the type of asymmetric encryption algorithm used for keys and certificates.
+	// Can be "RSA" (default algorithm, key size is 2048) or "ECDSA" (uses the P-256 eliptic curve).
+	// +optional
+	EncryptionAlgorithm EncryptionAlgorithmType `json:"encryptionAlgorithm,omitempty"`
 }
 
 // ControlPlaneComponent holds settings common to control plane component of the cluster
@@ -513,3 +518,13 @@ type Arg struct {
 type EnvVar struct {
 	corev1.EnvVar `json:",inline"`
 }
+
+// EncryptionAlgorithmType can define an asymmetric encryption algorithm type.
+type EncryptionAlgorithmType string
+
+const (
+	// EncryptionAlgorithmECDSA defines the ECDSA encryption algorithm type.
+	EncryptionAlgorithmECDSA EncryptionAlgorithmType = "ECDSA"
+	// EncryptionAlgorithmRSA defines the RSA encryption algorithm type.
+	EncryptionAlgorithmRSA EncryptionAlgorithmType = "RSA"
+)

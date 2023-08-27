@@ -17,8 +17,6 @@ limitations under the License.
 package kubeadm
 
 import (
-	"crypto/x509"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -141,6 +139,10 @@ type ClusterConfiguration struct {
 
 	// The cluster name
 	ClusterName string
+
+	// EncryptionAlgorithm holds the type of asymmetric encryption algorithm used for keys and certificates.
+	// Can be "RSA" (default algorithm, key size is 2048) or "ECDSA" (uses the P-256 eliptic curve).
+	EncryptionAlgorithm EncryptionAlgorithmType
 }
 
 // ControlPlaneComponent holds settings common to control plane component of the cluster
@@ -403,13 +405,18 @@ func (cfg *ClusterConfiguration) GetControlPlaneImageRepository() string {
 	return cfg.ImageRepository
 }
 
-// PublicKeyAlgorithm returns the type of encryption keys used in the cluster.
-func (cfg *ClusterConfiguration) PublicKeyAlgorithm() x509.PublicKeyAlgorithm {
-	if features.Enabled(cfg.FeatureGates, features.PublicKeysECDSA) {
-		return x509.ECDSA
+// EncryptionAlgorithmType returns the type of encryption keys used in the cluster.
+func (cfg *ClusterConfiguration) EncryptionAlgorithmType() EncryptionAlgorithmType {
+	// If the feature gate is set to true, or false respect it.
+	// If the feature gate is not set, use the EncryptionAlgorithm field (v1beta4).
+	// TODO: remove this function when the feature gate is removed.
+	if enabled, ok := cfg.FeatureGates[features.PublicKeysECDSA]; ok {
+		if enabled {
+			return EncryptionAlgorithmECDSA
+		}
+		return EncryptionAlgorithmRSA
 	}
-
-	return x509.RSA
+	return cfg.EncryptionAlgorithm
 }
 
 // HostPathMount contains elements describing volumes that are mounted from the
@@ -518,3 +525,13 @@ type Arg struct {
 type EnvVar struct {
 	v1.EnvVar
 }
+
+// EncryptionAlgorithmType can define an asymmetric encryption algorithm type.
+type EncryptionAlgorithmType string
+
+const (
+	// EncryptionAlgorithmECDSA defines the ECDSA encryption algorithm type.
+	EncryptionAlgorithmECDSA EncryptionAlgorithmType = "ECDSA"
+	// EncryptionAlgorithmRSA defines the RSA encryption algorithm type.
+	EncryptionAlgorithmRSA EncryptionAlgorithmType = "RSA"
+)

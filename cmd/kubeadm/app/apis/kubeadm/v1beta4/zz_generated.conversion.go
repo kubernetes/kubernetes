@@ -385,6 +385,7 @@ func autoConvert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in
 	out.ImageRepository = in.ImageRepository
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
+	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmType(in.EncryptionAlgorithm)
 	return nil
 }
 
@@ -421,6 +422,7 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1beta4_ClusterConfiguration(in
 	// INFO: in.CIImageRepository opted out of conversion generation
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
+	out.EncryptionAlgorithm = EncryptionAlgorithmType(in.EncryptionAlgorithm)
 	return nil
 }
 
