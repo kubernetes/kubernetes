@@ -469,7 +469,8 @@ func (jm *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
 		jm.enqueueSyncJobImmediately(logger, curJob)
 	}
 
-	// if curJob is finished, remove the finalizer as a backup check.
+	// The job shouldn't be marked as finished until all pod finalizers are removed.
+	// This is a backup operation
 	if IsJobFinished(curJob) {
 		jm.backupRemovePodFinalizers(curJob)
 	}

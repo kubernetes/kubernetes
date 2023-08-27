@@ -5174,52 +5174,48 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 
 func TestBackupFinalizerRemoval(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	clientset := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	manager := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	podInformer := sharedInformers.Core().V1().Pods().Informer()
-	go podInformer.Run(stopCh)
-	cache.WaitForCacheSync(stopCh, podInformer.HasSynced)
+	go manager.Run(context.TODO(), 0)
 
-	// 1. Create the controller but do not start the workers.
-	// This is done above by initializing the manager and not calling manager.Run() yet.
+	// Start the Pod and Job informers.
+	sharedInformers.Start(ctx.Done())
+	sharedInformers.WaitForCacheSync(ctx.Done())
 
-	// 2. Create a job.
+	// Create a simple Job
 	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
-
 	job, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating job: %v", err)
 	}
 
+	// Create a Pod with the job tracking finalizer
 	pod := newPod("test-pod", job)
 	pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
-
 	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Creating pod: %v", err)
 	}
 
+	// Mark Job as complete.
 	job.Status.Conditions = append(job.Status.Conditions, batch.JobCondition{
 		Type:   batch.JobComplete,
 		Status: v1.ConditionTrue,
 	})
-
 	_, err = clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Updating job status: %v", err)
 	}
 
-	go manager.Run(context.TODO(), 0)
-
-	ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
-	defer cancel()
-
+	// Since Pod was not correctly tracked, the the backup code
+	// should remove the finalizer. (backupRemovePodFinalizers)
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		p, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
@@ -5227,7 +5223,6 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 		}
 		return !hasJobTrackingFinalizer(p), nil
 	}); err != nil {
-		// Check for context deadline exceeded, which would mean the operation timed out
 		if errors.Is(err, context.DeadlineExceeded) {
 			t.Errorf("Timed out waiting for Pod to get the finalizer removed")
 		} else {
