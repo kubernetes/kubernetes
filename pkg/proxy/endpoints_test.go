@@ -200,6 +200,36 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Protocol: &udp,
 		}}
 	}
+	unnamedPortReady := func(eps *discovery.EndpointSlice) {
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       pointer.Bool(true),
+				Serving:     pointer.Bool(true),
+				Terminating: pointer.Bool(false),
+			},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     pointer.String(""),
+			Port:     pointer.Int32(11),
+			Protocol: &udp,
+		}}
+	}
+	unnamedPortTerminating := func(eps *discovery.EndpointSlice) {
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       pointer.Bool(false),
+				Serving:     pointer.Bool(true),
+				Terminating: pointer.Bool(true),
+			},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     pointer.String(""),
+			Port:     pointer.Int32(11),
+			Protocol: &udp,
+		}}
+	}
 	unnamedPortLocal := func(eps *discovery.EndpointSlice) {
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.1"},
@@ -1033,6 +1063,49 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 		expectedLocalEndpoints:   map[types.NamespacedName]int{},
 		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
+	}, {
+		name: "change from ready to terminating pod",
+		previousEndpointSlices: []*discovery.EndpointSlice{
+			makeTestEndpointSlice("ns1", "ep1", 1, unnamedPortReady),
+		},
+		currentEndpointSlices: []*discovery.EndpointSlice{
+			makeTestEndpointSlice("ns1", "ep1", 1, unnamedPortTerminating),
+		},
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+			},
+		},
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: false, Serving: true, Terminating: true},
+			},
+		},
+		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints:         map[types.NamespacedName]int{},
+		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
+	}, {
+		name: "change from terminating to empty pod",
+		previousEndpointSlices: []*discovery.EndpointSlice{
+			makeTestEndpointSlice("ns1", "ep1", 1, unnamedPortTerminating),
+		},
+		currentEndpointSlices: []*discovery.EndpointSlice{
+			makeTestEndpointSlice("ns1", "ep1", 1, emptyEndpoint),
+		},
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: false, Serving: true, Terminating: true},
+			},
+		},
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{},
+		expectedDeletedUDPEndpoints: []ServiceEndpoint{{
+			Endpoint:        "1.1.1.1:11",
+			ServicePortName: makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP),
+		}},
+		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
+		expectedLocalEndpoints:         map[types.NamespacedName]int{},
+		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
 	},
 	}
 

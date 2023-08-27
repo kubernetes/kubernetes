@@ -5268,7 +5268,7 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(false),
+					Serving: pointer.Bool(false),
 				},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
@@ -5291,7 +5291,7 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
 				Conditions: discovery.EndpointConditions{
-					Ready: pointer.Bool(true),
+					Serving: pointer.Bool(true),
 				},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
