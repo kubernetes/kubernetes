@@ -117,13 +117,6 @@ func (info *BaseEndpointInfo) Port() (int, error) {
 	return proxyutil.PortPart(info.Endpoint)
 }
 
-// Equal is part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
-	return info.String() == other.String() &&
-		info.GetIsLocal() == other.GetIsLocal() &&
-		info.IsReady() == other.IsReady()
-}
-
 // GetNodeName returns the NodeName for this endpoint.
 func (info *BaseEndpointInfo) GetNodeName() string {
 	return info.NodeName
@@ -425,7 +418,9 @@ func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, 
 			// ready to not ready. If it did change stale entries for the old
 			// endpoint have to be cleared.
 			for i := range newEndpointsMap[svcPortName] {
-				if newEndpointsMap[svcPortName][i].Equal(ep) {
+				if newEndpointsMap[svcPortName][i].String() == ep.String() &&
+					newEndpointsMap[svcPortName][i].IsReady() == ep.IsReady() &&
+					newEndpointsMap[svcPortName][i].GetIsLocal() == ep.GetIsLocal() {
 					deleted = false
 					break
 				}

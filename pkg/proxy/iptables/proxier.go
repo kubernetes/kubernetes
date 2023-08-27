@@ -136,19 +136,6 @@ func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.Servic
 	}
 }
 
-// Equal overrides the Equal() function implemented by proxy.BaseEndpointInfo.
-func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
-	o, ok := other.(*endpointsInfo)
-	if !ok {
-		klog.ErrorS(nil, "Failed to cast endpointsInfo")
-		return false
-	}
-	return e.Endpoint == o.Endpoint &&
-		e.IsLocal == o.IsLocal &&
-		e.ChainName == o.ChainName &&
-		e.Ready == o.Ready
-}
-
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {

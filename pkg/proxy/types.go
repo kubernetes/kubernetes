@@ -131,8 +131,6 @@ type Endpoint interface {
 	IP() string
 	// Port returns the Port part of the endpoint.
 	Port() (int, error)
-	// Equal checks if two endpoints are equal.
-	Equal(Endpoint) bool
 	// GetNodeName returns the node name for the endpoint
 	GetNodeName() string
 	// GetZone returns the zone for the endpoint
