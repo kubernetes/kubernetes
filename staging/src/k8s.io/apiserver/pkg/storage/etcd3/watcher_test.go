@@ -18,11 +18,14 @@ package etcd3
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
 	"sync"
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
@@ -132,4 +135,26 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	w.errChan <- fmt.Errorf("some error")
 	cancel()
 	wg.Wait()
+}
+
+// TestWatchErrorWhenNoNewFunc checks if an error
+// will be returned when establishing a watch
+// with progressNotify options set
+// when newFunc wasn't provided
+func TestWatchErrorWhenNoNewFunc(t *testing.T) {
+	origCtx, store, _ := testSetup(t, func(opts *setupOptions) { opts.newFunc = nil })
+	ctx, cancel := context.WithCancel(origCtx)
+	defer cancel()
+
+	w, err := store.watcher.Watch(ctx, "/abc", 0, storage.ListOptions{ProgressNotify: true})
+	if err == nil {
+		t.Fatalf("expected an error but got none")
+	}
+	if w != nil {
+		t.Fatalf("didn't expect a watcher because progress notifications cannot be delivered for a watcher without newFunc")
+	}
+	expectedError := apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
+	if err.Error() != expectedError.Error() {
+		t.Fatalf("unexpected err = %v, expected = %v", err, expectedError)
+	}
 }
