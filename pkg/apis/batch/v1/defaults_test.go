@@ -98,6 +98,7 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:        pointer.Bool(false),
+					ManualSelector: pointer.Bool(false),
 					PodFailurePolicy: &batchv1.PodFailurePolicy{
 						Rules: []batchv1.PodFailurePolicyRule{
 							{
@@ -166,6 +167,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:              pointer.Bool(false),
 					PodReplacementPolicy: podReplacementPtr(batchv1.Failed),
+					ManualSelector:       pointer.Bool(false),
 					PodFailurePolicy: &batchv1.PodFailurePolicy{
 						Rules: []batchv1.PodFailurePolicyRule{
 							{
@@ -198,6 +200,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:              pointer.Bool(false),
 					PodReplacementPolicy: podReplacementPtr(batchv1.TerminatingOrFailed),
+					ManualSelector:       pointer.Bool(false),
 				},
 			},
 			expectLabels:               true,
@@ -218,6 +221,7 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:        pointer.Bool(false),
+					ManualSelector: pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -237,6 +241,7 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:        pointer.Bool(false),
+					ManualSelector: pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -279,6 +284,7 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:        pointer.Bool(false),
+					ManualSelector: pointer.Bool(false),
 				},
 			},
 		},
@@ -369,6 +375,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:              pointer.Bool(false),
 					PodReplacementPolicy: podReplacementPtr(batchv1.TerminatingOrFailed),
+					ManualSelector:       pointer.Bool(false),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -382,6 +389,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:              pointer.Bool(false),
 					PodReplacementPolicy: podReplacementPtr(batchv1.TerminatingOrFailed),
+					ManualSelector:       pointer.Bool(false),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -398,6 +406,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
 					Suspend:              pointer.Bool(true),
 					PodReplacementPolicy: podReplacementPtr(batchv1.Failed),
+					ManualSelector:       pointer.Bool(true),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -411,6 +420,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
 					Suspend:              pointer.Bool(true),
 					PodReplacementPolicy: podReplacementPtr(batchv1.Failed),
+					ManualSelector:       pointer.Bool(true),
 				},
 			},
 			expectLabels: true,
@@ -449,6 +459,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
 					Template:             validPodTemplateSpec,
 					Suspend:              pointer.Bool(true),
+					ManualSelector:       pointer.Bool(true),
 				},
 			},
 			expected: &batchv1.Job{
@@ -460,6 +471,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
 					Template:             validPodTemplateSpec,
 					Suspend:              pointer.Bool(true),
+					ManualSelector:       pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
