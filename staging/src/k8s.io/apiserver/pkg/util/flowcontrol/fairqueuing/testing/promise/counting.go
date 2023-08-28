@@ -17,6 +17,7 @@ limitations under the License.
 package promise
 
 import (
+	"context"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -44,17 +45,19 @@ var _ promiseifc.WriteOnce = &countingPromise{}
 // NewCountingWriteOnce creates a WriteOnce that uses locking and counts goroutine activity.
 //
 // The final three arguments are like those for a regular WriteOnce factory:
-// - an optional initial value,
-// - an optional "done" channel,
-// - the value that is Set after the "done" channel becomes selectable.
-// Note that for this implementation, the reaction to `doneCh`
-// becoming selectable does not wait for a Get.
-// If `doneCh != nil` then the caller promises to close it reasonably promptly
+//   - an optional initial value,
+//   - an optional "done" context,
+//   - the value that is Set after the channel associated with the
+//     "done" context becomes selectable.
+//
+// Note that for this implementation, the reaction to the channel associated with the
+// `done` context becoming selectable does not wait for a Get.
+// If `doneCh.Done() != nil` then the caller promises to close it reasonably promptly
 // (to the degree allowed by the Go runtime scheduler), and increment the
 // goroutine counter before that.
 // The WriteOnce's Get method must be called without the lock held.
 // The WriteOnce's Set method must be called with the lock held.
-func NewCountingWriteOnce(activeCounter counter.GoRoutineCounter, lock sync.Locker, initial interface{}, doneCh <-chan struct{}, doneVal interface{}) promiseifc.WriteOnce {
+func NewCountingWriteOnce(activeCounter counter.GoRoutineCounter, lock sync.Locker, initial interface{}, doneCtx context.Context, doneVal interface{}) promiseifc.WriteOnce {
 	p := &countingPromise{
 		lock:          lock,
 		cond:          *sync.NewCond(lock),
@@ -62,13 +65,13 @@ func NewCountingWriteOnce(activeCounter counter.GoRoutineCounter, lock sync.Lock
 		isSet:         initial != nil,
 		value:         initial,
 	}
-	if doneCh != nil {
+	if doneCtx.Done() != nil {
 		activeCounter.Add(1) // count start of the following goroutine
 		go func() {
 			defer activeCounter.Add(-1) // count completion of this goroutine
 			defer runtime.HandleCrash()
 			activeCounter.Add(-1) // count suspension for channel receive
-			<-doneCh
+			<-doneCtx.Done()
 			// Whatever goroutine unblocked the preceding receive MUST
 			// have already accounted for this activation.
 			lock.Lock()

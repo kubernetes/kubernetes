@@ -1224,7 +1224,7 @@ func TestContextCancel(t *testing.T) {
 func countingPromiseFactoryFactory(activeCounter counter.GoRoutineCounter) promiseFactoryFactory {
 	return func(qs *queueSet) promiseFactory {
 		return func(initial interface{}, doneCtx context.Context, doneVal interface{}) promise.WriteOnce {
-			return testpromise.NewCountingWriteOnce(activeCounter, &qs.lock, initial, doneCtx.Done(), doneVal)
+			return testpromise.NewCountingWriteOnce(activeCounter, &qs.lock, initial, doneCtx, doneVal)
 		}
 	}
 }

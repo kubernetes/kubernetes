@@ -38,11 +38,11 @@ func TestMain(m *testing.M) {
 func TestCountingWriteOnceSet(t *testing.T) {
 	oldTime := time.Now()
 	cval := &oldTime
-	doneCh := make(chan struct{})
+	doneCtx, cancel := context.WithCancel(context.Background())
 	now := time.Now()
 	clock, counter := testeventclock.NewFake(now, 0, nil)
 	var lock sync.Mutex
-	wr := NewCountingWriteOnce(counter, &lock, nil, doneCh, cval)
+	wr := NewCountingWriteOnce(counter, &lock, nil, doneCtx, cval)
 	gots := make(chan interface{}, 1)
 	goGetExpectNotYet(t, clock, counter, wr, gots, "Set")
 	aval := &now
@@ -67,7 +67,7 @@ func TestCountingWriteOnceSet(t *testing.T) {
 	}()
 	goGetAndExpect(t, clock, counter, wr, gots, aval)
 	counter.Add(1) // account for unblocking the receive on doneCh
-	close(doneCh)
+	cancel()
 	time.Sleep(time.Second) // give it a chance to misbehave
 	goGetAndExpect(t, clock, counter, wr, gots, aval)
 }
@@ -77,7 +77,7 @@ func TestCountingWriteOnceCancel(t *testing.T) {
 	clock, counter := testeventclock.NewFake(oldTime, 0, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	var lock sync.Mutex
-	wr := NewCountingWriteOnce(counter, &lock, nil, ctx.Done(), cval)
+	wr := NewCountingWriteOnce(counter, &lock, nil, ctx, cval)
 	gots := make(chan interface{}, 1)
 	goGetExpectNotYet(t, clock, counter, wr, gots, "cancel")
 	counter.Add(1) // account for unblocking the receive on doneCh
@@ -105,7 +105,7 @@ func TestCountingWriteOnceInitial(t *testing.T) {
 	var lock sync.Mutex
 	now := time.Now()
 	aval := &now
-	wr := NewCountingWriteOnce(counter, &lock, aval, ctx.Done(), cval)
+	wr := NewCountingWriteOnce(counter, &lock, aval, ctx, cval)
 	gots := make(chan interface{}, 1)
 	goGetAndExpect(t, clock, counter, wr, gots, aval)
 	goGetAndExpect(t, clock, counter, wr, gots, aval) // check that a set value stays set
