@@ -1,17 +1,10 @@
-// Package httpcache provides a http.RoundTripper implementation that works as a
-// mostly RFC-compliant cache for http responses.
-//
-// It is only suitable for use as a 'private' cache (i.e. for a web-browser or an API-client
-// and not for a shared proxy).
-//
-package httpcache
+package disk
 
 import (
 	"bufio"
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -36,6 +29,8 @@ type Cache interface {
 	Set(key string, responseBytes []byte)
 	// Delete removes the value associated with the key
 	Delete(key string)
+	// Append stores the []byte representation of a response against a key
+	Append(key string, responseBytes []byte)
 }
 
 // cacheKey returns the cache key for req.
@@ -84,6 +79,13 @@ func (c *MemoryCache) Set(key string, resp []byte) {
 func (c *MemoryCache) Delete(key string) {
 	c.mu.Lock()
 	delete(c.items, key)
+	c.mu.Unlock()
+}
+
+// Append TODO
+func (c *MemoryCache) Append(key string, resp []byte) {
+	c.mu.Lock()
+	c.items[key] = resp
 	c.mu.Unlock()
 }
 
@@ -232,13 +234,8 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 			// Delay caching until EOF is reached.
 			resp.Body = &cachingReadCloser{
 				R: resp.Body,
-				OnEOF: func(r io.Reader) {
-					resp := *resp
-					resp.Body = ioutil.NopCloser(r)
-					respBytes, err := httputil.DumpResponse(&resp, true)
-					if err == nil {
-						t.Cache.Set(cacheKey, respBytes)
-					}
+				OnRead: func(respBytes []byte) {
+					t.Cache.Append(cacheKey, respBytes)
 				},
 			}
 		default:
@@ -416,14 +413,14 @@ func canStaleOnError(respHeaders, reqHeaders http.Header) bool {
 func getEndToEndHeaders(respHeaders http.Header) []string {
 	// These headers are always hop-by-hop
 	hopByHopHeaders := map[string]struct{}{
-		"Connection":          struct{}{},
-		"Keep-Alive":          struct{}{},
-		"Proxy-Authenticate":  struct{}{},
-		"Proxy-Authorization": struct{}{},
-		"Te":                struct{}{},
-		"Trailers":          struct{}{},
-		"Transfer-Encoding": struct{}{},
-		"Upgrade":           struct{}{},
+		"Connection":          {},
+		"Keep-Alive":          {},
+		"Proxy-Authenticate":  {},
+		"Proxy-Authorization": {},
+		"Te":                  {},
+		"Trailers":            {},
+		"Transfer-Encoding":   {},
+		"Upgrade":             {},
 	}
 
 	for _, extra := range strings.Split(respHeaders.Get("connection"), ",") {
@@ -433,7 +430,7 @@ func getEndToEndHeaders(respHeaders http.Header) []string {
 		}
 	}
 	endToEndHeaders := []string{}
-	for respHeader, _ := range respHeaders {
+	for respHeader := range respHeaders {
 		if _, ok := hopByHopHeaders[respHeader]; !ok {
 			endToEndHeaders = append(endToEndHeaders, respHeader)
 		}
@@ -520,8 +517,8 @@ func headerAllCommaSepValues(headers http.Header, name string) []string {
 type cachingReadCloser struct {
 	// Underlying ReadCloser.
 	R io.ReadCloser
-	// OnEOF is called with a copy of the content of R when EOF is reached.
-	OnEOF func(io.Reader)
+	// OnRead is called with a copy of the content of R when OnRead is reached.
+	OnRead func([]byte)
 
 	buf bytes.Buffer // buf stores a copy of the content of R.
 }
@@ -532,10 +529,7 @@ type cachingReadCloser struct {
 // has been read so far.
 func (r *cachingReadCloser) Read(p []byte) (n int, err error) {
 	n, err = r.R.Read(p)
-	r.buf.Write(p[:n])
-	if err == io.EOF {
-		r.OnEOF(bytes.NewReader(r.buf.Bytes()))
-	}
+	r.OnRead(p[:n])
 	return n, err
 }
 

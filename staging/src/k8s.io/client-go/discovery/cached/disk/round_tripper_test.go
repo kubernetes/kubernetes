@@ -26,7 +26,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/peterbourgon/diskv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,7 +48,7 @@ func BenchmarkDiskCache(b *testing.B) {
 	}
 	defer os.RemoveAll(cacheDir)
 
-	d := diskv.New(diskv.Options{
+	d := New(Options{
 		PathPerm: os.FileMode(0750),
 		FilePerm: os.FileMode(0660),
 		BasePath: cacheDir,
@@ -187,7 +186,7 @@ func TestSumDiskCache(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		d := New(Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
 
 		key := "testing"
@@ -204,7 +203,7 @@ func TestSumDiskCache(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		d := New(Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
 
 		key := "testing"
@@ -228,7 +227,7 @@ func TestSumDiskCache(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		d := New(Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
 
 		key := "testing"
@@ -263,7 +262,7 @@ func TestSumDiskCache(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		d := New(Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
 
 		key := "testing"
@@ -295,7 +294,7 @@ func TestSumDiskCache(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		d := New(Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
 
 		key := "testing"

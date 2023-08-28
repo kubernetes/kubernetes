@@ -20,30 +20,29 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/gregjones/httpcache"
-	"github.com/peterbourgon/diskv"
 	"k8s.io/klog/v2"
 )
 
 type cacheRoundTripper struct {
-	rt *httpcache.Transport
+	rt *Transport
 }
 
 // newCacheRoundTripper creates a roundtripper that reads the ETag on
 // response headers and send the If-None-Match header on subsequent
 // corresponding requests.
 func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
-	d := diskv.New(diskv.Options{
+	d := New(Options{
 		PathPerm: os.FileMode(0750),
 		FilePerm: os.FileMode(0660),
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
 	})
-	t := httpcache.NewTransport(&sumDiskCache{disk: d})
+	t := NewTransport(&sumDiskCache{disk: d})
 	t.Transport = rt
 
 	return &cacheRoundTripper{rt: t}
@@ -74,7 +73,7 @@ func (rt *cacheRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt
 //
 // See https://github.com/kubernetes/kubernetes/issues/110753 for more.
 type sumDiskCache struct {
-	disk *diskv.Diskv
+	disk *Diskv
 }
 
 // Get the requested key from the cache on disk. If Get encounters an error, or
@@ -106,6 +105,12 @@ func (c *sumDiskCache) Set(key string, response []byte) {
 
 func (c *sumDiskCache) Delete(key string) {
 	_ = c.disk.Erase(sanitize(key)) // Nothing we can do with this error.
+}
+
+// Append TODO
+func (c *sumDiskCache) Append(key string, response []byte) {
+	s := sha256.Sum256(response)
+	_ = c.disk.Append(sanitize(key), append(s[:], response...)) // Nothing we can do with this error.
 }
 
 // Sanitize an httpcache key such that it can be used as a diskv key, which must

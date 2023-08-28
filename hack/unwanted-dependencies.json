@@ -29,7 +29,6 @@
       "github.com/gorilla/mux": "unmaintained, archive mode",
       "github.com/gorilla/rpc": "unmaintained, archive mode",
       "github.com/gorilla/schema": "unmaintained, archive mode",
-      "github.com/gregjones/httpcache": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/go-grpc-prometheus": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/grpc-gateway": "use github.com/grpc-ecosystem/grpc-gateway/v2",
       "github.com/hashicorp/consul": "MPL license not in CNCF allowlist",
