@@ -344,6 +344,9 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations m
 	event := recorder.makeEvent(ref, annotations, eventtype, reason, message)
 	event.Source = recorder.source
 
+	event.ReportingInstance = recorder.source.Host
+	event.ReportingController = recorder.source.Component
+
 	// NOTE: events should be a non-blocking operation, but we also need to not
 	// put this in a goroutine, otherwise we'll race to write to a closed channel
 	// when we go to shut down this broadcaster.  Just drop events if we get overloaded,
