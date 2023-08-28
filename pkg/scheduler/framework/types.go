@@ -71,6 +71,7 @@ const (
 	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
 	PodSchedulingContext  GVK = "PodSchedulingContext"
 	ResourceClaim         GVK = "ResourceClaim"
+	ResourceClass         GVK = "ResourceClass"
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	CSINode               GVK = "storage.k8s.io/CSINode"
 	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
