@@ -262,6 +262,7 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:        pointer.Bool(true),
+					ManualSelector: pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -303,6 +304,7 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:        pointer.Bool(false),
+					ManualSelector: pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -322,6 +324,7 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:        pointer.Bool(false),
+					ManualSelector: pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -342,6 +345,7 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:        pointer.Bool(false),
+					ManualSelector: pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -362,6 +366,7 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(5),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
 					Suspend:        pointer.Bool(false),
+					ManualSelector: pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -434,6 +439,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
 					Template:             validPodTemplateSpec,
 					Suspend:              pointer.Bool(true),
+					ManualSelector:       pointer.Bool(false),
 				},
 			},
 			expected: &batchv1.Job{
@@ -445,6 +451,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
 					Template:             validPodTemplateSpec,
 					Suspend:              pointer.Bool(true),
+					ManualSelector:       pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -471,7 +478,7 @@ func TestSetDefaultJob(t *testing.T) {
 					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
 					Template:             validPodTemplateSpec,
 					Suspend:              pointer.Bool(true),
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       pointer.Bool(true),
 				},
 			},
 			expectLabels: true,
@@ -511,6 +518,9 @@ func TestSetDefaultJob(t *testing.T) {
 			}
 			if diff := cmp.Diff(expected.Spec.PodReplacementPolicy, actual.Spec.PodReplacementPolicy); diff != "" {
 				t.Errorf("Unexpected PodReplacementPolicy (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(expected.Spec.ManualSelector, actual.Spec.ManualSelector); diff != "" {
+				t.Errorf("Unexpected ManualSelector (-want,+got):\n%s", diff)
 			}
 		})
 	}
