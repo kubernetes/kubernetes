@@ -18,23 +18,13 @@ package main
 
 import (
 	"fmt"
-	flag "github.com/spf13/pflag"
-	"gopkg.in/yaml.v2"
 	"os"
 	"sort"
-	"strings"
-	"text/template"
 
+	flag "github.com/spf13/pflag"
+	"gopkg.in/yaml.v2"
+	
 	"k8s.io/component-base/metrics"
-)
-
-var (
-	GOROOT    string = os.Getenv("GOROOT")
-	GOOS      string = os.Getenv("GOOS")
-	KUBE_ROOT string = os.Getenv("KUBE_ROOT")
-	funcMap          = template.FuncMap{
-		"ToLower": strings.ToLower,
-	}
 )
 
 func main() {
