@@ -710,12 +710,8 @@ func TestGetPodResourcesV1(t *testing.T) {
 					t.Errorf("want exit = %v, got %v", tc.err, err)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("want exit = %v, got %v", tc.err, err)
-				} else {
-					if !equalGetResponse(tc.expectedResponse, resp) {
-						t.Errorf("want resp = %s, got %s", tc.expectedResponse.String(), resp.String())
-					}
+				if !equalGetResponse(tc.expectedResponse, resp) {
+					t.Errorf("want resp = %s, got %s", tc.expectedResponse.String(), resp.String())
 				}
 			}
 		})
