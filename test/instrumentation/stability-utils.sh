@@ -75,7 +75,7 @@ function kube::validate::stablemetrics() {
   if $doValidate; then
     echo -e "${green}Diffing test/instrumentation/testdata/stable-metrics-list.yaml\n${reset}"
   fi
-  doSort=$(KUBE_ROOT=${KUBE_ROOT} go run "test/instrumentation/sort/main.go" --sort_file="${temp_file}" 1>"${temp_file2}")
+  doSort=$(KUBE_ROOT=${KUBE_ROOT} go run "test/instrumentation/sort/main.go" --sort-file="${temp_file}" 1>"${temp_file2}")
   if ! $doSort; then
     echo "${red}!!! sorting metrics has failed! ${reset}" >&2
     exit 1
@@ -138,7 +138,7 @@ function kube::update::stablemetrics() {
     exit 1
   fi
   mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml"
-  doSort=$(KUBE_ROOT=${KUBE_ROOT} go run "test/instrumentation/sort/main.go" --sort_file="${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml" 1>"${temp_file2}")
+  doSort=$(go run "test/instrumentation/sort/main.go" --sort-file="${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml" 1>"${temp_file2}")
   if ! $doSort; then
     echo "${red}!!! sorting metrics has failed! ${reset}" >&2
     exit 1
