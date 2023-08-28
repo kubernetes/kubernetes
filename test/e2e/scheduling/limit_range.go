@@ -326,7 +326,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err, "failed to delete the LimitRange by Collection")
 
 		ginkgo.By(fmt.Sprintf("Confirm that the limitRange %q has been deleted", lrName))
-		err = wait.PollImmediateWithContext(ctx, 1*time.Second, 10*time.Second, checkLimitRangeListQuantity(f, patchedLabelSelector, 0))
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, checkLimitRangeListQuantity(f, patchedLabelSelector, 0))
 		framework.ExpectNoError(err, "failed to count the required limitRanges")
 		framework.Logf("LimitRange %q has been deleted.", lrName)
 
