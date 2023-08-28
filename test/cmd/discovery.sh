@@ -397,7 +397,7 @@ __EOF__
 
   output_message=$(kubectl get exmp 2>&1)
   kube::test::if_has_string "${output_message}" "test-crd-foo"
-  kube::test::if_has_string "${output_message}" "ambiguous resource \"examples.test.com\" for /, Resource=exmp is skipped"
+  kube::test::if_has_string "${output_message}" "short name \"exmp\" could also match lower priority resource examples.test.com"
 
   # Cleanup
   kubectl delete foos/test-crd-foo

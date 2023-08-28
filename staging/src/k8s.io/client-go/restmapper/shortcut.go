@@ -150,6 +150,7 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 
 		found := false
 		var rsc schema.GroupVersionResource
+		warnedAmbiguousShortcut := make(map[string]struct{})
 		for _, item := range shortcutResources {
 			if len(resource.Group) != 0 && resource.Group != item.ShortForm.Group {
 				continue
@@ -162,8 +163,11 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 						// in terms of shortname usage.
 						continue
 					}
-					if e.warningHandler != nil {
-						e.warningHandler(fmt.Sprintf("ambiguous resource %q for %s is skipped", item.LongForm, resource))
+					if _, ok := warnedAmbiguousShortcut[item.LongForm.String()]; !ok {
+						if e.warningHandler != nil {
+							e.warningHandler(fmt.Sprintf("short name %q could also match lower priority resource %s", resource.Resource, item.LongForm.String()))
+						}
+						warnedAmbiguousShortcut[item.LongForm.String()] = struct{}{}
 					}
 					continue
 				}
