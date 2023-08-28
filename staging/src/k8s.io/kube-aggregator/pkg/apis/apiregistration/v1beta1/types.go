@@ -107,7 +107,7 @@ const (
 )
 
 type ScopedResource struct {
-	ResourceScope ResourceScope `json:"resourceScope" protobuf:"bytes,2,2,name=resourceScope"`
+	ResourceScope ResourceScope `json:"resourceScope" protobuf:"bytes,2,name=resourceScope"`
 	// plural is the plural name of the resource to serve.
 	// The custom resources are served under `/apis/<group>/<version>/.../<plural>`.
 	// Must match the name of the CustomResourceDefinition (in the form `<names.plural>.<group>`).
@@ -115,7 +115,7 @@ type ScopedResource struct {
 	Plural string `json:"plural" protobuf:"bytes,1,opt,name=plural"`
 	// singular is the singular name of the resource. It must be all lowercase. Defaults to lowercased `kind`.
 	// +optional
-	Singular string `json:"singular,omitempty" protobuf:"bytes,2,opt,name=singular"`
+	Singular string `json:"singular,omitempty" protobuf:"bytes,3,opt,name=singular"`
 	// kind is the serialized kind of the resource. It is normally CamelCase and singular.
 	// kube aggregator will use this value as the `kind` attribute in API calls.
 	Kind string `json:"kind" protobuf:"bytes,4,opt,name=kind"`
