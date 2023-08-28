@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,12 +38,32 @@ import (
 	utilstrings "k8s.io/utils/strings"
 )
 
+var _ logr.Marshaler = podVolume{}
+var _ logr.Marshaler = reconstructedVolume{}
+var _ logr.Marshaler = globalVolumeInfo{}
+
 type podVolume struct {
 	podName        volumetypes.UniquePodName
 	volumeSpecName string
 	volumePath     string
 	pluginName     string
 	volumeMode     v1.PersistentVolumeMode
+}
+
+func (p podVolume) MarshalLog() interface{} {
+	return struct {
+		PodName        string `json:"podName"`
+		VolumeSpecName string `json:"volumeSpecName"`
+		VolumePath     string `json:"volumePath"`
+		PluginName     string `json:"pluginName"`
+		VolumeMode     string `json:"volumeMode"`
+	}{
+		PodName:        string(p.podName),
+		VolumeSpecName: p.volumeSpecName,
+		VolumePath:     p.volumePath,
+		PluginName:     p.pluginName,
+		VolumeMode:     string(p.volumeMode),
+	}
 }
 
 type reconstructedVolume struct {
@@ -59,6 +80,28 @@ type reconstructedVolume struct {
 	seLinuxMountContext string
 }
 
+func (rv reconstructedVolume) MarshalLog() interface{} {
+	return struct {
+		VolumeName          string `json:"volumeName"`
+		PodName             string `json:"podName"`
+		VolumeSpecName      string `json:"volumeSpecName"`
+		OuterVolumeSpecName string `json:"outerVolumeSpecName"`
+		PodUID              string `json:"podUID"`
+		VolumeGIDValue      string `json:"volumeGIDValue"`
+		DevicePath          string `json:"devicePath"`
+		SeLinuxMountContext string `json:"seLinuxMountContext"`
+	}{
+		VolumeName:          string(rv.volumeName),
+		PodName:             string(rv.podName),
+		VolumeSpecName:      rv.volumeSpec.Name(),
+		OuterVolumeSpecName: rv.outerVolumeSpecName,
+		PodUID:              string(rv.pod.UID),
+		VolumeGIDValue:      rv.volumeGidValue,
+		DevicePath:          rv.devicePath,
+		SeLinuxMountContext: rv.seLinuxMountContext,
+	}
+}
+
 // globalVolumeInfo stores reconstructed volume information
 // for each pod that was using that volume.
 type globalVolumeInfo struct {
@@ -69,6 +112,25 @@ type globalVolumeInfo struct {
 	deviceMounter     volumepkg.DeviceMounter
 	blockVolumeMapper volumepkg.BlockVolumeMapper
 	podVolumes        map[volumetypes.UniquePodName]*reconstructedVolume
+}
+
+func (gvi globalVolumeInfo) MarshalLog() interface{} {
+	podVolumes := make(map[volumetypes.UniquePodName]v1.UniqueVolumeName)
+	for podName, volume := range gvi.podVolumes {
+		podVolumes[podName] = volume.volumeName
+	}
+
+	return struct {
+		VolumeName     string                                            `json:"volumeName"`
+		VolumeSpecName string                                            `json:"volumeSpecName"`
+		DevicePath     string                                            `json:"devicePath"`
+		PodVolumes     map[volumetypes.UniquePodName]v1.UniqueVolumeName `json:"podVolumes"`
+	}{
+		VolumeName:     string(gvi.volumeName),
+		VolumeSpecName: gvi.volumeSpec.Name(),
+		DevicePath:     gvi.devicePath,
+		PodVolumes:     podVolumes,
+	}
 }
 
 func (rc *reconciler) updateLastSyncTime() {
@@ -181,7 +243,9 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			}
 		}
 	}
-	klog.V(4).InfoS("Get volumes from pod directory", "path", podDir, "volumes", volumes)
+	for _, volume := range volumes {
+		klog.V(4).InfoS("Get volume from pod directory", "path", podDir, "volume", volume)
+	}
 	return volumes, nil
 }
 
