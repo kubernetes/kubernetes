@@ -241,6 +241,7 @@ type PodFailurePolicyRule struct {
 	// as a list of pod condition patterns. The requirement is satisfied if at
 	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
 	// +listType=atomic
+	// +optional
 	OnPodConditions []PodFailurePolicyOnPodConditionsPattern
 }
 

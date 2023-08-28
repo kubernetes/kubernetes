@@ -15915,7 +15915,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyRule(ref common.ReferenceCallback
 						},
 					},
 				},
-				Required: []string{"action", "onPodConditions"},
+				Required: []string{"action"},
 			},
 		},
 		Dependencies: []string{
