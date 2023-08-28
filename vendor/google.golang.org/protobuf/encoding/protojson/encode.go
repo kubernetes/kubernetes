@@ -106,13 +106,19 @@ func (o MarshalOptions) Format(m proto.Message) string {
 // MarshalOptions. Do not depend on the output being stable. It may change over
 // time across different versions of the program.
 func (o MarshalOptions) Marshal(m proto.Message) ([]byte, error) {
-	return o.marshal(m)
+	return o.marshal(nil, m)
+}
+
+// MarshalAppend appends the JSON format encoding of m to b,
+// returning the result.
+func (o MarshalOptions) MarshalAppend(b []byte, m proto.Message) ([]byte, error) {
+	return o.marshal(b, m)
 }
 
 // marshal is a centralized function that all marshal operations go through.
 // For profiling purposes, avoid changing the name of this function or
 // introducing other code paths for marshal that do not go through this.
-func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
+func (o MarshalOptions) marshal(b []byte, m proto.Message) ([]byte, error) {
 	if o.Multiline && o.Indent == "" {
 		o.Indent = defaultIndent
 	}
@@ -120,7 +126,7 @@ func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
 		o.Resolver = protoregistry.GlobalTypes
 	}
 
-	internalEnc, err := json.NewEncoder(o.Indent)
+	internalEnc, err := json.NewEncoder(b, o.Indent)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +134,7 @@ func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
 	// Treat nil message interface as an empty message,
 	// in which case the output in an empty JSON object.
 	if m == nil {
-		return []byte("{}"), nil
+		return append(b, '{', '}'), nil
 	}
 
 	enc := encoder{internalEnc, o}
