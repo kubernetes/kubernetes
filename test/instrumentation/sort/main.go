@@ -23,20 +23,20 @@ import (
 
 	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
-	
 	"k8s.io/component-base/metrics"
 )
 
 func main() {
-	var sort_file string
-	flag.StringVar(&sort_file, "sort_file", "", "file of metrics to sort")
+	var sortFile string
+	flag.StringVar(&sortFile, "sort-file", "", "file of metrics to sort")
 	flag.Parse()
-	dat, err := os.ReadFile(sort_file)
+	dat, err := os.ReadFile(sortFile)
 	if err == nil {
 		var parsedMetrics []metric
 		err = yaml.Unmarshal(dat, &parsedMetrics)
 		if err != nil {
-			println("err", err)
+			fmt.Fprintf(os.Stderr, "%s\n", err)
+			os.Exit(1)
 		}
 		sort.Sort(byFQName(parsedMetrics))
 		data, err := yaml.Marshal(parsedMetrics)
