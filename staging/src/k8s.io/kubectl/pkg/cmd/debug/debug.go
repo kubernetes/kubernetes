@@ -213,6 +213,11 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
 		o.Attach = true
+		// Downstream tools may want to use their own customized
+		// attach function to do extra work or use attach command
+		// with different flags instead of the static one defined in
+		// handleAttachPod. But if this function is not set explicitly,
+		// we fall back to default.
 		if o.AttachFunc == nil {
 			o.AttachFunc = o.handleAttachPod
 		}
