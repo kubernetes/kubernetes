@@ -91,21 +91,8 @@ var (
 	kubeletHealthCheckURL    = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
 	containerRuntimeUnitName = ""
 	// KubeletConfig is the kubelet configuration the test is running against.
-	kubeletCfg  *kubeletconfig.KubeletConfiguration
-	featureGate featuregate.FeatureGate
+	kubeletCfg *kubeletconfig.KubeletConfiguration
 )
-
-// InitFeatureGates must be called in test suites that have a --feature-gates parameter.
-// If not called, SkipUnlessFeatureGateEnabled and SkipIfFeatureGateEnabled will
-// record a test failure.
-func initFeatureGates(defaults featuregate.FeatureGate, overrides map[string]bool) error {
-	clone := defaults.DeepCopy()
-	if err := clone.SetFromMap(overrides); err != nil {
-		return err
-	}
-	featureGate = clone
-	return nil
-}
 
 func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
 	kubeletConfig, err := getCurrentKubeletConfig(ctx)
