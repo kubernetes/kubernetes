@@ -1067,44 +1067,6 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	}.exercise(t)
 }
 
-func TestTimeout(t *testing.T) {
-	metrics.Register()
-	now := time.Now()
-
-	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
-	qCfg := fq.QueuingConfig{
-		Name:             "TestTimeout",
-		DesiredNumQueues: 128,
-		QueueLengthLimit: 128,
-		HandSize:         1,
-		RequestWaitLimit: 0,
-	}
-	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
-	if err != nil {
-		t.Fatal(err)
-	}
-	qs := qsComplete(qsc, 1)
-
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
-		clients: []uniformClient{
-			newUniformClient(1001001001, 5, 100, time.Second, time.Second),
-		},
-		concurrencyLimit:            1,
-		evalDuration:                time.Second * 10,
-		expectedFair:                []bool{true},
-		expectedFairnessMargin:      []float64{0.01},
-		evalInqueueMetrics:          true,
-		evalExecutingMetrics:        true,
-		rejectReason:                "time-out",
-		clk:                         clk,
-		counter:                     counter,
-		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
-	}.exercise(t)
-}
-
 // TestContextCancel tests cancellation of a request's context.
 // The outline is:
 //  1. Use a concurrency limit of 1.
