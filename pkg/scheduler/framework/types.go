@@ -307,8 +307,6 @@ type FitError struct {
 const (
 	// NoNodeAvailableMsg is used to format message when no nodes available.
 	NoNodeAvailableMsg = "0/%v nodes are available"
-	// SeparatorFormat is used to separate PreFilterMsg, FilterMsg and PostFilterMsg.
-	SeparatorFormat = " %v."
 )
 
 // Error returns detailed information of why the pod failed to fit on each node.
@@ -319,7 +317,7 @@ func (f *FitError) Error() string {
 	if preFilterMsg != "" {
 		// PreFilter plugin returns unschedulable.
 		// Add the messages from PreFilter plugins to reasonMsg.
-		reasonMsg += fmt.Sprintf(SeparatorFormat, preFilterMsg)
+		reasonMsg += fmt.Sprintf(" %v.", preFilterMsg)
 	}
 
 	if preFilterMsg == "" {
@@ -346,7 +344,7 @@ func (f *FitError) Error() string {
 		}
 		sortedFilterMsg := sortReasonsHistogram()
 		if len(sortedFilterMsg) != 0 {
-			reasonMsg += fmt.Sprintf(SeparatorFormat, strings.Join(sortedFilterMsg, ", "))
+			reasonMsg += fmt.Sprintf(" %v.", strings.Join(sortedFilterMsg, ", "))
 		}
 	}
 
@@ -355,9 +353,8 @@ func (f *FitError) Error() string {
 	// since we may run PostFilter (if enabled) in both cases.
 	postFilterMsg := f.Diagnosis.PostFilterMsg
 	if postFilterMsg != "" {
-		reasonMsg += fmt.Sprintf(SeparatorFormat, postFilterMsg)
+		reasonMsg += fmt.Sprintf(" %v", postFilterMsg)
 	}
-
 	return reasonMsg
 }
 
