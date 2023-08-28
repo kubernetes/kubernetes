@@ -47,8 +47,11 @@ var (
 	PodResources                           = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
 	ResourceMetrics                        = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceMetrics"))
 	RuntimeHandler                         = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
-	SidecarContainers                      = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
-	SystemNodeCriticalPod                  = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
+	// Added to test Swap Feature
+	// This label should be used when testing KEP-2400 (Node Swap Support)
+	Swap                  = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeSwap"))
+	SidecarContainers     = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
+	SystemNodeCriticalPod = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
 )
 
 func init() {
