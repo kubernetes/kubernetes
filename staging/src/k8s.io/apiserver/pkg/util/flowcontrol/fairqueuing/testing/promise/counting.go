@@ -19,9 +19,10 @@ package promise
 import (
 	"context"
 	"sync"
+	"time"
 
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
 	promiseifc "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 )
 
@@ -42,6 +43,26 @@ type countingPromise struct {
 
 var _ promiseifc.WriteOnce = &countingPromise{}
 
+type testKeyType int
+
+const testKey testKeyType = iota
+
+type testData struct {
+	queueWaitTime time.Duration
+}
+
+func NewQueueWaitTimeWithContext(parent context.Context, d time.Duration) context.Context {
+	ctx := context.WithValue(parent, testKey, &testData{queueWaitTime: d})
+	return ctx
+}
+
+func GetQueueWaitTimeFromContext(ctx context.Context) (time.Duration, bool) {
+	if td := ctx.Value(testKey); td != nil {
+		return td.(*testData).queueWaitTime, true
+	}
+	return 0, false
+}
+
 // NewCountingWriteOnce creates a WriteOnce that uses locking and counts goroutine activity.
 //
 // The final three arguments are like those for a regular WriteOnce factory:
@@ -50,14 +71,12 @@ var _ promiseifc.WriteOnce = &countingPromise{}
 //   - the value that is Set after the channel associated with the
 //     "done" context becomes selectable.
 //
-// Note that for this implementation, the reaction to the channel associated with the
-// `done` context becoming selectable does not wait for a Get.
-// If `doneCh.Done() != nil` then the caller promises to close it reasonably promptly
-// (to the degree allowed by the Go runtime scheduler), and increment the
-// goroutine counter before that.
+// This implementation schedules an event to set the value to 'doneVal' if the context
+// associated with the request has a queue wait threshold
+//
 // The WriteOnce's Get method must be called without the lock held.
 // The WriteOnce's Set method must be called with the lock held.
-func NewCountingWriteOnce(activeCounter counter.GoRoutineCounter, lock sync.Locker, initial interface{}, doneCtx context.Context, doneVal interface{}) promiseifc.WriteOnce {
+func NewCountingWriteOnce(clock eventclock.Interface, activeCounter counter.GoRoutineCounter, lock sync.Locker, initial interface{}, doneCtx context.Context, doneVal interface{}) promiseifc.WriteOnce {
 	p := &countingPromise{
 		lock:          lock,
 		cond:          *sync.NewCond(lock),
@@ -65,19 +84,16 @@ func NewCountingWriteOnce(activeCounter counter.GoRoutineCounter, lock sync.Lock
 		isSet:         initial != nil,
 		value:         initial,
 	}
-	if doneCtx.Done() != nil {
-		activeCounter.Add(1) // count start of the following goroutine
-		go func() {
-			defer activeCounter.Add(-1) // count completion of this goroutine
-			defer runtime.HandleCrash()
-			activeCounter.Add(-1) // count suspension for channel receive
-			<-doneCtx.Done()
-			// Whatever goroutine unblocked the preceding receive MUST
-			// have already accounted for this activation.
+
+	// if the 'doneCtx' has a queue wait time associated with it, then
+	// we schedule an event that will set the value represented by
+	// 'doneVal' as soon as the queue wait time elapses.
+	if queueWaitTime, ok := GetQueueWaitTimeFromContext(doneCtx); ok {
+		clock.EventAfterDuration(func(time.Time) {
 			lock.Lock()
 			defer lock.Unlock()
 			p.Set(doneVal)
-		}()
+		}, queueWaitTime)
 	}
 	return p
 }

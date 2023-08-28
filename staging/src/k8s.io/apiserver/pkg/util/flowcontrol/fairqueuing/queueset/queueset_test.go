@@ -281,11 +281,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 	maxWidth := float64(uint64max(ust.uc.initialSeats, ust.uc.finalSeats))
 	ust.uss.seatDemandIntegratorCheck.Add(maxWidth)
 	returnSeatDemand := func(time.Time) { ust.uss.seatDemandIntegratorCheck.Add(-maxWidth) }
-	ctx, cancel := context.WithCancel(context.Background())
-	ust.uss.clk.EventAfterDuration(func(time.Time) {
-		ust.uss.counter.Add(1)
-		cancel()
-	}, ust.uc.execDuration/4)
+	ctx := context.Background()
 	username := fmt.Sprintf("%d:%d:%d", ust.i, ust.j, k)
 	ctx = genericrequest.WithUser(ctx, &user.DefaultInfo{Name: username})
 	req, idle := ust.uss.qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: ust.uc.initialSeats, FinalSeats: ust.uc.finalSeats, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
@@ -1179,17 +1175,8 @@ func TestContextCancel(t *testing.T) {
 		defer counter.Add(-1) // account completion of this goroutine
 		idle1 = req1.Finish(func() {
 			executed1 = true
-			ctx2, cancel2 := context.WithCancel(context.Background())
+			ctx2 := testpromise.NewQueueWaitTimeWithContext(context.Background(), time.Second)
 			tBefore := clk.Now()
-			counter.Add(1) // account for the following goroutine
-			go func() {
-				defer counter.Add(-1) // account completion of this goroutine
-				clk.Sleep(time.Second)
-				expectQNCounts(2, 0, 1)
-				// account for unblocking the goroutine that waits on cancelation
-				counter.Add(1)
-				cancel2()
-			}()
 			req2, idle2a := qs.StartRequest(ctx2, &fcrequest.WorkEstimate{InitialSeats: 1}, 2, "", "fs2", "test", "two", queueNoteFn(2))
 			if idle2a {
 				t.Error("2nd StartRequest returned idle")
@@ -1228,7 +1215,7 @@ func TestContextCancel(t *testing.T) {
 func countingPromiseFactoryFactory(activeCounter counter.GoRoutineCounter) promiseFactoryFactory {
 	return func(qs *queueSet) promiseFactory {
 		return func(initial interface{}, doneCtx context.Context, doneVal interface{}) promise.WriteOnce {
-			return testpromise.NewCountingWriteOnce(activeCounter, &qs.lock, initial, doneCtx, doneVal)
+			return testpromise.NewCountingWriteOnce(qs.clock, activeCounter, &qs.lock, initial, doneCtx, doneVal)
 		}
 	}
 }
