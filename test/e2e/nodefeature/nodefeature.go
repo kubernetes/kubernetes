@@ -97,6 +97,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	RuntimeHandler = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
 
+	// Added to test Swap Feature
+	// This label should be used when testing KEP-2400 (Node Swap Support)
+	Swap = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeSwap"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	SidecarContainers = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
 
