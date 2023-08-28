@@ -208,6 +208,68 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			b.testPod(ctx, f.ClientSet, pod)
 		})
 
+		ginkgo.It("retries pod scheduling after creating resource class", func(ctx context.Context) {
+			parameters := b.parameters()
+			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+			class, err := f.ClientSet.ResourceV1alpha2().ResourceClasses().Get(ctx, template.Spec.Spec.ResourceClassName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			template.Spec.Spec.ResourceClassName += "-b"
+			b.create(ctx, parameters, template, pod)
+
+			// There's no way to be sure that the scheduler has checked the pod.
+			// But if we sleep for a short while, it's likely and if there are any
+			// bugs that prevent the scheduler from handling creation of the class,
+			// those bugs should show up as test flakes.
+			time.Sleep(time.Second)
+
+			class.UID = ""
+			class.ResourceVersion = ""
+			class.Name = template.Spec.Spec.ResourceClassName
+			b.create(ctx, class)
+
+			b.testPod(ctx, f.ClientSet, pod)
+		})
+
+		ginkgo.It("retries pod scheduling after updating resource class", func(ctx context.Context) {
+			parameters := b.parameters()
+			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+
+			// First modify the class so that it matches no nodes.
+			class, err := f.ClientSet.ResourceV1alpha2().ResourceClasses().Get(ctx, template.Spec.Spec.ResourceClassName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			class.SuitableNodes = &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "no-such-label",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"no-such-value"},
+							},
+						},
+					},
+				},
+			}
+			class, err = f.ClientSet.ResourceV1alpha2().ResourceClasses().Update(ctx, class, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			// Now create the pod.
+			b.create(ctx, parameters, template, pod)
+
+			// There's no way to be sure that the scheduler has checked the pod.
+			// But if we sleep for a short while, it's likely and if there are any
+			// bugs that prevent the scheduler from handling updates of the class,
+			// those bugs should show up as test flakes.
+			time.Sleep(time.Second)
+
+			// Unblock the pod.
+			class.SuitableNodes = nil
+			_, err = f.ClientSet.ResourceV1alpha2().ResourceClasses().Update(ctx, class, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			b.testPod(ctx, f.ClientSet, pod)
+		})
+
 		ginkgo.It("runs a pod without a generated resource claim", func(ctx context.Context) {
 			pod, _ /* template */ := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
 			created := b.create(ctx, pod)

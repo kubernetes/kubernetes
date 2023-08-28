@@ -272,6 +272,8 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEventWithHint 
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel}},
+		// A pod might be waiting for a class to get created or modified.
+		{Event: framework.ClusterEvent{Resource: framework.ResourceClass, ActionType: framework.Add | framework.Update}},
 	}
 	return events
 }
@@ -595,7 +597,13 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 			// about the specific pod.
 			class, err := pl.classLister.Get(claim.Spec.ResourceClassName)
 			if err != nil {
-				// If the class does not exist, then allocation cannot proceed.
+				// If the class cannot be retrieved, allocation cannot proceed.
+				if apierrors.IsNotFound(err) {
+					// Here we mark the pod as "unschedulable", so it'll sleep in
+					// the unscheduleable queue until a ResourceClass event occurs.
+					return nil, statusUnschedulable(logger, fmt.Sprintf("resource class %s does not exist", claim.Spec.ResourceClassName))
+				}
+				// Other error, retry with backoff.
 				return nil, statusError(logger, fmt.Errorf("look up resource class: %v", err))
 			}
 			if class.SuitableNodes != nil {
