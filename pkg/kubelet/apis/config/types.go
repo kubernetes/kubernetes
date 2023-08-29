@@ -145,10 +145,12 @@ type KubeletConfiguration struct {
 	Authorization KubeletAuthorization
 	// registryPullQPS is the limit of registry pulls per second.
 	// Set to 0 for no limit.
+	// Deprecated: use MaxParallelImagePulls instead
 	RegistryPullQPS int32
 	// registryBurst is the maximum size of bursty pulls, temporarily allows
 	// pulls to burst to this number, while still not exceeding registryPullQPS.
 	// Only used if registryPullQPS > 0.
+	// Deprecated: use MaxParallelImagePulls instead
 	RegistryBurst int32
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.

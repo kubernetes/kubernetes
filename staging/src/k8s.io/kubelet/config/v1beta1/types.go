@@ -194,6 +194,7 @@ type KubeletConfiguration struct {
 	// registryPullQPS is the limit of registry pulls per second.
 	// The value must not be a negative number.
 	// Setting it to 0 means no limit.
+	// Deprecated: use MaxParallelImagePulls instead. It will has no effect after v1.32.
 	// Default: 5
 	// +optional
 	RegistryPullQPS *int32 `json:"registryPullQPS,omitempty"`
@@ -201,6 +202,7 @@ type KubeletConfiguration struct {
 	// pulls to burst to this number, while still not exceeding registryPullQPS.
 	// The value must not be a negative number.
 	// Only used if registryPullQPS is greater than 0.
+	// Deprecated: use MaxParallelImagePulls instead. It will has no effect after v1.32.
 	// Default: 10
 	// +optional
 	RegistryBurst int32 `json:"registryBurst,omitempty"`
