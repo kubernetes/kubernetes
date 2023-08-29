@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -30,6 +31,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -55,6 +57,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 
@@ -710,6 +713,158 @@ func TestMultiplePolicyBindings(t *testing.T) {
 	}
 	checkForFailedRule(t, err)
 	checkFailureReason(t, err, metav1.StatusReasonInvalid)
+}
+
+func TestHas(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "deployments.stable.example.com",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "stable.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"spec": apiextensionsv1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"paused": apiextensionsv1.JSONSchemaProps{
+											Type: "boolean",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural: "deployments",
+				Kind:   "Deployment",
+			},
+		},
+	}
+
+	vap := unstructured.Unstructured{}
+	vab := unstructured.Unstructured{}
+	require.NoError(t, yaml.NewYAMLOrJSONDecoder(bytes.NewBufferString(`
+    apiVersion: admissionregistration.k8s.io/v1beta1
+    kind: ValidatingAdmissionPolicy
+    metadata:
+      name: "demo-policy.example.com"
+    spec:
+      failurePolicy: Fail
+      matchConstraints:
+        resourceRules:
+        - apiGroups:   ["*"]
+          apiVersions: ["*"]
+          operations:  ["*"]
+          resources:   ["deployments"]
+      validations:
+        - expression: "!has(object.spec.paused)"    
+`), 8192).Decode(&vap))
+	require.NoError(t, yaml.NewYAMLOrJSONDecoder(bytes.NewBufferString(`
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: "demo-binding-test.example.com"
+spec:
+  policyName: "demo-policy.example.com"
+  validationActions: [Deny]
+`), 8192).Decode(&vab))
+
+	opts := metav1.ApplyOptions{
+		FieldManager: "manager",
+	}
+
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, crd)
+
+	_, e := dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "admissionregistration.k8s.io",
+		Version:  "v1beta1",
+		Resource: "validatingadmissionpolicies",
+	}).Apply(context.TODO(), "demo-policy.example.com", &vap, opts)
+	require.NoError(t, e)
+	_, e = dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "admissionregistration.k8s.io",
+		Version:  "v1beta1",
+		Resource: "validatingadmissionpolicybindings",
+	}).Apply(context.TODO(), "demo-binding-test.example.com", &vab, opts)
+	require.NoError(t, e)
+
+	var deploy unstructured.Unstructured
+	var deploy2 unstructured.Unstructured
+
+	require.NoError(t, yaml.NewYAMLOrJSONDecoder(bytes.NewBufferString(`
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: nginx-deployment
+    spec:
+      paused: false
+      replicas: 3
+      selector:
+        matchLabels:
+          app: nginx
+      template:
+        metadata:
+          labels:
+            app: nginx
+        spec:
+          containers:
+            - image: nginx
+              name: nginx
+`), 8192).Decode(&deploy))
+	require.NoError(t, yaml.NewYAMLOrJSONDecoder(bytes.NewBufferString(`
+apiVersion: stable.example.com/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  paused: false
+`), 8192).Decode(&deploy2))
+	time.Sleep(3 * time.Second)
+
+	// Apply a ConfigMap with `false` for non-pointer omitempty field.
+	// It should be converted into unstructured and `has` returns false
+	// And therefore pass the admission policy
+	_, e = dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "apps",
+		Version:  "v1",
+		Resource: "deployments",
+	}).Namespace("default").Apply(context.TODO(), "nginx-deployment", &deploy, opts)
+	require.NoError(t, e)
+
+	// Apply a CRD ConfigMap with `false` for non-pointer omitempty field
+	// It should retain knowledge that `false` was specified
+	_, e = dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "stable.example.com",
+		Version:  "v1",
+		Resource: "deployments",
+	}).Namespace("default").Apply(context.TODO(), "nginx-deployment", &deploy2, opts)
+	require.NoError(t, e)
 }
 
 // Test_PolicyExemption tests that ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding resources
