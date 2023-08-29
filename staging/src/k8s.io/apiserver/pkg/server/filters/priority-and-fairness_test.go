@@ -687,7 +687,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var executed bool
@@ -757,7 +757,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var executed bool
@@ -833,7 +833,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var innerHandlerWriteErr error
@@ -911,7 +911,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var innerHandlerWriteErr error
@@ -986,7 +986,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var firstRequestInnerHandlerWriteErr error
@@ -1118,11 +1118,11 @@ func fmtError(err error) string {
 }
 
 func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration []runtime.Object, serverConcurrency int,
-	requestWaitLimit time.Duration, plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
+	plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta3(), serverConcurrency, requestWaitLimit)
+	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta3(), serverConcurrency)
 
 	factory.Start(stopCh)
 

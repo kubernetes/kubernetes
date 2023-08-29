@@ -108,7 +108,6 @@ func Test_GetMaxSeats(t *testing.T) {
 				// for the purposes of this test, serverCL ~= nominalCL since there is
 				// only 1 PL with large concurrency shares, making mandatory PLs negligible.
 				ServerConcurrencyLimit: testcase.nominalCL,
-				RequestWaitLimit:       time.Minute,
 				ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
 				ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 				QueueSetFactory:        fqs.NewQueueSetFactory(clk),

@@ -251,8 +251,7 @@ func TestConfigConsumer(t *testing.T) {
 				FoundToDangling:        func(found bool) bool { return !found },
 				InformerFactory:        informerFactory,
 				FlowcontrolClient:      flowcontrolClient,
-				ServerConcurrencyLimit: 100,         // server concurrency limit
-				RequestWaitLimit:       time.Minute, // request wait limit
+				ServerConcurrencyLimit: 100, // server concurrency limit
 				ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
 				ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 				QueueSetFactory:        cts,
@@ -384,7 +383,6 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		InformerFactory:        informerFactory,
 		FlowcontrolClient:      flowcontrolClient,
 		ServerConcurrencyLimit: 100,
-		RequestWaitLimit:       time.Minute,
 		ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
 		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        cts,
