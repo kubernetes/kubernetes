@@ -153,6 +153,14 @@ var (
 		},
 		[]string{"resource"},
 	)
+	etcdRequestRetry = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "etcd_request_retry_total",
+			Help:           "Etcd request retry total",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"error"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -175,6 +183,7 @@ func Register() {
 		legacyregistry.MustRegister(listStorageNumSelectorEvals)
 		legacyregistry.MustRegister(listStorageNumReturned)
 		legacyregistry.MustRegister(decodeErrorCounts)
+		legacyregistry.MustRegister(etcdRequestRetry)
 	})
 }
 
@@ -237,6 +246,11 @@ func UpdateLeaseObjectCount(count int64) {
 	// Currently we only store one previous lease, since all the events have the same ttl.
 	// See pkg/storage/etcd3/lease_manager.go
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
+}
+
+// UpdateEtcdRequestRetry sets the etcd_request_retry_total metric.
+func UpdateEtcdRequestRetry(errorCode string) {
+	etcdRequestRetry.WithLabelValues(errorCode).Inc()
 }
 
 // RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
