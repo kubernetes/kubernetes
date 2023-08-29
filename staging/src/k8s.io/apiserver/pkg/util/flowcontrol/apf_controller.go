@@ -150,9 +150,6 @@ type configController struct {
 	// from server configuration.
 	serverConcurrencyLimit int
 
-	// requestWaitLimit comes from server configuration.
-	requestWaitLimit time.Duration
-
 	// watchTracker implements the necessary WatchTracker interface.
 	WatchTracker
 
@@ -281,13 +278,12 @@ func newTestableController(config TestableConfig) *configController {
 		asFieldManager:         config.AsFieldManager,
 		foundToDangling:        config.FoundToDangling,
 		serverConcurrencyLimit: config.ServerConcurrencyLimit,
-		requestWaitLimit:       config.RequestWaitLimit,
 		flowcontrolClient:      config.FlowcontrolClient,
 		priorityLevelStates:    make(map[string]*priorityLevelState),
 		WatchTracker:           NewWatchTracker(),
 		MaxSeatsTracker:        NewMaxSeatsTracker(),
 	}
-	klog.V(2).Infof("NewTestableController %q with serverConcurrencyLimit=%d, requestWaitLimit=%s, name=%s, asFieldManager=%q", cfgCtlr.name, cfgCtlr.serverConcurrencyLimit, cfgCtlr.requestWaitLimit, cfgCtlr.name, cfgCtlr.asFieldManager)
+	klog.V(2).Infof("NewTestableController %q with serverConcurrencyLimit=%d, name=%s, asFieldManager=%q", cfgCtlr.name, cfgCtlr.serverConcurrencyLimit, cfgCtlr.name, cfgCtlr.asFieldManager)
 	// Start with longish delay because conflicts will be between
 	// different processes, so take some time to go away.
 	cfgCtlr.configQueue = workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "priority_and_fairness_config_queue")
@@ -427,7 +423,7 @@ func (cfgCtlr *configController) updateBorrowingLocked(setCompleters bool, plSta
 		plState := plStates[plName]
 		if setCompleters {
 			qsCompleter, err := queueSetCompleterForPL(cfgCtlr.queueSetFactory, plState.queues,
-				plState.pl, cfgCtlr.requestWaitLimit, plState.reqsGaugePair, plState.execSeatsObs,
+				plState.pl, plState.reqsGaugePair, plState.execSeatsObs,
 				metrics.NewUnionGauge(plState.seatDemandIntegrator, plState.seatDemandRatioedGauge))
 			if err != nil {
 				klog.ErrorS(err, "Inconceivable!  Configuration error in existing priority level", "pl", plState.pl)
@@ -651,10 +647,10 @@ func (cfgCtlr *configController) lockAndDigestConfigObjects(newPLs []*flowcontro
 
 	// Supply missing mandatory PriorityLevelConfiguration objects
 	if !meal.haveExemptPL {
-		meal.imaginePL(fcboot.MandatoryPriorityLevelConfigurationExempt, cfgCtlr.requestWaitLimit)
+		meal.imaginePL(fcboot.MandatoryPriorityLevelConfigurationExempt)
 	}
 	if !meal.haveCatchAllPL {
-		meal.imaginePL(fcboot.MandatoryPriorityLevelConfigurationCatchAll, cfgCtlr.requestWaitLimit)
+		meal.imaginePL(fcboot.MandatoryPriorityLevelConfigurationCatchAll)
 	}
 
 	meal.finishQueueSetReconfigsLocked()
@@ -686,7 +682,7 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 			}
 		}
 		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues,
-			pl, meal.cfgCtlr.requestWaitLimit, state.reqsGaugePair, state.execSeatsObs,
+			pl, state.reqsGaugePair, state.execSeatsObs,
 			metrics.NewUnionGauge(state.seatDemandIntegrator, state.seatDemandRatioedGauge))
 		if err != nil {
 			klog.Warningf("Ignoring PriorityLevelConfiguration object %s because its spec (%s) is broken: %s", pl.Name, fcfmt.Fmt(pl.Spec), err)
@@ -792,7 +788,7 @@ func (meal *cfgMeal) processOldPLsLocked() {
 		}
 		var err error
 		plState.qsCompleter, err = queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, plState.queues,
-			plState.pl, meal.cfgCtlr.requestWaitLimit, plState.reqsGaugePair, plState.execSeatsObs,
+			plState.pl, plState.reqsGaugePair, plState.execSeatsObs,
 			metrics.NewUnionGauge(plState.seatDemandIntegrator, plState.seatDemandRatioedGauge))
 		if err != nil {
 			// This can not happen because queueSetCompleterForPL already approved this config
@@ -874,7 +870,7 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 // queueSetCompleterForPL returns an appropriate QueueSetCompleter for the
 // given priority level configuration.  Returns nil and an error if the given
 // object is malformed in a way that is a problem for this package.
-func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedGaugePair, execSeatsObs metrics.RatioedGauge, seatDemandGauge metrics.Gauge) (fq.QueueSetCompleter, error) {
+func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, reqsIntPair metrics.RatioedGaugePair, execSeatsObs metrics.RatioedGauge, seatDemandGauge metrics.Gauge) (fq.QueueSetCompleter, error) {
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementLimited) != (pl.Spec.Limited != nil) {
 		return nil, errors.New("broken union structure at the top, for Limited")
 	}
@@ -896,7 +892,6 @@ func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flow
 				DesiredNumQueues: int(qcAPI.Queues),
 				QueueLengthLimit: int(qcAPI.QueueLengthLimit),
 				HandSize:         int(qcAPI.HandSize),
-				RequestWaitLimit: requestWaitLimit,
 			}
 		}
 	} else {
@@ -950,16 +945,15 @@ func (meal *cfgMeal) presyncFlowSchemaStatus(fs *flowcontrol.FlowSchema, isDangl
 
 // imaginePL adds a priority level based on one of the mandatory ones
 // that does not actually exist (right now) as a real API object.
-func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration) {
+func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration) {
 	klog.V(3).Infof("No %s PriorityLevelConfiguration found, imagining one", proto.Name)
 	labelValues := []string{proto.Name}
 	reqsGaugePair := metrics.RatioedGaugeVecPhasedElementPair(meal.cfgCtlr.reqsGaugeVec, 1, 1, labelValues)
 	execSeatsObs := meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues)
 	seatDemandIntegrator := fq.NewNamedIntegrator(meal.cfgCtlr.clock, proto.Name)
 	seatDemandRatioedGauge := metrics.ApiserverSeatDemands.NewForLabelValuesSafe(0, 1, []string{proto.Name})
-	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto,
-		requestWaitLimit, reqsGaugePair, execSeatsObs,
-		metrics.NewUnionGauge(seatDemandIntegrator, seatDemandRatioedGauge))
+	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto, reqsGaugePair,
+		execSeatsObs, metrics.NewUnionGauge(seatDemandIntegrator, seatDemandRatioedGauge))
 	if err != nil {
 		// This can not happen because proto is one of the mandatory
 		// objects and these are not erroneous
