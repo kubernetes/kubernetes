@@ -1,5 +1,17 @@
 {
   "components": {
+    "parameters": {
+      "logpath-2ALcjfmc": {
+        "description": "path to the log",
+        "in": "path",
+        "name": "logpath",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "uniqueItems": true
+        }
+      }
+    },
     "securitySchemes": {
       "BearerToken": {
         "description": "Bearer Token authentication",
@@ -42,14 +54,7 @@
       },
       "parameters": [
         {
-          "description": "path to the log",
-          "in": "path",
-          "name": "logpath",
-          "required": true,
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
+          "$ref": "#/components/parameters/logpath-2ALcjfmc"
         }
       ]
     }
