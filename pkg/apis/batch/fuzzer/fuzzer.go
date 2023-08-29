@@ -48,7 +48,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if c.Rand.Int31()%2 == 0 {
 				j.ManualSelector = pointer.Bool(true)
 			} else {
-				j.ManualSelector = nil
+				j.ManualSelector = pointer.Bool(false)
 			}
 			mode := batch.NonIndexedCompletion
 			if c.RandBool() {
