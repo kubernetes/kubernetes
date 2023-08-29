@@ -34,7 +34,7 @@ const (
 	PublicKeysECDSA = "PublicKeysECDSA"
 	// RootlessControlPlane is expected to be in alpha in v1.22
 	RootlessControlPlane = "RootlessControlPlane"
-	// EtcdLearnerMode is expected to be in alpha in v1.27
+	// EtcdLearnerMode is expected to be in alpha in v1.27, beta in v1.29
 	EtcdLearnerMode = "EtcdLearnerMode"
 	// UpgradeAddonsBeforeControlPlane is expected to be in deprecated in v1.28 and will be removed in future release
 	UpgradeAddonsBeforeControlPlane = "UpgradeAddonsBeforeControlPlane"
@@ -44,7 +44,7 @@ const (
 var InitFeatureGates = FeatureList{
 	PublicKeysECDSA:      {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 	RootlessControlPlane: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	EtcdLearnerMode:      {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	EtcdLearnerMode:      {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
 	UpgradeAddonsBeforeControlPlane: {
 		FeatureSpec:        featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
 		DeprecationMessage: "The UpgradeAddonsBeforeControlPlane feature gate is deprecated and will be removed in a future release.",
