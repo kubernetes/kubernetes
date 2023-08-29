@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -96,6 +97,9 @@ type watchChan struct {
 func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage.ListOptions) (watch.Interface, error) {
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
+	}
+	if opts.ProgressNotify && w.newFunc == nil {
+		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
 	}
 	wc := w.createWatchChan(ctx, key, rev, opts.Recursive, opts.ProgressNotify, opts.Predicate)
 	go wc.run()
@@ -334,9 +338,6 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 	switch {
 	case e.isProgressNotify:
-		if wc.watcher.newFunc == nil {
-			return nil
-		}
 		object := wc.watcher.newFunc()
 		if err := wc.watcher.versioner.UpdateObject(object, uint64(e.rev)); err != nil {
 			klog.Errorf("failed to propagate object version: %v", err)
