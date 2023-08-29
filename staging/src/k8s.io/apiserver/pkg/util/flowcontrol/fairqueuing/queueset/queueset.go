@@ -417,8 +417,7 @@ func (req *request) wait() (bool, bool) {
 	}
 	req.waitStarted = true
 	switch decisionAny {
-	case decisionCancel:
-		klog.V(5).Infof("QS(%s): request %#+v %#+v queue wait time exceeded after being enqueued\n", qs.qCfg.Name, req.descr1, req.descr2)
+	case decisionCancel: // handle in code following this switch
 	case decisionExecute:
 		klog.V(5).Infof("QS(%s): Dispatching request %#+v %#+v from its queue", qs.qCfg.Name, req.descr1, req.descr2)
 		return true, false
@@ -436,7 +435,7 @@ func (req *request) wait() (bool, bool) {
 		qs.totSeatsWaiting -= req.MaxSeats()
 		qs.totRequestsRejected++
 		qs.totRequestsCancelled++
-		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "cancelled")
+		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "time-out")
 		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 		metrics.AddSeatsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -req.MaxSeats())
 		req.NoteQueued(false)
