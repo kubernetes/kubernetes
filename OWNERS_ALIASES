@@ -11,7 +11,6 @@ aliases:
     - tallclair
   sig-auth-audit-reviewers:
     - hzxuzhonghu
-    - lavalamp
     - sttts
     - tallclair
   sig-auth-authenticators-approvers:
@@ -22,7 +21,6 @@ aliases:
   sig-auth-authenticators-reviewers:
     - deads2k
     - enj
-    - lavalamp
     - liggitt
     - mikedanese
     - sttts
@@ -35,7 +33,6 @@ aliases:
     - deads2k
     - dims
     - enj
-    - lavalamp
     - liggitt
     - mikedanese
     - ncdc
@@ -52,7 +49,6 @@ aliases:
     - deads2k
     - dims
     - enj
-    - lavalamp
     - liggitt
     - mikedanese
     - smarterclayton
@@ -65,10 +61,6 @@ aliases:
   sig-auth-encryption-at-rest-reviewers:
     - aramase
     - enj
-    - lavalamp
-    - liggitt
-    - smarterclayton
-    - wojtek-t
   sig-auth-node-isolation-approvers:
     - deads2k
     - liggitt
@@ -322,7 +314,6 @@ aliases:
 
   api-approvers:
     - deads2k
-    - lavalamp
     - msau42
     - smarterclayton
     - thockin
@@ -330,12 +321,10 @@ aliases:
   # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge
   sig-api-machinery-api-approvers:
     - deads2k
-    - lavalamp
     - liggitt
     - smarterclayton
   sig-apps-api-approvers:
     - deads2k
-    - lavalamp
     - liggitt
     - smarterclayton
   sig-auth-api-approvers:
@@ -372,7 +361,6 @@ aliases:
     - smarterclayton
     - thockin
   sig-scheduling-api-approvers:
-    - lavalamp
     - msau42
     - smarterclayton
     - thockin
@@ -392,7 +380,6 @@ aliases:
     - liggitt
   api-reviewers:
     - andrewsykim
-    - lavalamp
     - smarterclayton
     - thockin
     - liggitt
