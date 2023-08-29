@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/onsi/ginkgo/v2"
 	"io"
 	"net/http"
 	"os"
@@ -101,6 +102,8 @@ func WriteKubeletConfigFile(kubeletConfig *kubeletconfig.KubeletConfiguration) e
 	if err := os.WriteFile(kubeletConfigFilePath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write the kubelet file to %q: %w", kubeletConfigFilePath, err)
 	}
+	ginkgo.By(fmt.Sprintf("ihol3 Writing the kubelet config to the file %v", kubeletConfigFilePath))
+	ginkgo.By(fmt.Sprintf("ihol3 Writing congig: \n%v", string(data)))
 
 	return nil
 }
