@@ -94,6 +94,15 @@ var (
 	kubeletCfg *kubeletconfig.KubeletConfiguration
 )
 
+func initFeatureGates(featureGates map[string]bool) {
+	err := utilfeature.DefaultMutableFeatureGate.SetFromMap(featureGates)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
+		os.Exit(1)
+	}
+}
+
 func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
 	kubeletConfig, err := getCurrentKubeletConfig(ctx)
 	if err != nil {

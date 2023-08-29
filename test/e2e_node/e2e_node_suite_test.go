@@ -38,7 +38,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -134,10 +133,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(featureGates); err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
-		os.Exit(1)
-	}
+	initFeatureGates(featureGates)
 
 	if err := services.SetFeatureGatesForInProcessComponents(serviceFeatureGates); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize process feature gates for API service: %v", err)
