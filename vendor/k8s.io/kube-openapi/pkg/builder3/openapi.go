@@ -324,7 +324,7 @@ func BuildOpenAPISpecFromRoutes(webServices []common.RouteContainer, config *com
 	if err != nil {
 		return nil, err
 	}
-	return a.spec, nil
+	return deduplicateParameters(a.spec)
 }
 
 // BuildOpenAPIDefinitionsForResource builds a partial OpenAPI spec given a sample object and common.Config to customize it.
