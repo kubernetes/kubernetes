@@ -272,7 +272,6 @@ func (qs *queueSet) setConfiguration(ctx context.Context, qCfg fq.QueuingConfig,
 	} else {
 		qCfg.QueueLengthLimit = qs.qCfg.QueueLengthLimit
 		qCfg.HandSize = qs.qCfg.HandSize
-		qCfg.RequestWaitLimit = qs.qCfg.RequestWaitLimit
 	}
 
 	qs.qCfg = qCfg
