@@ -38,6 +38,8 @@ import (
 	utilstrings "k8s.io/utils/strings"
 )
 
+// these interfaces are necessary to keep the structures private
+// and at the same time log them correctly in structured logs.
 var _ logr.Marshaler = podVolume{}
 var _ logr.Marshaler = reconstructedVolume{}
 var _ logr.Marshaler = globalVolumeInfo{}
