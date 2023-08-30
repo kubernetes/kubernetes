@@ -76,8 +76,16 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 		}
 	}
 	out.ClientConnection = in.ClientConnection
+	in.Logging.DeepCopyInto(&out.Logging)
 	in.IPTables.DeepCopyInto(&out.IPTables)
 	in.IPVS.DeepCopyInto(&out.IPVS)
+	out.Winkernel = in.Winkernel
+	out.DetectLocal = in.DetectLocal
+	if in.NodePortAddresses != nil {
+		in, out := &in.NodePortAddresses, &out.NodePortAddresses
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.OOMScoreAdj != nil {
 		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
 		*out = new(int32)
@@ -85,14 +93,6 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 	}
 	in.Conntrack.DeepCopyInto(&out.Conntrack)
 	out.ConfigSyncPeriod = in.ConfigSyncPeriod
-	if in.NodePortAddresses != nil {
-		in, out := &in.NodePortAddresses, &out.NodePortAddresses
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
-	out.Winkernel = in.Winkernel
-	out.DetectLocal = in.DetectLocal
-	in.Logging.DeepCopyInto(&out.Logging)
 	return
 }
 
