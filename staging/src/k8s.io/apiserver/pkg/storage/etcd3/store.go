@@ -671,11 +671,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if len(resourceVersion) > 0 && resourceVersion != "0" {
 			return apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
 		}
-
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
-		options = append(options, clientv3.WithRange(rangeEnd))
 		preparedKey = continueKey
-
 		// If continueRV > 0, the LIST request needs a specific resource version.
 		// continueRV==0 is invalid.
 		// If continueRV < 0, the request is for the latest resource version.
@@ -698,9 +694,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
 			}
 		}
-
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
-		options = append(options, clientv3.WithRange(rangeEnd))
 	default:
 		if fromRV != nil {
 			switch match {
@@ -714,10 +707,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
 			}
 		}
+	}
 
-		if recursive {
-			options = append(options, clientv3.WithPrefix())
-		}
+	if recursive {
+		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
+		options = append(options, clientv3.WithRange(rangeEnd))
 	}
 	if withRev != 0 {
 		options = append(options, clientv3.WithRev(withRev))
