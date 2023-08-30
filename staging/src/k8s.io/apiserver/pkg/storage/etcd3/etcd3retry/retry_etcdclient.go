@@ -151,11 +151,11 @@ func onError(ctx context.Context, backoff wait.Backoff, retriable func(error) (s
 	var lastErr error
 	var lastErrLabel string
 	var retry bool
+	var retryCounter int
 	err := backoffWithRequestContext(ctx, backoff, func() (bool, error) {
 		err := fn()
 		if retry {
-			// TODO: reduce verbosity once debugging in ci (upgrade tests) is done.
-			klog.V(1).Infof("etcd retry - lastErrLabel: %s error:%v", lastErrLabel, err)
+			klog.V(1).Infof("etcd retry - counter: %v, lastErrLabel: %s lastError: %v, error: %v", retryCounter, lastErrLabel, lastErr, err)
 			metrics.UpdateEtcdRequestRetry(lastErrLabel)
 		}
 		if err == nil {
@@ -165,6 +165,7 @@ func onError(ctx context.Context, backoff wait.Backoff, retriable func(error) (s
 		lastErrLabel, retry = retriable(err)
 		if retry {
 			lastErr = err
+			retryCounter++
 			return false, nil
 		}
 
