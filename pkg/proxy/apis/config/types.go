@@ -141,6 +141,18 @@ type KubeProxyConfiguration struct {
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
 	FeatureGates map[string]bool
 
+	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
+	// server to use when communicating with the apiserver.
+	ClientConnection componentbaseconfig.ClientConnectionConfiguration
+	// logging specifies the options of logging.
+	// Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go)
+	// for more information.
+	Logging logsapi.LoggingConfiguration
+
+	// hostnameOverride, if non-empty, will be used as the name of the Node that
+	// kube-proxy is running on. If unset, the node name is assumed to be the same as
+	// the node's hostname.
+	HostnameOverride string
 	// bindAddress can be used to override kube-proxy's idea of what its node's
 	// primary IP is. Note that the name is a historical artifact, and kube-proxy does
 	// not actually bind any sockets to this IP.
@@ -160,53 +172,46 @@ type KubeProxyConfiguration struct {
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
 	EnableProfiling bool
+	// showHiddenMetricsForVersion is the version for which you want to show hidden metrics.
+	ShowHiddenMetricsForVersion string
+
+	// mode specifies which proxy mode to use.
+	Mode ProxyMode
+	// iptables contains iptables-related configuration options.
+	IPTables KubeProxyIPTablesConfiguration
+	// ipvs contains ipvs-related configuration options.
+	IPVS KubeProxyIPVSConfiguration
+	// winkernel contains winkernel-related configuration options.
+	Winkernel KubeProxyWinkernelConfiguration
+
+	// detectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	DetectLocalMode LocalMode
+	// detectLocal contains optional configuration settings related to DetectLocalMode.
+	DetectLocal DetectLocalConfiguration
 	// clusterCIDR is the CIDR range of the pods in the cluster. (For dual-stack
 	// clusters, this can be a comma-separated dual-stack pair of CIDR ranges.). When
 	// DetectLocalMode is set to LocalModeClusterCIDR, kube-proxy will consider
 	// traffic to be local if its source IP is in this range. (Otherwise it is not
 	// used.)
 	ClusterCIDR string
-	// hostnameOverride, if non-empty, will be used as the name of the Node that
-	// kube-proxy is running on. If unset, the node name is assumed to be the same as
-	// the node's hostname.
-	HostnameOverride string
-	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
-	// server to use when communicating with the apiserver.
-	ClientConnection componentbaseconfig.ClientConnectionConfiguration
-	// iptables contains iptables-related configuration options.
-	IPTables KubeProxyIPTablesConfiguration
-	// ipvs contains ipvs-related configuration options.
-	IPVS KubeProxyIPVSConfiguration
-	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
-	// the range [-1000, 1000]
-	OOMScoreAdj *int32
-	// mode specifies which proxy mode to use.
-	Mode ProxyMode
-	// portRange was previously used to configure the userspace proxy, but is now unused.
-	PortRange string
-	// conntrack contains conntrack-related configuration options.
-	Conntrack KubeProxyConntrackConfiguration
-	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
-	// than 0.
-	ConfigSyncPeriod metav1.Duration
+
 	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs. If set,
 	// connections to NodePort services will only be accepted on node IPs in one of
 	// the indicated ranges. If unset, NodePort connections will be accepted on all
 	// local IPs.
 	NodePortAddresses []string
-	// winkernel contains winkernel-related configuration options.
-	Winkernel KubeProxyWinkernelConfiguration
-	// showHiddenMetricsForVersion is the version for which you want to show hidden metrics.
-	ShowHiddenMetricsForVersion string
 
-	// detectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
-	DetectLocalMode LocalMode
-	// detectLocal contains optional configuration settings related to DetectLocalMode.
-	DetectLocal DetectLocalConfiguration
-	// logging specifies the options of logging.
-	// Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go)
-	// for more information.
-	Logging logsapi.LoggingConfiguration
+	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
+	// the range [-1000, 1000]
+	OOMScoreAdj *int32
+	// conntrack contains conntrack-related configuration options.
+	Conntrack KubeProxyConntrackConfiguration
+	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
+	// than 0.
+	ConfigSyncPeriod metav1.Duration
+
+	// portRange was previously used to configure the userspace proxy, but is now unused.
+	PortRange string
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.
