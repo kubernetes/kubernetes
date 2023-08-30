@@ -19,6 +19,9 @@ package v1
 import (
 	"encoding/json"
 	"time"
+
+	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // Time is a wrapper around time.Time which supports correct
@@ -161,15 +164,58 @@ func (t Time) ToUnstructured() interface{} {
 	return string(buf)
 }
 
-// OpenAPISchemaType is used by the kube-openapi generator when constructing
-// the OpenAPI spec of this type.
-//
-// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
-func (_ Time) OpenAPISchemaType() []string { return []string{"string"} }
-
-// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
-// the OpenAPI spec of this type.
-func (_ Time) OpenAPISchemaFormat() string { return "date-time" }
+func (_ Time) OpenAPIDefinition() common.OpenAPIDefinition {
+	zero := int64(0)
+	desc := "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers."
+	return common.EmbedOpenAPIDefinitionIntoV2Extension(common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:        spec.StringOrArray{"string"},
+				Description: desc,
+				Nullable:    true,
+				AnyOf: []spec.Schema{
+					{
+						SchemaProps: spec.SchemaProps{
+							Format: `date-time`,
+						},
+					},
+					{
+						SchemaProps: spec.SchemaProps{
+							MaxLength: &zero,
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
+	}, common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: desc,
+				AnyOf: []spec.Schema{
+					{
+						SchemaProps: spec.SchemaProps{
+							Type: spec.StringOrArray{"null"},
+						},
+					},
+					{
+						SchemaProps: spec.SchemaProps{
+							Type:   spec.StringOrArray{"string"},
+							Format: `date-time`,
+						},
+					},
+					{
+						SchemaProps: spec.SchemaProps{
+							Type:      spec.StringOrArray{"string"},
+							MaxLength: &zero,
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
+	})
+}
 
 // MarshalQueryParameter converts to a URL query parameter value
 func (t Time) MarshalQueryParameter() (string, error) {

@@ -19,6 +19,9 @@ package v1
 import (
 	"encoding/json"
 	"time"
+
+	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const RFC3339Micro = "2006-01-02T15:04:05.000000Z07:00"
@@ -160,15 +163,58 @@ func (t MicroTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.UTC().Format(RFC3339Micro))
 }
 
-// OpenAPISchemaType is used by the kube-openapi generator when constructing
-// the OpenAPI spec of this type.
-//
-// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
-func (_ MicroTime) OpenAPISchemaType() []string { return []string{"string"} }
-
-// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
-// the OpenAPI spec of this type.
-func (_ MicroTime) OpenAPISchemaFormat() string { return "date-time" }
+func (_ MicroTime) OpenAPIDefinition() common.OpenAPIDefinition {
+	desc := "MicroTime is version of Time with microsecond level precision."
+	zero := int64(0)
+	return common.EmbedOpenAPIDefinitionIntoV2Extension(common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:        spec.StringOrArray{"string"},
+				Description: desc,
+				Nullable:    true,
+				AnyOf: []spec.Schema{
+					{
+						SchemaProps: spec.SchemaProps{
+							Format: `date-time`,
+						},
+					},
+					{
+						SchemaProps: spec.SchemaProps{
+							MaxLength: &zero,
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
+	}, common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: desc,
+				AnyOf: []spec.Schema{
+					{
+						SchemaProps: spec.SchemaProps{
+							Type: spec.StringOrArray{"null"},
+						},
+					},
+					{
+						SchemaProps: spec.SchemaProps{
+							Type:   spec.StringOrArray{"string"},
+							Format: `date-time`,
+						},
+					},
+					{
+						SchemaProps: spec.SchemaProps{
+							Type:      spec.StringOrArray{"string"},
+							MaxLength: &zero,
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
+	})
+}
 
 // MarshalQueryParameter converts to a URL query parameter value
 func (t MicroTime) MarshalQueryParameter() (string, error) {
