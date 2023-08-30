@@ -16535,9 +16535,20 @@
       "type": "object"
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime": {
-      "description": "MicroTime is version of Time with microsecond level precision.",
-      "format": "date-time",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "maxLength": 0,
+          "type": "string"
+        }
+      ],
+      "description": "MicroTime is version of Time with microsecond level precision."
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta": {
       "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
@@ -16802,9 +16813,20 @@
       "type": "object"
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.Time": {
-      "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
-      "format": "date-time",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "maxLength": 0,
+          "type": "string"
+        }
+      ],
+      "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers."
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent": {
       "description": "Event represents a single event to a watched resource.",

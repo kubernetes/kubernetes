@@ -1702,8 +1702,16 @@
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.Time": {
+        "anyOf": [
+          {
+            "format": "date-time"
+          },
+          {
+            "maxLength": 0
+          }
+        ],
         "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
-        "format": "date-time",
+        "nullable": true,
         "type": "string"
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent": {
