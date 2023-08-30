@@ -724,15 +724,9 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 		framework.Logf("Logs: %s\n", logs)
 
-		framework.ExpectEqual(
-			strings.Contains(logs, "calling /healthz"),
-			true,
-			"app logs should contain 'calling /healthz'")
+		gomega.Expect(logs).Should(gomega.ContainSubstring("calling /healthz"), "app logs should contain 'calling /healthz'")
 
-		framework.ExpectEqual(
-			strings.Contains(logs, "status=failed"),
-			false,
-			"app logs should not contain 'status=failed")
+		gomega.Expect(logs).ShouldNot(gomega.ContainSubstring("status=failed"), "app logs should not contain 'status=failed'")
 	})
 
 	ginkgo.It("should run as localgroup accounts", func(ctx context.Context) {
@@ -802,12 +796,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, "localgroup-container")
 		framework.ExpectNoError(err, "error retrieving container logs")
 		framework.Logf("Pod logs: %s", logs)
-		framework.ExpectEqual(
-			strings.Contains(
-				strings.ToLower(logs),
-				"nt authority"),
-			false,
-			"Container runs 'whoami' and logs should not contain 'nt authority'")
+		gomega.Expect(strings.ToLower(logs)).ShouldNot(gomega.ContainSubstring("nt authority"), "Container runs 'whoami' and logs should not contain 'nt authority'")
 	})
 
 })
