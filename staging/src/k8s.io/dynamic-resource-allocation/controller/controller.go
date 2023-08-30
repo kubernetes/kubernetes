@@ -780,16 +780,20 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 
 			ctrl.allocateClaims(ctx, claims, selectedNode, selectedUser)
 
-			allErrorsStr := "allocation of one or more pod claims failed."
-			allocationFailed := false
+			var allErrors []error
 			for _, delayed := range claims {
 				if delayed.Error != nil {
-					allErrorsStr = fmt.Sprintf("%s Claim %s: %s.", allErrorsStr, delayed.Claim.Name, delayed.Error)
-					allocationFailed = true
+					if strings.Contains(delayed.Error.Error(), delayed.Claim.Name) {
+						// Avoid adding redundant information.
+						allErrors = append(allErrors, delayed.Error)
+					} else {
+						// Include claim name, it's not in the underlying error.
+						allErrors = append(allErrors, fmt.Errorf("claim %s: %v", delayed.Claim.Name, delayed.Error))
+					}
 				}
 			}
-			if allocationFailed {
-				return fmt.Errorf(allErrorsStr)
+			if len(allErrors) > 0 {
+				return errors.Join(allErrors...)
 			}
 		}
 	}
