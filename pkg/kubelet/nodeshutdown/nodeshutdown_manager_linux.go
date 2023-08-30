@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/integer"
 )
 
 const (
@@ -365,12 +366,14 @@ func (m *managerImpl) processShutdownEvent() error {
 			go func(pod *v1.Pod, group podShutdownGroup) {
 				defer wg.Done()
 
-				gracePeriodOverride := group.ShutdownGracePeriodSeconds
-
-				// If the pod's spec specifies a termination gracePeriod which is less than the gracePeriodOverride calculated, use the pod spec termination gracePeriod.
-				if pod.Spec.TerminationGracePeriodSeconds != nil && *pod.Spec.TerminationGracePeriodSeconds <= gracePeriodOverride {
-					gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
+				// Set a default value for the TerminationGracePeriodSeconds
+				terminationGracePeriodSeconds := int64(v1.DefaultTerminationGracePeriodSeconds)
+				if pod.Spec.TerminationGracePeriodSeconds != nil {
+					terminationGracePeriodSeconds = *pod.Spec.TerminationGracePeriodSeconds
 				}
+
+				gracePeriodOverride := group.ShutdownGracePeriodSeconds
+				gracePeriodOverride = integer.Int64Min(gracePeriodOverride, terminationGracePeriodSeconds)
 
 				m.logger.V(1).Info("Shutdown manager killing pod with gracePeriod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
 
@@ -392,7 +395,7 @@ func (m *managerImpl) processShutdownEvent() error {
 				}); err != nil {
 					m.logger.V(1).Info("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
 				} else {
-					m.logger.V(1).Info("Shutdown manager finished killing pod", "pod", klog.KObj(pod))
+					m.logger.V(1).Info("Shutdown manager finished killing pod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
 				}
 			}(pod, group)
 		}

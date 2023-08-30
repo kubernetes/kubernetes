@@ -118,7 +118,7 @@ func TestManager(t *testing.T) {
 	longGracePeriod := int64(1000)
 	normalPodLongGracePeriod := makePod("normal-pod-long-grace-period", scheduling.DefaultPriorityWhenNoDefaultClassExists, &longGracePeriod /* terminationGracePeriod */)
 
-	var tests = []struct {
+	tests := []struct {
 		desc                             string
 		activePods                       []*v1.Pod
 		shutdownGracePeriodRequested     time.Duration
@@ -179,8 +179,8 @@ func TestManager(t *testing.T) {
 				},
 				"failed-pod": {
 					Phase:   v1.PodFailed,
-					Message: "Pod was terminated in response to imminent node shutdown.",
 					Reason:  "Terminated",
+					Message: "Pod was terminated in response to imminent node shutdown.",
 					Conditions: []v1.PodCondition{
 						{
 							Type:    v1.DisruptionTarget,
@@ -206,7 +206,7 @@ func TestManager(t *testing.T) {
 			},
 		},
 		{
-			desc:                             "no override (total=30s, critical=10s)",
+			desc:                             "no override (total=30s, critical=30s)",
 			activePods:                       []*v1.Pod{normalPodNoGracePeriod, criticalPodNoGracePeriod},
 			shutdownGracePeriodRequested:     time.Duration(30 * time.Second),
 			shutdownGracePeriodCriticalPods:  time.Duration(10 * time.Second),
@@ -239,7 +239,7 @@ func TestManager(t *testing.T) {
 			expectedPodToGracePeriodOverride: map[string]int64{"normal-pod-nil-grace-period": 20, "critical-pod-nil-grace-period": 10, "normal-pod-grace-period": 2, "critical-pod-grace-period": 2},
 		},
 		{
-			desc:                             "no override (total=30s, critical=10s) pod with long terminationGracePeriod is overridden",
+			desc:                             "no override (total=30s, critical=30s) pod with long terminationGracePeriod is overridden",
 			activePods:                       []*v1.Pod{normalPodNoGracePeriod, criticalPodNoGracePeriod, normalPodGracePeriod, criticalPodGracePeriod, normalPodLongGracePeriod},
 			shutdownGracePeriodRequested:     time.Duration(30 * time.Second),
 			shutdownGracePeriodCriticalPods:  time.Duration(10 * time.Second),
@@ -249,7 +249,7 @@ func TestManager(t *testing.T) {
 			expectedPodToGracePeriodOverride: map[string]int64{"normal-pod-nil-grace-period": 20, "critical-pod-nil-grace-period": 10, "normal-pod-grace-period": 2, "critical-pod-grace-period": 2, "normal-pod-long-grace-period": 20},
 		},
 		{
-			desc:                             "no override (total=30, critical=0)",
+			desc:                             "no override (total=30, critical=10)",
 			activePods:                       []*v1.Pod{normalPodNoGracePeriod, criticalPodNoGracePeriod},
 			shutdownGracePeriodRequested:     time.Duration(30 * time.Second),
 			shutdownGracePeriodCriticalPods:  time.Duration(0 * time.Second),
@@ -259,7 +259,7 @@ func TestManager(t *testing.T) {
 			expectedPodToGracePeriodOverride: map[string]int64{"normal-pod-nil-grace-period": 30, "critical-pod-nil-grace-period": 0},
 		},
 		{
-			desc:                             "override successful (total=30, critical=10)",
+			desc:                             "override successful (total=20, critical=10)",
 			activePods:                       []*v1.Pod{normalPodNoGracePeriod, criticalPodNoGracePeriod},
 			shutdownGracePeriodRequested:     time.Duration(30 * time.Second),
 			shutdownGracePeriodCriticalPods:  time.Duration(10 * time.Second),
@@ -402,7 +402,7 @@ func TestManager(t *testing.T) {
 }
 
 func TestFeatureEnabled(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc                         string
 		shutdownGracePeriodRequested time.Duration
 		featureGateEnabled           bool
@@ -480,7 +480,7 @@ func TestRestart(t *testing.T) {
 
 	var shutdownChan chan bool
 	var shutdownChanMut sync.Mutex
-	var connChan = make(chan struct{}, 1)
+	connChan := make(chan struct{}, 1)
 
 	lock.Lock()
 	systemDbus = func() (dbusInhibiter, error) {
