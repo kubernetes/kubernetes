@@ -49,9 +49,6 @@ func (priorityLevelConfigurationStrategy) NamespaceScoped() bool {
 // and should not be modified by the user.
 func (priorityLevelConfigurationStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"flowcontrol.apiserver.k8s.io/v1alpha1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("status"),
-		),
 		"flowcontrol.apiserver.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
@@ -129,10 +126,6 @@ var StatusStrategy = priorityLevelConfigurationStatusStrategy{Strategy}
 // and should not be modified by the user.
 func (priorityLevelConfigurationStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"flowcontrol.apiserver.k8s.io/v1alpha1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("spec"),
-			fieldpath.MakePathOrDie("metadata"),
-		),
 		"flowcontrol.apiserver.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 			fieldpath.MakePathOrDie("metadata"),
