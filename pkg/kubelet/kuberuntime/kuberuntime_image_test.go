@@ -225,7 +225,12 @@ func TestImageStats(t *testing.T) {
 	fakeImageService.SetFakeImageSize(imageSize)
 	images := []string{"1111", "2222", "3333"}
 	fakeImageService.SetFakeImages(images)
-
+	usage := runtimeapi.FilesystemUsage{
+		UsedBytes: &runtimeapi.UInt64Value{
+			Value: imageSize * uint64(len(images)),
+		},
+	}
+	fakeImageService.SetFakeFilesystemUsage([]*runtimeapi.FilesystemUsage{&usage})
 	actualStats, err := fakeManager.ImageStats(ctx)
 	assert.NoError(t, err)
 	expectedStats := &kubecontainer.ImageStats{TotalStorageBytes: imageSize * uint64(len(images))}
@@ -237,7 +242,7 @@ func TestImageStatsWithError(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	fakeImageService.InjectError("ListImages", fmt.Errorf("test-failure"))
+	fakeImageService.InjectError("ImageFsInfo", fmt.Errorf("test-failure"))
 
 	actualImageStats, err := fakeManager.ImageStats(ctx)
 	assert.Error(t, err)
