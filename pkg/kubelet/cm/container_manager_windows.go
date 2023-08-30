@@ -84,8 +84,10 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		}
 	}
 
+	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(runtimeService)
+
 	// Starts device manager.
-	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady); err != nil {
+	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap, containerRunningSet); err != nil {
 		return err
 	}
 
