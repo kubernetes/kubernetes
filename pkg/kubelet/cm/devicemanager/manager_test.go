@@ -41,6 +41,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -280,7 +281,9 @@ func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitor
 		return []*v1.Pod{}
 	}
 
-	err = w.Start(activePods, &sourcesReadyStub{})
+	// test steady state, initialization where sourcesReady, containerMap and containerRunningSet
+	// are relevant will be tested with a different flow
+	err = w.Start(activePods, &sourcesReadyStub{}, containermap.NewContainerMap(), sets.NewString())
 	require.NoError(t, err)
 
 	return w, updateChan
@@ -1008,6 +1011,8 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 		unhealthyDevices: make(map[string]sets.String),
 		allocatedDevices: make(map[string]sets.String),
 		podDevices:       newPodDevices(),
+		activePods:       func() []*v1.Pod { return []*v1.Pod{} },
+		sourcesReady:     &sourcesReadyStub{},
 	}
 
 	testManager.podDevices.insert("pod1", "con1", resourceName1,
