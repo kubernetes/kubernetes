@@ -236,6 +236,23 @@ func (o containerOutputList) HasNotRestarted(name string) error {
 	return nil
 }
 
+type containerOutputIndex int
+
+func (i containerOutputIndex) IsBefore(other containerOutputIndex) error {
+	if i >= other {
+		return fmt.Errorf("%d should be before %d", i, other)
+	}
+	return nil
+}
+
+func (o containerOutputList) FindIndex(name string, command string, startIdx containerOutputIndex) (containerOutputIndex, error) {
+	idx := o.findIndex(name, command, int(startIdx))
+	if idx == -1 {
+		return -1, fmt.Errorf("couldn't find %s %s, got\n%v", name, command, o)
+	}
+	return containerOutputIndex(idx), nil
+}
+
 func (o containerOutputList) findIndex(name string, command string, startIdx int) int {
 	for i, v := range o {
 		if i < startIdx {
