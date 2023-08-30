@@ -678,22 +678,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if continueRV > 0 {
 			withRev = continueRV
 		}
-	case recursive && s.pagingEnabled && pred.Limit > 0:
-		if fromRV != nil {
-			switch match {
-			case metav1.ResourceVersionMatchNotOlderThan:
-				// The not older than constraint is checked after we get a response from etcd,
-				// and returnedRV is then set to the revision we get from the etcd response.
-			case metav1.ResourceVersionMatchExact:
-				withRev = int64(*fromRV)
-			case "": // legacy case
-				if *fromRV > 0 {
-					withRev = int64(*fromRV)
-				}
-			default:
-				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
-			}
-		}
 	default:
 		if fromRV != nil {
 			switch match {
@@ -703,6 +687,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			case metav1.ResourceVersionMatchExact:
 				withRev = int64(*fromRV)
 			case "": // legacy case
+				if recursive && s.pagingEnabled && pred.Limit > 0 && *fromRV > 0 {
+					withRev = int64(*fromRV)
+				}
 			default:
 				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
 			}
