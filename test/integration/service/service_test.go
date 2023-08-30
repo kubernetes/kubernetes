@@ -29,7 +29,7 @@ import (
 
 // Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy tests that Services no longer default
 // the internalTrafficPolicy field when Type is ExternalName. This test exists due to historic reasons where
-// the internalTrafficPolicy field was being defaulted in older versions. New versions stop defauting the
+// the internalTrafficPolicy field was being defaulted in older versions. New versions stop defaulting the
 // field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
@@ -74,7 +74,7 @@ func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) 
 
 // Test_ExternalNameServiceDropsInternalTrafficPolicy tests that Services accepts the internalTrafficPolicy field on Create,
 // but drops the field on read. This test exists due to historic reasons where the internalTrafficPolicy field was being defaulted
-// in older versions. New versions stop defauting the field and drop on read, but for compatibility reasons we still accept the field.
+// in older versions. New versions stop defaulting the field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -120,7 +120,7 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 
 // Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy tests that converting a Service to Type=ExternalName
 // results in the internalTrafficPolicy field being dropped.This test exists due to historic reasons where the internalTrafficPolicy
-// field was being defaulted in older versions. New versions stop defauting the field and drop on read, but for compatibility reasons
+// field was being defaulted in older versions. New versions stop defaulting the field and drop on read, but for compatibility reasons
 // we still accept the field.
 func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
@@ -164,7 +164,7 @@ func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T
 
 	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), newService, metav1.UpdateOptions{})
 	if err != nil {
-		t.Fatalf("error getting service: %v", err)
+		t.Fatalf("error updating service: %v", err)
 	}
 
 	if service.Spec.InternalTrafficPolicy != nil {
