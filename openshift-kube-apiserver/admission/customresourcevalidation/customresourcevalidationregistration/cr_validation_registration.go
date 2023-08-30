@@ -3,9 +3,6 @@ package customresourcevalidationregistration
 import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/apirequestcount"
-	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/imagecontentsourcepolicy"
-	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/imagedigestmirrorset"
-	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/imagetagmirrorset"
 
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/apiserver"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/authentication"
@@ -35,9 +32,6 @@ var AllCustomResourceValidators = []string{
 	console.PluginName,
 	dns.PluginName,
 	image.PluginName,
-	imagecontentsourcepolicy.PluginName,
-	imagedigestmirrorset.PluginName,
-	imagetagmirrorset.PluginName,
 	oauth.PluginName,
 	project.PluginName,
 	config.PluginName,
@@ -66,9 +60,6 @@ func RegisterCustomResourceValidation(plugins *admission.Plugins) {
 	console.Register(plugins)
 	dns.Register(plugins)
 	image.Register(plugins)
-	imagecontentsourcepolicy.Register(plugins)
-	imagedigestmirrorset.Register(plugins)
-	imagetagmirrorset.Register(plugins)
 	oauth.Register(plugins)
 	project.Register(plugins)
 	config.Register(plugins)
