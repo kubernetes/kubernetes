@@ -287,15 +287,6 @@ const (
 	// This flag used to be needed for dockershim CRI and currently does nothing.
 	ExperimentalHostUserNamespaceDefaultingGate featuregate.Feature = "ExperimentalHostUserNamespaceDefaulting"
 
-	// owner: @yuzhiquan, @bowei, @PxyUp, @SergeyKanzhelev
-	// kep: https://kep.k8s.io/2727
-	// alpha: v1.23
-	// beta: v1.24
-	// stable: v1.27
-	//
-	// Enables GRPC probe method for {Liveness,Readiness,Startup}Probe.
-	GRPCContainerProbe featuregate.Feature = "GRPCContainerProbe"
-
 	// owner: @bobbypage
 	// alpha: v1.20
 	// beta:  v1.21
@@ -1027,8 +1018,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandedDNSConfig: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.30
-
-	GRPCContainerProbe: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.29
 
 	GracefulNodeShutdown: {Default: true, PreRelease: featuregate.Beta},
 
