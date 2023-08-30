@@ -142,15 +142,6 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
-	// owner: @jefftree
-	// kep: https://kep.k8s.io/2896
-	// alpha: v1.23
-	// beta: v1.24
-	// stable: v1.27
-	//
-	// Enables kubernetes to publish OpenAPI v3
-	OpenAPIV3 featuregate.Feature = "OpenAPIV3"
-
 	// owner: @caesarxuchao
 	// alpha: v1.15
 	// beta: v1.16
@@ -167,22 +158,6 @@ const (
 	//
 	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
 	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
-
-	// owner: @apelisse, @lavalamp
-	// alpha: v1.14
-	// beta: v1.16
-	// stable: v1.22
-	//
-	// Server-side apply. Merging happens on the server.
-	ServerSideApply featuregate.Feature = "ServerSideApply"
-
-	// owner: @kevindelgado
-	// kep: https://kep.k8s.io/2885
-	// alpha: v1.23
-	// beta: v1.24
-	//
-	// Enables server-side field validation.
-	ServerSideFieldValidation featuregate.Feature = "ServerSideFieldValidation"
 
 	// owner: @caesarxuchao @roycaihw
 	// alpha: v1.20
@@ -264,15 +239,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
-	OpenAPIV3: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
 	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	RemoveSelfLink: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-
-	ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	ServerSideFieldValidation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
 

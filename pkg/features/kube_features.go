@@ -773,15 +773,6 @@ const (
 	// which benefits to reduce the useless requeueing.
 	SchedulerQueueingHints featuregate.Feature = "SchedulerQueueingHints"
 
-	// owner: @saschagrunert
-	// kep: https://kep.k8s.io/2413
-	// alpha: v1.22
-	// beta: v1.25
-	// ga: v1.27
-	//
-	// Enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
-	SeccompDefault featuregate.Feature = "SeccompDefault"
-
 	// owner: @mtardy
 	// alpha: v1.0
 	//
@@ -843,14 +834,6 @@ const (
 	//
 	// Enables topology aware hints for EndpointSlices
 	TopologyAwareHints featuregate.Feature = "TopologyAwareHints"
-
-	// owner: @lmdaly, @swatisehgal (for GA graduation)
-	// alpha: v1.16
-	// beta: v1.18
-	// GA: v1.27
-	//
-	// Enable resource managers to make NUMA aligned decisions
-	TopologyManager featuregate.Feature = "TopologyManager"
 
 	// owner: @PiotrProkop
 	// kep: https://kep.k8s.io/3545
@@ -1154,8 +1137,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SchedulerQueueingHints: {Default: true, PreRelease: featuregate.Beta},
 
-	SeccompDefault: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
 	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
 
 	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.Beta},
@@ -1171,8 +1152,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StatefulSetStartOrdinal: {Default: true, PreRelease: featuregate.Beta},
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
-
-	TopologyManager: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.27; remove in 1.29
 
 	TopologyManagerPolicyAlphaOptions: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1220,12 +1199,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.OpenAPIV3: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	genericfeatures.ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	genericfeatures.ServerSideFieldValidation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
