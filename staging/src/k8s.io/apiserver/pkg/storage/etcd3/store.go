@@ -659,7 +659,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		fromRV = &parsedRV
 	}
 
-	var returnedRV, continueRV, withRev int64
+	var continueRV, withRev int64
 	var continueKey string
 	switch {
 	case recursive && s.pagingEnabled && len(pred.Continue) > 0:
@@ -681,7 +681,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		// If continueRV < 0, the request is for the latest resource version.
 		if continueRV > 0 {
 			withRev = continueRV
-			returnedRV = continueRV
 		}
 	case recursive && s.pagingEnabled && pred.Limit > 0:
 		if fromRV != nil {
@@ -690,12 +689,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 				// The not older than constraint is checked after we get a response from etcd,
 				// and returnedRV is then set to the revision we get from the etcd response.
 			case metav1.ResourceVersionMatchExact:
-				returnedRV = int64(*fromRV)
-				withRev = returnedRV
+				withRev = int64(*fromRV)
 			case "": // legacy case
 				if *fromRV > 0 {
-					returnedRV = int64(*fromRV)
-					withRev = returnedRV
+					withRev = int64(*fromRV)
 				}
 			default:
 				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
@@ -711,8 +708,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 				// The not older than constraint is checked after we get a response from etcd,
 				// and returnedRV is then set to the revision we get from the etcd response.
 			case metav1.ResourceVersionMatchExact:
-				returnedRV = int64(*fromRV)
-				withRev = returnedRV
+				withRev = int64(*fromRV)
 			case "": // legacy case
 			default:
 				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
@@ -793,11 +789,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			getResp.Kvs[i] = nil
 		}
 
-		// indicate to the client which resource version was returned
-		if returnedRV == 0 {
-			returnedRV = getResp.Header.Revision
-		}
-
 		// no more results remain or we didn't request paging
 		if !hasMore || !paging {
 			break
@@ -818,10 +809,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 		preparedKey = string(lastKey) + "\x00"
 		if withRev == 0 {
-			withRev = returnedRV
+			withRev = getResp.Header.Revision
 			options = append(options, clientv3.WithRev(withRev))
 		}
 	}
+	// indicate to the client which resource version was returned
+	if withRev == 0 {
+		withRev = getResp.Header.Revision
+	}
+
 	if v.IsNil() {
 		// Ensure that we never return a nil Items pointer in the result for consistency.
 		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
@@ -831,7 +827,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// we never return a key that the client wouldn't be allowed to see
 	if hasMore {
 		// we want to start immediately after the last key
-		next, err := storage.EncodeContinue(string(lastKey)+"\x00", keyPrefix, returnedRV)
+		next, err := storage.EncodeContinue(string(lastKey)+"\x00", keyPrefix, withRev)
 		if err != nil {
 			return err
 		}
@@ -843,11 +839,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			c := int64(getResp.Count - pred.Limit)
 			remainingItemCount = &c
 		}
-		return s.versioner.UpdateList(listObj, uint64(returnedRV), next, remainingItemCount)
+		return s.versioner.UpdateList(listObj, uint64(withRev), next, remainingItemCount)
 	}
 
 	// no continuation
-	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
+	return s.versioner.UpdateList(listObj, uint64(withRev), "", nil)
 }
 
 // growSlice takes a slice value and grows its capacity up
