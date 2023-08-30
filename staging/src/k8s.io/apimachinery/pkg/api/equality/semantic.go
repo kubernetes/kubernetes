@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Semantic can do semantic deep equality checks for api objects.
@@ -45,5 +46,26 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 	func(a, b fields.Selector) bool {
 		return a.String() == b.String()
+	},
+	func(a, b metav1.LabelSelectorRequirement) bool {
+		if a.Key != b.Key {
+			return false
+		}
+		if a.Operator != b.Operator {
+			return false
+		}
+		switch a.Operator {
+		case metav1.LabelSelectorOpIn, metav1.LabelSelectorOpNotIn:
+			return sets.New(a.Values...).Equal(sets.New(b.Values...))
+		}
+		if len(a.Values) != len(b.Values) {
+			return false
+		}
+		for i := range a.Values {
+			if a.Values[i] != b.Values[i] {
+				return false
+			}
+		}
+		return true
 	},
 )

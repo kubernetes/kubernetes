@@ -22,11 +22,9 @@ import (
 	"strconv"
 	"strings"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -91,27 +89,7 @@ func NonConvertibleFields(annotations map[string]string) map[string]string {
 
 // Semantic can do semantic deep equality checks for core objects.
 // Example: apiequality.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
-var Semantic = conversion.EqualitiesOrDie(
-	func(a, b resource.Quantity) bool {
-		// Ignore formatting, only care that numeric value stayed the same.
-		// TODO: if we decide it's important, it should be safe to start comparing the format.
-		//
-		// Uninitialized quantities are equivalent to 0 quantities.
-		return a.Cmp(b) == 0
-	},
-	func(a, b metav1.MicroTime) bool {
-		return a.UTC() == b.UTC()
-	},
-	func(a, b metav1.Time) bool {
-		return a.UTC() == b.UTC()
-	},
-	func(a, b labels.Selector) bool {
-		return a.String() == b.String()
-	},
-	func(a, b fields.Selector) bool {
-		return a.String() == b.String()
-	},
-)
+var Semantic = apiequality.Semantic.Copy()
 
 var standardResourceQuotaScopes = sets.NewString(
 	string(core.ResourceQuotaScopeTerminating),
