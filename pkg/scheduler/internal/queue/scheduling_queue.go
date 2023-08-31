@@ -447,7 +447,7 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 
 // runPreEnqueuePlugins iterates PreEnqueue function in each registered PreEnqueuePlugin.
 // It returns true if all PreEnqueue function run successfully; otherwise returns false
-// upon the first failure.
+// upon the first failure or when a plugin returns Skip.
 // Note: we need to associate the failed plugin to `pInfo`, so that the pod can be moved back
 // to activeQ by related cluster event.
 func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framework.QueuedPodInfo) bool {
@@ -464,6 +464,12 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 		s = p.runPreEnqueuePlugin(ctx, pl, pod, shouldRecordMetric)
 		if s.IsSuccess() {
 			continue
+		}
+		if s.IsSkip() {
+			logger.Info("Plugin skipped running PreEnqueue", "pod", klog.KObj(pod), "plugin", pl.Name())
+			pInfo.Skip = true
+		} else {
+			pInfo.Skip = false
 		}
 		pInfo.UnschedulablePlugins.Insert(pl.Name())
 		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
@@ -492,8 +498,9 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl framework.Pr
 // 2. an error for the caller to act on.
 func (p *PriorityQueue) addToActiveQ(logger klog.Logger, pInfo *framework.QueuedPodInfo) (bool, error) {
 	pInfo.Gated = !p.runPreEnqueuePlugins(context.Background(), pInfo)
-	if pInfo.Gated {
+	if pInfo.Gated && !pInfo.Skip {
 		// Add the Pod to unschedulablePods if it's not passing PreEnqueuePlugins.
+		// Note that we don't add the Pod to unschedulablePods if it's skipped by PreEnqueuePlugins.
 		p.unschedulablePods.addOrUpdate(pInfo)
 		return false, nil
 	}

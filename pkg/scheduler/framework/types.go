@@ -181,6 +181,8 @@ type QueuedPodInfo struct {
 	UnschedulablePlugins sets.Set[string]
 	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
 	Gated bool
+	// Whether the Pod is skipped by the scheduler or not.
+	Skip bool
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
@@ -192,6 +194,7 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
 		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
 		Gated:                   pqi.Gated,
+		Skip:                    pqi.Skip,
 	}
 }
 

@@ -94,6 +94,7 @@ const (
 	Wait
 	// Skip is used in the following scenarios:
 	// - when a Bind plugin chooses to skip binding.
+	// - when a PreEnqueue plugin returns Skip so that the pod will be skipped in the current scheduling cycle.
 	// - when a PreFilter plugin returns Skip so that coupled Filter plugin/PreFilterExtensions() will be skipped.
 	// - when a PreScore plugin returns Skip so that coupled Score plugin will be skipped.
 	Skip
