@@ -658,10 +658,11 @@ func (s *store) getList(ctx context.Context, key string, opts storage.ListOption
 		fromRV = &parsedRV
 	}
 
-	var continueRV, withRev int64
+	var withRev int64
 	var continueKey string
 	switch {
 	case opts.Recursive && s.pagingEnabled && len(opts.Predicate.Continue) > 0:
+		var continueRV int64
 		continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, keyPrefix)
 		if err != nil {
 			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
