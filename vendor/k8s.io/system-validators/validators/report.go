@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/pkg/errors"
 )
 
 // ValidationResultType is type of the validation result. Different validation results
@@ -68,7 +66,7 @@ func (dr *StreamReporter) Report(key, value string, resultType ValidationResultT
 		c = white
 	}
 	if dr.WriteStream == nil {
-		return errors.New("WriteStream has to be defined for this reporter")
+		return fmt.Errorf("WriteStream has to be defined for this reporter")
 	}
 
 	fmt.Fprintf(dr.WriteStream, "%s: %s\n", colorize(key, white), colorize(value, c))

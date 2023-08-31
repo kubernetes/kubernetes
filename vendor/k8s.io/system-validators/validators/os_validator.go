@@ -17,10 +17,9 @@ limitations under the License.
 package system
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 var _ Validator = &OSValidator{}
@@ -39,7 +38,7 @@ func (o *OSValidator) Name() string {
 func (o *OSValidator) Validate(spec SysSpec) ([]error, []error) {
 	os, err := exec.Command("uname").CombinedOutput()
 	if err != nil {
-		return nil, []error{errors.Wrap(err, "failed to get os name")}
+		return nil, []error{fmt.Errorf("failed to get os name %w", err)}
 	}
 	if err = o.validateOS(strings.TrimSpace(string(os)), spec.OS); err != nil {
 		return nil, []error{err}
@@ -50,7 +49,7 @@ func (o *OSValidator) Validate(spec SysSpec) ([]error, []error) {
 func (o *OSValidator) validateOS(os, specOS string) error {
 	if os != specOS {
 		o.Reporter.Report("OS", os, bad)
-		return errors.Errorf("unsupported operating system: %s", os)
+		return fmt.Errorf("unsupported operating system: %s", os)
 	}
 	o.Reporter.Report("OS", os, good)
 	return nil

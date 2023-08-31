@@ -21,12 +21,12 @@ package system
 
 import (
 	"bufio"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -55,7 +55,7 @@ func (c *CgroupsValidator) Validate(spec SysSpec) (warns, errs []error) {
 	var st unix.Statfs_t
 	var err error
 	if err := unix.Statfs(unifiedMountpoint, &st); err != nil {
-		return nil, []error{errors.Wrap(err, "cannot statfs the cgroupv2 root")}
+		return nil, []error{fmt.Errorf("cannot statfs the cgroupv2 root %w", err)}
 	}
 	var requiredCgroupSpec []string
 	var optionalCgroupSpec []string
@@ -63,24 +63,24 @@ func (c *CgroupsValidator) Validate(spec SysSpec) (warns, errs []error) {
 	if st.Type == unix.CGROUP2_SUPER_MAGIC {
 		subsystems, err = c.getCgroupV2Subsystems()
 		if err != nil {
-			return nil, []error{errors.Wrap(err, "failed to get cgroup v2 subsystems")}
+			return nil, []error{fmt.Errorf("failed to get cgroup v2 subsystems %w", err)}
 		}
 		requiredCgroupSpec = spec.CgroupsV2
 		optionalCgroupSpec = spec.CgroupsV2Optional
 	} else {
 		subsystems, err = c.getCgroupV1Subsystems()
 		if err != nil {
-			return nil, []error{errors.Wrap(err, "failed to get cgroup v1 subsystems")}
+			return nil, []error{fmt.Errorf("failed to get cgroup v1 subsystems %w", err)}
 		}
 		requiredCgroupSpec = spec.Cgroups
 		optionalCgroupSpec = spec.CgroupsOptional
 	}
 
 	if missingRequired := c.validateCgroupSubsystems(requiredCgroupSpec, subsystems, true); len(missingRequired) != 0 {
-		errs = []error{errors.Errorf("missing required cgroups: %s", strings.Join(missingRequired, " "))}
+		errs = []error{fmt.Errorf("missing required cgroups: %s", strings.Join(missingRequired, " "))}
 	}
 	if missingOptional := c.validateCgroupSubsystems(optionalCgroupSpec, subsystems, false); len(missingOptional) != 0 {
-		warns = []error{errors.Errorf("missing optional cgroups: %s", strings.Join(missingOptional, " "))}
+		warns = []error{fmt.Errorf("missing optional cgroups: %s", strings.Join(missingOptional, " "))}
 	}
 	return
 }
