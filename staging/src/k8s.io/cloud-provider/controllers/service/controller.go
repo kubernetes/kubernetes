@@ -697,6 +697,12 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if oldNode.Spec.ProviderID != newNode.Spec.ProviderID {
 		return true
 	}
+	if oldNode.Labels[v1.LabelTopologyZone] != newNode.Labels[v1.LabelTopologyZone] {
+		return true
+	}
+	if oldNode.Labels[v1.LabelTopologyRegion] != newNode.Labels[v1.LabelTopologyRegion] {
+		return true
+	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
 		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
 	}

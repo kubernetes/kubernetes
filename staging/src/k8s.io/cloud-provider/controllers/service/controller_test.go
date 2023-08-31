@@ -2353,6 +2353,88 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 
 }
 
+func Test_shouldSyncUpdatedNode_zoneRegionLabels(t *testing.T) {
+	type testCase struct {
+		name          string
+		oldNodeLabels map[string]string
+		newNodeLabels map[string]string
+		shouldSync    bool
+	}
+	testcases := []testCase{
+		{
+			name:       "Empty labels",
+			shouldSync: false,
+		},
+		{
+			name:          "Old node has zone label",
+			oldNodeLabels: map[string]string{v1.LabelTopologyZone: "zone-a"},
+			newNodeLabels: nil,
+			shouldSync:    true,
+		},
+		{
+			name:          "New node has zone label",
+			oldNodeLabels: nil,
+			newNodeLabels: map[string]string{v1.LabelTopologyZone: "zone-a"},
+			shouldSync:    true,
+		},
+		{
+			name:          "Zone labels equal",
+			oldNodeLabels: map[string]string{v1.LabelTopologyZone: "zone-a"},
+			newNodeLabels: map[string]string{v1.LabelTopologyZone: "zone-a"},
+			shouldSync:    false,
+		},
+		{
+			name:          "Different zones",
+			oldNodeLabels: map[string]string{v1.LabelTopologyZone: "zone-a"},
+			newNodeLabels: map[string]string{v1.LabelTopologyZone: "zone-b"},
+			shouldSync:    false,
+		},
+		{
+			name:          "Old node has region label",
+			oldNodeLabels: map[string]string{v1.LabelTopologyRegion: "moon-dark1"},
+			newNodeLabels: nil,
+			shouldSync:    true,
+		},
+		{
+			name:          "New node has region label",
+			oldNodeLabels: nil,
+			newNodeLabels: map[string]string{v1.LabelTopologyRegion: "moon-dark1"},
+			shouldSync:    true,
+		},
+		{
+			name:          "Region labels equal",
+			newNodeLabels: map[string]string{v1.LabelTopologyRegion: "moon-dark1"},
+			oldNodeLabels: map[string]string{v1.LabelTopologyRegion: "moon-dark1"},
+			shouldSync:    false,
+		},
+		{
+			name:          "Different regions",
+			oldNodeLabels: map[string]string{v1.LabelTopologyRegion: "moon-dark1"},
+			newNodeLabels: map[string]string{v1.LabelTopologyRegion: "moon-bright1"},
+			shouldSync:    true,
+		},
+	}
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			oldNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: testcase.oldNodeLabels,
+				},
+			}
+			newNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: testcase.newNodeLabels,
+				},
+			}
+			shouldSync := shouldSyncUpdatedNode(oldNode, newNode)
+			if shouldSync != testcase.shouldSync {
+				t.Errorf("unexpected result from shouldSyncNode, expected: %v, actual: %v", testcase.shouldSync, shouldSync)
+			}
+		})
+	}
+
+}
+
 func TestServiceQueueDelay(t *testing.T) {
 	const ns = metav1.NamespaceDefault
 
