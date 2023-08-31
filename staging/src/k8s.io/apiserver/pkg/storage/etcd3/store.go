@@ -622,32 +622,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
-	return s.getList(ctx, key, opts, listObj)
-}
-
-func (s *store) getList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	listPtr, err := meta.GetItemsPtr(listObj)
-	if err != nil {
-		return err
-	}
-	v, err := conversion.EnforcePtr(listPtr)
-	if err != nil || v.Kind() != reflect.Slice {
-		return fmt.Errorf("need ptr to slice: %v", err)
-	}
-
 	keyPrefix := key
-	// set the appropriate clientv3 options to filter the returned data set
-	var limitOption *clientv3.OpOption
-	limit := opts.Predicate.Limit
-	var paging bool
-	options := make([]clientv3.OpOption, 0, 4)
-	if s.pagingEnabled && opts.Predicate.Limit > 0 {
-		paging = true
-		options = append(options, clientv3.WithLimit(limit))
-		limitOption = &options[len(options)-1]
-	}
-
-	newItemFunc := getNewItemFunc(listObj, v)
 
 	var fromRV *uint64
 	if len(opts.ResourceVersion) > 0 {
@@ -695,6 +670,35 @@ func (s *store) getList(ctx context.Context, key string, opts storage.ListOption
 			}
 		}
 	}
+	err = s.getList(ctx, key, keyPrefix, withRev, opts, listObj)
+	if err != nil {
+		return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
+	}
+	return err
+}
+
+func (s *store) getList(ctx context.Context, key, keyPrefix string, withRev int64, opts storage.ListOptions, listObj runtime.Object) error {
+	listPtr, err := meta.GetItemsPtr(listObj)
+	if err != nil {
+		return err
+	}
+	v, err := conversion.EnforcePtr(listPtr)
+	if err != nil || v.Kind() != reflect.Slice {
+		return fmt.Errorf("need ptr to slice: %v", err)
+	}
+
+	// set the appropriate clientv3 options to filter the returned data set
+	var limitOption *clientv3.OpOption
+	limit := opts.Predicate.Limit
+	var paging bool
+	options := make([]clientv3.OpOption, 0, 4)
+	if s.pagingEnabled && opts.Predicate.Limit > 0 {
+		paging = true
+		options = append(options, clientv3.WithLimit(limit))
+		limitOption = &options[len(options)-1]
+	}
+
+	newItemFunc := getNewItemFunc(listObj, v)
 
 	if opts.Recursive {
 		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
@@ -727,7 +731,7 @@ func (s *store) getList(ctx context.Context, key string, opts storage.ListOption
 		getResp, err = s.client.KV.Get(ctx, key, options...)
 		metrics.RecordEtcdRequest(metricsOp, s.groupResourceString, err, startTime)
 		if err != nil {
-			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
+			return err
 		}
 		numFetched += len(getResp.Kvs)
 		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
