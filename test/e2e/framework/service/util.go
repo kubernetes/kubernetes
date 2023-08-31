@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 )
@@ -44,7 +45,7 @@ func TestReachableHTTPWithRetriableErrorCodes(ctx context.Context, host string, 
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, false, pollfn); err != nil {
 		if err == wait.ErrWaitTimeout {
 			framework.Failf("Could not reach HTTP service through %v:%v after %v", host, port, timeout)
 		} else {

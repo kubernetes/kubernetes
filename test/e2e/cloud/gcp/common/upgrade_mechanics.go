@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
@@ -122,7 +123,7 @@ func checkControlPlaneVersion(ctx context.Context, c clientset.Interface, want s
 	framework.Logf("Checking control plane version")
 	var err error
 	var v *version.Info
-	waitErr := wait.PollImmediateWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
 		v, err = c.Discovery().ServerVersion()
 		if err != nil {
 			traceRouteToControlPlane()

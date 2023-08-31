@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/onsi/ginkgo/v2"
@@ -38,7 +39,7 @@ func WaitForServiceDeletedWithFinalizer(ctx context.Context, cs clientset.Interf
 	}
 
 	ginkgo.By("Wait for service to disappear")
-	if pollErr := wait.PollImmediateWithContext(ctx, LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(ctx, cs), func(ctx context.Context) (bool, error) {
+	if pollErr := wait.PollUntilContextTimeout(ctx, LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(ctx, cs), false, func(ctx context.Context) (bool, error) {
 		svc, err := cs.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -58,7 +59,7 @@ func WaitForServiceDeletedWithFinalizer(ctx context.Context, cs clientset.Interf
 // don't have a finalizer.
 func WaitForServiceUpdatedWithFinalizer(ctx context.Context, cs clientset.Interface, namespace, name string, hasFinalizer bool) {
 	ginkgo.By(fmt.Sprintf("Wait for service to hasFinalizer=%t", hasFinalizer))
-	if pollErr := wait.PollImmediateWithContext(ctx, LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(ctx, cs), func(ctx context.Context) (bool, error) {
+	if pollErr := wait.PollUntilContextTimeout(ctx, LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(ctx, cs), false, func(ctx context.Context) (bool, error) {
 		svc, err := cs.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

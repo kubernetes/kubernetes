@@ -38,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/version"
+	utilnet "k8s.io/utils/net"
+
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/daemonset"
@@ -46,7 +48,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereporters "k8s.io/kubernetes/test/e2e/reporters"
-	utilnet "k8s.io/utils/net"
 
 	clientset "k8s.io/client-go/kubernetes"
 	// ensure auth plugins are loaded
@@ -150,7 +151,7 @@ func waitForDaemonSets(ctx context.Context, c clientset.Interface, ns string, al
 	framework.Logf("Waiting up to %v for all daemonsets in namespace '%s' to start",
 		timeout, ns)
 
-	return wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, false, func(ctx context.Context) (bool, error) {
 		dsList, err := c.AppsV1().DaemonSets(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Error getting daemonsets in namespace: '%s': %v", ns, err)
@@ -429,7 +430,7 @@ func prepullImages(ctx context.Context, c clientset.Interface) {
 			return daemonset.CheckPresentOnNodes(ctx, c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
 		}
 		framework.Logf("Waiting for %s", imgPuller.Name)
-		err := wait.PollImmediateWithContext(ctx, dsRetryPeriod, dsRetryTimeout, checkDaemonset)
+		err := wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, false, checkDaemonset)
 		framework.ExpectNoError(err, "error waiting for image to be pulled")
 	}
 }

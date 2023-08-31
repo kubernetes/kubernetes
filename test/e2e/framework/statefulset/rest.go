@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -96,7 +97,7 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 	// pvs are global, so we need to wait for the exact ones bound to the statefulset pvcs.
 	pvNames := sets.NewString()
 	// TODO: Don't assume all pvcs in the ns belong to a statefulset
-	pvcPollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
+	pvcPollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, false, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
@@ -116,7 +117,7 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 		errList = append(errList, fmt.Sprintf("Timeout waiting for pvc deletion."))
 	}
 
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, false, func(ctx context.Context) (bool, error) {
 		pvList, err := c.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvs, retrying %v", err)
@@ -151,7 +152,7 @@ func Scale(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, c
 	ss = update(ctx, c, ns, name, count)
 
 	var statefulPodList *v1.PodList
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, false, func(ctx context.Context) (bool, error) {
 		statefulPodList = GetPodList(ctx, c, ss)
 		if int32(len(statefulPodList.Items)) == count {
 			return true, nil

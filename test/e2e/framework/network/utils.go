@@ -39,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	netutils "k8s.io/utils/net"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -47,7 +49,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -526,7 +527,7 @@ func (config *NetworkingTestConfig) executeCurlCmd(ctx context.Context, cmd stri
 	const retryTimeout = 30 * time.Second
 	podName := config.HostTestContainerPod.Name
 	var msg string
-	if pollErr := wait.PollImmediateWithContext(ctx, retryInterval, retryTimeout, func(ctx context.Context) (bool, error) {
+	if pollErr := wait.PollUntilContextTimeout(ctx, retryInterval, retryTimeout, false, func(ctx context.Context) (bool, error) {
 		stdout, err := e2epodoutput.RunHostCmd(config.Namespace, podName, cmd)
 		if err != nil {
 			msg = fmt.Sprintf("failed executing cmd %v in %v/%v: %v", cmd, config.Namespace, podName, err)
@@ -1172,7 +1173,7 @@ func UnblockNetwork(ctx context.Context, from string, to string) {
 
 // WaitForService waits until the service appears (exist == true), or disappears (exist == false)
 func WaitForService(ctx context.Context, c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
 		_, err := c.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 		switch {
 		case err == nil:

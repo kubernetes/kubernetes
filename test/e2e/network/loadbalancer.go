@@ -40,6 +40,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	gcecloud "k8s.io/legacy-cloud-providers/gce"
+	admissionapi "k8s.io/pod-security-admission/api"
+	netutils "k8s.io/utils/net"
+	utilpointer "k8s.io/utils/pointer"
+
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	e2eapps "k8s.io/kubernetes/test/e2e/apps"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -55,10 +60,6 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	gcecloud "k8s.io/legacy-cloud-providers/gce"
-	admissionapi "k8s.io/pod-security-admission/api"
-	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -1751,7 +1752,7 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 
 	ginkgo.By("Checking that daemon pods launch on every schedulable node of the cluster")
 	creationTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
-	err = wait.PollImmediateWithContext(ctx, framework.Poll, creationTimeout, e2edaemonset.CheckDaemonPodOnNodes(f, ds, nodeNames))
+	err = wait.PollUntilContextTimeout(ctx, framework.Poll, creationTimeout, false, e2edaemonset.CheckDaemonPodOnNodes(f, ds, nodeNames))
 	framework.ExpectNoError(err, "error waiting for daemon pods to start")
 	err = e2edaemonset.CheckDaemonStatus(ctx, f, name)
 	framework.ExpectNoError(err)

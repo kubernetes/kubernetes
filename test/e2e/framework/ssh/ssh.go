@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -422,7 +423,7 @@ func nodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 func waitListSchedulableNodes(ctx context.Context, c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
-	if wait.PollImmediateWithContext(ctx, pollNodeInterval, singleCallTimeout, func(ctx context.Context) (bool, error) {
+	if wait.PollUntilContextTimeout(ctx, pollNodeInterval, singleCallTimeout, false, func(ctx context.Context) (bool, error) {
 		nodes, err = c.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})

@@ -33,11 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	dnsclient "k8s.io/kubernetes/third_party/forked/golang/net"
-	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -456,7 +457,7 @@ func assertFilesExist(ctx context.Context, fileNames []string, fileDir string, p
 func assertFilesContain(ctx context.Context, fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
-	framework.ExpectNoError(wait.PollImmediateWithContext(ctx, time.Second*5, time.Second*600, func(ctx context.Context) (bool, error) {
+	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second*5, time.Second*600, false, func(ctx context.Context) (bool, error) {
 		failed = []string{}
 
 		ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)

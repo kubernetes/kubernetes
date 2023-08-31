@@ -25,9 +25,10 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
-	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
@@ -217,7 +218,7 @@ var _ = common.SIGDescribe("Events", func() {
 
 		ginkgo.By("check that the list of events matches the requested quantity")
 
-		err = wait.PollImmediateWithContext(ctx, eventRetryPeriod, eventRetryTimeout, checkEventListQuantity(f, "testevent-set=true", 0))
+		err = wait.PollUntilContextTimeout(ctx, eventRetryPeriod, eventRetryTimeout, false, checkEventListQuantity(f, "testevent-set=true", 0))
 		framework.ExpectNoError(err, "failed to count required events")
 	})
 

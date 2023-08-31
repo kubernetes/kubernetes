@@ -32,11 +32,12 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -139,7 +140,7 @@ func UpdatePVSize(ctx context.Context, pv *v1.PersistentVolume, size resource.Qu
 	pvToUpdate := pv.DeepCopy()
 
 	var lastError error
-	waitErr := wait.PollImmediateWithContext(ctx, 5*time.Second, csiResizeWaitPeriod, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, csiResizeWaitPeriod, false, func(ctx context.Context) (bool, error) {
 		var err error
 		pvToUpdate, err = c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {

@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
@@ -161,7 +162,7 @@ func pollConfigz(ctx context.Context, timeout time.Duration, pollInterval time.D
 	req.Header.Add("Accept", "application/json")
 
 	var respBody []byte
-	err = wait.PollImmediateWithContext(ctx, pollInterval, timeout, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, pollInterval, timeout, false, func(ctx context.Context) (bool, error) {
 		resp, err := client.Do(req)
 		if err != nil {
 			framework.Logf("Failed to get /configz, retrying. Error: %v", err)

@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -45,10 +46,11 @@ func WaitForAllNodesSchedulable(ctx context.Context, c clientset.Interface, time
 	}
 
 	framework.Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, framework.TestContext.AllowedNotReadyNodes)
-	return wait.PollImmediateWithContext(
+	return wait.PollUntilContextTimeout(
 		ctx,
 		30*time.Second,
 		timeout,
+		false,
 		CheckReadyForTests(ctx, c, framework.TestContext.NonblockingTaints, framework.TestContext.AllowedNotReadyNodes, largeClusterThreshold),
 	)
 }
@@ -120,7 +122,7 @@ func allNodesReady(ctx context.Context, c clientset.Interface, timeout time.Dura
 	framework.Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, framework.TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, false, func(ctx context.Context) (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})

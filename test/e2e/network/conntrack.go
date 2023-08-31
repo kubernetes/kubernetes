@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -35,7 +37,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -173,7 +174,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
-		if err := wait.PollImmediateWithContext(ctx, 5*time.Second, time.Minute, logContainsFn(podBackend1, podClient)); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, false, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
 			framework.Logf("Pod client logs: %s", logs)
@@ -197,7 +198,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
 		ginkgo.By("checking client pod connected to the backend 2 on Node IP " + serverNodeInfo.nodeIP)
-		if err := wait.PollImmediateWithContext(ctx, 5*time.Second, time.Minute, logContainsFn(podBackend2, podClient)); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, false, logContainsFn(podBackend2, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
 			framework.Logf("Pod client logs: %s", logs)
@@ -249,7 +250,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
-		if err := wait.PollImmediateWithContext(ctx, 5*time.Second, time.Minute, logContainsFn(podBackend1, podClient)); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, false, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
 			framework.Logf("Pod client logs: %s", logs)
@@ -273,7 +274,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
 		ginkgo.By("checking client pod connected to the backend 2 on Node IP " + serverNodeInfo.nodeIP)
-		if err := wait.PollImmediateWithContext(ctx, 5*time.Second, time.Minute, logContainsFn(podBackend2, podClient)); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, false, logContainsFn(podBackend2, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
 			framework.Logf("Pod client logs: %s", logs)
@@ -345,7 +346,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend on Node IP " + serverNodeInfo.nodeIP)
-		if err := wait.PollImmediateWithContext(ctx, 5*time.Second, time.Minute, logContainsFn(podBackend1, podClient)); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, false, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
 			framework.Logf("Pod client logs: %s", logs)
@@ -462,7 +463,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// so the client will receive an unexpected TCP connection and RST the connection
 		// the server will log ERROR if that happens
 		ginkgo.By("checking client pod does not RST the TCP connection because it receives an INVALID packet")
-		if err := wait.PollImmediateWithContext(ctx, 5*time.Second, time.Minute, logContainsFn("ERROR", "boom-server")); err == nil {
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, false, logContainsFn("ERROR", "boom-server")); err == nil {
 			logs, err := e2epod.GetPodLogs(ctx, cs, ns, "boom-server", "boom-server")
 			framework.ExpectNoError(err)
 			framework.Logf("boom-server pod logs: %s", logs)

@@ -41,6 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -51,7 +53,6 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type localTestConfig struct {
@@ -615,7 +616,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			ginkgo.By("Waiting for all pods to complete successfully")
 			const completeTimeout = 5 * time.Minute
-			waitErr := wait.PollImmediateWithContext(ctx, time.Second, completeTimeout, func(ctx context.Context) (done bool, err error) {
+			waitErr := wait.PollUntilContextTimeout(ctx, time.Second, completeTimeout, false, func(ctx context.Context) (done bool, err error) {
 				podsList, err := config.client.CoreV1().Pods(config.ns).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return false, err

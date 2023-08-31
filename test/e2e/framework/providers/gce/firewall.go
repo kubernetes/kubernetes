@@ -30,8 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/test/e2e/framework"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
+
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // MakeFirewallNameForLBService return the expected firewall name for a LB service.
@@ -410,7 +411,7 @@ func WaitForFirewallRule(ctx context.Context, gceCloud *gcecloud.Cloud, fwName s
 		return true, nil
 	}
 
-	if err := wait.PollImmediateWithContext(ctx, 5*time.Second, timeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, false, condition); err != nil {
 		return nil, fmt.Errorf("error waiting for firewall %v exist=%v", fwName, exist)
 	}
 	return fw, nil

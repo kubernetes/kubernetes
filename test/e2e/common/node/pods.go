@@ -47,6 +47,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/util/podutils"
+	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/pointer"
+
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -54,8 +57,6 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -883,7 +884,7 @@ var _ = SIGDescribe("Pods", func() {
 
 		// wait for all pods to be deleted
 		ginkgo.By("waiting for all pods to be deleted")
-		err = wait.PollImmediateWithContext(ctx, podRetryPeriod, f.Timeouts.PodDelete, checkPodListQuantity(f, "type=Testing", 0))
+		err = wait.PollUntilContextTimeout(ctx, podRetryPeriod, f.Timeouts.PodDelete, false, checkPodListQuantity(f, "type=Testing", 0))
 		framework.ExpectNoError(err, "found a pod(s)")
 	})
 

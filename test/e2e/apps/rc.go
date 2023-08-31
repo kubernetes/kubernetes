@@ -36,12 +36,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -432,7 +433,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		_, err := rcClient.Create(ctx, rc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create ReplicationController: %v", err)
 
-		err = wait.PollImmediateWithContext(ctx, 1*time.Second, 1*time.Minute, checkReplicationControllerStatusReplicaCount(f, rcName, initialRCReplicaCount))
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, false, checkReplicationControllerStatusReplicaCount(f, rcName, initialRCReplicaCount))
 		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
 
 		ginkgo.By(fmt.Sprintf("Getting scale subresource for ReplicationController %q", rcName))
@@ -447,7 +448,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "Failed to update scale subresource: %v", err)
 
 		ginkgo.By(fmt.Sprintf("Verifying replicas where modified for replication controller %q", rcName))
-		err = wait.PollImmediateWithContext(ctx, 1*time.Second, 1*time.Minute, checkReplicationControllerStatusReplicaCount(f, rcName, expectedRCReplicaCount))
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, false, checkReplicationControllerStatusReplicaCount(f, rcName, expectedRCReplicaCount))
 		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
 	})
 })

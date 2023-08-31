@@ -27,13 +27,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -134,7 +135,7 @@ func getUniqueVolumeName(pod *v1.Pod, driverName string) string {
 }
 
 func waitForVolumesNotInUse(ctx context.Context, client clientset.Interface, nodeName, volumeName string) error {
-	waitErr := wait.PollImmediateWithContext(ctx, 10*time.Second, 60*time.Second, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		node, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
@@ -154,7 +155,7 @@ func waitForVolumesNotInUse(ctx context.Context, client clientset.Interface, nod
 }
 
 func waitForVolumesAttached(ctx context.Context, client clientset.Interface, nodeName, volumeName string) error {
-	waitErr := wait.PollImmediateWithContext(ctx, 2*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
 		node, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
@@ -174,7 +175,7 @@ func waitForVolumesAttached(ctx context.Context, client clientset.Interface, nod
 }
 
 func waitForVolumesInUse(ctx context.Context, client clientset.Interface, nodeName, volumeName string) error {
-	waitErr := wait.PollImmediateWithContext(ctx, 10*time.Second, 60*time.Second, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, 60*time.Second, false, func(ctx context.Context) (bool, error) {
 		node, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)

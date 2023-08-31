@@ -47,6 +47,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
+	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/pointer"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -56,8 +59,6 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -1826,7 +1827,7 @@ func lastLine(out string) string {
 }
 
 func pollReadWithTimeout(ctx context.Context, statefulPod statefulPodTester, statefulPodNumber int, key, expectedVal string) error {
-	err := wait.PollImmediateWithContext(ctx, time.Second, readTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Second, readTimeout, false, func(ctx context.Context) (bool, error) {
 		val := statefulPod.read(statefulPodNumber, key)
 		if val == "" {
 			return false, nil

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -91,7 +92,7 @@ func isJobFailed(j *batchv1.Job) bool {
 
 // WaitForJobFinish uses c to wait for the Job jobName in namespace ns to finish (either Failed or Complete).
 func WaitForJobFinish(ctx context.Context, c clientset.Interface, ns, jobName string) error {
-	return wait.PollImmediateWithContext(ctx, framework.Poll, JobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, false, func(ctx context.Context) (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -125,7 +126,7 @@ func WaitForJobGone(ctx context.Context, c clientset.Interface, ns, jobName stri
 // WaitForAllJobPodsGone waits for all pods for the Job named jobName in namespace ns
 // to be deleted.
 func WaitForAllJobPodsGone(ctx context.Context, c clientset.Interface, ns, jobName string) error {
-	return wait.PollImmediateWithContext(ctx, framework.Poll, JobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, false, func(ctx context.Context) (bool, error) {
 		pods, err := GetJobPods(ctx, c, ns, jobName)
 		if err != nil {
 			return false, err

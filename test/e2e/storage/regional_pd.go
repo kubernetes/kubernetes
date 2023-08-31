@@ -39,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -48,7 +50,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -260,7 +261,7 @@ func testZonalFailover(ctx context.Context, c clientset.Interface, ns string) {
 	} else {
 		otherZone = cloudZones[0]
 	}
-	waitErr := wait.PollImmediateWithContext(ctx, framework.Poll, statefulSetReadyTimeout, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, framework.Poll, statefulSetReadyTimeout, false, func(ctx context.Context) (bool, error) {
 		framework.Logf("Checking whether new pod is scheduled in zone %q", otherZone)
 		pod := getPod(ctx, c, ns, regionalPDLabels)
 		node, err := c.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
