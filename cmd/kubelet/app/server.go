@@ -726,6 +726,12 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		cgroupRoots = append(cgroupRoots, s.SystemCgroups)
 	}
 
+	// CARRY: Monitor extra cgroups that are specific to OpenShift deployments
+	//        Adding them here since there is no way to handle this via configuration atm
+	// - ovs.slice is configured on clusters that use the NTO's PerformanceProfile and only exists together
+	//   with system-cpu-reserved
+	cgroupRoots = append(cgroupRoots, "/ovs.slice")
+
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntimeEndpoint)
 		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation)
