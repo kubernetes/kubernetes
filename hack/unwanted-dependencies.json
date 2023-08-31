@@ -21,7 +21,6 @@
       "github.com/gogo/protobuf": "unmaintained",
       "github.com/golang/mock": "unmaintained, archive mode",
       "github.com/google/shlex": "unmaintained, archive mode",
-      "github.com/google/shlex": "unmaintained, archive mode",
       "github.com/googleapis/enterprise-certificate-proxy": "references cloud dependencies",
       "github.com/googleapis/gax-go/v2": "references cloud dependencies",
       "github.com/gorilla/handlers": "unmaintained, archive mode",
@@ -53,7 +52,6 @@
       "github.com/mitchellh/gox": "MPL license not in CNCF allowlist",
       "github.com/mndrix/tap-go": "unmaintained",
       "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
-      "github.com/pkg/errors": "unmaintained, archive mode",
       "github.com/pkg/errors": "unmaintained, archive mode",
       "github.com/rubiojr/go-vhd": "unmaintained, archive mode",
       "github.com/smartystreets/goconvey": "MPL license not in CNCF allowlist",
@@ -125,6 +123,10 @@
         "k8s.io/kubernetes",
         "k8s.io/metrics"
       ],
+      "github.com/golang/mock": [
+        "k8s.io/kubernetes",
+        "k8s.io/legacy-cloud-providers"
+      ],
       "github.com/google/shlex": [
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
@@ -143,6 +145,14 @@
         "github.com/moby/spdystream",
         "github.com/tmc/grpc-websocket-proxy",
         "go.etcd.io/etcd/server/v3"
+      ],
+      "github.com/gregjones/httpcache": [
+        "k8s.io/client-go"
+      ],
+      "github.com/grpc-ecosystem/go-grpc-prometheus": [
+        "go.etcd.io/etcd/client/v3",
+        "go.etcd.io/etcd/server/v3",
+        "k8s.io/apiserver"
       ],
       "github.com/grpc-ecosystem/grpc-gateway": [
         "go.etcd.io/etcd/api/v3",
@@ -173,6 +183,15 @@
         "k8s.io/system-validators",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
+      ],
+      "github.com/rubiojr/go-vhd": [
+        "k8s.io/legacy-cloud-providers"
+      ],
+      "go.opencensus.io": [
+        "cloud.google.com/go",
+        "cloud.google.com/go/compute",
+        "github.com/Microsoft/hcsshim",
+        "google.golang.org/api"
       ],
       "golang.org/x/exp": [
         "github.com/antlr/antlr4/runtime/Go/antlr/v4",
