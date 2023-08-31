@@ -611,14 +611,21 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		attribute.Int("limit", int(opts.Predicate.Limit)),
 		attribute.String("continue", opts.Predicate.Continue))
 	defer span.End(500 * time.Millisecond)
+	key, err := s.prepareKey(key)
+	if err != nil {
+		return err
+	}
+	// For recursive lists, we need to make sure the key ended with "/" so that we only
+	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
+	// with prefix "/a" will return all three, while with prefix "/a/" will return only
+	// "/a/b" which is the correct answer.
+	if opts.Recursive && !strings.HasSuffix(key, "/") {
+		key += "/"
+	}
 	return s.getList(ctx, key, opts, listObj)
 }
 
 func (s *store) getList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	preparedKey, err := s.prepareKey(key)
-	if err != nil {
-		return err
-	}
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -628,15 +635,7 @@ func (s *store) getList(ctx context.Context, key string, opts storage.ListOption
 		return fmt.Errorf("need ptr to slice: %v", err)
 	}
 
-	// For recursive lists, we need to make sure the key ended with "/" so that we only
-	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
-	// with prefix "/a" will return all three, while with prefix "/a/" will return only
-	// "/a/b" which is the correct answer.
-	if opts.Recursive && !strings.HasSuffix(preparedKey, "/") {
-		preparedKey += "/"
-	}
-	keyPrefix := preparedKey
-
+	keyPrefix := key
 	// set the appropriate clientv3 options to filter the returned data set
 	var limitOption *clientv3.OpOption
 	limit := opts.Predicate.Limit
@@ -671,7 +670,7 @@ func (s *store) getList(ctx context.Context, key string, opts storage.ListOption
 		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
 			return apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
 		}
-		preparedKey = continueKey
+		key = continueKey
 		// If continueRV > 0, the LIST request needs a specific resource version.
 		// continueRV==0 is invalid.
 		// If continueRV < 0, the request is for the latest resource version.
@@ -724,7 +723,7 @@ func (s *store) getList(ctx context.Context, key string, opts storage.ListOption
 
 	for {
 		startTime := time.Now()
-		getResp, err = s.client.KV.Get(ctx, preparedKey, options...)
+		getResp, err = s.client.KV.Get(ctx, key, options...)
 		metrics.RecordEtcdRequest(metricsOp, s.groupResourceString, err, startTime)
 		if err != nil {
 			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
@@ -788,7 +787,7 @@ func (s *store) getList(ctx context.Context, key string, opts storage.ListOption
 			}
 			*limitOption = clientv3.WithLimit(limit)
 		}
-		preparedKey = string(lastKey) + "\x00"
+		key = string(lastKey) + "\x00"
 		if withRev == 0 {
 			withRev = getResp.Header.Revision
 			options = append(options, clientv3.WithRev(withRev))
