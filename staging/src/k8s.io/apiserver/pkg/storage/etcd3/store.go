@@ -603,10 +603,6 @@ func (s *store) Count(key string) (int64, error) {
 
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	preparedKey, err := s.prepareKey(key)
-	if err != nil {
-		return err
-	}
 	ctx, span := tracing.Start(ctx, fmt.Sprintf("List(recursive=%v) etcd3", opts.Recursive),
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
@@ -615,6 +611,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		attribute.Int("limit", int(opts.Predicate.Limit)),
 		attribute.String("continue", opts.Predicate.Continue))
 	defer span.End(500 * time.Millisecond)
+	return s.getList(ctx, key, opts, listObj)
+}
+
+func (s *store) getList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	preparedKey, err := s.prepareKey(key)
+	if err != nil {
+		return err
+	}
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
