@@ -1252,7 +1252,9 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 					return tc.now
 				},
 			}
-			cjCopy, requeueAfter, updateStatus, err := jm.syncCronJob(context.TODO(), &cj, js)
+			updateStatus := false
+			cjCopy := cj.DeepCopy()
+			requeueAfter, err := jm.syncCronJob(context.TODO(), cjCopy, &updateStatus, js)
 			if tc.expectErr && err == nil {
 				t.Errorf("%s: expected error got none with requeueAfter time: %#v", name, requeueAfter)
 			}
