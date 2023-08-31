@@ -1759,9 +1759,9 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 			client := fake.NewSimpleClientset()
 
 			informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-			informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(tt.cronJob)
+			_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(tt.cronJob)
 			for _, job := range tt.finishedJobs {
-				informerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+				_ = informerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
 
 			jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
