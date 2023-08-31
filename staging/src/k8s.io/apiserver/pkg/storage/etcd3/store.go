@@ -674,14 +674,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 		}
 	}
-	err = s.getList(ctx, rangeStart, rangeEnd, keyPrefix, withRev, opts, listObj)
+	err = s.getList(ctx, rangeStart, rangeEnd, keyPrefix, withRev, opts.Predicate, opts.ResourceVersion, listObj)
 	if err != nil {
 		return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 	}
 	return err
 }
 
-func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix string, withRev int64, opts storage.ListOptions, listObj runtime.Object) error {
+func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix string, withRev int64, pred storage.SelectionPredicate, minimalResourceVersion string, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -693,10 +693,10 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 
 	// set the appropriate clientv3 options to filter the returned data set
 	var limitOption *clientv3.OpOption
-	limit := opts.Predicate.Limit
+	limit := pred.Limit
 	var paging bool
 	options := make([]clientv3.OpOption, 0, 4)
-	if s.pagingEnabled && opts.Predicate.Limit > 0 {
+	if s.pagingEnabled && pred.Limit > 0 {
 		paging = true
 		options = append(options, clientv3.WithLimit(limit))
 		limitOption = &options[len(options)-1]
@@ -737,7 +737,7 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 			return err
 		}
 		numFetched += len(getResp.Kvs)
-		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
+		if err = s.validateMinimumResourceVersion(minimalResourceVersion, uint64(getResp.Header.Revision)); err != nil {
 			return err
 		}
 		hasMore = getResp.More
@@ -748,7 +748,7 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 
 		// avoid small allocations for the result slice, since this can be called in many
 		// different contexts and we don't know how significantly the result will be filtered
-		if opts.Predicate.Empty() {
+		if pred.Empty() {
 			growSlice(v, len(getResp.Kvs))
 		} else {
 			growSlice(v, 2048, len(getResp.Kvs))
@@ -756,7 +756,7 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 
 		// take items from the response until the bucket is full, filtering as we go
 		for i, kv := range getResp.Kvs {
-			if paging && int64(v.Len()) >= opts.Predicate.Limit {
+			if paging && int64(v.Len()) >= pred.Limit {
 				hasMore = true
 				break
 			}
@@ -767,7 +767,7 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), opts.Predicate, s.codec, s.versioner, newItemFunc); err != nil {
+			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
 				return err
 			}
@@ -782,7 +782,7 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 			break
 		}
 		// we're paging but we have filled our bucket
-		if int64(v.Len()) >= opts.Predicate.Limit {
+		if int64(v.Len()) >= pred.Limit {
 			break
 		}
 
@@ -823,8 +823,8 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 		// getResp.Count counts in objects that do not match the pred.
 		// Instead of returning inaccurate count for non-empty selectors, we return nil.
 		// Only set remainingItemCount if the predicate is empty.
-		if opts.Predicate.Empty() {
-			c := int64(getResp.Count - opts.Predicate.Limit)
+		if pred.Empty() {
+			c := int64(getResp.Count - pred.Limit)
 			remainingItemCount = &c
 		}
 		return s.versioner.UpdateList(listObj, uint64(withRev), next, remainingItemCount)
