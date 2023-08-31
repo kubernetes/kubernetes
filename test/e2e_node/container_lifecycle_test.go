@@ -142,7 +142,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		ginkgo.By("Parsing results")
 		podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(podSpec)
+		results := parseOutput(context.TODO(), f, podSpec)
 
 		// which we then use to make assertions regarding container ordering
 		ginkgo.By("Analyzing results")
@@ -201,7 +201,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		ginkgo.By("Parsing results")
 		podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(podSpec)
+		results := parseOutput(context.TODO(), f, podSpec)
 
 		ginkgo.By("Analyzing results")
 		// init container should start and exit with an error, and the regular container should never start
@@ -243,8 +243,9 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 							PostStart: &v1.LifecycleHandler{
 								Exec: &v1.ExecAction{
 									Command: ExecCommand(prefixedName(PostStartPrefix, regular1), execCommand{
-										Delay:    1,
-										ExitCode: 0,
+										Delay:         1,
+										ExitCode:      0,
+										ContainerName: regular1,
 									}),
 								},
 							},
@@ -265,7 +266,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		ginkgo.By("Parsing results")
 		podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(podSpec)
+		results := parseOutput(context.TODO(), f, podSpec)
 
 		ginkgo.By("Analyzing results")
 		// init container should start and exit with an error, and the regular container should never start
@@ -309,7 +310,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		ginkgo.By("Parsing results")
 		podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(podSpec)
+		results := parseOutput(context.TODO(), f, podSpec)
 
 		ginkgo.By("Analyzing results")
 		// container must be restarted
@@ -341,8 +342,9 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 							PostStart: &v1.LifecycleHandler{
 								Exec: &v1.ExecAction{
 									Command: ExecCommand(prefixedName(PostStartPrefix, regular1), execCommand{
-										Delay:    1,
-										ExitCode: 0,
+										Delay:         1,
+										ExitCode:      0,
+										ContainerName: regular1,
 									}),
 								},
 							},
@@ -371,7 +373,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		ginkgo.By("Parsing results")
 		podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(podSpec)
+		results := parseOutput(context.TODO(), f, podSpec)
 
 		ginkgo.By("Analyzing results")
 		// second container should not start before the PostStart of a first container completed
@@ -427,7 +429,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should not start an init container", func() {
 				framework.ExpectNoError(results.DoesntStart(init1))
@@ -500,7 +502,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		ginkgo.By("Parsing results")
 		podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(podSpec)
+		results := parseOutput(context.TODO(), f, podSpec)
 
 		ginkgo.By("Analyzing results")
 		framework.ExpectNoError(results.StartsBefore(init1, init2))
@@ -635,8 +637,9 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 							PreStop: &v1.LifecycleHandler{
 								Exec: &v1.ExecAction{
 									Command: ExecCommand(prefixedName(PreStopPrefix, regular1), execCommand{
-										Delay:    1,
-										ExitCode: 0,
+										Delay:         1,
+										ExitCode:      0,
+										ContainerName: regular1,
 									}),
 								},
 							},
@@ -658,7 +661,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		ginkgo.By("Parsing results")
 		podSpec, err = client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(podSpec)
+		results := parseOutput(context.TODO(), f, podSpec)
 
 		ginkgo.By("Analyzing results")
 		framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PreStopPrefix, regular1)))
@@ -701,8 +704,9 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 							PreStop: &v1.LifecycleHandler{
 								Exec: &v1.ExecAction{
 									Command: ExecCommand(prefixedName(PreStopPrefix, regular1), execCommand{
-										Delay:    1,
-										ExitCode: 0,
+										Delay:         1,
+										ExitCode:      0,
+										ContainerName: regular1,
 									}),
 								},
 							},
@@ -724,7 +728,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		ginkgo.By("Parsing results")
 		podSpec, err = client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(podSpec)
+		results := parseOutput(context.TODO(), f, podSpec)
 
 		ginkgo.By("Analyzing results")
 		framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PreStopPrefix, regular1)))
@@ -842,7 +846,7 @@ var _ = SIGDescribe("[Serial] Containers Lifecycle ", func() {
 		ginkgo.By("Parsing results")
 		pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(pod)
+		results := parseOutput(context.TODO(), f, pod)
 
 		ginkgo.By("Analyzing results")
 		init1Started, err := results.FindIndex(init1, "Started", 0)
@@ -962,7 +966,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 			podSpec, err := client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			results = parseOutput(podSpec)
+			results = parseOutput(context.TODO(), f, podSpec)
 		})
 
 		ginkgo.It("should run the first init container to completion before starting first restartable init container", func() {
@@ -1052,7 +1056,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should not restart a restartable init container", func() {
 				framework.ExpectNoError(results.DoesntStartAfter(restartableInit1, regular1))
@@ -1110,7 +1114,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should not start a restartable init container", func() {
 				framework.ExpectNoError(results.DoesntStart(restartableInit1))
@@ -1178,7 +1182,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
 				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
@@ -1246,7 +1250,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
 				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
@@ -1315,7 +1319,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should mark an Init container as failed", func() {
 				framework.ExpectNoError(results.Exits(init1))
@@ -1381,7 +1385,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should mark an Init container as failed", func() {
 				framework.ExpectNoError(results.Exits(init1))
@@ -1443,7 +1447,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should not restart a restartable init container", func() {
 				framework.ExpectNoError(results.DoesntStartAfter(restartableInit1, regular1))
@@ -1501,7 +1505,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should not start a restartable init container", func() {
 				framework.ExpectNoError(results.DoesntStart(restartableInit1))
@@ -1570,7 +1574,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
 				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
@@ -1640,7 +1644,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
 				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
@@ -1718,7 +1722,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should have Init container restartCount greater than 0", func() {
 				framework.ExpectNoError(results.HasRestarted(init1))
@@ -1793,7 +1797,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should have Init container restartCount greater than 0", func() {
 				framework.ExpectNoError(results.HasRestarted(init1))
@@ -1855,7 +1859,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 
 			ginkgo.It("should not restart a restartable init container", func() {
@@ -1915,7 +1919,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should not start a restartable init container", func() {
 				framework.ExpectNoError(results.DoesntStart(restartableInit1))
@@ -1983,7 +1987,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
 				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
@@ -2053,7 +2057,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
 				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
@@ -2131,7 +2135,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should have Init container restartCount greater than 0", func() {
 				framework.ExpectNoError(results.HasRestarted(init1))
@@ -2206,7 +2210,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 				podSpec, err := client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				results = parseOutput(podSpec)
+				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should have Init container restartCount greater than 0", func() {
 				framework.ExpectNoError(results.HasRestarted(init1))
@@ -2290,7 +2294,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 
 		pod, err = client.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		results := parseOutput(pod)
+		results := parseOutput(context.TODO(), f, pod)
 
 		ginkgo.By("Analyzing results")
 		framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit2))
@@ -2334,8 +2338,9 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 							PreStop: &v1.LifecycleHandler{
 								Exec: &v1.ExecAction{
 									Command: ExecCommand(prefixedName(PreStopPrefix, restartableInit1), execCommand{
-										Delay:    1,
-										ExitCode: 0,
+										Delay:         1,
+										ExitCode:      0,
+										ContainerName: restartableInit1,
 									}),
 								},
 							},
@@ -2372,7 +2377,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			framework.Failf("pod %q is not pending, it's %q", pod.Name, pod.Status.Phase)
 		}
 
-		results := parseOutput(pod)
+		results := parseOutput(context.TODO(), f, pod)
 
 		ginkgo.By("Analyzing results")
 		framework.ExpectNoError(results.RunTogether(restartableInit1, prefixedName(PreStopPrefix, restartableInit1)))
@@ -2418,8 +2423,9 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 							PreStop: &v1.LifecycleHandler{
 								Exec: &v1.ExecAction{
 									Command: ExecCommand(prefixedName(PreStopPrefix, restartableInit1), execCommand{
-										Delay:    1,
-										ExitCode: 0,
+										Delay:         1,
+										ExitCode:      0,
+										ContainerName: restartableInit1,
 									}),
 								},
 							},
@@ -2455,7 +2461,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 		pod, err = client.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		results := parseOutput(pod)
+		results := parseOutput(context.TODO(), f, pod)
 
 		ginkgo.By("Analyzing results")
 		framework.ExpectNoError(results.RunTogether(restartableInit1, prefixedName(PreStopPrefix, restartableInit1)))
