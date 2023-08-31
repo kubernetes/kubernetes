@@ -611,9 +611,18 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		attribute.Int("limit", int(opts.Predicate.Limit)),
 		attribute.String("continue", opts.Predicate.Continue))
 	defer span.End(500 * time.Millisecond)
-	keyPrefix, err := s.prepareKey(key)
+	rangeStart, rangeEnd, keyPrefix, continueKey, withRev, err := s.prepareList(key, opts)
+	err = s.getList(ctx, rangeStart, rangeEnd, keyPrefix, withRev, opts.Predicate, opts.ResourceVersion, listObj)
 	if err != nil {
-		return err
+		return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
+	}
+	return err
+}
+
+func (s *store) prepareList(key string, opts storage.ListOptions) (rangeStart, rangeEnd, keyPrefix, continueKey string, withRev int64, err error) {
+	keyPrefix, err = s.prepareKey(key)
+	if err != nil {
+		return "", "", "", "", 0, err
 	}
 	// For recursive lists, we need to make sure the key ended with "/" so that we only
 	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
@@ -622,8 +631,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	if opts.Recursive && !strings.HasSuffix(keyPrefix, "/") {
 		keyPrefix += "/"
 	}
-	rangeStart := keyPrefix
-	var rangeEnd string
+	rangeStart = keyPrefix
 	if opts.Recursive {
 		rangeEnd = clientv3.GetPrefixRangeEnd(keyPrefix)
 	}
@@ -632,23 +640,21 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	if len(opts.ResourceVersion) > 0 {
 		parsedRV, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
 		if err != nil {
-			return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+			return "", "", "", "", 0, apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 		}
 		fromRV = &parsedRV
 	}
 
-	var withRev int64
-	var continueKey string
 	switch {
 	case opts.Recursive && s.pagingEnabled && len(opts.Predicate.Continue) > 0:
 		var continueRV int64
 		continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, keyPrefix)
 		if err != nil {
-			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
+			return "", "", "", "", 0, apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
 
 		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
+			return "", "", "", "", 0, apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
 		}
 		rangeStart = continueKey
 		// If continueRV > 0, the LIST request needs a specific resource version.
@@ -670,15 +676,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 					withRev = int64(*fromRV)
 				}
 			default:
-				return fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
+				return "", "", "", "", 0, fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
 			}
 		}
 	}
-	err = s.getList(ctx, rangeStart, rangeEnd, keyPrefix, withRev, opts.Predicate, opts.ResourceVersion, listObj)
-	if err != nil {
-		return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
-	}
-	return err
+	return rangeStart, rangeEnd, keyPrefix, continueKey, withRev, nil
 }
 
 func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix string, withRev int64, pred storage.SelectionPredicate, minimalResourceVersion string, listObj runtime.Object) error {
