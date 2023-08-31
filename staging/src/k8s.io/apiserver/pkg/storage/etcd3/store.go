@@ -612,11 +612,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		attribute.String("continue", opts.Predicate.Continue))
 	defer span.End(500 * time.Millisecond)
 	rangeStart, rangeEnd, keyPrefix, continueKey, withRev, err := s.prepareList(key, opts)
-	err = s.getList(ctx, rangeStart, rangeEnd, keyPrefix, withRev, opts.Predicate, opts.ResourceVersion, listObj)
+	returnRV, nextContinue, remainingItemCount, err := s.getList(ctx, rangeStart, rangeEnd, keyPrefix, withRev, opts.Predicate, opts.ResourceVersion, listObj)
 	if err != nil {
 		return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 	}
-	return err
+	return s.versioner.UpdateList(listObj, uint64(returnRV), nextContinue, remainingItemCount)
 }
 
 func (s *store) prepareList(key string, opts storage.ListOptions) (rangeStart, rangeEnd, keyPrefix, continueKey string, withRev int64, err error) {
@@ -683,14 +683,14 @@ func (s *store) prepareList(key string, opts storage.ListOptions) (rangeStart, r
 	return rangeStart, rangeEnd, keyPrefix, continueKey, withRev, nil
 }
 
-func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix string, withRev int64, pred storage.SelectionPredicate, minimalResourceVersion string, listObj runtime.Object) error {
+func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix string, withRev int64, pred storage.SelectionPredicate, minimalResourceVersion string, listObj runtime.Object) (returnRV int64, nextContinue string, remainingItemCount *int64, err error) {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
-		return err
+		return 0, "", nil, err
 	}
 	v, err := conversion.EnforcePtr(listPtr)
 	if err != nil || v.Kind() != reflect.Slice {
-		return fmt.Errorf("need ptr to slice: %v", err)
+		return 0, "", nil, fmt.Errorf("need ptr to slice: %v", err)
 	}
 
 	// set the appropriate clientv3 options to filter the returned data set
@@ -736,16 +736,16 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 		getResp, err = s.client.KV.Get(ctx, rangeStart, options...)
 		metrics.RecordEtcdRequest(metricsOp, s.groupResourceString, err, startTime)
 		if err != nil {
-			return err
+			return 0, "", nil, err
 		}
 		numFetched += len(getResp.Kvs)
 		if err = s.validateMinimumResourceVersion(minimalResourceVersion, uint64(getResp.Header.Revision)); err != nil {
-			return err
+			return 0, "", nil, err
 		}
 		hasMore = getResp.More
 
 		if len(getResp.Kvs) == 0 && getResp.More {
-			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+			return 0, "", nil, fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 
 		// avoid small allocations for the result slice, since this can be called in many
@@ -766,12 +766,12 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 
 			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
+				return 0, "", nil, storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
 			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
-				return err
+				return 0, "", nil, err
 			}
 			numEvald++
 
@@ -804,7 +804,8 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 		}
 	}
 	// indicate to the client which resource version was returned
-	if withRev == 0 {
+	returnRV = withRev
+	if returnRV == 0 {
 		withRev = getResp.Header.Revision
 	}
 
@@ -817,11 +818,10 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 	// we never return a key that the client wouldn't be allowed to see
 	if hasMore {
 		// we want to start immediately after the last key
-		next, err := storage.EncodeContinue(string(lastKey)+"\x00", keyPrefix, withRev)
+		nextContinue, err = storage.EncodeContinue(string(lastKey)+"\x00", keyPrefix, returnRV)
 		if err != nil {
-			return err
+			return 0, "", nil, err
 		}
-		var remainingItemCount *int64
 		// getResp.Count counts in objects that do not match the pred.
 		// Instead of returning inaccurate count for non-empty selectors, we return nil.
 		// Only set remainingItemCount if the predicate is empty.
@@ -829,11 +829,8 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 			c := int64(getResp.Count - pred.Limit)
 			remainingItemCount = &c
 		}
-		return s.versioner.UpdateList(listObj, uint64(withRev), next, remainingItemCount)
 	}
-
-	// no continuation
-	return s.versioner.UpdateList(listObj, uint64(withRev), "", nil)
+	return returnRV, "", nil, nil
 }
 
 // growSlice takes a slice value and grows its capacity up
