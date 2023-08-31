@@ -611,8 +611,19 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		attribute.Int("limit", int(opts.Predicate.Limit)),
 		attribute.String("continue", opts.Predicate.Continue))
 	defer span.End(500 * time.Millisecond)
+
+	listPtr, err := meta.GetItemsPtr(listObj)
+	if err != nil {
+		return err
+	}
+	listValue, err := conversion.EnforcePtr(listPtr)
+	if err != nil || listValue.Kind() != reflect.Slice {
+		return fmt.Errorf("need ptr to slice: %v", err)
+	}
+
 	rangeStart, rangeEnd, keyPrefix, continueKey, withRev, err := s.prepareList(key, opts)
-	returnRV, nextContinue, remainingItemCount, err := s.getList(ctx, rangeStart, rangeEnd, keyPrefix, withRev, opts.Predicate, opts.ResourceVersion, listObj)
+
+	returnRV, nextContinue, remainingItemCount, err := s.getList(ctx, rangeStart, rangeEnd, keyPrefix, withRev, opts.Predicate, opts.ResourceVersion, listValue, getNewItemFunc(listObj, listValue))
 	if err != nil {
 		return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 	}
@@ -683,16 +694,7 @@ func (s *store) prepareList(key string, opts storage.ListOptions) (rangeStart, r
 	return rangeStart, rangeEnd, keyPrefix, continueKey, withRev, nil
 }
 
-func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix string, withRev int64, pred storage.SelectionPredicate, minimalResourceVersion string, listObj runtime.Object) (returnRV int64, nextContinue string, remainingItemCount *int64, err error) {
-	listPtr, err := meta.GetItemsPtr(listObj)
-	if err != nil {
-		return 0, "", nil, err
-	}
-	v, err := conversion.EnforcePtr(listPtr)
-	if err != nil || v.Kind() != reflect.Slice {
-		return 0, "", nil, fmt.Errorf("need ptr to slice: %v", err)
-	}
-
+func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix string, withRev int64, pred storage.SelectionPredicate, minimalResourceVersion string, listValue reflect.Value, newItemFunc func() runtime.Object) (returnRV int64, nextContinue string, remainingItemCount *int64, err error) {
 	// set the appropriate clientv3 options to filter the returned data set
 	var limitOption *clientv3.OpOption
 	limit := pred.Limit
@@ -703,8 +705,6 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 		options = append(options, clientv3.WithLimit(limit))
 		limitOption = &options[len(options)-1]
 	}
-
-	newItemFunc := getNewItemFunc(listObj, v)
 
 	if rangeEnd != "" {
 		options = append(options, clientv3.WithRange(rangeEnd))
@@ -722,7 +722,7 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 	// Because these metrics are for understanding the costs of handling LIST requests,
 	// get them recorded even in error cases.
 	defer func() {
-		numReturn := v.Len()
+		numReturn := listValue.Len()
 		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, numEvald, numReturn)
 	}()
 
@@ -751,14 +751,14 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 		// avoid small allocations for the result slice, since this can be called in many
 		// different contexts and we don't know how significantly the result will be filtered
 		if pred.Empty() {
-			growSlice(v, len(getResp.Kvs))
+			growSlice(listValue, len(getResp.Kvs))
 		} else {
-			growSlice(v, 2048, len(getResp.Kvs))
+			growSlice(listValue, 2048, len(getResp.Kvs))
 		}
 
 		// take items from the response until the bucket is full, filtering as we go
 		for i, kv := range getResp.Kvs {
-			if paging && int64(v.Len()) >= pred.Limit {
+			if paging && int64(listValue.Len()) >= pred.Limit {
 				hasMore = true
 				break
 			}
@@ -769,7 +769,7 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 				return 0, "", nil, storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
+			if err := appendListItem(listValue, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
 				return 0, "", nil, err
 			}
@@ -784,7 +784,7 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 			break
 		}
 		// we're paging but we have filled our bucket
-		if int64(v.Len()) >= pred.Limit {
+		if int64(listValue.Len()) >= pred.Limit {
 			break
 		}
 
@@ -809,9 +809,9 @@ func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix str
 		withRev = getResp.Header.Revision
 	}
 
-	if v.IsNil() {
+	if listValue.IsNil() {
 		// Ensure that we never return a nil Items pointer in the result for consistency.
-		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
+		listValue.Set(reflect.MakeSlice(listValue.Type(), 0, 0))
 	}
 
 	// instruct the client to begin querying from immediately after the last key we returned
