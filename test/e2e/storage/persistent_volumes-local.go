@@ -326,9 +326,9 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 			ginkgo.By("Creating local PVC and PV")
 			createLocalPVCsPVs(ctx, config, []*localTestVolume{testVol}, immediateMode)
 			pod, err := createLocalPod(ctx, config, testVol, nil)
-			framework.ExpectError(err)
+			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("is not Running")))
 			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, config.client, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-			framework.ExpectError(err)
+			gomega.Expect(err).To(gomega.MatchError(framework.ErrFailure))
 			cleanupLocalPVCsPVs(ctx, config, []*localTestVolume{testVol})
 		})
 
@@ -349,7 +349,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 			framework.ExpectNoError(err)
 
 			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, config.client, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-			framework.ExpectError(err)
+			gomega.Expect(err).To(gomega.MatchError(framework.ErrFailure))
 
 			cleanupLocalVolumes(ctx, config, []*localTestVolume{testVol})
 		})
