@@ -98,8 +98,10 @@ func RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir string) er
 	registerMetrics()
 
 	for _, provider := range credentialProviderConfig.Providers {
-		pluginBin := filepath.Join(pluginBinDir, provider.Name)
-		if _, err := os.Stat(pluginBin); err != nil {
+		// Considering Windows binary with suffix ".exe", LookPath() helps to find the correct path.
+		// LookPath() also calls os.Stat().
+		pluginBin, err := exec.LookPath(filepath.Join(pluginBinDir, provider.Name))
+		if err != nil {
 			if os.IsNotExist(err) {
 				return fmt.Errorf("plugin binary executable %s did not exist", pluginBin)
 			}
