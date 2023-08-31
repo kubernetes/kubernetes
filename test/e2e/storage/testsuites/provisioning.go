@@ -1004,7 +1004,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(ctx context.Co
 	// Wait for ClaimProvisionTimeout (across all PVCs in parallel) and make sure the phase did not become Bound i.e. the Wait errors out
 	ginkgo.By("checking the claims are in pending state")
 	err = e2epv.WaitForPersistentVolumeClaimsPhase(ctx, v1.ClaimBound, t.Client, namespace, claimNames, 2*time.Second /* Poll */, t.Timeouts.ClaimProvisionShort, true)
-	framework.ExpectError(err)
+	gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("not all in phase Bound")))
 	verifyPVCsPending(ctx, t.Client, createdClaims)
 
 	ginkgo.By("creating a pod referring to the claims")
