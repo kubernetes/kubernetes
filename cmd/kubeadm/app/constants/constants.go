@@ -296,8 +296,6 @@ const (
 	// This file should exist under KubeletRunDirectory
 	KubeletEnvFileName = "kubeadm-flags.env"
 
-	KubeletConfigInstanceFileName = "kubeadm-config-instance.yaml"
-
 	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
 	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"
 

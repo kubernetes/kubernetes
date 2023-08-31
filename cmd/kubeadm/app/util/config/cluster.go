@@ -39,7 +39,6 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
@@ -112,8 +111,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		kubeconfigFile := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
 		kubeletConfigFile := filepath.Join(kubeconfigDir, constants.KubeletConfigurationFileName)
 		kubeletEnvFile := filepath.Join(kubeconfigDir, constants.KubeletEnvFileName)
-		localCRISocket := features.Enabled(initcfg.FeatureGates, features.NodeLocalCRISocket)
-		if err := GetNodeRegistration(kubeconfigFile, kubeletConfigFile, localCRISocket, client, &initcfg.NodeRegistration); err != nil {
+		if err := GetNodeRegistration(kubeconfigFile, kubeletConfigFile, kubeletEnvFile, client, &initcfg.NodeRegistration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")
 		}
 
@@ -135,9 +133,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 }
 
 // GetNodeRegistration returns the nodeRegistration for the current node
-// if localCRISocket, it will get the cri socket from kubelet config.yaml
-// if localCRISocket is false, it will get cri socket from the annotation of node
-func GetNodeRegistration(kubeconfigFile, kubeletConfigFile string, localCRISocket bool, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
+func GetNodeRegistration(kubeconfigFile, kubeletConfigFile, kubeletEnvFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
 	// gets the name of the current node
 	nodeName, err := getNodeNameFromKubeletConfig(kubeconfigFile)
 	if err != nil {
@@ -149,22 +145,22 @@ func GetNodeRegistration(kubeconfigFile, kubeletConfigFile string, localCRISocke
 		return errors.Wrap(err, "failed to get corresponding node")
 	}
 
-	if localCRISocket {
-		criSocket, err := getContainerRuntimeEndpointFromKubeletConfig(kubeletConfigFile)
-		if err != nil {
-			return errors.Wrap(err, "failed to get cri socket from kubelet config")
-		}
-		nodeRegistration.CRISocket = criSocket
-	} else {
-		criSocket, ok := node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
+	criSocket, err := getContainerRuntimeEndpointFromKubeletConfig(kubeletConfigFile, kubeletEnvFile)
+	if err != nil {
+		klog.Warningf("failed to get cri socket from kubelet config: %v", err)
+	}
+	// fall back to use the annotation, and this can be removed in a future release
+	if len(criSocket) == 0 {
+		criSocketAnnotation, ok := node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
 		if !ok {
 			return errors.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
 		}
-		nodeRegistration.CRISocket = criSocket
+		criSocket = criSocketAnnotation
 	}
 
 	// returns the nodeRegistration attributes
 	nodeRegistration.Name = nodeName
+	nodeRegistration.CRISocket = criSocket
 	nodeRegistration.Taints = node.Spec.Taints
 	// NB. currently nodeRegistration.KubeletExtraArgs isn't stored at node level but only in the kubeadm-flags.env
 	//     that isn't modified during upgrades
@@ -172,8 +168,10 @@ func GetNodeRegistration(kubeconfigFile, kubeletConfigFile string, localCRISocke
 	return nil
 }
 
-// TODO
-func getContainerRuntimeEndpointFromKubeletConfig(fileName string) (string, error) {
+// TODO get containerRuntimeEndpoint from local configurations instead of from the annotation
+func getContainerRuntimeEndpointFromKubeletConfig(kubeletConfigFile, kubeletEnvFile string) (string, error) {
+	// for v1.28-, get it from the `kubeadm-flags.env`
+	// for v1.29+, get it from the `config.yaml`
 	return "", nil
 }
 

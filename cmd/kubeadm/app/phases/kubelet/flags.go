@@ -76,8 +76,6 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 // that are common to both Linux and Windows
 func buildKubeletArgsCommon(opts kubeletFlagsOpts) []kubeadmapi.Arg {
 	kubeletFlags := []kubeadmapi.Arg{}
-	// save to config.yaml instead
-	// kubeletFlags = append(kubeletFlags, kubeadmapi.Arg{Name: "container-runtime-endpoint", Value: opts.nodeRegOpts.CRISocket})
 
 	// This flag passes the pod infra container image (e.g. "pause" image) to the kubelet
 	// and prevents its garbage collection

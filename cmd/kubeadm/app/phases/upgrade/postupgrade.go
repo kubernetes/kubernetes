@@ -34,7 +34,6 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -42,7 +41,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
@@ -68,14 +66,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// Write the new kubelet config down to disk and the env file if needed
 	if err := WriteKubeletConfigFiles(cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
-	}
-
-	if !features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
-		// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
-		// --cri-socket.
-		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-			errs = append(errs, errors.Wrap(err, "error uploading crisocket"))
-		}
 	}
 
 	// Create RBAC rules that makes the bootstrap tokens able to get nodes
@@ -276,20 +266,9 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
 	}
 
-	clusterCfg := &cfg.ClusterConfiguration
-	// For upgradation, update containerRuntimeEndpoint in the kubelet confiugration
-	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
-		kubeletCfg, ok := clusterCfg.ComponentConfigs[componentconfigs.KubeletGroup]
-		if !ok {
-			return errors.New("no kubelet component config found")
-		}
-		kubeadmutil.ParseTemplate()
-		// update the containerRuntimeEndpoint
-	}
-
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
-	if err := kubeletphase.WriteConfigToDisk(clusterCfg, kubeletDir, patchesDir, out); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, cfg.NodeRegistration.CRISocket, out); err != nil {
 		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
 	}
 

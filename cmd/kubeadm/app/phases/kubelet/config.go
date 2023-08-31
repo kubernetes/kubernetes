@@ -40,7 +40,7 @@ import (
 
 // WriteConfigToDisk writes the kubelet config object down to a file
 // Used at "kubeadm init", "kubeadm join" and "kubeadm upgrade" time
-func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patchesDir string, output io.Writer) error {
+func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patchesDir, criSocket string, output io.Writer) error {
 	kubeletCfg, ok := cfg.ComponentConfigs[componentconfigs.KubeletGroup]
 	if !ok {
 		return errors.New("no kubelet component config found")
@@ -55,6 +55,13 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patches
 		return err
 	}
 
+	if len(criSocket) != 0 {
+		kubeletBytes, err = patchContainerRuntimeEndpoint(kubeletBytes, criSocket, output)
+		if err != nil {
+			return errors.Wrap(err, "could not apply criSocket to the KubeletConfiguration")
+		}
+	}
+
 	// Apply patches to the KubeletConfiguration
 	if len(patchesDir) != 0 {
 		kubeletBytes, err = applyKubeletConfigPatches(kubeletBytes, patchesDir, output)
@@ -64,6 +71,21 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patches
 	}
 
 	return writeConfigBytesToDisk(kubeletBytes, kubeletDir)
+}
+
+func patchContainerRuntimeEndpoint(kubeletBytes []byte, criSocket string, output io.Writer) ([]byte, error) {
+	tempDir, err := os.MkdirTemp("", "crisocket")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tempDir)
+	filePath := filepath.Join(tempDir, "kubeletconfiguration+json.json")
+	containerRuntimeEndpoint := fmt.Sprintf(`[{"op": "replace", "path": "/containerRuntimeEndpoint", "value": "%s"}]`, criSocket)
+	err = os.WriteFile(filePath, []byte(containerRuntimeEndpoint), 0644)
+	if err != nil {
+		return nil, err
+	}
+	return applyKubeletConfigPatches(kubeletBytes, tempDir, output)
 }
 
 // CreateConfigMap creates a ConfigMap with the generic kubelet configuration.

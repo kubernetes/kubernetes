@@ -27,8 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestAnnotateCRISocket(t *testing.T) {
@@ -70,11 +68,6 @@ func TestAnnotateCRISocket(t *testing.T) {
 					},
 					Annotations: map[string]string{},
 				},
-			}
-
-			// removed once 
-			if tc.currentCRISocketAnnotation != "" {
-				node.ObjectMeta.Annotations[kubeadmconstants.AnnotationKubeadmCRISocket] = tc.currentCRISocketAnnotation
 			}
 
 			jsonNode, err := json.Marshal(node)
