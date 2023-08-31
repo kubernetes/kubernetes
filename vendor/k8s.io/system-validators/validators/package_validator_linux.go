@@ -67,7 +67,7 @@ func newDPKG() (packageManager, bool) {
 func (dpkg) getPackageVersion(packageName string) (string, error) {
 	output, err := exec.Command("dpkg-query", "--show", "--showformat='${Version}'", packageName).Output()
 	if err != nil {
-		return "", fmt.Errof("dpkg-query failed %w", err)
+		return "", fmt.Errorf("dpkg-query failed %w", err)
 	}
 	version := extractUpstreamVersion(string(output))
 	if version == "" {
