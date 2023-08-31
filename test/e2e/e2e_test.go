@@ -62,6 +62,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/storage"
 	_ "k8s.io/kubernetes/test/e2e/storage/csi_mock"
 	_ "k8s.io/kubernetes/test/e2e/storage/external"
+	_ "k8s.io/kubernetes/test/e2e/storage/kind"
 	_ "k8s.io/kubernetes/test/e2e/windows"
 
 	// reconfigure framework
