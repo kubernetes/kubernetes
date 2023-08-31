@@ -41,6 +41,8 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -141,7 +143,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *framewor
 
 	ginkgo.By("Verifying there are no pods in the namespace")
 	_, err = f.ClientSet.CoreV1().Pods(namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectError(err, "failed to get pod %s in namespace: %s", pod.Name, namespace.Name)
+	gomega.Expect(err).To(gomega.HaveOccurred(), "failed to get pod %s in namespace: %s", pod.Name, namespace.Name)
 }
 
 func ensureServicesAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *framework.Framework) {
@@ -198,7 +200,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *fram
 
 	ginkgo.By("Verifying there is no service in the namespace")
 	_, err = f.ClientSet.CoreV1().Services(namespace.Name).Get(ctx, service.Name, metav1.GetOptions{})
-	framework.ExpectError(err, "failed to get service %s in namespace: %s", service.Name, namespace.Name)
+	gomega.Expect(err).To(gomega.HaveOccurred(), "failed to get service %s in namespace: %s", service.Name, namespace.Name)
 }
 
 // This test must run [Serial] due to the impact of running other parallel
