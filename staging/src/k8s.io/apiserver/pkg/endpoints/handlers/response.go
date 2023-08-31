@@ -18,8 +18,11 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,48 +32,119 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1beta1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
+
+	klog "k8s.io/klog/v2"
 )
 
-// transformObject takes the object as returned by storage and ensures it is in
-// the client's desired form, as well as ensuring any API level fields like self-link
-// are properly set.
-func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
-	if co, ok := obj.(runtime.CacheableObject); ok {
-		if mediaType.Convert != nil {
-			// Non-nil mediaType.Convert means that some conversion of the object
-			// has to happen. Currently conversion may potentially modify the
-			// object or assume something about it (e.g. asTable operates on
-			// reflection, which won't work for any wrapper).
-			// To ensure it will work correctly, let's operate on base objects
-			// and not cache it for now.
-			//
-			// TODO: Long-term, transformObject should be changed so that it
-			// implements runtime.Encoder interface.
-			return doTransformObject(ctx, co.GetObject(), opts, mediaType, scope, req)
-		}
-	}
-	return doTransformObject(ctx, obj, opts, mediaType, scope, req)
+// watchEmbeddedEncoder performs encoding of the embedded object.
+//
+// NOTE: watchEmbeddedEncoder is NOT thread-safe.
+type watchEmbeddedEncoder struct {
+	encoder runtime.Encoder
+
+	ctx context.Context
+
+	// target, if non-nil, configures transformation type.
+	// The other options are ignored if target is nil.
+	target       *schema.GroupVersionKind
+	tableOptions *metav1.TableOptions
+	scope        *RequestScope
+
+	// identifier of the encoder, computed lazily
+	identifier runtime.Identifier
 }
 
-func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
+func newWatchEmbeddedEncoder(ctx context.Context, encoder runtime.Encoder, target *schema.GroupVersionKind, tableOptions *metav1.TableOptions, scope *RequestScope) *watchEmbeddedEncoder {
+	return &watchEmbeddedEncoder{
+		encoder:      encoder,
+		ctx:          ctx,
+		target:       target,
+		tableOptions: tableOptions,
+		scope:        scope,
+	}
+}
+
+// Encode implements runtime.Encoder interface.
+func (e *watchEmbeddedEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(e.Identifier(), e.doEncode, w)
+	}
+	return e.doEncode(obj, w)
+}
+
+func (e *watchEmbeddedEncoder) doEncode(obj runtime.Object, w io.Writer) error {
+	result, err := doTransformObject(e.ctx, obj, e.tableOptions, e.target, e.scope)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to transform object %v: %v", reflect.TypeOf(obj), err))
+		result = obj
+	}
+
+	// When we are tranforming to a table, use the original table options when
+	// we should print headers only on the first object - headers should be
+	// omitted on subsequent events.
+	if e.tableOptions != nil && !e.tableOptions.NoHeaders {
+		e.tableOptions.NoHeaders = true
+		// With options change, we should recompute the identifier.
+		// Clearing this will trigger lazy recompute when needed.
+		e.identifier = ""
+	}
+
+	return e.encoder.Encode(result, w)
+}
+
+// Identifier implements runtime.Encoder interface.
+func (e *watchEmbeddedEncoder) Identifier() runtime.Identifier {
+	if e.identifier == "" {
+		e.identifier = e.embeddedIdentifier()
+	}
+	return e.identifier
+}
+
+type watchEmbeddedEncoderIdentifier struct {
+	Name      string              `json:"name,omitempty"`
+	Encoder   string              `json:"encoder,omitempty"`
+	Target    string              `json:"target,omitempty"`
+	Options   metav1.TableOptions `json:"options,omitempty"`
+	NoHeaders bool                `json:"noHeaders,omitempty"`
+}
+
+func (e *watchEmbeddedEncoder) embeddedIdentifier() runtime.Identifier {
+	if e.target == nil {
+		// If no conversion is performed, we effective only use
+		// the embedded identifier.
+		return e.encoder.Identifier()
+	}
+	identifier := watchEmbeddedEncoderIdentifier{
+		Name:    "watch-embedded",
+		Encoder: string(e.encoder.Identifier()),
+		Target:  e.target.String(),
+	}
+	if e.target.Kind == "Table" && e.tableOptions != nil {
+		identifier.Options = *e.tableOptions
+		identifier.NoHeaders = e.tableOptions.NoHeaders
+	}
+
+	result, err := json.Marshal(identifier)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for watchEmbeddedEncoder: %v", err)
+	}
+	return runtime.Identifier(result)
+}
+
+// doTransformResponseObject is used for handling all requests, including watch.
+func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, target *schema.GroupVersionKind, scope *RequestScope) (runtime.Object, error) {
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
 
-	// ensure that for empty lists we don't return <nil> items.
-	// This is safe to modify without deep-copying the object, as
-	// List objects themselves are never cached.
-	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
-		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-			return nil, err
-		}
-	}
-
-	switch target := mediaType.Convert; {
+	switch {
 	case target == nil:
+		// If we ever change that from a no-op, the identifier of
+		// the watchEmbeddedEncoder has to be adjusted accordingly.
 		return obj, nil
 
 	case target.Kind == "PartialObjectMetadata":
@@ -128,6 +202,7 @@ func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.Media
 
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
+// transformResponseObject is used only for handling non-streaming requests.
 func transformResponseObject(ctx context.Context, scope *RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
 	options, err := optionsForTransform(mediaType, req)
 	if err != nil {
@@ -135,9 +210,19 @@ func transformResponseObject(ctx context.Context, scope *RequestScope, req *http
 		return
 	}
 
+	// ensure that for empty lists we don't return <nil> items.
+	// This is safe to modify without deep-copying the object, as
+	// List objects themselves are never cached.
+	if meta.IsListType(result) && meta.LenList(result) == 0 {
+		if err := meta.SetList(result, []runtime.Object{}); err != nil {
+			scope.err(err, w, req)
+			return
+		}
+	}
+
 	var obj runtime.Object
 	do := func() {
-		obj, err = transformObject(ctx, result, options, mediaType, scope, req)
+		obj, err = doTransformObject(ctx, result, options, mediaType.Convert, scope)
 	}
 	endpointsrequest.TrackTransformResponseObjectLatency(ctx, do)
 
