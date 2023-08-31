@@ -611,7 +611,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		attribute.Int("limit", int(opts.Predicate.Limit)),
 		attribute.String("continue", opts.Predicate.Continue))
 	defer span.End(500 * time.Millisecond)
-	key, err := s.prepareKey(key)
+	keyPrefix, err := s.prepareKey(key)
 	if err != nil {
 		return err
 	}
@@ -619,10 +619,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
 	// with prefix "/a" will return all three, while with prefix "/a/" will return only
 	// "/a/b" which is the correct answer.
-	if opts.Recursive && !strings.HasSuffix(key, "/") {
-		key += "/"
+	if opts.Recursive && !strings.HasSuffix(keyPrefix, "/") {
+		keyPrefix += "/"
 	}
-	keyPrefix := key
+	rangeStart := keyPrefix
+	var rangeEnd string
+	if opts.Recursive {
+		rangeEnd = clientv3.GetPrefixRangeEnd(keyPrefix)
+	}
 
 	var fromRV *uint64
 	if len(opts.ResourceVersion) > 0 {
@@ -646,7 +650,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
 			return apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
 		}
-		key = continueKey
+		rangeStart = continueKey
 		// If continueRV > 0, the LIST request needs a specific resource version.
 		// continueRV==0 is invalid.
 		// If continueRV < 0, the request is for the latest resource version.
@@ -670,14 +674,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 		}
 	}
-	err = s.getList(ctx, key, keyPrefix, withRev, opts, listObj)
+	err = s.getList(ctx, rangeStart, rangeEnd, keyPrefix, withRev, opts, listObj)
 	if err != nil {
 		return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 	}
 	return err
 }
 
-func (s *store) getList(ctx context.Context, key, keyPrefix string, withRev int64, opts storage.ListOptions, listObj runtime.Object) error {
+func (s *store) getList(ctx context.Context, rangeStart, rangeEnd, keyPrefix string, withRev int64, opts storage.ListOptions, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -700,8 +704,7 @@ func (s *store) getList(ctx context.Context, key, keyPrefix string, withRev int6
 
 	newItemFunc := getNewItemFunc(listObj, v)
 
-	if opts.Recursive {
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
+	if rangeEnd != "" {
 		options = append(options, clientv3.WithRange(rangeEnd))
 	}
 	if withRev != 0 {
@@ -722,13 +725,13 @@ func (s *store) getList(ctx context.Context, key, keyPrefix string, withRev int6
 	}()
 
 	metricsOp := "get"
-	if opts.Recursive {
+	if rangeEnd != "" {
 		metricsOp = "list"
 	}
 
 	for {
 		startTime := time.Now()
-		getResp, err = s.client.KV.Get(ctx, key, options...)
+		getResp, err = s.client.KV.Get(ctx, rangeStart, options...)
 		metrics.RecordEtcdRequest(metricsOp, s.groupResourceString, err, startTime)
 		if err != nil {
 			return err
@@ -792,7 +795,7 @@ func (s *store) getList(ctx context.Context, key, keyPrefix string, withRev int6
 			}
 			*limitOption = clientv3.WithLimit(limit)
 		}
-		key = string(lastKey) + "\x00"
+		rangeStart = string(lastKey) + "\x00"
 		if withRev == 0 {
 			withRev = getResp.Header.Revision
 			options = append(options, clientv3.WithRev(withRev))
