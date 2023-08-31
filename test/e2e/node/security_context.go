@@ -322,6 +322,6 @@ func testPodSELinuxLabeling(ctx context.Context, f *framework.Framework, hostIPC
 	isEnforced, err := tk.ReadFileViaContainer(pod.Name, "test-container", "/sys/fs/selinux/enforce")
 	if err == nil && isEnforced == "1" {
 		_, err = tk.ReadFileViaContainer(pod.Name, "test-container", testFilePath)
-		framework.ExpectError(err, "expecting SELinux to not let the container with different MCS label to read the file")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "expecting SELinux to not let the container with different MCS label to read the file")
 	}
 }

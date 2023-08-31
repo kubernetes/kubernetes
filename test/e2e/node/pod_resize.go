@@ -1348,7 +1348,7 @@ func doPodResizeResourceQuotaTests() {
 		ginkgo.By("patching pod for resize with memory exceeding resource quota")
 		_, pErrExceedMemory := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(context.TODO(),
 			resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedMemory), metav1.PatchOptions{})
-		framework.ExpectError(pErrExceedMemory, "exceeded quota: %s, requested: memory=350Mi, used: memory=700Mi, limited: memory=800Mi",
+		gomega.Expect(pErrExceedMemory).To(gomega.HaveOccurred(), "exceeded quota: %s, requested: memory=350Mi, used: memory=700Mi, limited: memory=800Mi",
 			resourceQuota.Name)
 
 		ginkgo.By("verifying pod patched for resize exceeding memory resource quota remains unchanged")
@@ -1360,7 +1360,7 @@ func doPodResizeResourceQuotaTests() {
 		ginkgo.By(fmt.Sprintf("patching pod %s for resize with CPU exceeding resource quota", resizedPod.Name))
 		_, pErrExceedCPU := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(context.TODO(),
 			resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedCPU), metav1.PatchOptions{})
-		framework.ExpectError(pErrExceedCPU, "exceeded quota: %s, requested: cpu=200m, used: cpu=700m, limited: cpu=800m",
+		gomega.Expect(pErrExceedCPU).To(gomega.HaveOccurred(), "exceeded quota: %s, requested: cpu=200m, used: cpu=700m, limited: cpu=800m",
 			resourceQuota.Name)
 
 		ginkgo.By("verifying pod patched for resize exceeding CPU resource quota remains unchanged")
@@ -1447,7 +1447,7 @@ func doPodResizeErrorTests() {
 			if tc.patchError == "" {
 				framework.ExpectNoError(pErr, "failed to patch pod for resize")
 			} else {
-				framework.ExpectError(pErr, tc.patchError)
+				gomega.Expect(pErr).To(gomega.HaveOccurred(), tc.patchError)
 				patchedPod = newPod
 			}
 

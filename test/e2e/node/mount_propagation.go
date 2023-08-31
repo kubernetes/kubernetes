@@ -182,7 +182,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 					gomega.Expect(stdout).To(gomega.Equal(mountName), msg)
 				} else {
 					// We *expect* cat to return error here
-					framework.ExpectError(err, msg)
+					gomega.Expect(err).To(gomega.HaveOccurred(), msg)
 				}
 			}
 		}
