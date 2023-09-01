@@ -72,6 +72,7 @@ const (
 
 	// owner: @danwinship
 	// alpha: v1.27
+	// beta: v1.29
 	//
 	// Enables dual-stack --node-ip in kubelet with external cloud providers
 	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
@@ -971,7 +972,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
-	CloudDualStackNodeIPs: {Default: false, PreRelease: featuregate.Alpha},
+	CloudDualStackNodeIPs: {Default: true, PreRelease: featuregate.Beta},
 
 	ClusterTrustBundle: {Default: false, PreRelease: featuregate.Alpha},
 
