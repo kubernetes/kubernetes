@@ -1262,7 +1262,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Selector: metricLabelSelector,
 							},
 							Target: autoscaling.MetricTarget{
-								Type:         autoscaling.ValueMetricType,
+								Type:         autoscaling.AverageValueMetricType,
 								AverageValue: resource.NewMilliQuantity(-300, resource.DecimalSI),
 							},
 						},
@@ -1317,6 +1317,64 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				},
 			},
 			msg: "must be either Utilization, Value, or AverageValue",
+		}, {
+			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					MinReplicas:    utilpointer.Int32Ptr(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ObjectMetricSourceType,
+							Object: &autoscaling.ObjectMetricSource{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
+									Kind: "ReplicationController",
+									Name: "myrc",
+								},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "somemetric",
+									Selector: metricLabelSelector,
+								},
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.AverageValueMetricType,
+									Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+			msg: "must be set for metric target type AverageValue",
+		}, {
+			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					MinReplicas:    utilpointer.Int32Ptr(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ObjectMetricSourceType,
+							Object: &autoscaling.ObjectMetricSource{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
+									Kind: "ReplicationController",
+									Name: "myrc",
+								},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "somemetric",
+									Selector: metricLabelSelector,
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.ValueMetricType,
+									AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+			msg: "must be set for metric target type Value",
 		}, {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},

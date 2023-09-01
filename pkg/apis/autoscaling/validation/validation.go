@@ -442,6 +442,14 @@ func validateMetricTarget(mt autoscaling.MetricTarget, fldPath *field.Path) fiel
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), mt.Type, "must be either Utilization, Value, or AverageValue"))
 	}
 
+	if mt.Type == autoscaling.ValueMetricType && mt.Value == nil && mt.AverageValue != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), mt.Value, "must be set for metric target type Value"))
+	}
+
+	if mt.Type == autoscaling.AverageValueMetricType && mt.AverageValue == nil && mt.Value != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("averageValue"), mt.AverageValue, "must be set for metric target type AverageValue"))
+	}
+
 	if mt.Value != nil && mt.Value.Sign() != 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), mt.Value, "must be positive"))
 	}
