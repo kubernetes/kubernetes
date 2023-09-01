@@ -574,11 +574,10 @@ if [[ "${CLOUD_PROVIDER_FLAG:-}" == "external" ]]; then
   if [[ "${FEATURE_GATES:-}" != *"DisableKubeletCloudCredentialProviders=true"*  ]]; then
     FEATURE_GATES="${FEATURE_GATES/DisableKubeletCloudCredentialProviders=false/}" # Remove false for the feature gate if present
     FEATURE_GATES="${FEATURE_GATES},DisableKubeletCloudCredentialProviders=true"   # Add the true for the feature gate
-    export FEATURE_GATES=${FEATURE_GATES#","} # Remove the prefix comma if present
   fi
   if [[ "${FEATURE_GATES:-}" != *"DisableCloudProviders=true"*  ]]; then
     FEATURE_GATES="${FEATURE_GATES/DisableCloudProviders=false/}" # Remove false for the feature gate if present
     FEATURE_GATES="${FEATURE_GATES},DisableCloudProviders=true"   # Add the true for the feature gate
-    export FEATURE_GATES=${FEATURE_GATES#","} # Remove the prefix comma if present
   fi
+  export FEATURE_GATES=${FEATURE_GATES#","} # Remove the prefix comma if present
 fi
