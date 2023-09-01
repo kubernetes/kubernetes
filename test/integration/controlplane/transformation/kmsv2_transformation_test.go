@@ -27,6 +27,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"path"
 	"regexp"
 	"strings"
 	"testing"
@@ -34,6 +35,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	corev1 "k8s.io/api/core/v1"
@@ -1308,3 +1310,175 @@ resources:
 }
 
 func randomBool() bool { return utilrand.Int()%2 == 1 }
+
+// TestKMSv2ProviderLegacyData confirms that legacy data recorded from the earliest released commit can still be read.
+func TestKMSv2ProviderLegacyData(t *testing.T) {
+	t.Run("regular gcm", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
+		testKMSv2ProviderLegacyData(t)
+	})
+
+	t.Run("extended nonce gcm", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, true)()
+		testKMSv2ProviderLegacyData(t)
+	})
+}
+
+func testKMSv2ProviderLegacyData(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+
+	encryptionConfig := `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+       apiVersion: v2
+       name: kms-provider
+       endpoint: unix:///@kms-provider.sock
+`
+
+	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+
+	// the value.Context.AuthenticatedData during read is the etcd storage path of the associated resource
+	// thus we need to manually construct the storage config so that we can have a static path
+	const legacyDataEtcdPrefix = "43da1478-5e9c-4ef3-a92a-2b19d540c8a5"
+
+	storageConfig := storagebackend.NewDefaultConfig(path.Join(legacyDataEtcdPrefix, "registry"), nil)
+	storageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
+
+	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	if err != nil {
+		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
+	}
+	defer test.cleanUp()
+
+	const legacyDataNamespace = "kms-v2-legacy-data"
+
+	if _, err := test.createNamespace(legacyDataNamespace); err != nil {
+		t.Fatal(err)
+	}
+
+	// commit: 1b4df30b3cdfeaba6024e81e559a6cd09a089d65
+	// tag: v1.27.0
+	const dekSourceAESGCMKeyName = "dek-source-aes-gcm-key"
+	const dekSourceAESGCMKeyData = "k8s:enc:kms:v2:kms-provider:\n\x8a\x03\xb0ƙ\xdc\x01ʚ;\x00\x00\x00\x00\x8c\x80\v\xf0\x1dKo{0\v\xb5\xd5Ń\x1a\xb5\x0e\xcf\xd7Ve\xed邸\xdfE\xedMk\xcf!\x15\xc0\v\t\x82Wh \x9e\x8f\x1b\\9\b\xa4\x80\x02m\xf4P\x14z\xee\xf7\x8c\x1a\x84n5\xfdG\x83v#\x0e\xd4\f\x83YwH\xe1\x1c\xbf\x12\xc6\x1b\xba\x8br\b\x82z\xf8\xdb`\xa7]P\xb1\xe6!Lb\x8d\xb8I\x1aEL\xa0\xae+\xbe\x15R\x8e\x9b\x064\xf6P\xb6;\x9f\xa6\x8d\x96\xb2\x01\xa1\x8e\xe4a\xdf/\x90u\xde6\x9a\xc2ͻb\x88+\x16\x98=\xe9\x03\xdd\xd7HvC\n\xe5\x8cv\x05~\n\xabX_N\x9a\x84wp\xa8\x13\x0f\x82Y9x\xed\x89\x15\xb9\xe1ꦐ\xc6`R\n0\x04\xf2\xa6ѥ\x85\nk\xf4\xcf\xe4ul\x1c*[A\x12\xa0\xd9\xf2\xb5!\x82\xe4\x00\xa4L'&\xf5pln\"\xe0=\f[\xe1\xb0U97\x11|\xdaNk\xc3=\xc2\xf2\x85<7\x1e\x01\xb8\xa9\xf4\x89\xdb~\xe1\x8c\xe1\x1f\x05B@WʼS\n聛LY\x86$\xf6\x01ݝ\xcd\x1d\xe9\x02]\xf4i\xda\xfa\xc2\x0eUr\xc5Dʽdb\x13\xbe\xfe\x1c\xc5\xe1\x84\xcc\xdf&\x93j\x1eK\x04\xba\x06\x16\x85\x0e\x1f\xca\b\x90\x06\x11K\x9d[\rV\xe8E\xd5(\x91\fn\xd4\x10\x9cH\x1cܝX\x94ȁ5\x1b\x8c\xbbz\xf9Ho{\x1d\x112\x90F\xe7\xd8h\xa8\xa1\xf6\x8c\x8cvʲ1\xf9#\x82\xa3\xbe7ed\xd9\x14\xf3\x06\xff\xb7߫i\x12\x011\x1a,gafIvwT0ASoKdZ/D1L2SlH73LUMj5qa3hroljfS51wc=\"2\n\x1blocal-kek.kms.kubernetes.io\x12\x13encrypted-local-kek"
+	dekSourceAESGCMKeyPath := test.getETCDPathForResource(test.storageConfig.Prefix, "", "secrets", dekSourceAESGCMKeyName, legacyDataNamespace)
+	if _, err := test.writeRawRecordToETCD(dekSourceAESGCMKeyPath, []byte(dekSourceAESGCMKeyData)); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedDEKSourceAESGCMKeyObject := &kmstypes.EncryptedObject{
+		EncryptedData:          []byte("\xb0ƙ\xdc\x01ʚ;\x00\x00\x00\x00\x8c\x80\v\xf0\x1dKo{0\v\xb5\xd5Ń\x1a\xb5\x0e\xcf\xd7Ve\xed邸\xdfE\xedMk\xcf!\x15\xc0\v\t\x82Wh \x9e\x8f\x1b\\9\b\xa4\x80\x02m\xf4P\x14z\xee\xf7\x8c\x1a\x84n5\xfdG\x83v#\x0e\xd4\f\x83YwH\xe1\x1c\xbf\x12\xc6\x1b\xba\x8br\b\x82z\xf8\xdb`\xa7]P\xb1\xe6!Lb\x8d\xb8I\x1aEL\xa0\xae+\xbe\x15R\x8e\x9b\x064\xf6P\xb6;\x9f\xa6\x8d\x96\xb2\x01\xa1\x8e\xe4a\xdf/\x90u\xde6\x9a\xc2ͻb\x88+\x16\x98=\xe9\x03\xdd\xd7HvC\n\xe5\x8cv\x05~\n\xabX_N\x9a\x84wp\xa8\x13\x0f\x82Y9x\xed\x89\x15\xb9\xe1ꦐ\xc6`R\n0\x04\xf2\xa6ѥ\x85\nk\xf4\xcf\xe4ul\x1c*[A\x12\xa0\xd9\xf2\xb5!\x82\xe4\x00\xa4L'&\xf5pln\"\xe0=\f[\xe1\xb0U97\x11|\xdaNk\xc3=\xc2\xf2\x85<7\x1e\x01\xb8\xa9\xf4\x89\xdb~\xe1\x8c\xe1\x1f\x05B@WʼS\n聛LY\x86$\xf6\x01ݝ\xcd\x1d\xe9\x02]\xf4i\xda\xfa\xc2\x0eUr\xc5Dʽdb\x13\xbe\xfe\x1c\xc5\xe1\x84\xcc\xdf&\x93j\x1eK\x04\xba\x06\x16\x85\x0e\x1f\xca\b\x90\x06\x11K\x9d[\rV\xe8E\xd5(\x91\fn\xd4\x10\x9cH\x1cܝX\x94ȁ5\x1b\x8c\xbbz\xf9Ho{\x1d\x112\x90F\xe7\xd8h\xa8\xa1\xf6\x8c\x8cvʲ1\xf9#\x82\xa3\xbe7ed\xd9\x14\xf3\x06\xff\xb7߫i"),
+		KeyID:                  "1",
+		EncryptedDEKSource:     []byte("gafIvwT0ASoKdZ/D1L2SlH73LUMj5qa3hroljfS51wc="),
+		Annotations:            map[string][]byte{"local-kek.kms.kubernetes.io": []byte("encrypted-local-kek")},
+		EncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_AES_GCM_KEY,
+	}
+	legacyDEKSourceAESGCMKeyObject := &kmstypes.EncryptedObject{}
+	if err := proto.Unmarshal([]byte(strings.TrimPrefix(dekSourceAESGCMKeyData, "k8s:enc:kms:v2:kms-provider:")), legacyDEKSourceAESGCMKeyObject); err != nil {
+		t.Fatal(err)
+	}
+	if err := kmsv2.ValidateEncryptedObject(legacyDEKSourceAESGCMKeyObject); err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(expectedDEKSourceAESGCMKeyObject, legacyDEKSourceAESGCMKeyObject); len(diff) > 0 {
+		t.Errorf("kms v2 legacy encrypted object diff (-want, +got):\n%s", diff)
+	}
+
+	// commit: 855e7c48de7388eb330da0f8d9d2394ee818fb8d
+	// tag: v1.28.0
+	const dekSourceHKDFSHA256XNonceAESGCMSeedName = "dek-source-hkdf-sha256-xnonce-aes-gcm-seed"
+	const dekSourceHKDFSHA256XNonceAESGCMSeedData = "k8s:enc:kms:v2:kms-provider:\n\xd1\x03\x12\x0f\x87\xae\xa2\xa2\xf5J\x11\x06о\x8a\x81\xb6\x15\xdf4H\xa3\xb7i\x93^)\xe5i\xe2\x7f\xfdo\xee\"\x170\xb7\n\xa0\v\xec\xe0\xfa\t#\tƖ\xf6ǧw\x01\xb9\xab\xb3\xf4\xdf\xec\x9eJ\x95$&Z=\x8awAc\xa5\xb2;\t\xd5\xf9\x05\xc1E)\x8b\xb8\x14\xc9\xda\x14{I\rV?\xe5:\xf0BM\x9b\xad\xaaHn>W/Q\xa3\xf5\xba\xe7˚\n\xe7\"\xa7\\p\x8c\xba2\xf2\xb0x<Ą\x88\x9a\xf1\xb5:d=z\xe3\xc3&\x03\x99m\x96\xe7\\\xe3\xa3\xd7i\xb2\f\x84g\xf94\xd2\f\xd6~\xed\xac\xf8\x1b\xc6(,[\xd1\xff\xba\x89ȇD\x02):wTM12\xb5\xfdl\xd2\xf2\x85\x120\xd3\xd9aak\xce\xddI֥\x0fk2\xf6I\xd0\xf9\xc2\xda\vŗ\xd7\u05fb\x83\xd6\xf7\x1a\xbf\x13iH\x8f\xe4\xb3#\xf3\xdf\xc8$y\rL(F\\Xt\x86\xbb\xe5K\x88=\x92\xe9\x04\xf70\x1e\t>\xac;\x9e\xe6\xf0+ۙ4\x1d\x1aV9Մ-g\xf3\xc7Z\x00\xf73\x0e\xe7\xa6\xcf\xc4\xfc\xe0\xb2\x1f\xa0\xbb\x1a\x81\xb3\xe4צ\x7f\xc6\b\x94͉\xad@\xac\x81\x015\x0f\xe8A\xe9B\xfb2\x81o\x9c?*\f\x8c\x15\xa8)\"\xe8\xff\x8d8\xd5!O\x17\xc5㍀\x83\xd3´\xca1;\xf7\xb0\xf4\x90x\xa6\x01\x95\x85\xc0\xaf\xf6\x82Qk\xab\xc1\x82<D\x93\xcf\r\xdb\xdf\x1c\x94\x17Q\xfaS\xe6\xcb\xd4Xƿ\x80\x1d\xc4\x1c\x9dP74\x82JK\vy\xe9)\xbchY\xbe\xcc|\xe4\x97\xdd<;3\x90J\a\xee#\xb2y\xe3\t`\xef\xef\x1f\"k\x8b\x96\xa0\x98\xd9\xffs\xde&\xb7\xa6\x0e\xf1\x7f2ͅb\xe3\xda5\"c\\K\xe21\xa2\xec`\x1b\xe5R\xe6j\b@\x187\xe1\xdb\x04\xf6bNO\x0e\x12\x011\x1a,/+WnKXQEM/AhXICYRNBeGk+WSuB+7OBuSYJTbP66Zyc=\"2\n\x1blocal-kek.kms.kubernetes.io\x12\x13encrypted-local-kek(\x01"
+	dekSourceHKDFSHA256XNonceAESGCMSeedPath := test.getETCDPathForResource(test.storageConfig.Prefix, "", "secrets", dekSourceHKDFSHA256XNonceAESGCMSeedName, legacyDataNamespace)
+	if _, err := test.writeRawRecordToETCD(dekSourceHKDFSHA256XNonceAESGCMSeedPath, []byte(dekSourceHKDFSHA256XNonceAESGCMSeedData)); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedDEKSourceHKDFSHA256XNonceAESGCMSeedObject := &kmstypes.EncryptedObject{
+		EncryptedData:          []byte("\x12\x0f\x87\xae\xa2\xa2\xf5J\x11\x06о\x8a\x81\xb6\x15\xdf4H\xa3\xb7i\x93^)\xe5i\xe2\x7f\xfdo\xee\"\x170\xb7\n\xa0\v\xec\xe0\xfa\t#\tƖ\xf6ǧw\x01\xb9\xab\xb3\xf4\xdf\xec\x9eJ\x95$&Z=\x8awAc\xa5\xb2;\t\xd5\xf9\x05\xc1E)\x8b\xb8\x14\xc9\xda\x14{I\rV?\xe5:\xf0BM\x9b\xad\xaaHn>W/Q\xa3\xf5\xba\xe7˚\n\xe7\"\xa7\\p\x8c\xba2\xf2\xb0x<Ą\x88\x9a\xf1\xb5:d=z\xe3\xc3&\x03\x99m\x96\xe7\\\xe3\xa3\xd7i\xb2\f\x84g\xf94\xd2\f\xd6~\xed\xac\xf8\x1b\xc6(,[\xd1\xff\xba\x89ȇD\x02):wTM12\xb5\xfdl\xd2\xf2\x85\x120\xd3\xd9aak\xce\xddI֥\x0fk2\xf6I\xd0\xf9\xc2\xda\vŗ\xd7\u05fb\x83\xd6\xf7\x1a\xbf\x13iH\x8f\xe4\xb3#\xf3\xdf\xc8$y\rL(F\\Xt\x86\xbb\xe5K\x88=\x92\xe9\x04\xf70\x1e\t>\xac;\x9e\xe6\xf0+ۙ4\x1d\x1aV9Մ-g\xf3\xc7Z\x00\xf73\x0e\xe7\xa6\xcf\xc4\xfc\xe0\xb2\x1f\xa0\xbb\x1a\x81\xb3\xe4צ\x7f\xc6\b\x94͉\xad@\xac\x81\x015\x0f\xe8A\xe9B\xfb2\x81o\x9c?*\f\x8c\x15\xa8)\"\xe8\xff\x8d8\xd5!O\x17\xc5㍀\x83\xd3´\xca1;\xf7\xb0\xf4\x90x\xa6\x01\x95\x85\xc0\xaf\xf6\x82Qk\xab\xc1\x82<D\x93\xcf\r\xdb\xdf\x1c\x94\x17Q\xfaS\xe6\xcb\xd4Xƿ\x80\x1d\xc4\x1c\x9dP74\x82JK\vy\xe9)\xbchY\xbe\xcc|\xe4\x97\xdd<;3\x90J\a\xee#\xb2y\xe3\t`\xef\xef\x1f\"k\x8b\x96\xa0\x98\xd9\xffs\xde&\xb7\xa6\x0e\xf1\x7f2ͅb\xe3\xda5\"c\\K\xe21\xa2\xec`\x1b\xe5R\xe6j\b@\x187\xe1\xdb\x04\xf6bNO\x0e"),
+		KeyID:                  "1",
+		EncryptedDEKSource:     []byte("/+WnKXQEM/AhXICYRNBeGk+WSuB+7OBuSYJTbP66Zyc="),
+		Annotations:            map[string][]byte{"local-kek.kms.kubernetes.io": []byte("encrypted-local-kek")},
+		EncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED,
+	}
+	legacyDEKSourceHKDFSHA256XNonceAESGCMSeedObject := &kmstypes.EncryptedObject{}
+	if err := proto.Unmarshal([]byte(strings.TrimPrefix(dekSourceHKDFSHA256XNonceAESGCMSeedData, "k8s:enc:kms:v2:kms-provider:")), legacyDEKSourceHKDFSHA256XNonceAESGCMSeedObject); err != nil {
+		t.Fatal(err)
+	}
+	if err := kmsv2.ValidateEncryptedObject(legacyDEKSourceHKDFSHA256XNonceAESGCMSeedObject); err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(expectedDEKSourceHKDFSHA256XNonceAESGCMSeedObject, legacyDEKSourceHKDFSHA256XNonceAESGCMSeedObject); len(diff) > 0 {
+		t.Errorf("kms v2 legacy encrypted object diff (-want, +got):\n%s", diff)
+	}
+
+	ctx := testContext(t)
+
+	legacySecrets, err := test.restClient.CoreV1().Secrets(legacyDataNamespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dekSourceAESGCMKeyTime := metav1.NewTime(time.Date(2023, 9, 1, 11, 56, 49, 0, time.FixedZone("EDT", -4*60*60)))
+	dekSourceHKDFSHA256XNonceAESGCMSeedTime := metav1.NewTime(time.Date(2023, 9, 1, 10, 23, 13, 0, time.FixedZone("EDT", -4*60*60)))
+
+	expectedLegacySecrets := &corev1.SecretList{
+		Items: []corev1.Secret{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              dekSourceAESGCMKeyName,
+					Namespace:         legacyDataNamespace,
+					UID:               "1f4a8f7b-01b4-49d1-b898-751eb56937f1",
+					CreationTimestamp: dekSourceAESGCMKeyTime,
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							Manager:    "___TestKMSv2Provider_in_k8s_io_kubernetes_test_integration_controlplane_transformation.test",
+							Operation:  "Update",
+							APIVersion: "v1",
+							Time:       &dekSourceAESGCMKeyTime,
+							FieldsType: "FieldsV1",
+							FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:data":{".":{},"f:api_key":{}},"f:type":{}}`)},
+						},
+					},
+				},
+				Data: map[string][]byte{
+					secretKey: []byte(secretVal),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              dekSourceHKDFSHA256XNonceAESGCMSeedName,
+					Namespace:         legacyDataNamespace,
+					UID:               "87c514b4-9c26-4041-ad0d-0d07dca557ed",
+					CreationTimestamp: dekSourceHKDFSHA256XNonceAESGCMSeedTime,
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							Manager:    "___TestKMSv2Provider_extended_nonce_gcm_in_k8s_io_kubernetes_test_integration_controlplane_transformation.test",
+							Operation:  "Update",
+							APIVersion: "v1",
+							Time:       &dekSourceHKDFSHA256XNonceAESGCMSeedTime,
+							FieldsType: "FieldsV1",
+							FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:data":{".":{},"f:api_key":{}},"f:type":{}}`)},
+						},
+					},
+				},
+				Data: map[string][]byte{
+					secretKey: []byte(secretVal),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+		},
+	}
+
+	if diff := cmp.Diff(expectedLegacySecrets, legacySecrets,
+		// resource version is set after decoding based on etcd state - it is not stored in the etcd value
+		cmpopts.IgnoreFields(corev1.Secret{}, "ResourceVersion"),
+		cmpopts.IgnoreFields(metav1.ListMeta{}, "ResourceVersion"),
+	); len(diff) > 0 {
+		t.Errorf("kms v2 legacy secret data diff (-want, +got):\n%s", diff)
+	}
+}
