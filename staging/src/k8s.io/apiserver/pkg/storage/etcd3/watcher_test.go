@@ -104,6 +104,17 @@ func TestProgressNotify(t *testing.T) {
 	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
 }
 
+// TestWatchDispatchBookmarkEvents makes sure that
+// setting allowWatchBookmarks query param against
+// etcd implementation doesn't have any effect.
+func TestWatchDispatchBookmarkEvents(t *testing.T) {
+	clusterConfig := testserver.NewTestConfig(t)
+	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
+	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
+
+	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, store, false)
+}
+
 func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
