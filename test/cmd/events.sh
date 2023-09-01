@@ -56,8 +56,7 @@ run_kubectl_events_tests() {
     "names": {
       "plural": "cronjobs",
       "singular": "cronjob",
-      "kind": "Cronjob",
-      "shortNames": ["mycj"]
+      "kind": "Cronjob"
     },
     "versions": [
       {
