@@ -611,10 +611,23 @@ export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-external}"
 export ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-false}"
 
 # External cloud provider requires ENABLE_AUTH_PROVIDER_GCP and feature flags
-# DisableKubeletCloudCredentialProviders and DisableCloudProviders
+# DisableKubeletCloudCredentialProviders and DisableCloudProviders should be set to true
 if [[ "${CLOUD_PROVIDER_FLAG:-}" == "external" ]]; then
+  if [[ "${FEATURE_GATES:-}" == *"DisableKubeletCloudCredentialProviders=false"*  ]]; then
+    echo -e "${color_red:-}ERROR: Cannot set DisableKubeletCloudCredentialProviders to false when CLOUD_PROVIDER_FLAG is set to external." >&2
+  fi
+  if [[ "${FEATURE_GATES:-}" == *"DisableCloudProviders=false"*  ]]; then
+    echo -e "${color_red:-}ERROR: Cannot set DisableCloudProviders to false when CLOUD_PROVIDER_FLAG is set to external." >&2
+  fi
   export ENABLE_AUTH_PROVIDER_GCP=true
-  if [[ -n "${FEATURE_GATES:-DisableKubeletCloudCredentialProviders=True,DisableCloudProviders=True}" ]]; then
-    export FEATURE_GATES="${FEATURE_GATES},DisableKubeletCloudCredentialProviders=True,DisableCloudProviders=True"
+  if [[ "${FEATURE_GATES:-}" != *"DisableKubeletCloudCredentialProviders=true"*  ]]; then
+    FEATURE_GATES="${FEATURE_GATES/DisableKubeletCloudCredentialProviders=false/}" # Remove false for the feature gate if present
+    FEATURE_GATES="${FEATURE_GATES},DisableKubeletCloudCredentialProviders=true"   # Add the true for the feature gate
+    export FEATURE_GATES=${FEATURE_GATES#","} # Remove the prefix comma if present
+  fi
+  if [[ "${FEATURE_GATES:-}" != *"DisableCloudProviders=true"*  ]]; then
+    FEATURE_GATES="${FEATURE_GATES/DisableCloudProviders=false/}" # Remove false for the feature gate if present
+    FEATURE_GATES="${FEATURE_GATES},DisableCloudProviders=true"   # Add the true for the feature gate
+    export FEATURE_GATES=${FEATURE_GATES#","} # Remove the prefix comma if present
   fi
 fi
