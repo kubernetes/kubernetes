@@ -174,16 +174,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*NodeRegistrationOptions)(nil), (*kubeadm.NodeRegistrationOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(a.(*NodeRegistrationOptions), b.(*kubeadm.NodeRegistrationOptions), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*kubeadm.NodeRegistrationOptions)(nil), (*NodeRegistrationOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(a.(*kubeadm.NodeRegistrationOptions), b.(*NodeRegistrationOptions), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*Patches)(nil), (*kubeadm.Patches)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta3_Patches_To_kubeadm_Patches(a.(*Patches), b.(*kubeadm.Patches), scope)
 	}); err != nil {
@@ -214,6 +204,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*kubeadm.NodeRegistrationOptions)(nil), (*NodeRegistrationOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(a.(*kubeadm.NodeRegistrationOptions), b.(*NodeRegistrationOptions), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*ControlPlaneComponent)(nil), (*kubeadm.ControlPlaneComponent)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(a.(*ControlPlaneComponent), b.(*kubeadm.ControlPlaneComponent), scope)
 	}); err != nil {
@@ -226,6 +221,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*LocalEtcd)(nil), (*kubeadm.LocalEtcd)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(a.(*LocalEtcd), b.(*kubeadm.LocalEtcd), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*NodeRegistrationOptions)(nil), (*kubeadm.NodeRegistrationOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(a.(*NodeRegistrationOptions), b.(*kubeadm.NodeRegistrationOptions), scope)
 	}); err != nil {
 		return err
 	}
@@ -378,13 +378,13 @@ func Convert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in *ku
 }
 
 func autoConvert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *ControlPlaneComponent, out *kubeadm.ControlPlaneComponent, s conversion.Scope) error {
-	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
+	// WARNING: in.ExtraArgs requires manual conversion: inconvertible types (map[string]string vs []k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm.Arg)
 	out.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
 	return nil
 }
 
 func autoConvert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in *kubeadm.ControlPlaneComponent, out *ControlPlaneComponent, s conversion.Scope) error {
-	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
+	// WARNING: in.ExtraArgs requires manual conversion: inconvertible types ([]k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm.Arg vs map[string]string)
 	out.ExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
 	// WARNING: in.ExtraEnvs requires manual conversion: does not exist in peer-type
 	return nil
@@ -669,7 +669,7 @@ func autoConvert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kube
 		return err
 	}
 	out.DataDir = in.DataDir
-	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
+	// WARNING: in.ExtraArgs requires manual conversion: inconvertible types (map[string]string vs []k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm.Arg)
 	out.ServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ServerCertSANs))
 	out.PeerCertSANs = *(*[]string)(unsafe.Pointer(&in.PeerCertSANs))
 	return nil
@@ -680,7 +680,7 @@ func autoConvert_kubeadm_LocalEtcd_To_v1beta3_LocalEtcd(in *kubeadm.LocalEtcd, o
 		return err
 	}
 	out.DataDir = in.DataDir
-	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
+	// WARNING: in.ExtraArgs requires manual conversion: inconvertible types ([]k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm.Arg vs map[string]string)
 	// WARNING: in.ExtraEnvs requires manual conversion: does not exist in peer-type
 	out.ServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ServerCertSANs))
 	out.PeerCertSANs = *(*[]string)(unsafe.Pointer(&in.PeerCertSANs))
@@ -715,30 +715,20 @@ func autoConvert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOpti
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
 	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
-	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
+	// WARNING: in.KubeletExtraArgs requires manual conversion: inconvertible types (map[string]string vs []k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm.Arg)
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
 	return nil
-}
-
-// Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions is an autogenerated conversion function.
-func Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in *NodeRegistrationOptions, out *kubeadm.NodeRegistrationOptions, s conversion.Scope) error {
-	return autoConvert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in, out, s)
 }
 
 func autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
 	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
-	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
+	// WARNING: in.KubeletExtraArgs requires manual conversion: inconvertible types ([]k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm.Arg vs map[string]string)
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
 	return nil
-}
-
-// Convert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions is an autogenerated conversion function.
-func Convert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
-	return autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(in, out, s)
 }
 
 func autoConvert_v1beta3_Patches_To_kubeadm_Patches(in *Patches, out *kubeadm.Patches, s conversion.Scope) error {

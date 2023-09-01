@@ -1035,7 +1035,7 @@ func runDrainTest(ctx context.Context, f *framework.Framework, migSizes map[stri
 	ginkgo.DeferCleanup(e2erc.DeleteRCAndWaitForGC, f.ClientSet, namespace, "reschedulable-pods")
 
 	ginkgo.By("Create a PodDisruptionBudget")
-	minAvailable := intstr.FromInt(numPods - pdbSize)
+	minAvailable := intstr.FromInt32(int32(numPods - pdbSize))
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pdb",
@@ -1915,7 +1915,7 @@ func addKubeSystemPdbs(ctx context.Context, f *framework.Framework) error {
 		ginkgo.By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbData.label))
 		labelMap := map[string]string{"k8s-app": pdbData.label}
 		pdbName := fmt.Sprintf("test-pdb-for-%v", pdbData.label)
-		minAvailable := intstr.FromInt(pdbData.minAvailable)
+		minAvailable := intstr.FromInt32(int32(pdbData.minAvailable))
 		pdb := &policyv1.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pdbName,

@@ -177,7 +177,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		}, cs.PolicyV1().PodDisruptionBudgets(ns).UpdateStatus)
 		// fetch again to make sure the update from API was effective
 		updated := getPDBStatusOrDie(ctx, dc, ns, defaultName)
-		framework.ExpectHaveKey(updated.Status.DisruptedPods, pod.Name, "Expecting the DisruptedPods have %s", pod.Name)
+		gomega.Expect(updated.Status.DisruptedPods).To(gomega.HaveKey(pod.Name), "Expecting the DisruptedPods have %s", pod.Name)
 
 		ginkgo.By("Patching PodDisruptionBudget status")
 		patched := patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
@@ -188,7 +188,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			framework.ExpectNoError(err, "failed to marshal JSON for new data")
 			return jsonpatch.CreateMergePatch(oldBytes, newBytes)
 		}, "status")
-		framework.ExpectEmpty(patched.Status.DisruptedPods, "Expecting the PodDisruptionBudget's be empty")
+		gomega.Expect(patched.Status.DisruptedPods).To(gomega.BeEmpty(), "Expecting the PodDisruptionBudget's be empty")
 	})
 
 	// PDB shouldn't error out when there are unmanaged pods
@@ -506,7 +506,7 @@ func listPDBs(ctx context.Context, cs kubernetes.Interface, ns string, labelSele
 	for _, item := range pdbList.Items {
 		pdbNames = append(pdbNames, item.Name)
 	}
-	framework.ExpectConsistOf(pdbNames, expectedPDBNames, "Expecting returned PDBs '%s' in namespace %s", expectedPDBNames, ns)
+	gomega.Expect(pdbNames).To(gomega.ConsistOf(expectedPDBNames), "Expecting returned PDBs '%s' in namespace %s", expectedPDBNames, ns)
 }
 
 func deletePDBCollection(ctx context.Context, cs kubernetes.Interface, ns string) {

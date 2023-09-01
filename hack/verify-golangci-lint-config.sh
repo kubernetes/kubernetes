@@ -14,30 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script checks that golangci-strict.yaml and golangci.yaml remain in
-# sync. Lines that are intentionally different must have a comment which
-# mentions golangci.yaml or golangci-lint.yaml.
+# This script checks that all generated golangci-lint configurations
+# are up-to-date.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+source "${KUBE_ROOT}/hack/lib/verify-generated.sh"
 
-if differences=$(diff --context --ignore-blank-lines \
-                      --ignore-matching-lines='^ *#' \
-                      --ignore-matching-lines='#.*golangci\(-strict\)*.yaml' \
-                      "${KUBE_ROOT}/hack/golangci.yaml" "${KUBE_ROOT}/hack/golangci-strict.yaml" ); then
-    echo "hack/golangci.yaml and hack/golangci-strict.yaml are synchronized."
-else
-    cat >&2 <<EOF
-Unexpected differences between hack/golangci.yaml and hack/golangci-strict.yaml:
-
-${differences}
-
-If these differences are intentional, then add comments at the end of each
-different line in both files that mention golangci-strict.yaml or
-golangci.yaml.
-EOF
-    exit 1
-fi
+kube::verify::generated "" "Please run 'hack/update-golangci-lint-config.sh'" hack/update-golangci-lint-config.sh

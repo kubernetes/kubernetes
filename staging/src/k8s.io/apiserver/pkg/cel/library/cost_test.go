@@ -23,8 +23,9 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/ext"
-	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
@@ -228,14 +229,50 @@ func TestStringLibrary(t *testing.T) {
 			expectRuntimeCost:  3,
 		},
 		{
+			name:               "lowerAsciiEquals",
+			expr:               "'ABCDEFGHIJ abcdefghij'.lowerAscii() == 'abcdefghij ABCDEFGHIJ'.lowerAscii()",
+			expectEsimatedCost: checker.CostEstimate{Min: 7, Max: 9},
+			expectRuntimeCost:  9,
+		},
+		{
 			name:               "upperAscii",
 			expr:               "'ABCDEFGHIJ abcdefghij'.upperAscii()",
 			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
 		{
+			name:               "upperAsciiEquals",
+			expr:               "'ABCDEFGHIJ abcdefghij'.upperAscii() == 'abcdefghij ABCDEFGHIJ'.upperAscii()",
+			expectEsimatedCost: checker.CostEstimate{Min: 7, Max: 9},
+			expectRuntimeCost:  9,
+		},
+		{
+			name:               "quote",
+			expr:               "strings.quote('ABCDEFGHIJ abcdefghij')",
+			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:  3,
+		},
+		{
+			name:               "quoteEquals",
+			expr:               "strings.quote('ABCDEFGHIJ abcdefghij') == strings.quote('ABCDEFGHIJ abcdefghij')",
+			expectEsimatedCost: checker.CostEstimate{Min: 7, Max: 11},
+			expectRuntimeCost:  9,
+		},
+		{
 			name:               "replace",
 			expr:               "'abc 123 def 123'.replace('123', '456')",
+			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:  3,
+		},
+		{
+			name:               "replace between all chars",
+			expr:               "'abc 123 def 123'.replace('', 'x')",
+			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:  3,
+		},
+		{
+			name:               "replace with empty",
+			expr:               "'abc 123 def 123'.replace('123', '')",
 			expectEsimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:  3,
 		},
@@ -375,7 +412,7 @@ func TestAuthzLibrary(t *testing.T) {
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	env, err := cel.NewEnv(
-		ext.Strings(),
+		ext.Strings(ext.StringsVersion(2)),
 		URLs(),
 		Regex(),
 		Lists(),
@@ -413,18 +450,120 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 	}
 }
 
+func TestSize(t *testing.T) {
+	exactSize := func(size int) checker.SizeEstimate {
+		return checker.SizeEstimate{Min: uint64(size), Max: uint64(size)}
+	}
+	exactSizes := func(sizes ...int) []checker.SizeEstimate {
+		results := make([]checker.SizeEstimate, len(sizes))
+		for i, size := range sizes {
+			results[i] = exactSize(size)
+		}
+		return results
+	}
+	cases := []struct {
+		name       string
+		function   string
+		overload   string
+		targetSize checker.SizeEstimate
+		argSizes   []checker.SizeEstimate
+		expectSize checker.SizeEstimate
+	}{
+		{
+			name:       "replace empty with char",
+			function:   "replace",
+			targetSize: exactSize(3),     // e.g. abc
+			argSizes:   exactSizes(0, 1), // e.g. replace "" with "_"
+			expectSize: exactSize(7),     // e.g. _a_b_c_
+		},
+		{
+			name:       "maybe replace char with empty",
+			function:   "replace",
+			targetSize: exactSize(3),
+			argSizes:   exactSizes(1, 0),
+			expectSize: checker.SizeEstimate{Min: 0, Max: 3},
+		},
+		{
+			name:       "maybe replace repeated",
+			function:   "replace",
+			targetSize: exactSize(4),
+			argSizes:   exactSizes(2, 4),
+			expectSize: checker.SizeEstimate{Min: 4, Max: 8},
+		},
+		{
+			name:       "maybe replace empty",
+			function:   "replace",
+			targetSize: exactSize(4),
+			argSizes:   []checker.SizeEstimate{{Min: 0, Max: 1}, {Min: 0, Max: 2}},
+			expectSize: checker.SizeEstimate{Min: 0, Max: 14}, // len(__a__a__a__a__) == 14
+		},
+		{
+			name:       "replace non-empty size range, maybe larger",
+			function:   "replace",
+			targetSize: exactSize(4),
+			argSizes:   []checker.SizeEstimate{{Min: 1, Max: 1}, {Min: 1, Max: 2}},
+			expectSize: checker.SizeEstimate{Min: 4, Max: 8},
+		},
+		{
+			name:       "replace non-empty size range, maybe smaller",
+			function:   "replace",
+			targetSize: exactSize(4),
+			argSizes:   []checker.SizeEstimate{{Min: 1, Max: 2}, {Min: 1, Max: 1}},
+			expectSize: checker.SizeEstimate{Min: 2, Max: 4},
+		},
+	}
+	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var targetNode checker.AstNode = testSizeNode{size: tc.targetSize}
+			argNodes := make([]checker.AstNode, len(tc.argSizes))
+			for i, arg := range tc.argSizes {
+				argNodes[i] = testSizeNode{size: arg}
+			}
+			result := est.EstimateCallCost(tc.function, tc.overload, &targetNode, argNodes)
+			if result.ResultSize == nil {
+				t.Fatalf("Expected ResultSize but got none")
+			}
+			if *result.ResultSize != tc.expectSize {
+				t.Fatalf("Expected %+v but got %+v", tc.expectSize, *result.ResultSize)
+			}
+		})
+	}
+}
+
+type testSizeNode struct {
+	size checker.SizeEstimate
+}
+
+func (t testSizeNode) Path() []string {
+	return nil // not needed
+}
+
+func (t testSizeNode) Type() *types.Type {
+	return nil // not needed
+}
+
+func (t testSizeNode) Expr() *exprpb.Expr {
+	return nil // not needed
+}
+
+func (t testSizeNode) ComputedSize() *checker.SizeEstimate {
+	return &t.size
+}
+
 type testCostEstimator struct {
 }
 
 func (t *testCostEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {
-	switch t := element.Type().TypeKind.(type) {
-	case *expr.Type_Primitive:
-		switch t.Primitive {
-		case expr.Type_STRING:
-			return &checker.SizeEstimate{Min: 0, Max: 12}
-		case expr.Type_BYTES:
-			return &checker.SizeEstimate{Min: 0, Max: 12}
-		}
+	expr, err := cel.TypeToExprType(element.Type())
+	if err != nil {
+		return nil
+	}
+	switch expr.GetPrimitive() {
+	case exprpb.Type_STRING:
+		return &checker.SizeEstimate{Min: 0, Max: 12}
+	case exprpb.Type_BYTES:
+		return &checker.SizeEstimate{Min: 0, Max: 12}
 	}
 	return nil
 }

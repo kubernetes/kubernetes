@@ -529,7 +529,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 									continue
 								}
 								err = config.client.CoreV1().PersistentVolumes().Delete(backgroundCtx, pv.Name, metav1.DeleteOptions{})
-								if errors.Is(err, context.Canceled) {
+								if apierrors.IsNotFound(err) || errors.Is(err, context.Canceled) {
 									continue
 								}
 								framework.ExpectNoError(err)
@@ -819,7 +819,7 @@ func verifyLocalPod(ctx context.Context, config *localTestConfig, volume *localT
 	podNodeName, err := podNodeName(ctx, config, pod)
 	framework.ExpectNoError(err)
 	framework.Logf("pod %q created on Node %q", pod.Name, podNodeName)
-	framework.ExpectEqual(podNodeName, expectedNodeName)
+	gomega.Expect(podNodeName).To(gomega.Equal(expectedNodeName))
 }
 
 func makeLocalPVCConfig(config *localTestConfig, volumeType localVolumeType) e2epv.PersistentVolumeClaimConfig {
@@ -1069,7 +1069,7 @@ func newLocalClaimWithName(config *localTestConfig, name string) *v1.PersistentV
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse(testRequestSize),
 				},
@@ -1168,10 +1168,10 @@ func validateStatefulSet(ctx context.Context, config *localTestConfig, ss *appsv
 
 	if anti {
 		// Verify that each pod is on a different node
-		framework.ExpectEqual(nodes.Len(), len(pods.Items))
+		gomega.Expect(pods.Items).To(gomega.HaveLen(nodes.Len()))
 	} else {
 		// Verify that all pods are on same node.
-		framework.ExpectEqual(nodes.Len(), 1)
+		gomega.Expect(nodes.Len()).To(gomega.Equal(1))
 	}
 
 	// Validate all PVCs are bound

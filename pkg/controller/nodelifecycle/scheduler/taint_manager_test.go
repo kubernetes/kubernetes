@@ -23,7 +23,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,8 +39,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var timeForControllerToProgressForSanityCheck = 20 * time.Millisecond
@@ -884,4 +885,78 @@ func verifyPodActions(t *testing.T, description string, fakeClientset *fake.Clie
 	if podDeleted != expectDelete {
 		t.Errorf("[%v]Unexpected test result. Expected delete %v, got %v", description, expectDelete, podDeleted)
 	}
+}
+
+// TestPodDeletionEvent Verify that the output events are as expected
+func TestPodDeletionEvent(t *testing.T) {
+	f := func(path cmp.Path) bool {
+		switch path.String() {
+		// These fields change at runtime, so ignore it
+		case "LastTimestamp", "FirstTimestamp", "ObjectMeta.Name":
+			return true
+		}
+		return false
+	}
+
+	t.Run("emitPodDeletionEvent", func(t *testing.T) {
+		controller := &NoExecuteTaintManager{}
+		recorder := testutil.NewFakeRecorder()
+		controller.recorder = recorder
+		controller.emitPodDeletionEvent(types.NamespacedName{
+			Name:      "test",
+			Namespace: "test",
+		})
+		want := []*v1.Event{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+				},
+				InvolvedObject: v1.ObjectReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Namespace:  "test",
+					Name:       "test",
+				},
+				Reason:  "TaintManagerEviction",
+				Type:    "Normal",
+				Count:   1,
+				Message: "Marking for deletion Pod test/test",
+				Source:  v1.EventSource{Component: "nodeControllerTest"},
+			},
+		}
+		if diff := cmp.Diff(want, recorder.Events, cmp.FilterPath(f, cmp.Ignore())); len(diff) > 0 {
+			t.Errorf("emitPodDeletionEvent() returned data (-want,+got):\n%s", diff)
+		}
+	})
+
+	t.Run("emitCancelPodDeletionEvent", func(t *testing.T) {
+		controller := &NoExecuteTaintManager{}
+		recorder := testutil.NewFakeRecorder()
+		controller.recorder = recorder
+		controller.emitCancelPodDeletionEvent(types.NamespacedName{
+			Name:      "test",
+			Namespace: "test",
+		})
+		want := []*v1.Event{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+				},
+				InvolvedObject: v1.ObjectReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Namespace:  "test",
+					Name:       "test",
+				},
+				Reason:  "TaintManagerEviction",
+				Type:    "Normal",
+				Count:   1,
+				Message: "Cancelling deletion of Pod test/test",
+				Source:  v1.EventSource{Component: "nodeControllerTest"},
+			},
+		}
+		if diff := cmp.Diff(want, recorder.Events, cmp.FilterPath(f, cmp.Ignore())); len(diff) > 0 {
+			t.Errorf("emitPodDeletionEvent() returned data (-want,+got):\n%s", diff)
+		}
+	})
 }

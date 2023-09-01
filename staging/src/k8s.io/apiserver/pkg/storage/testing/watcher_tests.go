@@ -1042,7 +1042,7 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 // TODO(#109831): ProgressNotify feature is effectively implementing the same
 //
 //	functionality, so we should refactor this functionality to share the same input.
-func RunTestWatchDispatchBookmarkEvents(ctx context.Context, t *testing.T, store storage.Interface) {
+func RunTestWatchDispatchBookmarkEvents(ctx context.Context, t *testing.T, store storage.Interface, expectedWatchBookmarks bool) {
 	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	startRV := storedObj.ResourceVersion
 
@@ -1061,7 +1061,7 @@ func RunTestWatchDispatchBookmarkEvents(ctx context.Context, t *testing.T, store
 		{
 			name:                "allowWatchBookmarks=true",
 			timeout:             3 * time.Second,
-			expected:            true,
+			expected:            expectedWatchBookmarks,
 			allowWatchBookmarks: true,
 		},
 	}

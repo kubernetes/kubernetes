@@ -45,7 +45,7 @@ import (
 
 func TestResolvePortInt(t *testing.T) {
 	expected := 80
-	port, err := resolvePort(intstr.FromInt(expected), &v1.Container{})
+	port, err := resolvePort(intstr.FromInt32(int32(expected)), &v1.Container{})
 	if port != expected {
 		t.Errorf("expected: %d, saw: %d", expected, port)
 	}

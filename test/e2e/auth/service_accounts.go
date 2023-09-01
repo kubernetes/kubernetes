@@ -48,6 +48,7 @@ import (
 	utilptr "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const rootCAConfigMapName = "kube-root-ca.crt"
@@ -62,7 +63,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			time.Sleep(10 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(ctx, "default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEmpty(sa.Secrets)
+			gomega.Expect(sa.Secrets).To(gomega.BeEmpty())
 		}
 	})
 

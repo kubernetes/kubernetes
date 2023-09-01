@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -28,9 +29,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	fakecloud "k8s.io/cloud-provider/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -451,4 +455,82 @@ func newServiceController(t *testing.T, client *clientset.Clientset) (*serviceco
 	}
 	cloud.ClearCalls() // ignore any cloud calls made in init()
 	return controller, cloud, informerFactory
+}
+
+// Test_ServiceLoadBalancerIPMode tests whether the cloud provider has correctly updated the ipMode field.
+func Test_ServiceLoadBalancerIPMode(t *testing.T) {
+	ipModeVIP := corev1.LoadBalancerIPModeVIP
+	testCases := []struct {
+		ipModeEnabled  bool
+		externalIP     string
+		expectedIPMode *corev1.LoadBalancerIPMode
+	}{
+		{
+			ipModeEnabled:  false,
+			externalIP:     "1.2.3.4",
+			expectedIPMode: nil,
+		},
+		{
+			ipModeEnabled:  true,
+			externalIP:     "1.2.3.5",
+			expectedIPMode: &ipModeVIP,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run("", func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+			defer server.TearDownFn()
+
+			client, err := clientset.NewForConfig(server.ClientConfig)
+			if err != nil {
+				t.Fatalf("Error creating clientset: %v", err)
+			}
+
+			ns := framework.CreateNamespaceOrDie(client, "test-service-update-load-balancer-ip-mode", t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+			controller, cloud, informer := newServiceController(t, client)
+			cloud.ExternalIP = net.ParseIPSloppy(tc.externalIP)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			informer.Start(ctx.Done())
+			go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+
+			service := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-update-load-balancer-ip-mode",
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{{
+						Port: int32(80),
+					}},
+				},
+			}
+
+			service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Error creating test service: %v", err)
+			}
+
+			time.Sleep(5 * time.Second) // sleep 5 second to wait for the service controller reconcile
+			service, err = client.CoreV1().Services(ns.Name).Get(ctx, service.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Error getting test service: %v", err)
+			}
+
+			if len(service.Status.LoadBalancer.Ingress) == 0 {
+				t.Fatalf("unexpected load balancer status")
+			}
+
+			gotIngress := service.Status.LoadBalancer.Ingress[0]
+			if gotIngress.IP != tc.externalIP || !reflect.DeepEqual(gotIngress.IPMode, tc.expectedIPMode) {
+				t.Errorf("unexpected load balancer ingress, got ingress %v, expected IP %v, expected ipMode %v",
+					gotIngress, tc.externalIP, tc.expectedIPMode)
+			}
+		})
+	}
 }

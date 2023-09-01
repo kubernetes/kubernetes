@@ -52,7 +52,6 @@ var _ = SIGDescribe("API Streaming (aka. WatchList) [Serial] [Feature:WatchList]
 		secretInformer := cache.NewSharedIndexInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					framework.Fail("Unexpected list call")
 					return nil, fmt.Errorf("unexpected list call")
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {

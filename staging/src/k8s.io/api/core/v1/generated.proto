@@ -2171,6 +2171,15 @@ message LoadBalancerIngress {
   // +optional
   optional string hostname = 2;
 
+  // IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified.
+  // Setting this to "VIP" indicates that traffic is delivered to the node with
+  // the destination set to the load-balancer's IP and port.
+  // Setting this to "Proxy" indicates that traffic is delivered to the node or pod with
+  // the destination set to the node's IP and node port or the pod's IP and port.
+  // Service implementations may use this information to adjust traffic routing.
+  // +optional
+  optional string ipMode = 3;
+
   // Ports is a list of records of service ports
   // If used, every port defined in the service should have an entry in it
   // +listType=atomic
@@ -2816,7 +2825,7 @@ message PersistentVolumeClaimSpec {
   // status field of the claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
   // +optional
-  optional ResourceRequirements resources = 2;
+  optional VolumeResourceRequirements resources = 2;
 
   // volumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
@@ -5960,6 +5969,21 @@ message VolumeProjection {
   // serviceAccountToken is information about the serviceAccountToken data to project
   // +optional
   optional ServiceAccountTokenProjection serviceAccountToken = 4;
+}
+
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
+message VolumeResourceRequirements {
+  // Limits describes the maximum amount of compute resources allowed.
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> limits = 1;
+
+  // Requests describes the minimum amount of compute resources required.
+  // If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+  // otherwise to an implementation-defined value. Requests cannot exceed Limits.
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
 }
 
 // Represents the source of a volume to mount.

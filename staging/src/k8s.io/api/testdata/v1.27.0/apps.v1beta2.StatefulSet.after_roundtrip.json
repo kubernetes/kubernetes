@@ -453,12 +453,7 @@
                     },
                     "requests": {
                       "requestsKey": "0"
-                    },
-                    "claims": [
-                      {
-                        "name": "nameValue"
-                      }
-                    ]
+                    }
                   },
                   "volumeName": "volumeNameValue",
                   "storageClassName": "storageClassNameValue",
@@ -1751,12 +1746,7 @@
             },
             "requests": {
               "requestsKey": "0"
-            },
-            "claims": [
-              {
-                "name": "nameValue"
-              }
-            ]
+            }
           },
           "volumeName": "volumeNameValue",
           "storageClassName": "storageClassNameValue",

@@ -440,7 +440,7 @@ type PersistentVolumeClaimSpec struct {
 	// that are lower than previous value but must still be higher than capacity recorded in the
 	// status field of the claim.
 	// +optional
-	Resources ResourceRequirements
+	Resources VolumeResourceRequirements
 	// VolumeName is the binding reference to the PersistentVolume backing this
 	// claim. When set to non-empty value Selector is not evaluated
 	// +optional
@@ -2282,6 +2282,18 @@ type ResourceRequirements struct {
 	Claims []ResourceClaim
 }
 
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
+type VolumeResourceRequirements struct {
+	// Limits describes the maximum amount of compute resources allowed.
+	// +optional
+	Limits ResourceList
+	// Requests describes the minimum amount of compute resources required.
+	// If Request is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value
+	// +optional
+	Requests ResourceList
+}
+
 // ResourceClaim references one entry in PodSpec.ResourceClaims.
 type ResourceClaim struct {
 	// Name must match the name of one entry in pod.spec.resourceClaims of
@@ -2617,12 +2629,6 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodInitialized means that all init containers in the pod have started successfully.
 	PodInitialized PodConditionType = "Initialized"
-	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
-	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
-	PodReasonUnschedulable = "Unschedulable"
-	// PodReasonSchedulingGated reason in PodScheduled PodCondition means that the scheduler
-	// skips scheduling the pod because one or more scheduling gates are still present.
-	PodReasonSchedulingGated = "SchedulingGated"
 	// ContainersReady indicates whether all containers in the pod are ready.
 	ContainersReady PodConditionType = "ContainersReady"
 	// DisruptionTarget indicates the pod is about to be terminated due to a
@@ -4073,6 +4079,15 @@ type LoadBalancerIngress struct {
 	// (typically AWS load-balancers)
 	// +optional
 	Hostname string
+
+	// IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified.
+	// Setting this to "VIP" indicates that traffic is delivered to the node with
+	// the destination set to the load-balancer's IP and port.
+	// Setting this to "Proxy" indicates that traffic is delivered to the node or pod with
+	// the destination set to the node's IP and node port or the pod's IP and port.
+	// Service implementations may use this information to adjust traffic routing.
+	// +optional
+	IPMode *LoadBalancerIPMode
 
 	// Ports is a list of records of service ports
 	// If used, every port defined in the service should have an entry in it
@@ -6146,3 +6161,15 @@ type PortStatus struct {
 	// +kubebuilder:validation:MaxLength=316
 	Error *string
 }
+
+// LoadBalancerIPMode represents the mode of the LoadBalancer ingress IP
+type LoadBalancerIPMode string
+
+const (
+	// LoadBalancerIPModeVIP indicates that traffic is delivered to the node with
+	// the destination set to the load-balancer's IP and port.
+	LoadBalancerIPModeVIP LoadBalancerIPMode = "VIP"
+	// LoadBalancerIPModeProxy indicates that traffic is delivered to the node or pod with
+	// the destination set to the node's IP and port or the pod's IP and port.
+	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
+)

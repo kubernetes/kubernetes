@@ -330,13 +330,11 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
 			want: want{
-				filter: perNodeResult{
-					workerNode.Name: {
-						status: framework.AsStatus(fmt.Errorf(`look up resource class: resourceclass.resource.k8s.io "%s" not found`, className)),
-					},
+				prefilter: result{
+					status: framework.AsStatus(fmt.Errorf(`look up resource class: resourceclass.resource.k8s.io "%s" not found`, className)),
 				},
 				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
 				},
 			},
 		},

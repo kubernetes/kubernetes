@@ -19,11 +19,10 @@ import (
 	"fmt"
 	"sync"
 
+	celast "github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // Program is an evaluable view of an Ast.
@@ -61,6 +60,9 @@ func NoVars() interpreter.Activation {
 
 // PartialVars returns a PartialActivation which contains variables and a set of AttributePattern
 // values that indicate variables or parts of variables whose value are not yet known.
+//
+// This method relies on manually configured sets of missing attribute patterns. For a method which
+// infers the missing variables from the input and the configured environment, use Env.PartialVars().
 //
 // The `vars` value may either be an interpreter.Activation or any valid input to the
 // interpreter.NewActivation call.
@@ -169,7 +171,7 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 
 	// Add the function bindings created via Function() options.
 	for _, fn := range e.functions {
-		bindings, err := fn.bindings()
+		bindings, err := fn.Bindings()
 		if err != nil {
 			return nil, err
 		}
@@ -208,14 +210,11 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 	}
 	// Enable compile-time checking of syntax/cardinality for string.format calls.
 	if p.evalOpts&OptCheckStringFormat == OptCheckStringFormat {
-		var isValidType func(id int64, validTypes ...*types.TypeValue) (bool, error)
+		var isValidType func(id int64, validTypes ...ref.Type) (bool, error)
 		if ast.IsChecked() {
-			isValidType = func(id int64, validTypes ...*types.TypeValue) (bool, error) {
-				t, err := ExprTypeToType(ast.typeMap[id])
-				if err != nil {
-					return false, err
-				}
-				if t.kind == DynKind {
+			isValidType = func(id int64, validTypes ...ref.Type) (bool, error) {
+				t := ast.typeMap[id]
+				if t.Kind() == DynKind {
 					return true, nil
 				}
 				for _, vt := range validTypes {
@@ -223,7 +222,7 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 					if err != nil {
 						return false, err
 					}
-					if k == t.kind {
+					if t.Kind() == k {
 						return true, nil
 					}
 				}
@@ -231,7 +230,7 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 			}
 		} else {
 			// if the AST isn't type-checked, short-circuit validation
-			isValidType = func(id int64, validTypes ...*types.TypeValue) (bool, error) {
+			isValidType = func(id int64, validTypes ...ref.Type) (bool, error) {
 				return true, nil
 			}
 		}
@@ -284,10 +283,11 @@ func (p *prog) initInterpretable(ast *Ast, decs []interpreter.InterpretableDecor
 	}
 
 	// When the AST has been checked it contains metadata that can be used to speed up program execution.
-	var checked *exprpb.CheckedExpr
-	checked, err := AstToCheckedExpr(ast)
-	if err != nil {
-		return nil, err
+	checked := &celast.CheckedAST{
+		Expr:         ast.Expr(),
+		SourceInfo:   ast.SourceInfo(),
+		TypeMap:      ast.typeMap,
+		ReferenceMap: ast.refMap,
 	}
 	interpretable, err := p.interpreter.NewInterpretable(checked, decs...)
 	if err != nil {
@@ -498,7 +498,7 @@ type evalActivation struct {
 // The lazy binding will only be invoked once per evaluation.
 //
 // Values which are not represented as ref.Val types on input may be adapted to a ref.Val using
-// the ref.TypeAdapter configured in the environment.
+// the types.Adapter configured in the environment.
 func (a *evalActivation) ResolveName(name string) (any, bool) {
 	v, found := a.vars[name]
 	if !found {

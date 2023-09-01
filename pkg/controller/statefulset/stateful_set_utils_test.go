@@ -788,7 +788,7 @@ func newPVC(name string) v1.PersistentVolumeClaim {
 			Name:      name,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
@@ -933,7 +933,7 @@ func newStatefulSetWithLabels(replicas int, name string, uid types.UID, labels m
 				{
 					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "datadir"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						Resources: v1.ResourceRequirements{
+						Resources: v1.VolumeResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 							},

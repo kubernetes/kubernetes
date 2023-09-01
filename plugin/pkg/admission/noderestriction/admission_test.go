@@ -1552,7 +1552,7 @@ func makeTestPVC(
 	pvc := &api.PersistentVolumeClaim{
 		Spec: api.PersistentVolumeClaimSpec{
 			VolumeName: "volume1",
-			Resources: api.ResourceRequirements{
+			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
 					api.ResourceStorage: resource.MustParse("10G"),
 				},

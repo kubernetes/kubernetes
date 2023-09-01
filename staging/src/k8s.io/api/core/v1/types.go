@@ -486,7 +486,7 @@ type PersistentVolumeClaimSpec struct {
 	// status field of the claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
 	// +optional
-	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	Resources VolumeResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	// volumeName is the binding reference to the PersistentVolume backing this claim.
 	// +optional
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,3,opt,name=volumeName"`
@@ -2415,6 +2415,27 @@ type ResourceRequirements struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	Claims []ResourceClaim `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
+}
+
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
+type VolumeResourceRequirements struct {
+	// Limits describes the maximum amount of compute resources allowed.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Limits ResourceList `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=ResourceList,castkey=ResourceName"`
+	// Requests describes the minimum amount of compute resources required.
+	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value. Requests cannot exceed Limits.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// +optional
+	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+
+	// Claims got added by accident when volumes shared the ResourceRequirements struct
+	// with containers. Stripping the field got added in 1.27 and was backported to 1.26.
+	// Starting with Kubernetes 1.28, this field is not part of the volume API anymore.
+	//
+	// Future extensions must not use "claims" or field number 3.
+	// Claims []ResourceClaim `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
 }
 
 // ResourceClaim references one entry in PodSpec.ResourceClaims.
@@ -4692,6 +4713,15 @@ type LoadBalancerIngress struct {
 	// +optional
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
 
+	// IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified.
+	// Setting this to "VIP" indicates that traffic is delivered to the node with
+	// the destination set to the load-balancer's IP and port.
+	// Setting this to "Proxy" indicates that traffic is delivered to the node or pod with
+	// the destination set to the node's IP and node port or the pod's IP and port.
+	// Service implementations may use this information to adjust traffic routing.
+	// +optional
+	IPMode *LoadBalancerIPMode `json:"ipMode,omitempty" protobuf:"bytes,3,opt,name=ipMode"`
+
 	// Ports is a list of records of service ports
 	// If used, every port defined in the service should have an entry in it
 	// +listType=atomic
@@ -4709,6 +4739,8 @@ const (
 	IPv4Protocol IPFamily = "IPv4"
 	// IPv6Protocol indicates that this IP is IPv6 protocol
 	IPv6Protocol IPFamily = "IPv6"
+	// IPFamilyUnknown indicates that this IP is unknown protocol
+	IPFamilyUnknown IPFamily = ""
 )
 
 // IPFamilyPolicy represents the dual-stack-ness requested or required by a Service
@@ -7054,3 +7086,15 @@ type PortStatus struct {
 	// +kubebuilder:validation:MaxLength=316
 	Error *string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
 }
+
+// LoadBalancerIPMode represents the mode of the LoadBalancer ingress IP
+type LoadBalancerIPMode string
+
+const (
+	// LoadBalancerIPModeVIP indicates that traffic is delivered to the node with
+	// the destination set to the load-balancer's IP and port.
+	LoadBalancerIPModeVIP LoadBalancerIPMode = "VIP"
+	// LoadBalancerIPModeProxy indicates that traffic is delivered to the node or pod with
+	// the destination set to the node's IP and port or the pod's IP and port.
+	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
+)

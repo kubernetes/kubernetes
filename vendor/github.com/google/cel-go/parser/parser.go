@@ -89,8 +89,9 @@ func mustNewParser(opts ...Option) *Parser {
 
 // Parse parses the expression represented by source and returns the result.
 func (p *Parser) Parse(source common.Source) (*exprpb.ParsedExpr, *common.Errors) {
+	errs := common.NewErrors(source)
 	impl := parser{
-		errors:                           &parseErrors{common.NewErrors(source)},
+		errors:                           &parseErrors{errs},
 		helper:                           newParserHelper(source),
 		macros:                           p.macros,
 		maxRecursionDepth:                p.maxRecursionDepth,
@@ -99,6 +100,7 @@ func (p *Parser) Parse(source common.Source) (*exprpb.ParsedExpr, *common.Errors
 		errorRecoveryLookaheadTokenLimit: p.errorRecoveryTokenLookaheadLimit,
 		populateMacroCalls:               p.populateMacroCalls,
 		enableOptionalSyntax:             p.enableOptionalSyntax,
+		enableVariadicOperatorASTs:       p.enableVariadicOperatorASTs,
 	}
 	buf, ok := source.(runes.Buffer)
 	if !ok {
@@ -115,7 +117,7 @@ func (p *Parser) Parse(source common.Source) (*exprpb.ParsedExpr, *common.Errors
 	return &exprpb.ParsedExpr{
 		Expr:       e,
 		SourceInfo: impl.helper.getSourceInfo(),
-	}, impl.errors.Errors
+	}, errs
 }
 
 // reservedIds are not legal to use as variables.  We exclude them post-parse, as they *are* valid
@@ -295,6 +297,7 @@ type parser struct {
 	errorRecoveryLookaheadTokenLimit int
 	populateMacroCalls               bool
 	enableOptionalSyntax             bool
+	enableVariadicOperatorASTs       bool
 }
 
 var (
@@ -357,9 +360,9 @@ func (p *parser) parse(expr runes.Buffer, desc string) *exprpb.Expr {
 		if val := recover(); val != nil {
 			switch err := val.(type) {
 			case *lookaheadLimitError:
-				p.errors.ReportError(common.NoLocation, err.Error())
+				p.errors.internalError(err.Error())
 			case *recursionError:
-				p.errors.ReportError(common.NoLocation, err.Error())
+				p.errors.internalError(err.Error())
 			case *tooManyErrors:
 				// do nothing
 			case *recoveryLimitError:
@@ -449,7 +452,7 @@ func (p *parser) Visit(tree antlr.ParseTree) any {
 
 	// Report at least one error if the parser reaches an unknown parse element.
 	// Typically, this happens if the parser has already encountered a syntax error elsewhere.
-	if len(p.errors.GetErrors()) == 0 {
+	if p.errors.errorCount() == 0 {
 		txt := "<<nil>>"
 		if t != nil {
 			txt = fmt.Sprintf("<<%T>>", t)
@@ -480,7 +483,7 @@ func (p *parser) VisitExpr(ctx *gen.ExprContext) any {
 // Visit a parse tree produced by CELParser#conditionalOr.
 func (p *parser) VisitConditionalOr(ctx *gen.ConditionalOrContext) any {
 	result := p.Visit(ctx.GetE()).(*exprpb.Expr)
-	b := newBalancer(p.helper, operators.LogicalOr, result)
+	l := p.newLogicManager(operators.LogicalOr, result)
 	rest := ctx.GetE1()
 	for i, op := range ctx.GetOps() {
 		if i >= len(rest) {
@@ -488,15 +491,15 @@ func (p *parser) VisitConditionalOr(ctx *gen.ConditionalOrContext) any {
 		}
 		next := p.Visit(rest[i]).(*exprpb.Expr)
 		opID := p.helper.id(op)
-		b.addTerm(opID, next)
+		l.addTerm(opID, next)
 	}
-	return b.balance()
+	return l.toExpr()
 }
 
 // Visit a parse tree produced by CELParser#conditionalAnd.
 func (p *parser) VisitConditionalAnd(ctx *gen.ConditionalAndContext) any {
 	result := p.Visit(ctx.GetE()).(*exprpb.Expr)
-	b := newBalancer(p.helper, operators.LogicalAnd, result)
+	l := p.newLogicManager(operators.LogicalAnd, result)
 	rest := ctx.GetE1()
 	for i, op := range ctx.GetOps() {
 		if i >= len(rest) {
@@ -504,9 +507,9 @@ func (p *parser) VisitConditionalAnd(ctx *gen.ConditionalAndContext) any {
 		}
 		next := p.Visit(rest[i]).(*exprpb.Expr)
 		opID := p.helper.id(op)
-		b.addTerm(opID, next)
+		l.addTerm(opID, next)
 	}
-	return b.balance()
+	return l.toExpr()
 }
 
 // Visit a parse tree produced by CELParser#relation.
@@ -867,18 +870,24 @@ func (p *parser) unquote(ctx any, value string, isBytes bool) string {
 	return text
 }
 
+func (p *parser) newLogicManager(function string, term *exprpb.Expr) *logicManager {
+	if p.enableVariadicOperatorASTs {
+		return newVariadicLogicManager(p.helper, function, term)
+	}
+	return newBalancingLogicManager(p.helper, function, term)
+}
+
 func (p *parser) reportError(ctx any, format string, args ...any) *exprpb.Expr {
 	var location common.Location
-	switch ctx.(type) {
+	err := p.helper.newExpr(ctx)
+	switch c := ctx.(type) {
 	case common.Location:
-		location = ctx.(common.Location)
+		location = c
 	case antlr.Token, antlr.ParserRuleContext:
-		err := p.helper.newExpr(ctx)
 		location = p.helper.getLocation(err.GetId())
 	}
-	err := p.helper.newExpr(ctx)
 	// Provide arguments to the report error.
-	p.errors.ReportError(location, format, args...)
+	p.errors.reportErrorAtID(err.GetId(), location, format, args...)
 	return err
 }
 

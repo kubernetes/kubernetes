@@ -38,6 +38,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 // TODO: it would probably be slightly better to build up the objects
@@ -461,7 +462,7 @@ func getMasterSSHClient() (*ssh.Client, error) {
 func sshExecAndVerify(client *ssh.Client, cmd string) {
 	_, _, rc, err := sshExec(client, cmd)
 	framework.ExpectNoError(err, "Failed to execute %q with ssh client %+v", cmd, client)
-	framework.ExpectEqual(rc, 0, "error return code from executing command on the cluster: %s", cmd)
+	gomega.Expect(rc).To(gomega.BeZero(), "error return code from executing command on the cluster: %s", cmd)
 }
 
 func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {

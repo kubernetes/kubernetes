@@ -44,8 +44,9 @@ var ErrAPIServiceNotFound = errors.New("resource not found")
 // known specs including the http etag.
 type SpecAggregator interface {
 	AddUpdateAPIService(apiService *v1.APIService, handler http.Handler) error
+	// UpdateAPIServiceSpec updates the APIService. It returns ErrAPIServiceNotFound if the APIService doesn't exist.
 	UpdateAPIServiceSpec(apiServiceName string) error
-	RemoveAPIService(apiServiceName string) error
+	RemoveAPIService(apiServiceName string)
 }
 
 const (
@@ -231,17 +232,16 @@ func (s *specAggregator) AddUpdateAPIService(apiService *v1.APIService, handler 
 
 // RemoveAPIService removes an api service from OpenAPI aggregation. If it does not exist, no error is returned.
 // It is thread safe.
-func (s *specAggregator) RemoveAPIService(apiServiceName string) error {
+func (s *specAggregator) RemoveAPIService(apiServiceName string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	if _, exists := s.specsByAPIServiceName[apiServiceName]; !exists {
-		return ErrAPIServiceNotFound
+		return
 	}
 	delete(s.specsByAPIServiceName, apiServiceName)
 	// Re-create the mergeSpec for the new list of apiservices
 	s.openAPIVersionedService.UpdateSpecLazy(s.buildMergeSpecLocked())
-	return nil
 }
 
 // decorateError creates a new cache that wraps a downloader

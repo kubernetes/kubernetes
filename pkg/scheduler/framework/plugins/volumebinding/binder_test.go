@@ -349,7 +349,7 @@ func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolum
 		}
 		pvs[i] = newPv
 	}
-	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pv := range pvs {
 			obj, err := env.internalPVCache.GetAPIObj(pv.Name)
 			if obj == nil || err != nil {
@@ -375,7 +375,7 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 		}
 		pvcs[i] = newPvc
 	}
-	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pvc := range pvcs {
 			obj, err := env.internalPVCCache.GetAPIObj(getPVCName(pvc))
 			if obj == nil || err != nil {
@@ -627,7 +627,7 @@ func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVer
 			ResourceVersion: resourceVersion,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse(size),
 				},

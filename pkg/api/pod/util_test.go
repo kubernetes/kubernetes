@@ -1889,44 +1889,6 @@ func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
 	}
 }
 
-func TestDropVolumesClaimField(t *testing.T) {
-	pod := &api.Pod{
-		Spec: api.PodSpec{
-			Volumes: []api.Volume{
-				{},
-				{
-					VolumeSource: api.VolumeSource{
-						Ephemeral: &api.EphemeralVolumeSource{},
-					},
-				},
-				{
-					VolumeSource: api.VolumeSource{
-						Ephemeral: &api.EphemeralVolumeSource{
-							VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
-								Spec: api.PersistentVolumeClaimSpec{
-									Resources: api.ResourceRequirements{
-										Claims: []api.ResourceClaim{
-											{Name: "dra"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	DropDisabledPodFields(pod, nil)
-
-	for i, volume := range pod.Spec.Volumes {
-		if volume.Ephemeral != nil && volume.Ephemeral.VolumeClaimTemplate != nil && volume.Ephemeral.VolumeClaimTemplate.Spec.Resources.Claims != nil {
-			t.Errorf("volume #%d: Resources.Claim should be nil", i)
-		}
-	}
-}
-
 func TestDropInPlacePodVerticalScaling(t *testing.T) {
 	podWithInPlaceVerticalScaling := func() *api.Pod {
 		return &api.Pod{

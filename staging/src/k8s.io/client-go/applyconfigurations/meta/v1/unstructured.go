@@ -125,7 +125,7 @@ func (e *extractor) extractUnstructured(object *unstructured.Unstructured, field
 		return nil, fmt.Errorf("failed to fetch the objectType: %v", err)
 	}
 	result := &unstructured.Unstructured{}
-	err = managedfields.ExtractInto(object, *objectType, fieldManager, result, subresource)
+	err = managedfields.ExtractInto(object, *objectType, fieldManager, result, subresource) //nolint:forbidigo
 	if err != nil {
 		return nil, fmt.Errorf("failed calling ExtractInto for unstructured: %v", err)
 	}

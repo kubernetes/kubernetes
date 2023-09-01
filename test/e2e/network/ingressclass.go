@@ -35,6 +35,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
@@ -334,13 +335,13 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		ginkgo.By("getting")
 		gottenIC, err := icClient.Get(ctx, ingressClass1.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenIC.UID, ingressClass1.UID)
-		framework.ExpectEqual(gottenIC.UID, ingressClass1.UID)
+		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
+		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
 
 		ginkgo.By("listing")
 		ics, err := icClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=generic"})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ics.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(ics.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
@@ -350,14 +351,14 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		ginkgo.By("patching")
 		patchedIC, err := icClient.Patch(ctx, ingressClass1.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedIC.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedIC.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		icToUpdate := patchedIC.DeepCopy()
 		icToUpdate.Annotations["updated"] = "true"
 		updatedIC, err := icClient.Update(ctx, icToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedIC.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedIC.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
@@ -366,7 +367,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 				if !ok {
 					framework.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
 				watchedIngress, isIngress := evt.Object.(*networkingv1.IngressClass)
 				if !isIngress {
 					framework.Failf("expected Ingress, got %T", evt.Object)
@@ -393,14 +394,14 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		}
 		ics, err = icClient.List(ctx, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ics.Items), 2, "filtered list should have 2 items")
+		gomega.Expect(ics.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = icClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		ics, err = icClient.List(ctx, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ics.Items), 0, "filtered list should have 0 items")
+		gomega.Expect(ics.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 
 })

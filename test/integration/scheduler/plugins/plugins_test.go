@@ -475,7 +475,7 @@ func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 		bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}
 	}
 	if bp.bindStatus.IsSuccess() {
-		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(context.TODO(), &v1.Binding{
+		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(ctx, &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID, Annotations: map[string]string{bindPluginAnnotation: bp.Name()}},
 			Target: v1.ObjectReference{
 				Kind: "Node",
@@ -672,7 +672,8 @@ func TestPreFilterPlugin(t *testing.T) {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			} else if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
@@ -844,7 +845,8 @@ func TestPostFilterPlugin(t *testing.T) {
 			}
 
 			if tt.rejectFilter {
-				if err = wait.Poll(10*time.Millisecond, 10*time.Second, testutils.PodUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 10*time.Second, false,
+					testutils.PodUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled.")
 				}
 
@@ -912,7 +914,8 @@ func TestScorePlugin(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
@@ -1003,7 +1006,7 @@ func TestReservePluginReserve(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second,
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
 					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
@@ -1131,7 +1134,8 @@ func TestPrebindPlugin(t *testing.T) {
 					if err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod, 10*time.Second); err != nil {
 						t.Errorf("Expected the pod to be schedulable on retry, but got an error: %v", err)
 					}
-				} else if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				} else if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
 				}
 			} else if test.reject {
@@ -1148,7 +1152,7 @@ func TestPrebindPlugin(t *testing.T) {
 			}
 
 			if test.unschedulablePod != nil {
-				if err := wait.Poll(10*time.Millisecond, 15*time.Second, func() (bool, error) {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
 					// 2 means the unschedulable pod is expected to be retried at least twice.
 					// (one initial attempt plus the one moved by the preBind pod)
 					return filterPlugin.deepCopy().numFilterCalled >= 2*nodesNum, nil
@@ -1273,7 +1277,8 @@ func TestUnReserveReservePlugins(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
 				}
 
@@ -1509,7 +1514,8 @@ func TestUnReserveBindPlugins(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
 				}
 
@@ -1553,20 +1559,24 @@ func TestBindPlugin(t *testing.T) {
 
 	tests := []struct {
 		name                   string
+		enabledBindPlugins     []configv1.Plugin
 		bindPluginStatuses     []*framework.Status
 		expectBoundByScheduler bool   // true means this test case expecting scheduler would bind pods
 		expectBoundByPlugin    bool   // true means this test case expecting a plugin would bind pods
+		expectBindFailed       bool   // true means this test case expecting a plugin binding pods with error
 		expectBindPluginName   string // expecting plugin name to bind pods
 		expectInvokeEvents     []pluginInvokeEvent
 	}{
 		{
 			name:                   "bind plugins skipped to bind the pod and scheduler bond the pod",
+			enabledBindPlugins:     []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			bindPluginStatuses:     []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
 			expectBoundByScheduler: true,
 			expectInvokeEvents:     []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}, {pluginName: postBindPluginName, val: 1}},
 		},
 		{
 			name:                 "bindplugin2 succeeded to bind the pod",
+			enabledBindPlugins:   []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Success, "")},
 			expectBoundByPlugin:  true,
 			expectBindPluginName: bindPlugin2Name,
@@ -1574,6 +1584,7 @@ func TestBindPlugin(t *testing.T) {
 		},
 		{
 			name:                 "bindplugin1 succeeded to bind the pod",
+			enabledBindPlugins:   []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Success, ""), framework.NewStatus(framework.Success, "")},
 			expectBoundByPlugin:  true,
 			expectBindPluginName: bindPlugin1Name,
@@ -1581,8 +1592,16 @@ func TestBindPlugin(t *testing.T) {
 		},
 		{
 			name:               "bind plugin fails to bind the pod",
+			enabledBindPlugins: []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
+			expectBindFailed:   true,
 			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Error, "failed to bind"), framework.NewStatus(framework.Success, "")},
 			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: reservePluginName, val: 1}},
+		},
+		{
+			name:               "all bind plugins will be skipped(this should not happen for most of the cases)",
+			enabledBindPlugins: []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}},
+			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
+			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}},
 		},
 	}
 
@@ -1618,7 +1637,7 @@ func TestBindPlugin(t *testing.T) {
 						},
 						Bind: configv1.PluginSet{
 							// Put DefaultBinder last.
-							Enabled:  []configv1.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
+							Enabled:  test.enabledBindPlugins,
 							Disabled: []configv1.Plugin{{Name: defaultbinder.Name}},
 						},
 						PostBind: configv1.PluginSet{
@@ -1681,7 +1700,7 @@ func TestBindPlugin(t *testing.T) {
 						t.Errorf("Expected %s not to be called, was called %d times.", p2.Name(), p2.numBindCalled)
 					}
 				}
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, func() (done bool, err error) {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
 					p := postBindPlugin.deepCopy()
 					return p.numPostBindCalled == 1, nil
 				}); err != nil {
@@ -1690,16 +1709,21 @@ func TestBindPlugin(t *testing.T) {
 				if reservePlugin.numUnreserveCalled != 0 {
 					t.Errorf("Expected unreserve to not be called, was called %d times.", reservePlugin.numUnreserveCalled)
 				}
-			} else {
+			} else if test.expectBindFailed {
 				// bind plugin fails to bind the pod
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
 				}
 				p := postBindPlugin.deepCopy()
 				if p.numPostBindCalled > 0 {
 					t.Errorf("Didn't expect the postbind plugin to be called %d times.", p.numPostBindCalled)
 				}
+			} else if postBindPlugin.numPostBindCalled > 0 {
+				// all bind plugins are skipped
+				t.Errorf("Didn't expect the postbind plugin to be called %d times.", postBindPlugin.numPostBindCalled)
 			}
+
 			for j := range test.expectInvokeEvents {
 				expectEvent := test.expectInvokeEvents[j]
 				select {
@@ -1762,7 +1786,8 @@ func TestPostBindPlugin(t *testing.T) {
 			}
 
 			if test.preBindFail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
 				}
 				if postBindPlugin.numPostBindCalled > 0 {
@@ -1858,7 +1883,8 @@ func TestPermitPlugin(t *testing.T) {
 				t.Errorf("Error while creating a test pod: %v", err)
 			}
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
 				}
 			} else {
@@ -1907,7 +1933,7 @@ func TestMultiplePermitPlugins(t *testing.T) {
 
 	var waitingPod framework.WaitingPod
 	// Wait until the test pod is actually waiting.
-	wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+	wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
 		return waitingPod != nil, nil
 	})
@@ -1959,14 +1985,14 @@ func TestPermitPluginsCancelled(t *testing.T) {
 
 	var waitingPod framework.WaitingPod
 	// Wait until the test pod is actually waiting.
-	wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+	wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
 		return waitingPod != nil, nil
 	})
 
 	perPlugin1.rejectAllPods()
 	// Wait some time for the permit plugins to be cancelled
-	err = wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		p1 := perPlugin1.deepCopy()
 		p2 := perPlugin2.deepCopy()
 		return p1.cancelled && p2.cancelled, nil
@@ -2100,7 +2126,8 @@ func TestFilterPlugin(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 				if filterPlugin.numFilterCalled < 1 {
@@ -2156,7 +2183,8 @@ func TestPreScorePlugin(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
@@ -2361,7 +2389,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 					t.Fatalf("Error while creating the waiting pod: %v", err)
 				}
 				// Wait until the waiting-pod is actually waiting.
-				if err := wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 					w := false
 					permitPlugin.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { w = true })
 					return w, nil
@@ -2386,7 +2414,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 			}
 
 			if w := tt.waitingPod; w != nil {
-				if err := wait.Poll(200*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 					w := false
 					permitPlugin.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { w = true })
 					return !w, nil

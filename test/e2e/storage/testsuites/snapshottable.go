@@ -440,9 +440,9 @@ func checkSnapshot(ctx context.Context, dc dynamic.Interface, sr *storageframewo
 	ginkgo.By("checking the SnapshotContent")
 	// PreprovisionedCreatedSnapshot do not need to set volume snapshot class name
 	if pattern.SnapshotType != storageframework.PreprovisionedCreatedSnapshot {
-		framework.ExpectEqual(snapshotContentSpec["volumeSnapshotClassName"], vsc.GetName())
+		gomega.Expect(snapshotContentSpec["volumeSnapshotClassName"]).To(gomega.Equal(vsc.GetName()))
 	}
-	framework.ExpectEqual(volumeSnapshotRef["name"], vs.GetName())
-	framework.ExpectEqual(volumeSnapshotRef["namespace"], vs.GetNamespace())
+	gomega.Expect(volumeSnapshotRef).To(gomega.HaveKeyWithValue("name", vs.GetName()))
+	gomega.Expect(volumeSnapshotRef).To(gomega.HaveKeyWithValue("namespace", vs.GetNamespace()))
 	return vscontent
 }

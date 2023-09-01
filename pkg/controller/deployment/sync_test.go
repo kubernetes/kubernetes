@@ -35,7 +35,7 @@ import (
 )
 
 func intOrStrP(val int) *intstr.IntOrString {
-	intOrStr := intstr.FromInt(val)
+	intOrStr := intstr.FromInt32(int32(val))
 	return &intOrStr
 }
 

@@ -341,7 +341,7 @@ const (
 	CoreDNSImageName = "coredns"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "v1.10.1"
+	CoreDNSVersion = "v1.11.1"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -467,6 +467,7 @@ var (
 		26: "3.5.9-0",
 		27: "3.5.9-0",
 		28: "3.5.9-0",
+		29: "3.5.9-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

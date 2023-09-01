@@ -156,7 +156,7 @@ github.com/containerd/ttrpc
 # github.com/coredns/caddy v1.1.1
 ## explicit; go 1.13
 github.com/coredns/caddy/caddyfile
-# github.com/coredns/corefile-migration v1.0.20
+# github.com/coredns/corefile-migration v1.0.21
 ## explicit; go 1.14
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
@@ -202,7 +202,7 @@ github.com/emicklei/go-restful/v3/log
 # github.com/euank/go-kmsg-parser v2.0.0+incompatible
 ## explicit
 github.com/euank/go-kmsg-parser/kmsgparser
-# github.com/evanphx/json-patch v5.6.0+incompatible
+# github.com/evanphx/json-patch v4.12.0+incompatible
 ## explicit
 github.com/evanphx/json-patch
 # github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
@@ -354,17 +354,21 @@ github.com/google/cadvisor/utils/sysfs
 github.com/google/cadvisor/utils/sysinfo
 github.com/google/cadvisor/version
 github.com/google/cadvisor/watcher
-# github.com/google/cel-go v0.16.0
+# github.com/google/cel-go v0.17.6
 ## explicit; go 1.18
 github.com/google/cel-go/cel
 github.com/google/cel-go/checker
 github.com/google/cel-go/checker/decls
 github.com/google/cel-go/common
+github.com/google/cel-go/common/ast
 github.com/google/cel-go/common/containers
 github.com/google/cel-go/common/debug
+github.com/google/cel-go/common/decls
+github.com/google/cel-go/common/functions
 github.com/google/cel-go/common/operators
 github.com/google/cel-go/common/overloads
 github.com/google/cel-go/common/runes
+github.com/google/cel-go/common/stdlib
 github.com/google/cel-go/common/types
 github.com/google/cel-go/common/types/pb
 github.com/google/cel-go/common/types/ref
@@ -561,7 +565,7 @@ github.com/onsi/gomega/types
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
-# github.com/opencontainers/runc v1.1.7
+# github.com/opencontainers/runc v1.1.9
 ## explicit; go 1.17
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
@@ -1172,7 +1176,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.30.0
+# google.golang.org/protobuf v1.31.0
 ## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
@@ -1272,7 +1276,6 @@ k8s.io/api/discovery/v1beta1
 k8s.io/api/events/v1
 k8s.io/api/events/v1beta1
 k8s.io/api/extensions/v1beta1
-k8s.io/api/flowcontrol/v1alpha1
 k8s.io/api/flowcontrol/v1beta1
 k8s.io/api/flowcontrol/v1beta2
 k8s.io/api/flowcontrol/v1beta3
@@ -1313,6 +1316,8 @@ k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning
 k8s.io/apiextensions-apiserver/pkg/apiserver/validation
+k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1
+k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
@@ -1458,6 +1463,7 @@ k8s.io/apiserver/pkg/apis/apiserver/install
 k8s.io/apiserver/pkg/apis/apiserver/v1
 k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
 k8s.io/apiserver/pkg/apis/apiserver/v1beta1
+k8s.io/apiserver/pkg/apis/apiserver/validation
 k8s.io/apiserver/pkg/apis/audit
 k8s.io/apiserver/pkg/apis/audit/install
 k8s.io/apiserver/pkg/apis/audit/v1
@@ -1624,7 +1630,6 @@ k8s.io/client-go/applyconfigurations/discovery/v1beta1
 k8s.io/client-go/applyconfigurations/events/v1
 k8s.io/client-go/applyconfigurations/events/v1beta1
 k8s.io/client-go/applyconfigurations/extensions/v1beta1
-k8s.io/client-go/applyconfigurations/flowcontrol/v1alpha1
 k8s.io/client-go/applyconfigurations/flowcontrol/v1beta1
 k8s.io/client-go/applyconfigurations/flowcontrol/v1beta2
 k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3
@@ -1695,7 +1700,6 @@ k8s.io/client-go/informers/events/v1beta1
 k8s.io/client-go/informers/extensions
 k8s.io/client-go/informers/extensions/v1beta1
 k8s.io/client-go/informers/flowcontrol
-k8s.io/client-go/informers/flowcontrol/v1alpha1
 k8s.io/client-go/informers/flowcontrol/v1beta1
 k8s.io/client-go/informers/flowcontrol/v1beta2
 k8s.io/client-go/informers/flowcontrol/v1beta3
@@ -1786,8 +1790,6 @@ k8s.io/client-go/kubernetes/typed/events/v1beta1
 k8s.io/client-go/kubernetes/typed/events/v1beta1/fake
 k8s.io/client-go/kubernetes/typed/extensions/v1beta1
 k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake
-k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1
-k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1/fake
 k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1
 k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1/fake
 k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2
@@ -1854,7 +1856,6 @@ k8s.io/client-go/listers/discovery/v1beta1
 k8s.io/client-go/listers/events/v1
 k8s.io/client-go/listers/events/v1beta1
 k8s.io/client-go/listers/extensions/v1beta1
-k8s.io/client-go/listers/flowcontrol/v1alpha1
 k8s.io/client-go/listers/flowcontrol/v1beta1
 k8s.io/client-go/listers/flowcontrol/v1beta2
 k8s.io/client-go/listers/flowcontrol/v1beta3
@@ -2177,7 +2178,6 @@ k8s.io/kube-proxy/config/v1alpha1
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
 ## explicit; go 1.20
 k8s.io/kube-scheduler/config/v1
-k8s.io/kube-scheduler/config/v1beta3
 k8s.io/kube-scheduler/extender/v1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 ## explicit; go 1.20

@@ -328,7 +328,12 @@ function find-tar() {
 #   SERVER_BINARY_TAR
 #   KUBE_MANIFESTS_TAR
 function find-release-tars() {
-  SERVER_BINARY_TAR=$(find-tar kubernetes-server-linux-amd64.tar.gz)
+  # Use first item in KUBE_BUILD_PLATFORMS as server platform
+  KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-"linux/amd64"}
+  SERVER_PLATFORM=$(cut -d' ' -f1 <<< "${KUBE_BUILD_PLATFORMS}")
+  OS=$(cut -d'/' -f1 <<< "${SERVER_PLATFORM}")
+  ARCH=$(cut -d'/' -f2 <<< "${SERVER_PLATFORM}")
+  SERVER_BINARY_TAR=$(find-tar kubernetes-server-"${OS}"-"${ARCH}".tar.gz)
   if [[ -z "${SERVER_BINARY_TAR}" ]]; then
 	  exit 1
   fi
@@ -336,7 +341,7 @@ function find-release-tars() {
 
   local find_result
   if [[ "${NUM_WINDOWS_NODES}" -gt "0" ]]; then
-    if NODE_BINARY_TAR=$(find-tar kubernetes-node-windows-amd64.tar.gz); then
+    if NODE_BINARY_TAR=$(find-tar kubernetes-node-windows-"${ARCH}".tar.gz); then
       find_result=0
     else
       find_result=1

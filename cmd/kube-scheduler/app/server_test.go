@@ -36,7 +36,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -121,68 +121,10 @@ profiles:
 		t.Fatal(err)
 	}
 
-	// plugin config
-	pluginConfigFilev1beta3 := filepath.Join(tmpDir, "pluginv1beta3.yaml")
-	if err := os.WriteFile(pluginConfigFilev1beta3, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1beta3
-kind: KubeSchedulerConfiguration
-clientConnection:
-  kubeconfig: '%s'
-profiles:
-- plugins:
-    multiPoint:
-      enabled:
-      - name: SchedulingGates
-      - name: DefaultBinder
-      - name: PrioritySort
-      - name: DefaultPreemption
-      - name: VolumeBinding
-      - name: NodeResourcesFit
-      - name: NodePorts
-      - name: InterPodAffinity
-      - name: TaintToleration
-      disabled:
-      - name: "*"
-    preFilter:
-      disabled:
-      - name: VolumeBinding
-      - name: InterPodAffinity
-    filter:
-      disabled:
-      - name: VolumeBinding
-      - name: InterPodAffinity
-      - name: TaintToleration
-    score:
-      disabled:
-      - name: VolumeBinding
-      - name: NodeResourcesFit
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-
 	// out-of-tree plugin config v1
 	outOfTreePluginConfigFilev1 := filepath.Join(tmpDir, "outOfTreePluginv1.yaml")
 	if err := os.WriteFile(outOfTreePluginConfigFilev1, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1
-kind: KubeSchedulerConfiguration
-clientConnection:
-  kubeconfig: '%s'
-profiles:
-- plugins:
-    preFilter:
-      enabled:
-      - name: Foo
-    filter:
-      enabled:
-      - name: Foo
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-
-	// out-of-tree plugin config v1beta3
-	outOfTreePluginConfigFilev1beta3 := filepath.Join(tmpDir, "outOfTreePluginv1beta3.yaml")
-	if err := os.WriteFile(outOfTreePluginConfigFilev1beta3, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: '%s'
@@ -301,36 +243,6 @@ leaderElection:
 			},
 		},
 		{
-			name: "component configuration v1beta3",
-			flags: []string{
-				"--config", pluginConfigFilev1beta3,
-				"--kubeconfig", configKubeconfig,
-			},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": func() *config.Plugins {
-					plugins := defaults.ExpandedPluginsV1beta3.DeepCopy()
-					plugins.Filter.Enabled = []config.Plugin{
-						{Name: "NodeResourcesFit"},
-						{Name: "NodePorts"},
-					}
-					plugins.PreFilter.Enabled = []config.Plugin{
-						{Name: "NodeResourcesFit"},
-						{Name: "NodePorts"},
-					}
-					plugins.PreScore.Enabled = []config.Plugin{
-						{Name: "NodeResourcesFit"},
-						{Name: "InterPodAffinity"},
-						{Name: "TaintToleration"},
-					}
-					plugins.Score.Enabled = []config.Plugin{
-						{Name: "InterPodAffinity", Weight: 1},
-						{Name: "TaintToleration", Weight: 1},
-					}
-					return plugins
-				}(),
-			},
-		},
-		{
 			name: "component configuration v1",
 			flags: []string{
 				"--config", pluginConfigFilev1,
@@ -356,22 +268,6 @@ leaderElection:
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "TaintToleration", Weight: 1},
 					}
-					return plugins
-				}(),
-			},
-		},
-		{
-			name: "out-of-tree component configuration v1beta3",
-			flags: []string{
-				"--config", outOfTreePluginConfigFilev1beta3,
-				"--kubeconfig", configKubeconfig,
-			},
-			registryOptions: []Option{WithPlugin("Foo", newFoo)},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": func() *config.Plugins {
-					plugins := defaults.ExpandedPluginsV1beta3.DeepCopy()
-					plugins.PreFilter.Enabled = append(plugins.PreFilter.Enabled, config.Plugin{Name: "Foo"})
-					plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: "Foo"})
 					return plugins
 				}(),
 			},
@@ -406,8 +302,8 @@ leaderElection:
 				RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 				RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
 				ResourceLock:      "leases",
-				ResourceName:      v1beta3.SchedulerDefaultLockObjectName,
-				ResourceNamespace: v1beta3.SchedulerDefaultLockObjectNamespace,
+				ResourceName:      configv1.SchedulerDefaultLockObjectName,
+				ResourceNamespace: configv1.SchedulerDefaultLockObjectNamespace,
 			},
 			wantClientConnection: &componentbaseconfig.ClientConnectionConfiguration{
 				Kubeconfig:  configKubeconfig,
@@ -430,7 +326,7 @@ leaderElection:
 				RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 				RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
 				ResourceLock:      "leases",
-				ResourceName:      v1beta3.SchedulerDefaultLockObjectName,
+				ResourceName:      configv1.SchedulerDefaultLockObjectName,
 				ResourceNamespace: "default", // from CLI args
 			},
 			wantClientConnection: &componentbaseconfig.ClientConnectionConfiguration{
@@ -451,8 +347,8 @@ leaderElection:
 				RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 				RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
 				ResourceLock:      "leases",
-				ResourceName:      v1beta3.SchedulerDefaultLockObjectName,
-				ResourceNamespace: v1beta3.SchedulerDefaultLockObjectNamespace,
+				ResourceName:      configv1.SchedulerDefaultLockObjectName,
+				ResourceNamespace: configv1.SchedulerDefaultLockObjectNamespace,
 			},
 		},
 		{
@@ -469,8 +365,8 @@ leaderElection:
 				RenewDeadline:     metav1.Duration{Duration: 5 * time.Second}, // from CLI args
 				RetryPeriod:       metav1.Duration{Duration: 1 * time.Second}, // from CLI args
 				ResourceLock:      "leases",
-				ResourceName:      v1beta3.SchedulerDefaultLockObjectName,
-				ResourceNamespace: v1beta3.SchedulerDefaultLockObjectNamespace,
+				ResourceName:      configv1.SchedulerDefaultLockObjectName,
+				ResourceNamespace: configv1.SchedulerDefaultLockObjectNamespace,
 			},
 		},
 	}

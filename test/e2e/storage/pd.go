@@ -26,6 +26,7 @@ import (
 	"google.golang.org/api/googleapi"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -403,17 +404,17 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
 					output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-					framework.ExpectEqual(true, strings.Contains(string(output), string(host0Name)))
+					gomega.Expect(string(output)).Should(gomega.ContainSubstring(string(host0Name)))
 
 					ginkgo.By("deleting host0")
 					err = gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v", err))
 					ginkgo.By("expecting host0 node to be re-created")
 					numNodes := countReadyNodes(ctx, cs, host0Name)
-					framework.ExpectEqual(numNodes, origNodeCnt, fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
+					gomega.Expect(numNodes).To(gomega.Equal(origNodeCnt), fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
 					output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-					framework.ExpectEqual(true, strings.Contains(string(output), string(host0Name)))
+					gomega.Expect(string(output)).Should(gomega.ContainSubstring(string(host0Name)))
 
 				} else if disruptOp == deleteNodeObj {
 					ginkgo.By("deleting host0's node api object")

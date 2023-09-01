@@ -18,12 +18,13 @@ package etcd3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -48,6 +49,9 @@ const (
 	outgoingBufSize = 100
 )
 
+// defaultWatcherMaxLimit is used to facilitate construction tests
+var defaultWatcherMaxLimit int64 = maxLimit
+
 // fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error
 var fatalOnDecodeError = false
 
@@ -69,12 +73,12 @@ type watcher struct {
 	objectType    string
 	groupResource schema.GroupResource
 	versioner     storage.Versioner
+	transformer   value.Transformer
 }
 
 // watchChan implements watch.Interface.
 type watchChan struct {
 	watcher           *watcher
-	transformer       value.Transformer
 	key               string
 	initialRev        int64
 	recursive         bool
@@ -87,34 +91,21 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, groupResource schema.GroupResource, newFunc func() runtime.Object, versioner storage.Versioner) *watcher {
-	res := &watcher{
-		client:        client,
-		codec:         codec,
-		groupResource: groupResource,
-		newFunc:       newFunc,
-		versioner:     versioner,
-	}
-	if newFunc == nil {
-		res.objectType = "<unknown>"
-	} else {
-		res.objectType = reflect.TypeOf(newFunc()).String()
-	}
-	return res
-}
-
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
 // If rev is zero, it will return the existing object(s) and then start watching from
 // the maximum revision+1 from returned objects.
 // If rev is non-zero, it will watch events happened after given revision.
-// If recursive is false, it watches on given key.
-// If recursive is true, it watches any children and directories under the key, excluding the root key itself.
-// pred must be non-nil. Only if pred matches the change, it will be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, progressNotify bool, transformer value.Transformer, pred storage.SelectionPredicate) (watch.Interface, error) {
-	if recursive && !strings.HasSuffix(key, "/") {
+// If opts.Recursive is false, it watches on given key.
+// If opts.Recursive is true, it watches any children and directories under the key, excluding the root key itself.
+// pred must be non-nil. Only if opts.Predicate matches the change, it will be returned.
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage.ListOptions) (watch.Interface, error) {
+	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
-	wc := w.createWatchChan(ctx, key, rev, recursive, progressNotify, transformer, pred)
+	if opts.ProgressNotify && w.newFunc == nil {
+		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
+	}
+	wc := w.createWatchChan(ctx, key, rev, opts.Recursive, opts.ProgressNotify, opts.Predicate)
 	go wc.run()
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -127,10 +118,9 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, p
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, transformer value.Transformer, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
-		transformer:       transformer,
 		key:               key,
 		initialRev:        rev,
 		recursive:         recursive,
@@ -225,17 +215,58 @@ func (wc *watchChan) RequestWatchProgress() error {
 func (wc *watchChan) sync() error {
 	opts := []clientv3.OpOption{}
 	if wc.recursive {
-		opts = append(opts, clientv3.WithPrefix())
+		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
+		rangeEnd := clientv3.GetPrefixRangeEnd(wc.key)
+		opts = append(opts, clientv3.WithRange(rangeEnd))
 	}
-	getResp, err := wc.watcher.client.Get(wc.ctx, wc.key, opts...)
-	if err != nil {
-		return err
+
+	var err error
+	var lastKey []byte
+	var withRev int64
+	var getResp *clientv3.GetResponse
+
+	metricsOp := "get"
+	if wc.recursive {
+		metricsOp = "list"
 	}
-	wc.initialRev = getResp.Header.Revision
-	for _, kv := range getResp.Kvs {
-		wc.sendEvent(parseKV(kv))
+
+	preparedKey := wc.key
+
+	for {
+		startTime := time.Now()
+		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
+		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource.String(), err, startTime)
+		if err != nil {
+			return interpretListError(err, true, preparedKey, wc.key)
+		}
+
+		if len(getResp.Kvs) == 0 && getResp.More {
+			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+		}
+
+		// send items from the response until no more results
+		for i, kv := range getResp.Kvs {
+			lastKey = kv.Key
+			wc.sendEvent(parseKV(kv))
+			// free kv early. Long lists can take O(seconds) to decode.
+			getResp.Kvs[i] = nil
+		}
+
+		if withRev == 0 {
+			wc.initialRev = getResp.Header.Revision
+		}
+
+		// no more results remain
+		if !getResp.More {
+			return nil
+		}
+
+		preparedKey = string(lastKey) + "\x00"
+		if withRev == 0 {
+			withRev = getResp.Header.Revision
+			opts = append(opts, clientv3.WithRev(withRev))
+		}
 	}
-	return nil
 }
 
 func logWatchChannelErr(err error) {
@@ -352,9 +383,6 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 	switch {
 	case e.isProgressNotify:
-		if wc.watcher.newFunc == nil {
-			return nil
-		}
 		object := wc.watcher.newFunc()
 		if err := wc.watcher.versioner.UpdateObject(object, uint64(e.rev)); err != nil {
 			klog.Errorf("failed to propagate object version: %v", err)
@@ -447,7 +475,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	}
 
 	if !e.isDeleted {
-		data, _, err := wc.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -462,7 +490,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}

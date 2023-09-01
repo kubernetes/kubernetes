@@ -3102,6 +3102,10 @@
             "description": "IP is set for load-balancer ingress points that are IP based (typically GCE or OpenStack load-balancers)",
             "type": "string"
           },
+          "ipMode": {
+            "description": "IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified. Setting this to \"VIP\" indicates that traffic is delivered to the node with the destination set to the load-balancer's IP and port. Setting this to \"Proxy\" indicates that traffic is delivered to the node or pod with the destination set to the node's IP and node port or the pod's IP and port. Service implementations may use this information to adjust traffic routing.",
+            "type": "string"
+          },
           "ports": {
             "description": "Ports is a list of records of service ports If used, every port defined in the service should have an entry in it",
             "items": {
@@ -4191,7 +4195,7 @@
           "resources": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeResourceRequirements"
               }
             ],
             "default": {},
@@ -7977,6 +7981,36 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.VolumeResourceRequirements": {
+        "description": "VolumeResourceRequirements describes the storage resource requirements for a volume.",
+        "properties": {
+          "limits": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+            "type": "object"
+          },
+          "requests": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource": {
         "description": "Represents a vSphere volume resource.",
         "properties": {
@@ -8469,11 +8503,6 @@
             "group": "extensions",
             "kind": "DeleteOptions",
             "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
           },
           {
             "group": "flowcontrol.apiserver.k8s.io",
@@ -9202,11 +9231,6 @@
             "group": "extensions",
             "kind": "WatchEvent",
             "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
           },
           {
             "group": "flowcontrol.apiserver.k8s.io",

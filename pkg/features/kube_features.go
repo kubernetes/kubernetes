@@ -44,6 +44,13 @@ const (
 	// Enable usage of Provision of PVCs from snapshots in other namespaces
 	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
 
+	// owner: @thockin
+	// deprecated: v1.29
+	//
+	// Enables Service.status.ingress.loadBanace to be set on
+	// services of types other than LoadBalancer.
+	AllowServiceLBStatusOnNonLB featuregate.Feature = "AllowServiceLBStatusOnNonLB"
+
 	// owner: @bswartz
 	// alpha: v1.18
 	// beta: v1.24
@@ -787,6 +794,7 @@ const (
 	// kep: http://kep.k8s.io/3682
 	// alpha: v1.27
 	// beta: v1.28
+	// stable: v1.29
 	//
 	// Subdivide the NodePort range for dynamic and static port allocation.
 	ServiceNodePortStaticSubrange featuregate.Feature = "ServiceNodePortStaticSubrange"
@@ -934,6 +942,12 @@ const (
 	//
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+
+	// owner: @Sh4d1,@RyanAoh
+	// kep: http://kep.k8s.io/1860
+	// alpha: v1.29
+	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
+	LoadBalancerIPMode featuregate.Feature = "LoadBalancerIPMode"
 )
 
 func init() {
@@ -948,6 +962,8 @@ func init() {
 // when adding or removing one entry.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CrossNamespaceVolumeDataSource: {Default: false, PreRelease: featuregate.Alpha},
+
+	AllowServiceLBStatusOnNonLB: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.29
 
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
 
@@ -1143,7 +1159,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
 
-	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.Beta},
+	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
 
 	SidecarContainers: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1185,6 +1201,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodIndexLabel: {Default: true, PreRelease: featuregate.Beta},
 
+	LoadBalancerIPMode: {Default: false, PreRelease: featuregate.Alpha},
+
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 
@@ -1192,7 +1210,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.APIListChunking: {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	genericfeatures.APIPriorityAndFairness: {Default: true, PreRelease: featuregate.Beta},
 

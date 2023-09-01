@@ -45,7 +45,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			ExpectedEtcdPath: "/registry/configmaps/" + namespace + "/cm1",
 		},
 		gvr("", "v1", "services"): {
-			Stub:             `{"metadata": {"name": "service1"}, "spec": {"externalName": "service1name", "ports": [{"port": 10000, "targetPort": 11000}], "selector": {"test": "data"}}}`,
+			Stub:             `{"metadata": {"name": "service1"}, "spec": {"type": "LoadBalancer", "ports": [{"port": 10000, "targetPort": 11000}], "selector": {"test": "data"}}}`,
 			ExpectedEtcdPath: "/registry/services/specs/" + namespace + "/service1",
 		},
 		gvr("", "v1", "podtemplates"): {
@@ -232,22 +232,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1
-		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "flowschemas"): {
-			Stub:             `{"metadata": {"name": "va1"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
-			ExpectedEtcdPath: "/registry/flowschemas/va1",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta3", "FlowSchema"),
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1
-		gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"): {
-			Stub:             `{"metadata": {"name": "conf1"}, "spec": {"type": "Limited", "limited": {"assuredConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
-			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf1",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta3", "PriorityLevelConfiguration"),
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1
 		gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "flowschemas"): {
 			Stub:             `{"metadata": {"name": "va2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
@@ -354,12 +338,10 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"): {
 			Stub:             `{"metadata":{"name":"vap1b1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
 			ExpectedEtcdPath: "/registry/validatingadmissionpolicies/vap1b1",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1alpha1", "ValidatingAdmissionPolicy"),
 		},
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicybindings"): {
 			Stub:             `{"metadata":{"name":"pb1b1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com","parameterNotFoundAction":"Deny"},"validationActions":["Deny"]}}`,
 			ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pb1b1",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1alpha1", "ValidatingAdmissionPolicyBinding"),
 		},
 		// --
 
@@ -367,10 +349,12 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): {
 			Stub:             `{"metadata":{"name":"vap1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
 			ExpectedEtcdPath: "/registry/validatingadmissionpolicies/vap1",
+			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1beta1", "ValidatingAdmissionPolicy"),
 		},
 		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): {
 			Stub:             `{"metadata":{"name":"pb1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"},"validationActions":["Deny"]}}`,
 			ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pb1",
+			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1beta1", "ValidatingAdmissionPolicyBinding"),
 		},
 		// --
 

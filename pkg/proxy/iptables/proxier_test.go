@@ -38,8 +38,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
@@ -2623,7 +2626,7 @@ func TestExternalIPsReject(t *testing.T) {
 				Name:       svcPortName.Port,
 				Port:       int32(svcPort),
 				Protocol:   v1.ProtocolTCP,
-				TargetPort: intstr.FromInt(svcPort),
+				TargetPort: intstr.FromInt32(int32(svcPort)),
 			}}
 		}),
 	)
@@ -2698,7 +2701,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 				Name:       svcPortName.Port,
 				Port:       int32(svcPort),
 				Protocol:   v1.ProtocolTCP,
-				TargetPort: intstr.FromInt(svcPort),
+				TargetPort: intstr.FromInt32(int32(svcPort)),
 			}}
 		}),
 	)
@@ -2810,7 +2813,7 @@ func TestNonLocalExternalIPs(t *testing.T) {
 				Name:       svcPortName.Port,
 				Port:       int32(svcPort),
 				Protocol:   v1.ProtocolTCP,
-				TargetPort: intstr.FromInt(svcPort),
+				TargetPort: intstr.FromInt32(int32(svcPort)),
 			}}
 		}),
 	)
@@ -3932,7 +3935,7 @@ func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port
 		Protocol:   protocol,
 		Port:       port,
 		NodePort:   nodeport,
-		TargetPort: intstr.FromInt(targetPort),
+		TargetPort: intstr.FromInt32(int32(targetPort)),
 	}
 	return append(array, svcPort)
 }
@@ -8272,6 +8275,131 @@ func TestNoEndpointsMetric(t *testing.T) {
 
 			if tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal != int(syncProxyRulesNoLocalEndpointsTotalExternal) {
 				t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(internal): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalExternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal)
+			}
+		})
+	}
+}
+
+func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
+	ipModeProxy := v1.LoadBalancerIPModeProxy
+	ipModeVIP := v1.LoadBalancerIPModeVIP
+
+	testCases := []struct {
+		name          string
+		ipModeEnabled bool
+		svcIP         string
+		svcLBIP       string
+		ipMode        *v1.LoadBalancerIPMode
+		expectedRule  bool
+	}{
+		/* LoadBalancerIPMode disabled */
+		{
+			name:          "LoadBalancerIPMode disabled, ipMode Proxy",
+			ipModeEnabled: false,
+			svcIP:         "10.20.30.41",
+			svcLBIP:       "1.2.3.4",
+			ipMode:        &ipModeProxy,
+			expectedRule:  true,
+		},
+		{
+			name:          "LoadBalancerIPMode disabled, ipMode VIP",
+			ipModeEnabled: false,
+			svcIP:         "10.20.30.42",
+			svcLBIP:       "1.2.3.5",
+			ipMode:        &ipModeVIP,
+			expectedRule:  true,
+		},
+		{
+			name:          "LoadBalancerIPMode disabled, ipMode nil",
+			ipModeEnabled: false,
+			svcIP:         "10.20.30.43",
+			svcLBIP:       "1.2.3.6",
+			ipMode:        nil,
+			expectedRule:  true,
+		},
+		/* LoadBalancerIPMode enabled */
+		{
+			name:          "LoadBalancerIPMode enabled, ipMode Proxy",
+			ipModeEnabled: true,
+			svcIP:         "10.20.30.41",
+			svcLBIP:       "1.2.3.4",
+			ipMode:        &ipModeProxy,
+			expectedRule:  false,
+		},
+		{
+			name:          "LoadBalancerIPMode enabled, ipMode VIP",
+			ipModeEnabled: true,
+			svcIP:         "10.20.30.42",
+			svcLBIP:       "1.2.3.5",
+			ipMode:        &ipModeVIP,
+			expectedRule:  true,
+		},
+		{
+			name:          "LoadBalancerIPMode enabled, ipMode nil",
+			ipModeEnabled: true,
+			svcIP:         "10.20.30.43",
+			svcLBIP:       "1.2.3.6",
+			ipMode:        nil,
+			expectedRule:  true,
+		},
+	}
+
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)()
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			makeServiceMap(fp,
+				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+					svc.Spec.Type = "LoadBalancer"
+					svc.Spec.ClusterIP = testCase.svcIP
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
+						NodePort: int32(svcNodePort),
+					}}
+					svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+						IP:     testCase.svcLBIP,
+						IPMode: testCase.ipMode,
+					}}
+				}),
+			)
+
+			tcpProtocol := v1.ProtocolTCP
+			populateEndpointSlices(fp,
+				makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+					eps.AddressType = discovery.AddressTypeIPv4
+					eps.Endpoints = []discovery.Endpoint{{
+						Addresses: []string{"10.180.0.1"},
+					}}
+					eps.Ports = []discovery.EndpointPort{{
+						Name:     pointer.String("p80"),
+						Port:     pointer.Int32(80),
+						Protocol: &tcpProtocol,
+					}}
+				}),
+			)
+
+			fp.syncProxyRules()
+
+			c, _ := ipt.Dump.GetChain(utiliptables.TableNAT, kubeServicesChain)
+			ruleExists := false
+			for _, r := range c.Rules {
+				if r.DestinationAddress != nil && r.DestinationAddress.Value == testCase.svcLBIP {
+					ruleExists = true
+				}
+			}
+			if ruleExists != testCase.expectedRule {
+				t.Errorf("unexpected rule for %s", testCase.svcLBIP)
 			}
 		})
 	}

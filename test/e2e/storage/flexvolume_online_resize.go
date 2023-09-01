@@ -136,7 +136,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 
 		pvs, err = e2epv.WaitForPVClaimBoundPhase(ctx, c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		framework.ExpectEqual(len(pvs), 1)
+		gomega.Expect(pvs).To(gomega.HaveLen(1))
 
 		var pod *v1.Pod
 		ginkgo.By("Creating pod")
@@ -169,7 +169,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+		gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 	})
 })
 

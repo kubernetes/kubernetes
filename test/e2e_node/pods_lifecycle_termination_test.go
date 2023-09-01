@@ -113,7 +113,7 @@ func getSigkillTargetPod(podName string, ctnName string) *v1.Pod {
 					Command: []string{
 						"sh",
 						"-c",
-						"trap \"echo SIGTERM caught\" SIGTERM SIGINT; touch /tmp/healthy; sleep 1000",
+						"trap \"echo SIGTERM caught\" SIGTERM SIGINT; touch /tmp/healthy; /bin/sleep 1000",
 					},
 					// Using readiness probe to guarantee signal handler registering finished
 					ReadinessProbe: &v1.Probe{

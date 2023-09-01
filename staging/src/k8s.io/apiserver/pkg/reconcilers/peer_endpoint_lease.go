@@ -78,7 +78,9 @@ type peerEndpointLeaseReconciler struct {
 
 // NewPeerEndpointLeaseReconciler creates a new peer endpoint lease reconciler
 func NewPeerEndpointLeaseReconciler(config *storagebackend.ConfigForResource, baseKey string, leaseTime time.Duration) (PeerEndpointLeaseReconciler, error) {
-	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil)
+	// note that newFunc, newListFunc and resourcePrefix
+	// can be left blank unless the storage.Watch method is used
+	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error creating storage factory: %v", err)
 	}

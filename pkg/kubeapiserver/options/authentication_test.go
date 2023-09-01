@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -27,11 +28,13 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
+	"k8s.io/utils/pointer"
 )
 
 func TestAuthenticationValidate(t *testing.T) {
@@ -50,7 +53,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
@@ -63,7 +66,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers:  []string{"http://foo.bar.com"},
@@ -76,7 +79,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
@@ -89,7 +92,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
@@ -102,7 +105,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
@@ -115,7 +118,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
@@ -128,7 +131,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
@@ -141,7 +144,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
@@ -156,7 +159,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
@@ -171,7 +174,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testOIDC: &OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
-				IssuerURL:     "testIssuerURL",
+				IssuerURL:     "https://testIssuerURL",
 				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
@@ -228,10 +231,10 @@ func TestToAuthenticationConfig(t *testing.T) {
 			Enable: false,
 		},
 		OIDC: &OIDCAuthenticationOptions{
-			CAFile:        "/testCAFile",
+			CAFile:        "testdata/root.pem",
 			UsernameClaim: "sub",
 			SigningAlgs:   []string{"RS256"},
-			IssuerURL:     "testIssuerURL",
+			IssuerURL:     "https://testIssuerURL",
 			ClientID:      "testClientID",
 		},
 		RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
@@ -253,15 +256,27 @@ func TestToAuthenticationConfig(t *testing.T) {
 	}
 
 	expectConfig := kubeauthenticator.Config{
-		APIAudiences:                authenticator.Audiences{"http://foo.bar.com"},
-		Anonymous:                   false,
-		BootstrapToken:              false,
-		ClientCAContentProvider:     nil, // this is nil because you can't compare functions
-		TokenAuthFile:               "/testTokenFile",
-		OIDCIssuerURL:               "testIssuerURL",
-		OIDCClientID:                "testClientID",
-		OIDCCAFile:                  "/testCAFile",
-		OIDCUsernameClaim:           "sub",
+		APIAudiences:            authenticator.Audiences{"http://foo.bar.com"},
+		Anonymous:               false,
+		BootstrapToken:          false,
+		ClientCAContentProvider: nil, // this is nil because you can't compare functions
+		TokenAuthFile:           "/testTokenFile",
+		AuthenticationConfig: &apiserver.AuthenticationConfiguration{
+			JWT: []apiserver.JWTAuthenticator{
+				{
+					Issuer: apiserver.Issuer{
+						URL:       "https://testIssuerURL",
+						Audiences: []string{"testClientID"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "sub",
+							Prefix: pointer.String("https://testIssuerURL#"),
+						},
+					},
+				},
+			},
+		},
 		OIDCSigningAlgs:             []string{"RS256"},
 		ServiceAccountLookup:        true,
 		ServiceAccountIssuers:       []string{"http://foo.bar.com"},
@@ -279,6 +294,12 @@ func TestToAuthenticationConfig(t *testing.T) {
 			AllowedClientNames:  headerrequest.StaticStringSlice{"kube-aggregator"},
 		},
 	}
+
+	fileBytes, err := os.ReadFile("testdata/root.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectConfig.AuthenticationConfig.JWT[0].Issuer.CertificateAuthority = string(fileBytes)
 
 	resultConfig, err := testOptions.ToAuthenticationConfig()
 	if err != nil {
@@ -383,5 +404,223 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 
 	if !reflect.DeepEqual(opts, expected) {
 		t.Error(cmp.Diff(opts, expected))
+	}
+}
+
+func TestToAuthenticationConfig_OIDC(t *testing.T) {
+	testCases := []struct {
+		name         string
+		args         []string
+		expectConfig kubeauthenticator.Config
+	}{
+		{
+			name: "username prefix is '-'",
+			args: []string{
+				"--oidc-issuer-url=https://testIssuerURL",
+				"--oidc-client-id=testClientID",
+				"--oidc-username-claim=sub",
+				"--oidc-username-prefix=-",
+				"--oidc-signing-algs=RS256",
+				"--oidc-required-claim=foo=bar",
+			},
+			expectConfig: kubeauthenticator.Config{
+				TokenSuccessCacheTTL: 10 * time.Second,
+				AuthenticationConfig: &apiserver.AuthenticationConfiguration{
+					JWT: []apiserver.JWTAuthenticator{
+						{
+							Issuer: apiserver.Issuer{
+								URL:       "https://testIssuerURL",
+								Audiences: []string{"testClientID"},
+							},
+							ClaimMappings: apiserver.ClaimMappings{
+								Username: apiserver.PrefixedClaimOrExpression{
+									Claim:  "sub",
+									Prefix: pointer.String(""),
+								},
+							},
+							ClaimValidationRules: []apiserver.ClaimValidationRule{
+								{
+									Claim:         "foo",
+									RequiredValue: "bar",
+								},
+							},
+						},
+					},
+				},
+				OIDCSigningAlgs: []string{"RS256"},
+			},
+		},
+		{
+			name: "--oidc-username-prefix is empty, --oidc-username-claim is not email",
+			args: []string{
+				"--oidc-issuer-url=https://testIssuerURL",
+				"--oidc-client-id=testClientID",
+				"--oidc-username-claim=sub",
+				"--oidc-signing-algs=RS256",
+				"--oidc-required-claim=foo=bar",
+			},
+			expectConfig: kubeauthenticator.Config{
+				TokenSuccessCacheTTL: 10 * time.Second,
+				AuthenticationConfig: &apiserver.AuthenticationConfiguration{
+					JWT: []apiserver.JWTAuthenticator{
+						{
+							Issuer: apiserver.Issuer{
+								URL:       "https://testIssuerURL",
+								Audiences: []string{"testClientID"},
+							},
+							ClaimMappings: apiserver.ClaimMappings{
+								Username: apiserver.PrefixedClaimOrExpression{
+									Claim:  "sub",
+									Prefix: pointer.String("https://testIssuerURL#"),
+								},
+							},
+							ClaimValidationRules: []apiserver.ClaimValidationRule{
+								{
+									Claim:         "foo",
+									RequiredValue: "bar",
+								},
+							},
+						},
+					},
+				},
+				OIDCSigningAlgs: []string{"RS256"},
+			},
+		},
+		{
+			name: "--oidc-username-prefix is empty, --oidc-username-claim is email",
+			args: []string{
+				"--oidc-issuer-url=https://testIssuerURL",
+				"--oidc-client-id=testClientID",
+				"--oidc-username-claim=email",
+				"--oidc-signing-algs=RS256",
+				"--oidc-required-claim=foo=bar",
+			},
+			expectConfig: kubeauthenticator.Config{
+				TokenSuccessCacheTTL: 10 * time.Second,
+				AuthenticationConfig: &apiserver.AuthenticationConfiguration{
+					JWT: []apiserver.JWTAuthenticator{
+						{
+							Issuer: apiserver.Issuer{
+								URL:       "https://testIssuerURL",
+								Audiences: []string{"testClientID"},
+							},
+							ClaimMappings: apiserver.ClaimMappings{
+								Username: apiserver.PrefixedClaimOrExpression{
+									Claim:  "email",
+									Prefix: pointer.String(""),
+								},
+							},
+							ClaimValidationRules: []apiserver.ClaimValidationRule{
+								{
+									Claim:         "foo",
+									RequiredValue: "bar",
+								},
+							},
+						},
+					},
+				},
+				OIDCSigningAlgs: []string{"RS256"},
+			},
+		},
+		{
+			name: "non empty username prefix",
+			args: []string{
+				"--oidc-issuer-url=https://testIssuerURL",
+				"--oidc-client-id=testClientID",
+				"--oidc-username-claim=sub",
+				"--oidc-username-prefix=k8s-",
+				"--oidc-signing-algs=RS256",
+				"--oidc-required-claim=foo=bar",
+			},
+			expectConfig: kubeauthenticator.Config{
+				TokenSuccessCacheTTL: 10 * time.Second,
+				AuthenticationConfig: &apiserver.AuthenticationConfiguration{
+					JWT: []apiserver.JWTAuthenticator{
+						{
+							Issuer: apiserver.Issuer{
+								URL:       "https://testIssuerURL",
+								Audiences: []string{"testClientID"},
+							},
+							ClaimMappings: apiserver.ClaimMappings{
+								Username: apiserver.PrefixedClaimOrExpression{
+									Claim:  "sub",
+									Prefix: pointer.String("k8s-"),
+								},
+							},
+							ClaimValidationRules: []apiserver.ClaimValidationRule{
+								{
+									Claim:         "foo",
+									RequiredValue: "bar",
+								},
+							},
+						},
+					},
+				},
+				OIDCSigningAlgs: []string{"RS256"},
+			},
+		},
+		{
+			name: "groups claim exists",
+			args: []string{
+				"--oidc-issuer-url=https://testIssuerURL",
+				"--oidc-client-id=testClientID",
+				"--oidc-username-claim=sub",
+				"--oidc-username-prefix=-",
+				"--oidc-groups-claim=groups",
+				"--oidc-groups-prefix=oidc:",
+				"--oidc-signing-algs=RS256",
+				"--oidc-required-claim=foo=bar",
+			},
+			expectConfig: kubeauthenticator.Config{
+				TokenSuccessCacheTTL: 10 * time.Second,
+				AuthenticationConfig: &apiserver.AuthenticationConfiguration{
+					JWT: []apiserver.JWTAuthenticator{
+						{
+							Issuer: apiserver.Issuer{
+								URL:       "https://testIssuerURL",
+								Audiences: []string{"testClientID"},
+							},
+							ClaimMappings: apiserver.ClaimMappings{
+								Username: apiserver.PrefixedClaimOrExpression{
+									Claim:  "sub",
+									Prefix: pointer.String(""),
+								},
+								Groups: apiserver.PrefixedClaimOrExpression{
+									Claim:  "groups",
+									Prefix: pointer.String("oidc:"),
+								},
+							},
+							ClaimValidationRules: []apiserver.ClaimValidationRule{
+								{
+									Claim:         "foo",
+									RequiredValue: "bar",
+								},
+							},
+						},
+					},
+				},
+				OIDCSigningAlgs: []string{"RS256"},
+			},
+		},
+	}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.name, func(t *testing.T) {
+			opts := NewBuiltInAuthenticationOptions().WithOIDC()
+			pf := pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError)
+			opts.AddFlags(pf)
+
+			if err := pf.Parse(testcase.args); err != nil {
+				t.Fatal(err)
+			}
+
+			resultConfig, err := opts.ToAuthenticationConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(resultConfig, testcase.expectConfig) {
+				t.Error(cmp.Diff(resultConfig, testcase.expectConfig))
+			}
+		})
 	}
 }

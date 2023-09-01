@@ -33,7 +33,6 @@ import (
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
@@ -142,12 +141,8 @@ type invalidPlugins struct {
 // version (even if the list of invalid plugins is empty).
 var invalidPluginsByVersion = []invalidPlugins{
 	{
-		schemeGroupVersion: v1beta3.SchemeGroupVersion.String(),
-		plugins:            []string{},
-	},
-	{
 		schemeGroupVersion: v1.SchemeGroupVersion.String(),
-		plugins:            []string{"SelectorSpread"},
+		plugins:            []string{},
 	},
 }
 

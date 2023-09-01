@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -36,6 +37,28 @@ type testCase struct {
 	podSpec                *v1.Pod
 	oomTargetContainerName string
 }
+
+// KubeReservedMemory is default fraction value of node capacity memory to
+// be reserved for K8s components.
+const KubeReservedMemory = 0.35
+
+var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [LinuxOnly] [Serial]", func() {
+	f := framework.NewDefaultFramework("nodeallocatable-oomkiller-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+
+	testCases := []testCase{
+		{
+			name:                   "single process container without resource limits",
+			oomTargetContainerName: "oomkill-nodeallocatable-container",
+			podSpec: getOOMTargetPod("oomkill-nodeallocatable-pod", "oomkill-nodeallocatable-container",
+				getOOMTargetContainerWithoutLimit),
+		},
+	}
+
+	for _, testCase := range testCases {
+		runOomKillerTest(f, testCase, KubeReservedMemory)
+	}
+})
 
 var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
@@ -67,12 +90,26 @@ var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 		})
 	}
 	for _, tc := range testCases {
-		runOomKillerTest(f, tc)
+		runOomKillerTest(f, tc, 0)
 	}
 })
 
-func runOomKillerTest(f *framework.Framework, testCase testCase) {
+func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMemory float64) {
 	ginkgo.Context(testCase.name, func() {
+		// Update KubeReservedMemory in KubeletConfig.
+		if kubeReservedMemory > 0 {
+			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+				if initialConfig.KubeReserved == nil {
+					initialConfig.KubeReserved = map[string]string{}
+				}
+				// There's a race condition observed between system OOM and cgroup OOM if node alocatable
+				// memory is equal to node capacity. Hence, reserving a fraction of node's memory capacity for
+				// K8s components such that node allocatable memory is less than node capacity to
+				// observe OOM kills at cgroup level instead of system OOM kills.
+				initialConfig.KubeReserved["memory"] = fmt.Sprintf("%d", int(kubeReservedMemory*getLocalNode(context.TODO(), f).Status.Capacity.Memory().AsApproximateFloat64()))
+			})
+		}
+
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("setting up the pod to be used in the test")
 			e2epod.NewPodClient(f).Create(context.TODO(), testCase.podSpec)
@@ -101,7 +138,7 @@ func runOomKillerTest(f *framework.Framework, testCase testCase) {
 func verifyReasonForOOMKilledContainer(pod *v1.Pod, oomTargetContainerName string) {
 	container := e2epod.FindContainerStatusInPod(pod, oomTargetContainerName)
 	if container == nil {
-		framework.Failf("OOM target pod %q, container %q does not have the expected state terminated", pod.Name, container.Name)
+		framework.Failf("OOM target pod %q, container %q does not have the expected state terminated", pod.Name, oomTargetContainerName)
 	}
 	if container.State.Terminated == nil {
 		framework.Failf("OOM target pod %q, container %q is not in the terminated state", pod.Name, container.Name)
@@ -188,6 +225,21 @@ func getOOMTargetContainerMultiProcess(name string) v1.Container {
 			Limits: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("15Mi"),
 			},
+		},
+	}
+}
+
+// getOOMTargetContainerWithoutLimit returns a container with a single process which attempts to allocate more memory
+// than node allocatable and doesn't have resource limits set.
+func getOOMTargetContainerWithoutLimit(name string) v1.Container {
+	return v1.Container{
+		Name:  name,
+		Image: busyboxImage,
+		Command: []string{
+			"sh",
+			"-c",
+			// use the dd tool to attempt to allocate huge block of memory which exceeds the node allocatable
+			"sleep 5 && dd if=/dev/zero of=/dev/null iflag=fullblock count=10 bs=10G",
 		},
 	}
 }

@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
@@ -1279,10 +1278,6 @@ func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
 		concurrencyShares int32
 		errExpected       field.ErrorList
 	}{{
-		requestVersion:    flowcontrolv1alpha1.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("assuredConcurrencyShares"),
-	}, {
 		requestVersion:    flowcontrolv1beta1.SchemeGroupVersion,
 		concurrencyShares: 0,
 		errExpected:       errExpectedFn("assuredConcurrencyShares"),

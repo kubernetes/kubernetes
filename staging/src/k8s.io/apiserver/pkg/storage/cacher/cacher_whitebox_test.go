@@ -30,7 +30,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,12 +41,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
@@ -1812,76 +1808,6 @@ func TestCacherWatchSemantics(t *testing.T) {
 			verifyNoEvents(t, w)
 		})
 	}
-}
-
-func TestGetCurrentResourceVersionFromStorage(t *testing.T) {
-	// test data
-	newEtcdTestStorage := func(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
-		server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-		storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion, example2v1.SchemeGroupVersion), func() runtime.Object { return &example.Pod{} }, prefix, schema.GroupResource{Resource: "pods"}, identity.NewEncryptCheckTransformer(), true, etcd3.NewDefaultLeaseManagerConfig())
-		return server, storage
-	}
-	server, etcdStorage := newEtcdTestStorage(t, "")
-	defer server.Terminate(t)
-	podCacher, versioner, err := newTestCacher(etcdStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create podCacher: %v", err)
-	}
-	defer podCacher.Stop()
-
-	makePod := func(name string) *example.Pod {
-		return &example.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
-		}
-	}
-	createPod := func(obj *example.Pod) *example.Pod {
-		key := "pods/" + obj.Namespace + "/" + obj.Name
-		out := &example.Pod{}
-		err := etcdStorage.Create(context.TODO(), key, obj, out, 0)
-		require.NoError(t, err)
-		return out
-	}
-	getPod := func(name, ns string) *example.Pod {
-		key := "pods/" + ns + "/" + name
-		out := &example.Pod{}
-		err := etcdStorage.Get(context.TODO(), key, storage.GetOptions{}, out)
-		require.NoError(t, err)
-		return out
-	}
-	makeReplicaSet := func(name string) *example2v1.ReplicaSet {
-		return &example2v1.ReplicaSet{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
-		}
-	}
-	createReplicaSet := func(obj *example2v1.ReplicaSet) *example2v1.ReplicaSet {
-		key := "replicasets/" + obj.Namespace + "/" + obj.Name
-		out := &example2v1.ReplicaSet{}
-		err := etcdStorage.Create(context.TODO(), key, obj, out, 0)
-		require.NoError(t, err)
-		return out
-	}
-
-	// create a pod and make sure its RV is equal to the one maintained by etcd
-	pod := createPod(makePod("pod-1"))
-	currentStorageRV, err := podCacher.getCurrentResourceVersionFromStorage(context.TODO())
-	require.NoError(t, err)
-	podRV, err := versioner.ParseResourceVersion(pod.ResourceVersion)
-	require.NoError(t, err)
-	require.Equal(t, currentStorageRV, podRV, "expected the global etcd RV to be equal to pod's RV")
-
-	// now create a replicaset (new resource) and make sure the target function returns global etcd RV
-	rs := createReplicaSet(makeReplicaSet("replicaset-1"))
-	currentStorageRV, err = podCacher.getCurrentResourceVersionFromStorage(context.TODO())
-	require.NoError(t, err)
-	rsRV, err := versioner.ParseResourceVersion(rs.ResourceVersion)
-	require.NoError(t, err)
-	require.Equal(t, currentStorageRV, rsRV, "expected the global etcd RV to be equal to replicaset's RV")
-
-	// ensure that the pod's RV hasn't been changed
-	currentPod := getPod(pod.Name, pod.Namespace)
-	currentPodRV, err := versioner.ParseResourceVersion(currentPod.ResourceVersion)
-	require.NoError(t, err)
-	require.Equal(t, currentPodRV, podRV, "didn't expect to see the pod's RV changed")
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {

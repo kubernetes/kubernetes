@@ -30,6 +30,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
@@ -65,8 +66,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 
 		newNodes, err := e2enode.CheckReady(ctx, c, len(origNodes.Items)-1, 5*time.Minute)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
-
+		gomega.Expect(newNodes).To(gomega.HaveLen(len(origNodes.Items) - 1))
 		_, err = c.CoreV1().Nodes().Get(ctx, nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {
 			framework.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)

@@ -1,13 +1,28 @@
-# This file configures checks that all new code for Kubernetes is meant to
-# pass, in contrast to .golangci.yaml which defines checks that also the
-# existing code passes.
+# golangci-lint is used in Kubernetes with different configurations that
+# enable an increasing amount of checks:
+# - golangci.yaml is the most permissive configuration. All existing code
+#   passed.
+# - golangci-strict.yaml adds checks that all new code in pull requests
+#   must pass.
+# - golangci-hints.yaml adds checks for code patterns where developer
+#   and reviewer may decide whether findings should get addressed before
+#   merging. Beware that the golangci-lint output includes also the
+#   issues that must be fixed and doesn't indicate how severe each issue
+#   is (https://gophers.slack.com/archives/CS0TBRKPC/p1685721815275349).
+#
+# All three flavors are generated from golangci.yaml.in with
+# hack/update-golangci-lint-config.sh.
 
 run:
   timeout: 30m
   skip-files:
     - "^zz_generated.*"
 
+output:
+  sort-results: true
+
 issues:
+  max-issues-per-linter: 0
   max-same-issues: 0
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
@@ -15,20 +30,73 @@ issues:
     - path: conversion\.go
       linters:
         - ineffassign
+
+    # SSA Extract calls are allowed in tests.
+    - linters:
+        - forbidigo
+      text: should not be used because managedFields was removed
+      path: _test.go$
+
     # The Kubernetes naming convention for conversion functions uses underscores
     # and intentionally deviates from normal Go conventions to make those function
     # names more readable. Same for SetDefaults_*.
+    #
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
     - linters:
         - stylecheck
       text: "ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)"
+
     # This check currently has some false positives (https://github.com/nunnatsa/ginkgolinter/issues/91).
     - linters:
        - ginkgolinter
       text: use a function call in (Eventually|Consistently)
 
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
+    - linters:
+        - gocritic
+      text: "ifElseChain: rewrite if-else to switch statement"
+
+    # The following issues were deemed "might be worth fixing, needs to be
+    # decided on a case-by-case basis".  This was initially decided by a
+    # majority of the developers who voted in
+    # https://github.com/kubernetes/kubernetes/issues/117288 and may evolve
+    # over time.
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
+    - linters:
+        - gocritic
+      text: "assignOp:"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507016854
+    - linters:
+        - gosimple
+      text: "S1002: should omit comparison to bool constant"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507023980
+    - linters:
+        - gosimple
+      text: "S1016: should convert opts .* instead of using struct literal"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507026758
+    - linters:
+        - gosimple
+      text: "S1033: unnecessary guard around call to delete"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507030071
+    - linters:
+        - stylecheck
+      text: "ST1012: error var .* should have name of the form ErrFoo"
+
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507031224
+    - linters:
+        - stylecheck
+      text: "ST1023: should omit type .* from declaration; it will be inferred from the right-hand side"
+
 linters:
-  disable-all: false # in contrast to golangci.yaml, the default set of linters remains enabled
-  enable: # please keep this alphabetized and in sync with golangci.yaml
+  disable-all: false
+  enable: # please keep this alphabetized
+    - forbidigo
     - ginkgolinter
     - gocritic
     - govet
@@ -37,6 +105,9 @@ linters:
     - staticcheck
     - stylecheck
     - unused
+  disable:
+    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
+    - errcheck
 
 linters-settings: # please keep this alphabetized
   custom:
@@ -45,8 +116,15 @@ linters-settings: # please keep this alphabetized
       path: ../_output/local/bin/logcheck.so
       description: structured logging checker
       original-url: k8s.io/logtools/logcheck
-  gocritic:
+  forbidigo:
+    analyze-types: true
+    forbid:
+    - p: ^managedfields\.ExtractInto$
+      pkg: ^k8s\.io/apimachinery/pkg/util/managedfields$
+      msg: should not be used because managedFields was removed
+    - p: \.Extract
+      pkg: ^k8s\.io/client-go/applyconfigurations/
+      msg: should not be used because managedFields was removed
   staticcheck:
     checks:
       - "all"
-  stylecheck:

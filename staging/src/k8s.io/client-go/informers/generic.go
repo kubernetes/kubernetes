@@ -45,7 +45,6 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
@@ -259,12 +258,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case extensionsv1beta1.SchemeGroupVersion.WithResource("replicasets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1beta1().ReplicaSets().Informer()}, nil
 
-		// Group=flowcontrol.apiserver.k8s.io, Version=v1alpha1
-	case flowcontrolv1alpha1.SchemeGroupVersion.WithResource("flowschemas"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1alpha1().FlowSchemas().Informer()}, nil
-	case flowcontrolv1alpha1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1alpha1().PriorityLevelConfigurations().Informer()}, nil
-
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta1
 	case flowcontrolv1beta1.SchemeGroupVersion.WithResource("flowschemas"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1beta1().FlowSchemas().Informer()}, nil
@@ -326,8 +319,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=policy, Version=v1beta1
 	case policyv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1beta1().PodDisruptionBudgets().Informer()}, nil
-	case policyv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1beta1().PodSecurityPolicies().Informer()}, nil
 
 		// Group=rbac.authorization.k8s.io, Version=v1
 	case rbacv1.SchemeGroupVersion.WithResource("clusterroles"):

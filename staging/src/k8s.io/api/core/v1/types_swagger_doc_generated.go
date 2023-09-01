@@ -988,6 +988,7 @@ var map_LoadBalancerIngress = map[string]string{
 	"":         "LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
 	"ip":       "IP is set for load-balancer ingress points that are IP based (typically GCE or OpenStack load-balancers)",
 	"hostname": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)",
+	"ipMode":   "IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified. Setting this to \"VIP\" indicates that traffic is delivered to the node with the destination set to the load-balancer's IP and port. Setting this to \"Proxy\" indicates that traffic is delivered to the node or pod with the destination set to the node's IP and node port or the pod's IP and port. Service implementations may use this information to adjust traffic routing.",
 	"ports":    "Ports is a list of records of service ports If used, every port defined in the service should have an entry in it",
 }
 
@@ -2570,6 +2571,16 @@ var map_VolumeProjection = map[string]string{
 
 func (VolumeProjection) SwaggerDoc() map[string]string {
 	return map_VolumeProjection
+}
+
+var map_VolumeResourceRequirements = map[string]string{
+	"":         "VolumeResourceRequirements describes the storage resource requirements for a volume.",
+	"limits":   "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+	"requests": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+}
+
+func (VolumeResourceRequirements) SwaggerDoc() map[string]string {
+	return map_VolumeResourceRequirements
 }
 
 var map_VolumeSource = map[string]string{
