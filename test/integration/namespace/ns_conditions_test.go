@@ -23,6 +23,10 @@ import (
 	"testing"
 	"time"
 
+	kcpcorev1informers "github.com/kcp-dev/client-go/informers/core/v1"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
+	kcpmetadata "github.com/kcp-dev/client-go/metadata"
+	"github.com/kcp-dev/logicalcluster/v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +36,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -181,26 +184,28 @@ func namespaceLifecycleSetup(t *testing.T) (context.Context, kubeapiservertestin
 	config := restclient.CopyConfig(server.ClientConfig)
 	config.QPS = 10000
 	config.Burst = 10000
-	clientSet, err := clientset.NewForConfig(config)
+	clientSet, err := kcpkubernetesclientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("error in create clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-informers")), resyncPeriod)
+	informers := kcpcorev1informers.NewNamespaceClusterInformer(kcpkubernetesclientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-informers")), resyncPeriod, nil)
 
-	metadataClient, err := metadata.NewForConfig(config)
+	metadataClient, err := kcpmetadata.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
+	discoverResourcesFn := func(clusterName logicalcluster.Path) ([]*metav1.APIResourceList, error) {
+		return clientSet.Discovery().ServerPreferredNamespacedResources()
+	}
 	_, ctx := ktesting.NewTestContext(t)
 	controller := namespace.NewNamespaceController(
 		ctx,
 		clientSet,
 		metadataClient,
 		discoverResourcesFn,
-		informers.Core().V1().Namespaces(),
+		informers,
 		10*time.Hour,
 		corev1.FinalizerKubernetes)
 

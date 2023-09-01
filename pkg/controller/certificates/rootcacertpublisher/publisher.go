@@ -22,14 +22,16 @@ import (
 	"reflect"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
+	kcpcorev1informers "github.com/kcp-dev/client-go/informers/core/v1"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
+	kcpcorev1listers "github.com/kcp-dev/client-go/listers/core/v1"
+	"github.com/kcp-dev/logicalcluster/v3"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	coreinformers "k8s.io/client-go/informers/core/v1"
-	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -51,7 +53,7 @@ func init() {
 // NewPublisher construct a new controller which would manage the configmap
 // which stores certificates in each namespace. It will make sure certificate
 // configmap exists in each namespace.
-func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
+func NewPublisher(cmInformer kcpcorev1informers.ConfigMapClusterInformer, nsInformer kcpcorev1informers.NamespaceClusterInformer, cl kcpkubernetesclientset.ClusterInterface, rootCA []byte) (*Publisher, error) {
 	e := &Publisher{
 		client: cl,
 		rootCA: rootCA,
@@ -84,13 +86,13 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 
 // Publisher manages certificate ConfigMap objects inside Namespaces
 type Publisher struct {
-	client clientset.Interface
+	client kcpkubernetesclientset.ClusterInterface
 	rootCA []byte
 
 	// To allow injection for testing.
 	syncHandler func(ctx context.Context, key string) error
 
-	cmLister       corelisters.ConfigMapLister
+	cmLister       kcpcorev1listers.ConfigMapClusterLister
 	cmListerSynced cache.InformerSynced
 
 	nsListerSynced cache.InformerSynced
@@ -127,7 +129,12 @@ func (c *Publisher) configMapDeleted(obj interface{}) {
 	if cm.Name != RootCACertConfigMapName {
 		return
 	}
-	c.queue.Add(cm.Namespace)
+
+	key := getNamespaceKey(cm)
+	if key == "" {
+		return
+	}
+	c.queue.Add(key)
 }
 
 func (c *Publisher) configMapUpdated(_, newObj interface{}) {
@@ -139,12 +146,24 @@ func (c *Publisher) configMapUpdated(_, newObj interface{}) {
 	if cm.Name != RootCACertConfigMapName {
 		return
 	}
-	c.queue.Add(cm.Namespace)
+
+	key := getNamespaceKey(cm)
+	if key == "" {
+		return
+	}
+	c.queue.Add(key)
 }
 
 func (c *Publisher) namespaceAdded(obj interface{}) {
 	namespace := obj.(*v1.Namespace)
-	c.queue.Add(namespace.Name)
+
+	key, err := kcpcache.MetaClusterNamespaceKeyFunc(namespace)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+
+	c.queue.Add(key)
 }
 
 func (c *Publisher) namespaceUpdated(oldObj interface{}, newObj interface{}) {
@@ -152,7 +171,14 @@ func (c *Publisher) namespaceUpdated(oldObj interface{}, newObj interface{}) {
 	if newNamespace.Status.Phase != v1.NamespaceActive {
 		return
 	}
-	c.queue.Add(newNamespace.Name)
+
+	key, err := kcpcache.MetaClusterNamespaceKeyFunc(newNamespace)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+
+	c.queue.Add(key)
 }
 
 func (c *Publisher) runWorker(ctx context.Context) {
@@ -179,17 +205,24 @@ func (c *Publisher) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-func (c *Publisher) syncNamespace(ctx context.Context, ns string) (err error) {
+func (c *Publisher) syncNamespace(ctx context.Context, key string) (err error) {
 	startTime := time.Now()
 	defer func() {
 		recordMetrics(startTime, err)
-		klog.FromContext(ctx).V(4).Info("Finished syncing namespace", "namespace", ns, "elapsedTime", time.Since(startTime))
+		klog.FromContext(ctx).V(4).Info("Finished syncing namespace %q (%v)", key, time.Since(startTime))
 	}()
 
-	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertConfigMapName)
+	// Get the clusterName and name from the key.
+	clusterName, _, name, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return err
+	}
+	cm, err := c.cmLister.Cluster(clusterName).ConfigMaps(name).Get(RootCACertConfigMapName)
+
 	switch {
 	case apierrors.IsNotFound(err):
-		_, err = c.client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
+		_, err = c.client.Cluster(clusterName.Path()).CoreV1().ConfigMaps(name).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        RootCACertConfigMapName,
 				Annotations: map[string]string{DescriptionAnnotation: Description},
@@ -224,7 +257,7 @@ func (c *Publisher) syncNamespace(ctx context.Context, ns string) (err error) {
 	}
 	cm.Annotations[DescriptionAnnotation] = Description
 
-	_, err = c.client.CoreV1().ConfigMaps(ns).Update(ctx, cm, metav1.UpdateOptions{})
+	_, err = c.client.Cluster(clusterName.Path()).CoreV1().ConfigMaps(name).Update(ctx, cm, metav1.UpdateOptions{})
 	return err
 }
 
@@ -241,4 +274,8 @@ func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
 		}
 	}
 	return cm, nil
+}
+
+func getNamespaceKey(configmap *v1.ConfigMap) string {
+	return kcpcache.ToClusterAwareKey(logicalcluster.From(configmap).String(), "", configmap.GetNamespace())
 }

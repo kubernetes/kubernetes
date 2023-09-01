@@ -6,9 +6,9 @@ go 1.22.0
 
 require (
 	golang.org/x/time v0.3.0
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/client-go v0.0.0
+	k8s.io/api v0.31.0
+	k8s.io/apimachinery v0.31.0
+	k8s.io/client-go v0.31.0
 	k8s.io/code-generator v0.0.0
 	k8s.io/klog/v2 v2.130.1
 )

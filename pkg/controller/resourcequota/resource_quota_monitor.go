@@ -236,6 +236,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 	for _, monitor := range toRemove {
 		if monitor.stopCh != nil {
 			close(monitor.stopCh)
+			monitor.stopCh = nil
 		}
 	}
 
@@ -337,6 +338,7 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 		if monitor.stopCh != nil {
 			stopped++
 			close(monitor.stopCh)
+			monitor.stopCh = nil
 		}
 	}
 	logger.Info("QuotaMonitor stopped monitors", "stopped", stopped, "total", len(monitors))

@@ -26,6 +26,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/kcp-dev/logicalcluster/v3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -199,12 +200,12 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 				t.Fatal(err)
 			}
 
-			fn := func() ([]*metav1.APIResourceList, error) {
+			fn := func(clusterName logicalcluster.Name) ([]*metav1.APIResourceList, error) {
 				return resources, testInput.gvrError
 			}
 			_, ctx := ktesting.NewTestContext(t)
 			d := NewNamespacedResourcesDeleter(ctx, mockClient.CoreV1().Namespaces(), metadataClient, mockClient.CoreV1(), fn, v1.FinalizerKubernetes)
-			if err := d.Delete(ctx, testInput.testNamespace.Name); !matchErrors(err, testInput.expectErrorOnDelete) {
+			if err := d.Delete(ctx, logicalcluster.New(""), testInput.testNamespace.Name); !matchErrors(err, testInput.expectErrorOnDelete) {
 				t.Errorf("expected error %q when syncing namespace, got %q, %v", testInput.expectErrorOnDelete, err, testInput.expectErrorOnDelete == err)
 			}
 
@@ -297,13 +298,13 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 			Phase: v1.NamespaceActive,
 		},
 	}
-	fn := func() ([]*metav1.APIResourceList, error) {
+	fn := func(clusterName logicalcluster.Name) ([]*metav1.APIResourceList, error) {
 		return testResources(), nil
 	}
 	_, ctx := ktesting.NewTestContext(t)
 	d := NewNamespacedResourcesDeleter(ctx, mockClient.CoreV1().Namespaces(), nil, mockClient.CoreV1(),
 		fn, v1.FinalizerKubernetes)
-	err := d.Delete(ctx, testNamespace.Name)
+	err := d.Delete(ctx, logicalcluster.New(""), testNamespace.Name)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
@@ -427,7 +428,7 @@ func TestDeleteEncounters404(t *testing.T) {
 	mockMetadataClient.PrependReactor("delete-collection", "flakes", ns1FlakesNotFound)
 	mockMetadataClient.PrependReactor("list", "flakes", ns1FlakesNotFound)
 
-	resourcesFn := func() ([]*metav1.APIResourceList, error) {
+	resourcesFn := func(clusterName logicalcluster.Name) ([]*metav1.APIResourceList, error) {
 		return []*metav1.APIResourceList{{
 			GroupVersion: "example.com/v1",
 			APIResources: []metav1.APIResource{{Name: "flakes", Namespaced: true, Kind: "Flake", Verbs: []string{"get", "list", "delete", "deletecollection", "create", "update"}}},
@@ -438,7 +439,7 @@ func TestDeleteEncounters404(t *testing.T) {
 
 	// Delete ns1 and get NotFound errors for the flakes resource
 	mockMetadataClient.ClearActions()
-	if err := d.Delete(ctx, ns1.Name); err != nil {
+	if err := d.Delete(ctx, logicalcluster.New(""), ns1.Name); err != nil {
 		t.Fatal(err)
 	}
 	if len(mockMetadataClient.Actions()) != 3 ||
@@ -453,7 +454,7 @@ func TestDeleteEncounters404(t *testing.T) {
 
 	// Delete ns2
 	mockMetadataClient.ClearActions()
-	if err := d.Delete(ctx, ns2.Name); err != nil {
+	if err := d.Delete(ctx, logicalcluster.New(""), ns2.Name); err != nil {
 		t.Fatal(err)
 	}
 	if len(mockMetadataClient.Actions()) != 2 ||
