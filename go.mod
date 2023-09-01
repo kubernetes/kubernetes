@@ -30,7 +30,7 @@ require (
 	github.com/docker/distribution v2.8.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.9.0
-	github.com/evanphx/json-patch v5.6.0+incompatible
+	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-logr/logr v1.2.4
 	github.com/godbus/dbus/v5 v5.0.6

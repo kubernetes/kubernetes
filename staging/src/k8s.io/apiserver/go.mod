@@ -8,7 +8,7 @@ require (
 	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/emicklei/go-restful/v3 v3.9.0
-	github.com/evanphx/json-patch v5.6.0+incompatible
+	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cel-go v0.17.6
