@@ -370,11 +370,11 @@ func validateCloudProviderOptions(opts *kubeoptions.CloudProviderOptions) error 
 	if opts.CloudProvider == "external" {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
 			return fmt.Errorf("when using --cloud-provider set to '%s', "+
-				"please set DisableCloudProviders feature to false", opts.CloudProvider)
+				"please set DisableCloudProviders feature to true", opts.CloudProvider)
 		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableKubeletCloudCredentialProviders) {
 			return fmt.Errorf("when using --cloud-provider set to '%s', "+
-				"please set DisableKubeletCloudCredentialProviders feature to false", opts.CloudProvider)
+				"please set DisableKubeletCloudCredentialProviders feature to true", opts.CloudProvider)
 		}
 	} else if cloudprovider.IsDeprecatedInternal(opts.CloudProvider) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
