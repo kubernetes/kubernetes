@@ -44,8 +44,6 @@ import (
 	"k8s.io/utils/clock"
 )
 
-// TODO integration test with old AES GCM data recorded and new KDF data recorded
-
 func init() {
 	value.RegisterMetrics()
 	metrics.RegisterMetrics()
