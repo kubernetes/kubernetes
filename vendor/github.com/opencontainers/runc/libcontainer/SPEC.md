@@ -263,7 +263,7 @@ For example, on a two-socket machine, the schema line could be
 and 7000 MBps memory bandwidth limit on socket 1.
 
 For more information about Intel RDT kernel interface:  
-https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt
+<https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt>
 
 ```text
 An example for runc:
