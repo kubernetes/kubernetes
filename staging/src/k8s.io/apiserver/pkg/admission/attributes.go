@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -40,6 +41,8 @@ type attributesRecord struct {
 	object      runtime.Object
 	oldObject   runtime.Object
 	userInfo    user.Info
+
+	cluster logicalcluster.Name
 
 	// other elements are always accessed in single goroutine.
 	// But ValidatingAdmissionWebhook add annotations concurrently.
@@ -113,6 +116,14 @@ func (record *attributesRecord) GetOldObject() runtime.Object {
 
 func (record *attributesRecord) GetUserInfo() user.Info {
 	return record.userInfo
+}
+
+func (record *attributesRecord) SetCluster(cluster logicalcluster.Name) {
+	record.cluster = cluster
+}
+
+func (record *attributesRecord) GetCluster() logicalcluster.Name {
+	return record.cluster
 }
 
 // getAnnotations implements privateAnnotationsGetter.It's a private method used

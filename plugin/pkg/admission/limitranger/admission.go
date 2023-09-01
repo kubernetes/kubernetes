@@ -90,6 +90,11 @@ func (l *LimitRanger) SetExternalKubeInformerFactory(f informers.SharedInformerF
 	l.lister = limitRangeInformer.Lister()
 }
 
+// SetExternalKubeLister registers a limit range lister into the LimitRanger
+func (l *LimitRanger) SetExternalKubeLister(lister corev1listers.LimitRangeLister) {
+	l.lister = lister
+}
+
 // SetExternalKubeClientSet registers the client into LimitRanger
 func (l *LimitRanger) SetExternalKubeClientSet(client kubernetes.Interface) {
 	l.client = client

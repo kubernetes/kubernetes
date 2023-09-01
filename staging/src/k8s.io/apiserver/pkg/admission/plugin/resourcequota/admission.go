@@ -159,10 +159,11 @@ func (a *QuotaAdmission) Validate(ctx context.Context, attr admission.Attributes
 	if attr.GetSubresource() != "" {
 		return nil
 	}
-	// ignore all operations that are not namespaced or creation of namespaces
-	if attr.GetNamespace() == "" || isNamespaceCreation(attr) {
-		return nil
-	}
+	// kcp edit: allow quota of cluster-scoped resources, so don't ignore them
+	// ~~~ignore all operations that are not namespaced or creation of namespaces~~~
+	// if attr.GetNamespace() == "" || isNamespaceCreation(attr) {
+	// 	return nil
+	// }
 	return a.evaluator.Evaluate(attr)
 }
 

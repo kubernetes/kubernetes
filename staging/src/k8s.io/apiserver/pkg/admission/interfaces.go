@@ -20,6 +20,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -58,6 +59,9 @@ type Attributes interface {
 	GetKind() schema.GroupVersionKind
 	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info
+
+	GetCluster() logicalcluster.Name
+	SetCluster(logicalcluster.Name)
 
 	// AddAnnotation sets annotation according to key-value pair. The key should be qualified, e.g., podsecuritypolicy.admission.k8s.io/admit-policy, where
 	// "podsecuritypolicy" is the name of the plugin, "admission.k8s.io" is the name of the organization, "admit-policy" is the key name.

@@ -19,6 +19,7 @@ package resourcequota
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -104,7 +105,42 @@ func (e *quotaAccessor) checkCache(quota *corev1.ResourceQuota) *corev1.Resource
 	return cachedQuota
 }
 
+const (
+	kcpClusterScopedQuotaNamespace                 = "admin"
+	kcpExperimentalClusterScopedQuotaAnnotationKey = "experimental.quota.kcp.io/cluster-scoped"
+)
+
 func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, error) {
+	possibleClusterScopedQuotas, err := e.lister.ResourceQuotas(kcpClusterScopedQuotaNamespace).List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("error getting ResourceQuotas from namespace %q: %w", kcpClusterScopedQuotaNamespace, err)
+	}
+	// if there are no items held in our indexer, check our live-lookup LRU, if that misses, do the live lookup to prime it.
+	if len(possibleClusterScopedQuotas) == 0 {
+		lruItemObj, ok := e.liveLookupCache.Get(kcpClusterScopedQuotaNamespace)
+		if !ok || lruItemObj.(liveLookupEntry).expiry.Before(time.Now()) {
+			// TODO: If there are multiple operations at the same time and cache has just expired,
+			// this may cause multiple List operations being issued at the same time.
+			// If there is already in-flight List() for a given namespace, we should wait until
+			// it is finished and cache is updated instead of doing the same, also to avoid
+			// throttling - see #22422 for details.
+			liveList, err := e.client.CoreV1().ResourceQuotas(kcpClusterScopedQuotaNamespace).List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			newEntry := liveLookupEntry{expiry: time.Now().Add(e.liveTTL)}
+			for i := range liveList.Items {
+				newEntry.items = append(newEntry.items, &liveList.Items[i])
+			}
+			e.liveLookupCache.Add(kcpClusterScopedQuotaNamespace, newEntry)
+			lruItemObj = newEntry
+		}
+		lruEntry := lruItemObj.(liveLookupEntry)
+		for i := range lruEntry.items {
+			possibleClusterScopedQuotas = append(possibleClusterScopedQuotas, lruEntry.items[i])
+		}
+	}
+
 	// determine if there are any quotas in this namespace
 	// if there are no quotas, we don't need to do anything
 	items, err := e.lister.ResourceQuotas(namespace).List(labels.Everything())
@@ -137,6 +173,19 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, err
 		lruEntry := lruItemObj.(liveLookupEntry)
 		for i := range lruEntry.items {
 			items = append(items, lruEntry.items[i])
+		}
+	}
+
+	for i := range possibleClusterScopedQuotas {
+		candidate := possibleClusterScopedQuotas[i]
+
+		a := candidate.Annotations[kcpExperimentalClusterScopedQuotaAnnotationKey]
+		if a == "" {
+			continue
+		}
+
+		if clusterScoped, _ := strconv.ParseBool(a); clusterScoped {
+			items = append(items, candidate)
 		}
 	}
 
