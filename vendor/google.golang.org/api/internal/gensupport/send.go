@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/googleapis/gax-go/v2"
+	"github.com/googleapis/gax-go/v2/callctx"
 )
 
 // Use this error type to return an error which allows introspection of both
@@ -43,6 +44,16 @@ func (e wrappedCallErr) Is(target error) bool {
 // req.WithContext, then calls any functions returned by the hooks in
 // reverse order.
 func SendRequest(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
+	// Add headers set in context metadata.
+	if ctx != nil {
+		headers := callctx.HeadersFromContext(ctx)
+		for k, vals := range headers {
+			for _, v := range vals {
+				req.Header.Add(k, v)
+			}
+		}
+	}
+
 	// Disallow Accept-Encoding because it interferes with the automatic gzip handling
 	// done by the default http.Transport. See https://github.com/google/google-api-go-client/issues/219.
 	if _, ok := req.Header["Accept-Encoding"]; ok {
@@ -77,6 +88,16 @@ func send(ctx context.Context, client *http.Client, req *http.Request) (*http.Re
 // req.WithContext, then calls any functions returned by the hooks in
 // reverse order.
 func SendRequestWithRetry(ctx context.Context, client *http.Client, req *http.Request, retry *RetryConfig) (*http.Response, error) {
+	// Add headers set in context metadata.
+	if ctx != nil {
+		headers := callctx.HeadersFromContext(ctx)
+		for k, vals := range headers {
+			for _, v := range vals {
+				req.Header.Add(k, v)
+			}
+		}
+	}
+
 	// Disallow Accept-Encoding because it interferes with the automatic gzip handling
 	// done by the default http.Transport. See https://github.com/google/google-api-go-client/issues/219.
 	if _, ok := req.Header["Accept-Encoding"]; ok {
@@ -138,9 +159,14 @@ func sendAndRetry(ctx context.Context, client *http.Client, req *http.Request, r
 			}
 			return resp, ctx.Err()
 		}
+
+		// Set retry metrics and idempotency headers for GCS.
+		// TODO(b/274504690): Consider dropping gccl-invocation-id key since it
+		// duplicates the X-Goog-Gcs-Idempotency-Token header (added in v0.115.0).
 		invocationHeader := fmt.Sprintf("gccl-invocation-id/%s gccl-attempt-count/%d", invocationID, attempts)
 		xGoogHeader := strings.Join([]string{invocationHeader, baseXGoogHeader}, " ")
 		req.Header.Set("X-Goog-Api-Client", xGoogHeader)
+		req.Header.Set("X-Goog-Gcs-Idempotency-Token", invocationID)
 
 		resp, err = client.Do(req.WithContext(ctx))
 

@@ -25,6 +25,11 @@
 // later release.
 package attributes
 
+import (
+	"fmt"
+	"strings"
+)
+
 // Attributes is an immutable struct for storing and retrieving generic
 // key/value pairs.  Keys must be hashable, and users should define their own
 // types for keys.  Values should not be modified after they are added to an
@@ -98,4 +103,40 @@ func (a *Attributes) Equal(o *Attributes) bool {
 		}
 	}
 	return true
+}
+
+// String prints the attribute map. If any key or values throughout the map
+// implement fmt.Stringer, it calls that method and appends.
+func (a *Attributes) String() string {
+	var sb strings.Builder
+	sb.WriteString("{")
+	first := true
+	for k, v := range a.m {
+		if !first {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(fmt.Sprintf("%q: %q ", str(k), str(v)))
+		first = false
+	}
+	sb.WriteString("}")
+	return sb.String()
+}
+
+func str(x interface{}) string {
+	if v, ok := x.(fmt.Stringer); ok {
+		return v.String()
+	} else if v, ok := x.(string); ok {
+		return v
+	}
+	return fmt.Sprintf("<%p>", x)
+}
+
+// MarshalJSON helps implement the json.Marshaler interface, thereby rendering
+// the Attributes correctly when printing (via pretty.JSON) structs containing
+// Attributes as fields.
+//
+// Is it impossible to unmarshal attributes from a JSON representation and this
+// method is meant only for debugging purposes.
+func (a *Attributes) MarshalJSON() ([]byte, error) {
+	return []byte(a.String()), nil
 }
