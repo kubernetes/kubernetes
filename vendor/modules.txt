@@ -389,6 +389,9 @@ github.com/json-iterator/go
 # github.com/karrick/godirwalk v1.17.0
 ## explicit; go 1.13
 github.com/karrick/godirwalk
+# github.com/kcp-dev/logicalcluster/v3 v3.0.5
+## explicit; go 1.18
+github.com/kcp-dev/logicalcluster/v3
 # github.com/kr/pretty v0.3.1
 ## explicit; go 1.12
 # github.com/kr/text v0.2.0

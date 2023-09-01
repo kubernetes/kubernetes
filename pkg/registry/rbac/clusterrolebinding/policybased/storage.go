@@ -81,7 +81,7 @@ func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidati
 	if err != nil {
 		return nil, err
 	}
-	rules, err := s.ruleResolver.GetRoleReferenceRules(v1RoleRef, metav1.NamespaceNone)
+	rules, err := s.ruleResolver.GetRoleReferenceRules(ctx, v1RoleRef, metav1.NamespaceNone)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjec
 		if err != nil {
 			return nil, err
 		}
-		rules, err := s.ruleResolver.GetRoleReferenceRules(v1RoleRef, metav1.NamespaceNone)
+		rules, err := s.ruleResolver.GetRoleReferenceRules(ctx, v1RoleRef, metav1.NamespaceNone)
 		if err != nil {
 			return nil, err
 		}

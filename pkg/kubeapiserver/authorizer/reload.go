@@ -78,8 +78,8 @@ func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authoriz
 	return r.current.Load().authorizer.Authorize(ctx, a)
 }
 
-func (r *reloadableAuthorizerResolver) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
-	return r.current.Load().ruleResolver.RulesFor(user, namespace)
+func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	return r.current.Load().ruleResolver.RulesFor(ctx, user, namespace)
 }
 
 // newForConfig constructs

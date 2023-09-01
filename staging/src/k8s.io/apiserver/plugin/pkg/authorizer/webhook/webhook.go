@@ -402,7 +402,7 @@ func labelSelectorToAuthorizationAPI(attr authorizer.Attributes) ([]metav1.Label
 }
 
 // TODO: need to finish the method to get the rules when using webhook mode
-func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+func (w *WebhookAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo
 		nonResourceRules []authorizer.NonResourceRuleInfo

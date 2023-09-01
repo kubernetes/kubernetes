@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+
 	"k8s.io/kubernetes/pkg/apis/abac"
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
 	"k8s.io/kubernetes/pkg/apis/abac/v1beta1"
@@ -324,7 +326,7 @@ func TestRulesFor(t *testing.T) {
 			User:      &tc.User,
 			Namespace: tc.Namespace,
 		}
-		resourceRules, nonResourceRules, _, _ := a.RulesFor(attr.GetUser(), attr.GetNamespace())
+		resourceRules, nonResourceRules, _, _ := a.RulesFor(genericapirequest.NewContext(), attr.GetUser(), attr.GetNamespace())
 		actualResourceRules := getResourceRules(resourceRules)
 		if !reflect.DeepEqual(tc.ExpectResourceRules, actualResourceRules) {
 			t.Logf("tc: %v -> attr %v", tc, attr)

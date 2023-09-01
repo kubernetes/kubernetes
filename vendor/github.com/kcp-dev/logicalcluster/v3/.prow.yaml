@@ -1,0 +1,40 @@
+presubmits:
+  - name: pull-logicalcluster-verify
+    always_run: true
+    decorate: true
+    clone_uri: "ssh://git@github.com/kcp-dev/logicalcluster.git"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: ghcr.io/kcp-dev/infra/build:1.20.13-1
+          command:
+            - make
+            - verify-imports
+            - verify-boilerplate
+
+  - name: pull-logicalcluster-lint
+    always_run: true
+    decorate: true
+    clone_uri: "ssh://git@github.com/kcp-dev/logicalcluster.git"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: ghcr.io/kcp-dev/infra/build:1.20.13-1
+          command:
+            - make
+            - lint
+
+  - name: pull-logicalcluster-test
+    always_run: true
+    decorate: true
+    clone_uri: "ssh://git@github.com/kcp-dev/logicalcluster.git"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: ghcr.io/kcp-dev/infra/build:1.20.13-1
+          command:
+            - make
+            - test
