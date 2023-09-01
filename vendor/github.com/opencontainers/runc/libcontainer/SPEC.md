@@ -15,6 +15,7 @@ with a strong security configuration.
 ### System Requirements and Compatibility
 
 Minimum requirements:
+
 * Kernel version - 3.10 recommended 2.6.2x minimum(with backported patches)
 * Mounted cgroups with each subsystem in its own hierarchy
 
@@ -185,6 +186,7 @@ CAT and MBA features are introduced in Linux 4.10 and 4.12 kernel via
 "resource control" filesystem.
 
 Intel RDT "resource control" filesystem hierarchy:
+
 ```
 mount -t resctrl resctrl /sys/fs/resctrl
 tree /sys/fs/resctrl
@@ -223,9 +225,11 @@ Each resource (L3 cache, memory bandwidth) has its own line and format.
 L3 cache schema:
 It has allocation bitmasks/values for L3 cache on each socket, which
 contains L3 cache id and capacity bitmask (CBM).
+
 ```
 	Format: "L3:<cache_id0>=<cbm0>;<cache_id1>=<cbm1>;..."
 ```
+
 For example, on a two-socket machine, the schema line could be "L3:0=ff;1=c0"
 which means L3 cache id 0's CBM is 0xff, and L3 cache id 1's CBM is 0xc0.
 
@@ -339,6 +343,7 @@ the containers.  A container should support setting an apparmor profile or
 selinux process and mount labels if provided in the configuration.  
 
 Standard apparmor profile:
+
 ```c
 #include <tunables/global>
 profile <profile_name> flags=(attach_disconnected,mediate_deleted) {
@@ -394,6 +399,7 @@ execution of a process.  These files are usually created and populated with the 
 specific information via the runtime.  
 
 **Extra runtime files:**
+
 * /etc/hosts 
 * /etc/resolv.conf
 * /etc/hostname
