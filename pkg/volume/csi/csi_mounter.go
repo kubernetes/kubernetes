@@ -105,6 +105,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get CSI client: %v", err))
 	}
 
@@ -419,7 +421,9 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	volID := c.volumeID
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
-		return errors.New(log("Unmounter.TearDownAt failed to get CSI client: %v", err))
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
+		return volumetypes.NewTransientOperationFailure(log("Unmounter.TearDownAt failed to get CSI client: %v", err))
 	}
 
 	// Could not get spec info on whether this is a migrated operation because c.spec is nil
