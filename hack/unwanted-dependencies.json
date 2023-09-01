@@ -6,6 +6,7 @@
       "cloud.google.com/go/compute": "cloud dependency",
       "cloud.google.com/go/firestore": "db/datastore clients should not be required",
       "cloud.google.com/go/storage": "cloud dependency",
+      "github.com/GoogleCloudPlatform/k8s-cloud-provider": "cloud dependency",
       "github.com/PuerkitoBio/urlesc": "unmaintained, archive mode",
       "github.com/armon/consul-api": "MPL license not in CNCF allowlist",
       "github.com/bketelsen/crypt": "unused, crypto",
@@ -92,6 +93,10 @@
       ],
       "cloud.google.com/go/storage": [
         "cloud.google.com/go"
+      ],
+      "github.com/GoogleCloudPlatform/k8s-cloud-provider": [
+        "k8s.io/kubernetes",
+        "k8s.io/legacy-cloud-providers"
       ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -239,6 +244,7 @@
     },
     "unwantedVendored": [
       "cloud.google.com/go/compute",
+      "github.com/GoogleCloudPlatform/k8s-cloud-provider",
       "github.com/gogo/protobuf",
       "github.com/golang/mock",
       "github.com/google/shlex",
