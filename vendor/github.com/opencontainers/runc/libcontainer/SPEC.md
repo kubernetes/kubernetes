@@ -1,4 +1,4 @@
-## Container Specification - v1
+# Container Specification - v1
 
 This is the standard configuration for version 1 containers.  It includes
 namespaces, standard filesystem setup, a default Linux capability set, and
@@ -12,7 +12,7 @@ information about the processes running inside.
 The v1 profile is meant to be able to accommodate the majority of applications
 with a strong security configuration.
 
-### System Requirements and Compatibility
+## System Requirements and Compatibility
 
 Minimum requirements:
 
