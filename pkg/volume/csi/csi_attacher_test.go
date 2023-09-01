@@ -1109,6 +1109,7 @@ func TestAttacherMountDevice(t *testing.T) {
 		exitError                      error
 		spec                           *volume.Spec
 		watchTimeout                   time.Duration
+		skipClientSetup                bool
 	}{
 		{
 			testName:         "normal PV",
@@ -1249,6 +1250,20 @@ func TestAttacherMountDevice(t *testing.T) {
 			createAttachment:               true,
 			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
+		{
+			testName:                "driver not specified",
+			volName:                 "test-vol1",
+			devicePath:              "path1",
+			deviceMountPath:         "path2",
+			fsGroup:                 &testFSGroup,
+			stageUnstageSet:         true,
+			createAttachment:        true,
+			populateDeviceMountPath: false,
+			spec:                    volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, "not-found", "test-vol1"), false),
+			exitError:               transientError,
+			shouldFail:              true,
+			skipClientSetup:         true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1277,7 +1292,9 @@ func TestAttacherMountDevice(t *testing.T) {
 				t.Fatalf("failed to create new attacher: %v", err0)
 			}
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, tc.watchTimeout)
-			csiAttacher.csiClient = setupClientWithVolumeMountGroup(t, tc.stageUnstageSet, tc.driverSupportsVolumeMountGroup)
+			if !tc.skipClientSetup {
+				csiAttacher.csiClient = setupClientWithVolumeMountGroup(t, tc.stageUnstageSet, tc.driverSupportsVolumeMountGroup)
+			}
 
 			if tc.deviceMountPath != "" {
 				tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
@@ -1342,14 +1359,13 @@ func TestAttacherMountDevice(t *testing.T) {
 						t.Errorf("failed to modify permissions after test: %v", err)
 					}
 				}
+				if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
+					t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(tc.exitError), reflect.TypeOf(err), err)
+				}
 				return
 			}
 			if tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
-			}
-
-			if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
-				t.Fatalf("expected exitError: %v got: %v", tc.exitError, err)
 			}
 
 			// Verify call goes through all the way
@@ -1569,6 +1585,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 }
 
 func TestAttacherUnmountDevice(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
 	testCases := []struct {
 		testName        string
 		volID           string
@@ -1578,6 +1595,8 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		stageUnstageSet bool
 		shouldFail      bool
 		watchTimeout    time.Duration
+		exitError       error
+		unsetClient     bool
 	}{
 		// PV agnostic path positive test cases
 		{
@@ -1608,6 +1627,17 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			jsonFile:        `{"driverName"}}`,
 			stageUnstageSet: true,
 			shouldFail:      true,
+		},
+		// Ensure that a transient error is returned if the client is not established
+		{
+			testName:        "fail with transient error, json file exists but client not found",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
+			jsonFile:        `{"driverName": "unknown-driver", "volumeHandle":"project/zone/test-vol1"}`,
+			stageUnstageSet: true,
+			shouldFail:      true,
+			exitError:       transientError,
+			unsetClient:     true,
 		},
 	}
 
@@ -1656,6 +1686,11 @@ func TestAttacherUnmountDevice(t *testing.T) {
 					t.Fatalf("Failed to create PV: %v", err)
 				}
 			}
+			// Clear out the client if specified
+			// The lookup to generate a new client will fail
+			if tc.unsetClient {
+				csiAttacher.csiClient = nil
+			}
 
 			// Run
 			err := csiAttacher.UnmountDevice(tc.deviceMountPath)
@@ -1663,6 +1698,9 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			if err != nil {
 				if !tc.shouldFail {
 					t.Errorf("test should not fail, but error occurred: %v", err)
+				}
+				if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
+					t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(tc.exitError), reflect.TypeOf(err), err)
 				}
 				return
 			}
