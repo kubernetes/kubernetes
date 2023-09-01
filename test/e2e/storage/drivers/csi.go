@@ -40,6 +40,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"strconv"
 	"strings"
 	"sync"
@@ -245,6 +247,10 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HonorPVReclaimPolicy) {
+		o.Features["csi-provisioner"] = []string{"HonorPVReclaimPolicy=true"}
 	}
 
 	err = utils.CreateFromManifests(ctx, config.Framework, driverNamespace, func(item interface{}) error {
