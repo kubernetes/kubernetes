@@ -238,7 +238,7 @@ It has allocation values for memory bandwidth on each socket, which contains
 L3 cache id and memory bandwidth.
 
 ```text
-	Format: "MB:<cache_id0>=bandwidth0;<cache_id1>=bandwidth1;..."
+Format: "MB:<cache_id0>=bandwidth0;<cache_id1>=bandwidth1;..."
 ```
 
 For example, on a two-socket machine, the schema line could be "MB:0=20;1=70"
