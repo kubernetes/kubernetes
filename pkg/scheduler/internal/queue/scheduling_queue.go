@@ -611,6 +611,10 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	pInfo := obj.(*framework.QueuedPodInfo)
 	pInfo.Attempts++
 	p.schedulingCycle++
+
+	// Reset the set of unschedulable plugins for the next attempt.
+	pInfo.UnschedulablePlugins = sets.NewString()
+
 	return pInfo, nil
 }
 
