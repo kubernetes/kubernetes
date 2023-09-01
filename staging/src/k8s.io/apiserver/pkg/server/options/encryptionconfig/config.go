@@ -104,6 +104,15 @@ const (
 	kmsReloadHealthCheckName = "kms-providers"
 )
 
+var codecs serializer.CodecFactory
+
+func init() {
+	configScheme := runtime.NewScheme()
+	utilruntime.Must(apiserverconfig.AddToScheme(configScheme))
+	utilruntime.Must(apiserverconfigv1.AddToScheme(configScheme))
+	codecs = serializer.NewCodecFactory(configScheme)
+}
+
 type kmsPluginHealthzResponse struct {
 	err      error
 	received time.Time
@@ -474,11 +483,6 @@ func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfig
 	if len(data) == 0 {
 		return nil, "", fmt.Errorf("encryption provider configuration file %q is empty", filepath)
 	}
-
-	scheme := runtime.NewScheme()
-	codecs := serializer.NewCodecFactory(scheme)
-	utilruntime.Must(apiserverconfig.AddToScheme(scheme))
-	utilruntime.Must(apiserverconfigv1.AddToScheme(scheme))
 
 	configObj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
