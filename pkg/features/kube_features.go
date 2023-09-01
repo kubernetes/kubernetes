@@ -229,13 +229,14 @@ const (
 
 	// owner: @andrewsykim
 	// alpha: v1.22
-	// beta: v1.28
+	// beta: v1.29
 	//
 	// Disable any functionality in kube-apiserver, kube-controller-manager and kubelet related to the `--cloud-provider` component flag.
 	DisableCloudProviders featuregate.Feature = "DisableCloudProviders"
 
 	// owner: @andrewsykim
 	// alpha: v1.23
+	// beta: v1.29
 	//
 	// Disable in-tree functionality in kubelet to authenticate to cloud provider container registries for image pull credentials.
 	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
