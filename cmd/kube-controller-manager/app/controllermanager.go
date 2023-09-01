@@ -226,14 +226,14 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 	saTokenControllerDescriptor := newServiceAccountTokenControllerDescriptor(rootClientBuilder)
 
-	run := func(ctx context.Context, startSATokenControllerDescriptor *ControllerDescriptor, controllerDescriptorsFunc ControllerDescriptorsFunc) {
+	run := func(ctx context.Context, controllerDescriptors map[string]*ControllerDescriptor) {
 		controllerContext, err := CreateControllerContext(logger, c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
 			logger.Error(err, "Error building controller context")
 			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
-		controllerDescriptors := controllerDescriptorsFunc()
-		if err := StartControllers(ctx, controllerContext, startSATokenControllerDescriptor, controllerDescriptors, unsecuredMux, healthzHandler); err != nil {
+
+		if err := StartControllers(ctx, controllerContext, controllerDescriptors, unsecuredMux, healthzHandler); err != nil {
 			logger.Error(err, "Error starting controllers")
 			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
@@ -247,7 +247,9 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 	// No leader election, run directly
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(ctx, saTokenControllerDescriptor, NewControllerDescriptors)
+		controllerDescriptors := NewControllerDescriptors()
+		controllerDescriptors[names.ServiceAccountTokenController] = saTokenControllerDescriptor
+		run(ctx, controllerDescriptors)
 		return nil
 	}
 
@@ -286,14 +288,15 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
-				initializersFunc := NewControllerDescriptors
+				controllerDescriptors := NewControllerDescriptors()
 				if leaderMigrator != nil {
 					// If leader migration is enabled, we should start only non-migrated controllers
 					//  for the main lock.
-					initializersFunc = createFilteredControllerDescriptorsFunc(leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
+					controllerDescriptors = filteredControllerDescriptors(controllerDescriptors, leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
 					logger.Info("leader migration: starting main controllers.")
 				}
-				run(ctx, saTokenControllerDescriptor, initializersFunc)
+				controllerDescriptors[names.ServiceAccountTokenController] = saTokenControllerDescriptor
+				run(ctx, controllerDescriptors)
 			},
 			OnStoppedLeading: func() {
 				logger.Error(nil, "leaderelection lost")
@@ -316,8 +319,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
 					logger.Info("leader migration: starting migrated controllers.")
+					controllerDescriptors := NewControllerDescriptors()
+					controllerDescriptors = filteredControllerDescriptors(controllerDescriptors, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated)
 					// DO NOT start saTokenController under migration lock
-					run(ctx, nil, createFilteredControllerDescriptorsFunc(leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
+					delete(controllerDescriptors, names.ServiceAccountTokenController)
+					run(ctx, controllerDescriptors)
 				},
 				OnStoppedLeading: func() {
 					logger.Error(nil, "migration leaderelection lost")
@@ -398,6 +404,7 @@ type ControllerDescriptor struct {
 	requiredFeatureGates      []featuregate.Feature
 	isDisabledByDefault       bool
 	isCloudProviderController bool
+	requiresSpecialHandling   bool
 }
 
 func (r *ControllerDescriptor) Name() string {
@@ -420,25 +427,14 @@ func (r *ControllerDescriptor) IsCloudProviderController() bool {
 	return r.isCloudProviderController
 }
 
-// ControllerDescriptorsFunc is used to create a collection of controller descriptors
-// given the loopMode.
-type ControllerDescriptorsFunc func() (initializers map[string]*ControllerDescriptor)
-
-var _ ControllerDescriptorsFunc = NewControllerDescriptors
+// RequiresSpecialHandling should return true only in a special non-generic controllers like ServiceAccountTokenController
+func (r *ControllerDescriptor) RequiresSpecialHandling() bool {
+	return r.requiresSpecialHandling
+}
 
 // KnownControllers returns all known controllers's name
 func KnownControllers() []string {
-	ret := sets.StringKeySet(NewControllerDescriptors())
-
-	// add "special" controllers that aren't initialized normally.  These controllers cannot be initialized
-	// using a normal function.  The only known special case is the SA token controller which *must* be started
-	// first to ensure that the SA tokens for future controllers will exist.  Think very carefully before adding
-	// to this list.
-	ret.Insert(
-		newServiceAccountTokenControllerDescriptor(nil).Name(),
-	)
-
-	return ret.List()
+	return sets.StringKeySet(NewControllerDescriptors()).List()
 }
 
 func ControllersDisabledByDefault() []string {
@@ -478,6 +474,14 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 		}
 		controllers[name] = controllerDesc
 	}
+
+	// First add "special" controllers that aren't initialized normally. These controllers cannot be initialized
+	// in the main controller loop initialization, so we add them here only for the metadata and duplication detection.
+	// app.ControllerDescriptor#RequiresSpecialHandling should return true for such controllers
+	// The only known special case is the ServiceAccountTokenController which *must* be started
+	// first to ensure that the SA tokens for future controllers will exist. Think very carefully before adding new
+	// special controllers.
+	register(newServiceAccountTokenControllerDescriptor(nil))
 
 	register(newEndpointsControllerDescriptor())
 	register(newEndpointSliceControllerDescriptor())
@@ -584,18 +588,20 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 }
 
 // StartControllers starts a set of controllers with a specified ControllerContext
-func StartControllers(ctx context.Context, controllerCtx ControllerContext, startSATokenControllerDescriptor *ControllerDescriptor, controllerDescriptors map[string]*ControllerDescriptor,
+func StartControllers(ctx context.Context, controllerCtx ControllerContext, controllerDescriptors map[string]*ControllerDescriptor,
 	unsecuredMux *mux.PathRecorderMux, healthzHandler *controllerhealthz.MutableHealthzHandler) error {
 	logger := klog.FromContext(ctx)
 
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.
-	if startSATokenControllerDescriptor != nil {
-		if !controllerCtx.IsControllerEnabled(startSATokenControllerDescriptor) {
-			logger.Info("Warning: controller is disabled", "controller", startSATokenControllerDescriptor.Name())
+	if serviceAccountTokenControllerDescriptor, ok := controllerDescriptors[names.ServiceAccountTokenController]; ok {
+		controllerName := serviceAccountTokenControllerDescriptor.Name()
+		if !controllerCtx.IsControllerEnabled(serviceAccountTokenControllerDescriptor) {
+			logger.Info("Warning: controller is disabled", "controller", controllerName)
 		} else {
-			initFunc := startSATokenControllerDescriptor.GetInitFunc()
-			if _, _, err := initFunc(ctx, controllerCtx, startSATokenControllerDescriptor.Name()); err != nil {
+			logger.V(1).Info("Starting controller", "controller", controllerName)
+			initFunc := serviceAccountTokenControllerDescriptor.GetInitFunc()
+			if _, _, err := initFunc(klog.NewContext(ctx, klog.LoggerWithName(logger, controllerName)), controllerCtx, controllerName); err != nil {
 				return err
 			}
 		}
@@ -619,6 +625,10 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, star
 	// - it allows distinguishing between log entries emitted by the controller
 	//   and those emitted for it - this is a bit debatable and could be revised.
 	for controllerName, controllerDesc := range controllerDescriptors {
+		if controllerDesc.RequiresSpecialHandling() {
+			continue
+		}
+
 		disabledByFeatureGate := false
 		for _, featureGate := range controllerDesc.GetRequiredFeatureGates() {
 			if !utilfeature.DefaultFeatureGate.Enabled(featureGate) {
@@ -683,14 +693,15 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, star
 }
 
 // serviceAccountTokenControllerStarter is special because it must run first to set up permissions for other controllers.
-// It cannot use the "normal" client builder, so it tracks its own. It must also avoid being included in the "normal"
-// ControllerDescriptor map so that it can always run first.
+// It cannot use the "normal" client builder, so it tracks its own.
 func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.ControllerClientBuilder) *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name: names.ServiceAccountTokenController,
 		initFunc: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 			return startServiceAccountTokenController(ctx, controllerContext, controllerName, rootClientBuilder)
 		},
+		// will make sure it runs first before other controllers
+		requiresSpecialHandling: true,
 	}
 }
 
@@ -803,16 +814,13 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 	panic("unreachable")
 }
 
-// createFilteredControllerDescriptorsFunc creates a controllerDescriptorsFunc that returns all controllerDescriptors
-// with expected as the result after filtering through filterFunc.
-func createFilteredControllerDescriptorsFunc(filterFunc leadermigration.FilterFunc, expected leadermigration.FilterResult) ControllerDescriptorsFunc {
-	return func() map[string]*ControllerDescriptor {
-		controllerDescriptors := make(map[string]*ControllerDescriptor)
-		for name, controllerDesc := range NewControllerDescriptors() {
-			if filterFunc(name) == expected {
-				controllerDescriptors[name] = controllerDesc
-			}
+// filteredControllerDescriptors returns all controllerDescriptors after filtering through filterFunc.
+func filteredControllerDescriptors(controllerDescriptors map[string]*ControllerDescriptor, filterFunc leadermigration.FilterFunc, expected leadermigration.FilterResult) map[string]*ControllerDescriptor {
+	resultControllers := make(map[string]*ControllerDescriptor)
+	for name, controllerDesc := range controllerDescriptors {
+		if filterFunc(name) == expected {
+			resultControllers[name] = controllerDesc
 		}
-		return controllerDescriptors
 	}
+	return resultControllers
 }
