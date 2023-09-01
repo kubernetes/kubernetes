@@ -661,6 +661,11 @@ func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim
 		// Nothing to do for it as part of pod scheduling.
 		return nil, nil
 	}
+	if claim.Status.Allocation != nil {
+		// Already allocated, class and parameter are not needed and nothing
+		// need to be done for the claim either.
+		return nil, nil
+	}
 	class, err := ctrl.rcLister.Get(claim.Spec.ResourceClassName)
 	if err != nil {
 		return nil, err
