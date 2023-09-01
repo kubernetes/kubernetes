@@ -19,7 +19,6 @@ Minimum requirements:
 * Kernel version - 3.10 recommended 2.6.2x minimum(with backported patches)
 * Mounted cgroups with each subsystem in its own hierarchy
 
-
 ### Namespaces
 
 |     Flag        | Enabled |
@@ -33,7 +32,6 @@ Minimum requirements:
 | CLONE_NEWCGROUP |    1    |
 
 Namespaces are created for the container via the `unshare` syscall.
-
 
 ### Filesystem
 
@@ -58,7 +56,6 @@ are required to be mounted within the rootfs that the runtime will setup.
 | /dev/pts    | devpts | MS_NOEXEC,MS_NOSUID                    | newinstance,ptmxmode=0666,mode=620,gid=5 |
 | /sys        | sysfs  | MS_NOEXEC,MS_NOSUID,MS_NODEV,MS_RDONLY |                                          |
 
-
 After a container's filesystems are mounted within the newly created 
 mount namespace `/dev` will need to be populated with a set of device nodes.
 It is expected that a rootfs does not need to have any device nodes specified
@@ -74,7 +71,6 @@ that are required for executing a container's process.
 | /dev/random  | 0666 |  rwm       |
 | /dev/urandom | 0666 |  rwm       |
 
-
 **ptmx**
 `/dev/ptmx` will need to be a symlink to the host's `/dev/ptmx` within
 the container.  
@@ -88,12 +84,10 @@ in tmpfs.
 | --------------- | ------------ | ------- | ---- | ---- |
 | *pty host path* | /dev/console | 0 0     | 0600 | bind | 
 
-
 After `/dev/null` has been setup we check for any external links between
 the container's io, STDIN, STDOUT, STDERR.  If the container's io is pointing
 to `/dev/null` outside the container we close and `dup2` the `/dev/null` 
 that is local to the container's rootfs.
-
 
 After the container has `/proc` mounted a few standard symlinks are setup 
 within `/dev/` for the io.
@@ -144,7 +138,6 @@ system resources like cpu, memory, and device access.
 | freezer    | 1       |
 | hugetlb    | 1       |
 | pids       | 1       |
-
 
 All cgroup subsystem are joined so that statistics can be collected from
 each of the subsystems.  Freezer does not expose any stats but is joined
@@ -247,6 +240,7 @@ L3 cache id and memory bandwidth.
 ```text
 	Format: "MB:<cache_id0>=bandwidth0;<cache_id1>=bandwidth1;..."
 ```
+
 For example, on a two-socket machine, the schema line could be "MB:0=20;1=70"
 
 The minimum bandwidth percentage value for each CPU model is predefined and
@@ -295,7 +289,6 @@ maximum memory bandwidth of 20% on socket 0 and 70% on socket 1.
 The standard set of Linux capabilities that are set in a container
 provide a good default for security and flexibility for the applications.
 
-
 |     Capability       | Enabled |
 | -------------------- | ------- |
 | CAP_NET_RAW          | 1       |
@@ -336,7 +329,6 @@ provide a good default for security and flexibility for the applications.
 | CAP_LEASE            | 0       |
 | CAP_WAKE_ALARM       | 0       |
 | CAP_BLOCK_SUSPEND    | 0       |
-
 
 Additional security layers like [apparmor](https://wiki.ubuntu.com/AppArmor)
 and [selinux](http://selinuxproject.org/page/Main_Page) can be used with
@@ -406,7 +398,6 @@ specific information via the runtime.
 * /etc/hostname
 * /etc/localtime
 
-
 #### Defaults
 
 There are a few defaults that can be overridden by users, but in their omission
@@ -422,7 +413,6 @@ these apply to processes within a container.
 | $HOME               | Current user's home dir or "/" |
 | Readonly rootfs     | false                          |
 | Pseudo TTY          | false                          |
-
 
 ## Actions
 
