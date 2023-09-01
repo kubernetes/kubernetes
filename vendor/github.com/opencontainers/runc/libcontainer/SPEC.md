@@ -187,7 +187,7 @@ CAT and MBA features are introduced in Linux 4.10 and 4.12 kernel via
 
 Intel RDT "resource control" filesystem hierarchy:
 
-```
+```text
 mount -t resctrl resctrl /sys/fs/resctrl
 tree /sys/fs/resctrl
 /sys/fs/resctrl/
@@ -226,7 +226,7 @@ L3 cache schema:
 It has allocation bitmasks/values for L3 cache on each socket, which
 contains L3 cache id and capacity bitmask (CBM).
 
-```
+```text
 	Format: "L3:<cache_id0>=<cbm0>;<cache_id1>=<cbm1>;..."
 ```
 
@@ -243,7 +243,8 @@ set in a group: 0xf, 0xf0, 0x3ff, 0x1f00 and etc.
 Memory bandwidth schema:
 It has allocation values for memory bandwidth on each socket, which contains
 L3 cache id and memory bandwidth.
-```
+
+```text
 	Format: "MB:<cache_id0>=bandwidth0;<cache_id1>=bandwidth1;..."
 ```
 For example, on a two-socket machine, the schema line could be "MB:0=20;1=70"
@@ -270,7 +271,7 @@ and 7000 MBps memory bandwidth limit on socket 1.
 For more information about Intel RDT kernel interface:  
 https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt
 
-```
+```text
 An example for runc:
 Consider a two-socket machine with two L3 caches where the default CBM is
 0x7ff and the max CBM length is 11 bits, and minimum memory bandwidth of 10%
