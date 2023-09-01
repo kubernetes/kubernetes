@@ -70,6 +70,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -1784,6 +1785,71 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	assert.Equal(t, v1.PodFailed, status.Phase)
 	// check pod status contains ContainerStatuses, etc.
 	assert.NotNil(t, status.ContainerStatuses)
+}
+
+func TestSyncPodStartMetrics(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kl := testKubelet.kubelet
+	metrics.Register()
+
+	podPending := podWithUIDNameNsSpec("12345678", "foo", "ns", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "1234", Image: "foo"},
+		},
+	})
+	podPending.Status.Phase = v1.PodPending
+	pods := []*v1.Pod{podPending}
+	kl.podManager.SetPods(pods)
+
+	kl.SyncPod(context.Background(), kubetypes.SyncPodUpdate, podPending, nil, &kubecontainer.PodStatus{})
+	metricsFamily, err := metrics.GetGather().Gather()
+	if err != nil {
+		t.Errorf("metrics gather error")
+	}
+	for _, mf := range metricsFamily {
+		if *mf.Name == "kubelet_pod_start_duration_seconds" {
+			if *mf.Metric[0].Histogram.SampleCount > 0 {
+				t.Errorf("unexpected kubelet_pod_start_duration_seconds > 0")
+			}
+		}
+	}
+
+	podRunning := podWithUIDNameNsSpec("12345678", "foo", "ns", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "1234", Image: "foo"},
+		},
+	})
+	podRunning.Status.ContainerStatuses = append(podRunning.Status.ContainerStatuses)
+	podRunning.Annotations[kubetypes.ConfigFirstSeenAnnotationKey] = kubetypes.NewTimestamp().GetString()
+	podRunning.Status.Phase = v1.PodRunning
+	pods = []*v1.Pod{podRunning}
+	kl.podManager.SetPods(pods)
+
+	kl.SyncPod(context.Background(), kubetypes.SyncPodUpdate, podRunning, nil, &kubecontainer.PodStatus{
+		ID:        podRunning.UID,
+		Name:      podRunning.Name,
+		Namespace: podRunning.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:  "1234",
+				State: kubecontainer.ContainerStateRunning,
+			},
+		},
+	})
+	metricsFamily, err = metrics.GetGather().Gather()
+	if err != nil {
+		t.Errorf("metrics error")
+	}
+	for _, mf := range metricsFamily {
+		if *mf.Name == "kubelet_pod_start_duration_seconds" {
+			t.Log(mf.Metric)
+			if *mf.Metric[0].Histogram.SampleCount == 0 {
+				t.Errorf("expected kubelet_pod_start_duration_seconds counter > 0")
+			}
+		}
+	}
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
