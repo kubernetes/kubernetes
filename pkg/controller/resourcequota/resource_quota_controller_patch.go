@@ -56,7 +56,7 @@ func (rq *Controller) UpdateMonitors(ctx context.Context, discoveryFunc Namespac
 
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
-			logger.V(4).Info("no resource updates from discovery, skipping resource quota sync")
+			logger.V(8).Info("no resource updates from discovery, skipping resource quota sync")
 			return
 		}
 
