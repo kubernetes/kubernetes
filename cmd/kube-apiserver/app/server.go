@@ -364,6 +364,9 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 }
 
 func validateCloudProviderOptions(opts *kubeoptions.CloudProviderOptions) error {
+	if opts.CloudProvider == "" {
+		return nil
+	}
 	if opts.CloudProvider == "external" {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
 			return fmt.Errorf("when using --cloud-provider set to '%s', "+
