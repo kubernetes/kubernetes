@@ -236,6 +236,25 @@
         "google.golang.org/grpc",
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ]
-    }
+    },
+    "unwantedVendored": [
+      "cloud.google.com/go/compute",
+      "github.com/gogo/protobuf",
+      "github.com/golang/mock",
+      "github.com/google/shlex",
+      "github.com/googleapis/enterprise-certificate-proxy",
+      "github.com/googleapis/gax-go/v2",
+      "github.com/gregjones/httpcache",
+      "github.com/grpc-ecosystem/go-grpc-prometheus",
+      "github.com/grpc-ecosystem/grpc-gateway",
+      "github.com/json-iterator/go",
+      "github.com/pkg/errors",
+      "github.com/rubiojr/go-vhd",
+      "go.opencensus.io",
+      "golang.org/x/exp",
+      "google.golang.org/api",
+      "google.golang.org/appengine",
+      "google.golang.org/genproto"
+    ]
   }
 }
