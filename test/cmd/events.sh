@@ -151,7 +151,7 @@ __EOF__
 
     #Clean up
     kubectl delete cronjob pi --namespace=test-events
-    kubectl delete mycj pi --namespace=test-events
+    kubectl delete cronjobs.v1.example.com pi --namespace=test-events
     kubectl delete crd cronjobs.example.com
     kubectl delete namespace test-events
 
