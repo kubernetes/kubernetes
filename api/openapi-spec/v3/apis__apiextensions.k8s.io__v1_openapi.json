@@ -1163,11 +1163,6 @@
           {
             "group": "flowcontrol.apiserver.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
             "version": "v1beta1"
           },
           {
@@ -1832,11 +1827,6 @@
             "group": "extensions",
             "kind": "WatchEvent",
             "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
           },
           {
             "group": "flowcontrol.apiserver.k8s.io",

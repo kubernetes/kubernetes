@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -441,8 +440,7 @@ func ValidateExemptPriorityLevelConfiguration(eplc *flowcontrol.ExemptPriorityLe
 
 func getVersionedFieldNameForConcurrencyShares(requestGV schema.GroupVersion) string {
 	switch {
-	case requestGV == flowcontrolv1alpha1.SchemeGroupVersion ||
-		requestGV == flowcontrolv1beta1.SchemeGroupVersion ||
+	case requestGV == flowcontrolv1beta1.SchemeGroupVersion ||
 		requestGV == flowcontrolv1beta2.SchemeGroupVersion:
 		return "assuredConcurrencyShares"
 	default:

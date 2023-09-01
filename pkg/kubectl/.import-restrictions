@@ -60,7 +60,6 @@ rules:
       - k8s.io/kubernetes/pkg/apis/extensions/v1beta1
       - k8s.io/kubernetes/pkg/apis/flowcontrol
       - k8s.io/kubernetes/pkg/apis/flowcontrol/install
-      - k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1
       - k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1
       - k8s.io/kubernetes/pkg/apis/imagepolicy
       - k8s.io/kubernetes/pkg/apis/imagepolicy/install
