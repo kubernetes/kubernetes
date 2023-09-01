@@ -220,7 +220,7 @@ It has allocation bitmasks/values for L3 cache on each socket, which
 contains L3 cache id and capacity bitmask (CBM).
 
 ```text
-	Format: "L3:<cache_id0>=<cbm0>;<cache_id1>=<cbm1>;..."
+Format: "L3:<cache_id0>=<cbm0>;<cache_id1>=<cbm1>;..."
 ```
 
 For example, on a two-socket machine, the schema line could be "L3:0=ff;1=c0"
