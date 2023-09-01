@@ -8,6 +8,7 @@
       "cloud.google.com/go/storage": "cloud dependency",
       "github.com/armon/consul-api": "MPL license not in CNCF allowlist",
       "github.com/bketelsen/crypt": "unused, crypto",
+      "github.com/docker/distribution": "we have switched to distribution/references only",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
       "github.com/getsentry/raven-go": "unmaintained, archive mode",
       "github.com/go-bindata/go-bindata": "refer to #99829",
@@ -86,6 +87,9 @@
       ],
       "cloud.google.com/go/storage": [
         "cloud.google.com/go"
+      ],
+      "github.com/docker/distribution": [
+        "github.com/google/cadvisor"
       ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
