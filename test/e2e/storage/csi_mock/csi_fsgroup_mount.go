@@ -23,7 +23,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -75,8 +74,8 @@ var _ = utils.SIGDescribe("CSI Mock fsgroup as mount option", func() {
 				framework.ExpectNoError(err, "failed to start pod")
 
 				if t.enableVolumeMountGroup {
-					framework.ExpectEqual(nodeStageFsGroup, fsGroupStr, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodeStageFsGroup)
-					framework.ExpectEqual(nodePublishFsGroup, fsGroupStr, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodePublishFsGroup)
+					gomega.Expect(nodeStageFsGroup).To(gomega.Equal(fsGroupStr), "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodeStageFsGroup)
+					gomega.Expect(nodePublishFsGroup).To(gomega.Equal(fsGroupStr), "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodePublishFsGroup)
 				} else {
 					gomega.Expect(nodeStageFsGroup).To(gomega.BeEmpty(), "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to be empty; got: %q", nodeStageFsGroup)
 					gomega.Expect(nodePublishFsGroup).To(gomega.BeEmpty(), "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to empty; got: %q", nodePublishFsGroup)

@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,7 +111,7 @@ var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 			framework.ExpectNoError(err)
 			updatedPVC, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(*updatedPVC.Spec.StorageClassName, storageClass.Name, "Expected PVC %v to have StorageClass %v, but it has StorageClass %v instead", updatedPVC.Name, prefixSC, updatedPVC.Spec.StorageClassName)
+			gomega.Expect(*updatedPVC.Spec.StorageClassName).To(gomega.Equal(storageClass.Name), "Expected PVC %v to have StorageClass %v, but it has StorageClass %v instead", updatedPVC.Name, prefixSC, updatedPVC.Spec.StorageClassName)
 			framework.Logf("Success - PersistentVolumeClaim %s got updated retroactively with StorageClass %v", updatedPVC.Name, storageClass.Name)
 		})
 	})
