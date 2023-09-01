@@ -616,7 +616,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 			annotations = make(map[string]string)
 		}
 		annotations[podResourceClaimAnnotation] = podClaim.Name
-		generateName := pod.Name + "-" + podClaim.Name
+		generateName := pod.Name + "-" + podClaim.Name + "-"
 		maxBaseLen := 57 // Leave space for hyphen and 5 random characters in a name with 63 characters.
 		if len(generateName) > maxBaseLen {
 			// We could leave truncation to the apiserver, but as
