@@ -31,6 +31,7 @@ import (
 func newEndpointSliceControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.EndpointSliceController,
+		aliases:  []string{"endpointslice"},
 		initFunc: startEndpointSliceController,
 	}
 }
@@ -52,6 +53,7 @@ func startEndpointSliceController(ctx context.Context, controllerContext Control
 func newEndpointSliceMirroringControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.EndpointSliceMirroringController,
+		aliases:  []string{"endpointslicemirroring"},
 		initFunc: startEndpointSliceMirroringController,
 	}
 }

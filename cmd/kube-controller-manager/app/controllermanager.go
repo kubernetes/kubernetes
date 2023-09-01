@@ -135,7 +135,7 @@ controller, and serviceaccounts controller.`,
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
-			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault(), names.KCMControllerAliases())
+			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
 			if err != nil {
 				return err
 			}
@@ -154,7 +154,7 @@ controller, and serviceaccounts controller.`,
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault(), names.KCMControllerAliases())
+	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	registerLegacyGlobalFlags(namedFlagSets)
@@ -402,6 +402,7 @@ type ControllerDescriptor struct {
 	name                      string
 	initFunc                  InitFunc
 	requiredFeatureGates      []featuregate.Feature
+	aliases                   []string
 	isDisabledByDefault       bool
 	isCloudProviderController bool
 	requiresSpecialHandling   bool
@@ -417,6 +418,12 @@ func (r *ControllerDescriptor) GetInitFunc() InitFunc {
 
 func (r *ControllerDescriptor) GetRequiredFeatureGates() []featuregate.Feature {
 	return append([]featuregate.Feature(nil), r.requiredFeatureGates...)
+}
+
+// GetAliases returns aliases to ensure backwards compatibility and should never be removed!
+// Only addition of new aliases is allowed, and only when a canonical name is changed (please see CHANGE POLICY of controller names)
+func (r *ControllerDescriptor) GetAliases() []string {
+	return append([]string(nil), r.aliases...)
 }
 
 func (r *ControllerDescriptor) IsDisabledByDefault() bool {
@@ -435,6 +442,17 @@ func (r *ControllerDescriptor) RequiresSpecialHandling() bool {
 // KnownControllers returns all known controllers's name
 func KnownControllers() []string {
 	return sets.StringKeySet(NewControllerDescriptors()).List()
+}
+
+// ControllerAliases returns a mapping of aliases to canonical controller names
+func ControllerAliases() map[string]string {
+	aliases := map[string]string{}
+	for name, c := range NewControllerDescriptors() {
+		for _, alias := range c.GetAliases() {
+			aliases[alias] = name
+		}
+	}
+	return aliases
 }
 
 func ControllersDisabledByDefault() []string {
@@ -456,8 +474,9 @@ func ControllersDisabledByDefault() []string {
 // This allows for structured downstream composition and subdivision.
 func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	controllers := map[string]*ControllerDescriptor{}
+	aliases := sets.NewString()
 
-	// All of the controllers must have unique names, or else we will explode.
+	// All the controllers must fulfil common constraints, or else we will explode.
 	register := func(controllerDesc *ControllerDescriptor) {
 		if controllerDesc == nil {
 			panic("received nil controller for a registration")
@@ -470,8 +489,16 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 			panic(fmt.Sprintf("controller name %q was registered twice", name))
 		}
 		if controllerDesc.GetInitFunc() == nil {
-			panic("received controller without an init function for a registration")
+			panic(fmt.Sprintf("controller %q does not have an init function", name))
 		}
+
+		for _, alias := range controllerDesc.GetAliases() {
+			if aliases.Has(alias) {
+				panic(fmt.Sprintf("controller %q has a duplicate alias %q", name, alias))
+			}
+			aliases.Insert(alias)
+		}
+
 		controllers[name] = controllerDesc
 	}
 
@@ -529,6 +556,12 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newResourceClaimControllerDescriptor())
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())
+
+	for _, alias := range aliases.UnsortedList() {
+		if _, ok := controllers[alias]; ok {
+			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))
+		}
+	}
 
 	return controllers
 }
@@ -696,7 +729,8 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, cont
 // It cannot use the "normal" client builder, so it tracks its own.
 func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.ControllerClientBuilder) *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name: names.ServiceAccountTokenController,
+		name:    names.ServiceAccountTokenController,
+		aliases: []string{"serviceaccount-token"},
 		initFunc: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 			return startServiceAccountTokenController(ctx, controllerContext, controllerName, rootClientBuilder)
 		},

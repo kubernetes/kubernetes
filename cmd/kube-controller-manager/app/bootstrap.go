@@ -28,6 +28,7 @@ import (
 func newBootstrapSignerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                names.BootstrapSignerController,
+		aliases:             []string{"bootstrapsigner"},
 		initFunc:            startBootstrapSignerController,
 		isDisabledByDefault: true,
 	}
@@ -49,6 +50,7 @@ func startBootstrapSignerController(ctx context.Context, controllerContext Contr
 func newTokenCleanerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                names.TokenCleanerController,
+		aliases:             []string{"tokencleaner"},
 		initFunc:            startTokenCleanerController,
 		isDisabledByDefault: true,
 	}

@@ -37,6 +37,7 @@ import (
 func newDaemonSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.DaemonSetController,
+		aliases:  []string{"daemonset"},
 		initFunc: startDaemonSetController,
 	}
 }
@@ -60,6 +61,7 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 func newStatefulSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.StatefulSetController,
+		aliases:  []string{"statefulset"},
 		initFunc: startStatefulSetController,
 	}
 }
@@ -78,6 +80,7 @@ func startStatefulSetController(ctx context.Context, controllerContext Controlle
 func newReplicaSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ReplicaSetController,
+		aliases:  []string{"replicaset"},
 		initFunc: startReplicaSetController,
 	}
 }
@@ -96,6 +99,7 @@ func startReplicaSetController(ctx context.Context, controllerContext Controller
 func newDeploymentControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.DeploymentController,
+		aliases:  []string{"deployment"},
 		initFunc: startDeploymentController,
 	}
 }

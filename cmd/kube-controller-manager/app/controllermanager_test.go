@@ -41,7 +41,7 @@ func TestControllerNamesConsistency(t *testing.T) {
 }
 
 func TestControllerNamesDeclaration(t *testing.T) {
-	declaredControllers := sets.New(
+	declaredControllers := sets.NewString(
 		names.ServiceAccountTokenController,
 		names.EndpointsController,
 		names.EndpointSliceController,
@@ -91,4 +91,8 @@ func TestControllerNamesDeclaration(t *testing.T) {
 			t.Errorf("name declaration check failed: controller name %q should be declared in  \"controller_names.go\" and added to this test", name)
 		}
 	}
+}
+
+func TestNewControllerDescriptorsShouldNotPanic(t *testing.T) {
+	NewControllerDescriptors()
 }

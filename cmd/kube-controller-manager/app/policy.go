@@ -32,6 +32,7 @@ import (
 func newDisruptionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.DisruptionController,
+		aliases:  []string{"disruption"},
 		initFunc: startDisruptionController,
 	}
 }

@@ -36,6 +36,7 @@ import (
 func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.CertificateSigningRequestSigningController,
+		aliases:  []string{"csrsigning"},
 		initFunc: startCertificateSigningRequestSigningController,
 	}
 }
@@ -159,6 +160,7 @@ func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 func newCertificateSigningRequestApprovingControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.CertificateSigningRequestApprovingController,
+		aliases:  []string{"csrapproving"},
 		initFunc: startCertificateSigningRequestApprovingController,
 	}
 }
@@ -176,6 +178,7 @@ func startCertificateSigningRequestApprovingController(ctx context.Context, cont
 func newCertificateSigningRequestCleanerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.CertificateSigningRequestCleanerController,
+		aliases:  []string{"csrcleaner"},
 		initFunc: startCertificateSigningRequestCleanerController,
 	}
 }
@@ -191,6 +194,7 @@ func startCertificateSigningRequestCleanerController(ctx context.Context, contro
 func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.RootCACertificatePublisherController,
+		aliases:  []string{"root-ca-cert-publisher"},
 		initFunc: startRootCACertificatePublisherController,
 	}
 }
