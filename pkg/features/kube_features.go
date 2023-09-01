@@ -794,6 +794,7 @@ const (
 	// kep: http://kep.k8s.io/3682
 	// alpha: v1.27
 	// beta: v1.28
+	// stable: v1.29
 	//
 	// Subdivide the NodePort range for dynamic and static port allocation.
 	ServiceNodePortStaticSubrange featuregate.Feature = "ServiceNodePortStaticSubrange"
@@ -1158,7 +1159,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
 
-	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.Beta},
+	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
 
 	SidecarContainers: {Default: false, PreRelease: featuregate.Alpha},
 
