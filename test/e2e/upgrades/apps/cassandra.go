@@ -116,7 +116,7 @@ func (t *CassandraUpgradeTest) Setup(ctx context.Context, f *framework.Framework
 	ginkgo.By("Verifying that the users exist")
 	users, err := t.listUsers()
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(len(users), 2)
+	gomega.Expect(users).To(gomega.HaveLen(2))
 }
 
 // listUsers gets a list of users from the db via the tester service.

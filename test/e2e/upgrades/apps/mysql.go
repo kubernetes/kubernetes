@@ -125,7 +125,7 @@ func (t *MySQLUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(count, 2)
+	gomega.Expect(count).To(gomega.Equal(2))
 }
 
 // Test continually polls the db using the read and write connections, inserting data, and checking
