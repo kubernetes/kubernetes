@@ -4,11 +4,14 @@
 // Grammar
 //
 //	reference                       := name [ ":" tag ] [ "@" digest ]
-//	name                            := [domain '/'] path-component ['/' path-component]*
-//	domain                          := domain-component ['.' domain-component]* [':' port-number]
+//	name                            := [domain '/'] remote-name
+//	domain                          := host [':' port-number]
+//	host                            := domain-name | IPv4address | \[ IPv6address \]	; rfc3986 appendix-A
+//	domain-name                     := domain-component ['.' domain-component]*
 //	domain-component                := /([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])/
 //	port-number                     := /[0-9]+/
 //	path-component                  := alpha-numeric [separator alpha-numeric]*
+//	path (or "remote-name")         := path-component ['/' path-component]*
 //	alpha-numeric                   := /[a-z0-9]+/
 //	separator                       := /[_.]|__|[-]*/
 //
@@ -21,7 +24,6 @@
 //	digest-hex                      := /[0-9a-fA-F]{32,}/ ; At least 128 bit digest value
 //
 //	identifier                      := /[a-f0-9]{64}/
-//	short-identifier                := /[a-f0-9]{6,64}/
 package reference
 
 import (
@@ -145,7 +147,7 @@ type namedRepository interface {
 	Path() string
 }
 
-// Domain returns the domain part of the Named reference
+// Domain returns the domain part of the [Named] reference.
 func Domain(named Named) string {
 	if r, ok := named.(namedRepository); ok {
 		return r.Domain()
@@ -154,7 +156,7 @@ func Domain(named Named) string {
 	return domain
 }
 
-// Path returns the name without the domain part of the Named reference
+// Path returns the name without the domain part of the [Named] reference.
 func Path(named Named) (name string) {
 	if r, ok := named.(namedRepository); ok {
 		return r.Path()
@@ -175,7 +177,8 @@ func splitDomain(name string) (string, string) {
 // hostname and name string. If no valid hostname is
 // found, the hostname is empty and the full value
 // is returned as name
-// DEPRECATED: Use Domain or Path
+//
+// Deprecated: Use [Domain] or [Path].
 func SplitHostname(named Named) (string, string) {
 	if r, ok := named.(namedRepository); ok {
 		return r.Domain(), r.Path()
@@ -185,7 +188,6 @@ func SplitHostname(named Named) (string, string) {
 
 // Parse parses s and returns a syntactically valid Reference.
 // If an error was encountered it is returned, along with a nil Reference.
-// NOTE: Parse will not handle short digests.
 func Parse(s string) (Reference, error) {
 	matches := ReferenceRegexp.FindStringSubmatch(s)
 	if matches == nil {
@@ -237,7 +239,6 @@ func Parse(s string) (Reference, error) {
 // the Named interface. The reference must have a name and be in the canonical
 // form, otherwise an error is returned.
 // If an error was encountered it is returned, along with a nil Reference.
-// NOTE: ParseNamed will not handle short digests.
 func ParseNamed(s string) (Named, error) {
 	named, err := ParseNormalizedNamed(s)
 	if err != nil {
@@ -320,11 +321,13 @@ func WithDigest(name Named, digest digest.Digest) (Canonical, error) {
 
 // TrimNamed removes any tag or digest from the named reference.
 func TrimNamed(ref Named) Named {
-	domain, path := SplitHostname(ref)
-	return repository{
-		domain: domain,
-		path:   path,
+	repo := repository{}
+	if r, ok := ref.(namedRepository); ok {
+		repo.domain, repo.path = r.Domain(), r.Path()
+	} else {
+		repo.domain, repo.path = splitDomain(ref.Name())
 	}
+	return repo
 }
 
 func getBestReferenceType(ref reference) Reference {
