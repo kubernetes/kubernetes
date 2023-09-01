@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"time"
 
+	typedv1core "github.com/kcp-dev/client-go/kubernetes/typed/core/v1"
+	"github.com/kcp-dev/logicalcluster/v3"
 	"gopkg.in/square/go-jose.v2/jwt"
 
 	v1 "k8s.io/api/core/v1"
@@ -33,7 +35,6 @@ import (
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/warning"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
-	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -47,6 +48,7 @@ func LegacyClaims(serviceAccount v1.ServiceAccount, secret v1.Secret) (*jwt.Clai
 			ServiceAccountName: serviceAccount.Name,
 			ServiceAccountUID:  string(serviceAccount.UID),
 			SecretName:         secret.Name,
+			ClusterName:        logicalcluster.From(&serviceAccount),
 		}
 }
 
@@ -56,13 +58,14 @@ const (
 )
 
 type legacyPrivateClaims struct {
-	ServiceAccountName string `json:"kubernetes.io/serviceaccount/service-account.name"`
-	ServiceAccountUID  string `json:"kubernetes.io/serviceaccount/service-account.uid"`
-	SecretName         string `json:"kubernetes.io/serviceaccount/secret.name"`
-	Namespace          string `json:"kubernetes.io/serviceaccount/namespace"`
+	ServiceAccountName string              `json:"kubernetes.io/serviceaccount/service-account.name"`
+	ServiceAccountUID  string              `json:"kubernetes.io/serviceaccount/service-account.uid"`
+	SecretName         string              `json:"kubernetes.io/serviceaccount/secret.name"`
+	Namespace          string              `json:"kubernetes.io/serviceaccount/namespace"`
+	ClusterName        logicalcluster.Name `json:"kubernetes.io/serviceaccount/clusterName"`
 }
 
-func NewLegacyValidator(lookup bool, getter ServiceAccountTokenGetter, secretsWriter typedv1core.SecretsGetter) (Validator[legacyPrivateClaims], error) {
+func NewLegacyValidator(lookup bool, getter ServiceAccountTokenClusterGetter, secretsWriter typedv1core.SecretClusterInterface) (Validator[legacyPrivateClaims], error) {
 	if lookup && getter == nil {
 		return nil, errors.New("ServiceAccountTokenGetter must be provided")
 	}
@@ -78,8 +81,8 @@ func NewLegacyValidator(lookup bool, getter ServiceAccountTokenGetter, secretsWr
 
 type legacyValidator struct {
 	lookup        bool
-	getter        ServiceAccountTokenGetter
-	secretsWriter typedv1core.SecretsGetter
+	getter        ServiceAccountTokenClusterGetter
+	secretsWriter typedv1core.SecretClusterInterface
 }
 
 var _ = Validator[legacyPrivateClaims](&legacyValidator{})
@@ -113,7 +116,7 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 
 	if v.lookup {
 		// Make sure token hasn't been invalidated by deletion of the secret
-		secret, err := v.getter.GetSecret(namespace, secretName)
+		secret, err := v.getter.Cluster(private.ClusterName).GetSecret(namespace, secretName)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
 			return nil, errors.New("Token has been invalidated")
@@ -128,7 +131,7 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 		}
 
 		// Make sure service account still exists (name and UID)
-		serviceAccount, err := v.getter.GetServiceAccount(namespace, serviceAccountName)
+		serviceAccount, err := v.getter.Cluster(private.ClusterName).GetServiceAccount(namespace, serviceAccountName)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, serviceAccountName, err)
 			return nil, err
@@ -149,7 +152,7 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 		if invalidSince := secret.Labels[InvalidSinceLabelKey]; invalidSince != "" {
 			audit.AddAuditAnnotation(ctx, "authentication.k8s.io/legacy-token-invalidated", secret.Name+"/"+secret.Namespace)
 			invalidatedAutoTokensTotal.WithContext(ctx).Inc()
-			v.patchSecretWithLastUsedDate(ctx, secret)
+			v.patchSecretWithLastUsedDate(ctx, secret, private.ClusterName)
 			return nil, fmt.Errorf("the token in secret %s/%s for service account %s/%s has been marked invalid. Use tokens from the TokenRequest API or manually created secret-based tokens, or remove the '%s' label from the secret to temporarily allow use of this token", namespace, secretName, namespace, serviceAccountName, InvalidSinceLabelKey)
 		}
 
@@ -170,17 +173,33 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 			manuallyCreatedTokensTotal.WithContext(ctx).Inc()
 		}
 
-		v.patchSecretWithLastUsedDate(ctx, secret)
+		now := time.Now().UTC()
+		today := now.Format("2006-01-02")
+		tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
+		lastUsed := secret.Labels[LastUsedLabelKey]
+		if lastUsed != today && lastUsed != tomorrow {
+			patchContent, err := json.Marshal(applyv1.Secret(secret.Name, secret.Namespace).WithLabels(map[string]string{LastUsedLabelKey: today}))
+			if err != nil {
+				klog.Errorf("Failed to marshal legacy service account token tracking labels, err: %v", err)
+			} else {
+				if _, err := v.secretsWriter.Cluster(private.ClusterName.Path()).Namespace(namespace).Patch(ctx, secret.Name, types.MergePatchType, patchContent, metav1.PatchOptions{}); err != nil {
+					klog.Errorf("Failed to label legacy service account token secret with last-used, err: %v", err)
+				}
+			}
+		}
+
+		v.patchSecretWithLastUsedDate(ctx, secret, private.ClusterName)
 	}
 
 	return &apiserverserviceaccount.ServiceAccountInfo{
-		Namespace: private.Namespace,
-		Name:      private.ServiceAccountName,
-		UID:       private.ServiceAccountUID,
+		ClusterName: private.ClusterName,
+		Namespace:   private.Namespace,
+		Name:        private.ServiceAccountName,
+		UID:         private.ServiceAccountUID,
 	}, nil
 }
 
-func (v *legacyValidator) patchSecretWithLastUsedDate(ctx context.Context, secret *v1.Secret) {
+func (v *legacyValidator) patchSecretWithLastUsedDate(ctx context.Context, secret *v1.Secret, clusterName logicalcluster.Name) {
 	now := time.Now().UTC()
 	today := now.Format("2006-01-02")
 	tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
@@ -190,7 +209,7 @@ func (v *legacyValidator) patchSecretWithLastUsedDate(ctx context.Context, secre
 		if err != nil {
 			klog.Errorf("Failed to marshal legacy service account token %s/%s tracking labels, err: %v", secret.Name, secret.Namespace, err)
 		} else {
-			if _, err := v.secretsWriter.Secrets(secret.Namespace).Patch(ctx, secret.Name, types.MergePatchType, patchContent, metav1.PatchOptions{}); err != nil {
+			if _, err := v.secretsWriter.Cluster(clusterName.Path()).Namespace(secret.Namespace).Patch(ctx, secret.Name, types.MergePatchType, patchContent, metav1.PatchOptions{}); err != nil {
 				klog.Errorf("Failed to label legacy service account token %s/%s with last-used date, err: %v", secret.Name, secret.Namespace, err)
 			}
 		}
