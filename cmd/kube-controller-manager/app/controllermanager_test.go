@@ -83,6 +83,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.StorageVersionGarbageCollectorController,
 		names.ResourceClaimController,
 		names.LegacyServiceAccountTokenCleanerController,
+		names.ValidatingAdmissionPolicyStatusController,
 	)
 
 	for _, name := range KnownControllers() {

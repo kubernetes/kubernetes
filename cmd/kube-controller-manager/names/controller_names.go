@@ -33,20 +33,17 @@ import cpnames "k8s.io/cloud-provider/names"
 //
 // USE CASES
 // The following places should use the controller name constants, when:
-//  1. registering a controller in app.NewControllerInitializers or app.KnownControllers:
-//     1.1. disabling a controller by default in app.ControllersDisabledByDefault
-//     1.2. checking if IsControllerEnabled
-//     1.3. defining an alias in KCMControllerAliases (for backwards compatibility only)
-//  2. used anywhere inside the controller itself:
-//     2.1. [TODO] logger component should be configured with the controller name by calling LoggerWithName
-//     2.2. [TODO] logging should use a canonical controller name when referencing a controller (Eg. Starting X, Shutting down X)
-//     2.3. [TODO] emitted events should have an EventSource.Component set to the controller name (usually when initializing an EventRecorder)
-//     2.4. [TODO] registering ControllerManagerMetrics with ControllerStarted and ControllerStopped
-//     2.5. [TODO] calling WaitForNamedCacheSync
-//  3. defining controller options for "--help" command or generated documentation
-//     3.1. controller name should be used to create a pflag.FlagSet when registering controller options (the name is rendered in a controller flag group header)
-//     3.2. when defined flag's help mentions a controller name
-//  4. defining a new service account for a new controller (old controllers may have inconsistent service accounts to stay backwards compatible)
+//  1. defining a new app.ControllerDescriptor so it can be used in app.NewControllerDescriptors or app.KnownControllers:
+//  2. defining an alias in KCMControllerAliases (for backwards compatibility only)
+//  3. used anywhere inside the controller itself:
+//     3.1. [TODO] logging should use a canonical controller name when referencing a controller (Eg. Starting X, Shutting down X)
+//     3.2. [TODO] emitted events should have an EventSource.Component set to the controller name (usually when initializing an EventRecorder)
+//     3.3. [TODO] registering ControllerManagerMetrics with ControllerStarted and ControllerStopped
+//     3.4. [TODO] calling WaitForNamedCacheSync
+//  4. defining controller options for "--help" command or generated documentation
+//     1.1. controller name should be used to create a pflag.FlagSet when registering controller options (the name is rendered in a controller flag group header) in options.KubeControllerManagerOptions
+//     1.2. when defined flag's help mentions a controller name
+//  5. defining a new service account for a new controller (old controllers may have inconsistent service accounts to stay backwards compatible)
 const (
 	ServiceAccountTokenController                = "serviceaccount-token-controller"
 	EndpointsController                          = "endpoints-controller"
