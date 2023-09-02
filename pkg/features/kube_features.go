@@ -229,12 +229,14 @@ const (
 
 	// owner: @andrewsykim
 	// alpha: v1.22
+	// beta: v1.29
 	//
 	// Disable any functionality in kube-apiserver, kube-controller-manager and kubelet related to the `--cloud-provider` component flag.
 	DisableCloudProviders featuregate.Feature = "DisableCloudProviders"
 
 	// owner: @andrewsykim
 	// alpha: v1.23
+	// beta: v1.29
 	//
 	// Disable in-tree functionality in kubelet to authenticate to cloud provider container registries for image pull credentials.
 	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
@@ -1012,9 +1014,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Deprecated},
 
-	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
+	DisableCloudProviders: {Default: true, PreRelease: featuregate.Beta},
 
-	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
+	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.Beta},
 
 	DevicePluginCDIDevices: {Default: false, PreRelease: featuregate.Alpha},
 

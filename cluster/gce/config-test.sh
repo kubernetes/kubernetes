@@ -609,12 +609,3 @@ export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-external}"
 # Also, it is required that DisableKubeletCloudCredentialProviders and KubeletCredentialProviders
 # feature gates are set to true for kubelet to use external credential provider.
 export ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-false}"
-
-# External cloud provider requires ENABLE_AUTH_PROVIDER_GCP and feature flags
-# DisableKubeletCloudCredentialProviders and DisableCloudProviders
-if [[ "${CLOUD_PROVIDER_FLAG:-}" == "external" ]]; then
-  export ENABLE_AUTH_PROVIDER_GCP=true
-  if [[ -n "${FEATURE_GATES:-DisableKubeletCloudCredentialProviders=True,DisableCloudProviders=True}" ]]; then
-    export FEATURE_GATES="${FEATURE_GATES},DisableKubeletCloudCredentialProviders=True,DisableCloudProviders=True"
-  fi
-fi

@@ -46,6 +46,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/keyutil"
+	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/logs"
@@ -67,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -292,6 +294,11 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
 	}
 
+	err = validateCloudProviderOptions(opts.CloudProvider)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to validate cloud provider: %w", err)
+	}
+
 	// setup admission
 	admissionConfig := &kubeapiserveradmission.Config{
 		ExternalInformers:    versionedInformers,
@@ -354,6 +361,34 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
 
 	return config, serviceResolver, pluginInitializers, nil
+}
+
+func validateCloudProviderOptions(opts *kubeoptions.CloudProviderOptions) error {
+	if opts.CloudProvider == "" {
+		return nil
+	}
+	if opts.CloudProvider == "external" {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
+			return fmt.Errorf("when using --cloud-provider set to '%s', "+
+				"please set DisableCloudProviders feature to true", opts.CloudProvider)
+		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableKubeletCloudCredentialProviders) {
+			return fmt.Errorf("when using --cloud-provider set to '%s', "+
+				"please set DisableKubeletCloudCredentialProviders feature to true", opts.CloudProvider)
+		}
+		return nil
+	} else if cloudprovider.IsDeprecatedInternal(opts.CloudProvider) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
+			return fmt.Errorf("when using --cloud-provider set to '%s', "+
+				"please set DisableCloudProviders feature to false", opts.CloudProvider)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DisableKubeletCloudCredentialProviders) {
+			return fmt.Errorf("when using --cloud-provider set to '%s', "+
+				"please set DisableKubeletCloudCredentialProviders feature to false", opts.CloudProvider)
+		}
+		return nil
+	}
+	return fmt.Errorf("unknown --cloud-provider : %s", opts.CloudProvider)
 }
 
 var testServiceResolver webhook.ServiceResolver
