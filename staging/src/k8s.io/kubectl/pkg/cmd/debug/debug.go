@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/docker/distribution/reference"
@@ -120,6 +121,7 @@ type DebugOptions struct {
 	Namespace       string
 	TargetNames     []string
 	PullPolicy      corev1.PullPolicy
+	PullSecret      *corev1.LocalObjectReference
 	Quiet           bool
 	SameNode        bool
 	SetImages       map[string]string
@@ -185,6 +187,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, i18n.T("Container image to use for debug container."))
 	cmd.Flags().StringToStringVar(&o.SetImages, "set-image", o.SetImages, i18n.T("When used with '--copy-to', a list of name=image pairs for changing container images, similar to how 'kubectl set image' works."))
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server."))
+	cmd.Flags().String("image-pull-secret", "", i18n.T("The image pull secret to use for pulling an image from a private container image registry or repository."))
 	cmd.Flags().BoolVarP(&o.Interactive, "stdin", "i", o.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, i18n.T("If true, suppress informational messages."))
 	cmd.Flags().BoolVar(&o.SameNode, "same-node", o.SameNode, i18n.T("When used with '--copy-to', schedule the copy of target Pod on the same node."))
@@ -236,6 +239,13 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 	// Set default WarningPrinter
 	if o.WarningPrinter == nil {
 		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	}
+
+	// Pull Secret
+	if cmd.Flags().Changed("image-pull-secret") {
+		o.PullSecret = &corev1.LocalObjectReference{
+			Name: cmdutil.GetFlagString(cmd, "image-pull-secret"),
+		}
 	}
 
 	if o.Applier == nil {
@@ -336,6 +346,15 @@ func (o *DebugOptions) Validate() error {
 	// WarningPrinter
 	if o.WarningPrinter == nil {
 		return fmt.Errorf("WarningPrinter can not be used without initialization")
+	}
+
+	// Pull Secret
+	if o.PullSecret != nil && len(o.CopyTo) == 0 {
+		for _, name := range o.TargetNames {
+			if !strings.Contains(name, "node/") {
+				return fmt.Errorf("--copy-to is required when debugging a pod with --image-pull-secret")
+			}
+		}
 	}
 
 	return nil
@@ -619,6 +638,10 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 		p.Spec.Containers[0].Command = o.Args
 	}
 
+	if o.PullSecret != nil {
+		p.Spec.ImagePullSecrets = append(p.Spec.ImagePullSecrets, *o.PullSecret)
+	}
+
 	if err := o.Applier.Apply(p, cn, node); err != nil {
 		return nil, err
 	}
@@ -678,6 +701,10 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 		})
 		c = &copied.Spec.Containers[len(copied.Spec.Containers)-1]
+	}
+
+	if o.PullSecret != nil {
+		copied.Spec.ImagePullSecrets = append(copied.Spec.ImagePullSecrets, *o.PullSecret)
 	}
 
 	if len(o.Args) > 0 {

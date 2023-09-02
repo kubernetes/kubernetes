@@ -1331,6 +1331,85 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "image pull secret",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				PullSecret: &corev1.LocalObjectReference{Name: "mysecret"},
+				Profile:    ProfileLegacy,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+						},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{{Name: "mysecret"}},
+				},
+			},
+		},
+		{
+			name: "pod with image pull secret",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				PullSecret: &corev1.LocalObjectReference{Name: "mysecret1"},
+				Profile:    ProfileLegacy,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName:         "node-1",
+					ImagePullSecrets: []corev1.LocalObjectReference{{Name: "mysecret2"}},
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+						},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{{Name: "mysecret2"}, {Name: "mysecret1"}},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
@@ -1715,6 +1794,60 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "image pull secret",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+				},
+			},
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				PullSecret: &corev1.LocalObjectReference{Name: "mysecret"},
+				Profile:    ProfileLegacy,
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+						},
+					},
+					HostIPC:       true,
+					HostNetwork:   true,
+					HostPID:       true,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{{Name: "mysecret"}},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
@@ -1790,6 +1923,28 @@ func TestCompleteAndValidate(t *testing.T) {
 				Profile:        ProfileLegacy,
 				TargetNames:    []string{"mypod"},
 			},
+		},
+		{
+			name: "Set image pull secret",
+			args: "-it --copy-to=myapp-debug --image=busybox --image-pull-secret=mysecret mypod",
+			wantOpts: &DebugOptions{
+				Args:           []string{},
+				Attach:         true,
+				CopyTo:         "myapp-debug",
+				Image:          "busybox",
+				Interactive:    true,
+				Namespace:      "test",
+				PullSecret:     &corev1.LocalObjectReference{Name: "mysecret"},
+				ShareProcesses: true,
+				Profile:        ProfileLegacy,
+				TargetNames:    []string{"mypod"},
+				TTY:            true,
+			},
+		},
+		{
+			name:      "--copy-to is required when debugging a pod with --image-pull-secret",
+			args:      "-it --image=busybox --image-pull-secret=mysecret mypod",
+			wantError: true,
 		},
 		{
 			name: "Multiple targets",
