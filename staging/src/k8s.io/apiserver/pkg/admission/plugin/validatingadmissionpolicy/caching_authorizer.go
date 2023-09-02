@@ -59,6 +59,8 @@ var _ authorizer.Attributes = (interface {
 	IsResourceRequest() bool
 	GetPath() string
 	GetQuery() string
+	GetLabelSelector() []string
+	GetFieldSelector() []string
 })(nil)
 
 // The user info accessors known to cache key construction. If this fails to compile, the cache
@@ -84,6 +86,8 @@ func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 		ResourceRequest: a.IsResourceRequest(),
 		Path:            a.GetPath(),
 		Query:           a.GetQuery(),
+		LabelSelector:   a.GetLabelSelector(),
+		FieldSelector:   a.GetFieldSelector(),
 	}
 
 	if u := a.GetUser(); u != nil {

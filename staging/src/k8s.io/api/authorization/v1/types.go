@@ -117,10 +117,10 @@ type ResourceAttributes struct {
 	Name string `json:"name,omitempty" protobuf:"bytes,7,opt,name=name"`
 	// LabelSelector is the selector specified (if any).
 	// +optional
-	LabelSelector string `json:"labelSelector,omitempty" protobuf:"bytes,8,opt,name=labelSelector"`
+	LabelSelector []string `json:"labelSelector,omitempty" protobuf:"bytes,8,opt,name=labelSelector"`
 	// FieldSelector is the selector specified (if any).
 	// +optional
-	FieldSelector string `json:"fieldSelector,omitempty" protobuf:"bytes,9,opt,name=fieldSelector"`
+	FieldSelector []string `json:"fieldSelector,omitempty" protobuf:"bytes,9,opt,name=fieldSelector"`
 }
 
 // NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface

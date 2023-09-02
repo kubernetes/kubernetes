@@ -176,18 +176,21 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 
 	if attr.IsResourceRequest() {
 		r.Spec.ResourceAttributes = &authorizationv1.ResourceAttributes{
-			Namespace:   attr.GetNamespace(),
-			Verb:        attr.GetVerb(),
-			Group:       attr.GetAPIGroup(),
-			Version:     attr.GetAPIVersion(),
-			Resource:    attr.GetResource(),
-			Subresource: attr.GetSubresource(),
-			Name:        attr.GetName(),
+			Namespace:     attr.GetNamespace(),
+			Verb:          attr.GetVerb(),
+			Group:         attr.GetAPIGroup(),
+			Version:       attr.GetAPIVersion(),
+			Resource:      attr.GetResource(),
+			Subresource:   attr.GetSubresource(),
+			Name:          attr.GetName(),
+			LabelSelector: attr.GetLabelSelector(),
+			FieldSelector: attr.GetFieldSelector(),
 		}
 	} else {
 		r.Spec.NonResourceAttributes = &authorizationv1.NonResourceAttributes{
-			Path: attr.GetPath(),
-			Verb: attr.GetVerb(),
+			Path:  attr.GetPath(),
+			Verb:  attr.GetVerb(),
+			Query: attr.GetQuery(),
 		}
 	}
 	key, err := json.Marshal(r.Spec)

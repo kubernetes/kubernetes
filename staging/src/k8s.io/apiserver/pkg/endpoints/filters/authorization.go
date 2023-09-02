@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -117,6 +118,15 @@ func GetAuthorizerAttributes(ctx context.Context) (authorizer.Attributes, error)
 	attribs.Namespace = requestInfo.Namespace
 	attribs.Name = requestInfo.Name
 	attribs.Query = requestInfo.Query
+
+	m, _ := url.ParseQuery(requestInfo.Query)
+	if len(m["labelSelector"]) > 0 {
+		attribs.LabelSelector = m["labelSelector"]
+	}
+
+	if len(m["fieldSelector"]) > 0 {
+		attribs.FieldSelector = m["fieldSelector"]
+	}
 
 	return &attribs, nil
 }

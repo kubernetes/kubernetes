@@ -115,27 +115,47 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 
 		case nodeResource:
 
+			// node list request
+			// NODE----LIST: path "/api/v1/nodes" query "fieldSelector=metadata.name%3D192.168.1.100&limit=500&resourceVersion=0"
+
 			if attrs.GetVerb() == "list" {
+
+				// klog.V(2).Infof("NODE----LIST: path %q query %q", attrs.GetPath(), attrs.GetQuery())
+
 				return r.authorizeListRequestForNode(attrs, nodeName)
+
 			}
 
+			// node get request
+			// NODE-----GET: path "/api/v1/nodes/192.168.1.100" query "resourceVersion=0&timeout=10s"
 			if attrs.GetVerb() == "get" {
 
-				if nodeName != attrs.GetName() {
-					return authorizer.DecisionDeny, "", nil
+				if nodeName == attrs.GetName() {
+
+					return authorizer.DecisionAllow, "", nil
+
 				}
+
+				klog.V(2).Infof("NODE-----GET---DENY: path %q query %q", attrs.GetPath(), attrs.GetQuery())
+				return authorizer.DecisionDeny, "", nil
 
 			}
 
-			return authorizer.DecisionNoOpinion, "", nil
-
-		// special case for nodes
 		case podResource:
 
+			// pod list request
+			// POD----LIST: path "/api/v1/pods" query "fieldSelector=spec.nodeName%3D192.168.1.100&limit=500&resourceVersion=0"
+			// limit=500 直接 get nodes会出现这个参数
+
 			if attrs.GetVerb() == "list" {
+
+				// klog.V(2).Infof("POD----LIST: path %q query %q", attrs.GetPath(), attrs.GetQuery())
+
 				return r.authorizeListRequestForNode(attrs, nodeName)
 			}
 
+			// pod get request
+			// POD-----GET: path "/api/v1/namespaces/kube-system/pods/kube-flannel-ds-amd64-85msb" query "" get pod aaa
 			if attrs.GetVerb() == "get" {
 
 				ok, err := r.hasPathFrom(nodeName, podVertexType, attrs.GetNamespace(), attrs.GetName())
@@ -145,11 +165,13 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 					return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
 				}
 				if !ok {
+					klog.V(2).Infof("POD-----GET---DENY: path %q query %q", attrs.GetPath(), attrs.GetQuery())
 					return authorizer.DecisionDeny, "", nil
+				} else {
+					return authorizer.DecisionAllow, "", nil
 				}
-			}
 
-			return authorizer.DecisionNoOpinion, "", nil
+			}
 
 		case secretResource:
 			return r.authorizeReadNamespacedObject(nodeName, secretVertexType, attrs)
@@ -192,9 +214,14 @@ func (r NodeAuthorizer) authorizeListRequestForNode(attrs authorizer.Attributes,
 		if m["fieldSelector"][0] == "metadata.name="+nodeName {
 			return authorizer.DecisionAllow, "", nil
 		}
+
+		if m["fieldSelector"][0] == "spec.nodeName="+nodeName {
+			return authorizer.DecisionAllow, "", nil
+		}
 	}
 
-	return authorizer.DecisionNoOpinion, "", nil
+	klog.V(2).Infof("LIST---DENY: path %q query %q", attrs.GetPath(), attrs.GetQuery())
+	return authorizer.DecisionDeny, "", nil
 }
 
 // authorizeStatusUpdate authorizes get/update/patch requests to status subresources of the specified type if they are related to the specified node
