@@ -115,6 +115,12 @@ type ResourceAttributes struct {
 	// Name is the name of the resource being requested for a "get" or deleted for a "delete". "" (empty) means all.
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,7,opt,name=name"`
+	// LabelSelector is the selector specified (if any).
+	// +optional
+	LabelSelector string `json:"labelSelector,omitempty" protobuf:"bytes,8,opt,name=labelSelector"`
+	// FieldSelector is the selector specified (if any).
+	// +optional
+	FieldSelector string `json:"fieldSelector,omitempty" protobuf:"bytes,9,opt,name=fieldSelector"`
 }
 
 // NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface
@@ -125,6 +131,9 @@ type NonResourceAttributes struct {
 	// Verb is the standard HTTP verb
 	// +optional
 	Verb string `json:"verb,omitempty" protobuf:"bytes,2,opt,name=verb"`
+	// Query is the Query of the request
+	// +optional
+	Query string `json:"query,omitempty" protobuf:"bytes,3,opt,name=query"`
 }
 
 // SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes
