@@ -126,9 +126,19 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 			if period >= *objectMeta.GetDeletionGracePeriodSeconds() {
 				return false, true, nil
 			}
+			// move the existing deletionTimestamp back by existing object.DeletionGracePeriod, then forward by options.DeletionGracePeriod.
+			// that moves the deletionTimestamp back if the grace period is shortened.
 			newDeletionTimestamp := metav1.NewTime(
 				objectMeta.GetDeletionTimestamp().Add(-time.Second * time.Duration(*objectMeta.GetDeletionGracePeriodSeconds())).
 					Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+			// prevent shortening the grace period from moving deletionTimestamp into the past
+			if now := metav1Now(); newDeletionTimestamp.Before(&now) {
+				newDeletionTimestamp = now
+				if period != 0 {
+					// if immediate deletion (period==0) was not requested, shorten to the minimum grace period possible
+					period = int64(1)
+				}
+			}
 			objectMeta.SetDeletionTimestamp(&newDeletionTimestamp)
 			objectMeta.SetDeletionGracePeriodSeconds(&period)
 			return true, false, nil
@@ -147,8 +157,8 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 		return false, false, errors.NewInternalError(fmt.Errorf("options.GracePeriodSeconds should not be nil"))
 	}
 
-	now := metav1.NewTime(metav1.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
-	objectMeta.SetDeletionTimestamp(&now)
+	requestedDeletionTimestamp := metav1.NewTime(metav1Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
+	objectMeta.SetDeletionTimestamp(&requestedDeletionTimestamp)
 	objectMeta.SetDeletionGracePeriodSeconds(options.GracePeriodSeconds)
 	// If it's the first graceful deletion we are going to set the DeletionTimestamp to non-nil.
 	// Controllers of the object that's being deleted shouldn't take any nontrivial actions, hence its behavior changes.
