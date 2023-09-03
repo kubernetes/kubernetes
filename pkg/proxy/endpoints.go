@@ -117,13 +117,6 @@ func (info *BaseEndpointInfo) Port() (int, error) {
 	return proxyutil.PortPart(info.Endpoint)
 }
 
-// Equal is part of proxy.Endpoint interface.
-func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
-	return info.String() == other.String() &&
-		info.GetIsLocal() == other.GetIsLocal() &&
-		info.IsReady() == other.IsReady()
-}
-
 // GetNodeName returns the NodeName for this endpoint.
 func (info *BaseEndpointInfo) GetNodeName() string {
 	return info.NodeName
@@ -414,18 +407,18 @@ func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, 
 		}
 
 		for _, ep := range epList {
-			// If the old endpoint wasn't Ready then there can't be stale
+			// If the old endpoint wasn't Serving then there can't be stale
 			// conntrack entries since there was no traffic sent to it.
-			if !ep.IsReady() {
+			if !ep.IsServing() {
 				continue
 			}
 
 			deleted := true
 			// Check if the endpoint has changed, including if it went from
-			// ready to not ready. If it did change stale entries for the old
+			// serving to not serving. If it did change stale entries for the old
 			// endpoint have to be cleared.
 			for i := range newEndpointsMap[svcPortName] {
-				if newEndpointsMap[svcPortName][i].Equal(ep) {
+				if newEndpointsMap[svcPortName][i].String() == ep.String() {
 					deleted = false
 					break
 				}
@@ -446,21 +439,21 @@ func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, 
 			continue
 		}
 
-		epReady := 0
+		epServing := 0
 		for _, ep := range epList {
-			if ep.IsReady() {
-				epReady++
+			if ep.IsServing() {
+				epServing++
 			}
 		}
 
-		oldEpReady := 0
+		oldEpServing := 0
 		for _, ep := range oldEndpointsMap[svcPortName] {
-			if ep.IsReady() {
-				oldEpReady++
+			if ep.IsServing() {
+				oldEpServing++
 			}
 		}
 
-		if epReady > 0 && oldEpReady == 0 {
+		if epServing > 0 && oldEpServing == 0 {
 			*newlyActiveUDPServices = append(*newlyActiveUDPServices, svcPortName)
 		}
 	}
