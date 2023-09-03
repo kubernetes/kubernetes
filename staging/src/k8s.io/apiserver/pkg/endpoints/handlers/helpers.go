@@ -95,6 +95,24 @@ func (lazy *lazyAPIGroup) String() string {
 	return "unknown"
 }
 
+// lazyAPIVersion implements String() string and it will
+// lazily get Group from request info.
+type lazyAPIVersion struct {
+	req *http.Request
+}
+
+func (lazy *lazyAPIVersion) String() string {
+	if lazy.req != nil {
+		ctx := lazy.req.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if ok {
+			return requestInfo.APIVersion
+		}
+	}
+
+	return "unknown"
+}
+
 // lazyAuditID implements Stringer interface to lazily retrieve
 // the audit ID associated with the request.
 type lazyAuditID struct {
