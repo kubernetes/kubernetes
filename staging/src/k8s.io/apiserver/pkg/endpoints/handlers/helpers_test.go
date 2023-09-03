@@ -133,6 +133,18 @@ func TestLazySubresource(t *testing.T) {
 	assert.Equal(t, "binding", fmt.Sprintf("%v", scopeWithReq))
 }
 
+func TestLazyNamespace(t *testing.T) {
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyNamespace{}))
+
+	scopeWithEmptyReq := &lazyNamespace{&http.Request{}}
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", scopeWithEmptyReq))
+
+	req := &http.Request{}
+	ctx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Namespace: "jaeger"})
+	scopeWithReq := &lazyNamespace{req: req.WithContext(ctx)}
+	assert.Equal(t, "jaeger", fmt.Sprintf("%v", scopeWithReq))
+}
+
 func TestLazyResource(t *testing.T) {
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyResource{}))
 

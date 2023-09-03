@@ -31,6 +31,7 @@ func traceFields(req *http.Request) []attribute.KeyValue {
 		attribute.Stringer("api-version", &lazyAPIVersion{req: req}),
 		attribute.Stringer("name", &lazyName{req: req}),
 		attribute.Stringer("subresource", &lazySubresource{req: req}),
+		attribute.Stringer("namespace", &lazyNamespace{req: req}),
 		attribute.String("protocol", req.Proto),
 		attribute.Stringer("resource", &lazyResource{req: req}),
 		attribute.Stringer("scope", &lazyScope{req: req}),
