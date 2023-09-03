@@ -19,8 +19,6 @@ package node
 import (
 	"context"
 	"fmt"
-	"net/url"
-
 	"k8s.io/klog/v2"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -136,7 +134,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 
 				}
 
-				klog.V(2).Infof("NODE-----GET---DENY: path %q query %q", attrs.GetPath(), attrs.GetQuery())
+				klog.V(2).Infof("NODE GET DENY: path %q query %q", attrs.GetPath(), attrs.GetQuery())
 				return authorizer.DecisionDeny, "", nil
 
 			}
@@ -165,7 +163,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 					return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
 				}
 				if !ok {
-					klog.V(2).Infof("POD-----GET---DENY: path %q query %q", attrs.GetPath(), attrs.GetQuery())
+					klog.V(2).Infof("POD GET DENY: path %q query %q", attrs.GetPath(), attrs.GetQuery())
 					return authorizer.DecisionDeny, "", nil
 				} else {
 					return authorizer.DecisionAllow, "", nil
@@ -207,20 +205,19 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 
 // authorizeListRequestForNode authorizes list requests to objects of a specified types if they are related to the specified node
 func (r NodeAuthorizer) authorizeListRequestForNode(attrs authorizer.Attributes, nodeName string) (authorizer.Decision, string, error) {
-	m, _ := url.ParseQuery(attrs.GetQuery())
 
-	if len(m["fieldSelector"]) > 0 {
+	if len(attrs.GetFieldSelector()) > 0 {
 
-		if m["fieldSelector"][0] == "metadata.name="+nodeName {
+		if attrs.GetFieldSelector() == "metadata.name="+nodeName {
 			return authorizer.DecisionAllow, "", nil
 		}
 
-		if m["fieldSelector"][0] == "spec.nodeName="+nodeName {
+		if attrs.GetFieldSelector() == "spec.nodeName="+nodeName {
 			return authorizer.DecisionAllow, "", nil
 		}
 	}
 
-	klog.V(2).Infof("LIST---DENY: path %q query %q", attrs.GetPath(), attrs.GetQuery())
+	klog.V(2).Infof("LIST DENY: path %q query %q", attrs.GetPath(), attrs.GetQuery())
 	return authorizer.DecisionDeny, "", nil
 }
 

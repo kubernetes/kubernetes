@@ -59,8 +59,8 @@ var _ authorizer.Attributes = (interface {
 	IsResourceRequest() bool
 	GetPath() string
 	GetQuery() string
-	GetLabelSelector() []string
-	GetFieldSelector() []string
+	GetLabelSelector() string
+	GetFieldSelector() string
 })(nil)
 
 // The user info accessors known to cache key construction. If this fails to compile, the cache

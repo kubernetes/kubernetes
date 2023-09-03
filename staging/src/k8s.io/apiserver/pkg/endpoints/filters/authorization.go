@@ -121,11 +121,11 @@ func GetAuthorizerAttributes(ctx context.Context) (authorizer.Attributes, error)
 
 	m, _ := url.ParseQuery(requestInfo.Query)
 	if len(m["labelSelector"]) > 0 {
-		attribs.LabelSelector = m["labelSelector"]
+		attribs.LabelSelector = m["labelSelector"][0]
 	}
 
 	if len(m["fieldSelector"]) > 0 {
-		attribs.FieldSelector = m["fieldSelector"]
+		attribs.FieldSelector = m["fieldSelector"][0]
 	}
 
 	return &attribs, nil
