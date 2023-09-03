@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: EMAIL\n"
-"POT-Creation-Date: 2023-06-27 12:09-0400\n"
+"POT-Creation-Date: 2023-09-03 22:27+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -332,7 +332,7 @@ msgid ""
 "\t\tkubectl create role foo --verb=get,list,watch --resource=pods,pods/status"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:67
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:66
 msgid ""
 "\n"
 "\t\t# Create a service for a replicated nginx, which serves on port 80 and "
@@ -521,7 +521,7 @@ msgid ""
 "\t\tcat service.yaml | kubectl diff -f -"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:140
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:141
 msgid ""
 "\n"
 "\t\t# Drain node \"foo\", even if there are pods not managed by a "
@@ -775,14 +775,14 @@ msgid ""
 "\t\tkubectl port-forward pod/mypod :5000"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:89
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:90
 msgid ""
 "\n"
 "\t\t# Mark node \"foo\" as schedulable\n"
 "\t\tkubectl uncordon foo"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:60
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:61
 msgid ""
 "\n"
 "\t\t# Mark node \"foo\" as unschedulable\n"
@@ -1099,6 +1099,14 @@ msgid ""
 "\t\t# Wait for the pod \"busybox1\" to contain the status phase to be "
 "\"Running\"\n"
 "\t\tkubectl wait --for=jsonpath='{.status.phase}'=Running pod/busybox1\n"
+"\n"
+"\t\t# Wait for pod \"busybox1\" to be Ready\n"
+"\t\tkubectl wait --for='jsonpath={.status.conditions[?(@.type==\"Ready\")]."
+"status}=True' pod/busybox1\n"
+"\n"
+"\t\t# Wait for the service \"loadbalancer\" to have ingress.\n"
+"\t\tkubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/"
+"loadbalancer\n"
 "\n"
 "\t\t# Wait for the pod \"busybox1\" to be deleted, with a timeout of 60s, "
 "after having issued the \"delete\" command\n"
@@ -1574,7 +1582,7 @@ msgid ""
 "\t\tDisplay the current-context."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:115
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:116
 msgid ""
 "\n"
 "\t\tDrain node in preparation for maintenance.\n"
@@ -1712,7 +1720,7 @@ msgid ""
 "destination."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:53
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:52
 msgid ""
 "\n"
 "\t\tExpose a resource as a new Kubernetes service.\n"
@@ -1752,13 +1760,13 @@ msgid ""
 "\t\tManage the rollout of one or many resources."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:86
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:87
 msgid ""
 "\n"
 "\t\tMark node as schedulable."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:57
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:58
 msgid ""
 "\n"
 "\t\tMark node as unschedulable."
@@ -2473,21 +2481,21 @@ msgid ""
 "requirements are supported."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:180
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:209
 msgid ""
 "A label selector to use for this service. Only equality-based selector "
 "requirements are supported. If empty (the default) infer the selector from "
 "the replication controller or replica set.)"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:183
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:212
 msgid ""
 "Additional external IP address (not managed by Kubernetes) to accept for the "
 "service. If this IP is routed to a node, the service can be accessed by this "
 "IP in addition to its generated service IP."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:193
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:194
 msgid "Allocate a TTY for the debugging container."
 msgstr ""
 
@@ -2530,7 +2538,7 @@ msgid ""
 "Auto-scale a deployment, replica set, stateful set, or replication controller"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:186
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:215
 msgid ""
 "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or "
 "set to 'None' to create a headless service."
@@ -2548,11 +2556,11 @@ msgstr ""
 msgid "Commands for features in alpha"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:185
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:186
 msgid "Container image to use for debug container."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:181
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:182
 msgid "Container name to use for debug container."
 msgstr ""
 
@@ -2596,7 +2604,7 @@ msgstr ""
 msgid "Create a config map from a local file, directory or literal value"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:182
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:183
 msgid "Create a copy of the target Pod with this name."
 msgstr ""
 
@@ -2676,17 +2684,17 @@ msgstr ""
 msgid "Create and run a particular image in a pod."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:162
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:163
 msgid "Create debugging sessions for troubleshooting workloads and nodes"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:194
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:195
 msgid ""
 "Debugging profile. Options are \"legacy\", \"general\", \"baseline\", "
 "\"netadmin\", or \"restricted\"."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/delete/delete.go:146
+#: staging/src/k8s.io/kubectl/pkg/cmd/delete/delete.go:149
 msgid ""
 "Delete resources by file names, stdin, resources and names, or by resources "
 "and label selector"
@@ -2724,7 +2732,7 @@ msgstr ""
 msgid "Describe one or many contexts"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/diff/diff.go:136
+#: staging/src/k8s.io/kubectl/pkg/cmd/diff/diff.go:137
 msgid "Diff the live version against a would-be applied version"
 msgstr ""
 
@@ -2776,7 +2784,11 @@ msgstr ""
 msgid "Display users defined in the kubeconfig."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:186
+#: staging/src/k8s.io/kubectl/pkg/cmd/delete/delete.go:534
+msgid "Do you want to continue?"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:216
 msgid "Drain node in preparation for maintenance"
 msgstr ""
 
@@ -2796,7 +2808,7 @@ msgstr ""
 msgid "Email for Docker registry"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:184
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:185
 msgid "Environment variables to set in the container."
 msgstr ""
 
@@ -2808,7 +2820,7 @@ msgstr ""
 msgid "Execute a command in a container."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/wait/wait.go:124
+#: staging/src/k8s.io/kubectl/pkg/cmd/wait/wait.go:130
 msgid "Experimental: Wait for a specific condition on one or many resources"
 msgstr ""
 
@@ -2820,7 +2832,7 @@ msgstr ""
 msgid "Forward one or more local ports to a pod"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/explain/explain.go:102
+#: staging/src/k8s.io/kubectl/pkg/cmd/explain/explain.go:101
 msgid "Get documentation for a resource"
 msgstr ""
 
@@ -2828,13 +2840,13 @@ msgstr ""
 msgid "Help about any command"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:179
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:208
 msgid ""
 "IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created "
 "and used (cloud-provider specific)."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:185
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:214
 msgid ""
 "If non-empty, set the session affinity for the service to this; legal "
 "values: 'None', 'ClientIP'"
@@ -2854,7 +2866,7 @@ msgid ""
 "resource."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:179
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:180
 msgid ""
 "If specified, everything after -- will be passed to the new container as "
 "Args instead of Command."
@@ -2864,18 +2876,18 @@ msgstr ""
 msgid "If true, run the container in privileged mode."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:189
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:190
 msgid "If true, suppress informational messages."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:180
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:181
 msgid ""
 "If true, wait for the container to start running, and then attach as if "
 "'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is "
 "set, in which case the default is true."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:188
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:189
 msgid ""
 "Keep stdin open on the container(s) in the pod, even if nothing is attached."
 msgstr ""
@@ -2892,11 +2904,11 @@ msgstr ""
 msgid "Manage the rollout of a resource"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:100
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:101
 msgid "Mark node as schedulable"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:71
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:72
 msgid "Mark node as unschedulable"
 msgstr ""
 
@@ -2916,7 +2928,7 @@ msgstr ""
 msgid "Modify kubeconfig files"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:182
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:211
 msgid ""
 "Name or number for the port on the container that the service should direct "
 "traffic to. Optional."
@@ -2962,11 +2974,11 @@ msgid ""
 "version match this value in order to scale."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/version/version.go:80
+#: staging/src/k8s.io/kubectl/pkg/cmd/version/version.go:79
 msgid "Print the client and server version information"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/version/version.go:81
+#: staging/src/k8s.io/kubectl/pkg/cmd/version/version.go:80
 msgid ""
 "Print the client and server version information for the current context."
 msgstr ""
@@ -3012,7 +3024,7 @@ msgstr ""
 msgid "Replace a resource by file name or stdin"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_restart.go:93
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_restart.go:96
 msgid "Restart a resource"
 msgstr ""
 
@@ -3082,7 +3094,7 @@ msgstr ""
 msgid "Show the status of the rollout"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:163
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:185
 msgid ""
 "Take a replication controller, service, deployment or pod and expose it as a "
 "new Kubernetes service"
@@ -3098,7 +3110,7 @@ msgid ""
 "be specified by the client and defaulted by the server."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:187
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:188
 msgid ""
 "The image pull policy for the container. If left empty, this value will not "
 "be specified by the client and defaulted by the server."
@@ -3114,7 +3126,7 @@ msgid ""
 "The minimum number or percentage of available pods this budget requires."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:184
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:213
 msgid "The name for the newly created object."
 msgstr ""
 
@@ -3124,11 +3136,11 @@ msgid ""
 "input resource will be used."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:176
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:205
 msgid "The network protocol for the service to be created. Default is 'TCP'."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:177
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:206
 msgid ""
 "The port that the service should serve on. Copied from the resource being "
 "exposed, if unspecified"
@@ -3153,7 +3165,7 @@ msgid ""
 "Kubernetes clusters by default."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:178
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:207
 msgid ""
 "Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. "
 "Default is 'ClusterIP'."
@@ -3218,27 +3230,27 @@ msgid ""
 "View the latest last-applied-configuration annotations of a resource/object"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:186
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:187
 msgid ""
 "When used with '--copy-to', a list of name=image pairs for changing "
 "container images, similar to how 'kubectl set image' works."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:183
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:184
 msgid "When used with '--copy-to', delete the original Pod."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:191
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:192
 msgid ""
 "When used with '--copy-to', enable process namespace sharing in the copy."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:190
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:191
 msgid ""
 "When used with '--copy-to', schedule the copy of target Pod on the same node."
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:192
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:193
 msgid ""
 "When using an ephemeral container, target processes in this container name."
 msgstr ""
@@ -3247,6 +3259,11 @@ msgstr ""
 msgid ""
 "Where to output the files.  If empty or '-' uses stdout, otherwise creates a "
 "directory hierarchy in that directory"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/delete/delete.go:524
+#, c-format
+msgid "You are about to delete the following %d resource(s):\n"
 msgstr ""
 
 #: staging/src/k8s.io/kubectl/pkg/cmd/create/create_priorityclass.go:108
@@ -3269,7 +3286,7 @@ msgstr ""
 msgid "kubectl controls the Kubernetes cluster manager"
 msgstr ""
 
-#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:51
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:50
 msgid ""
 "pod (po), service (svc), replicationcontroller (rc), deployment (deploy), "
 "replicaset (rs)"
