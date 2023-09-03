@@ -109,6 +109,18 @@ func TestLazyApiVersion(t *testing.T) {
 	assert.Equal(t, "v1", fmt.Sprintf("%v", scopeWithReq))
 }
 
+func TestLazyName(t *testing.T) {
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyName{}))
+
+	scopeWithEmptyReq := &lazyName{&http.Request{}}
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", scopeWithEmptyReq))
+
+	req := &http.Request{}
+	ctx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Name: "jaeger-76d45d6876-vqp8t"})
+	scopeWithReq := &lazyName{req: req.WithContext(ctx)}
+	assert.Equal(t, "jaeger-76d45d6876-vqp8t", fmt.Sprintf("%v", scopeWithReq))
+}
+
 func TestLazyResource(t *testing.T) {
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyResource{}))
 
