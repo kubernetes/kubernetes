@@ -77,6 +77,24 @@ func (lazy *lazyAccept) String() string {
 	return "unknown"
 }
 
+// lazyAPIGroup implements String() string and it will
+// lazily get Group from request info.
+type lazyAPIGroup struct {
+	req *http.Request
+}
+
+func (lazy *lazyAPIGroup) String() string {
+	if lazy.req != nil {
+		ctx := lazy.req.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if ok {
+			return requestInfo.APIGroup
+		}
+	}
+
+	return "unknown"
+}
+
 // lazyAuditID implements Stringer interface to lazily retrieve
 // the audit ID associated with the request.
 type lazyAuditID struct {

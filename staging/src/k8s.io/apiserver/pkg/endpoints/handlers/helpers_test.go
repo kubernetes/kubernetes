@@ -85,6 +85,18 @@ func TestLazyVerb(t *testing.T) {
 	assert.Equal(t, "WATCH", fmt.Sprintf("%v", verbWithReq))
 }
 
+func TestLazyApiGroup(t *testing.T) {
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyAPIGroup{}))
+
+	scopeWithEmptyReq := &lazyAPIGroup{&http.Request{}}
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", scopeWithEmptyReq))
+
+	req := &http.Request{}
+	ctx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{APIGroup: "apps"})
+	scopeWithReq := &lazyAPIGroup{req: req.WithContext(ctx)}
+	assert.Equal(t, "apps", fmt.Sprintf("%v", scopeWithReq))
+}
+
 func TestLazyResource(t *testing.T) {
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyResource{}))
 
