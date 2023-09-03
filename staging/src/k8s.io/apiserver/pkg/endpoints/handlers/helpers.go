@@ -131,6 +131,24 @@ func (lazy *lazyName) String() string {
 	return "unknown"
 }
 
+// lazySubresource implements String() string and it will
+// lazily get Group from request info.
+type lazySubresource struct {
+	req *http.Request
+}
+
+func (lazy *lazySubresource) String() string {
+	if lazy.req != nil {
+		ctx := lazy.req.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if ok {
+			return requestInfo.Subresource
+		}
+	}
+
+	return "unknown"
+}
+
 // lazyAuditID implements Stringer interface to lazily retrieve
 // the audit ID associated with the request.
 type lazyAuditID struct {

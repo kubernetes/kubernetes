@@ -121,6 +121,18 @@ func TestLazyName(t *testing.T) {
 	assert.Equal(t, "jaeger-76d45d6876-vqp8t", fmt.Sprintf("%v", scopeWithReq))
 }
 
+func TestLazySubresource(t *testing.T) {
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazySubresource{}))
+
+	scopeWithEmptyReq := &lazySubresource{&http.Request{}}
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", scopeWithEmptyReq))
+
+	req := &http.Request{}
+	ctx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Subresource: "binding"})
+	scopeWithReq := &lazySubresource{req: req.WithContext(ctx)}
+	assert.Equal(t, "binding", fmt.Sprintf("%v", scopeWithReq))
+}
+
 func TestLazyResource(t *testing.T) {
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyResource{}))
 
