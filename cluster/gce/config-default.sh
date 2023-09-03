@@ -553,6 +553,11 @@ export TLS_CIPHER_SUITES=""
 # and kubelet
 export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-external}"
 
+# Don't run the node-ipam-controller on the KCM if cloud-provider external
+if [[ "${CLOUD_PROVIDER_FLAG}" ==  "external" ]]; then
+  RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,-node-ipam-controller}"
+fi
+
 # When ENABLE_AUTH_PROVIDER_GCP is set, following flags for out-of-tree credential provider for GCP
 # are presented to kubelet:
 # --image-credential-provider-config=${path-to-config}
