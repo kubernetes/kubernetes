@@ -97,6 +97,18 @@ func TestLazyApiGroup(t *testing.T) {
 	assert.Equal(t, "apps", fmt.Sprintf("%v", scopeWithReq))
 }
 
+func TestLazyApiVersion(t *testing.T) {
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyAPIVersion{}))
+
+	scopeWithEmptyReq := &lazyAPIVersion{&http.Request{}}
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", scopeWithEmptyReq))
+
+	req := &http.Request{}
+	ctx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{APIVersion: "v1"})
+	scopeWithReq := &lazyAPIVersion{req: req.WithContext(ctx)}
+	assert.Equal(t, "v1", fmt.Sprintf("%v", scopeWithReq))
+}
+
 func TestLazyResource(t *testing.T) {
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyResource{}))
 
