@@ -78,6 +78,11 @@ func TestContainsString(t *testing.T) {
 	if !ContainsString(src, "ee", modifier) {
 		t.Errorf("ContainsString didn't find the string by modifier")
 	}
+
+	src = make([]string, 0)
+	if ContainsString(src, "", nil) {
+		t.Errorf("The result returned is not the expected result")
+	}
 }
 
 func TestRemoveString(t *testing.T) {

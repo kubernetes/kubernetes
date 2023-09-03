@@ -11,13 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !windows
 // +build !windows
 
 package procfs
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,10 +26,12 @@ import (
 )
 
 // The VM interface is described at
-//   https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+//
+//	https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+//
 // Each setting is exposed as a single file.
 // Each file contains one line with a single numerical value, except lowmem_reserve_ratio which holds an array
-// and numa_zonelist_order (deprecated) which is a string
+// and numa_zonelist_order (deprecated) which is a string.
 type VM struct {
 	AdminReserveKbytes        *int64   // /proc/sys/vm/admin_reserve_kbytes
 	BlockDump                 *int64   // /proc/sys/vm/block_dump
@@ -87,7 +89,7 @@ func (fs FS) VM() (*VM, error) {
 		return nil, fmt.Errorf("%s is not a directory", path)
 	}
 
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}

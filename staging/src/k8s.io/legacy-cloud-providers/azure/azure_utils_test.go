@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/pointer"
 )
 
 func TestSimpleLockEntry(t *testing.T) {
@@ -164,46 +164,46 @@ func TestReconcileTags(t *testing.T) {
 		{
 			description: "reconcileTags should add missing tags and update existing tags",
 			currentTagsOnResource: map[string]*string{
-				"a": to.StringPtr("b"),
+				"a": pointer.String("b"),
 			},
 			newTags: map[string]*string{
-				"a": to.StringPtr("c"),
-				"b": to.StringPtr("d"),
+				"a": pointer.String("c"),
+				"b": pointer.String("d"),
 			},
 			expectedTags: map[string]*string{
-				"a": to.StringPtr("c"),
-				"b": to.StringPtr("d"),
+				"a": pointer.String("c"),
+				"b": pointer.String("d"),
 			},
 			expectedChanged: true,
 		},
 		{
 			description: "reconcileTags should ignore the case of keys when comparing",
 			currentTagsOnResource: map[string]*string{
-				"A": to.StringPtr("b"),
-				"c": to.StringPtr("d"),
+				"A": pointer.String("b"),
+				"c": pointer.String("d"),
 			},
 			newTags: map[string]*string{
-				"a": to.StringPtr("b"),
-				"C": to.StringPtr("d"),
+				"a": pointer.String("b"),
+				"C": pointer.String("d"),
 			},
 			expectedTags: map[string]*string{
-				"A": to.StringPtr("b"),
-				"c": to.StringPtr("d"),
+				"A": pointer.String("b"),
+				"c": pointer.String("d"),
 			},
 		},
 		{
 			description: "reconcileTags should ignore the case of values when comparing",
 			currentTagsOnResource: map[string]*string{
-				"A": to.StringPtr("b"),
-				"c": to.StringPtr("d"),
+				"A": pointer.String("b"),
+				"c": pointer.String("d"),
 			},
 			newTags: map[string]*string{
-				"a": to.StringPtr("B"),
-				"C": to.StringPtr("D"),
+				"a": pointer.String("B"),
+				"C": pointer.String("D"),
 			},
 			expectedTags: map[string]*string{
-				"A": to.StringPtr("b"),
-				"c": to.StringPtr("d"),
+				"A": pointer.String("b"),
+				"c": pointer.String("d"),
 			},
 		},
 	} {

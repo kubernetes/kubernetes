@@ -87,6 +87,10 @@ func (plugin *testPlugins) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *testPlugins) SupportsSELinuxContextMount(spec *Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *testPlugins) NewMounter(spec *Spec, podRef *v1.Pod, opts VolumeOptions) (Mounter, error) {
 	return nil, nil
 }
@@ -95,8 +99,8 @@ func (plugin *testPlugins) NewUnmounter(name string, podUID types.UID) (Unmounte
 	return nil, nil
 }
 
-func (plugin *testPlugins) ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error) {
-	return nil, nil
+func (plugin *testPlugins) ConstructVolumeSpec(volumeName, mountPath string) (ReconstructedVolume, error) {
+	return ReconstructedVolume{}, nil
 }
 
 func newTestPlugin() []VolumePlugin {

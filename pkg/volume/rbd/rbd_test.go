@@ -156,15 +156,6 @@ func (fake *fakeDiskManager) MakeGlobalVDPDName(rbd rbd) string {
 	return makePDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
 }
 
-func (fake *fakeDiskManager) AttachDisk(b rbdMounter) (string, error) {
-	fake.mutex.Lock()
-	defer fake.mutex.Unlock()
-	fake.rbdMapIndex++
-	devicePath := fmt.Sprintf("/dev/rbd%d", fake.rbdMapIndex)
-	fake.rbdDevices[devicePath] = true
-	return devicePath, nil
-}
-
 func (fake *fakeDiskManager) DetachDisk(r *rbdPlugin, deviceMountPath string, device string) error {
 	fake.mutex.Lock()
 	defer fake.mutex.Unlock()
@@ -292,7 +283,11 @@ func doTestPlugin(t *testing.T, c *testcase) {
 			t.Errorf("Attacher.MountDevice() failed: %v", err)
 		}
 	}
-	checkMounterLog(t, fakeMounter, 1, mount.FakeAction{Action: "mount", Target: c.expectedDeviceMountPath, Source: devicePath, FSType: "ext4"})
+	loggedSource, err := getLoggedSource(devicePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkMounterLog(t, fakeMounter, 1, mount.FakeAction{Action: "mount", Target: c.expectedDeviceMountPath, Source: loggedSource, FSType: "ext4"})
 
 	// mounter
 	mounter, err := plug.(*rbdPlugin).newMounterInternal(c.spec, c.pod.UID, fdm, "secrets")
@@ -317,7 +312,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	checkMounterLog(t, fakeMounter, 2, mount.FakeAction{Action: "mount", Target: c.expectedPodMountPath, Source: devicePath, FSType: ""})
+	checkMounterLog(t, fakeMounter, 2, mount.FakeAction{Action: "mount", Target: c.expectedPodMountPath, Source: loggedSource, FSType: ""})
 
 	// unmounter
 	unmounter, err := plug.(*rbdPlugin).newUnmounterInternal(c.spec.Name(), c.pod.UID, fdm)
@@ -374,6 +369,12 @@ func TestPlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectedDevicePath := "/dev/rbd0"
+	if runtime.GOOS == "windows" {
+		// Windows expects Disk Numbers.
+		expectedDevicePath = "0"
+	}
+
 	podUID := uuid.NewUUID()
 	var cases []*testcase
 	cases = append(cases, &testcase{
@@ -396,9 +397,9 @@ func TestPlugin(t *testing.T) {
 				UID:       podUID,
 			},
 		},
-		expectedDevicePath:      "/dev/rbd1",
-		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/pool1-image-image1", tmpDir),
-		expectedPodMountPath:    fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~rbd/vol1", tmpDir, podUID),
+		expectedDevicePath:      expectedDevicePath,
+		expectedDeviceMountPath: filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/mounts/pool1-image-image1"),
+		expectedPodMountPath:    filepath.Join(tmpDir, "pods", string(podUID), "volumes/kubernetes.io~rbd/vol1"),
 	})
 	cases = append(cases, &testcase{
 		spec: volume.NewSpecFromPersistentVolume(&v1.PersistentVolume{
@@ -425,9 +426,9 @@ func TestPlugin(t *testing.T) {
 				UID:       podUID,
 			},
 		},
-		expectedDevicePath:      "/dev/rbd1",
-		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/pool2-image-image2", tmpDir),
-		expectedPodMountPath:    fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~rbd/vol2", tmpDir, podUID),
+		expectedDevicePath:      expectedDevicePath,
+		expectedDeviceMountPath: filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/mounts/pool2-image-image2"),
+		expectedPodMountPath:    filepath.Join(tmpDir, "pods", string(podUID), "volumes/kubernetes.io~rbd/vol2"),
 	})
 
 	for i := 0; i < len(cases); i++ {
@@ -560,8 +561,8 @@ func TestGetDeviceMountPath(t *testing.T) {
 		},
 	})
 
-	deprecatedDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/%s-image-%s", tmpDir, pool, image)
-	canonicalDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/%s-image-%s", tmpDir, pool, image)
+	deprecatedDir := filepath.Join(tmpDir, fmt.Sprintf("plugins/kubernetes.io/rbd/rbd/%s-image-%s", pool, image))
+	canonicalDir := filepath.Join(tmpDir, fmt.Sprintf("plugins/kubernetes.io/rbd/mounts/%s-image-%s", pool, image))
 
 	type testCase struct {
 		deprecated bool
@@ -609,9 +610,9 @@ func TestConstructVolumeSpec(t *testing.T) {
 	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mount.FakeMounter)
 
 	pool, image, volumeName := "pool", "image", "vol"
-	podMountPath := fmt.Sprintf("%s/pods/pod123/volumes/kubernetes.io~rbd/%s", tmpDir, volumeName)
-	deprecatedDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/%s-image-%s", tmpDir, pool, image)
-	canonicalDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/%s-image-%s", tmpDir, pool, image)
+	podMountPath := filepath.Join(tmpDir, "pods/pod123/volumes/kubernetes.io~rbd", volumeName)
+	deprecatedDir := filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/rbd", fmt.Sprintf("%s-image-%s", pool, image))
+	canonicalDir := filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/mounts", fmt.Sprintf("%s-image-%s", pool, image))
 
 	type testCase struct {
 		volumeName string
@@ -631,15 +632,15 @@ func TestConstructVolumeSpec(t *testing.T) {
 		if err = fakeMounter.Mount(c.targetPath, podMountPath, "fake", []string{"bind"}); err != nil {
 			t.Fatalf("Mount %s to %s failed: %v", c.targetPath, podMountPath, err)
 		}
-		spec, err := plug.ConstructVolumeSpec(c.volumeName, podMountPath)
+		rec, err := plug.ConstructVolumeSpec(c.volumeName, podMountPath)
 		if err != nil {
 			t.Errorf("ConstructVolumeSpec failed: %v", err)
 		} else {
-			if spec.Volume.RBD.RBDPool != pool {
-				t.Errorf("Mismatch rbd pool: wanted %s, got %s", pool, spec.Volume.RBD.RBDPool)
+			if rec.Spec.Volume.RBD.RBDPool != pool {
+				t.Errorf("Mismatch rbd pool: wanted %s, got %s", pool, rec.Spec.Volume.RBD.RBDPool)
 			}
-			if spec.Volume.RBD.RBDImage != image {
-				t.Fatalf("Mismatch rbd image: wanted %s, got %s", image, spec.Volume.RBD.RBDImage)
+			if rec.Spec.Volume.RBD.RBDImage != image {
+				t.Fatalf("Mismatch rbd image: wanted %s, got %s", image, rec.Spec.Volume.RBD.RBDImage)
 			}
 		}
 		if err = fakeMounter.Unmount(podMountPath); err != nil {

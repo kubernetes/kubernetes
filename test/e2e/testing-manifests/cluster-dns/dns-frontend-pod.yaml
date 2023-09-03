@@ -7,7 +7,7 @@ metadata:
 spec:
   containers:
     - name: dns-frontend
-      image: k8s.gcr.io/example-dns-frontend:v1
+      image: registry.k8s.io/example-dns-frontend:v1
       command:
         - python
         - client.py

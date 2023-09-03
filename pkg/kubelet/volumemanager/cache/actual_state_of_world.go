@@ -27,7 +27,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -73,7 +75,7 @@ type ActualStateOfWorld interface {
 	// global mount point prior to detach.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, an error is returned.
-	SetDeviceMountState(volumeName v1.UniqueVolumeName, deviceMountState operationexecutor.DeviceMountState, devicePath, deviceMountPath string) error
+	SetDeviceMountState(volumeName v1.UniqueVolumeName, deviceMountState operationexecutor.DeviceMountState, devicePath, deviceMountPath, seLinuxMountContext string) error
 
 	// DeletePodFromVolume removes the given pod from the given volume in the
 	// cache indicating the volume has been successfully unmounted from the pod.
@@ -107,7 +109,7 @@ type ActualStateOfWorld interface {
 	// volumes, depend on this to update the contents of the volume.
 	// All volume mounting calls should be idempotent so a second mount call for
 	// volumes that do not need to update contents should not fail.
-	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, desiredVolumeSize resource.Quantity) (bool, string, error)
+	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, desiredVolumeSize resource.Quantity, seLinuxLabel string) (bool, string, error)
 
 	// PodRemovedFromVolume returns true if the given pod does not exist in the list of
 	// mountedPods for the given volume in the cache, indicating that the pod has
@@ -167,8 +169,20 @@ type ActualStateOfWorld interface {
 	GetAttachedVolumes() []AttachedVolume
 
 	// SyncReconstructedVolume check the volume.outerVolumeSpecName in asw and
-	// the one populated from dsw , if they do not match, update this field from the value from dsw.
+	// the one populated from dsw, if they do not match, update this field from the value from dsw.
 	SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string)
+
+	// Add the specified volume to ASW as uncertainly attached.
+	AddAttachUncertainReconstructedVolume(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
+
+	// UpdateReconstructedDevicePath updates devicePath of a reconstructed volume
+	// from Node.Status.VolumesAttached. The ASW is updated only when the volume is still
+	// uncertain. If the volume got mounted in the meantime, its devicePath must have
+	// been fixed by such an update.
+	UpdateReconstructedDevicePath(volumeName v1.UniqueVolumeName, devicePath string)
+
+	// UpdateReconstructedVolumeAttachability updates volume attachability from the API server.
+	UpdateReconstructedVolumeAttachability(volumeName v1.UniqueVolumeName, volumeAttachable bool)
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -182,6 +196,11 @@ type AttachedVolume struct {
 
 	// DeviceMountState indicates if device has been globally mounted or is not.
 	DeviceMountState operationexecutor.DeviceMountState
+
+	// SELinuxMountContext is the context with that the volume is globally mounted
+	// (via -o context=XYZ mount option). If empty, the volume is not mounted with
+	// "-o context=".
+	SELinuxMountContext string
 }
 
 // DeviceMayBeMounted returns true if device is mounted in global path or is in
@@ -196,9 +215,10 @@ func NewActualStateOfWorld(
 	nodeName types.NodeName,
 	volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
 	return &actualStateOfWorld{
-		nodeName:        nodeName,
-		attachedVolumes: make(map[v1.UniqueVolumeName]attachedVolume),
-		volumePluginMgr: volumePluginMgr,
+		nodeName:                  nodeName,
+		attachedVolumes:           make(map[v1.UniqueVolumeName]attachedVolume),
+		foundDuringReconstruction: make(map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID),
+		volumePluginMgr:           volumePluginMgr,
 	}
 }
 
@@ -227,12 +247,23 @@ type actualStateOfWorld struct {
 	// The key in this map is the name of the volume and the value is an object
 	// containing more information about the attached volume.
 	attachedVolumes map[v1.UniqueVolumeName]attachedVolume
+	// foundDuringReconstruction is a map of volumes which were discovered
+	// from kubelet root directory when kubelet was restarted.
+	foundDuringReconstruction map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID
 
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
 	sync.RWMutex
 }
+
+type volumeAttachability string
+
+const (
+	volumeAttachabilityTrue      volumeAttachability = "True"
+	volumeAttachabilityFalse     volumeAttachability = "False"
+	volumeAttachabilityUncertain volumeAttachability = "Uncertain"
+)
 
 // attachedVolume represents a volume the kubelet volume manager believes to be
 // successfully attached to a node it is managing. Volume types that do not
@@ -263,7 +294,7 @@ type attachedVolume struct {
 
 	// pluginIsAttachable indicates the volume plugin used to attach and mount
 	// this volume implements the volume.Attacher interface
-	pluginIsAttachable bool
+	pluginIsAttachable volumeAttachability
 
 	// deviceMountState stores information that tells us if device is mounted
 	// globally or not
@@ -284,6 +315,11 @@ type attachedVolume struct {
 	// persistentVolumeSize records size of the volume when pod was started or
 	// size after successful completion of volume expansion operation.
 	persistentVolumeSize *resource.Quantity
+
+	// seLinuxMountContext is the context with that the volume is mounted to global directory
+	// (via -o context=XYZ mount option). If nil, the volume is not mounted. If "", the volume is
+	// mounted without "-o context=".
+	seLinuxMountContext *string
 }
 
 // The mountedPod object represents a pod for which the kubelet volume manager
@@ -329,15 +365,33 @@ type mountedPod struct {
 	//   - VolumeMounted: means volume for pod has been successfully mounted
 	//   - VolumeMountUncertain: means volume for pod may not be mounted, but it must be unmounted
 	volumeMountStateForPod operationexecutor.VolumeMountState
+
+	// seLinuxMountContext is the context with that the volume is mounted to Pod directory
+	// (via -o context=XYZ mount option). If nil, the volume is not mounted. If "", the volume is
+	// mounted without "-o context=".
+	seLinuxMountContext string
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
+	logger klog.Logger,
 	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName, devicePath string) error {
-	return asw.addVolume(volumeName, volumeSpec, devicePath)
+
+	pluginIsAttachable := volumeAttachabilityFalse
+	if attachablePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec); err == nil && attachablePlugin != nil {
+		pluginIsAttachable = volumeAttachabilityTrue
+	}
+
+	return asw.addVolume(volumeName, volumeSpec, devicePath, pluginIsAttachable)
+}
+
+func (asw *actualStateOfWorld) AddAttachUncertainReconstructedVolume(
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName, devicePath string) error {
+
+	return asw.addVolume(volumeName, volumeSpec, devicePath, volumeAttachabilityUncertain)
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsUncertain(
-	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName) error {
+	logger klog.Logger, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName) error {
 	return nil
 }
 
@@ -346,11 +400,107 @@ func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 	asw.DeleteVolume(volumeName)
 }
 
+func (asw *actualStateOfWorld) IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
+	volumeState := asw.GetVolumeMountState(volumeName, podName)
+
+	// only uncertain volumes are reconstructed
+	if volumeState != operationexecutor.VolumeMountUncertain {
+		return false
+	}
+
+	asw.RLock()
+	defer asw.RUnlock()
+	podMap, ok := asw.foundDuringReconstruction[volumeName]
+	if !ok {
+		return false
+	}
+	_, foundPod := podMap[podName]
+	return foundPod
+}
+
+func (asw *actualStateOfWorld) CheckAndMarkVolumeAsUncertainViaReconstruction(opts operationexecutor.MarkVolumeOpts) (bool, error) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[opts.VolumeName]
+	if !volumeExists {
+		return false, nil
+	}
+
+	podObj, podExists := volumeObj.mountedPods[opts.PodName]
+	if podExists {
+		// if volume mount was uncertain we should keep trying to unmount the volume
+		if podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain {
+			return false, nil
+		}
+		if podObj.volumeMountStateForPod == operationexecutor.VolumeMounted {
+			return false, nil
+		}
+	}
+
+	podName := opts.PodName
+	podUID := opts.PodUID
+	volumeName := opts.VolumeName
+	mounter := opts.Mounter
+	blockVolumeMapper := opts.BlockVolumeMapper
+	outerVolumeSpecName := opts.OuterVolumeSpecName
+	volumeGidValue := opts.VolumeGidVolume
+	volumeSpec := opts.VolumeSpec
+
+	podObj = mountedPod{
+		podName:                podName,
+		podUID:                 podUID,
+		mounter:                mounter,
+		blockVolumeMapper:      blockVolumeMapper,
+		outerVolumeSpecName:    outerVolumeSpecName,
+		volumeGidValue:         volumeGidValue,
+		volumeSpec:             volumeSpec,
+		remountRequired:        false,
+		volumeMountStateForPod: operationexecutor.VolumeMountUncertain,
+	}
+
+	if mounter != nil {
+		// The mounter stored in the object may have old information,
+		// use the newest one.
+		podObj.mounter = mounter
+	}
+
+	asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
+
+	podMap, ok := asw.foundDuringReconstruction[opts.VolumeName]
+	if !ok {
+		podMap = map[volumetypes.UniquePodName]types.UID{}
+	}
+	podMap[opts.PodName] = opts.PodUID
+	asw.foundDuringReconstruction[opts.VolumeName] = podMap
+	return true, nil
+}
+
+func (asw *actualStateOfWorld) CheckAndMarkDeviceUncertainViaReconstruction(volumeName v1.UniqueVolumeName, deviceMountPath string) bool {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	// CheckAndMarkDeviceUncertainViaReconstruction requires volume to be marked as attached, so if
+	// volume does not exist in ASOW or is in any state other than DeviceNotMounted we should return
+	if !volumeExists || volumeObj.deviceMountState != operationexecutor.DeviceNotMounted {
+		return false
+	}
+
+	volumeObj.deviceMountState = operationexecutor.DeviceMountUncertain
+	// we are only changing deviceMountPath because devicePath at at this stage is
+	// determined from node object.
+	volumeObj.deviceMountPath = deviceMountPath
+	asw.attachedVolumes[volumeName] = volumeObj
+	return true
+
+}
+
 func (asw *actualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
 	return asw.AddPodToVolume(markVolumeOpts)
 }
 
-func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
+func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	// no operation for kubelet side
 }
 
@@ -365,13 +515,13 @@ func (asw *actualStateOfWorld) MarkVolumeAsUnmounted(
 }
 
 func (asw *actualStateOfWorld) MarkDeviceAsMounted(
-	volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error {
-	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceGloballyMounted, devicePath, deviceMountPath)
+	volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error {
+	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceGloballyMounted, devicePath, deviceMountPath, seLinuxMountContext)
 }
 
 func (asw *actualStateOfWorld) MarkDeviceAsUncertain(
-	volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error {
-	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceMountUncertain, devicePath, deviceMountPath)
+	volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error {
+	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceMountUncertain, devicePath, deviceMountPath, seLinuxMountContext)
 }
 
 func (asw *actualStateOfWorld) MarkVolumeMountAsUncertain(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
@@ -381,7 +531,47 @@ func (asw *actualStateOfWorld) MarkVolumeMountAsUncertain(markVolumeOpts operati
 
 func (asw *actualStateOfWorld) MarkDeviceAsUnmounted(
 	volumeName v1.UniqueVolumeName) error {
-	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceNotMounted, "", "")
+	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceNotMounted, "", "", "")
+}
+
+func (asw *actualStateOfWorld) UpdateReconstructedDevicePath(volumeName v1.UniqueVolumeName, devicePath string) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
+		return
+	}
+	if volumeObj.deviceMountState != operationexecutor.DeviceMountUncertain {
+		// Reconciler must have updated volume state, i.e. when a pod uses the volume and
+		// succeeded mounting the volume. Such update has fixed the device path.
+		return
+	}
+
+	volumeObj.devicePath = devicePath
+	asw.attachedVolumes[volumeName] = volumeObj
+}
+
+func (asw *actualStateOfWorld) UpdateReconstructedVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
+		return
+	}
+	if volumeObj.pluginIsAttachable != volumeAttachabilityUncertain {
+		// Reconciler must have updated volume state, i.e. when a pod uses the volume and
+		// succeeded mounting the volume. Such update has fixed the device path.
+		return
+	}
+
+	if attachable {
+		volumeObj.pluginIsAttachable = volumeAttachabilityTrue
+	} else {
+		volumeObj.pluginIsAttachable = volumeAttachabilityFalse
+	}
+	asw.attachedVolumes[volumeName] = volumeObj
 }
 
 func (asw *actualStateOfWorld) GetDeviceMountState(volumeName v1.UniqueVolumeName) operationexecutor.DeviceMountState {
@@ -450,7 +640,7 @@ func (asw *actualStateOfWorld) IsVolumeMountedElsewhere(volumeName v1.UniqueVolu
 // volume plugin can support the given volumeSpec or more than one plugin can
 // support it, an error is returned.
 func (asw *actualStateOfWorld) addVolume(
-	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, devicePath string) error {
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, devicePath string, attachability volumeAttachability) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -473,11 +663,6 @@ func (asw *actualStateOfWorld) addVolume(
 		}
 	}
 
-	pluginIsAttachable := false
-	if attachablePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec); err == nil && attachablePlugin != nil {
-		pluginIsAttachable = true
-	}
-
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if !volumeExists {
 		volumeObj = attachedVolume{
@@ -485,7 +670,7 @@ func (asw *actualStateOfWorld) addVolume(
 			spec:               volumeSpec,
 			mountedPods:        make(map[volumetypes.UniquePodName]mountedPod),
 			pluginName:         volumePlugin.GetPluginName(),
-			pluginIsAttachable: pluginIsAttachable,
+			pluginIsAttachable: attachability,
 			deviceMountState:   operationexecutor.DeviceNotMounted,
 			devicePath:         devicePath,
 		}
@@ -519,7 +704,16 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	}
 
 	podObj, podExists := volumeObj.mountedPods[podName]
-	if !podExists {
+
+	updateUncertainVolume := false
+	if podExists {
+		// Update uncertain volumes - the new markVolumeOpts may have updated information.
+		// Especially reconstructed volumes (marked as uncertain during reconstruction) need
+		// an update.
+		updateUncertainVolume = utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain
+	}
+	if !podExists || updateUncertainVolume {
+		// Add new mountedPod or update existing one.
 		podObj = mountedPod{
 			podName:                podName,
 			podUID:                 podUID,
@@ -529,18 +723,33 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 			volumeGidValue:         volumeGidValue,
 			volumeSpec:             volumeSpec,
 			volumeMountStateForPod: markVolumeOpts.VolumeMountState,
+			seLinuxMountContext:    markVolumeOpts.SELinuxMountContext,
 		}
 	}
 
 	// If pod exists, reset remountRequired value
 	podObj.remountRequired = false
 	podObj.volumeMountStateForPod = markVolumeOpts.VolumeMountState
+
+	// if volume is mounted successfully, then it should be removed from foundDuringReconstruction map
+	if markVolumeOpts.VolumeMountState == operationexecutor.VolumeMounted {
+		delete(asw.foundDuringReconstruction[volumeName], podName)
+	}
 	if mounter != nil {
 		// The mounter stored in the object may have old information,
 		// use the newest one.
 		podObj.mounter = mounter
 	}
 	asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		// Store the mount context also in the AttachedVolume to have a global volume context
+		// for a quick comparison in PodExistsInVolume.
+		if volumeObj.seLinuxMountContext == nil {
+			volumeObj.seLinuxMountContext = &markVolumeOpts.SELinuxMountContext
+			asw.attachedVolumes[volumeName] = volumeObj
+		}
+	}
+
 	return nil
 }
 
@@ -580,7 +789,7 @@ func (asw *actualStateOfWorld) MarkRemountRequired(
 }
 
 func (asw *actualStateOfWorld) SetDeviceMountState(
-	volumeName v1.UniqueVolumeName, deviceMountState operationexecutor.DeviceMountState, devicePath, deviceMountPath string) error {
+	volumeName v1.UniqueVolumeName, deviceMountState operationexecutor.DeviceMountState, devicePath, deviceMountPath, seLinuxMountContext string) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -596,11 +805,16 @@ func (asw *actualStateOfWorld) SetDeviceMountState(
 	if devicePath != "" {
 		volumeObj.devicePath = devicePath
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		if seLinuxMountContext != "" {
+			volumeObj.seLinuxMountContext = &seLinuxMountContext
+		}
+	}
 	asw.attachedVolumes[volumeName] = volumeObj
 	return nil
 }
 
-func (asw *actualStateOfWorld) InitializeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
+func (asw *actualStateOfWorld) InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -641,6 +855,12 @@ func (asw *actualStateOfWorld) DeletePodFromVolume(
 		delete(asw.attachedVolumes[volumeName].mountedPods, podName)
 	}
 
+	// if there were reconstructed volumes, we should remove them
+	_, podExists = asw.foundDuringReconstruction[volumeName]
+	if podExists {
+		delete(asw.foundDuringReconstruction[volumeName], podName)
+	}
+
 	return nil
 }
 
@@ -661,16 +881,25 @@ func (asw *actualStateOfWorld) DeleteVolume(volumeName v1.UniqueVolumeName) erro
 	}
 
 	delete(asw.attachedVolumes, volumeName)
+	delete(asw.foundDuringReconstruction, volumeName)
 	return nil
 }
 
-func (asw *actualStateOfWorld) PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, desiredVolumeSize resource.Quantity) (bool, string, error) {
+func (asw *actualStateOfWorld) PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, desiredVolumeSize resource.Quantity, seLinuxLabel string) (bool, string, error) {
 	asw.RLock()
 	defer asw.RUnlock()
 
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if !volumeExists {
 		return false, "", newVolumeNotAttachedError(volumeName)
+	}
+
+	// The volume exists, check its SELinux context mount option
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		if volumeObj.seLinuxMountContext != nil && *volumeObj.seLinuxMountContext != seLinuxLabel {
+			fullErr := newSELinuxMountMismatchError(volumeName)
+			return false, volumeObj.devicePath, fullErr
+		}
 	}
 
 	podObj, podExists := volumeObj.mountedPods[podName]
@@ -739,7 +968,6 @@ func (asw *actualStateOfWorld) PodRemovedFromVolume(
 			return false
 		}
 	}
-
 	return true
 }
 
@@ -794,7 +1022,6 @@ func (asw *actualStateOfWorld) GetAllMountedVolumes() []MountedVolume {
 					mountedVolume,
 					getMountedVolume(&podObj, &volumeObj))
 			}
-
 		}
 	}
 
@@ -899,16 +1126,24 @@ func (asw *actualStateOfWorld) SyncReconstructedVolume(volumeName v1.UniqueVolum
 
 func (asw *actualStateOfWorld) newAttachedVolume(
 	attachedVolume *attachedVolume) AttachedVolume {
+	seLinuxMountContext := ""
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		if attachedVolume.seLinuxMountContext != nil {
+			seLinuxMountContext = *attachedVolume.seLinuxMountContext
+		}
+	}
 	return AttachedVolume{
 		AttachedVolume: operationexecutor.AttachedVolume{
-			VolumeName:         attachedVolume.volumeName,
-			VolumeSpec:         attachedVolume.spec,
-			NodeName:           asw.nodeName,
-			PluginIsAttachable: attachedVolume.pluginIsAttachable,
-			DevicePath:         attachedVolume.devicePath,
-			DeviceMountPath:    attachedVolume.deviceMountPath,
-			PluginName:         attachedVolume.pluginName},
-		DeviceMountState: attachedVolume.deviceMountState,
+			VolumeName:          attachedVolume.volumeName,
+			VolumeSpec:          attachedVolume.spec,
+			NodeName:            asw.nodeName,
+			PluginIsAttachable:  attachedVolume.pluginIsAttachable == volumeAttachabilityTrue,
+			DevicePath:          attachedVolume.devicePath,
+			DeviceMountPath:     attachedVolume.deviceMountPath,
+			PluginName:          attachedVolume.pluginName,
+			SELinuxMountContext: seLinuxMountContext},
+		DeviceMountState:    attachedVolume.deviceMountState,
+		SELinuxMountContext: seLinuxMountContext,
 	}
 }
 
@@ -994,6 +1229,10 @@ func IsFSResizeRequiredError(err error) bool {
 // mountedPod and attachedVolume objects.
 func getMountedVolume(
 	mountedPod *mountedPod, attachedVolume *attachedVolume) MountedVolume {
+	seLinuxMountContext := ""
+	if attachedVolume.seLinuxMountContext != nil {
+		seLinuxMountContext = *attachedVolume.seLinuxMountContext
+	}
 	return MountedVolume{
 		MountedVolume: operationexecutor.MountedVolume{
 			PodName:             mountedPod.podName,
@@ -1006,5 +1245,32 @@ func getMountedVolume(
 			BlockVolumeMapper:   mountedPod.blockVolumeMapper,
 			VolumeGidValue:      mountedPod.volumeGidValue,
 			VolumeSpec:          mountedPod.volumeSpec,
-			DeviceMountPath:     attachedVolume.deviceMountPath}}
+			DeviceMountPath:     attachedVolume.deviceMountPath,
+			SELinuxMountContext: seLinuxMountContext}}
+
+}
+
+// seLinuxMountMismatchError is an error returned when PodExistsInVolume() found
+// a volume mounted with a different SELinux label than expected.
+type seLinuxMountMismatchError struct {
+	volumeName v1.UniqueVolumeName
+}
+
+func (err seLinuxMountMismatchError) Error() string {
+	return fmt.Sprintf(
+		"waiting for unmount of volume %q, because it is already mounted to a different pod with a different SELinux label",
+		err.volumeName)
+}
+
+func newSELinuxMountMismatchError(volumeName v1.UniqueVolumeName) error {
+	return seLinuxMountMismatchError{
+		volumeName: volumeName,
+	}
+}
+
+// IsSELinuxMountMismatchError returns true if the specified error is a
+// seLinuxMountMismatchError.
+func IsSELinuxMountMismatchError(err error) bool {
+	_, ok := err.(seLinuxMountMismatchError)
+	return ok
 }

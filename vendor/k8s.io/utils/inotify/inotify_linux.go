@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 // Copyright 2010 The Go Authors. All rights reserved.
@@ -8,23 +9,23 @@
 Package inotify implements a wrapper for the Linux inotify system.
 
 Example:
-    watcher, err := inotify.NewWatcher()
-    if err != nil {
-        log.Fatal(err)
-    }
-    err = watcher.Watch("/tmp")
-    if err != nil {
-        log.Fatal(err)
-    }
-    for {
-        select {
-        case ev := <-watcher.Event:
-            log.Println("event:", ev)
-        case err := <-watcher.Error:
-            log.Println("error:", err)
-        }
-    }
 
+	watcher, err := inotify.NewWatcher()
+	if err != nil {
+	    log.Fatal(err)
+	}
+	err = watcher.Watch("/tmp")
+	if err != nil {
+	    log.Fatal(err)
+	}
+	for {
+	    select {
+	    case ev := <-watcher.Event:
+	        log.Println("event:", ev)
+	    case err := <-watcher.Error:
+	        log.Println("error:", err)
+	    }
+	}
 */
 package inotify // import "k8s.io/utils/inotify"
 

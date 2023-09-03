@@ -18,9 +18,16 @@ package serialize
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strconv"
+
+	"github.com/go-logr/logr"
 )
+
+type textWriter interface {
+	WriteText(*bytes.Buffer)
+}
 
 // WithValues implements LogSink.WithValues. The old key/value pairs are
 // assumed to be well-formed, the new ones are checked and padded if
@@ -44,60 +51,111 @@ func WithValues(oldKV, newKV []interface{}) []interface{} {
 	return kv
 }
 
-// TrimDuplicates deduplicates elements provided in multiple key/value tuple
-// slices, whilst maintaining the distinction between where the items are
-// contained.
-func TrimDuplicates(kvLists ...[]interface{}) [][]interface{} {
-	// maintain a map of all seen keys
-	seenKeys := map[interface{}]struct{}{}
-	// build the same number of output slices as inputs
-	outs := make([][]interface{}, len(kvLists))
-	// iterate over the input slices backwards, as 'later' kv specifications
-	// of the same key will take precedence over earlier ones
-	for i := len(kvLists) - 1; i >= 0; i-- {
-		// initialise this output slice
-		outs[i] = []interface{}{}
-		// obtain a reference to the kvList we are processing
-		// and make sure it has an even number of entries
-		kvList := kvLists[i]
-		if len(kvList)%2 != 0 {
-			kvList = append(kvList, missingValue)
-		}
-
-		// start iterating at len(kvList) - 2 (i.e. the 2nd last item) for
-		// slices that have an even number of elements.
-		// We add (len(kvList) % 2) here to handle the case where there is an
-		// odd number of elements in a kvList.
-		// If there is an odd number, then the last element in the slice will
-		// have the value 'null'.
-		for i2 := len(kvList) - 2 + (len(kvList) % 2); i2 >= 0; i2 -= 2 {
-			k := kvList[i2]
-			// if we have already seen this key, do not include it again
-			if _, ok := seenKeys[k]; ok {
-				continue
-			}
-			// make a note that we've observed a new key
-			seenKeys[k] = struct{}{}
-			// attempt to obtain the value of the key
-			var v interface{}
-			// i2+1 should only ever be out of bounds if we handling the first
-			// iteration over a slice with an odd number of elements
-			if i2+1 < len(kvList) {
-				v = kvList[i2+1]
-			}
-			// add this KV tuple to the *start* of the output list to maintain
-			// the original order as we are iterating over the slice backwards
-			outs[i] = append([]interface{}{k, v}, outs[i]...)
-		}
+// MergeKVs deduplicates elements provided in two key/value slices.
+//
+// Keys in each slice are expected to be unique, so duplicates can only occur
+// when the first and second slice contain the same key. When that happens, the
+// key/value pair from the second slice is used. The first slice must be well-formed
+// (= even key/value pairs). The second one may have a missing value, in which
+// case the special "missing value" is added to the result.
+func MergeKVs(first, second []interface{}) []interface{} {
+	maxLength := len(first) + (len(second)+1)/2*2
+	if maxLength == 0 {
+		// Nothing to do at all.
+		return nil
 	}
-	return outs
+
+	if len(first) == 0 && len(second)%2 == 0 {
+		// Nothing to be overridden, second slice is well-formed
+		// and can be used directly.
+		return second
+	}
+
+	// Determine which keys are in the second slice so that we can skip
+	// them when iterating over the first one. The code intentionally
+	// favors performance over completeness: we assume that keys are string
+	// constants and thus compare equal when the string values are equal. A
+	// string constant being overridden by, for example, a fmt.Stringer is
+	// not handled.
+	overrides := map[interface{}]bool{}
+	for i := 0; i < len(second); i += 2 {
+		overrides[second[i]] = true
+	}
+	merged := make([]interface{}, 0, maxLength)
+	for i := 0; i+1 < len(first); i += 2 {
+		key := first[i]
+		if overrides[key] {
+			continue
+		}
+		merged = append(merged, key, first[i+1])
+	}
+	merged = append(merged, second...)
+	if len(merged)%2 != 0 {
+		merged = append(merged, missingValue)
+	}
+	return merged
+}
+
+type Formatter struct {
+	AnyToStringHook AnyToStringFunc
+}
+
+type AnyToStringFunc func(v interface{}) string
+
+// MergeKVsInto is a variant of MergeKVs which directly formats the key/value
+// pairs into a buffer.
+func (f Formatter) MergeAndFormatKVs(b *bytes.Buffer, first, second []interface{}) {
+	if len(first) == 0 && len(second) == 0 {
+		// Nothing to do at all.
+		return
+	}
+
+	if len(first) == 0 && len(second)%2 == 0 {
+		// Nothing to be overridden, second slice is well-formed
+		// and can be used directly.
+		for i := 0; i < len(second); i += 2 {
+			f.KVFormat(b, second[i], second[i+1])
+		}
+		return
+	}
+
+	// Determine which keys are in the second slice so that we can skip
+	// them when iterating over the first one. The code intentionally
+	// favors performance over completeness: we assume that keys are string
+	// constants and thus compare equal when the string values are equal. A
+	// string constant being overridden by, for example, a fmt.Stringer is
+	// not handled.
+	overrides := map[interface{}]bool{}
+	for i := 0; i < len(second); i += 2 {
+		overrides[second[i]] = true
+	}
+	for i := 0; i < len(first); i += 2 {
+		key := first[i]
+		if overrides[key] {
+			continue
+		}
+		f.KVFormat(b, key, first[i+1])
+	}
+	// Round down.
+	l := len(second)
+	l = l / 2 * 2
+	for i := 1; i < l; i += 2 {
+		f.KVFormat(b, second[i-1], second[i])
+	}
+	if len(second)%2 == 1 {
+		f.KVFormat(b, second[len(second)-1], missingValue)
+	}
+}
+
+func MergeAndFormatKVs(b *bytes.Buffer, first, second []interface{}) {
+	Formatter{}.MergeAndFormatKVs(b, first, second)
 }
 
 const missingValue = "(MISSING)"
 
 // KVListFormat serializes all key/value pairs into the provided buffer.
 // A space gets inserted before the first pair and between each pair.
-func KVListFormat(b *bytes.Buffer, keysAndValues ...interface{}) {
+func (f Formatter) KVListFormat(b *bytes.Buffer, keysAndValues ...interface{}) {
 	for i := 0; i < len(keysAndValues); i += 2 {
 		var v interface{}
 		k := keysAndValues[i]
@@ -106,49 +164,104 @@ func KVListFormat(b *bytes.Buffer, keysAndValues ...interface{}) {
 		} else {
 			v = missingValue
 		}
-		b.WriteByte(' ')
-		// Keys are assumed to be well-formed according to
-		// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/migration-to-structured-logging.md#name-arguments
-		// for the sake of performance. Keys with spaces,
-		// special characters, etc. will break parsing.
-		if k, ok := k.(string); ok {
-			// Avoid one allocation when the key is a string, which
-			// normally it should be.
-			b.WriteString(k)
-		} else {
-			b.WriteString(fmt.Sprintf("%s", k))
-		}
-
-		// The type checks are sorted so that more frequently used ones
-		// come first because that is then faster in the common
-		// cases. In Kubernetes, ObjectRef (a Stringer) is more common
-		// than plain strings
-		// (https://github.com/kubernetes/kubernetes/pull/106594#issuecomment-975526235).
-		switch v := v.(type) {
-		case fmt.Stringer:
-			writeStringValue(b, true, StringerToString(v))
-		case string:
-			writeStringValue(b, true, v)
-		case error:
-			writeStringValue(b, true, ErrorToString(v))
-		case []byte:
-			// In https://github.com/kubernetes/klog/pull/237 it was decided
-			// to format byte slices with "%+q". The advantages of that are:
-			// - readable output if the bytes happen to be printable
-			// - non-printable bytes get represented as unicode escape
-			//   sequences (\uxxxx)
-			//
-			// The downsides are that we cannot use the faster
-			// strconv.Quote here and that multi-line output is not
-			// supported. If developers know that a byte array is
-			// printable and they want multi-line output, they can
-			// convert the value to string before logging it.
-			b.WriteByte('=')
-			b.WriteString(fmt.Sprintf("%+q", v))
-		default:
-			writeStringValue(b, false, fmt.Sprintf("%+v", v))
-		}
+		f.KVFormat(b, k, v)
 	}
+}
+
+func KVListFormat(b *bytes.Buffer, keysAndValues ...interface{}) {
+	Formatter{}.KVListFormat(b, keysAndValues...)
+}
+
+// KVFormat serializes one key/value pair into the provided buffer.
+// A space gets inserted before the pair.
+func (f Formatter) KVFormat(b *bytes.Buffer, k, v interface{}) {
+	b.WriteByte(' ')
+	// Keys are assumed to be well-formed according to
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/migration-to-structured-logging.md#name-arguments
+	// for the sake of performance. Keys with spaces,
+	// special characters, etc. will break parsing.
+	if sK, ok := k.(string); ok {
+		// Avoid one allocation when the key is a string, which
+		// normally it should be.
+		b.WriteString(sK)
+	} else {
+		b.WriteString(fmt.Sprintf("%s", k))
+	}
+
+	// The type checks are sorted so that more frequently used ones
+	// come first because that is then faster in the common
+	// cases. In Kubernetes, ObjectRef (a Stringer) is more common
+	// than plain strings
+	// (https://github.com/kubernetes/kubernetes/pull/106594#issuecomment-975526235).
+	switch v := v.(type) {
+	case textWriter:
+		writeTextWriterValue(b, v)
+	case fmt.Stringer:
+		writeStringValue(b, StringerToString(v))
+	case string:
+		writeStringValue(b, v)
+	case error:
+		writeStringValue(b, ErrorToString(v))
+	case logr.Marshaler:
+		value := MarshalerToValue(v)
+		// A marshaler that returns a string is useful for
+		// delayed formatting of complex values. We treat this
+		// case like a normal string. This is useful for
+		// multi-line support.
+		//
+		// We could do this by recursively formatting a value,
+		// but that comes with the risk of infinite recursion
+		// if a marshaler returns itself. Instead we call it
+		// only once and rely on it returning the intended
+		// value directly.
+		switch value := value.(type) {
+		case string:
+			writeStringValue(b, value)
+		default:
+			f.formatAny(b, value)
+		}
+	case []byte:
+		// In https://github.com/kubernetes/klog/pull/237 it was decided
+		// to format byte slices with "%+q". The advantages of that are:
+		// - readable output if the bytes happen to be printable
+		// - non-printable bytes get represented as unicode escape
+		//   sequences (\uxxxx)
+		//
+		// The downsides are that we cannot use the faster
+		// strconv.Quote here and that multi-line output is not
+		// supported. If developers know that a byte array is
+		// printable and they want multi-line output, they can
+		// convert the value to string before logging it.
+		b.WriteByte('=')
+		b.WriteString(fmt.Sprintf("%+q", v))
+	default:
+		f.formatAny(b, v)
+	}
+}
+
+func KVFormat(b *bytes.Buffer, k, v interface{}) {
+	Formatter{}.KVFormat(b, k, v)
+}
+
+// formatAny is the fallback formatter for a value. It supports a hook (for
+// example, for YAML encoding) and itself uses JSON encoding.
+func (f Formatter) formatAny(b *bytes.Buffer, v interface{}) {
+	b.WriteRune('=')
+	if f.AnyToStringHook != nil {
+		b.WriteString(f.AnyToStringHook(v))
+		return
+	}
+	encoder := json.NewEncoder(b)
+	l := b.Len()
+	if err := encoder.Encode(v); err != nil {
+		// This shouldn't happen. We discard whatever the encoder
+		// wrote and instead dump an error string.
+		b.Truncate(l)
+		b.WriteString(fmt.Sprintf(`"<internal error: %v>"`, err))
+		return
+	}
+	// Remove trailing newline.
+	b.Truncate(b.Len() - 1)
 }
 
 // StringerToString converts a Stringer to a string,
@@ -160,6 +273,18 @@ func StringerToString(s fmt.Stringer) (ret string) {
 		}
 	}()
 	ret = s.String()
+	return
+}
+
+// MarshalerToValue invokes a marshaler and catches
+// panics.
+func MarshalerToValue(m logr.Marshaler) (ret interface{}) {
+	defer func() {
+		if err := recover(); err != nil {
+			ret = fmt.Sprintf("<panic: %s>", err)
+		}
+	}()
+	ret = m.MarshalLog()
 	return
 }
 
@@ -175,18 +300,23 @@ func ErrorToString(err error) (ret string) {
 	return
 }
 
-func writeStringValue(b *bytes.Buffer, quote bool, v string) {
+func writeTextWriterValue(b *bytes.Buffer, v textWriter) {
+	b.WriteByte('=')
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Fprintf(b, `"<panic: %s>"`, err)
+		}
+	}()
+	v.WriteText(b)
+}
+
+func writeStringValue(b *bytes.Buffer, v string) {
 	data := []byte(v)
 	index := bytes.IndexByte(data, '\n')
 	if index == -1 {
 		b.WriteByte('=')
-		if quote {
-			// Simple string, quote quotation marks and non-printable characters.
-			b.WriteString(strconv.Quote(v))
-			return
-		}
-		// Non-string with no line breaks.
-		b.WriteString(v)
+		// Simple string, quote quotation marks and non-printable characters.
+		b.WriteString(strconv.Quote(v))
 		return
 	}
 

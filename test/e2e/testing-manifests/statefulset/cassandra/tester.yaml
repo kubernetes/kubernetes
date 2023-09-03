@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: test-server
-        image: k8s.gcr.io/cassandra-e2e-test:0.1
+        image: registry.k8s.io/cassandra-e2e-test:0.1
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

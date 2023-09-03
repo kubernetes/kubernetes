@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/russross/blackfriday"
+	"github.com/russross/blackfriday/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -70,7 +70,7 @@ type normalizer struct {
 
 func (s normalizer) markdown() normalizer {
 	bytes := []byte(s.string)
-	formatted := blackfriday.Markdown(bytes, &ASCIIRenderer{Indentation: Indentation}, blackfriday.EXTENSION_NO_INTRA_EMPHASIS)
+	formatted := blackfriday.Run(bytes, blackfriday.WithExtensions(blackfriday.NoIntraEmphasis), blackfriday.WithRenderer(&ASCIIRenderer{Indentation: Indentation}))
 	s.string = string(formatted)
 	return s
 }

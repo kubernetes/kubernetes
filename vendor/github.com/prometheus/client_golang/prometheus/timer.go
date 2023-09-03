@@ -23,13 +23,24 @@ type Timer struct {
 }
 
 // NewTimer creates a new Timer. The provided Observer is used to observe a
-// duration in seconds. Timer is usually used to time a function call in the
+// duration in seconds. If the Observer implements ExemplarObserver, passing exemplar
+// later on will be also supported.
+// Timer is usually used to time a function call in the
 // following way:
-//    func TimeMe() {
-//        timer := NewTimer(myHistogram)
-//        defer timer.ObserveDuration()
-//        // Do actual work.
-//    }
+//
+//	func TimeMe() {
+//	    timer := NewTimer(myHistogram)
+//	    defer timer.ObserveDuration()
+//	    // Do actual work.
+//	}
+//
+// or
+//
+//	func TimeMeWithExemplar() {
+//		    timer := NewTimer(myHistogram)
+//		    defer timer.ObserveDurationWithExemplar(exemplar)
+//		    // Do actual work.
+//		}
 func NewTimer(o Observer) *Timer {
 	return &Timer{
 		begin:    time.Now(),
@@ -47,6 +58,22 @@ func NewTimer(o Observer) *Timer {
 // if used with Go1.9+.
 func (t *Timer) ObserveDuration() time.Duration {
 	d := time.Since(t.begin)
+	if t.observer != nil {
+		t.observer.Observe(d.Seconds())
+	}
+	return d
+}
+
+// ObserveDurationWithExemplar is like ObserveDuration, but it will also
+// observe exemplar with the duration unless exemplar is nil or provided Observer can't
+// be casted to ExemplarObserver.
+func (t *Timer) ObserveDurationWithExemplar(exemplar Labels) time.Duration {
+	d := time.Since(t.begin)
+	eo, ok := t.observer.(ExemplarObserver)
+	if ok && exemplar != nil {
+		eo.ObserveWithExemplar(d.Seconds(), exemplar)
+		return d
+	}
 	if t.observer != nil {
 		t.observer.Observe(d.Seconds())
 	}

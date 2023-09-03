@@ -42,9 +42,14 @@ message ServerStorageVersion {
   // The encodingVersion must be included in the decodableVersions.
   // +listType=set
   repeated string decodableVersions = 3;
+
+  // The API server can serve these versions.
+  // DecodableVersions must include all ServedVersions.
+  // +listType=set
+  repeated string servedVersions = 4;
 }
 
-//  Storage version of a specific resource.
+// Storage version of a specific resource.
 message StorageVersion {
   // The name is <group>.<resource>.
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;

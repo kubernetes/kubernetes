@@ -27,7 +27,6 @@ import (
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -73,7 +72,7 @@ func RequestCertificate(client clientset.Interface, csrData []byte, name, signer
 	case err == nil:
 		return reqName, reqUID, err
 
-	case errors.IsAlreadyExists(err) && len(name) > 0:
+	case apierrors.IsAlreadyExists(err) && len(name) > 0:
 		klog.Infof("csr for this node already exists, reusing")
 		req, err := get(client, name)
 		if err != nil {
@@ -346,8 +345,8 @@ func ensureCompatible(new, orig *certificatesv1.CertificateSigningRequest, priva
 // formatError preserves the type of an API message but alters the message. Expects
 // a single argument format string, and returns the wrapped error.
 func formatError(format string, err error) error {
-	if s, ok := err.(errors.APIStatus); ok {
-		se := &errors.StatusError{ErrStatus: s.Status()}
+	if s, ok := err.(apierrors.APIStatus); ok {
+		se := &apierrors.StatusError{ErrStatus: s.Status()}
 		se.ErrStatus.Message = fmt.Sprintf(format, se.ErrStatus.Message)
 		return se
 	}

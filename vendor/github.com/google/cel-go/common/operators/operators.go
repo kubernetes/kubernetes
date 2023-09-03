@@ -37,6 +37,8 @@ const (
 	Modulo        = "_%_"
 	Negate        = "-_"
 	Index         = "_[_]"
+	OptIndex      = "_[?_]"
+	OptSelect     = "_?._"
 
 	// Macros, must have a valid identifier.
 	Has       = "has"
@@ -99,6 +101,8 @@ var (
 		LogicalNot:    {displayName: "!", precedence: 2, arity: 1},
 		Negate:        {displayName: "-", precedence: 2, arity: 1},
 		Index:         {displayName: "", precedence: 1, arity: 2},
+		OptIndex:      {displayName: "", precedence: 1, arity: 2},
+		OptSelect:     {displayName: "", precedence: 1, arity: 2},
 	}
 )
 
@@ -140,4 +144,14 @@ func Precedence(symbol string) int {
 		return 0
 	}
 	return op.precedence
+}
+
+// Arity returns the number of argument the operator takes
+// -1 is returned if an undefined symbol is provided
+func Arity(symbol string) int {
+	op, found := operatorMap[symbol]
+	if !found {
+		return -1
+	}
+	return op.arity
 }

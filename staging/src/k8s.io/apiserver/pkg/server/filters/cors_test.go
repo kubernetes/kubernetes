@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -25,79 +26,142 @@ import (
 )
 
 func TestCORSAllowedOrigins(t *testing.T) {
-	table := []struct {
+	tests := []struct {
+		name           string
 		allowedOrigins []string
-		origin         string
+		origins        []string
 		allowed        bool
 	}{
-		{[]string{}, "example.com", false},
-		{[]string{"example.com"}, "example.com", true},
-		{[]string{"example.com"}, "not-allowed.com", false},
-		{[]string{"not-matching.com", "example.com"}, "example.com", true},
-		{[]string{".*"}, "example.com", true},
+		{
+			name:           "allowed origins list is empty",
+			allowedOrigins: []string{},
+			origins:        []string{"example.com"},
+			allowed:        false,
+		},
+		{
+			name:           "origin request header not set",
+			allowedOrigins: []string{"example.com"},
+			origins:        []string{""},
+			allowed:        false,
+		},
+		{
+			name:           "allowed regexp is a match",
+			allowedOrigins: []string{"example.com"},
+			origins:        []string{"http://example.com", "example.com"},
+			allowed:        true,
+		},
+		{
+			name:           "allowed regexp is not a match",
+			allowedOrigins: []string{"example.com"},
+			origins:        []string{"http://not-allowed.com", "not-allowed.com"},
+			allowed:        false,
+		},
+		{
+			name:           "allowed list with multiple regex",
+			allowedOrigins: []string{"not-matching.com", "example.com"},
+			origins:        []string{"http://example.com", "example.com"},
+			allowed:        true,
+		},
+		{
+			name:           "wildcard matching",
+			allowedOrigins: []string{".*"},
+			origins:        []string{"http://example.com", "example.com"},
+			allowed:        true,
+		},
+		{
+			// CVE-2022-1996: regular expression 'example.com' matches
+			// 'example.com.hacker.org' because it does not pin to the start
+			// and end of the host.
+			// The CVE should not occur in a real kubernetes cluster since we
+			// validate the regular expression specified in --cors-allowed-origins
+			// to ensure that it pins to the start and end of the host name.
+			name:           "regex does not pin, CVE-2022-1996 is not prevented",
+			allowedOrigins: []string{"example.com"},
+			origins:        []string{"http://example.com.hacker.org", "http://example.com.hacker.org:8080"},
+			allowed:        true,
+		},
+		{
+			// with a proper regular expression we can prevent CVE-2022-1996
+			name:           "regex pins to start/end of the host name, CVE-2022-1996 is prevented",
+			allowedOrigins: []string{`//example.com(:|$)`},
+			origins:        []string{"http://example.com.hacker.org", "http://example.com.hacker.org:8080"},
+			allowed:        false,
+		},
 	}
 
-	for _, item := range table {
-		handler := WithCORS(
-			http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
-			item.allowedOrigins, nil, nil, nil, "true",
-		)
-		var response *http.Response
-		func() {
-			server := httptest.NewServer(handler)
-			defer server.Close()
+	for _, test := range tests {
+		for _, origin := range test.origins {
+			name := fmt.Sprintf("%s/origin/%s", test.name, origin)
+			t.Run(name, func(t *testing.T) {
+				var handlerInvoked int
+				handler := WithCORS(
+					http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+						handlerInvoked++
+					}),
+					test.allowedOrigins, nil, nil, nil, "true",
+				)
+				var response *http.Response
+				func() {
+					server := httptest.NewServer(handler)
+					defer server.Close()
 
-			request, err := http.NewRequest("GET", server.URL+"/version", nil)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			request.Header.Set("Origin", item.origin)
-			client := http.Client{}
-			response, err = client.Do(request)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		}()
-		if item.allowed {
-			if !reflect.DeepEqual(item.origin, response.Header.Get("Access-Control-Allow-Origin")) {
-				t.Errorf("Expected %#v, Got %#v", item.origin, response.Header.Get("Access-Control-Allow-Origin"))
-			}
+					request, err := http.NewRequest("GET", server.URL+"/version", nil)
+					if err != nil {
+						t.Errorf("unexpected error: %v", err)
+					}
+					request.Header.Set("Origin", origin)
+					client := http.Client{}
+					response, err = client.Do(request)
+					if err != nil {
+						t.Errorf("unexpected error: %v", err)
+					}
+				}()
+				if handlerInvoked != 1 {
+					t.Errorf("Expected the handler to be invoked once, but got: %d", handlerInvoked)
+				}
 
-			if response.Header.Get("Access-Control-Allow-Credentials") == "" {
-				t.Errorf("Expected Access-Control-Allow-Credentials header to be set")
-			}
+				if test.allowed {
+					if !reflect.DeepEqual(origin, response.Header.Get("Access-Control-Allow-Origin")) {
+						t.Errorf("Expected %#v, Got %#v", origin, response.Header.Get("Access-Control-Allow-Origin"))
+					}
 
-			if response.Header.Get("Access-Control-Allow-Headers") == "" {
-				t.Errorf("Expected Access-Control-Allow-Headers header to be set")
-			}
+					if response.Header.Get("Access-Control-Allow-Credentials") == "" {
+						t.Errorf("Expected Access-Control-Allow-Credentials header to be set")
+					}
 
-			if response.Header.Get("Access-Control-Allow-Methods") == "" {
-				t.Errorf("Expected Access-Control-Allow-Methods header to be set")
-			}
+					if response.Header.Get("Access-Control-Allow-Headers") == "" {
+						t.Errorf("Expected Access-Control-Allow-Headers header to be set")
+					}
 
-			if response.Header.Get("Access-Control-Expose-Headers") != "Date" {
-				t.Errorf("Expected Date in Access-Control-Expose-Headers header")
-			}
-		} else {
-			if response.Header.Get("Access-Control-Allow-Origin") != "" {
-				t.Errorf("Expected Access-Control-Allow-Origin header to not be set")
-			}
+					if response.Header.Get("Access-Control-Allow-Methods") == "" {
+						t.Errorf("Expected Access-Control-Allow-Methods header to be set")
+					}
 
-			if response.Header.Get("Access-Control-Allow-Credentials") != "" {
-				t.Errorf("Expected Access-Control-Allow-Credentials header to not be set")
-			}
+					if response.Header.Get("Access-Control-Expose-Headers") != "Date" {
+						t.Errorf("Expected Date in Access-Control-Expose-Headers header")
+					}
+				} else {
+					if response.Header.Get("Access-Control-Allow-Origin") != "" {
+						t.Errorf("Expected Access-Control-Allow-Origin header to not be set")
+					}
 
-			if response.Header.Get("Access-Control-Allow-Headers") != "" {
-				t.Errorf("Expected Access-Control-Allow-Headers header to not be set")
-			}
+					if response.Header.Get("Access-Control-Allow-Credentials") != "" {
+						t.Errorf("Expected Access-Control-Allow-Credentials header to not be set")
+					}
 
-			if response.Header.Get("Access-Control-Allow-Methods") != "" {
-				t.Errorf("Expected Access-Control-Allow-Methods header to not be set")
-			}
+					if response.Header.Get("Access-Control-Allow-Headers") != "" {
+						t.Errorf("Expected Access-Control-Allow-Headers header to not be set")
+					}
 
-			if response.Header.Get("Access-Control-Expose-Headers") == "Date" {
-				t.Errorf("Expected Date in Access-Control-Expose-Headers header")
-			}
+					if response.Header.Get("Access-Control-Allow-Methods") != "" {
+						t.Errorf("Expected Access-Control-Allow-Methods header to not be set")
+					}
+
+					if response.Header.Get("Access-Control-Expose-Headers") == "Date" {
+						t.Errorf("Expected Date in Access-Control-Expose-Headers header")
+					}
+				}
+			})
 		}
 	}
 }

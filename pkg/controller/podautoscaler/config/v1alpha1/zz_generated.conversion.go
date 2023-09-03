@@ -82,6 +82,7 @@ func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, ou
 }
 
 func autoConvert_v1alpha1_HPAControllerConfiguration_To_config_HPAControllerConfiguration(in *v1alpha1.HPAControllerConfiguration, out *config.HPAControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentHorizontalPodAutoscalerSyncs = in.ConcurrentHorizontalPodAutoscalerSyncs
 	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
 	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
 	out.HorizontalPodAutoscalerDownscaleStabilizationWindow = in.HorizontalPodAutoscalerDownscaleStabilizationWindow
@@ -93,6 +94,7 @@ func autoConvert_v1alpha1_HPAControllerConfiguration_To_config_HPAControllerConf
 }
 
 func autoConvert_config_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration(in *config.HPAControllerConfiguration, out *v1alpha1.HPAControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentHorizontalPodAutoscalerSyncs = in.ConcurrentHorizontalPodAutoscalerSyncs
 	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
 	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
 	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow

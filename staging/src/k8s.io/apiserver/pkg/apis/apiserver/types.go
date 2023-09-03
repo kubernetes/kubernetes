@@ -19,6 +19,7 @@ package apiserver
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -153,16 +154,47 @@ type TLSConfig struct {
 type TracingConfiguration struct {
 	metav1.TypeMeta
 
-	// +optional
-	// Endpoint of the collector that's running on the control-plane node.
-	// The APIServer uses the egressType ControlPlane when sending data to the collector.
-	// The syntax is defined in https://github.com/grpc/grpc/blob/master/doc/naming.md.
-	// Defaults to the otlp grpc default, localhost:4317
-	// The connection is insecure, and does not currently support TLS.
-	Endpoint *string
+	// Embed the component config tracing configuration struct
+	tracingapi.TracingConfiguration
+}
 
-	// +optional
-	// SamplingRatePerMillion is the number of samples to collect per million spans.
-	// Defaults to 0.
-	SamplingRatePerMillion *int32
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AuthenticationConfiguration provides versioned configuration for authentication.
+type AuthenticationConfiguration struct {
+	metav1.TypeMeta
+
+	JWT []JWTAuthenticator
+}
+
+// JWTAuthenticator provides the configuration for a single JWT authenticator.
+type JWTAuthenticator struct {
+	Issuer               Issuer
+	ClaimValidationRules []ClaimValidationRule
+	ClaimMappings        ClaimMappings
+}
+
+// Issuer provides the configuration for a external provider specific settings.
+type Issuer struct {
+	URL                  string
+	CertificateAuthority string
+	Audiences            []string
+}
+
+// ClaimValidationRule provides the configuration for a single claim validation rule.
+type ClaimValidationRule struct {
+	Claim         string
+	RequiredValue string
+}
+
+// ClaimMappings provides the configuration for claim mapping
+type ClaimMappings struct {
+	Username PrefixedClaimOrExpression
+	Groups   PrefixedClaimOrExpression
+}
+
+// PrefixedClaimOrExpression provides the configuration for a single prefixed claim or expression.
+type PrefixedClaimOrExpression struct {
+	Claim  string
+	Prefix *string
 }

@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ import (
 
 func TestSummaryProvider(t *testing.T) {
 	var (
+		ctx            = context.Background()
 		podStats       = []statsapi.PodStats{*getPodStats()}
 		imageFsStats   = getFsStats()
 		rootFsStats    = getFsStats()
@@ -60,19 +62,21 @@ func TestSummaryProvider(t *testing.T) {
 	mockStatsProvider.EXPECT().GetNode().Return(node, nil).AnyTimes()
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig).AnyTimes()
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot).AnyTimes()
-	mockStatsProvider.EXPECT().ListPodStats().Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage().Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ImageFsStats().Return(imageFsStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, nil).AnyTimes()
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil).AnyTimes()
 	mockStatsProvider.EXPECT().RlimitStats().Return(nil, nil).AnyTimes()
 	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).AnyTimes()
 
-	provider := NewSummaryProvider(mockStatsProvider)
-	summary, err := provider.Get(true)
+	kubeletCreationTime := metav1.Now()
+	systemBootTime := metav1.Now()
+	provider := summaryProviderImpl{kubeletCreationTime: kubeletCreationTime, systemBootTime: systemBootTime, provider: mockStatsProvider}
+	summary, err := provider.Get(ctx, true)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")
-	assert.Equal(summary.Node.StartTime, cgroupStatsMap["/"].cs.StartTime)
+	assert.Equal(summary.Node.StartTime, systemBootTime)
 	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
 	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
 	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)

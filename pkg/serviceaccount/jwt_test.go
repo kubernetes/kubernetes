@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
@@ -60,9 +61,9 @@ WwIDAQAB
 
 // Obtained by:
 //
-//   1. Serializing rsaPublicKey as DER
-//   2. Taking the SHA256 of the DER bytes
-//   3. URLSafe Base64-encoding the sha bytes
+//  1. Serializing rsaPublicKey as DER
+//  2. Taking the SHA256 of the DER bytes
+//  3. URLSafe Base64-encoding the sha bytes
 const rsaKeyID = "JHJehTTTZlsspKHT-GaJxK7Kd1NQgZJu3fyK6K_QDYU"
 
 // Fake value for testing.
@@ -111,9 +112,9 @@ X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 
 // Obtained by:
 //
-//   1. Serializing ecdsaPublicKey as DER
-//   2. Taking the SHA256 of the DER bytes
-//   3. URLSafe Base64-encoding the sha bytes
+//  1. Serializing ecdsaPublicKey as DER
+//  2. Taking the SHA256 of the DER bytes
+//  3. URLSafe Base64-encoding the sha bytes
 const ecdsaKeyID = "SoABiieYuNx4UdqYvZRVeuC6SihxgLrhLy9peHMHpTc"
 
 func getPrivateKey(data string) interface{} {
@@ -342,7 +343,15 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 				return tc.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 		)
-		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
+		var secretsWriter typedv1core.SecretsGetter
+		if tc.Client != nil {
+			secretsWriter = tc.Client.CoreV1()
+		}
+		validator, err := serviceaccount.NewLegacyValidator(tc.Client != nil, getter, secretsWriter)
+		if err != nil {
+			t.Fatalf("While creating legacy validator, err: %v", err)
+		}
+		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, validator)
 
 		// An invalid, non-JWT token should always fail
 		ctx := authenticator.WithAudiences(context.Background(), auds)

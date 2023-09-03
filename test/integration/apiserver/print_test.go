@@ -30,11 +30,11 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/printers"
@@ -120,7 +120,7 @@ var missingHanlders = sets.NewString(
 )
 
 func TestServerSidePrint(t *testing.T) {
-	s, _, closeFn := setupWithResources(t,
+	_, clientSet, kubeConfig, tearDownFn := setupWithResources(t,
 		// additional groupversions needed for the test to run
 		[]schema.GroupVersion{
 			{Group: "discovery.k8s.io", Version: "v1"},
@@ -136,20 +136,21 @@ func TestServerSidePrint(t *testing.T) {
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"},
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
+			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"},
 			{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"},
 		},
 		[]schema.GroupVersionResource{},
 	)
-	defer closeFn()
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("server-print", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(clientSet, "server-print", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 	tableParam := fmt.Sprintf("application/json;as=Table;g=%s;v=%s, application/json", metav1beta1.GroupName, metav1beta1.SchemeGroupVersion.Version)
 	printer := newFakePrinter(printersinternal.AddHandlers)
 
 	configFlags := genericclioptions.NewTestConfigFlags().
-		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
+		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(kubeConfig.Host), &clientcmd.ConfigOverrides{}))
 
 	restConfig, err := configFlags.ToRESTConfig()
 	if err != nil {

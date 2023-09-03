@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strings"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/common/restfuladapter"
@@ -152,7 +152,7 @@ func (o *openAPI) finalizeSwagger() (*spec.Swagger, error) {
 		}
 	}
 
-	return o.swagger, nil
+	return deduplicateParameters(o.swagger)
 }
 
 func (o *openAPI) buildDefinitionRecursively(name string) error {

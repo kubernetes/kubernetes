@@ -17,9 +17,11 @@ limitations under the License.
 package stats
 
 import (
+	"context"
+	"runtime"
 	"testing"
 
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 
@@ -30,7 +32,6 @@ import (
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -49,6 +50,11 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		namespace = "test"
 		pName0    = "pod0"
 		cName00   = "c0"
+		pName1    = "pod1"
+		cName11   = "c1"
+		pName2    = "pod2"
+		cName22   = "c2"
+		cName222  = "c222"
 	)
 	infos := map[string]cadvisorapiv2.ContainerInfo{
 		// ContainerInfo with past creation time and no CPU/memory usage for
@@ -66,16 +72,37 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		// The latest containers, which should be in the results.
 		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
 		"/pod0-c0": getTestContainerInfo(seedPod0Container0, pName0, namespace, cName00),
+
+		"/pod1-i.slice":  getTestContainerInfo(seedPod0Infra, pName1, namespace, leaky.PodInfraContainerName),
+		"/pod1-c1.slice": getTestContainerInfo(seedPod0Container0, pName1, namespace, cName11),
+
+		"/pod2-i-terminated-1": getTerminatedContainerInfo(seedPastPod0Infra, pName2, namespace, leaky.PodInfraContainerName),
+		// ContainerInfo with past creation time and no CPU/memory usage for
+		// simulating uncleaned cgroups of already terminated containers, which
+		// should not be shown in the results.
+		"/pod2-c2-terminated-1": getTerminatedContainerInfo(seedPastPod0Container0, pName2, namespace, cName22),
+
+		//ContainerInfo with no CPU/memory usage but has network usage for uncleaned cgroups, should not be filtered out
+		"/pod2-c222-zerocpumem-1": getContainerInfoWithZeroCpuMem(seedPastPod0Container0, pName2, namespace, cName222),
 	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
-	assert.Len(t, filteredInfos, 2)
-	assert.Len(t, allInfos, 6)
+	assert.Len(t, filteredInfos, 5)
+	assert.Len(t, allInfos, 11)
 	for _, c := range []string{"/pod0-i", "/pod0-c0"} {
 		if _, found := filteredInfos[c]; !found {
 			t.Errorf("%q is expected to be in the output\n", c)
 		}
 	}
-	for _, c := range []string{"pod0-i-terminated-1", "pod0-c0-terminated-1", "pod0-i-terminated-2", "pod0-c0-terminated-2", "pod0-i", "pod0-c0"} {
+
+	expectedInfoKeys := []string{"pod0-i-terminated-1", "pod0-c0-terminated-1", "pod0-i-terminated-2", "pod0-c0-terminated-2", "pod0-i", "pod0-c0"}
+	// NOTE: on Windows, IsSystemdStyleName will return false, which means that the Container Info will
+	// not be assembled by cgroup key.
+	if runtime.GOOS != "windows" {
+		expectedInfoKeys = append(expectedInfoKeys, "c1")
+	} else {
+		expectedInfoKeys = append(expectedInfoKeys, "pod1-c1.slice")
+	}
+	for _, c := range expectedInfoKeys {
 		if _, found := allInfos[c]; !found {
 			t.Errorf("%q is expected to be in the output\n", c)
 		}
@@ -83,6 +110,7 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 }
 
 func TestCadvisorListPodStats(t *testing.T) {
+	ctx := context.Background()
 	const (
 		namespace0 = "test0"
 		namespace2 = "test2"
@@ -203,6 +231,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 		info.Spec.Cpu = cadvisorapiv2.CpuSpec{}
 		info.Spec.HasMemory = false
 		info.Spec.HasCpu = false
+		info.Spec.HasNetwork = false
 		infos[name] = info
 	}
 
@@ -221,7 +250,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imagefs, nil)
 
 	mockRuntime := containertest.NewMockRuntime(mockCtrl)
-	mockRuntime.EXPECT().ImageStats().Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
+	mockRuntime.EXPECT().ImageStats(ctx).Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
 
 	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
 		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2")}
@@ -244,7 +273,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockRuntime, mockStatus, NewFakeHostStatsProvider())
-	pods, err := p.ListPodStats()
+	pods, err := p.ListPodStats(ctx)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 4, len(pods))
@@ -265,11 +294,13 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container0).Unix(), con.StartTime.Time.Unix())
 	checkCPUStats(t, "Pod0Container0", seedPod0Container0, con.CPU)
 	checkMemoryStats(t, "Pod0Conainer0", seedPod0Container0, infos["/pod0-c0"], con.Memory)
+	checkSwapStats(t, "Pod0Conainer0", seedPod0Container0, infos["/pod0-c0"], con.Swap)
 
 	con = indexCon[cName01]
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container1).Unix(), con.StartTime.Time.Unix())
 	checkCPUStats(t, "Pod0Container1", seedPod0Container1, con.CPU)
 	checkMemoryStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.Memory)
+	checkSwapStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.Swap)
 
 	assert.EqualValues(t, p0Time.Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
@@ -280,6 +311,9 @@ func TestCadvisorListPodStats(t *testing.T) {
 	if ps.Memory != nil {
 		checkMemoryStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Memory)
 	}
+	if ps.Swap != nil {
+		checkSwapStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Swap)
+	}
 
 	// Validate Pod1 Results
 	ps, found = indexPods[prf1]
@@ -289,6 +323,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.Equal(t, cName10, con.Name)
 	checkCPUStats(t, "Pod1Container0", seedPod1Container, con.CPU)
 	checkMemoryStats(t, "Pod1Container0", seedPod1Container, infos["/pod1-c0"], con.Memory)
+	checkSwapStats(t, "Pod1Container0", seedPod1Container, infos["/pod1-c0"], con.Swap)
 	checkNetworkStats(t, "Pod1", seedPod1Infra, ps.Network)
 
 	// Validate Pod2 Results
@@ -299,13 +334,15 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.Equal(t, cName20, con.Name)
 	checkCPUStats(t, "Pod2Container0", seedPod2Container, con.CPU)
 	checkMemoryStats(t, "Pod2Container0", seedPod2Container, infos["/pod2-c0"], con.Memory)
+	checkSwapStats(t, "Pod2Container0", seedPod2Container, infos["/pod2-c0"], con.Swap)
 	checkNetworkStats(t, "Pod2", seedPod2Infra, ps.Network)
 
 	// Validate Pod3 Results
 
 	ps, found = indexPods[prf3]
 	assert.True(t, found)
-	assert.Len(t, ps.Containers, 2)
+	// /pod3-c0-init has no stats should be filtered
+	assert.Len(t, ps.Containers, 1)
 	indexCon = make(map[string]statsapi.ContainerStats, len(ps.Containers))
 	for _, con := range ps.Containers {
 		indexCon[con.Name] = con
@@ -314,13 +351,11 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.Equal(t, cName31, con.Name)
 	checkCPUStats(t, "Pod3Container1", seedPod3Container1, con.CPU)
 	checkMemoryStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.Memory)
-	con = indexCon[cName30]
-	assert.Equal(t, cName30, con.Name)
-	checkEmptyCPUStats(t, "Pod3Container0", seedPod3Container0, con.CPU)
-	checkEmptyMemoryStats(t, "Pod3Container0", seedPod3Container0, infos["/pod3-c0-init"], con.Memory)
+	checkSwapStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.Swap)
 }
 
 func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
+	ctx := context.Background()
 	const (
 		namespace0 = "test0"
 		namespace2 = "test2"
@@ -414,7 +449,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, nil, nil, NewFakeHostStatsProvider())
-	pods, err := p.ListPodCPUAndMemoryStats()
+	pods, err := p.ListPodCPUAndMemoryStats(ctx)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 3, len(pods))
@@ -486,6 +521,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCadvisorImagesFsStats(t *testing.T) {
+	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	var (
@@ -499,10 +535,10 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 	)
 
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
-	mockRuntime.EXPECT().ImageStats().Return(imageStats, nil)
+	mockRuntime.EXPECT().ImageStats(ctx).Return(imageStats, nil)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
-	stats, err := provider.ImageFsStats()
+	stats, err := provider.ImageFsStats(ctx)
 	assert.NoError(err)
 
 	assert.Equal(imageFsInfo.Timestamp, stats.Time.Time)
@@ -515,6 +551,7 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 }
 
 func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
+	ctx := context.Background()
 	const (
 		namespace0 = "test0"
 	)
@@ -564,7 +601,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 		kuberuntime.BuildContainerLogsDirectory(prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName01): containerLogStats1,
 	}
 	fakeStatsSlice := []*volume.Metrics{containerLogStats0, containerLogStats1}
-	fakeOS := &kubecontainertest.FakeOS{}
+	fakeOS := &containertest.FakeOS{}
 
 	freeRootfsInodes := rootfsInodesFree
 	totalRootfsInodes := rootfsInodes
@@ -599,7 +636,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imagefs, nil)
 
 	mockRuntime := containertest.NewMockRuntime(mockCtrl)
-	mockRuntime.EXPECT().ImageStats().Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
+	mockRuntime.EXPECT().ImageStats(ctx).Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
 
 	volumeStats := serverstats.PodVolumeStats{}
 	p0Time := metav1.Now()
@@ -609,7 +646,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockRuntime, mockStatus, NewFakeHostStatsProviderWithData(fakeStats, fakeOS))
-	pods, err := p.ListPodStats()
+	pods, err := p.ListPodStats(ctx)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1, len(pods))

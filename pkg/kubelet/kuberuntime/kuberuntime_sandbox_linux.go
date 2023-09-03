@@ -21,7 +21,9 @@ package kuberuntime
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
@@ -40,8 +42,16 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 }
 
 func (m *kubeGenericRuntimeManager) calculateSandboxResources(pod *v1.Pod) *runtimeapi.LinuxContainerResources {
-	req, lim := resourcehelper.PodRequestsAndLimitsWithoutOverhead(pod)
-	return m.calculateLinuxResources(req.Cpu(), lim.Cpu(), lim.Memory())
+	opts := resourcehelper.PodResourcesOptions{
+		ExcludeOverhead: true,
+	}
+	req := resourcehelper.PodRequests(pod, opts)
+	lim := resourcehelper.PodLimits(pod, opts)
+	var cpuRequest *resource.Quantity
+	if _, cpuRequestExists := req[v1.ResourceCPU]; cpuRequestExists {
+		cpuRequest = req.Cpu()
+	}
+	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory())
 }
 
 func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {

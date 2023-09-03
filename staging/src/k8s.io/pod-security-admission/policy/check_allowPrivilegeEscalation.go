@@ -52,6 +52,11 @@ func CheckAllowPrivilegeEscalation() Check {
 				MinimumVersion: api.MajorMinorVersion(1, 8),
 				CheckPod:       allowPrivilegeEscalation_1_8,
 			},
+			{
+				// Starting 1.25, windows pods would be exempted from this check using pod.spec.os field when set to windows.
+				MinimumVersion: api.MajorMinorVersion(1, 25),
+				CheckPod:       allowPrivilegeEscalation_1_25,
+			},
 		},
 	}
 }
@@ -76,4 +81,13 @@ func allowPrivilegeEscalation_1_8(podMetadata *metav1.ObjectMeta, podSpec *corev
 		}
 	}
 	return CheckResult{Allowed: true}
+}
+
+func allowPrivilegeEscalation_1_25(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	// Pod API validation would have failed if podOS == Windows and if privilegeEscalation has been set.
+	// We can admit the Windows pod even if privilegeEscalation has not been set.
+	if podSpec.OS != nil && podSpec.OS.Name == corev1.Windows {
+		return CheckResult{Allowed: true}
+	}
+	return allowPrivilegeEscalation_1_8(podMetadata, podSpec)
 }

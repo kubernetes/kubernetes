@@ -17,7 +17,7 @@ limitations under the License.
 package warning
 
 import (
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 
 	"k8s.io/apiserver/pkg/warning"
 )

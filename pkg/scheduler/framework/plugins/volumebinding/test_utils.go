@@ -115,7 +115,7 @@ func makePVC(name string, storageClassName string) pvcBuilder {
 			Namespace: v1.NamespaceDefault,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			StorageClassName: pointer.StringPtr(storageClassName),
+			StorageClassName: pointer.String(storageClassName),
 		},
 	}}
 }
@@ -127,7 +127,7 @@ func (pvcb pvcBuilder) withBoundPV(pvName string) pvcBuilder {
 }
 
 func (pvcb pvcBuilder) withRequestStorage(request resource.Quantity) pvcBuilder {
-	pvcb.PersistentVolumeClaim.Spec.Resources = v1.ResourceRequirements{
+	pvcb.PersistentVolumeClaim.Spec.Resources = v1.VolumeResourceRequirements{
 		Requests: v1.ResourceList{
 			v1.ResourceName(v1.ResourceStorage): request,
 		},

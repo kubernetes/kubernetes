@@ -30,11 +30,12 @@ import (
 type resetData interface {
 	ForceReset() bool
 	InputReader() io.Reader
-	IgnorePreflightErrors() sets.String
+	IgnorePreflightErrors() sets.Set[string]
 	Cfg() *kubeadmapi.InitConfiguration
+	ResetCfg() *kubeadmapi.ResetConfiguration
 	DryRun() bool
 	Client() clientset.Interface
-	AddDirsToClean(dirs ...string)
 	CertificatesDir() string
 	CRISocketPath() string
+	CleanupTmpDir() bool
 }

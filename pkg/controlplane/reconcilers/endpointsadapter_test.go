@@ -26,69 +26,62 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestEndpointsAdapterGet(t *testing.T) {
-	endpoints1, _ := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
+	endpoints1, epSlice1 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
 
 	testCases := map[string]struct {
-		endpointSlicesEnabled bool
-		expectedError         error
-		expectedEndpoints     *corev1.Endpoints
-		endpoints             []*corev1.Endpoints
-		namespaceParam        string
-		nameParam             string
+		expectedError     error
+		expectedEndpoints *corev1.Endpoints
+		initialState      []runtime.Object
+		namespaceParam    string
+		nameParam         string
 	}{
 		"single-existing-endpoints": {
-			endpointSlicesEnabled: false,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints1,
-			endpoints:             []*corev1.Endpoints{endpoints1},
-			namespaceParam:        "testing",
-			nameParam:             "foo",
+			expectedError:     nil,
+			expectedEndpoints: endpoints1,
+			initialState:      []runtime.Object{endpoints1, epSlice1},
+			namespaceParam:    "testing",
+			nameParam:         "foo",
 		},
-		"single-existing-endpoints-slices-enabled": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints1,
-			endpoints:             []*corev1.Endpoints{endpoints1},
-			namespaceParam:        "testing",
-			nameParam:             "foo",
+		"endpoints exists, endpointslice does not": {
+			expectedError:     nil,
+			expectedEndpoints: endpoints1,
+			initialState:      []runtime.Object{endpoints1},
+			namespaceParam:    "testing",
+			nameParam:         "foo",
+		},
+		"endpointslice exists, endpoints does not": {
+			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
+			expectedEndpoints: nil,
+			initialState:      []runtime.Object{epSlice1},
+			namespaceParam:    "testing",
+			nameParam:         "foo",
 		},
 		"wrong-namespace": {
-			endpointSlicesEnabled: false,
-			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
-			expectedEndpoints:     nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
-			namespaceParam:        "foo",
-			nameParam:             "foo",
+			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
+			expectedEndpoints: nil,
+			initialState:      []runtime.Object{endpoints1, epSlice1},
+			namespaceParam:    "foo",
+			nameParam:         "foo",
 		},
 		"wrong-name": {
-			endpointSlicesEnabled: false,
-			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
-			expectedEndpoints:     nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
-			namespaceParam:        "testing",
-			nameParam:             "bar",
+			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
+			expectedEndpoints: nil,
+			initialState:      []runtime.Object{endpoints1, epSlice1},
+			namespaceParam:    "testing",
+			nameParam:         "bar",
 		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
-			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
-
-			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Error creating Endpoints: %v", err)
-				}
-			}
+			client := fake.NewSimpleClientset(testCase.initialState...)
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
 			endpoints, err := epAdapter.Get(testCase.namespaceParam, testCase.nameParam, metav1.GetOptions{})
 
@@ -117,76 +110,75 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 	epSlice3.AddressType = discovery.AddressTypeIPv6
 
 	testCases := map[string]struct {
-		endpointSlicesEnabled bool
-		expectedError         error
-		expectedEndpoints     *corev1.Endpoints
-		expectedEndpointSlice *discovery.EndpointSlice
-		endpoints             []*corev1.Endpoints
-		endpointSlices        []*discovery.EndpointSlice
-		namespaceParam        string
-		endpointsParam        *corev1.Endpoints
+		expectedError  error
+		expectedResult *corev1.Endpoints
+		expectCreate   []runtime.Object
+		expectUpdate   []runtime.Object
+		initialState   []runtime.Object
+		namespaceParam string
+		endpointsParam *corev1.Endpoints
 	}{
 		"single-endpoint": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints1,
-			expectedEndpointSlice: epSlice1,
-			endpoints:             []*corev1.Endpoints{},
-			namespaceParam:        endpoints1.Namespace,
-			endpointsParam:        endpoints1,
+			expectedError:  nil,
+			expectedResult: endpoints1,
+			expectCreate:   []runtime.Object{endpoints1, epSlice1},
+			initialState:   []runtime.Object{},
+			namespaceParam: endpoints1.Namespace,
+			endpointsParam: endpoints1,
 		},
 		"single-endpoint-partial-ipv6": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints2,
-			expectedEndpointSlice: epSlice2,
-			endpoints:             []*corev1.Endpoints{},
-			namespaceParam:        endpoints2.Namespace,
-			endpointsParam:        endpoints2,
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectCreate:   []runtime.Object{endpoints2, epSlice2},
+			initialState:   []runtime.Object{},
+			namespaceParam: endpoints2.Namespace,
+			endpointsParam: endpoints2,
 		},
 		"single-endpoint-full-ipv6": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints3,
-			expectedEndpointSlice: epSlice3,
-			endpoints:             []*corev1.Endpoints{},
-			namespaceParam:        endpoints3.Namespace,
-			endpointsParam:        endpoints3,
+			expectedError:  nil,
+			expectedResult: endpoints3,
+			expectCreate:   []runtime.Object{endpoints3, epSlice3},
+			initialState:   []runtime.Object{},
+			namespaceParam: endpoints3.Namespace,
+			endpointsParam: endpoints3,
 		},
-		"single-endpoint-no-slices": {
-			endpointSlicesEnabled: false,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints1,
-			expectedEndpointSlice: nil,
-			endpoints:             []*corev1.Endpoints{},
-			namespaceParam:        endpoints1.Namespace,
-			endpointsParam:        endpoints1,
+		"existing-endpoints": {
+			expectedError:  errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
+			expectedResult: nil,
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: endpoints1.Namespace,
+			endpointsParam: endpoints1,
+
+			// We expect the create to be attempted, we just also expect it to fail
+			expectCreate: []runtime.Object{endpoints1},
 		},
-		"existing-endpoint": {
-			endpointSlicesEnabled: true,
-			expectedError:         errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
-			expectedEndpoints:     nil,
-			expectedEndpointSlice: nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
-			namespaceParam:        endpoints1.Namespace,
-			endpointsParam:        endpoints1,
+		"existing-endpointslice-incorrect": {
+			// No error when we need to create the Endpoints but the correct
+			// EndpointSlice already exists
+			expectedError:  nil,
+			expectedResult: endpoints1,
+			expectCreate:   []runtime.Object{endpoints1},
+			initialState:   []runtime.Object{epSlice1},
+			namespaceParam: endpoints1.Namespace,
+			endpointsParam: endpoints1,
+		},
+		"existing-endpointslice-correct": {
+			// No error when we need to create the Endpoints but an incorrect
+			// EndpointSlice already exists
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectCreate:   []runtime.Object{endpoints2},
+			expectUpdate:   []runtime.Object{epSlice2},
+			initialState:   []runtime.Object{epSlice1},
+			namespaceParam: endpoints2.Namespace,
+			endpointsParam: endpoints2,
 		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
-			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
-
-			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Error creating Endpoints: %v", err)
-				}
-			}
+			client := fake.NewSimpleClientset(testCase.initialState...)
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
 			endpoints, err := epAdapter.Create(testCase.namespaceParam, testCase.endpointsParam)
 
@@ -194,37 +186,20 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
 			}
 
-			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedEndpoints) {
-				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedEndpoints, endpoints)
+			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedResult) {
+				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedResult, endpoints)
 			}
 
-			epSliceList, err := client.DiscoveryV1().EndpointSlices(testCase.namespaceParam).List(context.TODO(), metav1.ListOptions{})
+			err = verifyCreatesAndUpdates(client, testCase.expectCreate, testCase.expectUpdate)
 			if err != nil {
-				t.Fatalf("Error listing Endpoint Slices: %v", err)
-			}
-
-			if testCase.expectedEndpointSlice == nil {
-				if len(epSliceList.Items) != 0 {
-					t.Fatalf("Expected no Endpoint Slices, got: %v", epSliceList.Items)
-				}
-			} else {
-				if len(epSliceList.Items) == 0 {
-					t.Fatalf("No Endpoint Slices found, expected: %v", testCase.expectedEndpointSlice)
-				}
-				if len(epSliceList.Items) > 1 {
-					t.Errorf("Only 1 Endpoint Slice expected, got: %v", testCase.expectedEndpointSlice)
-				}
-				if !apiequality.Semantic.DeepEqual(*testCase.expectedEndpointSlice, epSliceList.Items[0]) {
-					t.Errorf("Expected Endpoint Slice: %v, got: %v", testCase.expectedEndpointSlice, epSliceList.Items[0])
-
-				}
+				t.Errorf("unexpected error in side effects: %v", err)
 			}
 		})
 	}
 }
 
 func TestEndpointsAdapterUpdate(t *testing.T) {
-	endpoints1, _ := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.3", "10.1.2.4"})
+	endpoints1, epSlice1 := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.3", "10.1.2.4"})
 	endpoints2, epSlice2 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 	endpoints3, _ := generateEndpointsAndSlice("bar", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 
@@ -237,68 +212,96 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 	_, epSlice4IPv4 := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.7", "10.1.2.8"})
 
 	testCases := map[string]struct {
-		endpointSlicesEnabled bool
-		expectedError         error
-		expectedEndpoints     *corev1.Endpoints
-		expectedEndpointSlice *discovery.EndpointSlice
-		endpoints             []*corev1.Endpoints
-		endpointSlices        []*discovery.EndpointSlice
-		namespaceParam        string
-		endpointsParam        *corev1.Endpoints
+		expectedError  error
+		expectedResult *corev1.Endpoints
+		expectCreate   []runtime.Object
+		expectUpdate   []runtime.Object
+		initialState   []runtime.Object
+		namespaceParam string
+		endpointsParam *corev1.Endpoints
 	}{
 		"single-existing-endpoints-no-change": {
-			endpointSlicesEnabled: false,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints1,
-			expectedEndpointSlice: nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints1,
+			expectedError:  nil,
+			expectedResult: endpoints1,
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints1,
+
+			// Even though there's no change, we still expect Update() to be
+			// called, because this unit test ALWAYS calls Update().
+			expectUpdate: []runtime.Object{endpoints1},
 		},
 		"existing-endpointslice-replaced-with-updated-ipv4-address-type": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints4,
-			expectedEndpointSlice: epSlice4IPv4,
-			endpoints:             []*corev1.Endpoints{endpoints4},
-			endpointSlices:        []*discovery.EndpointSlice{epSlice4IP},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints4,
+			expectedError:  nil,
+			expectedResult: endpoints4,
+			initialState:   []runtime.Object{endpoints4, epSlice4IP},
+			namespaceParam: "testing",
+			endpointsParam: endpoints4,
+
+			// When AddressType changes, we Delete+Create the EndpointSlice,
+			// so that shows up in expectCreate, not expectUpdate.
+			expectUpdate: []runtime.Object{endpoints4},
+			expectCreate: []runtime.Object{epSlice4IPv4},
 		},
 		"add-ports-and-ips": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints2,
-			expectedEndpointSlice: epSlice2,
-			endpoints:             []*corev1.Endpoints{endpoints1},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints2,
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectUpdate:   []runtime.Object{endpoints2, epSlice2},
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints2,
+		},
+		"endpoints-correct-endpointslice-wrong": {
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectUpdate:   []runtime.Object{endpoints2, epSlice2},
+			initialState:   []runtime.Object{endpoints2, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints2,
+		},
+		"endpointslice-correct-endpoints-wrong": {
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectUpdate:   []runtime.Object{endpoints2},
+			initialState:   []runtime.Object{endpoints1, epSlice2},
+			namespaceParam: "testing",
+			endpointsParam: endpoints2,
+		},
+		"wrong-endpoints": {
+			expectedError:  errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
+			expectedResult: nil,
+			expectUpdate:   []runtime.Object{endpoints3},
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints3,
 		},
 		"missing-endpoints": {
-			endpointSlicesEnabled: true,
-			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
-			expectedEndpoints:     nil,
-			expectedEndpointSlice: nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints3,
+			expectedError:  errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
+			expectedResult: nil,
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints3,
+
+			// We expect the update to be attempted, we just also expect it to fail
+			expectUpdate: []runtime.Object{endpoints3},
+		},
+		"missing-endpointslice": {
+			// No error when we need to update the Endpoints but the
+			// EndpointSlice doesn't exist
+			expectedError:  nil,
+			expectedResult: endpoints1,
+			expectUpdate:   []runtime.Object{endpoints1},
+			expectCreate:   []runtime.Object{epSlice1},
+			initialState:   []runtime.Object{endpoints2},
+			namespaceParam: "testing",
+			endpointsParam: endpoints1,
 		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
-			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
-
-			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Error creating Endpoints: %v", err)
-				}
-			}
+			client := fake.NewSimpleClientset(testCase.initialState...)
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
 			endpoints, err := epAdapter.Update(testCase.namespaceParam, testCase.endpointsParam)
 
@@ -306,40 +309,25 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
 			}
 
-			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedEndpoints) {
-				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedEndpoints, endpoints)
+			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedResult) {
+				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedResult, endpoints)
 			}
 
-			epSliceList, err := client.DiscoveryV1().EndpointSlices(testCase.namespaceParam).List(context.TODO(), metav1.ListOptions{})
+			err = verifyCreatesAndUpdates(client, testCase.expectCreate, testCase.expectUpdate)
 			if err != nil {
-				t.Fatalf("Error listing Endpoint Slices: %v", err)
-			}
-
-			if testCase.expectedEndpointSlice == nil {
-				if len(epSliceList.Items) != 0 {
-					t.Fatalf("Expected no Endpoint Slices, got: %v", epSliceList.Items)
-				}
-			} else {
-				if len(epSliceList.Items) == 0 {
-					t.Fatalf("No Endpoint Slices found, expected: %v", testCase.expectedEndpointSlice)
-				}
-				if len(epSliceList.Items) > 1 {
-					t.Errorf("Only 1 Endpoint Slice expected, got: %v", testCase.expectedEndpointSlice)
-				}
-				if !apiequality.Semantic.DeepEqual(*testCase.expectedEndpointSlice, epSliceList.Items[0]) {
-					t.Errorf("Expected Endpoint Slice: %v, got: %v", testCase.expectedEndpointSlice, epSliceList.Items[0])
-
-				}
+				t.Errorf("unexpected error in side effects: %v", err)
 			}
 		})
 	}
 }
 
 func generateEndpointsAndSlice(name, namespace string, ports []int, addresses []string) (*corev1.Endpoints, *discovery.EndpointSlice) {
-	objectMeta := metav1.ObjectMeta{Name: name, Namespace: namespace}
 	trueBool := true
 
-	epSlice := &discovery.EndpointSlice{ObjectMeta: objectMeta, AddressType: discovery.AddressTypeIPv4}
+	epSlice := &discovery.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Name: name, Namespace: namespace},
+		AddressType: discovery.AddressTypeIPv4,
+	}
 	epSlice.Labels = map[string]string{discovery.LabelServiceName: name}
 	subset := corev1.EndpointSubset{}
 
@@ -376,52 +364,46 @@ func generateEndpointsAndSlice(name, namespace string, ports []int, addresses []
 	}
 
 	return &corev1.Endpoints{
-		ObjectMeta: objectMeta,
-		Subsets:    []corev1.EndpointSubset{subset},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				discovery.LabelSkipMirror: "true",
+			},
+		},
+		Subsets: []corev1.EndpointSubset{subset},
 	}, epSlice
 }
 
-func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
+func TestEndpointManagerEnsureEndpointSliceFromEndpoints(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
 	endpoints2, epSlice2 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 
 	testCases := map[string]struct {
-		endpointSlicesEnabled bool
 		expectedError         error
 		expectedEndpointSlice *discovery.EndpointSlice
-		endpointSlices        []*discovery.EndpointSlice
+		initialState          []runtime.Object
 		namespaceParam        string
 		endpointsParam        *corev1.Endpoints
 	}{
 		"existing-endpointslice-no-change": {
-			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpointSlice: epSlice1,
-			endpointSlices:        []*discovery.EndpointSlice{epSlice1},
+			initialState:          []runtime.Object{epSlice1},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints1,
 		},
 		"existing-endpointslice-change": {
-			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpointSlice: epSlice2,
-			endpointSlices:        []*discovery.EndpointSlice{epSlice1},
+			initialState:          []runtime.Object{epSlice1},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints2,
 		},
 		"missing-endpointslice": {
-			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpointSlice: epSlice1,
-			endpointSlices:        []*discovery.EndpointSlice{},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints1,
-		},
-		"endpointslices-disabled": {
-			endpointSlicesEnabled: false,
-			expectedError:         nil,
-			expectedEndpointSlice: nil,
-			endpointSlices:        []*discovery.EndpointSlice{},
+			initialState:          []runtime.Object{},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints1,
 		},
@@ -429,18 +411,8 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
-			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
-
-			for _, endpointSlice := range testCase.endpointSlices {
-				_, err := client.DiscoveryV1().EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Error creating EndpointSlice: %v", err)
-				}
-			}
+			client := fake.NewSimpleClientset(testCase.initialState...)
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
 			err := epAdapter.EnsureEndpointSliceFromEndpoints(testCase.namespaceParam, testCase.endpointsParam)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {

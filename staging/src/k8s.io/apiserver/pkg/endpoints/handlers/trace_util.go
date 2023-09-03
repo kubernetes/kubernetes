@@ -19,15 +19,19 @@ package handlers
 import (
 	"net/http"
 
-	utiltrace "k8s.io/utils/trace"
+	"go.opentelemetry.io/otel/attribute"
 )
 
-func traceFields(req *http.Request) []utiltrace.Field {
-	return []utiltrace.Field{
-		{Key: "url", Value: req.URL.Path},
-		{Key: "user-agent", Value: &lazyTruncatedUserAgent{req: req}},
-		{Key: "audit-id", Value: &lazyAuditID{req: req}},
-		{Key: "client", Value: &lazyClientIP{req: req}},
-		{Key: "accept", Value: &lazyAccept{req: req}},
-		{Key: "protocol", Value: req.Proto}}
+func traceFields(req *http.Request) []attribute.KeyValue {
+	return []attribute.KeyValue{
+		attribute.Stringer("accept", &lazyAccept{req: req}),
+		attribute.Stringer("audit-id", &lazyAuditID{req: req}),
+		attribute.Stringer("client", &lazyClientIP{req: req}),
+		attribute.String("protocol", req.Proto),
+		attribute.Stringer("resource", &lazyResource{req: req}),
+		attribute.Stringer("scope", &lazyScope{req: req}),
+		attribute.String("url", req.URL.Path),
+		attribute.Stringer("user-agent", &lazyTruncatedUserAgent{req: req}),
+		attribute.Stringer("verb", &lazyVerb{req: req}),
+	}
 }

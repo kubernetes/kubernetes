@@ -21,9 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"text/template"
 
-	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -46,46 +44,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-)
-
-var (
-	initDoneTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
-		Your Kubernetes control-plane has initialized successfully!
-
-		To start using your cluster, you need to run the following as a regular user:
-
-		  mkdir -p $HOME/.kube
-		  sudo cp -i {{.KubeConfigPath}} $HOME/.kube/config
-		  sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-		Alternatively, if you are the root user, you can run:
-
-		  export KUBECONFIG=/etc/kubernetes/admin.conf
-
-		You should now deploy a pod network to the cluster.
-		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
-		  https://kubernetes.io/docs/concepts/cluster-administration/addons/
-
-		{{if .ControlPlaneEndpoint -}}
-		{{if .UploadCerts -}}
-		You can now join any number of the control-plane node running the following command on each as root:
-
-		  {{.joinControlPlaneCommand}}
-
-		Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
-		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
-		"kubeadm init phase upload-certs --upload-certs" to reload certs afterward.
-
-		{{else -}}
-		You can now join any number of control-plane nodes by copying certificate authorities
-		and service account keys on each node and then running the following as root:
-
-		  {{.joinControlPlaneCommand}}
-
-		{{end}}{{end}}Then you can join any number of worker nodes by running the following on each as root:
-
-		{{.joinWorkerCommand}}
-		`)))
 )
 
 // initOptions defines all the init options exposed via flags by kubeadm init.
@@ -118,7 +76,7 @@ type initData struct {
 	dryRun                  bool
 	kubeconfigDir           string
 	kubeconfigPath          string
-	ignorePreflightErrors   sets.String
+	ignorePreflightErrors   sets.Set[string]
 	certificatesDir         string
 	dryRunDir               string
 	externalCA              bool
@@ -131,7 +89,7 @@ type initData struct {
 
 // newCmdInit returns "kubeadm init" command.
 // NB. initOptions is exposed as parameter for allowing unit testing of
-//     the newInitOptions method, that implements all the command options validation logic
+// the newInitOptions method, that implements all the command options validation logic
 func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	if initOptions == nil {
 		initOptions = newInitOptions()
@@ -150,16 +108,12 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			data := c.(*initData)
 			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
-			if err := initRunner.Run(args); err != nil {
-				return err
-			}
-
-			return showJoinCommand(data, out)
+			return initRunner.Run(args)
 		},
 		Args: cobra.NoArgs,
 	}
 
-	// adds flags to the init command
+	// add flags to the init command.
 	// init command local flags could be eventually inherited by the sub-commands automatically generated for phases
 	AddInitConfigFlags(cmd.Flags(), initOptions.externalInitCfg)
 	AddClusterConfigFlags(cmd.Flags(), initOptions.externalClusterCfg, &initOptions.featureGatesString)
@@ -180,9 +134,9 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(phases.NewPreflightPhase())
 	initRunner.AppendPhase(phases.NewCertsPhase())
 	initRunner.AppendPhase(phases.NewKubeConfigPhase())
-	initRunner.AppendPhase(phases.NewKubeletStartPhase())
-	initRunner.AppendPhase(phases.NewControlPlanePhase())
 	initRunner.AppendPhase(phases.NewEtcdPhase())
+	initRunner.AppendPhase(phases.NewControlPlanePhase())
+	initRunner.AppendPhase(phases.NewKubeletStartPhase())
 	initRunner.AppendPhase(phases.NewWaitControlPlanePhase())
 	initRunner.AppendPhase(phases.NewUploadConfigPhase())
 	initRunner.AppendPhase(phases.NewUploadCertsPhase())
@@ -190,10 +144,16 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
 	initRunner.AppendPhase(phases.NewKubeletFinalizePhase())
 	initRunner.AppendPhase(phases.NewAddonPhase())
+	initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	initRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
+			// avoid CRI detection
+			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
+			initOptions.externalInitCfg.NodeRegistration.CRISocket = kubeadmconstants.UnknownCRISocket
+		}
 		data, err := newInitData(cmd, args, initOptions, out)
 		if err != nil {
 			return nil, err
@@ -319,15 +279,15 @@ func newInitOptions() *initOptions {
 // newInitData returns a new initData struct to be used for the execution of the kubeadm init workflow.
 // This func takes care of validating initOptions passed to the command, and then it converts
 // options into the internal InitConfiguration type that is used as input all the phases in the kubeadm init workflow
-func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io.Writer) (*initData, error) {
+func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, out io.Writer) (*initData, error) {
 	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
-	kubeadmscheme.Scheme.Default(options.externalInitCfg)
-	kubeadmscheme.Scheme.Default(options.externalClusterCfg)
+	kubeadmscheme.Scheme.Default(initOptions.externalInitCfg)
+	kubeadmscheme.Scheme.Default(initOptions.externalClusterCfg)
 
 	// Validate standalone flags values and/or combination of flags and then assigns
 	// validated values to the public kubeadm config API when applicable
 	var err error
-	if options.externalClusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, options.featureGatesString); err != nil {
+	if initOptions.externalClusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, initOptions.featureGatesString); err != nil {
 		return nil, err
 	}
 
@@ -335,27 +295,27 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		return nil, err
 	}
 
-	if err = options.bto.ApplyTo(options.externalInitCfg); err != nil {
+	if err = initOptions.bto.ApplyTo(initOptions.externalInitCfg); err != nil {
 		return nil, err
 	}
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
 	// and validates InitConfiguration
-	cfg, err := configutil.LoadOrDefaultInitConfiguration(options.cfgPath, options.externalInitCfg, options.externalClusterCfg)
+	cfg, err := configutil.LoadOrDefaultInitConfiguration(initOptions.cfgPath, initOptions.externalInitCfg, initOptions.externalClusterCfg)
 	if err != nil {
 		return nil, err
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(initOptions.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {
 		return nil, err
 	}
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	// override node name from the command line option
-	if options.externalInitCfg.NodeRegistration.Name != "" {
-		cfg.NodeRegistration.Name = options.externalInitCfg.NodeRegistration.Name
+	if initOptions.externalInitCfg.NodeRegistration.Name != "" {
+		cfg.NodeRegistration.Name = initOptions.externalInitCfg.NodeRegistration.Name
 	}
 
 	if err := configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
@@ -367,7 +327,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 
 	// if dry running creates a temporary folder for saving kubeadm generated files
 	dryRunDir := ""
-	if options.dryRun {
+	if initOptions.dryRun || cfg.DryRun {
 		// the KUBEADM_INIT_DRYRUN_DIR environment variable allows overriding the dry-run temporary
 		// directory from the command line. This makes it possible to run "kubeadm init" integration
 		// tests without root.
@@ -387,7 +347,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 
 		// Validate that also the required kubeconfig files exists and are invalid, because
 		// kubeadm can't regenerate them without the CA Key
-		kubeconfigDir := options.kubeconfigDir
+		kubeconfigDir := initOptions.kubeconfigDir
 		if err := kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
 			return nil, err
 		}
@@ -403,24 +363,24 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		}
 	}
 
-	if options.uploadCerts && (externalCA || externalFrontProxyCA) {
+	if initOptions.uploadCerts && (externalCA || externalFrontProxyCA) {
 		return nil, errors.New("can't use upload-certs with an external CA or an external front-proxy CA")
 	}
 
 	return &initData{
 		cfg:                     cfg,
 		certificatesDir:         cfg.CertificatesDir,
-		skipTokenPrint:          options.skipTokenPrint,
-		dryRun:                  options.dryRun,
+		skipTokenPrint:          initOptions.skipTokenPrint,
+		dryRun:                  cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, cfg.DryRun, initOptions.dryRun).(bool),
 		dryRunDir:               dryRunDir,
-		kubeconfigDir:           options.kubeconfigDir,
-		kubeconfigPath:          options.kubeconfigPath,
+		kubeconfigDir:           initOptions.kubeconfigDir,
+		kubeconfigPath:          initOptions.kubeconfigPath,
 		ignorePreflightErrors:   ignorePreflightErrorsSet,
 		externalCA:              externalCA,
 		outputWriter:            out,
-		uploadCerts:             options.uploadCerts,
-		skipCertificateKeyPrint: options.skipCertificateKeyPrint,
-		patchesDir:              options.patchesDir,
+		uploadCerts:             initOptions.uploadCerts,
+		skipCertificateKeyPrint: initOptions.skipCertificateKeyPrint,
+		patchesDir:              initOptions.patchesDir,
 	}, nil
 }
 
@@ -460,7 +420,7 @@ func (d *initData) SkipTokenPrint() bool {
 }
 
 // IgnorePreflightErrors returns the IgnorePreflightErrors flag.
-func (d *initData) IgnorePreflightErrors() sets.String {
+func (d *initData) IgnorePreflightErrors() sets.Set[string] {
 	return d.ignorePreflightErrors
 }
 
@@ -563,40 +523,4 @@ func (d *initData) PatchesDir() string {
 		return d.cfg.Patches.Directory
 	}
 	return ""
-}
-
-func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
-	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.CertificateKey(), i.skipTokenPrint, i.skipCertificateKeyPrint)
-	if err != nil {
-		return err
-	}
-
-	joinWorkerCommand, err := cmdutil.GetJoinWorkerCommand(adminKubeConfigPath, token, i.skipTokenPrint)
-	if err != nil {
-		return err
-	}
-
-	ctx := map[string]interface{}{
-		"KubeConfigPath":          adminKubeConfigPath,
-		"ControlPlaneEndpoint":    i.Cfg().ControlPlaneEndpoint,
-		"UploadCerts":             i.uploadCerts,
-		"joinControlPlaneCommand": joinControlPlaneCommand,
-		"joinWorkerCommand":       joinWorkerCommand,
-	}
-
-	return initDoneTempl.Execute(out, ctx)
-}
-
-// showJoinCommand prints the join command after all the phases in init have finished
-func showJoinCommand(i *initData, out io.Writer) error {
-	adminKubeConfigPath := i.KubeConfigPath()
-
-	// Prints the join command, multiple times in case the user has multiple tokens
-	for _, token := range i.Tokens() {
-		if err := printJoinCommand(out, adminKubeConfigPath, token, i); err != nil {
-			return errors.Wrap(err, "failed to print join command")
-		}
-	}
-
-	return nil
 }

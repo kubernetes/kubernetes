@@ -46,6 +46,7 @@ func TestCertRotation(t *testing.T) {
 	defer close(stopCh)
 
 	transport.CertCallbackRefreshDuration = 1 * time.Second
+	transport.DialerStopCh = stopCh
 
 	certDir := os.TempDir()
 	clientCAFilename, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)
@@ -103,6 +104,7 @@ func TestCertRotationContinuousRequests(t *testing.T) {
 	defer close(stopCh)
 
 	transport.CertCallbackRefreshDuration = 1 * time.Second
+	transport.DialerStopCh = stopCh
 
 	certDir := os.TempDir()
 	clientCAFilename, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)
@@ -181,10 +183,12 @@ func writeCerts(t *testing.T, clientSigningCert *x509.Certificate, clientSigning
 		t.Fatal(err)
 	}
 
-	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
+	// returns a uniform random value in [0, max-1), then add 1 to serial to make it a uniform random value in [1, max).
+	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
 	if err != nil {
 		t.Fatal(err)
 	}
+	serial = new(big.Int).Add(serial, big.NewInt(1))
 
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{

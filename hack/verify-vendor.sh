@@ -74,7 +74,7 @@ pushd "${KUBE_ROOT}" > /dev/null 2>&1
     ret=1
   fi
 
-  if ! _out="$(diff -Naupr -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor "${_kubetmp}/vendor")"; then
+  if ! _out="$(diff -Naupr -x "AUTHORS*" -x "CONTRIBUTORS*" vendor "${_kubetmp}/vendor")"; then
     echo "Your vendored results are different:" >&2
     echo "${_out}" >&2
     echo "Vendor Verify failed." >&2
@@ -91,6 +91,18 @@ popd > /dev/null 2>&1
 if [[ ${ret} -gt 0 ]]; then
   exit ${ret}
 fi
+
+# Ensure we can tidy every repo using only its recorded versions
+for repo in $(kube::util::list_staging_repos); do
+  pushd "${_kubetmp}/staging/src/k8s.io/${repo}" >/dev/null 2>&1
+    echo "Tidying k8s.io/${repo}..."
+    GODEBUG=gocacheverify=1 go mod tidy
+  popd >/dev/null 2>&1
+done
+pushd "${_kubetmp}" >/dev/null 2>&1
+  echo "Tidying k8s.io/kubernetes..."
+  GODEBUG=gocacheverify=1 go mod tidy
+popd >/dev/null 2>&1
 
 echo "Vendor Verified."
 # ex: ts=2 sw=2 et filetype=sh

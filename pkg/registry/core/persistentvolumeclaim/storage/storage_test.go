@@ -20,13 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -62,7 +62,7 @@ func validNewPersistentVolumeClaim(name, ns string) *api.PersistentVolumeClaim {
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			Resources: api.ResourceRequirements{
+			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
@@ -178,7 +178,7 @@ func TestUpdateStatus(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			Resources: api.ResourceRequirements{
+			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("3Gi"),
 				},
@@ -200,7 +200,7 @@ func TestUpdateStatus(t *testing.T) {
 	pvcOut := obj.(*api.PersistentVolumeClaim)
 	// only compare relevant changes b/c of difference in metadata
 	if !apiequality.Semantic.DeepEqual(pvc.Status, pvcOut.Status) {
-		t.Errorf("unexpected object: %s", diff.ObjectDiff(pvc.Status, pvcOut.Status))
+		t.Errorf("unexpected object: %s", cmp.Diff(pvc.Status, pvcOut.Status))
 	}
 }
 
@@ -216,8 +216,11 @@ func TestDefaultOnReadPvc(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-
 	dataSource := api.TypedLocalObjectReference{
+		Kind: "PersistentVolumeClaim",
+		Name: "my-pvc",
+	}
+	dataSourceRef := api.TypedObjectReference{
 		Kind: "PersistentVolumeClaim",
 		Name: "my-pvc",
 	}
@@ -278,15 +281,15 @@ func TestDefaultOnReadPvc(t *testing.T) {
 				pvc.Spec.DataSource = dataSource.DeepCopy()
 			}
 			if test.dataSourceRef {
-				pvc.Spec.DataSourceRef = dataSource.DeepCopy()
+				pvc.Spec.DataSourceRef = dataSourceRef.DeepCopy()
 			}
 			var expectDataSource *api.TypedLocalObjectReference
 			if test.want {
 				expectDataSource = &dataSource
 			}
-			var expectDataSourceRef *api.TypedLocalObjectReference
+			var expectDataSourceRef *api.TypedObjectReference
 			if test.wantRef {
-				expectDataSourceRef = &dataSource
+				expectDataSourceRef = &dataSourceRef
 			}
 
 			// Method under test

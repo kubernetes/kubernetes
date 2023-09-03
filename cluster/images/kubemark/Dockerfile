@@ -19,6 +19,6 @@
 # See https://console.cloud.google.com/gcr/images/k8s-staging-build-image/global/go-runner
 # for a list of available versions. This base image should be updated
 # periodically.
-FROM k8s.gcr.io/build-image/go-runner:v2.3.1-go1.17.2-bullseye.0
+FROM registry.k8s.io/build-image/go-runner:v2.3.1-go1.17.2-bullseye.0
 
 COPY kubemark /kubemark

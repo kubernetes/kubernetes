@@ -275,7 +275,7 @@ func (t RegisterWithTaintsVar) Set(s string) error {
 	}
 	var taints []v1.Taint
 	for _, ct := range corev1Taints {
-		taints = append(taints, v1.Taint{Key: ct.Key, Value: ct.Value, Effect: v1.TaintEffect(ct.Effect)})
+		taints = append(taints, v1.Taint{Key: ct.Key, Value: ct.Value, Effect: ct.Effect})
 	}
 	*t.Value = taints
 	return nil

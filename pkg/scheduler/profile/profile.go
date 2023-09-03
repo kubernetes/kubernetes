@@ -18,6 +18,7 @@ limitations under the License.
 package profile
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -34,24 +35,24 @@ import (
 type RecorderFactory func(string) events.EventRecorder
 
 // newProfile builds a Profile for the given configuration.
-func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
+func newProfile(ctx context.Context, cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
 	opts ...frameworkruntime.Option) (framework.Framework, error) {
 	recorder := recorderFact(cfg.SchedulerName)
 	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
-	return frameworkruntime.NewFramework(r, &cfg, opts...)
+	return frameworkruntime.NewFramework(ctx, r, &cfg, opts...)
 }
 
 // Map holds frameworks indexed by scheduler name.
 type Map map[string]framework.Framework
 
 // NewMap builds the frameworks given by the configuration, indexed by name.
-func NewMap(cfgs []config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
+func NewMap(ctx context.Context, cfgs []config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
 	opts ...frameworkruntime.Option) (Map, error) {
 	m := make(Map)
 	v := cfgValidator{m: m}
 
 	for _, cfg := range cfgs {
-		p, err := newProfile(cfg, r, recorderFact, opts...)
+		p, err := newProfile(ctx, cfg, r, recorderFact, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("creating profile for scheduler name %s: %v", cfg.SchedulerName, err)
 		}
@@ -98,6 +99,7 @@ func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile, f framework.Fra
 	for _, plCfg := range cfg.PluginConfig {
 		if plCfg.Name == queueSort {
 			queueSortArgs = plCfg.Args
+			break
 		}
 	}
 	if len(v.queueSort) == 0 {

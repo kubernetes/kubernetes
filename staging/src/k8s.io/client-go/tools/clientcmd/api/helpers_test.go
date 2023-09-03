@@ -17,23 +17,25 @@ limitations under the License.
 package api
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
+
+	utiltesting "k8s.io/client-go/util/testing"
 
 	"sigs.k8s.io/yaml"
 )
 
 func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caContent string, t *testing.T) Config {
-	if err := ioutil.WriteFile(certFile, []byte(certContent), 0644); err != nil {
+	if err := os.WriteFile(certFile, []byte(certContent), 0644); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := ioutil.WriteFile(keyFile, []byte(keyContent), 0600); err != nil {
+	if err := os.WriteFile(keyFile, []byte(keyContent), 0600); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := ioutil.WriteFile(caFile, []byte(caContent), 0644); err != nil {
+	if err := os.WriteFile(caFile, []byte(caContent), 0644); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -52,12 +54,10 @@ func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caConte
 }
 
 func TestMinifySuccess(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(caFile.Name())
+	certFile, _ := os.CreateTemp("", "")
+	keyFile, _ := os.CreateTemp("", "")
+	caFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 
@@ -88,12 +88,10 @@ func TestMinifySuccess(t *testing.T) {
 }
 
 func TestMinifyMissingContext(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(caFile.Name())
+	certFile, _ := os.CreateTemp("", "")
+	keyFile, _ := os.CreateTemp("", "")
+	caFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 	mutatingConfig.CurrentContext = "missing"
@@ -106,12 +104,10 @@ func TestMinifyMissingContext(t *testing.T) {
 }
 
 func TestMinifyMissingCluster(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(caFile.Name())
+	certFile, _ := os.CreateTemp("", "")
+	keyFile, _ := os.CreateTemp("", "")
+	caFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 	delete(mutatingConfig.Clusters, mutatingConfig.Contexts[mutatingConfig.CurrentContext].Cluster)
@@ -124,12 +120,10 @@ func TestMinifyMissingCluster(t *testing.T) {
 }
 
 func TestMinifyMissingAuthInfo(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(caFile.Name())
+	certFile, _ := os.CreateTemp("", "")
+	keyFile, _ := os.CreateTemp("", "")
+	caFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 	delete(mutatingConfig.AuthInfos, mutatingConfig.Contexts[mutatingConfig.CurrentContext].AuthInfo)
@@ -142,12 +136,10 @@ func TestMinifyMissingAuthInfo(t *testing.T) {
 }
 
 func TestFlattenSuccess(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(caFile.Name())
+	certFile, _ := os.CreateTemp("", "")
+	keyFile, _ := os.CreateTemp("", "")
+	caFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	certData := "cert"
 	keyData := "key"
@@ -207,12 +199,10 @@ func TestFlattenSuccess(t *testing.T) {
 }
 
 func Example_minifyAndShorten() {
-	certFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(caFile.Name())
+	certFile, _ := os.CreateTemp("", "")
+	keyFile, _ := os.CreateTemp("", "")
+	caFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(&testing.T{}, certFile, keyFile, caFile)
 
 	certData := "cert"
 	keyData := "key"
@@ -228,31 +218,26 @@ func Example_minifyAndShorten() {
 	// Output:
 	// clusters:
 	//   cow-cluster:
-	//     LocationOfOrigin: ""
 	//     certificate-authority-data: DATA+OMITTED
 	//     server: http://cow.org:8080
 	// contexts:
 	//   federal-context:
-	//     LocationOfOrigin: ""
 	//     cluster: cow-cluster
 	//     user: red-user
 	// current-context: federal-context
 	// preferences: {}
 	// users:
 	//   red-user:
-	//     LocationOfOrigin: ""
-	//     client-certificate-data: REDACTED
-	//     client-key-data: REDACTED
+	//     client-certificate-data: DATA+OMITTED
+	//     client-key-data: DATA+OMITTED
 	//     token: REDACTED
 }
 
 func TestShortenSuccess(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(caFile.Name())
+	certFile, _ := os.CreateTemp("", "")
+	keyFile, _ := os.CreateTemp("", "")
+	caFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	certData := "cert"
 	keyData := "key"
@@ -275,7 +260,6 @@ func TestShortenSuccess(t *testing.T) {
 		t.Errorf("expected %v, got %v", startingConfig.Contexts, mutatingConfig.Contexts)
 	}
 
-	redacted := string(redactedBytes)
 	dataOmitted := string(dataOmittedBytes)
 	if len(mutatingConfig.Clusters) != 2 {
 		t.Errorf("unexpected clusters: %v", mutatingConfig.Clusters)
@@ -293,13 +277,65 @@ func TestShortenSuccess(t *testing.T) {
 	if !reflect.DeepEqual(startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo]) {
 		t.Errorf("expected %v, got %v", startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo])
 	}
-	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData) != redacted {
-		t.Errorf("expected %v, got %v", redacted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData))
+	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData) != dataOmitted {
+		t.Errorf("expected %v, got %v", dataOmitted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData))
 	}
-	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData) != redacted {
-		t.Errorf("expected %v, got %v", redacted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData))
+	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData) != dataOmitted {
+		t.Errorf("expected %v, got %v", dataOmitted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData))
+	}
+	if mutatingConfig.AuthInfos[changingAuthInfo].Token != "REDACTED" {
+		t.Errorf("expected REDACTED, got %q", mutatingConfig.AuthInfos[changingAuthInfo].Token)
+	}
+}
+
+func TestRedactSecrets(t *testing.T) {
+	certFile, _ := os.CreateTemp("", "")
+	defer os.Remove(certFile.Name())
+	keyFile, _ := os.CreateTemp("", "")
+	defer os.Remove(keyFile.Name())
+	caFile, _ := os.CreateTemp("", "")
+	defer os.Remove(caFile.Name())
+
+	certData := "cert"
+	keyData := "key"
+	caData := "ca"
+
+	unchangingCluster := "chicken-cluster"
+	unchangingAuthInfo := "blue-user"
+	changingAuthInfo := "red-user"
+
+	startingConfig := newMergedConfig(certFile.Name(), certData, keyFile.Name(), keyData, caFile.Name(), caData, t)
+	mutatingConfig := startingConfig
+
+	err := RedactSecrets(&mutatingConfig)
+	if err != nil {
+		t.Errorf("unexpected error redacting secrets:\n%v", err)
+	}
+
+	if len(mutatingConfig.Contexts) != 2 {
+		t.Errorf("unexpected contexts: %v", mutatingConfig.Contexts)
+	}
+	if !reflect.DeepEqual(startingConfig.Contexts, mutatingConfig.Contexts) {
+		t.Errorf("expected %v, got %v", startingConfig.Contexts, mutatingConfig.Contexts)
+	}
+
+	if len(mutatingConfig.Clusters) != 2 {
+		t.Errorf("unexpected clusters: %v", mutatingConfig.Clusters)
+	}
+	if !reflect.DeepEqual(startingConfig.Clusters[unchangingCluster], mutatingConfig.Clusters[unchangingCluster]) {
+		t.Errorf("expected %v, got %v", startingConfig.Clusters[unchangingCluster], mutatingConfig.Clusters[unchangingCluster])
+	}
+
+	if len(mutatingConfig.AuthInfos) != 2 {
+		t.Errorf("unexpected users: %v", mutatingConfig.AuthInfos)
+	}
+	if !reflect.DeepEqual(startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo]) {
+		t.Errorf("expected %v, got %v", startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo])
 	}
 	if mutatingConfig.AuthInfos[changingAuthInfo].Token != "REDACTED" {
 		t.Errorf("expected REDACTED, got %v", mutatingConfig.AuthInfos[changingAuthInfo].Token)
+	}
+	if !bytes.Equal(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData, []byte("REDACTED")) {
+		t.Errorf("expected REDACTED, got %s", mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData)
 	}
 }

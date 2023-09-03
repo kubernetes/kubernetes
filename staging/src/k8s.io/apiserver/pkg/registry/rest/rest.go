@@ -89,6 +89,12 @@ type CategoriesProvider interface {
 	Categories() []string
 }
 
+// SingularNameProvider returns singular name of resources. This is used by kubectl discovery to have singular
+// name representation of resources. In case of shortcut conflicts(with CRD shortcuts) singular name should always map to this resource.
+type SingularNameProvider interface {
+	GetSingularName() string
+}
+
 // GroupVersionKindProvider is used to specify a particular GroupVersionKind to discovery.  This is used for polymorphic endpoints
 // which generally point to foreign versions.  Scale refers to Scale.v1beta1.extensions for instance.
 // This trumps KindProvider since it is capable of providing the information required.
@@ -201,6 +207,13 @@ type NamedCreater interface {
 	// This is needed for create operations on subresources which include the name of the parent
 	// resource in the path.
 	Create(ctx context.Context, name string, obj runtime.Object, createValidation ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error)
+}
+
+// SubresourceObjectMetaPreserver adds configuration options to a Creater for subresources.
+type SubresourceObjectMetaPreserver interface {
+	// PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate indicates that a
+	// handler should preserve fields of ObjectMeta that are managed by the system.
+	PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() bool
 }
 
 // UpdatedObjectInfo provides information about an updated object to an Updater.

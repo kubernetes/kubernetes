@@ -38,6 +38,9 @@ func init() {
 			return nil
 		},
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
+			if p.Spec.OS != nil && p.Spec.OS.Name == corev1.Windows {
+				return []*corev1.Pod{}
+			}
 			return []*corev1.Pod{
 				// explicit true
 				tweak(p, func(p *corev1.Pod) {

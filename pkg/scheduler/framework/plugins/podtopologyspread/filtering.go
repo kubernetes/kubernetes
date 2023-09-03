@@ -147,34 +147,15 @@ func (p *criticalPaths) update(tpVal string, num int) {
 	}
 }
 
-func (s *preFilterState) updateWithPod(updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int) {
-	if s == nil || updatedPod.Namespace != preemptorPod.Namespace || node == nil {
-		return
-	}
-	if !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
-		return
-	}
-
-	podLabelSet := labels.Set(updatedPod.Labels)
-	for _, constraint := range s.Constraints {
-		if !constraint.Selector.Matches(podLabelSet) {
-			continue
-		}
-
-		k, v := constraint.TopologyKey, node.Labels[constraint.TopologyKey]
-		pair := topologyPair{key: k, value: v}
-		s.TpPairToMatchNum[pair] += delta
-
-		s.TpKeyToCriticalPaths[k].update(v, s.TpPairToMatchNum[pair])
-	}
-}
-
 // PreFilter invoked at the prefilter extension point.
 func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	s, err := pl.calPreFilterState(ctx, pod)
 	if err != nil {
 		return nil, framework.AsStatus(err)
+	} else if s != nil && len(s.Constraints) == 0 {
+		return nil, framework.NewStatus(framework.Skip)
 	}
+
 	cycleState.Write(preFilterStateKey, s)
 	return nil, nil
 }
@@ -191,7 +172,7 @@ func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState *framework.C
 		return framework.AsStatus(err)
 	}
 
-	s.updateWithPod(podInfoToAdd.Pod, podToSchedule, nodeInfo.Node(), 1)
+	pl.updateWithPod(s, podInfoToAdd.Pod, podToSchedule, nodeInfo.Node(), 1)
 	return nil
 }
 
@@ -202,8 +183,43 @@ func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState *framewor
 		return framework.AsStatus(err)
 	}
 
-	s.updateWithPod(podInfoToRemove.Pod, podToSchedule, nodeInfo.Node(), -1)
+	pl.updateWithPod(s, podInfoToRemove.Pod, podToSchedule, nodeInfo.Node(), -1)
 	return nil
+}
+
+func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int) {
+	if s == nil || updatedPod.Namespace != preemptorPod.Namespace || node == nil {
+		return
+	}
+	if !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
+		return
+	}
+
+	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(preemptorPod)
+	if !pl.enableNodeInclusionPolicyInPodTopologySpread {
+		// spreading is applied to nodes that pass those filters.
+		// Ignore parsing errors for backwards compatibility.
+		if match, _ := requiredSchedulingTerm.Match(node); !match {
+			return
+		}
+	}
+
+	podLabelSet := labels.Set(updatedPod.Labels)
+	for _, constraint := range s.Constraints {
+		if !constraint.Selector.Matches(podLabelSet) {
+			continue
+		}
+
+		if pl.enableNodeInclusionPolicyInPodTopologySpread &&
+			!constraint.matchNodeInclusionPolicies(preemptorPod, node, requiredSchedulingTerm) {
+			continue
+		}
+
+		k, v := constraint.TopologyKey, node.Labels[constraint.TopologyKey]
+		pair := topologyPair{key: k, value: v}
+		s.TpPairToMatchNum[pair] += delta
+		s.TpKeyToCriticalPaths[k].update(v, s.TpPairToMatchNum[pair])
+	}
 }
 
 // getPreFilterState fetches a pre-computed preFilterState.
@@ -223,19 +239,15 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
 func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod) (*preFilterState, error) {
-	allNodes, err := pl.sharedLister.NodeInfos().List()
-	if err != nil {
-		return nil, fmt.Errorf("listing NodeInfos: %w", err)
-	}
 	var constraints []topologySpreadConstraint
+	var err error
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		// We have feature gating in APIServer to strip the spec
 		// so don't need to re-check feature gate, just check length of Constraints.
-		constraints, err = filterTopologySpreadConstraints(
+		constraints, err = pl.filterTopologySpreadConstraints(
 			pod.Spec.TopologySpreadConstraints,
+			pod.Labels,
 			v1.DoNotSchedule,
-			pl.enableMinDomainsInPodTopologySpread,
-			pl.enableNodeInclusionPolicyInPodTopologySpread,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("obtaining pod's hard topology spread constraints: %w", err)
@@ -250,6 +262,11 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		return &preFilterState{}, nil
 	}
 
+	allNodes, err := pl.sharedLister.NodeInfos().List()
+	if err != nil {
+		return nil, fmt.Errorf("listing NodeInfos: %w", err)
+	}
+
 	s := preFilterState{
 		Constraints:          constraints,
 		TpKeyToCriticalPaths: make(map[string]*criticalPaths, len(constraints)),
@@ -261,10 +278,6 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
-		if node == nil {
-			klog.ErrorS(nil, "Node not found")
-			return
-		}
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
 			// spreading is applied to nodes that pass those filters.
@@ -292,7 +305,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		}
 		tpCountsByNode[i] = tpCounts
 	}
-	pl.parallelizer.Until(ctx, len(allNodes), processNode)
+	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 
 	for _, tpCounts := range tpCountsByNode {
 		for tp, count := range tpCounts {
@@ -321,9 +334,6 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 // Filter invoked at the filter extension point.
 func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.AsStatus(fmt.Errorf("node not found"))
-	}
 
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
@@ -335,13 +345,22 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	podLabelSet := labels.Set(pod.Labels)
 	for _, c := range s.Constraints {
 		tpKey := c.TopologyKey
 		tpVal, ok := node.Labels[c.TopologyKey]
 		if !ok {
-			klog.V(5).InfoS("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)
+			logger.V(5).Info("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
+		}
+
+		// judging criteria:
+		// 'existing matching num' + 'if self-match (1 or 0)' - 'global minimum' <= 'maxSkew'
+		minMatchNum, err := s.minMatchNum(tpKey, c.MinDomains, pl.enableMinDomainsInPodTopologySpread)
+		if err != nil {
+			logger.Error(err, "Internal error occurred while retrieving value precalculated in PreFilter", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
+			continue
 		}
 
 		selfMatchNum := 0
@@ -350,22 +369,13 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		}
 
 		pair := topologyPair{key: tpKey, value: tpVal}
-
-		// judging criteria:
-		// 'existing matching num' + 'if self-match (1 or 0)' - 'global minimum' <= 'maxSkew'
-		minMatchNum, err := s.minMatchNum(tpKey, c.MinDomains, pl.enableMinDomainsInPodTopologySpread)
-		if err != nil {
-			klog.ErrorS(err, "Internal error occurred while retrieving value precalculated in PreFilter", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
-			continue
-		}
-
 		matchNum := 0
 		if tpCount, ok := s.TpPairToMatchNum[pair]; ok {
 			matchNum = tpCount
 		}
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > int(c.MaxSkew) {
-			klog.V(5).InfoS("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klog.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
+			logger.V(5).Info("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klog.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
 			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
 		}
 	}

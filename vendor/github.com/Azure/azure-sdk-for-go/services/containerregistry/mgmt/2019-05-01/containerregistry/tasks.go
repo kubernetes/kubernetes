@@ -82,7 +82,7 @@ func (client TasksClient) Create(ctx context.Context, resourceGroupName string, 
 
 	result, err = client.CreateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerregistry.TasksClient", "Create", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerregistry.TasksClient", "Create", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -117,6 +117,7 @@ func (client TasksClient) CreatePreparer(ctx context.Context, resourceGroupName 
 // http.Response Body if it receives an error.
 func (client TasksClient) CreateSender(req *http.Request) (future TasksCreateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -178,7 +179,7 @@ func (client TasksClient) Delete(ctx context.Context, resourceGroupName string, 
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerregistry.TasksClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerregistry.TasksClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -211,6 +212,7 @@ func (client TasksClient) DeletePreparer(ctx context.Context, resourceGroupName 
 // http.Response Body if it receives an error.
 func (client TasksClient) DeleteSender(req *http.Request) (future TasksDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -584,7 +586,7 @@ func (client TasksClient) Update(ctx context.Context, resourceGroupName string, 
 
 	result, err = client.UpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "containerregistry.TasksClient", "Update", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "containerregistry.TasksClient", "Update", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -619,6 +621,7 @@ func (client TasksClient) UpdatePreparer(ctx context.Context, resourceGroupName 
 // http.Response Body if it receives an error.
 func (client TasksClient) UpdateSender(req *http.Request) (future TasksUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

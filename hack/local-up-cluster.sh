@@ -47,20 +47,22 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 CGROUP_ROOT=${CGROUP_ROOT:-""}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
+# if true, limited swap is being used instead of unlimited swap (default)
+LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.0.1"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.3.0"}
 CNI_TARGETARCH=${CNI_TARGETARCH:-amd64}
 CNI_PLUGINS_TARBALL="${CNI_PLUGINS_VERSION}/cni-plugins-linux-${CNI_TARGETARCH}-${CNI_PLUGINS_VERSION}.tgz"
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_TARBALL}"
-CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"5238fbb2767cbf6aae736ad97a7aa29167525dcd405196dfbc064672a730d3cf"}
-CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"2d4528c45bdd0a8875f849a75082bc4eafe95cb61f9bcc10a6db38a031f67226"}
-CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"f078e33067e6daaef3a3a5010d6440f2464b7973dec3ca0b5d5be22fdcb1fd96"}
-CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"468d33e16440d9ca4395c6bb2d5b71b35ae4a4df26301e4da85ac70c5ce56822"}
+CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"754a71ed60a4bd08726c3af705a7d55ee3df03122b12e389fdba4bea35d7dd7e"}
+CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"86c4c866a01a8073ad14f6feec74de1fd63669786850c7be47521433f9570902"}
+CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"8ceff026f4eccf33c261b4153af6911e10784ac169d08c1d86cf6887b9f4e99b"}
+CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"2f1f65ac33e961bcdc633e14c376656455824e22cc45d3ca7e31eb2750a7ebc4"}
 
 # enables testing eviction scenarios locally.
-EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
+EVICTION_HARD=${EVICTION_HARD:-"imagefs.available<15%,memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
 EVICTION_SOFT=${EVICTION_SOFT:-""}
 EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 
@@ -75,7 +77,6 @@ DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 LOCAL_DNS_IP=${KUBE_LOCAL_DNS_IP:-169.254.20.10}
 DNS_MEMORY_LIMIT=${KUBE_DNS_MEMORY_LIMIT:-170Mi}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
-KUBECTL=${KUBECTL:-"${KUBE_ROOT}/cluster/kubectl.sh"}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}
 MAX_TIME_FOR_URL_API_SERVER=${MAX_TIME_FOR_URL_API_SERVER:-1}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
@@ -93,6 +94,7 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
+ENABLE_TRACING=${ENABLE_TRACING:-false}
 
 # enable Kubernetes-CSI snapshotter
 ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
@@ -132,18 +134,6 @@ KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 
 # Audit policy
 AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
-
-# sanity check for OpenStack provider
-if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
-    if [ "${CLOUD_CONFIG}" == "" ]; then
-        echo "Missing CLOUD_CONFIG env for OpenStack provider!"
-        exit 1
-    fi
-    if [ ! -f "${CLOUD_CONFIG}" ]; then
-        echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
-        exit 1
-    fi
-fi
 
 # Stop right away if the build fails
 set -e
@@ -198,10 +188,10 @@ do
     esac
 done
 
-if [ "x${GO_OUT}" == "x" ]; then
+if [ -z "${GO_OUT}" ]; then
     make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kubelet cmd/kube-proxy cmd/kube-scheduler"
 else
-    echo "skipped the build."
+    echo "skipped the build because GO_OUT was set (${GO_OUT})"
 fi
 
 # Shut down anyway if there's an error.
@@ -229,7 +219,7 @@ LOG_LEVEL=${LOG_LEVEL:-3}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
 LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
-CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"remote"}
+TMP_DIR=${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
@@ -237,6 +227,7 @@ CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
+LOCAL_STORAGE_CAPACITY_ISOLATION=${LOCAL_STORAGE_CAPACITY_ISOLATION:-"true"} # current default
 # This is the default dir and filename where the apiserver will generate a self-signed cert
 # which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
@@ -423,7 +414,7 @@ function start_etcd {
 
 function set_service_accounts {
     SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
-    SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
+    SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-${TMP_DIR}/kube-serviceaccount.key}
     # Generate ServiceAccount key if needed
     if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
       mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
@@ -512,6 +503,13 @@ function start_apiserver {
     fi
 
     if [[ "${REUSE_CERTS}" != true ]]; then
+      # Clean previous dynamic certs
+      # This file is owned by root, so we can't always overwrite it (depends if
+      # we run the script as root or not). Let's remove it, that is something we
+      # can always do: either we have write permissions as a user in CERT_DIR or
+      # we run the rm with sudo.
+      ${CONTROLPLANE_SUDO} rm -f "${CERT_DIR}"/kubelet-rotated.kubeconfig
+
       # Create Certs
       generate_certs
     fi
@@ -522,7 +520,7 @@ function start_apiserver {
     fi
 
     if [[ -z "${EGRESS_SELECTOR_CONFIG_FILE:-}" ]]; then
-      cat <<EOF > /tmp/kube_egress_selector_configuration.yaml
+      cat <<EOF > "${TMP_DIR}"/kube_egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1beta1
 kind: EgressSelectorConfiguration
 egressSelections:
@@ -536,18 +534,18 @@ egressSelections:
   connection:
     proxyProtocol: Direct
 EOF
-      EGRESS_SELECTOR_CONFIG_FILE="/tmp/kube_egress_selector_configuration.yaml"
+      EGRESS_SELECTOR_CONFIG_FILE="${TMP_DIR}/kube_egress_selector_configuration.yaml"
     fi
 
     if [[ -z "${AUDIT_POLICY_FILE}" ]]; then
-      cat <<EOF > /tmp/kube-audit-policy-file
+      cat <<EOF > "${TMP_DIR}"/kube-audit-policy-file
 # Log all requests at the Metadata level.
 apiVersion: audit.k8s.io/v1
 kind: Policy
 rules:
 - level: Metadata
 EOF
-      AUDIT_POLICY_FILE="/tmp/kube-audit-policy-file"
+      AUDIT_POLICY_FILE="${TMP_DIR}/kube-audit-policy-file"
     fi
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
@@ -666,8 +664,9 @@ function start_cloud_controller_manager {
     fi
 
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
+    # shellcheck disable=SC2086
     ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/cloud-controller-manager"}" \
-      "${CLOUD_CTLRMGR_FLAGS}" \
+      ${CLOUD_CTLRMGR_FLAGS} \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --feature-gates="${FEATURE_GATES}" \
@@ -689,9 +688,72 @@ function wait_node_ready(){
   local interval_time=2
   kube::util::wait_for_success "$system_node_wait_time" "$interval_time" "$nodes_stats | grep $node_name"
   if [ $? == "1" ]; then
+    echo "time out on waiting $node_name exist"
+    exit 1
+  fi
+
+  local system_node_ready_time=300
+  local node_ready="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Ready --timeout=60s nodes $node_name"
+  kube::util::wait_for_success "$system_node_ready_time" "$interval_time" "$node_ready"
+  if [ $? == "1" ]; then
     echo "time out on waiting $node_name info"
     exit 1
   fi
+}
+
+function refresh_docker_containerd_runc {
+  apt update
+  apt-get install ca-certificates curl gnupg ripgrep tree vim
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  chmod a+r /etc/apt/keyrings/docker.gpg
+
+  # shellcheck disable=SC2027 disable=SC2046
+  echo \
+    "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+    "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+    tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+  apt-get update
+  apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+  groupadd docker
+  usermod -aG docker "$USER"
+
+  if ! grep -q "cri-containerd" "/lib/systemd/system/docker.service"; then
+    sed -i "s/ExecStart=\(.*\)/ExecStart=\1 --cri-containerd/" /lib/systemd/system/docker.service
+  fi
+
+  apt install -y conntrack vim htop ripgrep dnsutils tree ripgrep build-essential
+}
+
+function wait_coredns_available(){
+  local interval_time=2
+  local coredns_wait_time=300
+
+  # kick the coredns pods to be recreated
+  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-system delete pods -l k8s-app=kube-dns
+  sleep 30
+
+  local coredns_pods_ready="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Ready --timeout=60s pods -l k8s-app=kube-dns -n kube-system"
+  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_pods_ready"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for coredns pods"
+    exit 1
+  fi
+
+  local coredns_available="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Available --timeout=60s deployments coredns -n kube-system"
+  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_available"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for coredns deployment"
+    exit 1
+  fi
+
+  # bump log level
+  echo "6" | sudo tee /proc/sys/kernel/printk
+
+  # loop through and grab all things in dmesg
+  dmesg > "${LOG_DIR}/dmesg.log"
+  dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
 }
 
 function start_kubelet {
@@ -723,7 +785,6 @@ function start_kubelet {
     all_kubelet_flags=(
       "--v=${LOG_LEVEL}"
       "--vmodule=${LOG_SPEC}"
-      "--container-runtime=${CONTAINER_RUNTIME}"
       "--hostname-override=${HOSTNAME_OVERRIDE}"
       "${cloud_config_arg[@]}"
       "--bootstrap-kubeconfig=${CERT_DIR}/kubelet.kubeconfig"
@@ -745,7 +806,7 @@ function start_kubelet {
         generate_kubelet_certs
     fi
 
-    cat <<EOF > /tmp/kubelet.yaml
+    cat <<EOF > "${TMP_DIR}"/kubelet.yaml
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 address: "${KUBELET_HOST}"
@@ -754,6 +815,7 @@ cgroupRoot: "${CGROUP_ROOT}"
 cgroupsPerQOS: ${CGROUPS_PER_QOS}
 cpuCFSQuota: ${CPU_CFS_QUOTA}
 enableControllerAttachDetach: ${ENABLE_CONTROLLER_ATTACH_DETACH}
+localStorageCapacityIsolation: ${LOCAL_STORAGE_CAPACITY_ISOLATION}
 evictionPressureTransitionPeriod: "${EVICTION_PRESSURE_TRANSITION_PERIOD}"
 failSwapOn: ${FAIL_SWAP_ON}
 port: ${KUBELET_PORT}
@@ -763,6 +825,22 @@ runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
 EOF
+
+  if [[ "$ENABLE_TRACING" = true ]]; then
+        cat <<EOF >> "${TMP_DIR}"/kubelet.yaml
+tracing:
+  endpoint: localhost:4317 # the default value
+  samplingRatePerMillion: 1000000 # sample always
+EOF
+    fi
+
+    if [[ "$LIMITED_SWAP" == "true" ]]; then
+        cat <<EOF >> "${TMP_DIR}"/kubelet.yaml
+memorySwap:
+  swapBehavior: LimitedSwap
+EOF
+    fi
+
     {
       # authentication
       echo "authentication:"
@@ -814,11 +892,11 @@ EOF
       if [[ -n ${FEATURE_GATES} ]]; then
         parse_feature_gates "${FEATURE_GATES}"
       fi
-    } >>/tmp/kubelet.yaml
+    } >>"${TMP_DIR}"/kubelet.yaml
 
     # shellcheck disable=SC2024
     sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
-      --config=/tmp/kubelet.yaml >"${KUBELET_LOG}" 2>&1 &
+      --config="${TMP_DIR}"/kubelet.yaml >"${KUBELET_LOG}" 2>&1 &
     KUBELET_PID=$!
 
     # Quick check that kubelet is running.
@@ -838,7 +916,7 @@ function start_kubeproxy {
       wait_node_ready
     fi
 
-    cat <<EOF > /tmp/kube-proxy.yaml
+    cat <<EOF > "${TMP_DIR}"/kube-proxy.yaml
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
 clientConnection:
@@ -855,7 +933,7 @@ conntrack:
 EOF
     if [[ -n ${FEATURE_GATES} ]]; then
       parse_feature_gates "${FEATURE_GATES}"
-    fi >>/tmp/kube-proxy.yaml
+    fi >>"${TMP_DIR}"/kube-proxy.yaml
 
     if [[ "${REUSE_CERTS}" != true ]]; then
         generate_kubeproxy_certs
@@ -864,7 +942,7 @@ EOF
     # shellcheck disable=SC2024
     sudo "${GO_OUT}/kube-proxy" \
       --v="${LOG_LEVEL}" \
-      --config=/tmp/kube-proxy.yaml \
+      --config="${TMP_DIR}"/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 }
@@ -872,8 +950,8 @@ EOF
 function start_kubescheduler {
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
 
-    cat <<EOF > /tmp/kube-scheduler.yaml
-apiVersion: kubescheduler.config.k8s.io/v1beta2
+    cat <<EOF > "${TMP_DIR}"/kube-scheduler.yaml
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/scheduler.kubeconfig
@@ -882,7 +960,7 @@ leaderElection:
 EOF
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
       --v="${LOG_LEVEL}" \
-      --config=/tmp/kube-scheduler.yaml \
+      --config="${TMP_DIR}"/kube-scheduler.yaml \
       --feature-gates="${FEATURE_GATES}" \
       --authentication-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --authorization-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
@@ -957,9 +1035,17 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   else
     echo "Local Kubernetes cluster is running."
   fi
+
+  echo
+  echo "Configurations:"
+  for f in "${TMP_DIR}"/*; do
+    echo "  ${f}"
+  done
+
   cat <<EOF
 
 Logs:
+  ${ETCD_LOGFILE:-}
   ${APISERVER_LOG:-}
   ${CTLRMGR_LOG:-}
   ${CLOUD_CTLRMGR_LOG:-}
@@ -1028,15 +1114,47 @@ function parse_eviction {
   done
 }
 
+function update_packages {
+  apt-get update && apt-get install -y sudo
+  apt-get remove -y systemd
+
+  # Do not update docker / containerd / runc
+  sed -i 's/\(.*\)docker\(.*\)/#\1docker\2/' /etc/apt/sources.list
+
+  # jump through hoops to avoid removing docker/containerd
+  # when installing nftables and kmod, as those docker/containerd
+  # packages depend on iptables
+  dpkg -r --force-depends iptables && \
+  apt -y --fix-broken install && \
+  apt -y install nftables kmod && \
+  apt -y install iptables
+}
+
+function tolerate_cgroups_v2 {
+  # https://github.com/moby/moby/blob/be220af9fb36e9baa9a75bbc41f784260aa6f96e/hack/dind#L28-L38
+  # cgroup v2: enable nesting
+  if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+    # move the processes from the root group to the /init group,
+    # otherwise writing subtree_control fails with EBUSY.
+    # An error during moving non-existent process (i.e., "cat") is ignored.
+    mkdir -p /sys/fs/cgroup/init
+    xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs || :
+    # enable controllers
+    sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers \
+      > /sys/fs/cgroup/cgroup.subtree_control
+  fi
+}
+
 function install_cni {
+  cni_plugin_sha=CNI_PLUGINS_${CNI_TARGETARCH^^}_SHA256SUM
   echo "Installing CNI plugin binaries ..." \
-    && curl -sSL --retry 5 --output /tmp/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
-    && echo "${CNI_PLUGINS_AMD64_SHA256SUM}  /tmp/cni.amd64.tgz" | tee /tmp/cni.sha256 \
-    && sha256sum --ignore-missing -c /tmp/cni.sha256 \
-    && rm -f /tmp/cni.sha256 \
+    && curl -sSL --retry 5 --output "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
+    && echo "${!cni_plugin_sha} ${TMP_DIR}/cni.${CNI_TARGETARCH}.tgz" | tee "${TMP_DIR}"/cni.sha256 \
+    && sha256sum --ignore-missing -c "${TMP_DIR}"/cni.sha256 \
+    && rm -f "${TMP_DIR}"/cni.sha256 \
     && sudo mkdir -p /opt/cni/bin \
-    && sudo tar -C /opt/cni/bin -xzvf /tmp/cni."${CNI_TARGETARCH}".tgz \
-    && rm -rf /tmp/cni."${CNI_TARGETARCH}".tgz \
+    && sudo tar -C /opt/cni/bin -xzvf "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz \
+    && rm -rf "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz \
     && sudo find /opt/cni/bin -type f -not \( \
          -iname host-local \
          -o -iname bridge \
@@ -1050,36 +1168,37 @@ function install_cni {
   sudo mkdir -p "$CNI_CONFIG_DIR"
   cat << EOF | sudo tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
 {
-  "cniVersion": "0.4.0",
-  "name": "containerd-net",
-  "plugins": [
-    {
-      "type": "bridge",
-      "bridge": "cni0",
-      "isGateway": true,
-      "ipMasq": true,
-      "promiscMode": true,
-      "ipam": {
-        "type": "host-local",
-        "ranges": [
-          [{
-            "subnet": "10.88.0.0/16"
-          }],
-          [{
-            "subnet": "2001:4860:4860::/64"
-          }]
-        ],
-        "routes": [
-          { "dst": "0.0.0.0/0" },
-          { "dst": "::/0" }
-        ]
-      }
-    },
-    {
-      "type": "portmap",
-      "capabilities": {"portMappings": true}
-    }
-  ]
+ "cniVersion": "1.0.0",
+ "name": "containerd-net",
+ "plugins": [
+   {
+     "type": "bridge",
+     "bridge": "cni0",
+     "isGateway": true,
+     "ipMasq": true,
+     "promiscMode": true,
+     "ipam": {
+       "type": "host-local",
+       "ranges": [
+         [{
+           "subnet": "10.88.0.0/16"
+         }],
+         [{
+           "subnet": "2001:db8:4860::/64"
+         }]
+       ],
+       "routes": [
+         { "dst": "0.0.0.0/0" },
+         { "dst": "::/0" }
+       ]
+     }
+   },
+   {
+     "type": "portmap",
+     "capabilities": {"portMappings": true},
+     "externalSetMarkChain": "KUBE-MARK-MASQ"
+   }
+ ]
 }
 EOF
 }
@@ -1099,8 +1218,8 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
   KUBE_FASTBUILD=true make ginkgo cross
 
-  apt-get update && apt-get install -y sudo
-  apt-get remove -y systemd
+  # install things we need that are missing from the kubekins image
+  update_packages
 
   # configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
@@ -1113,9 +1232,28 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # install cni for docker in docker
   install_cni 
 
+  # If we are running in a cgroups v2 environment
+  # we need to enable nesting
+  tolerate_cgroups_v2
+
   # enable cri for docker in docker
   echo "enable cri"
+  # shellcheck disable=SC2129
   echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --cri-containerd\"" >> /etc/default/docker
+
+  # enable debug
+  echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --debug\"" >> /etc/default/docker
+
+  # let's log it where we can grab it later
+  echo "DOCKER_LOGFILE=${LOG_DIR}/docker.log" >> /etc/default/docker
+
+  # bump up things
+  refresh_docker_containerd_runc
+
+  # check if the new stuff is there
+  docker version
+  containerd --version
+  runc --version
 
   echo "restarting docker"
   service docker restart
@@ -1139,10 +1277,13 @@ if [ "${GO_OUT}" == "" ]; then
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT ${GO_OUT}"
-export KUBELET_CIDFILE=/tmp/kubelet.cid
+export KUBELET_CIDFILE=${TMP_DIR}/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup EXIT
+  trap cleanup INT
 fi
+
+KUBECTL=${KUBECTL:-"${GO_OUT}/kubectl"}
 
 echo "Starting services now!"
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
@@ -1189,6 +1330,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
         ;;
       Linux)
         start_kubeproxy
+        wait_coredns_available
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."

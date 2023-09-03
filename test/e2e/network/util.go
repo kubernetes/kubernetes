@@ -18,18 +18,24 @@ package network
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -54,10 +60,10 @@ func GetHTTPContent(host string, port int, timeout time.Duration, url string) (s
 }
 
 // GetHTTPContentFromTestContainer returns the content of the given url by HTTP via a test container.
-func GetHTTPContentFromTestContainer(config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, dialCmd string) (string, error) {
+func GetHTTPContentFromTestContainer(ctx context.Context, config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, dialCmd string) (string, error) {
 	var body string
 	pollFn := func() (bool, error) {
-		resp, err := config.GetResponseFromTestContainer("http", dialCmd, host, port)
+		resp, err := config.GetResponseFromTestContainer(ctx, "http", dialCmd, host, port)
 		if err != nil || len(resp.Errors) > 0 || len(resp.Responses) == 0 {
 			return false, nil
 		}
@@ -73,7 +79,7 @@ func GetHTTPContentFromTestContainer(config *e2enetwork.NetworkingTestConfig, ho
 // DescribeSvc logs the output of kubectl describe svc for the given namespace
 func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")
-	desc, _ := framework.RunKubectl(
+	desc, _ := e2ekubectl.RunKubectl(
 		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	framework.Logf(desc)
 }
@@ -83,14 +89,14 @@ func DescribeSvc(ns string) {
 // For security reasons, and also to allow clusters to use userspace SCTP implementations,
 // we require that just creating an SCTP Pod/Service/NetworkPolicy must not do anything
 // that would cause the sctp kernel module to be loaded.
-func CheckSCTPModuleLoadedOnNodes(f *framework.Framework, nodes *v1.NodeList) bool {
+func CheckSCTPModuleLoadedOnNodes(ctx context.Context, f *framework.Framework, nodes *v1.NodeList) bool {
 	hostExec := utils.NewHostExec(f)
-	defer hostExec.Cleanup()
+	ginkgo.DeferCleanup(hostExec.Cleanup)
 	re := regexp.MustCompile(`^\s*sctp\s+`)
 	cmd := "lsmod | grep sctp"
 	for _, node := range nodes.Items {
 		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-		result, err := hostExec.IssueCommandWithResult(cmd, &node)
+		result, err := hostExec.IssueCommandWithResult(ctx, cmd, &node)
 		if err != nil {
 			framework.Logf("sctp module is not loaded or error occurred while executing command %s on node: %v", cmd, err)
 		}
@@ -117,7 +123,7 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		stdout, err = e2eoutput.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
 			framework.Logf("got err: %v, retry until timeout", err)
 			continue
@@ -153,9 +159,9 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	)
 
 	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/hostname`, targetAddr)
+	cmd := fmt.Sprintf(`curl -q -s --max-time 30 %s/hostname`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		stdout, err = e2eoutput.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
 			framework.Logf("got err: %v, retry until timeout", err)
 			continue
@@ -173,11 +179,11 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
 
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(hostname, targetHostname)
+	gomega.Expect(hostname).To(gomega.Equal(targetHostname))
 }
 
 // createSecondNodePortService creates a service with the same selector as config.NodePortService and same HTTP Port
-func createSecondNodePortService(f *framework.Framework, config *e2enetwork.NetworkingTestConfig) (*v1.Service, int) {
+func createSecondNodePortService(ctx context.Context, f *framework.Framework, config *e2enetwork.NetworkingTestConfig) (*v1.Service, int) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secondNodePortSvcName,
@@ -189,16 +195,16 @@ func createSecondNodePortService(f *framework.Framework, config *e2enetwork.Netw
 					Port:       e2enetwork.ClusterHTTPPort,
 					Name:       "http",
 					Protocol:   v1.ProtocolTCP,
-					TargetPort: intstr.FromInt(e2enetwork.EndpointHTTPPort),
+					TargetPort: intstr.FromInt32(e2enetwork.EndpointHTTPPort),
 				},
 			},
 			Selector: config.NodePortService.Spec.Selector,
 		},
 	}
 
-	createdService := config.CreateService(svc)
+	createdService := config.CreateService(ctx, svc)
 
-	err := framework.WaitForServiceEndpointsNum(f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	err := framework.WaitForServiceEndpointsNum(ctx, f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
 	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", secondNodePortSvcName, config.Namespace)
 
 	var httpPort int
@@ -212,4 +218,35 @@ func createSecondNodePortService(f *framework.Framework, config *e2enetwork.Netw
 	}
 
 	return createdService, httpPort
+}
+
+// testEndpointReachability tests reachability to endpoints (i.e. IP, ServiceName) and ports. Test request is initiated from specified execPod.
+// TCP and UDP protocol based service are supported at this moment
+func testEndpointReachability(ctx context.Context, endpoint string, port int32, protocol v1.Protocol, execPod *v1.Pod, timeout time.Duration) error {
+	cmd := ""
+	switch protocol {
+	case v1.ProtocolTCP:
+		cmd = fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", endpoint, port)
+	case v1.ProtocolUDP:
+		cmd = fmt.Sprintf("echo hostName | nc -v -u -w 2 %s %v", endpoint, port)
+	default:
+		return fmt.Errorf("service reachability check is not supported for %v", protocol)
+	}
+
+	err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+		stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		if err != nil {
+			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
+			return false, nil
+		}
+		trimmed := strings.TrimSpace(stdout)
+		if trimmed != "" {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s %d over %s protocol", timeout, endpoint, port, protocol)
+	}
+	return nil
 }

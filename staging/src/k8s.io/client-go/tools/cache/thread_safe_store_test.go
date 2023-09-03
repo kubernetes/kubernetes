@@ -43,7 +43,7 @@ func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
 	store.Add(testKey, testKey)
 
 	// Assumption check, there should be a set for the `testKey` with one element in the added index
-	set := store.indices[testIndexer][testKey]
+	set := store.index.indices[testIndexer][testKey]
 
 	if len(set) != 1 {
 		t.Errorf("Initial assumption of index backing string set having 1 element failed. Actual elements: %d", len(set))
@@ -51,7 +51,7 @@ func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
 	}
 
 	store.Delete(testKey)
-	set, present := store.indices[testIndexer][testKey]
+	set, present := store.index.indices[testIndexer][testKey]
 
 	if present {
 		t.Errorf("Index backing string set not deleted from index. Set length: %d", len(set))
@@ -76,7 +76,7 @@ func TestThreadSafeStoreAddKeepsNonEmptySetPostDeleteFromIndex(t *testing.T) {
 	store.Add("delete", "delete")
 
 	// Assumption check, there should be a set for the `testIndex` with two elements
-	set := store.indices[testIndexer][testIndex]
+	set := store.index.indices[testIndexer][testIndex]
 
 	if len(set) != 2 {
 		t.Errorf("Initial assumption of index backing string set having 2 elements failed. Actual elements: %d", len(set))
@@ -84,7 +84,7 @@ func TestThreadSafeStoreAddKeepsNonEmptySetPostDeleteFromIndex(t *testing.T) {
 	}
 
 	store.Delete("delete")
-	set, present := store.indices[testIndexer][testIndex]
+	set, present := store.index.indices[testIndexer][testIndex]
 
 	if !present {
 		t.Errorf("Index backing string set erroneously deleted from index.")
@@ -114,7 +114,7 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	assert := assert.New(t)
 
 	compare := func(key string, expected []string) error {
-		values := store.indices[testIndexer][key].List()
+		values := store.index.indices[testIndexer][key].List()
 		if cmp.Equal(values, expected) {
 			return nil
 		}

@@ -68,7 +68,7 @@ function start-kube-apiserver {
   # Calculate variables and assemble the command line.
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --allow-privileged=true"
-  params+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}"
+  params+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-external}"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
 
   # params is passed by reference, so no "$"
@@ -342,6 +342,12 @@ function start-kube-apiserver {
       container_env="${container_env}, "
     fi
     container_env+="{\"name\": \"KUBE_PATCH_CONVERSION_DETECTOR\", \"value\": \"${ENABLE_PATCH_CONVERSION_DETECTOR}\"}"
+  fi
+  if [[ -n "${KUBE_APISERVER_GODEBUG:-}" ]]; then
+    if [[ -n "${container_env}" ]]; then
+      container_env="${container_env}, "
+    fi
+    container_env+="{\"name\": \"GODEBUG\", \"value\": \"${KUBE_APISERVER_GODEBUG}\"}"
   fi
   if [[ -n "${container_env}" ]]; then
     container_env="\"env\":[${container_env}],"

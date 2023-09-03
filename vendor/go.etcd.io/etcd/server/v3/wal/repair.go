@@ -15,6 +15,7 @@
 package wal
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -40,12 +41,12 @@ func Repair(lg *zap.Logger, dirpath string) bool {
 	lg.Info("repairing", zap.String("path", f.Name()))
 
 	rec := &walpb.Record{}
-	decoder := newDecoder(f)
+	decoder := newDecoder(fileutil.NewFileReader(f.File))
 	for {
 		lastOffset := decoder.lastOffset()
 		err := decoder.decode(rec)
-		switch err {
-		case nil:
+		switch {
+		case err == nil:
 			// update crc of the decoder when necessary
 			switch rec.Type {
 			case crcType:
@@ -59,11 +60,11 @@ func Repair(lg *zap.Logger, dirpath string) bool {
 			}
 			continue
 
-		case io.EOF:
+		case errors.Is(err, io.EOF):
 			lg.Info("repaired", zap.String("path", f.Name()), zap.Error(io.EOF))
 			return true
 
-		case io.ErrUnexpectedEOF:
+		case errors.Is(err, io.ErrUnexpectedEOF):
 			bf, bferr := os.Create(f.Name() + ".broken")
 			if bferr != nil {
 				lg.Warn("failed to create backup file", zap.String("path", f.Name()+".broken"), zap.Error(bferr))

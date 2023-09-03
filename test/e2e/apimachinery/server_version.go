@@ -17,18 +17,19 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"regexp"
 
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("server version", func() {
 	f := framework.NewDefaultFramework("server-version")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 	   Release: v1.19
@@ -36,7 +37,7 @@ var _ = SIGDescribe("server version", func() {
 	   Description: Ensure that an API server version can be retrieved.
 	   Both the major and minor versions MUST only be an integer.
 	*/
-	framework.ConformanceIt("should find the server version", func() {
+	framework.ConformanceIt("should find the server version", func(ctx context.Context) {
 
 		ginkgo.By("Request ServerVersion")
 

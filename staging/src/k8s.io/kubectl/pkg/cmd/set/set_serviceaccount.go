@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -63,7 +64,6 @@ type SetServiceAccountOptions struct {
 
 	fileNameOptions        resource.FilenameOptions
 	dryRunStrategy         cmdutil.DryRunStrategy
-	dryRunVerifier         *resource.QueryParamVerifier
 	shortOutput            bool
 	all                    bool
 	output                 string
@@ -76,11 +76,11 @@ type SetServiceAccountOptions struct {
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewSetServiceAccountOptions returns an initialized SetServiceAccountOptions instance
-func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
+func NewSetServiceAccountOptions(streams genericiooptions.IOStreams) *SetServiceAccountOptions {
 	return &SetServiceAccountOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("serviceaccount updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -92,7 +92,7 @@ func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServic
 }
 
 // NewCmdServiceAccount returns the "set serviceaccount" command.
-func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdServiceAccount(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewSetServiceAccountOptions(streams)
 
 	cmd := &cobra.Command{
@@ -138,11 +138,6 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	if o.local && o.dryRunStrategy == cmdutil.DryRunServer {
 		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 
@@ -174,10 +169,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 			Latest()
 	}
 	o.infos, err = builder.Do().Infos()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Run creates and applies the patch either locally or calling apiserver.
@@ -212,12 +204,6 @@ func (o *SetServiceAccountOptions) Run() error {
 				patchErrs = append(patchErrs, err)
 			}
 			continue
-		}
-		if o.dryRunStrategy == cmdutil.DryRunServer {
-			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				patchErrs = append(patchErrs, err)
-				continue
-			}
 		}
 		actual, err := resource.
 			NewHelper(info.Client, info.Mapping).

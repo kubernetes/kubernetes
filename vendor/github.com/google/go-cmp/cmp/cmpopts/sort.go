@@ -18,9 +18,9 @@ import (
 // sort any slice with element type V that is assignable to T.
 //
 // The less function must be:
-//	• Deterministic: less(x, y) == less(x, y)
-//	• Irreflexive: !less(x, x)
-//	• Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
+//   - Deterministic: less(x, y) == less(x, y)
+//   - Irreflexive: !less(x, x)
+//   - Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
 //
 // The less function does not have to be "total". That is, if !less(x, y) and
 // !less(y, x) for two elements x and y, their relative order is maintained.
@@ -91,10 +91,10 @@ func (ss sliceSorter) less(v reflect.Value, i, j int) bool {
 // use Comparers on K or the K.Equal method if it exists.
 //
 // The less function must be:
-//	• Deterministic: less(x, y) == less(x, y)
-//	• Irreflexive: !less(x, x)
-//	• Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
-//	• Total: if x != y, then either less(x, y) or less(y, x)
+//   - Deterministic: less(x, y) == less(x, y)
+//   - Irreflexive: !less(x, x)
+//   - Transitive: if !less(x, y) and !less(y, z), then !less(x, z)
+//   - Total: if x != y, then either less(x, y) or less(y, x)
 //
 // SortMaps can be used in conjunction with EquateEmpty.
 func SortMaps(lessFunc interface{}) cmp.Option {

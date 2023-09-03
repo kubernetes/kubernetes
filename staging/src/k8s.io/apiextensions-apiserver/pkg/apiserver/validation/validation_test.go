@@ -29,6 +29,8 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 	kjson "sigs.k8s.io/json"
 
+	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -40,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
-	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 // TestRoundTrip checks the conversion to go-openapi types.
@@ -163,6 +165,7 @@ func TestValidateCustomResource(t *testing.T) {
 	}{
 		{name: "!nullable",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:     "object",
@@ -185,6 +188,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:     "object",
@@ -207,6 +211,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable and no type",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Nullable: true,
@@ -226,6 +231,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "x-kubernetes-int-or-string",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						XIntOrString: true,
@@ -247,6 +253,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable and x-kubernetes-int-or-string",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Nullable:     true,
@@ -269,6 +276,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable, x-kubernetes-int-or-string and user-provided anyOf",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Nullable:     true,
@@ -311,6 +319,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable, x-kubernetes-int-or-string and user-provider allOf",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Nullable:     true,
@@ -361,6 +370,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "invalid regex",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:    "string",
@@ -374,6 +384,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "required field",
 			schema: apiextensions.JSONSchemaProps{
+				Type:     "object",
 				Required: []string{"field"},
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -392,6 +403,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "enum",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:     "object",
@@ -424,6 +436,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "immutability transition rule",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type: "string",
@@ -453,6 +466,7 @@ func TestValidateCustomResource(t *testing.T) {
 		{name: "correlatable transition rule",
 			// Ensures a transition rule under a "listMap" is supported.
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:         "array",
@@ -503,6 +517,7 @@ func TestValidateCustomResource(t *testing.T) {
 			// does NOT use oldSelf (is not a transition rule), still behaves
 			// as expected under a non-correlatable field.
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type: "array",
@@ -537,6 +552,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "maxProperties",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:          "object",
@@ -552,6 +568,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "maxItems",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:     "array",
@@ -567,6 +584,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "maxLength",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:      "string",
@@ -583,7 +601,7 @@ func TestValidateCustomResource(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator, _, err := NewSchemaValidator(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: &tt.schema})
+			validator, _, err := NewSchemaValidator(&tt.schema)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -591,7 +609,7 @@ func TestValidateCustomResource(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			celValidator := cel.NewValidator(structural, cel.PerCallLimit)
+			celValidator := cel.NewValidator(structural, false, celconfig.PerCallLimit)
 			for i, obj := range tt.objects {
 				var oldObject interface{}
 				if len(tt.oldObjects) == len(tt.objects) {
@@ -600,14 +618,14 @@ func TestValidateCustomResource(t *testing.T) {
 				if errs := ValidateCustomResource(nil, obj, validator); len(errs) > 0 {
 					t.Errorf("unexpected validation error for %v: %v", obj, errs)
 				}
-				errs, _ := celValidator.Validate(context.TODO(), nil, structural, obj, oldObject, cel.RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(context.TODO(), nil, structural, obj, oldObject, celconfig.RuntimeCELCostBudget)
 				if len(errs) > 0 {
 					t.Errorf(errs.ToAggregate().Error())
 				}
 			}
 			for i, failingObject := range tt.failingObjects {
 				errs := ValidateCustomResource(nil, failingObject.object, validator)
-				celErrs, _ := celValidator.Validate(context.TODO(), nil, structural, failingObject.object, failingObject.oldObject, cel.RuntimeCELCostBudget)
+				celErrs, _ := celValidator.Validate(context.TODO(), nil, structural, failingObject.object, failingObject.oldObject, celconfig.RuntimeCELCostBudget)
 				errs = append(errs, celErrs...)
 				if len(errs) == 0 {
 					t.Errorf("missing error for %v", failingObject.object)
@@ -671,7 +689,7 @@ func TestItemsProperty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator, _, err := NewSchemaValidator(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: &tt.args.schema})
+			validator, _, err := NewSchemaValidator(&tt.args.schema)
 			if err != nil {
 				t.Fatal(err)
 			}

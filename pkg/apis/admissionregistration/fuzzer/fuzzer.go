@@ -20,6 +20,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
@@ -35,12 +36,18 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(obj *admissionregistration.ValidatingWebhook, c fuzz.Continue) {
 			c.FuzzNoCustom(obj) // fuzz self without calling this function again
-			p := admissionregistration.FailurePolicyType("Fail")
-			obj.FailurePolicy = &p
-			m := admissionregistration.MatchPolicyType("Exact")
-			obj.MatchPolicy = &m
-			s := admissionregistration.SideEffectClassUnknown
-			obj.SideEffects = &s
+			if obj.FailurePolicy == nil {
+				p := admissionregistration.FailurePolicyType("Fail")
+				obj.FailurePolicy = &p
+			}
+			if obj.MatchPolicy == nil {
+				m := admissionregistration.MatchPolicyType("Exact")
+				obj.MatchPolicy = &m
+			}
+			if obj.SideEffects == nil {
+				s := admissionregistration.SideEffectClassUnknown
+				obj.SideEffects = &s
+			}
 			if obj.TimeoutSeconds == nil {
 				i := int32(30)
 				obj.TimeoutSeconds = &i
@@ -49,19 +56,56 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(obj *admissionregistration.MutatingWebhook, c fuzz.Continue) {
 			c.FuzzNoCustom(obj) // fuzz self without calling this function again
-			p := admissionregistration.FailurePolicyType("Fail")
-			obj.FailurePolicy = &p
-			m := admissionregistration.MatchPolicyType("Exact")
-			obj.MatchPolicy = &m
-			s := admissionregistration.SideEffectClassUnknown
-			obj.SideEffects = &s
-			n := admissionregistration.NeverReinvocationPolicy
-			obj.ReinvocationPolicy = &n
+			if obj.FailurePolicy == nil {
+				p := admissionregistration.FailurePolicyType("Fail")
+				obj.FailurePolicy = &p
+			}
+			if obj.MatchPolicy == nil {
+				m := admissionregistration.MatchPolicyType("Exact")
+				obj.MatchPolicy = &m
+			}
+			if obj.SideEffects == nil {
+				s := admissionregistration.SideEffectClassUnknown
+				obj.SideEffects = &s
+			}
+			if obj.ReinvocationPolicy == nil {
+				r := admissionregistration.NeverReinvocationPolicy
+				obj.ReinvocationPolicy = &r
+			}
 			if obj.TimeoutSeconds == nil {
 				i := int32(30)
 				obj.TimeoutSeconds = &i
 			}
 			obj.AdmissionReviewVersions = []string{"v1beta1"}
+		},
+		func(obj *admissionregistration.ValidatingAdmissionPolicySpec, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			if obj.FailurePolicy == nil {
+				p := admissionregistration.FailurePolicyType("Fail")
+				obj.FailurePolicy = &p
+			}
+		},
+		func(obj *admissionregistration.ValidatingAdmissionPolicyBindingSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			if obj.ValidationActions == nil {
+				obj.ValidationActions = []admissionregistration.ValidationAction{admissionregistration.Deny}
+			}
+		},
+		func(obj *admissionregistration.MatchResources, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			if obj.MatchPolicy == nil {
+				m := admissionregistration.MatchPolicyType("Exact")
+				obj.MatchPolicy = &m
+			}
+		},
+		func(obj *admissionregistration.ParamRef, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+
+			// Populate required field
+			if obj.ParameterNotFoundAction == nil {
+				v := admissionregistration.DenyAction
+				obj.ParameterNotFoundAction = &v
+			}
 		},
 	}
 }

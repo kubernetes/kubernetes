@@ -31,7 +31,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
@@ -40,6 +39,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 // 2065-01-24 05:20:00 +0000 UTC
@@ -83,8 +83,8 @@ func getTestDeploymentClientWithRetryAfterReader(armClient armclient.Interface) 
 
 func getTestDeploymentExtended(name string) resources.DeploymentExtended {
 	return resources.DeploymentExtended{
-		ID:   to.StringPtr(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Resources/deployments/%s", name)),
-		Name: to.StringPtr(name),
+		ID:   pointer.String(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Resources/deployments/%s", name)),
+		Name: pointer.String(name),
 	}
 }
 
@@ -278,7 +278,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 	}
 
 	lastResult := resources.DeploymentListResult{
-		NextLink: to.StringPtr("next"),
+		NextLink: pointer.String("next"),
 	}
 
 	for _, test := range tests {
@@ -323,7 +323,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	}
 
 	lastResult := resources.DeploymentListResult{
-		NextLink: to.StringPtr("next"),
+		NextLink: pointer.String("next"),
 	}
 
 	armClient := mockarmclient.NewMockInterface(ctrl)
@@ -474,7 +474,7 @@ func TestCreateOrUpdate(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
 	}
-	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(dpExtended.ID), dp, gomock.Any()).Return(response, nil).Times(1)
+	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), pointer.StringDeref(dpExtended.ID, ""), dp, gomock.Any()).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	dpClient := getTestDeploymentClient(armClient)
@@ -493,7 +493,7 @@ func TestCreateOrUpdateWithCreateOrUpdateResponderError(t *testing.T) {
 		StatusCode: http.StatusNotFound,
 		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
 	}
-	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(dpExtended.ID), dp, gomock.Any()).Return(response, nil).Times(1)
+	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), pointer.StringDeref(dpExtended.ID, ""), dp, gomock.Any()).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	dpClient := getTestDeploymentClient(armClient)
@@ -556,7 +556,7 @@ func TestCreateOrUpdateThrottle(t *testing.T) {
 	dp := resources.Deployment{}
 	dpExtended := getTestDeploymentExtended("dep")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(dpExtended.ID), dp, gomock.Any()).Return(response, throttleErr).Times(1)
+	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), pointer.StringDeref(dpExtended.ID, ""), dp, gomock.Any()).Return(response, throttleErr).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	dpClient := getTestDeploymentClient(armClient)
@@ -571,7 +571,7 @@ func TestDelete(t *testing.T) {
 
 	dp := getTestDeploymentExtended("dep")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(dp.ID), "").Return(nil).Times(1)
+	armClient.EXPECT().DeleteResource(gomock.Any(), pointer.StringDeref(dp.ID, ""), "").Return(nil).Times(1)
 
 	dpClient := getTestDeploymentClient(armClient)
 	rerr := dpClient.Delete(context.TODO(), "rg", "dep")
@@ -626,7 +626,7 @@ func TestDeleteThrottle(t *testing.T) {
 
 	dp := getTestDeploymentExtended("dep")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(dp.ID), "").Return(throttleErr).Times(1)
+	armClient.EXPECT().DeleteResource(gomock.Any(), pointer.StringDeref(dp.ID, ""), "").Return(throttleErr).Times(1)
 
 	dpClient := getTestDeploymentClient(armClient)
 	rerr := dpClient.Delete(context.TODO(), "rg", "dep")

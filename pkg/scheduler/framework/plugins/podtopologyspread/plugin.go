@@ -64,6 +64,7 @@ type PodTopologySpread struct {
 	statefulSets                                 appslisters.StatefulSetLister
 	enableMinDomainsInPodTopologySpread          bool
 	enableNodeInclusionPolicyInPodTopologySpread bool
+	enableMatchLabelKeysInPodTopologySpread      bool
 }
 
 var _ framework.PreFilterPlugin = &PodTopologySpread{}
@@ -72,10 +73,8 @@ var _ framework.PreScorePlugin = &PodTopologySpread{}
 var _ framework.ScorePlugin = &PodTopologySpread{}
 var _ framework.EnqueueExtensions = &PodTopologySpread{}
 
-const (
-	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = names.PodTopologySpread
-)
+// Name is the name of the plugin used in the plugin registry and configurations.
+const Name = names.PodTopologySpread
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *PodTopologySpread) Name() string {
@@ -100,6 +99,7 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 		defaultConstraints:                  args.DefaultConstraints,
 		enableMinDomainsInPodTopologySpread: fts.EnableMinDomainsInPodTopologySpread,
 		enableNodeInclusionPolicyInPodTopologySpread: fts.EnableNodeInclusionPolicyInPodTopologySpread,
+		enableMatchLabelKeysInPodTopologySpread:      fts.EnableMatchLabelKeysInPodTopologySpread,
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints
@@ -131,8 +131,8 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *PodTopologySpread) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
+func (pl *PodTopologySpread) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Add. An unschedulable Pod may fail due to violating topology spread constraints,
 		// adding an assigned Pod may make it schedulable.
@@ -140,9 +140,9 @@ func (pl *PodTopologySpread) EventsToRegister() []framework.ClusterEvent {
 		// an unschedulable Pod schedulable.
 		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's topology spread constraints,
 		// deleting an existing Pod may make it schedulable.
-		{Resource: framework.Pod, ActionType: framework.All},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.All}},
 		// Node add|delete|updateLabel maybe lead an topology key changed,
 		// and make these pod in scheduling schedulable or unschedulable.
-		{Resource: framework.Node, ActionType: framework.Add | framework.Delete | framework.UpdateNodeLabel},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Delete | framework.UpdateNodeLabel}},
 	}
 }

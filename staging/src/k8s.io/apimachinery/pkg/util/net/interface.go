@@ -339,7 +339,7 @@ func chooseIPFromHostInterfaces(nw networkInterfacer, addressFamilies AddressFam
 			for _, addr := range addrs {
 				ip, _, err := netutils.ParseCIDRSloppy(addr.String())
 				if err != nil {
-					return nil, fmt.Errorf("Unable to parse CIDR for interface %q: %s", intf.Name, err)
+					return nil, fmt.Errorf("unable to parse CIDR for interface %q: %s", intf.Name, err)
 				}
 				if !memberOf(ip, family) {
 					klog.V(4).Infof("Skipping: no address family match for %q on interface %q.", ip, intf.Name)

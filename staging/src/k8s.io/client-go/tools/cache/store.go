@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Store is a generic object storage and processing interface.  A
@@ -99,20 +100,38 @@ type ExplicitKey string
 // The key uses the format <namespace>/<name> unless <namespace> is empty, then
 // it's just <name>.
 //
-// TODO: replace key-as-string with a key-as-struct so that this
-// packing/unpacking won't be necessary.
+// Clients that want a structured alternative can use ObjectToName or MetaObjectToName.
+// Note: this would not be a client that wants a key for a Store because those are
+// necessarily strings.
+//
+// TODO maybe some day?: change Store to be keyed differently
 func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	if key, ok := obj.(ExplicitKey); ok {
 		return string(key), nil
 	}
+	objName, err := ObjectToName(obj)
+	if err != nil {
+		return "", err
+	}
+	return objName.String(), nil
+}
+
+// ObjectToName returns the structured name for the given object,
+// if indeed it can be viewed as a metav1.Object.
+func ObjectToName(obj interface{}) (ObjectName, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
-		return "", fmt.Errorf("object has no meta: %v", err)
+		return ObjectName{}, fmt.Errorf("object has no meta: %v", err)
 	}
-	if len(meta.GetNamespace()) > 0 {
-		return meta.GetNamespace() + "/" + meta.GetName(), nil
+	return MetaObjectToName(meta), nil
+}
+
+// MetaObjectToName returns the structured name for the given object
+func MetaObjectToName(obj metav1.Object) ObjectName {
+	if len(obj.GetNamespace()) > 0 {
+		return ObjectName{Namespace: obj.GetNamespace(), Name: obj.GetName()}
 	}
-	return meta.GetName(), nil
+	return ObjectName{Namespace: "", Name: obj.GetName()}
 }
 
 // SplitMetaNamespaceKey returns the namespace and name that
@@ -199,8 +218,11 @@ func (c *cache) Index(indexName string, obj interface{}) ([]interface{}, error) 
 	return c.cacheStorage.Index(indexName, obj)
 }
 
-func (c *cache) IndexKeys(indexName, indexKey string) ([]string, error) {
-	return c.cacheStorage.IndexKeys(indexName, indexKey)
+// IndexKeys returns the storage keys of the stored objects whose set of
+// indexed values for the named index includes the given indexed value.
+// The returned keys are suitable to pass to GetByKey().
+func (c *cache) IndexKeys(indexName, indexedValue string) ([]string, error) {
+	return c.cacheStorage.IndexKeys(indexName, indexedValue)
 }
 
 // ListIndexFuncValues returns the list of generated values of an Index func
@@ -208,8 +230,10 @@ func (c *cache) ListIndexFuncValues(indexName string) []string {
 	return c.cacheStorage.ListIndexFuncValues(indexName)
 }
 
-func (c *cache) ByIndex(indexName, indexKey string) ([]interface{}, error) {
-	return c.cacheStorage.ByIndex(indexName, indexKey)
+// ByIndex returns the stored objects whose set of indexed values
+// for the named index includes the given indexed value.
+func (c *cache) ByIndex(indexName, indexedValue string) ([]interface{}, error) {
+	return c.cacheStorage.ByIndex(indexName, indexedValue)
 }
 
 func (c *cache) AddIndexers(newIndexers Indexers) error {

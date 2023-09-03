@@ -17,16 +17,10 @@ limitations under the License.
 package skipper
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
-	"regexp"
-	"runtime"
-	"runtime/debug"
-	"strings"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,77 +38,12 @@ import (
 
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	framework.Logf(msg)
-	skip(msg, caller+1)
-}
-
-// SkipPanic is the value that will be panicked from Skip.
-type SkipPanic struct {
-	Message        string // The failure message passed to Fail
-	Filename       string // The filename that is the source of the failure
-	Line           int    // The line number of the filename that is the source of the failure
-	FullStackTrace string // A full stack trace starting at the source of the failure
-}
-
-// String makes SkipPanic look like the old Ginkgo panic when printed.
-func (SkipPanic) String() string { return ginkgo.GINKGO_PANIC }
-
-// Skip wraps ginkgo.Skip so that it panics with more useful
-// information about why the test is being skipped. This function will
-// panic with a SkipPanic.
-func skip(message string, callerSkip ...int) {
-	skip := 1
-	if len(callerSkip) > 0 {
-		skip += callerSkip[0]
-	}
-
-	_, file, line, _ := runtime.Caller(skip)
-	sp := SkipPanic{
-		Message:        message,
-		Filename:       file,
-		Line:           line,
-		FullStackTrace: pruneStack(skip),
-	}
-
-	defer func() {
-		e := recover()
-		if e != nil {
-			panic(sp)
-		}
-	}()
-
-	ginkgo.Skip(message, skip)
-}
-
-// ginkgo adds a lot of test running infrastructure to the stack, so
-// we filter those out
-var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo`)
-
-func pruneStack(skip int) string {
-	skip += 2 // one for pruneStack and one for debug.Stack
-	stack := debug.Stack()
-	scanner := bufio.NewScanner(bytes.NewBuffer(stack))
-	var prunedStack []string
-
-	// skip the top of the stack
-	for i := 0; i < 2*skip+1; i++ {
-		scanner.Scan()
-	}
-
-	for scanner.Scan() {
-		if stackSkipPattern.Match(scanner.Bytes()) {
-			scanner.Scan() // these come in pairs
-		} else {
-			prunedStack = append(prunedStack, scanner.Text())
-			scanner.Scan() // these come in pairs
-			prunedStack = append(prunedStack, scanner.Text())
-		}
-	}
-
-	return strings.Join(prunedStack, "\n")
+	ginkgo.Skip(msg, caller+1)
+	panic("unreachable")
 }
 
 // Skipf skips with information about why the test is being skipped.
+// The direct caller is recorded in the callstack.
 func Skipf(format string, args ...interface{}) {
 	skipInternalf(1, format, args...)
 	panic("unreachable")
@@ -172,9 +101,9 @@ func SkipIfFeatureGateEnabled(gate featuregate.Feature) {
 }
 
 // SkipIfMissingResource skips if the gvr resource is missing.
-func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
+func SkipIfMissingResource(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
 	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
-	_, err := resourceClient.List(context.TODO(), metav1.ListOptions{})
+	_, err := resourceClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		// not all resources support list, so we ignore those
 		if apierrors.IsMethodNotSupported(err) || apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
@@ -213,8 +142,8 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 }
 
 // SkipUnlessMultizone skips if the cluster does not have multizone.
-func SkipUnlessMultizone(c clientset.Interface) {
-	zones, err := e2enode.GetClusterZones(c)
+func SkipUnlessMultizone(ctx context.Context, c clientset.Interface) {
+	zones, err := e2enode.GetClusterZones(ctx, c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}
@@ -224,8 +153,8 @@ func SkipUnlessMultizone(c clientset.Interface) {
 }
 
 // SkipIfMultizone skips if the cluster has multizone.
-func SkipIfMultizone(c clientset.Interface) {
-	zones, err := e2enode.GetClusterZones(c)
+func SkipIfMultizone(ctx context.Context, c clientset.Interface) {
+	zones, err := e2enode.GetClusterZones(ctx, c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}
@@ -284,11 +213,11 @@ func SkipUnlessSSHKeyPresent() {
 func serverVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) (bool, error) {
 	serverVersion, err := c.ServerVersion()
 	if err != nil {
-		return false, fmt.Errorf("Unable to get server version: %v", err)
+		return false, fmt.Errorf("Unable to get server version: %w", err)
 	}
 	sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
 	if err != nil {
-		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
+		return false, fmt.Errorf("Unable to parse server version %q: %w", serverVersion.GitVersion, err)
 	}
 	return sv.AtLeast(v), nil
 }
@@ -312,11 +241,11 @@ func RunIfSystemSpecNameIs(names ...string) {
 }
 
 // SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem run if the component run as pods and client can delete them
-func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(componentName string, c clientset.Interface, ns string, labelSet labels.Set) {
+func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(ctx context.Context, componentName string, c clientset.Interface, ns string, labelSet labels.Set) {
 	// verify if component run as pod
 	label := labels.SelectorFromSet(labelSet)
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), listOpts)
+	pods, err := c.CoreV1().Pods(ns).List(ctx, listOpts)
 	framework.Logf("SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem: %v, %v", pods, err)
 	if err != nil {
 		skipInternalf(1, "Skipped because client failed to get component:%s pod err:%v", componentName, err)
@@ -328,7 +257,7 @@ func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(componentName string, c
 
 	// verify if client can delete pod
 	pod := pods.Items[0]
-	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
+	if err := c.CoreV1().Pods(ns).Delete(ctx, pod.Name, metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
 		skipInternalf(1, "Skipped because client failed to delete component:%s pod, err:%v", componentName, err)
 	}
 }

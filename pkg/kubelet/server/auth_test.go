@@ -110,6 +110,7 @@ func AuthzTestCases() []AuthzTestCase {
 	testPaths := map[string]string{
 		"/attach/{podNamespace}/{podID}/{containerName}":       "proxy",
 		"/attach/{podNamespace}/{podID}/{uid}/{containerName}": "proxy",
+		"/checkpoint/{podNamespace}/{podID}/{containerName}":   "proxy",
 		"/configz": "proxy",
 		"/containerLogs/{podNamespace}/{podID}/{containerName}": "proxy",
 		"/debug/flags/v":                                     "proxy",

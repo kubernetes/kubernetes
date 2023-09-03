@@ -76,7 +76,7 @@ func TestFIFO_requeueOnPop(t *testing.T) {
 	f := NewFIFO(testFifoObjectKeyFunc)
 
 	f.Add(mkFifoObj("foo", 10))
-	_, err := f.Pop(func(obj interface{}) error {
+	_, err := f.Pop(func(obj interface{}, isInInitialList bool) error {
 		if obj.(testFifoObject).name != "foo" {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
@@ -89,7 +89,7 @@ func TestFIFO_requeueOnPop(t *testing.T) {
 		t.Fatalf("object should have been requeued: %t %v", ok, err)
 	}
 
-	_, err = f.Pop(func(obj interface{}) error {
+	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
 		if obj.(testFifoObject).name != "foo" {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
@@ -102,7 +102,7 @@ func TestFIFO_requeueOnPop(t *testing.T) {
 		t.Fatalf("object should have been requeued: %t %v", ok, err)
 	}
 
-	_, err = f.Pop(func(obj interface{}) error {
+	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
 		if obj.(testFifoObject).name != "foo" {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
@@ -289,7 +289,7 @@ func TestFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 	const jobs = 10
 	for i := 0; i < jobs; i++ {
 		go func() {
-			f.Pop(func(obj interface{}) error {
+			f.Pop(func(obj interface{}, isInInitialList bool) error {
 				return nil
 			})
 			c <- struct{}{}

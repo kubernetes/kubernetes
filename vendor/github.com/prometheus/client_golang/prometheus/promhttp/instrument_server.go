@@ -28,6 +28,26 @@ import (
 // magicString is used for the hacky label test in checkLabels. Remove once fixed.
 const magicString = "zZgWfBxLqvG8kc8IMv3POi2Bb0tZI3vAnBx+gBaFi9FyPzB/CzKUer1yufDa"
 
+// observeWithExemplar is a wrapper for [prometheus.ExemplarAdder.ExemplarObserver],
+// which falls back to [prometheus.Observer.Observe] if no labels are provided.
+func observeWithExemplar(obs prometheus.Observer, val float64, labels map[string]string) {
+	if labels == nil {
+		obs.Observe(val)
+		return
+	}
+	obs.(prometheus.ExemplarObserver).ObserveWithExemplar(val, labels)
+}
+
+// addWithExemplar is a wrapper for [prometheus.ExemplarAdder.AddWithExemplar],
+// which falls back to [prometheus.Counter.Add] if no labels are provided.
+func addWithExemplar(obs prometheus.Counter, val float64, labels map[string]string) {
+	if labels == nil {
+		obs.Add(val)
+		return
+	}
+	obs.(prometheus.ExemplarAdder).AddWithExemplar(val, labels)
+}
+
 // InstrumentHandlerInFlight is a middleware that wraps the provided
 // http.Handler. It sets the provided prometheus.Gauge to the number of
 // requests currently handled by the wrapped http.Handler.
@@ -48,7 +68,7 @@ func InstrumentHandlerInFlight(g prometheus.Gauge, next http.Handler) http.Handl
 // names are "code" and "method". The function panics otherwise. For the "method"
 // label a predefined default label value set is used to filter given values.
 // Values besides predefined values will count as `unknown` method.
-//`WithExtraMethods` can be used to add more methods to the set. The Observe
+// `WithExtraMethods` can be used to add more methods to the set. The Observe
 // method of the Observer in the ObserverVec is called with the request duration
 // in seconds. Partitioning happens by HTTP status code and/or HTTP method if
 // the respective instance label names are present in the ObserverVec. For
@@ -62,28 +82,37 @@ func InstrumentHandlerInFlight(g prometheus.Gauge, next http.Handler) http.Handl
 // Note that this method is only guaranteed to never observe negative durations
 // if used with Go1.9+.
 func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler, opts ...Option) http.HandlerFunc {
-	mwOpts := &option{}
+	hOpts := defaultOptions()
 	for _, o := range opts {
-		o(mwOpts)
+		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(obs)
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	if code {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
 			now := time.Now()
 			d := newDelegator(w, nil)
 			next.ServeHTTP(d, r)
 
-			obs.With(labels(code, method, r.Method, d.Status(), mwOpts.extraMethods...)).Observe(time.Since(now).Seconds())
-		})
+			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
+		}
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		next.ServeHTTP(w, r)
-		obs.With(labels(code, method, r.Method, 0, mwOpts.extraMethods...)).Observe(time.Since(now).Seconds())
-	})
+		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
+	}
 }
 
 // InstrumentHandlerCounter is a middleware that wraps the provided http.Handler
@@ -104,25 +133,36 @@ func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler, op
 //
 // See the example for InstrumentHandlerDuration for example usage.
 func InstrumentHandlerCounter(counter *prometheus.CounterVec, next http.Handler, opts ...Option) http.HandlerFunc {
-	mwOpts := &option{}
+	hOpts := defaultOptions()
 	for _, o := range opts {
-		o(mwOpts)
+		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(counter)
+	// Curry the counter with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(counter.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	if code {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
 			d := newDelegator(w, nil)
 			next.ServeHTTP(d, r)
-			counter.With(labels(code, method, r.Method, d.Status(), mwOpts.extraMethods...)).Inc()
-		})
+
+			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r.Context()))
+		}
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r)
-		counter.With(labels(code, method, r.Method, 0, mwOpts.extraMethods...)).Inc()
-	})
+
+		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r.Context()))
+	}
 }
 
 // InstrumentHandlerTimeToWriteHeader is a middleware that wraps the provided
@@ -148,20 +188,25 @@ func InstrumentHandlerCounter(counter *prometheus.CounterVec, next http.Handler,
 //
 // See the example for InstrumentHandlerDuration for example usage.
 func InstrumentHandlerTimeToWriteHeader(obs prometheus.ObserverVec, next http.Handler, opts ...Option) http.HandlerFunc {
-	mwOpts := &option{}
+	hOpts := defaultOptions()
 	for _, o := range opts {
-		o(mwOpts)
+		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(obs)
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		d := newDelegator(w, func(status int) {
-			obs.With(labels(code, method, r.Method, status, mwOpts.extraMethods...)).Observe(time.Since(now).Seconds())
+			l := labels(code, method, r.Method, status, hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
 		})
 		next.ServeHTTP(d, r)
-	})
+	}
 }
 
 // InstrumentHandlerRequestSize is a middleware that wraps the provided
@@ -184,27 +229,38 @@ func InstrumentHandlerTimeToWriteHeader(obs prometheus.ObserverVec, next http.Ha
 //
 // See the example for InstrumentHandlerDuration for example usage.
 func InstrumentHandlerRequestSize(obs prometheus.ObserverVec, next http.Handler, opts ...Option) http.HandlerFunc {
-	mwOpts := &option{}
+	hOpts := defaultOptions()
 	for _, o := range opts {
-		o(mwOpts)
+		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(obs)
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	if code {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
 			d := newDelegator(w, nil)
 			next.ServeHTTP(d, r)
 			size := computeApproximateRequestSize(r)
-			obs.With(labels(code, method, r.Method, d.Status(), mwOpts.extraMethods...)).Observe(float64(size))
-		})
+
+			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r.Context()))
+		}
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r)
 		size := computeApproximateRequestSize(r)
-		obs.With(labels(code, method, r.Method, 0, mwOpts.extraMethods...)).Observe(float64(size))
-	})
+
+		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r.Context()))
+	}
 }
 
 // InstrumentHandlerResponseSize is a middleware that wraps the provided
@@ -227,17 +283,23 @@ func InstrumentHandlerRequestSize(obs prometheus.ObserverVec, next http.Handler,
 //
 // See the example for InstrumentHandlerDuration for example usage.
 func InstrumentHandlerResponseSize(obs prometheus.ObserverVec, next http.Handler, opts ...Option) http.Handler {
-	mwOpts := &option{}
+	hOpts := defaultOptions()
 	for _, o := range opts {
-		o(mwOpts)
+		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(obs)
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		d := newDelegator(w, nil)
 		next.ServeHTTP(d, r)
-		obs.With(labels(code, method, r.Method, d.Status(), mwOpts.extraMethods...)).Observe(float64(d.Written()))
+
+		l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		observeWithExemplar(obs.With(l), float64(d.Written()), hOpts.getExemplarFn(r.Context()))
 	})
 }
 
@@ -246,7 +308,7 @@ func InstrumentHandlerResponseSize(obs prometheus.ObserverVec, next http.Handler
 // Collector does not have a Desc or has more than one Desc or its Desc is
 // invalid. It also panics if the Collector has any non-const, non-curried
 // labels that are not named "code" or "method".
-func checkLabels(c prometheus.Collector) (code bool, method bool) {
+func checkLabels(c prometheus.Collector) (code, method bool) {
 	// TODO(beorn7): Remove this hacky way to check for instance labels
 	// once Descriptors can have their dimensionality queried.
 	var (

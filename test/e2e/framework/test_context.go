@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -24,18 +25,25 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
+	"github.com/onsi/ginkgo/v2/types"
+	"github.com/onsi/gomega"
+	gomegaformat "github.com/onsi/gomega/format"
+
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/e2e/framework/internal/junit"
+	"k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
 
 const (
@@ -52,24 +60,24 @@ const (
 // into the code which uses the settings.
 //
 // The recommendation for those settings is:
-// - They are stored in their own context structure or local
-//   variables.
-// - The standard `flag` package is used to register them.
-//   The flag name should follow the pattern <part1>.<part2>....<partn>
-//   where the prefix is unlikely to conflict with other tests or
-//   standard packages and each part is in lower camel case. For
-//   example, test/e2e/storage/csi/context.go could define
-//   storage.csi.numIterations.
-// - framework/config can be used to simplify the registration of
-//   multiple options with a single function call:
-//   var storageCSI {
-//       NumIterations `default:"1" usage:"number of iterations"`
-//   }
-//   _ config.AddOptions(&storageCSI, "storage.csi")
-// - The direct use Viper in tests is possible, but discouraged because
-//   it only works in test suites which use Viper (which is not
-//   required) and the supported options cannot be
-//   discovered by a test suite user.
+//   - They are stored in their own context structure or local
+//     variables.
+//   - The standard `flag` package is used to register them.
+//     The flag name should follow the pattern <part1>.<part2>....<partn>
+//     where the prefix is unlikely to conflict with other tests or
+//     standard packages and each part is in lower camel case. For
+//     example, test/e2e/storage/csi/context.go could define
+//     storage.csi.numIterations.
+//   - framework/config can be used to simplify the registration of
+//     multiple options with a single function call:
+//     var storageCSI {
+//     NumIterations `default:"1" usage:"number of iterations"`
+//     }
+//     _ config.AddOptions(&storageCSI, "storage.csi")
+//   - The direct use Viper in tests is possible, but discouraged because
+//     it only works in test suites which use Viper (which is not
+//     required) and the supported options cannot be
+//     discovered by a test suite user.
 //
 // Test suite authors can use framework/viper to make all command line
 // parameters also configurable via a configuration file.
@@ -95,15 +103,22 @@ type TestContextType struct {
 	// Tooling is the tooling in use (e.g. kops, gke).  Provider is the cloud provider and might not uniquely identify the tooling.
 	Tooling string
 
-	CloudConfig    CloudConfig
-	KubectlPath    string
-	OutputDir      string
-	ReportDir      string
-	ReportPrefix   string
-	Prefix         string
-	MinStartupPods int
-	// Timeout for waiting for system pods to be running
-	SystemPodsStartupTimeout    time.Duration
+	// timeouts contains user-configurable timeouts for various operations.
+	// Individual Framework instance also have such timeouts which may be
+	// different from these here. To avoid confusion, this field is not
+	// exported. Its values can be accessed through
+	// NewTimeoutContext.
+	timeouts TimeoutContext
+
+	CloudConfig                 CloudConfig
+	KubectlPath                 string
+	OutputDir                   string
+	ReportDir                   string
+	ReportPrefix                string
+	ReportCompleteGinkgo        bool
+	ReportCompleteJUnit         bool
+	Prefix                      string
+	MinStartupPods              int
 	EtcdUpgradeStorage          string
 	EtcdUpgradeVersion          string
 	GCEUpgradeScript            string
@@ -136,10 +151,6 @@ type TestContextType struct {
 	IncludeClusterAutoscalerMetrics bool
 	// Currently supported values are 'hr' for human-readable and 'json'. It's a comma separated list.
 	OutputPrintType string
-	// NodeSchedulableTimeout is the timeout for waiting for all nodes to be schedulable.
-	NodeSchedulableTimeout time.Duration
-	// SystemDaemonsetStartupTimeout is the timeout for waiting for all system daemonsets to be ready.
-	SystemDaemonsetStartupTimeout time.Duration
 	// CreateTestingNS is responsible for creating namespace used for executing e2e tests.
 	// It accepts namespace base name, which will be prepended with e2e prefix, kube client
 	// and labels to be applied to a namespace.
@@ -177,6 +188,13 @@ type TestContextType struct {
 	// DockerConfigFile is a file that contains credentials which can be used to pull images from certain private registries, needed for a test.
 	DockerConfigFile string
 
+	// E2EDockerConfigFile is a docker credentials configuration file used which contains authorization token that can be used to pull images from certain private registries provided by the users.
+	// For more details refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub
+	E2EDockerConfigFile string
+
+	// KubeTestRepoConfigFile is a yaml file used for overriding registries for test images.
+	KubeTestRepoList string
+
 	// SnapshotControllerPodName is the name used for identifying the snapshot controller pod.
 	SnapshotControllerPodName string
 
@@ -186,10 +204,16 @@ type TestContextType struct {
 	// RequireDevices makes mandatory on the environment on which tests are run 1+ devices exposed through device plugins.
 	// With this enabled The e2e tests requiring devices for their operation can assume that if devices aren't reported, the test can fail
 	RequireDevices bool
+
+	// Enable volume drivers which are disabled by default. See test/e2e/storage/in_tree_volumes.go for details.
+	EnabledVolumeDrivers []string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
 // simulate node failures.
+//
+// TODO: move this and the corresponding command line flags into
+// test/e2e/framework/node.
 type NodeKillerConfig struct {
 	// Enabled determines whether NodeKill should do anything at all.
 	// All other options below are ignored if Enabled = false.
@@ -203,8 +227,10 @@ type NodeKillerConfig struct {
 	JitterFactor float64
 	// SimulatedDowntime is a duration between node is killed and recreated.
 	SimulatedDowntime time.Duration
-	// NodeKillerStopCh is a channel that is used to notify NodeKiller to stop killing nodes.
-	NodeKillerStopCh chan struct{}
+	// NodeKillerStopCtx is a context that is used to notify NodeKiller to stop killing nodes.
+	NodeKillerStopCtx context.Context
+	// NodeKillerStop is the cancel function for NodeKillerStopCtx.
+	NodeKillerStop func()
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -217,8 +243,6 @@ type NodeTestContextType struct {
 	NodeConformance bool
 	// PrepullImages indicates whether node e2e framework should prepull images.
 	PrepullImages bool
-	// KubeletConfig is the kubelet configuration the test is running against.
-	KubeletConfig kubeletconfig.KubeletConfiguration
 	// ImageDescription is the description of the image on which the test is running.
 	ImageDescription string
 	// RuntimeConfig is a map of API server runtime configuration values.
@@ -231,6 +255,8 @@ type NodeTestContextType struct {
 	RestartKubelet bool
 	// ExtraEnvs is a map of environment names to values.
 	ExtraEnvs map[string]string
+	// StandaloneMode indicates whether the test is running kubelet in a standalone mode.
+	StandaloneMode bool
 }
 
 // CloudConfig holds the cloud configuration for e2e test suites.
@@ -249,7 +275,7 @@ type CloudConfig struct {
 	ClusterIPRange    string
 	ClusterTag        string
 	Network           string
-	ConfigFile        string // for azure and openstack
+	ConfigFile        string // for azure
 	NodeTag           string
 	MasterTag         string
 
@@ -257,7 +283,30 @@ type CloudConfig struct {
 }
 
 // TestContext should be used by all tests to access common context data.
-var TestContext TestContextType
+var TestContext = TestContextType{
+	timeouts: defaultTimeouts,
+}
+
+// StringArrayValue is used with flag.Var for a comma-separated list of strings placed into a string array.
+type stringArrayValue struct {
+	stringArray *[]string
+}
+
+func (v stringArrayValue) String() string {
+	if v.stringArray != nil {
+		return strings.Join(*v.stringArray, ",")
+	}
+	return ""
+}
+
+func (v stringArrayValue) Set(s string) error {
+	if len(s) == 0 {
+		*v.stringArray = []string{}
+	} else {
+		*v.stringArray = strings.Split(s, ",")
+	}
+	return nil
+}
 
 // ClusterIsIPv6 returns true if the cluster is IPv6
 func (tc TestContextType) ClusterIsIPv6() bool {
@@ -276,20 +325,14 @@ func (tc TestContextType) ClusterIsIPv6() bool {
 // options themselves, copy flags from test/e2e/framework/config
 // as shown in HandleFlags.
 func RegisterCommonFlags(flags *flag.FlagSet) {
-	// Turn on verbose by default to get spec names
-	config.DefaultReporterConfig.Verbose = true
-
-	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
-	config.GinkgoConfig.EmitSpecProgress = true
-
-	// Randomize specs as well as suites
-	config.GinkgoConfig.RandomizeAllSpecs = true
+	// The default is too low for objects like pods, even when using YAML. We double the default.
+	flags.IntVar(&gomegaformat.MaxLength, "gomega-max-length", 8000, "Sets the maximum size for the gomega formatter (= gomega.MaxLength). Use 0 to disable truncation.")
 
 	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flags.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
 	flags.IntVar(&TestContext.MaxNodesToGather, "max-nodes-to-gather-from", 20, "The maximum number of nodes to gather extended info from on test failure.")
 	flags.StringVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", "false", "If set to 'true' framework will gather metrics from all components after each test. If set to 'master' only master component metrics would be gathered.")
-	flags.BoolVar(&TestContext.GatherSuiteMetricsAfterTest, "gather-suite-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after the whole test suite completes.")
+	flags.BoolVar(&TestContext.GatherSuiteMetricsAfterTest, "gather-suite-metrics-at-teardown", false, "If set to true framework will gather metrics from all components after the whole test suite completes.")
 	flags.BoolVar(&TestContext.IncludeClusterAutoscalerMetrics, "include-cluster-autoscaler", false, "If set to true, framework will include Cluster Autoscaler when gathering metrics.")
 	flags.StringVar(&TestContext.OutputPrintType, "output-print-type", "json", "Format in which summaries should be printed: 'hr' for human readable, 'json' for JSON ones.")
 	flags.BoolVar(&TestContext.DumpLogsOnFailure, "dump-logs-on-failure", true, "If set to true test will dump data about the namespace in which test was running.")
@@ -301,30 +344,43 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set.", defaultHost))
 	flags.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
-	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
-	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
-	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
-	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
-	flags.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
+	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the simplified JUnit XML reports and other tests results should be saved. Default is empty, which doesn't generate these reports.  If ginkgo's -junit-report parameter is used, that parameter instead of -report-dir determines the location of a single JUnit report.")
+	flags.BoolVar(&TestContext.ReportCompleteGinkgo, "report-complete-ginkgo", false, "Enables writing a complete test report as Ginkgo JSON to <report dir>/ginkgo/report.json. Ignored if --report-dir is not set.")
+	flags.BoolVar(&TestContext.ReportCompleteJUnit, "report-complete-junit", false, "Enables writing a complete test report as JUnit XML to <report dir>/ginkgo/report.json. Ignored if --report-dir is not set.")
+	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
+	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "containerd", "The name of the container runtime process.")
+	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/run/containerd/containerd.pid", "The pid file of the container runtime.")
+	flags.StringVar(&TestContext.SystemdServices, "systemd-services", "containerd*", "The comma separated list of systemd services the framework will dump logs for.")
 	flags.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flags.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
-	// TODO: remove the node-role.kubernetes.io/master taint in 1.25 or later.
-	// The change will likely require an action for some users that do not
-	// use k8s originated tools like kubeadm or kOps for creating clusters
-	// and taint their control plane nodes with "master", expecting the test
-	// suite to work with this legacy non-blocking taint.
-	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane,node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests. The default taint 'node-role.kubernetes.io/master' is DEPRECATED and will be removed from the list in a future release.")
+	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
 
-	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
-	flags.BoolVar(&TestContext.ListConformanceTests, "list-conformance-tests", false, "If true, will show list of conformance tests.")
+	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for running tests.")
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
 	flags.StringVar(&TestContext.SpecSummaryOutput, "spec-dump", "", "The file to dump all ginkgo.SpecSummary to after tests run. If empty, no objects are saved/printed.")
-	flags.StringVar(&TestContext.DockerConfigFile, "docker-config-file", "", "A file that contains credentials which can be used to pull images from certain private registries, needed for a test.")
+	flags.StringVar(&TestContext.DockerConfigFile, "docker-config-file", "", "A docker credential file which contains authorization token that is used to perform image pull tests from an authenticated registry. For more details regarding the content of the file refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub")
+
+	flags.StringVar(&TestContext.E2EDockerConfigFile, "e2e-docker-config-file", "", "A docker credentials configuration file used which contains authorization token that can be used to pull images from certain private registries provided by the users. For more details refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub")
+	flags.StringVar(&TestContext.KubeTestRepoList, "kube-test-repo-list", "", "A yaml file used for overriding registries for test images. Alternatively, the KUBE_TEST_REPO_LIST env variable can be set.")
 
 	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
 	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
+
+	flags.Var(&stringArrayValue{&TestContext.EnabledVolumeDrivers}, "enabled-volume-drivers", "Comma-separated list of in-tree volume drivers to enable for testing. This is only needed for in-tree drivers disabled by default. An example is gcepd; see test/e2e/storage/in_tree_volumes.go for full details.")
+}
+
+func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
+	// fetch the current config
+	suiteConfig, reporterConfig := ginkgo.GinkgoConfiguration()
+	// Randomize specs as well as suites
+	suiteConfig.RandomizeAllSpecs = true
+	// Disable skipped tests unless they are explicitly requested.
+	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
+		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
+	}
+	return suiteConfig, reporterConfig
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.
@@ -371,9 +427,9 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&cloudConfig.ClusterTag, "cluster-tag", "", "Tag used to identify resources.  Only required if provider is aws.")
 	flags.StringVar(&cloudConfig.ConfigFile, "cloud-config-file", "", "Cloud config file.  Only required if provider is azure or vsphere.")
 	flags.IntVar(&TestContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used. If set to -1, no pods are checked and tests run straight away.")
-	flags.DurationVar(&TestContext.SystemPodsStartupTimeout, "system-pods-startup-timeout", 10*time.Minute, "Timeout for waiting for all system pods to be running before starting tests.")
-	flags.DurationVar(&TestContext.NodeSchedulableTimeout, "node-schedulable-timeout", 30*time.Minute, "Timeout for waiting for all nodes to be schedulable.")
-	flags.DurationVar(&TestContext.SystemDaemonsetStartupTimeout, "system-daemonsets-startup-timeout", 5*time.Minute, "Timeout for waiting for all system daemonsets to be ready.")
+	flags.DurationVar(&TestContext.timeouts.SystemPodsStartup, "system-pods-startup-timeout", TestContext.timeouts.SystemPodsStartup, "Timeout for waiting for all system pods to be running before starting tests.")
+	flags.DurationVar(&TestContext.timeouts.NodeSchedulable, "node-schedulable-timeout", TestContext.timeouts.NodeSchedulable, "Timeout for waiting for all nodes to be schedulable.")
+	flags.DurationVar(&TestContext.timeouts.SystemDaemonsetStartup, "system-daemonsets-startup-timeout", TestContext.timeouts.SystemDaemonsetStartup, "Timeout for waiting for all system daemonsets to be ready.")
 	flags.StringVar(&TestContext.EtcdUpgradeStorage, "etcd-upgrade-storage", "", "The storage version to upgrade to (either 'etcdv2' or 'etcdv3') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
@@ -385,44 +441,6 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&nodeKiller.Interval, "node-killer-interval", 1*time.Minute, "Time between node failures.")
 	flags.Float64Var(&nodeKiller.JitterFactor, "node-killer-jitter-factor", 60, "Factor used to jitter node failures.")
 	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
-}
-
-func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
-	clusterNick := "cluster"
-	userNick := "user"
-	contextNick := "context"
-
-	configCmd := clientcmdapi.NewConfig()
-
-	credentials := clientcmdapi.NewAuthInfo()
-	credentials.Token = clientCfg.BearerToken
-	credentials.TokenFile = clientCfg.BearerTokenFile
-	credentials.ClientCertificate = clientCfg.TLSClientConfig.CertFile
-	if len(credentials.ClientCertificate) == 0 {
-		credentials.ClientCertificateData = clientCfg.TLSClientConfig.CertData
-	}
-	credentials.ClientKey = clientCfg.TLSClientConfig.KeyFile
-	if len(credentials.ClientKey) == 0 {
-		credentials.ClientKeyData = clientCfg.TLSClientConfig.KeyData
-	}
-	configCmd.AuthInfos[userNick] = credentials
-
-	cluster := clientcmdapi.NewCluster()
-	cluster.Server = clientCfg.Host
-	cluster.CertificateAuthority = clientCfg.CAFile
-	if len(cluster.CertificateAuthority) == 0 {
-		cluster.CertificateAuthorityData = clientCfg.CAData
-	}
-	cluster.InsecureSkipTLSVerify = clientCfg.Insecure
-	configCmd.Clusters[clusterNick] = cluster
-
-	context := clientcmdapi.NewContext()
-	context.Cluster = clusterNick
-	context.AuthInfo = userNick
-	configCmd.Contexts[contextNick] = context
-	configCmd.CurrentContext = contextNick
-
-	return configCmd
 }
 
 // GenerateSecureToken returns a string of length tokenLen, consisting
@@ -441,14 +459,47 @@ func GenerateSecureToken(tokenLen int) (string, error) {
 }
 
 // AfterReadingAllFlags makes changes to the context after all flags
-// have been read.
+// have been read and prepares the process for a test run.
 func AfterReadingAllFlags(t *TestContextType) {
+	// Reconfigure klog so that output goes to the GinkgoWriter instead
+	// of stderr. The advantage is that it then gets interleaved properly
+	// with output that goes to GinkgoWriter (By, Logf).
+
+	// These flags are not exposed via the normal command line flag set,
+	// therefore we have to use our own private one here.
+	if t.KubeTestRepoList != "" {
+		image.Init(t.KubeTestRepoList)
+	}
+	var fs flag.FlagSet
+	klog.InitFlags(&fs)
+	fs.Set("logtostderr", "false")
+	fs.Set("alsologtostderr", "false")
+	fs.Set("one_output", "true")
+	fs.Set("stderrthreshold", "10" /* higher than any of the severities -> none pass the threshold */)
+	klog.SetOutput(ginkgo.GinkgoWriter)
+
+	if t.ListImages {
+		for _, v := range image.GetImageConfigs() {
+			fmt.Println(v.GetE2EImage())
+		}
+		os.Exit(0)
+	}
+
+	// Reconfigure gomega defaults. The poll interval should be suitable
+	// for most tests. The timeouts are more subjective and tests may want
+	// to override them, but these defaults are still better for E2E than the
+	// ones from Gomega (1s timeout, 10ms interval).
+	gomega.SetDefaultEventuallyPollingInterval(t.timeouts.Poll)
+	gomega.SetDefaultConsistentlyPollingInterval(t.timeouts.Poll)
+	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
+	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
+
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
 		// Check if we can use the in-cluster config
 		if clusterConfig, err := restclient.InClusterConfig(); err == nil {
 			if tempFile, err := os.CreateTemp(os.TempDir(), "kubeconfig-"); err == nil {
-				kubeConfig := createKubeConfig(clusterConfig)
+				kubeConfig := kubeconfig.CreateKubeConfig(clusterConfig)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
 				klog.V(4).Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
@@ -503,5 +554,49 @@ func AfterReadingAllFlags(t *TestContextType) {
 			klog.Errorf("Failed to setup provider config for %q: %v", TestContext.Provider, err)
 		}
 		os.Exit(1)
+	}
+
+	if TestContext.ReportDir != "" {
+		// Create the directory before running the suite. If
+		// --report-dir is not unusable, we should report
+		// that as soon as possible. This will be done by each worker
+		// in parallel, so we will get "exists" error in most of them.
+		if err := os.MkdirAll(TestContext.ReportDir, 0777); err != nil && !os.IsExist(err) {
+			klog.Errorf("Create report dir: %v", err)
+			os.Exit(1)
+		}
+		ginkgoDir := path.Join(TestContext.ReportDir, "ginkgo")
+		if TestContext.ReportCompleteGinkgo || TestContext.ReportCompleteJUnit {
+			if err := os.MkdirAll(ginkgoDir, 0777); err != nil && !os.IsExist(err) {
+				klog.Errorf("Create <report-dir>/ginkgo: %v", err)
+				os.Exit(1)
+			}
+		}
+
+		if TestContext.ReportCompleteGinkgo {
+			ginkgo.ReportAfterSuite("Ginkgo JSON report", func(report ginkgo.Report) {
+				ExpectNoError(reporters.GenerateJSONReport(report, path.Join(ginkgoDir, "report.json")))
+			})
+			ginkgo.ReportAfterSuite("JUnit XML report", func(report ginkgo.Report) {
+				ExpectNoError(reporters.GenerateJUnitReport(report, path.Join(ginkgoDir, "report.xml")))
+			})
+		}
+
+		ginkgo.ReportAfterSuite("Kubernetes e2e JUnit report", func(report ginkgo.Report) {
+			// With Ginkgo v1, we used to write one file per
+			// parallel node. Now Ginkgo v2 automatically merges
+			// all results into a report for us. The 01 suffix is
+			// kept in case that users expect files to be called
+			// "junit_<prefix><number>.xml".
+			junitReport := path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
+
+			// writeJUnitReport generates a JUnit file in the e2e
+			// report directory that is shorter than the one
+			// normally written by `ginkgo --junit-report`. This is
+			// needed because the full report can become too large
+			// for tools like Spyglass
+			// (https://github.com/kubernetes/kubernetes/issues/111510).
+			ExpectNoError(junit.WriteJUnitReport(report, junitReport))
+		})
 	}
 }

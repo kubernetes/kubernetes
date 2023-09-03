@@ -83,10 +83,16 @@ type Helper struct {
 	ErrOut io.Writer
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
 
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
+	// Deprecated: use OnPodDeletionOrEvictionFinished instead
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
+
+	// OnPodDeletionOrEvictionFinished is called when a pod is eviction/deletetion is failed; for printing progress output
+	OnPodDeletionOrEvictionFinished func(pod *corev1.Pod, usingEviction bool, err error)
+
+	// OnPodDeletionOrEvictionStarted is called when a pod eviction/deletion is started; for printing progress output
+	OnPodDeletionOrEvictionStarted func(pod *corev1.Pod, usingEviction bool)
 }
 
 type waitForDeleteParams struct {
@@ -97,6 +103,7 @@ type waitForDeleteParams struct {
 	usingEviction                   bool
 	getPodFn                        func(string, string) (*corev1.Pod, error)
 	onDoneFn                        func(pod *corev1.Pod, usingEviction bool)
+	onFinishFn                      func(pod *corev1.Pod, usingEviction bool, err error)
 	globalTimeout                   time.Duration
 	skipWaitForDeleteTimeoutSeconds int
 	out                             io.Writer
@@ -135,22 +142,11 @@ func (d *Helper) makeDeleteOptions() metav1.DeleteOptions {
 
 // DeletePod will delete the given pod, or return an error if it couldn't
 func (d *Helper) DeletePod(pod corev1.Pod) error {
-	if d.DryRunStrategy == cmdutil.DryRunServer {
-		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
-			return err
-		}
-	}
 	return d.Client.CoreV1().Pods(pod.Namespace).Delete(d.getContext(), pod.Name, d.makeDeleteOptions())
 }
 
 // EvictPod will evict the given pod, or return an error if it couldn't
 func (d *Helper) EvictPod(pod corev1.Pod, evictionGroupVersion schema.GroupVersion) error {
-	if d.DryRunStrategy == cmdutil.DryRunServer {
-		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
-			return err
-		}
-	}
-
 	delOpts := d.makeDeleteOptions()
 
 	switch evictionGroupVersion {
@@ -288,6 +284,9 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 				case cmdutil.DryRunServer:
 					fmt.Fprintf(d.Out, "evicting pod %s/%s (server dry run)\n", pod.Namespace, pod.Name)
 				default:
+					if d.OnPodDeletionOrEvictionStarted != nil {
+						d.OnPodDeletionOrEvictionStarted(&pod, true)
+					}
 					fmt.Fprintf(d.Out, "evicting pod %s/%s\n", pod.Namespace, pod.Name)
 				}
 				select {
@@ -327,7 +326,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 				} else if apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 					// an eviction request in a deleting namespace will throw a forbidden error,
 					// if the pod is not marked deleted, we retry until it is.
-					fmt.Fprintf(d.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", activePod.Name, err)
+					fmt.Fprintf(d.ErrOut, "error when evicting pod %q from terminating namespace %q (will retry after 5s): %v\n", activePod.Name, activePod.Namespace, err)
 					time.Sleep(5 * time.Second)
 				} else {
 					returnCh <- fmt.Errorf("error when evicting pods/%q -n %q: %v", activePod.Name, activePod.Namespace, err)
@@ -346,6 +345,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 				usingEviction:                   true,
 				getPodFn:                        getPodFn,
 				onDoneFn:                        d.OnPodDeletedOrEvicted,
+				onFinishFn:                      d.OnPodDeletionOrEvictionFinished,
 				globalTimeout:                   globalTimeout,
 				skipWaitForDeleteTimeoutSeconds: d.SkipWaitForDeleteTimeoutSeconds,
 				out:                             d.Out,
@@ -354,7 +354,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 			if err == nil {
 				returnCh <- nil
 			} else {
-				returnCh <- fmt.Errorf("error when waiting for pod %q terminating: %v", pod.Name, err)
+				returnCh <- fmt.Errorf("error when waiting for pod %q in namespace %q to terminate: %v", pod.Name, pod.Namespace, err)
 			}
 		}(pod, returnCh)
 	}
@@ -389,6 +389,9 @@ func (d *Helper) deletePods(pods []corev1.Pod, getPodFn func(namespace, name str
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+		if d.OnPodDeletionOrEvictionStarted != nil {
+			d.OnPodDeletionOrEvictionStarted(&pod, false)
+		}
 	}
 	ctx := d.getContext()
 	params := waitForDeleteParams{
@@ -399,6 +402,7 @@ func (d *Helper) deletePods(pods []corev1.Pod, getPodFn func(namespace, name str
 		usingEviction:                   false,
 		getPodFn:                        getPodFn,
 		onDoneFn:                        d.OnPodDeletedOrEvicted,
+		onFinishFn:                      d.OnPodDeletionOrEvictionFinished,
 		globalTimeout:                   globalTimeout,
 		skipWaitForDeleteTimeoutSeconds: d.SkipWaitForDeleteTimeoutSeconds,
 		out:                             d.Out,
@@ -414,11 +418,16 @@ func waitForDelete(params waitForDeleteParams) ([]corev1.Pod, error) {
 		for i, pod := range pods {
 			p, err := params.getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				if params.onDoneFn != nil {
+				if params.onFinishFn != nil {
+					params.onFinishFn(&pod, params.usingEviction, nil)
+				} else if params.onDoneFn != nil {
 					params.onDoneFn(&pod, params.usingEviction)
 				}
 				continue
 			} else if err != nil {
+				if params.onFinishFn != nil {
+					params.onFinishFn(&pod, params.usingEviction, err)
+				}
 				return false, err
 			} else {
 				if shouldSkipPod(*p, params.skipWaitForDeleteTimeoutSeconds) {

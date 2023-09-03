@@ -56,7 +56,7 @@ func (w tfWideDeepWorkload) PodSpec() v1.PodSpec {
 			},
 		},
 		Command: []string{"/bin/sh"},
-		Args:    []string{"-c", "python ./data_download.py && time -p python ./wide_deep.py --model_type=wide_deep --train_epochs=300 --epochs_between_evals=300 --batch_size=32561"},
+		Args:    []string{"-c", "time -p python ./wide_deep.py --model_type=wide_deep --train_epochs=300 --epochs_between_evals=300 --batch_size=32561"},
 	}
 	containers = append(containers, ctn)
 

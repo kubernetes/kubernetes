@@ -3,10 +3,7 @@
 approvers:
   - dims
   - feiskyer
-  - Random-Liu
-  - derekwaynecarr
-  - dchen1107
-  - yujuhong
+  - sig-node-approvers
   - sig-node-api-approvers
   - api-approvers
 reviewers:

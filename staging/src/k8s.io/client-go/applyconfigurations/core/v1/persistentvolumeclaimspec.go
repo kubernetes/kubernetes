@@ -26,14 +26,14 @@ import (
 // PersistentVolumeClaimSpecApplyConfiguration represents an declarative configuration of the PersistentVolumeClaimSpec type for use
 // with apply.
 type PersistentVolumeClaimSpecApplyConfiguration struct {
-	AccessModes      []v1.PersistentVolumeAccessMode              `json:"accessModes,omitempty"`
-	Selector         *metav1.LabelSelectorApplyConfiguration      `json:"selector,omitempty"`
-	Resources        *ResourceRequirementsApplyConfiguration      `json:"resources,omitempty"`
-	VolumeName       *string                                      `json:"volumeName,omitempty"`
-	StorageClassName *string                                      `json:"storageClassName,omitempty"`
-	VolumeMode       *v1.PersistentVolumeMode                     `json:"volumeMode,omitempty"`
-	DataSource       *TypedLocalObjectReferenceApplyConfiguration `json:"dataSource,omitempty"`
-	DataSourceRef    *TypedLocalObjectReferenceApplyConfiguration `json:"dataSourceRef,omitempty"`
+	AccessModes      []v1.PersistentVolumeAccessMode               `json:"accessModes,omitempty"`
+	Selector         *metav1.LabelSelectorApplyConfiguration       `json:"selector,omitempty"`
+	Resources        *VolumeResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
+	VolumeName       *string                                       `json:"volumeName,omitempty"`
+	StorageClassName *string                                       `json:"storageClassName,omitempty"`
+	VolumeMode       *v1.PersistentVolumeMode                      `json:"volumeMode,omitempty"`
+	DataSource       *TypedLocalObjectReferenceApplyConfiguration  `json:"dataSource,omitempty"`
+	DataSourceRef    *TypedObjectReferenceApplyConfiguration       `json:"dataSourceRef,omitempty"`
 }
 
 // PersistentVolumeClaimSpecApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimSpec type for use with
@@ -63,7 +63,7 @@ func (b *PersistentVolumeClaimSpecApplyConfiguration) WithSelector(value *metav1
 // WithResources sets the Resources field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Resources field is set to the value of the last call.
-func (b *PersistentVolumeClaimSpecApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *PersistentVolumeClaimSpecApplyConfiguration {
+func (b *PersistentVolumeClaimSpecApplyConfiguration) WithResources(value *VolumeResourceRequirementsApplyConfiguration) *PersistentVolumeClaimSpecApplyConfiguration {
 	b.Resources = value
 	return b
 }
@@ -103,7 +103,7 @@ func (b *PersistentVolumeClaimSpecApplyConfiguration) WithDataSource(value *Type
 // WithDataSourceRef sets the DataSourceRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DataSourceRef field is set to the value of the last call.
-func (b *PersistentVolumeClaimSpecApplyConfiguration) WithDataSourceRef(value *TypedLocalObjectReferenceApplyConfiguration) *PersistentVolumeClaimSpecApplyConfiguration {
+func (b *PersistentVolumeClaimSpecApplyConfiguration) WithDataSourceRef(value *TypedObjectReferenceApplyConfiguration) *PersistentVolumeClaimSpecApplyConfiguration {
 	b.DataSourceRef = value
 	return b
 }

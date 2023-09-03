@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,15 +17,19 @@ limitations under the License.
 package util
 
 import (
-	"os/exec"
+	"os"
 )
 
-// CopyDir copies the content of a folder
-func CopyDir(src string, dst string) error {
-	cmd := exec.Command("cp", "-r", src, dst)
-	err := cmd.Run()
+// CopyFile copies a file from src to dest.
+func CopyFile(src, dest string) error {
+	fileInfo, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
-	return nil
+	contents, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(dest, contents, fileInfo.Mode())
+	return err
 }

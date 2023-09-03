@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/klog/v2"
@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -44,7 +45,7 @@ type isImmutableFunc func(runtime.Object) bool
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {
-	refCount  int
+	refMap    map[types.UID]int
 	store     *cacheStore
 	reflector *cache.Reflector
 
@@ -164,8 +165,9 @@ type objectCache struct {
 	clock         clock.Clock
 	maxIdleTime   time.Duration
 
-	lock  sync.RWMutex
-	items map[objectKey]*objectCacheItem
+	lock    sync.RWMutex
+	items   map[objectKey]*objectCacheItem
+	stopped bool
 }
 
 const minIdleTime = 1 * time.Minute
@@ -178,7 +180,8 @@ func NewObjectCache(
 	isImmutable isImmutableFunc,
 	groupResource schema.GroupResource,
 	clock clock.Clock,
-	maxIdleTime time.Duration) Store {
+	maxIdleTime time.Duration,
+	stopCh <-chan struct{}) Store {
 
 	if maxIdleTime < minIdleTime {
 		maxIdleTime = minIdleTime
@@ -195,8 +198,8 @@ func NewObjectCache(
 		items:         make(map[objectKey]*objectCacheItem),
 	}
 
-	// TODO propagate stopCh from the higher level.
-	go wait.Until(store.startRecycleIdleWatch, time.Minute, wait.NeverStop)
+	go wait.Until(store.startRecycleIdleWatch, time.Minute, stopCh)
+	go store.shutdownWhenStopped(stopCh)
 	return store
 }
 
@@ -210,7 +213,7 @@ func (c *objectCache) newStore() *cacheStore {
 	return &cacheStore{store, sync.Mutex{}, false}
 }
 
-func (c *objectCache) newReflector(namespace, name string) *objectCacheItem {
+func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheItem {
 	fieldSelector := fields.Set{"metadata.name": name}.AsSelector().String()
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
 		options.FieldSelector = fieldSelector
@@ -229,17 +232,21 @@ func (c *objectCache) newReflector(namespace, name string) *objectCacheItem {
 		0,
 	)
 	item := &objectCacheItem{
-		refCount:  0,
+		refMap:    make(map[types.UID]int),
 		store:     store,
 		reflector: reflector,
 		hasSynced: func() (bool, error) { return store.hasSynced(), nil },
 		stopCh:    make(chan struct{}),
 	}
-	go item.startReflector()
+
+	// Don't start reflector if Kubelet is already shutting down.
+	if !c.stopped {
+		go item.startReflector()
+	}
 	return item
 }
 
-func (c *objectCache) AddReference(namespace, name string) {
+func (c *objectCache) AddReference(namespace, name string, referencedFrom types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod thus it needs to be efficient.
@@ -251,20 +258,23 @@ func (c *objectCache) AddReference(namespace, name string) {
 	defer c.lock.Unlock()
 	item, exists := c.items[key]
 	if !exists {
-		item = c.newReflector(namespace, name)
+		item = c.newReflectorLocked(namespace, name)
 		c.items[key] = item
 	}
-	item.refCount++
+	item.refMap[referencedFrom]++
 }
 
-func (c *objectCache) DeleteReference(namespace, name string) {
+func (c *objectCache) DeleteReference(namespace, name string, referencedFrom types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if item, ok := c.items[key]; ok {
-		item.refCount--
-		if item.refCount == 0 {
+		item.refMap[referencedFrom]--
+		if item.refMap[referencedFrom] == 0 {
+			delete(item.refMap, referencedFrom)
+		}
+		if len(item.refMap) == 0 {
 			// Stop the underlying reflector.
 			item.stop()
 			delete(c.items, key)
@@ -281,6 +291,12 @@ func (c *objectCache) key(namespace, name string) string {
 	return name
 }
 
+func (c *objectCache) isStopped() bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.stopped
+}
+
 func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	key := objectKey{namespace: namespace, name: name}
 
@@ -295,7 +311,10 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	// This protects from premature (racy) reflector closure.
 	item.setLastAccessTime(c.clock.Now())
 
-	item.restartReflectorIfNeeded()
+	// Don't restart reflector if Kubelet is already shutting down.
+	if !c.isStopped() {
+		item.restartReflectorIfNeeded()
+	}
 	if err := wait.PollImmediate(10*time.Millisecond, time.Second, item.hasSynced); err != nil {
 		return nil, fmt.Errorf("failed to sync %s cache: %v", c.groupResource.String(), err)
 	}
@@ -339,12 +358,24 @@ func (c *objectCache) startRecycleIdleWatch() {
 	}
 }
 
+func (c *objectCache) shutdownWhenStopped(stopCh <-chan struct{}) {
+	<-stopCh
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.stopped = true
+	for _, item := range c.items {
+		item.stop()
+	}
+}
+
 // NewWatchBasedManager creates a manager that keeps a cache of all objects
 // necessary for registered pods.
 // It implements the following logic:
-// - whenever a pod is created or updated, we start individual watches for all
-//   referenced objects that aren't referenced from other registered pods
-// - every GetObject() returns a value from local cache propagated via watches
+//   - whenever a pod is created or updated, we start individual watches for all
+//     referenced objects that aren't referenced from other registered pods
+//   - every GetObject() returns a value from local cache propagated via watches
 func NewWatchBasedManager(
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
@@ -360,6 +391,7 @@ func NewWatchBasedManager(
 	// We currently set it to 5 times.
 	maxIdleTime := resyncInterval * 5
 
-	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime)
+	// TODO propagate stopCh from the higher level.
+	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }

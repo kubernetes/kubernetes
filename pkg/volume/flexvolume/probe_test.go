@@ -19,6 +19,7 @@ package flexvolume
 import (
 	"fmt"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -52,7 +53,11 @@ func TestProberExistingDriverBeforeInit(t *testing.T) {
 	// current subdirectories) registered.
 	assert.Equal(t, 1, len(events))
 	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
-	assertPathSuffix(t, pluginDir, watcher.watches[0])
+	plugDir := pluginDir
+	if goruntime.GOOS == "windows" {
+		plugDir = "\\flexvolume"
+	}
+	assertPathSuffix(t, plugDir, watcher.watches[0])
 	assertPathSuffix(t, driverPath, watcher.watches[1])
 	assert.NoError(t, err)
 
@@ -67,6 +72,11 @@ func TestProberExistingDriverBeforeInit(t *testing.T) {
 
 // Probes newly added drivers after prober is running.
 func TestProberAddRemoveDriver(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	// Arrange
 	_, fs, watcher, prober := initTestEnvironment(t)
 	prober.Probe()
@@ -200,9 +210,15 @@ func TestEmptyPluginDir(t *testing.T) {
 
 // Issue an event to remove plugindir. New directory should still be watched.
 func TestRemovePluginDir(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	// Arrange
 	driverPath, fs, watcher, _ := initTestEnvironment(t)
-	fs.RemoveAll(pluginDir)
+	err := fs.RemoveAll(pluginDir)
+	assert.NoError(t, err)
 	watcher.TriggerEvent(fsnotify.Remove, filepath.Join(driverPath, driverName))
 	watcher.TriggerEvent(fsnotify.Remove, driverPath)
 	watcher.TriggerEvent(fsnotify.Remove, pluginDir)
@@ -211,11 +227,20 @@ func TestRemovePluginDir(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, 3, len(watcher.watches)) // 2 from initial setup, 1 from new watch.
-	assertPathSuffix(t, pluginDir, watcher.watches[len(watcher.watches)-1])
+	plugDir := pluginDir
+	if goruntime.GOOS == "windows" {
+		plugDir = "\\flexvolume"
+	}
+	assertPathSuffix(t, plugDir, watcher.watches[len(watcher.watches)-1])
 }
 
 // Issue an event to remove plugindir. New directory should still be watched.
 func TestNestedDriverDir(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	// Arrange
 	_, fs, watcher, _ := initTestEnvironment(t)
 	// Assert
@@ -321,7 +346,10 @@ func TestProberSuccessAndError(t *testing.T) {
 func installDriver(driverName string, fs utilfs.Filesystem) {
 	driverPath := filepath.Join(pluginDir, driverName)
 	fs.MkdirAll(driverPath, 0777)
-	fs.Create(filepath.Join(driverPath, driverName))
+
+	// We need to close the file, otherwise we won't be able to remove it.
+	f, _ := fs.Create(filepath.Join(driverPath, driverName))
+	f.Close()
 }
 
 // Initializes mocks, installs a single driver in the mock fs, then initializes prober.

@@ -35,7 +35,7 @@ type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
-	// label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+	// selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 	// +optional
 	// +mapType=atomic
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
@@ -683,7 +683,54 @@ type IngressTLS struct {
 type IngressStatus struct {
 	// LoadBalancer contains the current status of the load-balancer.
 	// +optional
-	LoadBalancer v1.LoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
+	LoadBalancer IngressLoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
+}
+
+// LoadBalancerStatus represents the status of a load-balancer.
+type IngressLoadBalancerStatus struct {
+	// Ingress is a list containing ingress points for the load-balancer.
+	// +optional
+	Ingress []IngressLoadBalancerIngress `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
+}
+
+// IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
+type IngressLoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based.
+	// +optional
+	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+
+	// Hostname is set for load-balancer ingress points that are DNS based.
+	// +optional
+	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
+
+	// Ports provides information about the ports exposed by this LoadBalancer.
+	// +listType=atomic
+	// +optional
+	Ports []IngressPortStatus `json:"ports,omitempty" protobuf:"bytes,4,rep,name=ports"`
+}
+
+// IngressPortStatus represents the error condition of a service port
+type IngressPortStatus struct {
+	// Port is the port number of the ingress port.
+	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
+
+	// Protocol is the protocol of the ingress port.
+	// The supported values are: "TCP", "UDP", "SCTP"
+	Protocol v1.Protocol `json:"protocol" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
+
+	// Error is to record the problem with the service port
+	// The format of the error shall comply with the following rules:
+	// - built-in error values shall be specified in this file and those shall use
+	//   CamelCase names
+	// - cloud provider specific error values must have names that comply with the
+	//   format foo.example.com/CamelCase.
+	// ---
+	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+	// +optional
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
+	// +kubebuilder:validation:MaxLength=316
+	Error *string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to
@@ -920,7 +967,7 @@ type ReplicaSetSpec struct {
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
-	// Replicas is the most recently oberved number of replicas.
+	// Replicas is the most recently observed number of replicas.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
@@ -975,389 +1022,6 @@ type ReplicaSetCondition struct {
 }
 
 // +genclient
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.2
-// +k8s:prerelease-lifecycle-gen:deprecated=1.11
-// +k8s:prerelease-lifecycle-gen:removed=1.16
-// +k8s:prerelease-lifecycle-gen:replacement=policy,v1beta1,PodSecurityPolicy
-
-// PodSecurityPolicy governs the ability to make requests that affect the Security Context
-// that will be applied to a pod and container.
-// Deprecated: use PodSecurityPolicy from policy API Group instead.
-type PodSecurityPolicy struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// spec defines the policy enforced.
-	// +optional
-	Spec PodSecurityPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-}
-
-// PodSecurityPolicySpec defines the policy enforced.
-// Deprecated: use PodSecurityPolicySpec from policy API Group instead.
-type PodSecurityPolicySpec struct {
-	// privileged determines if a pod can request to be run as privileged.
-	// +optional
-	Privileged bool `json:"privileged,omitempty" protobuf:"varint,1,opt,name=privileged"`
-	// defaultAddCapabilities is the default set of capabilities that will be added to the container
-	// unless the pod spec specifically drops the capability.  You may not list a capability in both
-	// defaultAddCapabilities and requiredDropCapabilities. Capabilities added here are implicitly
-	// allowed, and need not be included in the allowedCapabilities list.
-	// +optional
-	DefaultAddCapabilities []v1.Capability `json:"defaultAddCapabilities,omitempty" protobuf:"bytes,2,rep,name=defaultAddCapabilities,casttype=k8s.io/api/core/v1.Capability"`
-	// requiredDropCapabilities are the capabilities that will be dropped from the container.  These
-	// are required to be dropped and cannot be added.
-	// +optional
-	RequiredDropCapabilities []v1.Capability `json:"requiredDropCapabilities,omitempty" protobuf:"bytes,3,rep,name=requiredDropCapabilities,casttype=k8s.io/api/core/v1.Capability"`
-	// allowedCapabilities is a list of capabilities that can be requested to add to the container.
-	// Capabilities in this field may be added at the pod author's discretion.
-	// You must not list a capability in both allowedCapabilities and requiredDropCapabilities.
-	// +optional
-	AllowedCapabilities []v1.Capability `json:"allowedCapabilities,omitempty" protobuf:"bytes,4,rep,name=allowedCapabilities,casttype=k8s.io/api/core/v1.Capability"`
-	// volumes is an allowlist of volume plugins. Empty indicates that
-	// no volumes may be used. To allow all volumes you may use '*'.
-	// +optional
-	Volumes []FSType `json:"volumes,omitempty" protobuf:"bytes,5,rep,name=volumes,casttype=FSType"`
-	// hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.
-	// +optional
-	HostNetwork bool `json:"hostNetwork,omitempty" protobuf:"varint,6,opt,name=hostNetwork"`
-	// hostPorts determines which host port ranges are allowed to be exposed.
-	// +optional
-	HostPorts []HostPortRange `json:"hostPorts,omitempty" protobuf:"bytes,7,rep,name=hostPorts"`
-	// hostPID determines if the policy allows the use of HostPID in the pod spec.
-	// +optional
-	HostPID bool `json:"hostPID,omitempty" protobuf:"varint,8,opt,name=hostPID"`
-	// hostIPC determines if the policy allows the use of HostIPC in the pod spec.
-	// +optional
-	HostIPC bool `json:"hostIPC,omitempty" protobuf:"varint,9,opt,name=hostIPC"`
-	// seLinux is the strategy that will dictate the allowable labels that may be set.
-	SELinux SELinuxStrategyOptions `json:"seLinux" protobuf:"bytes,10,opt,name=seLinux"`
-	// runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
-	RunAsUser RunAsUserStrategyOptions `json:"runAsUser" protobuf:"bytes,11,opt,name=runAsUser"`
-	// RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set.
-	// If this field is omitted, the pod's RunAsGroup can take any value. This field requires the
-	// RunAsGroup feature gate to be enabled.
-	// +optional
-	RunAsGroup *RunAsGroupStrategyOptions `json:"runAsGroup,omitempty" protobuf:"bytes,22,opt,name=runAsGroup"`
-	// supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
-	SupplementalGroups SupplementalGroupsStrategyOptions `json:"supplementalGroups" protobuf:"bytes,12,opt,name=supplementalGroups"`
-	// fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.
-	FSGroup FSGroupStrategyOptions `json:"fsGroup" protobuf:"bytes,13,opt,name=fsGroup"`
-	// readOnlyRootFilesystem when set to true will force containers to run with a read only root file
-	// system.  If the container specifically requests to run with a non-read only root file system
-	// the PSP should deny the pod.
-	// If set to false the container may run with a read only root file system if it wishes but it
-	// will not be forced to.
-	// +optional
-	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,14,opt,name=readOnlyRootFilesystem"`
-	// defaultAllowPrivilegeEscalation controls the default setting for whether a
-	// process can gain more privileges than its parent process.
-	// +optional
-	DefaultAllowPrivilegeEscalation *bool `json:"defaultAllowPrivilegeEscalation,omitempty" protobuf:"varint,15,opt,name=defaultAllowPrivilegeEscalation"`
-	// allowPrivilegeEscalation determines if a pod can request to allow
-	// privilege escalation. If unspecified, defaults to true.
-	// +optional
-	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,16,opt,name=allowPrivilegeEscalation"`
-	// allowedHostPaths is an allowlist of host paths. Empty indicates
-	// that all host paths may be used.
-	// +optional
-	AllowedHostPaths []AllowedHostPath `json:"allowedHostPaths,omitempty" protobuf:"bytes,17,rep,name=allowedHostPaths"`
-	// allowedFlexVolumes is an allowlist of Flexvolumes.  Empty or nil indicates that all
-	// Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
-	// is allowed in the "volumes" field.
-	// +optional
-	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
-	// AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
-	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
-	// +optional
-	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
-	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
-	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
-	// as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
-	// Kubelet has to allowlist all unsafe sysctls explicitly to avoid rejection.
-	//
-	// Examples:
-	// e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
-	// e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
-	// +optional
-	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty" protobuf:"bytes,19,rep,name=allowedUnsafeSysctls"`
-	// forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
-	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
-	// as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.
-	//
-	// Examples:
-	// e.g. "foo/*" forbids "foo/bar", "foo/baz", etc.
-	// e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
-	// +optional
-	ForbiddenSysctls []string `json:"forbiddenSysctls,omitempty" protobuf:"bytes,20,rep,name=forbiddenSysctls"`
-	// AllowedProcMountTypes is an allowlist of allowed ProcMountTypes.
-	// Empty or nil indicates that only the DefaultProcMountType may be used.
-	// This requires the ProcMountType feature flag to be enabled.
-	// +optional
-	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
-	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
-	// If this field is omitted, the pod's runtimeClassName field is unrestricted.
-	// Enforcement of this field depends on the RuntimeClass feature gate being enabled.
-	// +optional
-	RuntimeClass *RuntimeClassStrategyOptions `json:"runtimeClass,omitempty" protobuf:"bytes,24,opt,name=runtimeClass"`
-}
-
-// AllowedHostPath defines the host volume conditions that will be enabled by a policy
-// for pods to use. It requires the path prefix to be defined.
-// Deprecated: use AllowedHostPath from policy API Group instead.
-type AllowedHostPath struct {
-	// pathPrefix is the path prefix that the host volume must match.
-	// It does not support `*`.
-	// Trailing slashes are trimmed when validating the path prefix with a host path.
-	//
-	// Examples:
-	// `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
-	// `/foo` would not allow `/food` or `/etc/foo`
-	PathPrefix string `json:"pathPrefix,omitempty" protobuf:"bytes,1,rep,name=pathPrefix"`
-
-	// when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.
-	// +optional
-	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
-}
-
-// FSType gives strong typing to different file systems that are used by volumes.
-// Deprecated: use FSType from policy API Group instead.
-type FSType string
-
-const (
-	AzureFile             FSType = "azureFile"
-	Flocker               FSType = "flocker"
-	FlexVolume            FSType = "flexVolume"
-	HostPath              FSType = "hostPath"
-	EmptyDir              FSType = "emptyDir"
-	GCEPersistentDisk     FSType = "gcePersistentDisk"
-	AWSElasticBlockStore  FSType = "awsElasticBlockStore"
-	GitRepo               FSType = "gitRepo"
-	Secret                FSType = "secret"
-	NFS                   FSType = "nfs"
-	ISCSI                 FSType = "iscsi"
-	Glusterfs             FSType = "glusterfs"
-	PersistentVolumeClaim FSType = "persistentVolumeClaim"
-	RBD                   FSType = "rbd"
-	Cinder                FSType = "cinder"
-	CephFS                FSType = "cephFS"
-	DownwardAPI           FSType = "downwardAPI"
-	FC                    FSType = "fc"
-	ConfigMap             FSType = "configMap"
-	Quobyte               FSType = "quobyte"
-	AzureDisk             FSType = "azureDisk"
-	CSI                   FSType = "csi"
-	All                   FSType = "*"
-)
-
-// AllowedFlexVolume represents a single Flexvolume that is allowed to be used.
-// Deprecated: use AllowedFlexVolume from policy API Group instead.
-type AllowedFlexVolume struct {
-	// driver is the name of the Flexvolume driver.
-	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
-}
-
-// AllowedCSIDriver represents a single inline CSI Driver that is allowed to be used.
-type AllowedCSIDriver struct {
-	// Name is the registered name of the CSI driver
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-}
-
-// HostPortRange defines a range of host ports that will be enabled by a policy
-// for pods to use.  It requires both the start and end to be defined.
-// Deprecated: use HostPortRange from policy API Group instead.
-type HostPortRange struct {
-	// min is the start of the range, inclusive.
-	Min int32 `json:"min" protobuf:"varint,1,opt,name=min"`
-	// max is the end of the range, inclusive.
-	Max int32 `json:"max" protobuf:"varint,2,opt,name=max"`
-}
-
-// SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
-// Deprecated: use SELinuxStrategyOptions from policy API Group instead.
-type SELinuxStrategyOptions struct {
-	// rule is the strategy that will dictate the allowable labels that may be set.
-	Rule SELinuxStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=SELinuxStrategy"`
-	// seLinuxOptions required to run as; required for MustRunAs
-	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
-	// +optional
-	SELinuxOptions *v1.SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,2,opt,name=seLinuxOptions"`
-}
-
-// SELinuxStrategy denotes strategy types for generating SELinux options for a
-// Security Context.
-// Deprecated: use SELinuxStrategy from policy API Group instead.
-type SELinuxStrategy string
-
-const (
-	// SELinuxStrategyMustRunAs means that container must have SELinux labels of X applied.
-	// Deprecated: use SELinuxStrategyMustRunAs from policy API Group instead.
-	SELinuxStrategyMustRunAs SELinuxStrategy = "MustRunAs"
-	// SELinuxStrategyRunAsAny means that container may make requests for any SELinux context labels.
-	// Deprecated: use SELinuxStrategyRunAsAny from policy API Group instead.
-	SELinuxStrategyRunAsAny SELinuxStrategy = "RunAsAny"
-)
-
-// RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.
-// Deprecated: use RunAsUserStrategyOptions from policy API Group instead.
-type RunAsUserStrategyOptions struct {
-	// rule is the strategy that will dictate the allowable RunAsUser values that may be set.
-	Rule RunAsUserStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=RunAsUserStrategy"`
-	// ranges are the allowed ranges of uids that may be used. If you would like to force a single uid
-	// then supply a single range with the same start and end. Required for MustRunAs.
-	// +optional
-	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
-}
-
-// RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.
-// Deprecated: use RunAsGroupStrategyOptions from policy API Group instead.
-type RunAsGroupStrategyOptions struct {
-	// rule is the strategy that will dictate the allowable RunAsGroup values that may be set.
-	Rule RunAsGroupStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=RunAsGroupStrategy"`
-	// ranges are the allowed ranges of gids that may be used. If you would like to force a single gid
-	// then supply a single range with the same start and end. Required for MustRunAs.
-	// +optional
-	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
-}
-
-// IDRange provides a min/max of an allowed range of IDs.
-// Deprecated: use IDRange from policy API Group instead.
-type IDRange struct {
-	// min is the start of the range, inclusive.
-	Min int64 `json:"min" protobuf:"varint,1,opt,name=min"`
-	// max is the end of the range, inclusive.
-	Max int64 `json:"max" protobuf:"varint,2,opt,name=max"`
-}
-
-// RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
-// Security Context.
-// Deprecated: use RunAsUserStrategy from policy API Group instead.
-type RunAsUserStrategy string
-
-const (
-	// RunAsUserStrategyMustRunAs means that container must run as a particular uid.
-	// Deprecated: use RunAsUserStrategyMustRunAs from policy API Group instead.
-	RunAsUserStrategyMustRunAs RunAsUserStrategy = "MustRunAs"
-	// RunAsUserStrategyMustRunAsNonRoot means that container must run as a non-root uid.
-	// Deprecated: use RunAsUserStrategyMustRunAsNonRoot from policy API Group instead.
-	RunAsUserStrategyMustRunAsNonRoot RunAsUserStrategy = "MustRunAsNonRoot"
-	// RunAsUserStrategyRunAsAny means that container may make requests for any uid.
-	// Deprecated: use RunAsUserStrategyRunAsAny from policy API Group instead.
-	RunAsUserStrategyRunAsAny RunAsUserStrategy = "RunAsAny"
-)
-
-// RunAsGroupStrategy denotes strategy types for generating RunAsGroup values for a
-// Security Context.
-// Deprecated: use RunAsGroupStrategy from policy API Group instead.
-type RunAsGroupStrategy string
-
-const (
-	// RunAsGroupStrategyMayRunAs means that container does not need to run with a particular gid.
-	// However, when RunAsGroup are specified, they have to fall in the defined range.
-	RunAsGroupStrategyMayRunAs RunAsGroupStrategy = "MayRunAs"
-	// RunAsGroupStrategyMustRunAs means that container must run as a particular gid.
-	// Deprecated: use RunAsGroupStrategyMustRunAs from policy API Group instead.
-	RunAsGroupStrategyMustRunAs RunAsGroupStrategy = "MustRunAs"
-	// RunAsGroupStrategyRunAsAny means that container may make requests for any gid.
-	// Deprecated: use RunAsGroupStrategyRunAsAny from policy API Group instead.
-	RunAsGroupStrategyRunAsAny RunAsGroupStrategy = "RunAsAny"
-)
-
-// FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
-// Deprecated: use FSGroupStrategyOptions from policy API Group instead.
-type FSGroupStrategyOptions struct {
-	// rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
-	// +optional
-	Rule FSGroupStrategyType `json:"rule,omitempty" protobuf:"bytes,1,opt,name=rule,casttype=FSGroupStrategyType"`
-	// ranges are the allowed ranges of fs groups.  If you would like to force a single
-	// fs group then supply a single range with the same start and end. Required for MustRunAs.
-	// +optional
-	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
-}
-
-// FSGroupStrategyType denotes strategy types for generating FSGroup values for a
-// SecurityContext
-// Deprecated: use FSGroupStrategyType from policy API Group instead.
-type FSGroupStrategyType string
-
-const (
-	// FSGroupStrategyMustRunAs meant that container must have FSGroup of X applied.
-	// Deprecated: use FSGroupStrategyMustRunAs from policy API Group instead.
-	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
-	// FSGroupStrategyRunAsAny means that container may make requests for any FSGroup labels.
-	// Deprecated: use FSGroupStrategyRunAsAny from policy API Group instead.
-	FSGroupStrategyRunAsAny FSGroupStrategyType = "RunAsAny"
-)
-
-// SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
-// Deprecated: use SupplementalGroupsStrategyOptions from policy API Group instead.
-type SupplementalGroupsStrategyOptions struct {
-	// rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
-	// +optional
-	Rule SupplementalGroupsStrategyType `json:"rule,omitempty" protobuf:"bytes,1,opt,name=rule,casttype=SupplementalGroupsStrategyType"`
-	// ranges are the allowed ranges of supplemental groups.  If you would like to force a single
-	// supplemental group then supply a single range with the same start and end. Required for MustRunAs.
-	// +optional
-	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
-}
-
-// SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental
-// groups for a SecurityContext.
-// Deprecated: use SupplementalGroupsStrategyType from policy API Group instead.
-type SupplementalGroupsStrategyType string
-
-const (
-	// SupplementalGroupsStrategyMustRunAs means that container must run as a particular gid.
-	// Deprecated: use SupplementalGroupsStrategyMustRunAs from policy API Group instead.
-	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
-	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.
-	// Deprecated: use SupplementalGroupsStrategyRunAsAny from policy API Group instead.
-	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
-)
-
-// RuntimeClassStrategyOptions define the strategy that will dictate the allowable RuntimeClasses
-// for a pod.
-type RuntimeClassStrategyOptions struct {
-	// allowedRuntimeClassNames is an allowlist of RuntimeClass names that may be specified on a pod.
-	// A value of "*" means that any RuntimeClass name is allowed, and must be the only item in the
-	// list. An empty list requires the RuntimeClassName field to be unset.
-	AllowedRuntimeClassNames []string `json:"allowedRuntimeClassNames" protobuf:"bytes,1,rep,name=allowedRuntimeClassNames"`
-	// defaultRuntimeClassName is the default RuntimeClassName to set on the pod.
-	// The default MUST be allowed by the allowedRuntimeClassNames list.
-	// A value of nil does not mutate the Pod.
-	// +optional
-	DefaultRuntimeClassName *string `json:"defaultRuntimeClassName,omitempty" protobuf:"bytes,2,opt,name=defaultRuntimeClassName"`
-}
-
-// AllowAllRuntimeClassNames can be used as a value for the
-// RuntimeClassStrategyOptions.AllowedRuntimeClassNames field and means that any RuntimeClassName is
-// allowed.
-const AllowAllRuntimeClassNames = "*"
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.2
-// +k8s:prerelease-lifecycle-gen:deprecated=1.11
-// +k8s:prerelease-lifecycle-gen:removed=1.16
-// +k8s:prerelease-lifecycle-gen:replacement=policy,v1beta1,PodSecurityPolicyList
-
-// PodSecurityPolicyList is a list of PodSecurityPolicy objects.
-// Deprecated: use PodSecurityPolicyList from policy API Group instead.
-type PodSecurityPolicyList struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// items is a list of schema objects.
-	Items []PodSecurityPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
-
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.3
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
@@ -1377,10 +1041,10 @@ type NetworkPolicy struct {
 	// +optional
 	Spec NetworkPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status is the current state of the NetworkPolicy.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	Status NetworkPolicyStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	// Status is tombstoned to show why 3 is a reserved protobuf tag.
+	// This commented field should remain, so in the future if we decide to reimplement
+	// NetworkPolicyStatus a different protobuf name and tag SHOULD be used!
+	// Status NetworkPolicyStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // DEPRECATED 1.9 - This group version of PolicyType is deprecated by networking/v1/PolicyType.
@@ -1498,22 +1162,20 @@ type NetworkPolicyPort struct {
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
-	// This feature is in Beta state and is enabled by default.
-	// It can be disabled using the Feature Gate "NetworkPolicyEndPort".
 	// +optional
 	EndPort *int32 `json:"endPort,omitempty" protobuf:"bytes,3,opt,name=endPort"`
 }
 
 // DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock.
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// IPBlock describes a particular CIDR (Ex. "192.168.1.0/24","2001:db8::/64") that is allowed
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
 type IPBlock struct {
 	// CIDR is a string representing the IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 	// Except is a slice of CIDRs that should not be included within an IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// Except values will be rejected if they are outside the CIDR range
 	// +optional
 	Except []string `json:"except,omitempty" protobuf:"bytes,2,rep,name=except"`
@@ -1543,48 +1205,6 @@ type NetworkPolicyPeer struct {
 	// neither of the other fields can be.
 	// +optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
-}
-
-// NetworkPolicyConditionType is the type for status conditions on
-// a NetworkPolicy. This type should be used with the
-// NetworkPolicyStatus.Conditions field.
-type NetworkPolicyConditionType string
-
-const (
-	// NetworkPolicyConditionStatusAccepted represents status of a Network Policy that could be properly parsed by
-	// the Network Policy provider and will be implemented in the cluster
-	NetworkPolicyConditionStatusAccepted NetworkPolicyConditionType = "Accepted"
-
-	// NetworkPolicyConditionStatusPartialFailure represents status of a Network Policy that could be partially
-	// parsed by the Network Policy provider and may not be completely implemented due to a lack of a feature or some
-	// other condition
-	NetworkPolicyConditionStatusPartialFailure NetworkPolicyConditionType = "PartialFailure"
-
-	// NetworkPolicyConditionStatusFailure represents status of a Network Policy that could not be parsed by the
-	// Network Policy provider and will not be implemented in the cluster
-	NetworkPolicyConditionStatusFailure NetworkPolicyConditionType = "Failure"
-)
-
-// NetworkPolicyConditionReason defines the set of reasons that explain why a
-// particular NetworkPolicy condition type has been raised.
-type NetworkPolicyConditionReason string
-
-const (
-	// NetworkPolicyConditionReasonFeatureNotSupported represents a reason where the Network Policy may not have been
-	// implemented in the cluster due to a lack of some feature not supported by the Network Policy provider
-	NetworkPolicyConditionReasonFeatureNotSupported NetworkPolicyConditionReason = "FeatureNotSupported"
-)
-
-// NetworkPolicyStatus describe the current state of the NetworkPolicy.
-type NetworkPolicyStatus struct {
-	// Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
-	// Current service state
-	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

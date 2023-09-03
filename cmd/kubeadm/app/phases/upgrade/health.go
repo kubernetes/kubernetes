@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -65,9 +65,8 @@ func (c *healthCheck) Name() string {
 // CheckClusterHealth makes sure:
 // - the API /healthz endpoint is healthy
 // - all control-plane Nodes are Ready
-// - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
-func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.String) error {
+func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.Set[string]) error {
 	fmt.Println("[upgrade] Running cluster health checks")
 
 	healthChecks := []preflight.Checker{
@@ -83,17 +82,15 @@ func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfi
 			f:      controlPlaneNodesReady,
 		},
 		&healthCheck{
-			name:   "StaticPodManifest",
-			client: client,
-			cfg:    cfg,
-			f:      staticPodManifestHealth,
+			name: "StaticPodManifest",
+			f:    staticPodManifestHealth,
 		},
 	}
 
 	return preflight.RunChecks(healthChecks, os.Stderr, ignoreChecksErrors)
 }
 
-// CreateJob is a check that verifies that a Job can be created in the cluster
+// createJob is a check that verifies that a Job can be created in the cluster
 func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration) (lastError error) {
 	const (
 		jobName = "upgrade-health-check"
@@ -115,20 +112,16 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 			Namespace: ns,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: utilpointer.Int32Ptr(0),
+			BackoffLimit: pointer.Int32(0),
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					SecurityContext: &v1.PodSecurityContext{
-						RunAsUser:    utilpointer.Int64Ptr(999),
-						RunAsGroup:   utilpointer.Int64Ptr(999),
-						RunAsNonRoot: utilpointer.BoolPtr(true),
+						RunAsUser:    pointer.Int64(999),
+						RunAsGroup:   pointer.Int64(999),
+						RunAsNonRoot: pointer.Bool(true),
 					},
 					Tolerations: []v1.Toleration{
-						{
-							Key:    constants.LabelNodeRoleOldControlPlane,
-							Effect: v1.TaintEffectNoSchedule,
-						},
 						{
 							Key:    constants.LabelNodeRoleControlPlane,
 							Effect: v1.TaintEffectNoSchedule,
@@ -212,9 +205,9 @@ func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error 
 
 // controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
 func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
-	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+	selectorControlPlane := labels.SelectorFromSet(map[string]string{
 		constants.LabelNodeRoleControlPlane: "",
-	}))
+	})
 	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selectorControlPlane.String(),
 	})
@@ -231,7 +224,7 @@ func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterCon
 
 // staticPodManifestHealth makes sure the required static pods are presents
 func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
-	nonExistentManifests := []string{}
+	var nonExistentManifests []string
 	for _, component := range constants.ControlPlaneComponents {
 		manifestFile := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())
 		if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
@@ -246,7 +239,7 @@ func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfigu
 
 // getNotReadyNodes returns a string slice of nodes in the cluster that are NotReady
 func getNotReadyNodes(nodes []v1.Node) []string {
-	notReadyNodes := []string{}
+	var notReadyNodes []string
 	for _, node := range nodes {
 		for _, condition := range node.Status.Conditions {
 			if condition.Type == v1.NodeReady && condition.Status != v1.ConditionTrue {

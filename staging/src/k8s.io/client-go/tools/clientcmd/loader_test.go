@@ -18,8 +18,8 @@ package clientcmd
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -27,12 +27,15 @@ import (
 	"strings"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
+	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -74,8 +77,8 @@ var (
 			"red-user":    {Token: "a-different-red-token"},
 			"yellow-user": {Token: "yellow-token"}},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"cow-cluster":    {Server: "http://a-different-cow.org:8080", InsecureSkipTLSVerify: true},
-			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true}},
+			"cow-cluster":    {Server: "http://a-different-cow.org:8080", InsecureSkipTLSVerify: true, DisableCompression: true},
+			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true, DisableCompression: true}},
 		CurrentContext: "federal-context",
 	}
 )
@@ -121,21 +124,84 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 }
 
 func TestToleratingMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
 	loadingRules := ClientConfigLoadingRules{
-		Precedence: []string{"bogus1", "bogus2", "bogus3"},
+		Precedence:       []string{"bogus1", "bogus2", "bogus3"},
+		WarnIfAllMissing: true,
+		Warner:           func(err error) { klog.Warning(err) },
 	}
+
+	buffer := &bytes.Buffer{}
+
+	klog.LogToStderr(false)
+	klog.SetOutput(buffer)
 
 	_, err := loadingRules.Load()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	klog.Flush()
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
+	if !strings.Contains(buffer.String(), expectedLog) {
+		t.Fatalf("expected log: \"%s\"", expectedLog)
+	}
+}
+
+func TestWarningMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
+	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
+	loadingRules := NewDefaultClientConfigLoadingRules()
+
+	buffer := &bytes.Buffer{}
+
+	flags := &flag.FlagSet{}
+	klog.InitFlags(flags)
+	flags.Set("v", "1")
+	klog.LogToStderr(false)
+	klog.SetOutput(buffer)
+
+	_, err := loadingRules.Load()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	klog.Flush()
+
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
+	if !strings.Contains(buffer.String(), expectedLog) {
+		t.Fatalf("expected log: \"%s\"", expectedLog)
+	}
+}
+
+func TestNoWarningMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
+	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
+	loadingRules := NewDefaultClientConfigLoadingRules()
+
+	buffer := &bytes.Buffer{}
+
+	flags := &flag.FlagSet{}
+	klog.InitFlags(flags)
+	flags.Set("v", "0")
+	klog.LogToStderr(false)
+	klog.SetOutput(buffer)
+
+	_, err := loadingRules.Load()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	klog.Flush()
+
+	logNotExpected := fmt.Sprintf("Config not found: %s", envVarValue)
+	if strings.Contains(buffer.String(), logNotExpected) {
+		t.Fatalf("log not expected: \"%s\"", logNotExpected)
+	}
 }
 
 func TestErrorReadingFile(t *testing.T) {
-	commandLineFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(commandLineFile.Name())
+	commandLineFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, commandLineFile)
 
-	if err := ioutil.WriteFile(commandLineFile.Name(), []byte("bogus value"), 0644); err != nil {
+	if err := os.WriteFile(commandLineFile.Name(), []byte("bogus value"), 0644); err != nil {
 		t.Fatalf("Error creating tempfile: %v", err)
 	}
 
@@ -153,7 +219,7 @@ func TestErrorReadingFile(t *testing.T) {
 }
 
 func TestErrorReadingNonFile(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -173,10 +239,9 @@ func TestErrorReadingNonFile(t *testing.T) {
 }
 
 func TestConflictingCurrentContext(t *testing.T) {
-	commandLineFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(envVarFile.Name())
+	commandLineFile, _ := os.CreateTemp("", "")
+	envVarFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, commandLineFile, envVarFile)
 
 	mockCommandLineConfig := clientcmdapi.Config{
 		CurrentContext: "any-context-value",
@@ -249,13 +314,13 @@ preferences: {}
 users: null
 `)
 	if !bytes.Equal(expected, data) {
-		t.Error(diff.ObjectReflectDiff(string(expected), string(data)))
+		t.Error(cmp.Diff(string(expected), string(data)))
 	}
 }
 
 func TestLoadingEmptyMaps(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(configFile.Name())
+	configFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	mockConfig := clientcmdapi.Config{
 		CurrentContext: "any-context-value",
@@ -280,10 +345,10 @@ func TestLoadingEmptyMaps(t *testing.T) {
 }
 
 func TestDuplicateClusterName(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(configFile.Name())
+	configFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, configFile)
 
-	err := ioutil.WriteFile(configFile.Name(), []byte(`
+	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -322,10 +387,10 @@ users:
 }
 
 func TestDuplicateContextName(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(configFile.Name())
+	configFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, configFile)
 
-	err := ioutil.WriteFile(configFile.Name(), []byte(`
+	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -364,10 +429,10 @@ users:
 }
 
 func TestDuplicateUserName(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(configFile.Name())
+	configFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, configFile)
 
-	err := ioutil.WriteFile(configFile.Name(), []byte(`
+	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -404,10 +469,10 @@ users:
 }
 
 func TestDuplicateExtensionName(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(configFile.Name())
+	configFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, configFile)
 
-	err := ioutil.WriteFile(configFile.Name(), []byte(`
+	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -472,14 +537,14 @@ func TestResolveRelativePaths(t *testing.T) {
 		},
 	}
 
-	configDir1, _ := ioutil.TempDir("", "")
+	configDir1, _ := os.MkdirTemp("", "")
 	defer os.RemoveAll(configDir1)
 	configFile1 := path.Join(configDir1, ".kubeconfig")
 	configDir1, _ = filepath.Abs(configDir1)
 
-	configDir2, _ := ioutil.TempDir("", "")
+	configDir2, _ := os.MkdirTemp("", "")
 	defer os.RemoveAll(configDir2)
-	configDir2, _ = ioutil.TempDir(configDir2, "")
+	configDir2, _ = os.MkdirTemp(configDir2, "")
 	configFile2 := path.Join(configDir2, ".kubeconfig")
 	configDir2, _ = filepath.Abs(configDir2)
 
@@ -560,9 +625,9 @@ func TestResolveRelativePaths(t *testing.T) {
 }
 
 func TestMigratingFile(t *testing.T) {
-	sourceFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(sourceFile.Name())
-	destinationFile, _ := ioutil.TempFile("", "")
+	sourceFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, sourceFile)
+	destinationFile, _ := os.CreateTemp("", "")
 	// delete the file so that we'll write to it
 	os.Remove(destinationFile.Name())
 
@@ -575,15 +640,14 @@ func TestMigratingFile(t *testing.T) {
 	if _, err := loadingRules.Load(); err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-
 	// the load should have recreated this file
-	defer os.Remove(destinationFile.Name())
+	defer utiltesting.CloseAndRemove(t, destinationFile)
 
-	sourceContent, err := ioutil.ReadFile(sourceFile.Name())
+	sourceContent, err := os.ReadFile(sourceFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	destinationContent, err := ioutil.ReadFile(destinationFile.Name())
+	destinationContent, err := os.ReadFile(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -594,10 +658,9 @@ func TestMigratingFile(t *testing.T) {
 }
 
 func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
-	sourceFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(sourceFile.Name())
-	destinationFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(destinationFile.Name())
+	sourceFile, _ := os.CreateTemp("", "")
+	destinationFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, sourceFile, destinationFile)
 
 	WriteToFile(testConfigAlfa, sourceFile.Name())
 
@@ -609,7 +672,7 @@ func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 
-	destinationContent, err := ioutil.ReadFile(destinationFile.Name())
+	destinationContent, err := os.ReadFile(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -621,9 +684,9 @@ func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
 
 func TestMigratingFileSourceMissingSkip(t *testing.T) {
 	sourceFilename := "some-missing-file"
-	destinationFile, _ := ioutil.TempFile("", "")
+	destinationFile, _ := os.CreateTemp("", "")
 	// delete the file so that we'll write to it
-	os.Remove(destinationFile.Name())
+	utiltesting.CloseAndRemove(t, destinationFile)
 
 	loadingRules := ClientConfigLoadingRules{
 		MigrationRules: map[string]string{destinationFile.Name(): sourceFilename},
@@ -639,8 +702,8 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 }
 
 func TestFileLocking(t *testing.T) {
-	f, _ := ioutil.TempFile("", "")
-	defer os.Remove(f.Name())
+	f, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(t, f)
 
 	err := lockFile(f.Name())
 	if err != nil {
@@ -655,10 +718,9 @@ func TestFileLocking(t *testing.T) {
 }
 
 func Example_noMergingOnExplicitPaths() {
-	commandLineFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(envVarFile.Name())
+	commandLineFile, _ := os.CreateTemp("", "")
+	envVarFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(&testing.T{}, commandLineFile, envVarFile)
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
@@ -704,10 +766,9 @@ func Example_noMergingOnExplicitPaths() {
 }
 
 func Example_mergingSomeWithConflict() {
-	commandLineFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(envVarFile.Name())
+	commandLineFile, _ := os.CreateTemp("", "")
+	envVarFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(&testing.T{}, commandLineFile, envVarFile)
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
@@ -737,6 +798,7 @@ func Example_mergingSomeWithConflict() {
 	//     server: http://cow.org:8080
 	//   name: cow-cluster
 	// - cluster:
+	//     disable-compression: true
 	//     insecure-skip-tls-verify: true
 	//     server: http://donkey.org:8080
 	//   name: donkey-cluster
@@ -759,14 +821,11 @@ func Example_mergingSomeWithConflict() {
 }
 
 func Example_mergingEverythingNoConflicts() {
-	commandLineFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(envVarFile.Name())
-	currentDirFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(currentDirFile.Name())
-	homeDirFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(homeDirFile.Name())
+	commandLineFile, _ := os.CreateTemp("", "")
+	envVarFile, _ := os.CreateTemp("", "")
+	currentDirFile, _ := os.CreateTemp("", "")
+	homeDirFile, _ := os.CreateTemp("", "")
+	defer utiltesting.CloseAndRemove(&testing.T{}, commandLineFile, envVarFile, currentDirFile, homeDirFile)
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigBravo, envVarFile.Name())
@@ -897,12 +956,9 @@ func TestLoadingGetLoadingPrecedence(t *testing.T) {
 		},
 	}
 
-	kubeconfig := os.Getenv("KUBECONFIG")
-	defer os.Setenv("KUBECONFIG", kubeconfig)
-
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			os.Setenv("KUBECONFIG", test.env)
+			t.Setenv("KUBECONFIG", test.env)
 			rules := test.rules
 			if rules == nil {
 				rules = NewDefaultClientConfigLoadingRules()

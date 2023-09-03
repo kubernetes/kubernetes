@@ -17,7 +17,7 @@ limitations under the License.
 package testing
 
 import (
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
+	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 )
 
 // ExpectedVirtualServer is the expected ipvs rules with VirtualServer and RealServer
@@ -43,8 +43,9 @@ type ExpectedIptablesChain map[string][]ExpectedIptablesRule
 
 // ExpectedIptablesRule is the expected iptables rules with jump chain and match ipset name
 type ExpectedIptablesRule struct {
-	JumpChain string
-	MatchSet  string
+	SourceAddress string
+	JumpChain     string
+	MatchSet      string
 }
 
 // ExpectedIPSet is the expected ipset with set name and entries name

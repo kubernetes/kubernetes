@@ -26,6 +26,8 @@ import (
 	"net"
 	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers/networking/v1alpha1"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
@@ -36,6 +38,7 @@ import (
 	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -59,17 +62,22 @@ func (nodeIpamController *nodeIPAMController) StartNodeIpamControllerWrapper(ini
 	nodeIpamController.nodeIPAMControllerOptions.ApplyTo(&nodeIpamController.nodeIPAMControllerConfiguration)
 
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startNodeIpamController(initContext, completedConfig, nodeIpamController.nodeIPAMControllerConfiguration, controllerContext, cloud)
+		return startNodeIpamController(ctx, initContext, completedConfig, nodeIpamController.nodeIPAMControllerConfiguration, controllerContext, cloud)
 	}
 }
 
-func startNodeIpamController(initContext app.ControllerInitContext, ccmConfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, ctx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+func startNodeIpamController(ctx context.Context, initContext app.ControllerInitContext, ccmConfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, controllerCtx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
 
 	// should we start nodeIPAM
 	if !ccmConfig.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
 		return nil, false, nil
+	}
+
+	// Cannot run cloud ipam controller if cloud provider is nil (--cloud-provider not set or set to 'external')
+	if cloud == nil && ccmConfig.ComponentConfig.KubeCloudShared.CIDRAllocatorType == string(ipam.CloudAllocatorType) {
+		return nil, false, errors.New("--cidr-allocator-type is set to 'CloudAllocator' but cloud provider is not configured")
 	}
 
 	// failure: bad cidrs in config
@@ -120,10 +128,16 @@ func startNodeIpamController(initContext app.ControllerInitContext, ccmConfig *c
 		return nil, false, err
 	}
 
+	var clusterCIDRInformer v1alpha1.ClusterCIDRInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRRangeAllocator) {
+		clusterCIDRInformer = controllerCtx.InformerFactory.Networking().V1alpha1().ClusterCIDRs()
+	}
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
-		ctx.InformerFactory.Core().V1().Nodes(),
+		ctx,
+		controllerCtx.InformerFactory.Core().V1().Nodes(),
+		clusterCIDRInformer,
 		cloud,
-		ctx.ClientBuilder.ClientOrDie(initContext.ClientName),
+		controllerCtx.ClientBuilder.ClientOrDie(initContext.ClientName),
 		clusterCIDRs,
 		serviceCIDR,
 		secondaryServiceCIDR,
@@ -133,7 +147,7 @@ func startNodeIpamController(initContext app.ControllerInitContext, ccmConfig *c
 	if err != nil {
 		return nil, true, err
 	}
-	go nodeIpamController.Run(ctx.Stop)
+	go nodeIpamController.Run(ctx)
 	return nil, true, nil
 }
 

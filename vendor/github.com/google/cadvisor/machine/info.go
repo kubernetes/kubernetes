@@ -79,6 +79,11 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		return nil, err
 	}
 
+	swapCapacity, err := GetMachineSwapCapacity()
+	if err != nil {
+		return nil, err
+	}
+
 	nvmInfo, err := nvm.GetInfo()
 	if err != nil {
 		return nil, err
@@ -128,6 +133,7 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		CpuFrequency:     clockSpeed,
 		MemoryCapacity:   memoryCapacity,
 		MemoryByType:     memoryByType,
+		SwapCapacity:     swapCapacity,
 		NVMInfo:          nvmInfo,
 		HugePages:        hugePagesInfo,
 		DiskMap:          diskMap,

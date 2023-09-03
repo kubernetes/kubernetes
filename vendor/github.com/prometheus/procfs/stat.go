@@ -41,7 +41,7 @@ type CPUStat struct {
 
 // SoftIRQStat represent the softirq statistics as exported in the procfs stat file.
 // A nice introduction can be found at https://0xax.gitbooks.io/linux-insides/content/interrupts/interrupts-9.html
-// It is possible to get per-cpu stats by reading /proc/softirqs
+// It is possible to get per-cpu stats by reading `/proc/softirqs`.
 type SoftIRQStat struct {
 	Hi          uint64
 	Timer       uint64
@@ -62,7 +62,7 @@ type Stat struct {
 	// Summed up cpu statistics.
 	CPUTotal CPUStat
 	// Per-CPU statistics.
-	CPU []CPUStat
+	CPU map[int64]CPUStat
 	// Number of times interrupts were handled, which contains numbered and unnumbered IRQs.
 	IRQTotal uint64
 	// Number of times a numbered IRQ was triggered.
@@ -145,7 +145,7 @@ func parseSoftIRQStat(line string) (SoftIRQStat, uint64, error) {
 // NewStat returns information about current cpu/process statistics.
 // See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 //
-// Deprecated: use fs.Stat() instead
+// Deprecated: Use fs.Stat() instead.
 func NewStat() (Stat, error) {
 	fs, err := NewFS(fs.DefaultProcMountPoint)
 	if err != nil {
@@ -155,25 +155,38 @@ func NewStat() (Stat, error) {
 }
 
 // NewStat returns information about current cpu/process statistics.
-// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+// See: https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 //
-// Deprecated: use fs.Stat() instead
+// Deprecated: Use fs.Stat() instead.
 func (fs FS) NewStat() (Stat, error) {
 	return fs.Stat()
 }
 
 // Stat returns information about current cpu/process statistics.
-// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+// See: https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 func (fs FS) Stat() (Stat, error) {
 	fileName := fs.proc.Path("stat")
 	data, err := util.ReadFileNoStat(fileName)
 	if err != nil {
 		return Stat{}, err
 	}
+	procStat, err := parseStat(bytes.NewReader(data), fileName)
+	if err != nil {
+		return Stat{}, err
+	}
+	return procStat, nil
+}
 
-	stat := Stat{}
+// parseStat parses the metrics from /proc/[pid]/stat.
+func parseStat(r io.Reader, fileName string) (Stat, error) {
+	var (
+		scanner = bufio.NewScanner(r)
+		stat    = Stat{
+			CPU: make(map[int64]CPUStat),
+		}
+		err error
+	)
 
-	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Fields(scanner.Text())
@@ -228,9 +241,6 @@ func (fs FS) Stat() (Stat, error) {
 			if cpuID == -1 {
 				stat.CPUTotal = cpuStat
 			} else {
-				for int64(len(stat.CPU)) <= cpuID {
-					stat.CPU = append(stat.CPU, CPUStat{})
-				}
 				stat.CPU[cpuID] = cpuStat
 			}
 		}

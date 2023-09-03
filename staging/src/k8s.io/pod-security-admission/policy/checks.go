@@ -58,10 +58,11 @@ type CheckID string
 // and if not, why it was forbidden.
 //
 // Example output for (false, "host ports", "8080, 9090"):
-//   When checking all pods in a namespace:
-//     disallowed by policy "baseline": host ports, privileged containers, non-default capabilities
-//   When checking an individual pod:
-//     disallowed by policy "baseline": host ports (8080, 9090), privileged containers, non-default capabilities (CAP_NET_RAW)
+//
+//	When checking all pods in a namespace:
+//	  disallowed by policy "baseline": host ports, privileged containers, non-default capabilities
+//	When checking an individual pod:
+//	  disallowed by policy "baseline": host ports (8080, 9090), privileged containers, non-default capabilities (CAP_NET_RAW)
 type CheckResult struct {
 	// Allowed indicates if the check allowed the pod.
 	Allowed bool

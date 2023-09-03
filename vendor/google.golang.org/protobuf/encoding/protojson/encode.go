@@ -18,7 +18,6 @@ import (
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	pref "google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
@@ -107,13 +106,19 @@ func (o MarshalOptions) Format(m proto.Message) string {
 // MarshalOptions. Do not depend on the output being stable. It may change over
 // time across different versions of the program.
 func (o MarshalOptions) Marshal(m proto.Message) ([]byte, error) {
-	return o.marshal(m)
+	return o.marshal(nil, m)
+}
+
+// MarshalAppend appends the JSON format encoding of m to b,
+// returning the result.
+func (o MarshalOptions) MarshalAppend(b []byte, m proto.Message) ([]byte, error) {
+	return o.marshal(b, m)
 }
 
 // marshal is a centralized function that all marshal operations go through.
 // For profiling purposes, avoid changing the name of this function or
 // introducing other code paths for marshal that do not go through this.
-func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
+func (o MarshalOptions) marshal(b []byte, m proto.Message) ([]byte, error) {
 	if o.Multiline && o.Indent == "" {
 		o.Indent = defaultIndent
 	}
@@ -121,7 +126,7 @@ func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
 		o.Resolver = protoregistry.GlobalTypes
 	}
 
-	internalEnc, err := json.NewEncoder(o.Indent)
+	internalEnc, err := json.NewEncoder(b, o.Indent)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +134,7 @@ func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
 	// Treat nil message interface as an empty message,
 	// in which case the output in an empty JSON object.
 	if m == nil {
-		return []byte("{}"), nil
+		return append(b, '{', '}'), nil
 	}
 
 	enc := encoder{internalEnc, o}
@@ -164,8 +169,8 @@ type typeURLFieldRanger struct {
 	typeURL string
 }
 
-func (m typeURLFieldRanger) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
-	if !f(typeFieldDesc, pref.ValueOfString(m.typeURL)) {
+func (m typeURLFieldRanger) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
+	if !f(typeFieldDesc, protoreflect.ValueOfString(m.typeURL)) {
 		return
 	}
 	m.FieldRanger.Range(f)
@@ -173,9 +178,9 @@ func (m typeURLFieldRanger) Range(f func(pref.FieldDescriptor, pref.Value) bool)
 
 // unpopulatedFieldRanger wraps a protoreflect.Message and modifies its Range
 // method to additionally iterate over unpopulated fields.
-type unpopulatedFieldRanger struct{ pref.Message }
+type unpopulatedFieldRanger struct{ protoreflect.Message }
 
-func (m unpopulatedFieldRanger) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
+func (m unpopulatedFieldRanger) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
 	fds := m.Descriptor().Fields()
 	for i := 0; i < fds.Len(); i++ {
 		fd := fds.Get(i)
@@ -184,10 +189,10 @@ func (m unpopulatedFieldRanger) Range(f func(pref.FieldDescriptor, pref.Value) b
 		}
 
 		v := m.Get(fd)
-		isProto2Scalar := fd.Syntax() == pref.Proto2 && fd.Default().IsValid()
-		isSingularMessage := fd.Cardinality() != pref.Repeated && fd.Message() != nil
+		isProto2Scalar := fd.Syntax() == protoreflect.Proto2 && fd.Default().IsValid()
+		isSingularMessage := fd.Cardinality() != protoreflect.Repeated && fd.Message() != nil
 		if isProto2Scalar || isSingularMessage {
-			v = pref.Value{} // use invalid value to emit null
+			v = protoreflect.Value{} // use invalid value to emit null
 		}
 		if !f(fd, v) {
 			return
@@ -199,7 +204,7 @@ func (m unpopulatedFieldRanger) Range(f func(pref.FieldDescriptor, pref.Value) b
 // marshalMessage marshals the fields in the given protoreflect.Message.
 // If the typeURL is non-empty, then a synthetic "@type" field is injected
 // containing the URL as the value.
-func (e encoder) marshalMessage(m pref.Message, typeURL string) error {
+func (e encoder) marshalMessage(m protoreflect.Message, typeURL string) error {
 	if !flags.ProtoLegacy && messageset.IsMessageSet(m.Descriptor()) {
 		return errors.New("no support for proto1 MessageSets")
 	}
@@ -220,7 +225,7 @@ func (e encoder) marshalMessage(m pref.Message, typeURL string) error {
 	}
 
 	var err error
-	order.RangeFields(fields, order.IndexNameFieldOrder, func(fd pref.FieldDescriptor, v pref.Value) bool {
+	order.RangeFields(fields, order.IndexNameFieldOrder, func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		name := fd.JSONName()
 		if e.opts.UseProtoNames {
 			name = fd.TextName()
@@ -238,7 +243,7 @@ func (e encoder) marshalMessage(m pref.Message, typeURL string) error {
 }
 
 // marshalValue marshals the given protoreflect.Value.
-func (e encoder) marshalValue(val pref.Value, fd pref.FieldDescriptor) error {
+func (e encoder) marshalValue(val protoreflect.Value, fd protoreflect.FieldDescriptor) error {
 	switch {
 	case fd.IsList():
 		return e.marshalList(val.List(), fd)
@@ -251,44 +256,44 @@ func (e encoder) marshalValue(val pref.Value, fd pref.FieldDescriptor) error {
 
 // marshalSingular marshals the given non-repeated field value. This includes
 // all scalar types, enums, messages, and groups.
-func (e encoder) marshalSingular(val pref.Value, fd pref.FieldDescriptor) error {
+func (e encoder) marshalSingular(val protoreflect.Value, fd protoreflect.FieldDescriptor) error {
 	if !val.IsValid() {
 		e.WriteNull()
 		return nil
 	}
 
 	switch kind := fd.Kind(); kind {
-	case pref.BoolKind:
+	case protoreflect.BoolKind:
 		e.WriteBool(val.Bool())
 
-	case pref.StringKind:
+	case protoreflect.StringKind:
 		if e.WriteString(val.String()) != nil {
 			return errors.InvalidUTF8(string(fd.FullName()))
 		}
 
-	case pref.Int32Kind, pref.Sint32Kind, pref.Sfixed32Kind:
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
 		e.WriteInt(val.Int())
 
-	case pref.Uint32Kind, pref.Fixed32Kind:
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
 		e.WriteUint(val.Uint())
 
-	case pref.Int64Kind, pref.Sint64Kind, pref.Uint64Kind,
-		pref.Sfixed64Kind, pref.Fixed64Kind:
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Uint64Kind,
+		protoreflect.Sfixed64Kind, protoreflect.Fixed64Kind:
 		// 64-bit integers are written out as JSON string.
 		e.WriteString(val.String())
 
-	case pref.FloatKind:
+	case protoreflect.FloatKind:
 		// Encoder.WriteFloat handles the special numbers NaN and infinites.
 		e.WriteFloat(val.Float(), 32)
 
-	case pref.DoubleKind:
+	case protoreflect.DoubleKind:
 		// Encoder.WriteFloat handles the special numbers NaN and infinites.
 		e.WriteFloat(val.Float(), 64)
 
-	case pref.BytesKind:
+	case protoreflect.BytesKind:
 		e.WriteString(base64.StdEncoding.EncodeToString(val.Bytes()))
 
-	case pref.EnumKind:
+	case protoreflect.EnumKind:
 		if fd.Enum().FullName() == genid.NullValue_enum_fullname {
 			e.WriteNull()
 		} else {
@@ -300,7 +305,7 @@ func (e encoder) marshalSingular(val pref.Value, fd pref.FieldDescriptor) error 
 			}
 		}
 
-	case pref.MessageKind, pref.GroupKind:
+	case protoreflect.MessageKind, protoreflect.GroupKind:
 		if err := e.marshalMessage(val.Message(), ""); err != nil {
 			return err
 		}
@@ -312,7 +317,7 @@ func (e encoder) marshalSingular(val pref.Value, fd pref.FieldDescriptor) error 
 }
 
 // marshalList marshals the given protoreflect.List.
-func (e encoder) marshalList(list pref.List, fd pref.FieldDescriptor) error {
+func (e encoder) marshalList(list protoreflect.List, fd protoreflect.FieldDescriptor) error {
 	e.StartArray()
 	defer e.EndArray()
 
@@ -326,12 +331,12 @@ func (e encoder) marshalList(list pref.List, fd pref.FieldDescriptor) error {
 }
 
 // marshalMap marshals given protoreflect.Map.
-func (e encoder) marshalMap(mmap pref.Map, fd pref.FieldDescriptor) error {
+func (e encoder) marshalMap(mmap protoreflect.Map, fd protoreflect.FieldDescriptor) error {
 	e.StartObject()
 	defer e.EndObject()
 
 	var err error
-	order.RangeEntries(mmap, order.GenericKeyOrder, func(k pref.MapKey, v pref.Value) bool {
+	order.RangeEntries(mmap, order.GenericKeyOrder, func(k protoreflect.MapKey, v protoreflect.Value) bool {
 		if err = e.WriteName(k.String()); err != nil {
 			return false
 		}

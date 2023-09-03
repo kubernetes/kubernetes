@@ -18,10 +18,10 @@ limitations under the License.
  * This file defines various in-tree volume test drivers for TestSuites.
  *
  * There are two ways, how to prepare test drivers:
- * 1) With containerized server (NFS, Ceph, Gluster, iSCSI, ...)
+ * 1) With containerized server (NFS, Ceph, iSCSI, ...)
  * It creates a server pod which defines one volume for the tests.
  * These tests work only when privileged containers are allowed, exporting
- * various filesystems (NFS, GlusterFS, ...) usually needs some mounting or
+ * various filesystems (like NFS) usually needs some mounting or
  * other privileged magic in the server pod.
  *
  * Note that the server containers are for testing purposes only and should not
@@ -38,16 +38,14 @@ package drivers
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -107,10 +105,11 @@ func InitNFSDriver() storageframework.TestDriver {
 			SupportedMountOption: sets.NewString("relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapExec:        true,
-				storageframework.CapRWX:         true,
-				storageframework.CapMultiPODs:   true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapExec:              true,
+				storageframework.CapRWX:               true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -125,7 +124,9 @@ func (n *nfsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 
 func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	nv, ok := e2evolume.(*nfsVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the NFS test volume", e2evolume)
+	}
 	return &v1.VolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverHost,
@@ -137,7 +138,9 @@ func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume stor
 
 func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	nv, ok := e2evolume.(*nfsVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the NFS test volume", e2evolume)
+	}
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverHost,
@@ -147,7 +150,7 @@ func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2ev
 	}, nil
 }
 
-func (n *nfsDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (n *nfsDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := n.externalPluginName
 	parameters := map[string]string{"mountOptions": "vers=4.1"}
 	ns := config.Framework.Namespace.Name
@@ -155,37 +158,35 @@ func (n *nfsDriver) GetDynamicProvisionStorageClass(config *storageframework.Per
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
-func (n *nfsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (n *nfsDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	cs := f.ClientSet
 	ns := f.Namespace
 	n.externalPluginName = fmt.Sprintf("example.com/nfs-%s", ns.Name)
 
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
-	err := e2eauth.BindClusterRole(cs.RbacV1(), "cluster-admin", ns.Name,
+	err := e2eauth.BindClusterRole(ctx, cs.RbacV1(), "cluster-admin", ns.Name,
 		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
 	framework.ExpectNoError(err)
+	ginkgo.DeferCleanup(cs.RbacV1().ClusterRoleBindings().Delete, ns.Name+"--"+"cluster-admin", *metav1.NewDeleteOptions(0))
 
-	err = e2eauth.WaitForAuthorizationUpdate(cs.AuthorizationV1(),
+	err = e2eauth.WaitForAuthorizationUpdate(ctx, cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
 		"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
 	framework.ExpectNoError(err, "Failed to update authorization: %v", err)
 
 	ginkgo.By("creating an external dynamic provisioner pod")
-	n.externalProvisionerPod = utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName)
+	n.externalProvisionerPod = utils.StartExternalProvisioner(ctx, cs, ns.Name, n.externalPluginName)
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, cs, n.externalProvisionerPod)
 
 	return &storageframework.PerTestConfig{
-			Driver:    n,
-			Prefix:    "nfs",
-			Framework: f,
-		}, func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
-			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-			cs.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, *metav1.NewDeleteOptions(0))
-		}
+		Driver:    n,
+		Prefix:    "nfs",
+		Framework: f,
+	}
 }
 
-func (n *nfsDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (n *nfsDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	f := config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
@@ -197,7 +198,7 @@ func (n *nfsDriver) CreateVolume(config *storageframework.PerTestConfig, volType
 	case storageframework.InlineVolume:
 		fallthrough
 	case storageframework.PreprovisionedPV:
-		c, serverPod, serverHost := e2evolume.NewNFSServer(cs, ns.Name, []string{})
+		c, serverPod, serverHost := e2evolume.NewNFSServer(ctx, cs, ns.Name, []string{})
 		config.ServerConfig = &c
 		return &nfsVolume{
 			serverHost: serverHost,
@@ -212,141 +213,8 @@ func (n *nfsDriver) CreateVolume(config *storageframework.PerTestConfig, volType
 	return nil
 }
 
-func (v *nfsVolume) DeleteVolume() {
-	cleanUpVolumeServer(v.f, v.serverPod)
-}
-
-// Gluster
-type glusterFSDriver struct {
-	driverInfo storageframework.DriverInfo
-}
-
-type glusterVolume struct {
-	prefix    string
-	serverPod *v1.Pod
-	f         *framework.Framework
-}
-
-var _ storageframework.TestDriver = &glusterFSDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &glusterFSDriver{}
-var _ storageframework.InlineVolumeTestDriver = &glusterFSDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &glusterFSDriver{}
-
-// InitGlusterFSDriver returns glusterFSDriver that implements TestDriver interface
-func InitGlusterFSDriver() storageframework.TestDriver {
-	return &glusterFSDriver{
-		driverInfo: storageframework.DriverInfo{
-			Name:             "gluster",
-			InTreePluginName: "kubernetes.io/glusterfs",
-			MaxFileSize:      storageframework.FileSizeMedium,
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Gi",
-			},
-			SupportedFsType: sets.NewString(
-				"", // Default fsType
-			),
-			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapExec:        true,
-				storageframework.CapRWX:         true,
-				storageframework.CapMultiPODs:   true,
-			},
-		},
-	}
-}
-
-func (g *glusterFSDriver) GetDriverInfo() *storageframework.DriverInfo {
-	return &g.driverInfo
-}
-
-func (g *glusterFSDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
-}
-
-func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
-	gv, ok := e2evolume.(*glusterVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
-
-	name := gv.prefix + "-server"
-	return &v1.VolumeSource{
-		Glusterfs: &v1.GlusterfsVolumeSource{
-			EndpointsName: name,
-			// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
-			Path:     "test_vol",
-			ReadOnly: readOnly,
-		},
-	}
-}
-
-func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	gv, ok := e2evolume.(*glusterVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
-
-	name := gv.prefix + "-server"
-	return &v1.PersistentVolumeSource{
-		Glusterfs: &v1.GlusterfsPersistentVolumeSource{
-			EndpointsName: name,
-			// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
-			Path:     "test_vol",
-			ReadOnly: readOnly,
-		},
-	}, nil
-}
-
-func (g *glusterFSDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
-	return &storageframework.PerTestConfig{
-		Driver:    g,
-		Prefix:    "gluster",
-		Framework: f,
-	}, func() {}
-}
-
-func (g *glusterFSDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	f := config.Framework
-	cs := f.ClientSet
-	ns := f.Namespace
-
-	c, serverPod, _ := e2evolume.NewGlusterfsServer(cs, ns.Name)
-	config.ServerConfig = &c
-	return &glusterVolume{
-		prefix:    config.Prefix,
-		serverPod: serverPod,
-		f:         f,
-	}
-}
-
-func (v *glusterVolume) DeleteVolume() {
-	f := v.f
-	cs := f.ClientSet
-	ns := f.Namespace
-
-	name := v.prefix + "-server"
-
-	nameSpaceName := fmt.Sprintf("%s/%s", ns.Name, name)
-
-	framework.Logf("Deleting Gluster endpoints %s...", nameSpaceName)
-	err := cs.CoreV1().Endpoints(ns.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			framework.Failf("Gluster deleting endpoint %s failed: %v", nameSpaceName, err)
-		}
-		framework.Logf("Gluster endpoints %q not found, assuming deleted", nameSpaceName)
-	}
-
-	framework.Logf("Deleting Gluster service %s...", nameSpaceName)
-	err = cs.CoreV1().Services(ns.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			framework.Failf("Gluster deleting service %s failed: %v", nameSpaceName, err)
-		}
-		framework.Logf("Gluster service %q not found, assuming deleted", nameSpaceName)
-	}
-
-	framework.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
-	err = e2epod.DeletePodWithWait(cs, v.serverPod)
-	if err != nil {
-		framework.Failf("Gluster server pod delete failed: %v", err)
-	}
+func (v *nfsVolume) DeleteVolume(ctx context.Context) {
+	cleanUpVolumeServer(ctx, v.f, v.serverPod)
 }
 
 // iSCSI
@@ -380,12 +248,13 @@ func InitISCSIDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapFsGroup:     true,
-				storageframework.CapBlock:       true,
-				storageframework.CapExec:        true,
-				storageframework.CapMultiPODs:   true,
-				storageframework.CapTopology:    true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapFsGroup:           true,
+				storageframework.CapBlock:             true,
+				storageframework.CapExec:              true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -400,7 +269,9 @@ func (i *iSCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) 
 
 func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	iv, ok := e2evolume.(*iSCSIVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
+	if !ok {
+		framework.Failf("failed to cast test volume of type %T to the iSCSI test volume", e2evolume)
+	}
 
 	volSource := v1.VolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
@@ -418,7 +289,9 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume st
 
 func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	iv, ok := e2evolume.(*iSCSIVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
+	if !ok {
+		framework.Failf("failed to cast test volume of type %T to the iSCSI test volume", e2evolume)
+	}
 
 	pvSource := v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIPersistentVolumeSource{
@@ -434,20 +307,20 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 	return &pvSource, nil
 }
 
-func (i *iSCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (i *iSCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    i,
 		Prefix:    "iscsi",
 		Framework: f,
-	}, func() {}
+	}
 }
 
-func (i *iSCSIDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (i *iSCSIDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	f := config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, serverIP, iqn := newISCSIServer(cs, ns.Name)
+	c, serverPod, serverIP, iqn := newISCSIServer(ctx, cs, ns.Name)
 	config.ServerConfig = &c
 	config.ClientNodeSelection = c.ClientNodeSelection
 	return &iSCSIVolume{
@@ -459,7 +332,7 @@ func (i *iSCSIDriver) CreateVolume(config *storageframework.PerTestConfig, volTy
 }
 
 // newISCSIServer is an iSCSI-specific wrapper for CreateStorageServer.
-func newISCSIServer(cs clientset.Interface, namespace string) (config e2evolume.TestConfig, pod *v1.Pod, ip, iqn string) {
+func newISCSIServer(ctx context.Context, cs clientset.Interface, namespace string) (config e2evolume.TestConfig, pod *v1.Pod, ip, iqn string) {
 	// Generate cluster-wide unique IQN
 	iqn = fmt.Sprintf(iSCSIIQNTemplate, namespace)
 	config = e2evolume.TestConfig{
@@ -474,18 +347,20 @@ func newISCSIServer(cs clientset.Interface, namespace string) (config e2evolume.
 			"/sys/kernel": "/sys/kernel",
 			// iSCSI source "block devices" must be available on the host
 			"/srv/iscsi": "/srv/iscsi",
+			// targetcli uses dbus
+			"/run/dbus": "/run/dbus",
 		},
 		ServerReadyMessage: "iscsi target started",
 		ServerHostNetwork:  true,
 	}
-	pod, ip = e2evolume.CreateStorageServer(cs, config)
+	pod, ip = e2evolume.CreateStorageServer(ctx, cs, config)
 	// Make sure the client runs on the same node as server so we don't need to open any firewalls.
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: pod.Spec.NodeName}
 	return config, pod, ip, iqn
 }
 
 // newRBDServer is a CephRBD-specific wrapper for CreateStorageServer.
-func newRBDServer(cs clientset.Interface, namespace string) (config e2evolume.TestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
+func newRBDServer(ctx context.Context, cs clientset.Interface, namespace string) (config e2evolume.TestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
 	config = e2evolume.TestConfig{
 		Namespace:   namespace,
 		Prefix:      "rbd",
@@ -496,7 +371,7 @@ func newRBDServer(cs clientset.Interface, namespace string) (config e2evolume.Te
 		},
 		ServerReadyMessage: "Ceph is ready",
 	}
-	pod, ip = e2evolume.CreateStorageServer(cs, config)
+	pod, ip = e2evolume.CreateStorageServer(ctx, cs, config)
 	// create secrets for the server
 	secret = &v1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -513,7 +388,7 @@ func newRBDServer(cs clientset.Interface, namespace string) (config e2evolume.Te
 		Type: "kubernetes.io/rbd",
 	}
 
-	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
 	}
@@ -521,8 +396,8 @@ func newRBDServer(cs clientset.Interface, namespace string) (config e2evolume.Te
 	return config, pod, secret, ip
 }
 
-func (v *iSCSIVolume) DeleteVolume() {
-	cleanUpVolumeServer(v.f, v.serverPod)
+func (v *iSCSIVolume) DeleteVolume(ctx context.Context) {
+	cleanUpVolumeServer(ctx, v.f, v.serverPod)
 }
 
 // Ceph RBD
@@ -558,11 +433,12 @@ func InitRbdDriver() storageframework.TestDriver {
 				"ext4",
 			),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapFsGroup:     true,
-				storageframework.CapBlock:       true,
-				storageframework.CapExec:        true,
-				storageframework.CapMultiPODs:   true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapFsGroup:           true,
+				storageframework.CapBlock:             true,
+				storageframework.CapExec:              true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -577,7 +453,9 @@ func (r *rbdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 
 func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	rv, ok := e2evolume.(*rbdVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
+	if !ok {
+		framework.Failf("failed to cast test volume of type %T to the RBD test volume", e2evolume)
+	}
 
 	volSource := v1.VolumeSource{
 		RBD: &v1.RBDVolumeSource{
@@ -599,7 +477,9 @@ func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume stor
 
 func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	rv, ok := e2evolume.(*rbdVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
+	if !ok {
+		framework.Failf("failed to cast test volume of type %T to the RBD test volume", e2evolume)
+	}
 
 	f := rv.f
 	ns := f.Namespace
@@ -623,20 +503,20 @@ func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2ev
 	return &pvSource, nil
 }
 
-func (r *rbdDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (r *rbdDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    r,
 		Prefix:    "rbd",
 		Framework: f,
-	}, func() {}
+	}
 }
 
-func (r *rbdDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (r *rbdDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	f := config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, secret, serverIP := newRBDServer(cs, ns.Name)
+	c, serverPod, secret, serverIP := newRBDServer(ctx, cs, ns.Name)
 	config.ServerConfig = &c
 	return &rbdVolume{
 		serverPod: serverPod,
@@ -646,8 +526,8 @@ func (r *rbdDriver) CreateVolume(config *storageframework.PerTestConfig, volType
 	}
 }
 
-func (v *rbdVolume) DeleteVolume() {
-	cleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
+func (v *rbdVolume) DeleteVolume(ctx context.Context) {
+	cleanUpVolumeServerWithSecret(ctx, v.f, v.serverPod, v.secret)
 }
 
 // Ceph
@@ -682,10 +562,11 @@ func InitCephFSDriver() storageframework.TestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapExec:        true,
-				storageframework.CapRWX:         true,
-				storageframework.CapMultiPODs:   true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapExec:              true,
+				storageframework.CapRWX:               true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -700,7 +581,9 @@ func (c *cephFSDriver) SkipUnsupportedTest(pattern storageframework.TestPattern)
 
 func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	cv, ok := e2evolume.(*cephVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the Ceph test volume", e2evolume)
+	}
 
 	return &v1.VolumeSource{
 		CephFS: &v1.CephFSVolumeSource{
@@ -716,7 +599,9 @@ func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume s
 
 func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	cv, ok := e2evolume.(*cephVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the Ceph test volume", e2evolume)
+	}
 
 	ns := cv.f.Namespace
 
@@ -733,20 +618,20 @@ func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e
 	}, nil
 }
 
-func (c *cephFSDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (c *cephFSDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    c,
 		Prefix:    "cephfs",
 		Framework: f,
-	}, func() {}
+	}
 }
 
-func (c *cephFSDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (c *cephFSDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	f := config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	cfg, serverPod, secret, serverIP := newRBDServer(cs, ns.Name)
+	cfg, serverPod, secret, serverIP := newRBDServer(ctx, cs, ns.Name)
 	config.ServerConfig = &cfg
 	return &cephVolume{
 		serverPod: serverPod,
@@ -756,8 +641,8 @@ func (c *cephFSDriver) CreateVolume(config *storageframework.PerTestConfig, volT
 	}
 }
 
-func (v *cephVolume) DeleteVolume() {
-	cleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
+func (v *cephVolume) DeleteVolume(ctx context.Context) {
+	cleanUpVolumeServerWithSecret(ctx, v.f, v.serverPod, v.secret)
 }
 
 // Hostpath
@@ -781,10 +666,11 @@ func InitHostPathDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence:      true,
-				storageframework.CapMultiPODs:        true,
-				storageframework.CapSingleNodeVolume: true,
-				storageframework.CapTopology:         true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapSingleNodeVolume:  true,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -809,20 +695,20 @@ func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume
 	}
 }
 
-func (h *hostPathDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (h *hostPathDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    h,
 		Prefix:    "hostpath",
 		Framework: f,
-	}, func() {}
+	}
 }
 
-func (h *hostPathDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (h *hostPathDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	f := config.Framework
 	cs := f.ClientSet
 
 	// pods should be scheduled on the node
-	node, err := e2enode.GetRandomReadySchedulableNode(cs)
+	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
 	framework.ExpectNoError(err)
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 	return nil
@@ -856,10 +742,11 @@ func InitHostPathSymlinkDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence:      true,
-				storageframework.CapMultiPODs:        true,
-				storageframework.CapSingleNodeVolume: true,
-				storageframework.CapTopology:         true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapSingleNodeVolume:  true,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -874,7 +761,9 @@ func (h *hostPathSymlinkDriver) SkipUnsupportedTest(pattern storageframework.Tes
 
 func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	hv, ok := e2evolume.(*hostPathSymlinkVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Hostpath Symlink test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the Hostpath Symlink test volume", e2evolume)
+	}
 
 	// hostPathSymlink doesn't support readOnly volume
 	if readOnly {
@@ -887,15 +776,15 @@ func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, e2
 	}
 }
 
-func (h *hostPathSymlinkDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (h *hostPathSymlinkDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    h,
 		Prefix:    "hostpathsymlink",
 		Framework: f,
-	}, func() {}
+	}
 }
 
-func (h *hostPathSymlinkDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (h *hostPathSymlinkDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	f := config.Framework
 	cs := f.ClientSet
 
@@ -904,7 +793,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *storageframework.PerTestCon
 	volumeName := "test-volume"
 
 	// pods should be scheduled on the node
-	node, err := e2enode.GetRandomReadySchedulableNode(cs)
+	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
 	framework.ExpectNoError(err)
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 
@@ -948,13 +837,13 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *storageframework.PerTestCon
 		},
 	}
 	// h.prepPod will be reused in cleanupDriver.
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), prepPod, metav1.CreateOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, prepPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating hostPath init pod")
 
-	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
 
-	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
+	err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting hostPath init pod")
 	return &hostPathSymlinkVolume{
 		sourcePath: sourcePath,
@@ -964,19 +853,19 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *storageframework.PerTestCon
 	}
 }
 
-func (v *hostPathSymlinkVolume) DeleteVolume() {
+func (v *hostPathSymlinkVolume) DeleteVolume(ctx context.Context) {
 	f := v.f
 
 	cmd := fmt.Sprintf("rm -rf %v&& rm -rf %v", v.targetPath, v.sourcePath)
 	v.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
 
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), v.prepPod, metav1.CreateOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, v.prepPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating hostPath teardown pod")
 
-	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
 
-	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
+	err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting hostPath teardown pod")
 }
 
@@ -1024,36 +913,25 @@ func (e *emptydirDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume
 	}
 }
 
-func (e *emptydirDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (e *emptydirDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	return nil
 }
 
-func (e *emptydirDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (e *emptydirDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    e,
 		Prefix:    "emptydir",
 		Framework: f,
-	}, func() {}
+	}
 }
 
 // Cinder
-// This driver assumes that OpenStack client tools are installed
-// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
-// and that the usual OpenStack authentication env. variables are set
-// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
+// This tests only CSI migration with dynamically provisioned volumes.
 type cinderDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-type cinderVolume struct {
-	volumeName string
-	volumeID   string
-}
-
 var _ storageframework.TestDriver = &cinderDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &cinderDriver{}
-var _ storageframework.InlineVolumeTestDriver = &cinderDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &cinderDriver{}
 var _ storageframework.DynamicPVTestDriver = &cinderDriver{}
 
 // InitCinderDriver returns cinderDriver that implements TestDriver interface
@@ -1092,39 +970,7 @@ func (c *cinderDriver) SkipUnsupportedTest(pattern storageframework.TestPattern)
 	e2eskipper.SkipUnlessProviderIs("openstack")
 }
 
-func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
-	cv, ok := e2evolume.(*cinderVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
-
-	volSource := v1.VolumeSource{
-		Cinder: &v1.CinderVolumeSource{
-			VolumeID: cv.volumeID,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		volSource.Cinder.FSType = fsType
-	}
-	return &volSource
-}
-
-func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	cv, ok := e2evolume.(*cinderVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
-
-	pvSource := v1.PersistentVolumeSource{
-		Cinder: &v1.CinderPersistentVolumeSource{
-			VolumeID: cv.volumeID,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		pvSource.Cinder.FSType = fsType
-	}
-	return &pvSource, nil
-}
-
-func (c *cinderDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (c *cinderDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/cinder"
 	parameters := map[string]string{}
 	if fsType != "" {
@@ -1135,78 +981,12 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(config *storageframework.
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
-func (c *cinderDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (c *cinderDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    c,
 		Prefix:    "cinder",
 		Framework: f,
-	}, func() {}
-}
-
-func (c *cinderDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	f := config.Framework
-	ns := f.Namespace
-
-	// We assume that namespace.Name is a random string
-	volumeName := ns.Name
-	ginkgo.By("creating a test Cinder volume")
-	output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
-	outputString := string(output[:])
-	framework.Logf("cinder output:\n%s", outputString)
-	framework.ExpectNoError(err)
-
-	// Parse 'id'' from stdout. Expected format:
-	// |     attachments     |                  []                  |
-	// |  availability_zone  |                 nova                 |
-	// ...
-	// |          id         | 1d6ff08f-5d1c-41a4-ad72-4ef872cae685 |
-	volumeID := ""
-	for _, line := range strings.Split(outputString, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) != 5 {
-			continue
-		}
-		if fields[1] != "id" {
-			continue
-		}
-		volumeID = fields[3]
-		break
 	}
-	framework.Logf("Volume ID: %s", volumeID)
-	framework.ExpectNotEqual(volumeID, "")
-	return &cinderVolume{
-		volumeName: volumeName,
-		volumeID:   volumeID,
-	}
-}
-
-func (v *cinderVolume) DeleteVolume() {
-	id := v.volumeID
-	name := v.volumeName
-
-	// Try to delete the volume for several seconds - it takes
-	// a while for the plugin to detach it.
-	var output []byte
-	var err error
-	timeout := time.Second * 120
-
-	framework.Logf("Waiting up to %v for removal of cinder volume %s / %s", timeout, id, name)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		output, err = exec.Command("cinder", "delete", id).CombinedOutput()
-		if err == nil {
-			framework.Logf("Cinder volume %s deleted", id)
-			return
-		}
-		framework.Logf("Failed to delete volume %s / %s: %v\n%s", id, name, err, string(output))
-	}
-	// Timed out, try to get "cinder show <volume>" output for easier debugging
-	showOutput, showErr := exec.Command("cinder", "show", id).CombinedOutput()
-	if showErr != nil {
-		framework.Logf("Failed to show volume %s / %s: %v\n%s", id, name, showErr, string(showOutput))
-	} else {
-		framework.Logf("Volume %s / %s:\n%s", id, name, string(showOutput))
-	}
-	framework.Failf("Failed to delete pre-provisioned volume %s / %s: %v\n%s", id, name, err, string(output[:]))
 }
 
 // GCE
@@ -1256,8 +1036,9 @@ func InitGcePdDriver() storageframework.TestDriver {
 				storageframework.CapNodeExpansion:       true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1288,8 +1069,9 @@ func InitWindowsGcePdDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:           true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1308,7 +1090,9 @@ func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) 
 
 func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	gv, ok := e2evolume.(*gcePdVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the GCE PD test volume", e2evolume)
+	}
 	volSource := v1.VolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   gv.volumeName,
@@ -1323,7 +1107,9 @@ func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume st
 
 func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	gv, ok := e2evolume.(*gcePdVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the GCE PD test volume", e2evolume)
+	}
 	pvSource := v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   gv.volumeName,
@@ -1336,7 +1122,7 @@ func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 	return &pvSource, nil
 }
 
-func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (g *gcePdDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/gce-pd"
 	parameters := map[string]string{}
 	if fsType != "" {
@@ -1348,7 +1134,7 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *storageframework.P
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
-func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (g *gcePdDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	config := &storageframework.PerTestConfig{
 		Driver:    g,
 		Prefix:    "gcepd",
@@ -1362,12 +1148,12 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 			},
 		}
 	}
-	return config, func() {}
+	return config
 
 }
 
-func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	zone := getInlineVolumeZone(config.Framework)
+func (g *gcePdDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+	zone := getInlineVolumeZone(ctx, config.Framework)
 	if volType == storageframework.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
@@ -1378,15 +1164,15 @@ func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volTy
 		}
 	}
 	ginkgo.By("creating a test gce pd volume")
-	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
+	vname, err := e2epv.CreatePDWithRetryAndZone(ctx, zone)
 	framework.ExpectNoError(err)
 	return &gcePdVolume{
 		volumeName: vname,
 	}
 }
 
-func (v *gcePdVolume) DeleteVolume() {
-	e2epv.DeletePDWithRetry(v.volumeName)
+func (v *gcePdVolume) DeleteVolume(ctx context.Context) {
+	_ = e2epv.DeletePDWithRetry(ctx, v.volumeName)
 }
 
 // vSphere
@@ -1422,11 +1208,13 @@ func InitVSphereDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapFsGroup:     true,
-				storageframework.CapExec:        true,
-				storageframework.CapMultiPODs:   true,
-				storageframework.CapTopology:    true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapFsGroup:           true,
+				storageframework.CapExec:              true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapTopology:          true,
+				storageframework.CapBlock:             true,
+				storageframework.CapMultiplePVsSameID: false,
 			},
 		},
 	}
@@ -1441,7 +1229,9 @@ func (v *vSphereDriver) SkipUnsupportedTest(pattern storageframework.TestPattern
 
 func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	vsv, ok := e2evolume.(*vSphereVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the cSphere test volume", e2evolume)
+	}
 
 	// vSphere driver doesn't seem to support readOnly volume
 	// TODO: check if it is correct
@@ -1461,7 +1251,9 @@ func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume 
 
 func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	vsv, ok := e2evolume.(*vSphereVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the vSphere test volume", e2evolume)
+	}
 
 	// vSphere driver doesn't seem to support readOnly volume
 	// TODO: check if it is correct
@@ -1479,7 +1271,7 @@ func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, 
 	return &pvSource, nil
 }
 
-func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (v *vSphereDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/vsphere-volume"
 	parameters := map[string]string{}
 	if fsType != "" {
@@ -1490,27 +1282,28 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *storageframework
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
-func (v *vSphereDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
-	return &storageframework.PerTestConfig{
-			Driver:    v,
-			Prefix:    "vsphere",
-			Framework: f,
-		}, func() {
-			// Driver Cleanup function
-			// Logout each vSphere client connection to prevent session leakage
-			nodes := vspheretest.GetReadySchedulableNodeInfos()
-			for _, node := range nodes {
-				if node.VSphere.Client != nil {
-					node.VSphere.Client.Logout(context.TODO())
-				}
+func (v *vSphereDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		// Driver Cleanup function
+		// Logout each vSphere client connection to prevent session leakage
+		nodes := vspheretest.GetReadySchedulableNodeInfos(ctx, f.ClientSet)
+		for _, node := range nodes {
+			if node.VSphere.Client != nil {
+				_ = node.VSphere.Client.Logout(ctx)
 			}
 		}
+	})
+	return &storageframework.PerTestConfig{
+		Driver:    v,
+		Prefix:    "vsphere",
+		Framework: f,
+	}
 }
 
-func (v *vSphereDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (v *vSphereDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	f := config.Framework
 	vspheretest.Bootstrap(f)
-	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
+	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo(ctx, f.ClientSet)
 	volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
 	framework.ExpectNoError(err)
 	return &vSphereVolume{
@@ -1519,7 +1312,7 @@ func (v *vSphereDriver) CreateVolume(config *storageframework.PerTestConfig, vol
 	}
 }
 
-func (v *vSphereVolume) DeleteVolume() {
+func (v *vSphereVolume) DeleteVolume(ctx context.Context) {
 	v.nodeInfo.VSphere.DeleteVolume(v.volumePath, v.nodeInfo.DataCenterRef)
 }
 
@@ -1537,6 +1330,7 @@ var _ storageframework.PreprovisionedVolumeTestDriver = &azureDiskDriver{}
 var _ storageframework.InlineVolumeTestDriver = &azureDiskDriver{}
 var _ storageframework.PreprovisionedPVTestDriver = &azureDiskDriver{}
 var _ storageframework.DynamicPVTestDriver = &azureDiskDriver{}
+var _ storageframework.CustomTimeoutsTestDriver = &azureDiskDriver{}
 
 // InitAzureDiskDriver returns azureDiskDriver that implements TestDriver interface
 func InitAzureDiskDriver() storageframework.TestDriver {
@@ -1562,8 +1356,9 @@ func InitAzureDiskDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:   true,
 				// Azure supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1579,7 +1374,9 @@ func (a *azureDiskDriver) SkipUnsupportedTest(pattern storageframework.TestPatte
 
 func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	av, ok := e2evolume.(*azureDiskVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the Azure test volume", e2evolume)
+	}
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
 	kind := v1.AzureManagedDisk
@@ -1599,7 +1396,9 @@ func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, e2evolum
 
 func (a *azureDiskDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	av, ok := e2evolume.(*azureDiskVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the Azure test volume", e2evolume)
+	}
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
@@ -1618,7 +1417,7 @@ func (a *azureDiskDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 	return &pvSource, nil
 }
 
-func (a *azureDiskDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (a *azureDiskDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/azure-disk"
 	parameters := map[string]string{}
 	if fsType != "" {
@@ -1630,35 +1429,35 @@ func (a *azureDiskDriver) GetDynamicProvisionStorageClass(config *storageframewo
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
-func (a *azureDiskDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (a *azureDiskDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    a,
 		Prefix:    "azure",
 		Framework: f,
-	}, func() {}
+	}
 }
 
-func (a *azureDiskDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (a *azureDiskDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	ginkgo.By("creating a test azure disk volume")
-	zone := getInlineVolumeZone(config.Framework)
+	zone := getInlineVolumeZone(ctx, config.Framework)
 	if volType == storageframework.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelFailureDomainBetaZone: zone,
+				v1.LabelTopologyZone: zone,
 			},
 		}
 	}
-	volumeName, err := e2epv.CreatePDWithRetryAndZone(zone)
+	volumeName, err := e2epv.CreatePDWithRetryAndZone(ctx, zone)
 	framework.ExpectNoError(err)
 	return &azureDiskVolume{
 		volumeName: volumeName,
 	}
 }
 
-func (v *azureDiskVolume) DeleteVolume() {
-	e2epv.DeletePDWithRetry(v.volumeName)
+func (v *azureDiskVolume) DeleteVolume(ctx context.Context) {
+	_ = e2epv.DeletePDWithRetry(ctx, v.volumeName)
 }
 
 // AWS
@@ -1666,15 +1465,7 @@ type awsDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-type awsVolume struct {
-	volumeName string
-}
-
 var _ storageframework.TestDriver = &awsDriver{}
-
-var _ storageframework.PreprovisionedVolumeTestDriver = &awsDriver{}
-var _ storageframework.InlineVolumeTestDriver = &awsDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &awsDriver{}
 var _ storageframework.DynamicPVTestDriver = &awsDriver{}
 
 // InitAwsDriver returns awsDriver that implements TestDriver interface
@@ -1707,8 +1498,9 @@ func InitAwsDriver() storageframework.TestDriver {
 				storageframework.CapOnlineExpansion:     true,
 				// AWS supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1722,37 +1514,7 @@ func (a *awsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("aws")
 }
 
-func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
-	av, ok := e2evolume.(*awsVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
-	volSource := v1.VolumeSource{
-		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-			VolumeID: av.volumeName,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		volSource.AWSElasticBlockStore.FSType = fsType
-	}
-	return &volSource
-}
-
-func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	av, ok := e2evolume.(*awsVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
-	pvSource := v1.PersistentVolumeSource{
-		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-			VolumeID: av.volumeName,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		pvSource.AWSElasticBlockStore.FSType = fsType
-	}
-	return &pvSource, nil
-}
-
-func (a *awsDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (a *awsDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/aws-ebs"
 	parameters := map[string]string{}
 	if fsType != "" {
@@ -1764,7 +1526,7 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(config *storageframework.Per
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
-func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (a *awsDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	config := &storageframework.PerTestConfig{
 		Driver:    a,
 		Prefix:    "aws",
@@ -1778,30 +1540,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 			},
 		}
 	}
-	return config, func() {}
-}
-
-func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	zone := getInlineVolumeZone(config.Framework)
-	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
-		// so pods should be also scheduled there.
-		config.ClientNodeSelection = e2epod.NodeSelection{
-			Selector: map[string]string{
-				v1.LabelTopologyZone: zone,
-			},
-		}
-	}
-	ginkgo.By("creating a test aws volume")
-	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
-	framework.ExpectNoError(err)
-	return &awsVolume{
-		volumeName: vname,
-	}
-}
-
-func (v *awsVolume) DeleteVolume() {
-	e2epv.DeletePDWithRetry(v.volumeName)
+	return config
 }
 
 // local
@@ -1823,21 +1562,23 @@ type localVolume struct {
 var (
 	// capabilities
 	defaultLocalVolumeCapabilities = map[storageframework.Capability]bool{
-		storageframework.CapPersistence:      true,
-		storageframework.CapFsGroup:          true,
-		storageframework.CapBlock:            false,
-		storageframework.CapExec:             true,
-		storageframework.CapMultiPODs:        true,
-		storageframework.CapSingleNodeVolume: true,
+		storageframework.CapPersistence:       true,
+		storageframework.CapFsGroup:           true,
+		storageframework.CapBlock:             false,
+		storageframework.CapExec:              true,
+		storageframework.CapMultiPODs:         true,
+		storageframework.CapSingleNodeVolume:  true,
+		storageframework.CapMultiplePVsSameID: true,
 	}
 	localVolumeCapabitilies = map[utils.LocalVolumeType]map[storageframework.Capability]bool{
 		utils.LocalVolumeBlock: {
-			storageframework.CapPersistence:      true,
-			storageframework.CapFsGroup:          true,
-			storageframework.CapBlock:            true,
-			storageframework.CapExec:             true,
-			storageframework.CapMultiPODs:        true,
-			storageframework.CapSingleNodeVolume: true,
+			storageframework.CapPersistence:       true,
+			storageframework.CapFsGroup:           true,
+			storageframework.CapBlock:             true,
+			storageframework.CapExec:              true,
+			storageframework.CapMultiPODs:         true,
+			storageframework.CapSingleNodeVolume:  true,
+			storageframework.CapMultiplePVsSameID: true,
 		},
 	}
 	// fstype
@@ -1900,9 +1641,9 @@ func (l *localDriver) GetDriverInfo() *storageframework.DriverInfo {
 func (l *localDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 }
 
-func (l *localDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (l *localDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	var err error
-	l.node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+	l.node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
 
 	l.hostExec = utils.NewHostExec(f)
@@ -1913,7 +1654,7 @@ func (l *localDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 		ssdInterface := "scsi"
 		filesystemType := "fs"
 		ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
-		res, err := l.hostExec.IssueCommandWithResult(ssdCmd, l.node)
+		res, err := l.hostExec.IssueCommandWithResult(ctx, ssdCmd, l.node)
 		framework.ExpectNoError(err)
 		num, err := strconv.Atoi(strings.TrimSpace(res))
 		framework.ExpectNoError(err)
@@ -1922,17 +1663,16 @@ func (l *localDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 		}
 	}
 
+	ginkgo.DeferCleanup(l.hostExec.Cleanup)
 	return &storageframework.PerTestConfig{
-			Driver:              l,
-			Prefix:              "local",
-			Framework:           f,
-			ClientNodeSelection: e2epod.NodeSelection{Name: l.node.Name},
-		}, func() {
-			l.hostExec.Cleanup()
-		}
+		Driver:              l,
+		Prefix:              "local",
+		Framework:           f,
+		ClientNodeSelection: e2epod.NodeSelection{Name: l.node.Name},
+	}
 }
 
-func (l *localDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (l *localDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	switch volType {
 	case storageframework.PreprovisionedPV:
 		node := l.node
@@ -1940,7 +1680,7 @@ func (l *localDriver) CreateVolume(config *storageframework.PerTestConfig, volTy
 		config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 		return &localVolume{
 			ltrMgr: l.ltrMgr,
-			ltr:    l.ltrMgr.Create(node, l.volumeType, nil),
+			ltr:    l.ltrMgr.Create(ctx, node, l.volumeType, nil),
 		}
 	default:
 		framework.Failf("Unsupported volType: %v is specified", volType)
@@ -1948,8 +1688,8 @@ func (l *localDriver) CreateVolume(config *storageframework.PerTestConfig, volTy
 	return nil
 }
 
-func (v *localVolume) DeleteVolume() {
-	v.ltrMgr.Remove(v.ltr)
+func (v *localVolume) DeleteVolume(ctx context.Context) {
+	v.ltrMgr.Remove(ctx, v.ltr)
 }
 
 func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity {
@@ -1980,7 +1720,9 @@ func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity 
 
 func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	lv, ok := e2evolume.(*localVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to local test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the local test volume", e2evolume)
+	}
 	return &v1.PersistentVolumeSource{
 		Local: &v1.LocalVolumeSource{
 			Path:   lv.ltr.Path,
@@ -1990,39 +1732,43 @@ func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 }
 
 // cleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
-func cleanUpVolumeServer(f *framework.Framework, serverPod *v1.Pod) {
-	cleanUpVolumeServerWithSecret(f, serverPod, nil)
+func cleanUpVolumeServer(ctx context.Context, f *framework.Framework, serverPod *v1.Pod) {
+	cleanUpVolumeServerWithSecret(ctx, f, serverPod, nil)
 }
 
-func getInlineVolumeZone(f *framework.Framework) string {
+func getInlineVolumeZone(ctx context.Context, f *framework.Framework) string {
 	if framework.TestContext.CloudConfig.Zone != "" {
 		return framework.TestContext.CloudConfig.Zone
 	}
 	// if zone is not specified we will randomly pick a zone from schedulable nodes for inline tests
-	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+	node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
 	zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
 	if ok {
 		return zone
 	}
+	topologyZone, ok := node.Labels[v1.LabelTopologyZone]
+	if ok {
+		return topologyZone
+	}
 	return ""
 }
 
 // cleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.
-func cleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, secret *v1.Secret) {
+func cleanUpVolumeServerWithSecret(ctx context.Context, f *framework.Framework, serverPod *v1.Pod, secret *v1.Secret) {
 	cs := f.ClientSet
 	ns := f.Namespace
 
 	if secret != nil {
 		framework.Logf("Deleting server secret %q...", secret.Name)
-		err := cs.CoreV1().Secrets(ns.Name).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
+		err := cs.CoreV1().Secrets(ns.Name).Delete(ctx, secret.Name, metav1.DeleteOptions{})
 		if err != nil {
 			framework.Logf("Delete secret failed: %v", err)
 		}
 	}
 
 	framework.Logf("Deleting server pod %q...", serverPod.Name)
-	err := e2epod.DeletePodWithWait(cs, serverPod)
+	err := e2epod.DeletePodWithWait(ctx, cs, serverPod)
 	if err != nil {
 		framework.Logf("Server pod delete failed: %v", err)
 	}
@@ -2066,6 +1812,7 @@ func InitAzureFileDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:           true,
 				storageframework.CapControllerExpansion: true,
 				storageframework.CapNodeExpansion:       true,
+				storageframework.CapMultiplePVsSameID:   true,
 			},
 		},
 	}
@@ -2081,7 +1828,9 @@ func (a *azureFileDriver) SkipUnsupportedTest(pattern storageframework.TestPatte
 
 func (a *azureFileDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	av, ok := e2evolume.(*azureFileVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the Azure test volume", e2evolume)
+	}
 	volSource := v1.VolumeSource{
 		AzureFile: &v1.AzureFileVolumeSource{
 			SecretName: av.secretName,
@@ -2094,7 +1843,9 @@ func (a *azureFileDriver) GetVolumeSource(readOnly bool, fsType string, e2evolum
 
 func (a *azureFileDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	av, ok := e2evolume.(*azureFileVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the Azure test volume", e2evolume)
+	}
 	pvSource := v1.PersistentVolumeSource{
 		AzureFile: &v1.AzureFilePersistentVolumeSource{
 			SecretName:      av.secretName,
@@ -2106,7 +1857,7 @@ func (a *azureFileDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 	return &pvSource, nil
 }
 
-func (a *azureFileDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (a *azureFileDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/azure-file"
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
@@ -2114,15 +1865,15 @@ func (a *azureFileDriver) GetDynamicProvisionStorageClass(config *storageframewo
 	return storageframework.GetStorageClass(provisioner, parameters, &immediateBinding, ns)
 }
 
-func (a *azureFileDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (a *azureFileDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    a,
 		Prefix:    "azure-file",
 		Framework: f,
-	}, func() {}
+	}
 }
 
-func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+func (a *azureFileDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	ginkgo.By("creating a test azure file volume")
 	accountName, accountKey, shareName, err := e2epv.CreateShare()
 	framework.ExpectNoError(err)
@@ -2141,7 +1892,7 @@ func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, v
 		Type: "Opaque",
 	}
 
-	_, err = config.Framework.ClientSet.CoreV1().Secrets(config.Framework.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
+	_, err = config.Framework.ClientSet.CoreV1().Secrets(config.Framework.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return &azureFileVolume{
 		accountName:     accountName,
@@ -2151,7 +1902,15 @@ func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, v
 	}
 }
 
-func (v *azureFileVolume) DeleteVolume() {
+func (v *azureFileVolume) DeleteVolume(ctx context.Context) {
 	err := e2epv.DeleteShare(v.accountName, v.shareName)
 	framework.ExpectNoError(err)
+}
+
+func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
+	timeouts := framework.NewTimeoutContext()
+	timeouts.PodStart = time.Minute * 15
+	timeouts.PodDelete = time.Minute * 15
+	timeouts.PVDelete = time.Minute * 20
+	return timeouts
 }

@@ -1,3 +1,6 @@
+// Copyright 2022 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
+
 package utils
 
 import "sigs.k8s.io/kustomize/api/konfig"

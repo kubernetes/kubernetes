@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package otelhttp
+package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 import (
 	"context"
@@ -24,12 +24,12 @@ import (
 
 // DefaultClient is the default Client and is used by Get, Head, Post and PostForm.
 // Please be careful of intitialization order - for example, if you change
-// the global propagator, the DefaultClient might still be using the old one
+// the global propagator, the DefaultClient might still be using the old one.
 var DefaultClient = &http.Client{Transport: NewTransport(http.DefaultTransport)}
 
 // Get is a convenient replacement for http.Get that adds a span around the request.
-func Get(ctx context.Context, url string) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+func Get(ctx context.Context, targetURL string) (resp *http.Response, err error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +37,8 @@ func Get(ctx context.Context, url string) (resp *http.Response, err error) {
 }
 
 // Head is a convenient replacement for http.Head that adds a span around the request.
-func Head(ctx context.Context, url string) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
+func Head(ctx context.Context, targetURL string) (resp *http.Response, err error) {
+	req, err := http.NewRequestWithContext(ctx, "HEAD", targetURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -46,8 +46,8 @@ func Head(ctx context.Context, url string) (resp *http.Response, err error) {
 }
 
 // Post is a convenient replacement for http.Post that adds a span around the request.
-func Post(ctx context.Context, url, contentType string, body io.Reader) (resp *http.Response, err error) {
-	req, err := http.NewRequestWithContext(ctx, "POST", url, body)
+func Post(ctx context.Context, targetURL, contentType string, body io.Reader) (resp *http.Response, err error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, body)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +56,6 @@ func Post(ctx context.Context, url, contentType string, body io.Reader) (resp *h
 }
 
 // PostForm is a convenient replacement for http.PostForm that adds a span around the request.
-func PostForm(ctx context.Context, url string, data url.Values) (resp *http.Response, err error) {
-	return Post(ctx, url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+func PostForm(ctx context.Context, targetURL string, data url.Values) (resp *http.Response, err error) {
+	return Post(ctx, targetURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 }

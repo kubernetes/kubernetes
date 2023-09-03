@@ -15,6 +15,7 @@
 package membership
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -39,9 +40,11 @@ const (
 var (
 	StoreMembersPrefix        = path.Join(storePrefix, "members")
 	storeRemovedMembersPrefix = path.Join(storePrefix, "removed_members")
+	errMemberAlreadyExist     = fmt.Errorf("member already exists")
+	errMemberNotFound         = fmt.Errorf("member not found")
 )
 
-func mustSaveMemberToBackend(lg *zap.Logger, be backend.Backend, m *Member) {
+func unsafeSaveMemberToBackend(lg *zap.Logger, be backend.Backend, m *Member) error {
 	mkey := backendMemberKey(m.ID)
 	mvalue, err := json.Marshal(m)
 	if err != nil {
@@ -49,29 +52,48 @@ func mustSaveMemberToBackend(lg *zap.Logger, be backend.Backend, m *Member) {
 	}
 
 	tx := be.BatchTx()
-	tx.Lock()
+	tx.LockInsideApply()
 	defer tx.Unlock()
+	if unsafeMemberExists(tx, mkey) {
+		return errMemberAlreadyExist
+	}
 	tx.UnsafePut(buckets.Members, mkey, mvalue)
+	return nil
 }
 
 // TrimClusterFromBackend removes all information about cluster (versions)
 // from the v3 backend.
 func TrimClusterFromBackend(be backend.Backend) error {
 	tx := be.BatchTx()
-	tx.Lock()
+	tx.LockOutsideApply()
 	defer tx.Unlock()
 	tx.UnsafeDeleteBucket(buckets.Cluster)
 	return nil
 }
 
-func mustDeleteMemberFromBackend(be backend.Backend, id types.ID) {
+func unsafeDeleteMemberFromBackend(be backend.Backend, id types.ID) error {
 	mkey := backendMemberKey(id)
 
 	tx := be.BatchTx()
-	tx.Lock()
+	tx.LockInsideApply()
 	defer tx.Unlock()
-	tx.UnsafeDelete(buckets.Members, mkey)
 	tx.UnsafePut(buckets.MembersRemoved, mkey, []byte("removed"))
+	if !unsafeMemberExists(tx, mkey) {
+		return errMemberNotFound
+	}
+	tx.UnsafeDelete(buckets.Members, mkey)
+	return nil
+}
+
+func unsafeMemberExists(tx backend.ReadTx, mkey []byte) bool {
+	var found bool
+	tx.UnsafeForEach(buckets.Members, func(k, v []byte) error {
+		if bytes.Equal(k, mkey) {
+			found = true
+		}
+		return nil
+	})
+	return found
 }
 
 func readMembersFromBackend(lg *zap.Logger, be backend.Backend) (map[types.ID]*Member, map[types.ID]bool, error) {
@@ -118,7 +140,7 @@ func mustReadMembersFromBackend(lg *zap.Logger, be backend.Backend) (map[types.I
 func TrimMembershipFromBackend(lg *zap.Logger, be backend.Backend) error {
 	lg.Info("Trimming membership information from the backend...")
 	tx := be.BatchTx()
-	tx.Lock()
+	tx.LockOutsideApply()
 	defer tx.Unlock()
 	err := tx.UnsafeForEach(buckets.Members, func(k, v []byte) error {
 		tx.UnsafeDelete(buckets.Members, k)
@@ -163,7 +185,7 @@ func mustSaveClusterVersionToBackend(be backend.Backend, ver *semver.Version) {
 	ckey := backendClusterVersionKey()
 
 	tx := be.BatchTx()
-	tx.Lock()
+	tx.LockInsideApply()
 	defer tx.Unlock()
 	tx.UnsafePut(buckets.Cluster, ckey, []byte(ver.String()))
 }
@@ -176,41 +198,40 @@ func mustSaveDowngradeToBackend(lg *zap.Logger, be backend.Backend, downgrade *D
 		lg.Panic("failed to marshal downgrade information", zap.Error(err))
 	}
 	tx := be.BatchTx()
-	tx.Lock()
+	tx.LockInsideApply()
 	defer tx.Unlock()
 	tx.UnsafePut(buckets.Cluster, dkey, dvalue)
 }
 
 func mustSaveMemberToStore(lg *zap.Logger, s v2store.Store, m *Member) {
-	b, err := json.Marshal(m.RaftAttributes)
+	err := unsafeSaveMemberToStore(lg, s, m)
 	if err != nil {
-		lg.Panic("failed to marshal raftAttributes", zap.Error(err))
-	}
-	p := path.Join(MemberStoreKey(m.ID), raftAttributesSuffix)
-	if _, err := s.Create(p, false, string(b), false, v2store.TTLOptionSet{ExpireTime: v2store.Permanent}); err != nil {
 		lg.Panic(
 			"failed to save member to store",
-			zap.String("path", p),
+			zap.String("member-id", m.ID.String()),
 			zap.Error(err),
 		)
 	}
 }
 
-func mustDeleteMemberFromStore(lg *zap.Logger, s v2store.Store, id types.ID) {
+func unsafeSaveMemberToStore(lg *zap.Logger, s v2store.Store, m *Member) error {
+	b, err := json.Marshal(m.RaftAttributes)
+	if err != nil {
+		lg.Panic("failed to marshal raftAttributes", zap.Error(err))
+	}
+	p := path.Join(MemberStoreKey(m.ID), raftAttributesSuffix)
+	_, err = s.Create(p, false, string(b), false, v2store.TTLOptionSet{ExpireTime: v2store.Permanent})
+	return err
+}
+
+func unsafeDeleteMemberFromStore(s v2store.Store, id types.ID) error {
 	if _, err := s.Delete(MemberStoreKey(id), true, true); err != nil {
-		lg.Panic(
-			"failed to delete member from store",
-			zap.String("path", MemberStoreKey(id)),
-			zap.Error(err),
-		)
+		return err
 	}
 	if _, err := s.Create(RemovedMemberStoreKey(id), false, "", false, v2store.TTLOptionSet{ExpireTime: v2store.Permanent}); err != nil {
-		lg.Panic(
-			"failed to create removedMember",
-			zap.String("path", RemovedMemberStoreKey(id)),
-			zap.Error(err),
-		)
+		return err
 	}
+	return nil
 }
 
 func mustUpdateMemberInStore(lg *zap.Logger, s v2store.Store, m *Member) {
@@ -295,7 +316,7 @@ func backendDowngradeKey() []byte {
 
 func mustCreateBackendBuckets(be backend.Backend) {
 	tx := be.BatchTx()
-	tx.Lock()
+	tx.LockOutsideApply()
 	defer tx.Unlock()
 	tx.UnsafeCreateBucket(buckets.Members)
 	tx.UnsafeCreateBucket(buckets.MembersRemoved)

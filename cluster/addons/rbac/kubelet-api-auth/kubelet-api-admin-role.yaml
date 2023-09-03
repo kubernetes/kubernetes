@@ -13,6 +13,5 @@ rules:
   - nodes/log
   - nodes/stats
   - nodes/metrics
-  - nodes/spec
   verbs:
   - "*"

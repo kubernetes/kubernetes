@@ -35,9 +35,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work with ControllerRevision objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apps.ControllerRevision{} },
-		NewListFunc:              func() runtime.Object { return &apps.ControllerRevisionList{} },
-		DefaultQualifiedResource: apps.Resource("controllerrevisions"),
+		NewFunc:                   func() runtime.Object { return &apps.ControllerRevision{} },
+		NewListFunc:               func() runtime.Object { return &apps.ControllerRevisionList{} },
+		DefaultQualifiedResource:  apps.Resource("controllerrevisions"),
+		SingularQualifiedResource: apps.Resource("controllerrevision"),
 
 		CreateStrategy: controllerrevision.Strategy,
 		UpdateStrategy: controllerrevision.Strategy,

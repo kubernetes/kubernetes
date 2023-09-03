@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/logger"
 	"github.com/Azure/go-autorest/tracing"
 )
 
@@ -215,6 +216,7 @@ func (f *Future) WaitForCompletionRef(ctx context.Context, client autorest.Clien
 	}
 	// if the initial response has a Retry-After, sleep for the specified amount of time before starting to poll
 	if delay, ok := f.GetPollingDelay(); ok {
+		logger.Instance.Writeln(logger.LogInfo, "WaitForCompletionRef: initial polling delay")
 		if delayElapsed := autorest.DelayForBackoff(delay, 0, cancelCtx.Done()); !delayElapsed {
 			err = cancelCtx.Err()
 			return
@@ -234,12 +236,14 @@ func (f *Future) WaitForCompletionRef(ctx context.Context, client autorest.Clien
 			var ok bool
 			delay, ok = f.GetPollingDelay()
 			if !ok {
+				logger.Instance.Writeln(logger.LogInfo, "WaitForCompletionRef: Using client polling delay")
 				delay = client.PollingDelay
 			}
 		} else {
 			// there was an error polling for status so perform exponential
 			// back-off based on the number of attempts using the client's retry
 			// duration.  update attempts after delayAttempt to avoid off-by-one.
+			logger.Instance.Writef(logger.LogError, "WaitForCompletionRef: %s\n", err)
 			delayAttempt = attempts
 			delay = client.RetryDuration
 			attempts++

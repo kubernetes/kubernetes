@@ -274,8 +274,11 @@ type CertificateSigningRequestList struct {
 }
 
 // KeyUsage specifies valid usage contexts for keys.
-// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+// See:
+//
+//	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+//	https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+//
 // +enum
 type KeyUsage string
 

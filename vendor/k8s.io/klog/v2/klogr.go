@@ -42,24 +42,26 @@ func (l *klogger) Init(info logr.RuntimeInfo) {
 	l.callDepth += info.CallDepth
 }
 
-func (l klogger) Info(level int, msg string, kvList ...interface{}) {
-	trimmed := serialize.TrimDuplicates(l.values, kvList)
+func (l *klogger) Info(level int, msg string, kvList ...interface{}) {
+	merged := serialize.MergeKVs(l.values, kvList)
 	if l.prefix != "" {
 		msg = l.prefix + ": " + msg
 	}
-	V(Level(level)).InfoSDepth(l.callDepth+1, msg, append(trimmed[0], trimmed[1]...)...)
+	// Skip this function.
+	VDepth(l.callDepth+1, Level(level)).InfoSDepth(l.callDepth+1, msg, merged...)
 }
 
-func (l klogger) Enabled(level int) bool {
-	return V(Level(level)).Enabled()
+func (l *klogger) Enabled(level int) bool {
+	// Skip this function and logr.Logger.Info where Enabled is called.
+	return VDepth(l.callDepth+2, Level(level)).Enabled()
 }
 
-func (l klogger) Error(err error, msg string, kvList ...interface{}) {
-	trimmed := serialize.TrimDuplicates(l.values, kvList)
+func (l *klogger) Error(err error, msg string, kvList ...interface{}) {
+	merged := serialize.MergeKVs(l.values, kvList)
 	if l.prefix != "" {
 		msg = l.prefix + ": " + msg
 	}
-	ErrorSDepth(l.callDepth+1, err, msg, append(trimmed[0], trimmed[1]...)...)
+	ErrorSDepth(l.callDepth+1, err, msg, merged...)
 }
 
 // WithName returns a new logr.Logger with the specified name appended.  klogr

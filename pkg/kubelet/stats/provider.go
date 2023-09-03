@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
@@ -26,26 +27,32 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
+
+// PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
+// See pkg/k8s.io/kubernetes/pkg/kubelet/pod.Manager for method godoc.
+type PodManager interface {
+	TranslatePodUID(uid types.UID) kubetypes.ResolvedPodUID
+}
 
 // NewCRIStatsProvider returns a Provider that provides the node stats
 // from cAdvisor and the container stats from CRI.
 func NewCRIStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
-	podManager kubepod.Manager,
+	podManager PodManager,
 	runtimeCache kubecontainer.RuntimeCache,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
-	disableAcceleratorUsageMetrics, podAndContainerStatsFromCRI bool,
+	podAndContainerStatsFromCRI bool,
 ) *Provider {
 	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
-		runtimeService, imageService, hostStatsProvider, disableAcceleratorUsageMetrics, podAndContainerStatsFromCRI))
+		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
@@ -53,7 +60,7 @@ func NewCRIStatsProvider(
 func NewCadvisorStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
-	podManager kubepod.Manager,
+	podManager PodManager,
 	runtimeCache kubecontainer.RuntimeCache,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
@@ -66,7 +73,7 @@ func NewCadvisorStatsProvider(
 // cAdvisor and the container stats using the containerStatsProvider.
 func newStatsProvider(
 	cadvisor cadvisor.Interface,
-	podManager kubepod.Manager,
+	podManager PodManager,
 	runtimeCache kubecontainer.RuntimeCache,
 	containerStatsProvider containerStatsProvider,
 ) *Provider {
@@ -81,24 +88,19 @@ func newStatsProvider(
 // Provider provides the stats of the node and the pod-managed containers.
 type Provider struct {
 	cadvisor     cadvisor.Interface
-	podManager   kubepod.Manager
+	podManager   PodManager
 	runtimeCache kubecontainer.RuntimeCache
 	containerStatsProvider
-	rlimitStatsProvider
 }
 
 // containerStatsProvider is an interface that provides the stats of the
 // containers managed by pods.
 type containerStatsProvider interface {
-	ListPodStats() ([]statsapi.PodStats, error)
-	ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error)
-	ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error)
-	ImageFsStats() (*statsapi.FsStats, error)
-	ImageFsDevice() (string, error)
-}
-
-type rlimitStatsProvider interface {
-	RlimitStats() (*statsapi.RlimitStats, error)
+	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
+	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
+	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
+	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
+	ImageFsDevice(ctx context.Context) (string, error)
 }
 
 // RlimitStats returns base information about process count
@@ -163,12 +165,12 @@ func (p *Provider) RootFsStats() (*statsapi.FsStats, error) {
 }
 
 // GetContainerInfo returns stats (from cAdvisor) for a container.
-func (p *Provider) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorapiv1.ContainerInfoRequest) (*cadvisorapiv1.ContainerInfo, error) {
+func (p *Provider) GetContainerInfo(ctx context.Context, podFullName string, podUID types.UID, containerName string, req *cadvisorapiv1.ContainerInfoRequest) (*cadvisorapiv1.ContainerInfo, error) {
 	// Resolve and type convert back again.
 	// We need the static pod UID but the kubecontainer API works with types.UID.
 	podUID = types.UID(p.podManager.TranslatePodUID(podUID))
 
-	pods, err := p.runtimeCache.GetPods()
+	pods, err := p.runtimeCache.GetPods(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -201,8 +203,8 @@ func (p *Provider) GetRawContainerInfo(containerName string, req *cadvisorapiv1.
 }
 
 // HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
-func (p *Provider) HasDedicatedImageFs() (bool, error) {
-	device, err := p.containerStatsProvider.ImageFsDevice()
+func (p *Provider) HasDedicatedImageFs(ctx context.Context) (bool, error) {
+	device, err := p.containerStatsProvider.ImageFsDevice(ctx)
 	if err != nil {
 		return false, err
 	}

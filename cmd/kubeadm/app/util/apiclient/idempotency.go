@@ -187,18 +187,6 @@ func CreateOrUpdateDaemonSet(client clientset.Interface, ds *apps.DaemonSet) err
 	return nil
 }
 
-// DeleteDaemonSetForeground deletes the specified DaemonSet in foreground mode; i.e. it blocks until/makes sure all the managed Pods are deleted
-func DeleteDaemonSetForeground(client clientset.Interface, namespace, name string) error {
-	foregroundDelete := metav1.DeletePropagationForeground
-	return client.AppsV1().DaemonSets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{PropagationPolicy: &foregroundDelete})
-}
-
-// DeleteDeploymentForeground deletes the specified Deployment in foreground mode; i.e. it blocks until/makes sure all the managed Pods are deleted
-func DeleteDeploymentForeground(client clientset.Interface, namespace, name string) error {
-	foregroundDelete := metav1.DeletePropagationForeground
-	return client.AppsV1().Deployments(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{PropagationPolicy: &foregroundDelete})
-}
-
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 	var lastError error
@@ -315,7 +303,7 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 
 		if _, err := client.CoreV1().Nodes().Patch(context.TODO(), n.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			*lastError = errors.Wrapf(err, "error patching node %q through apiserver", n.Name)
-			if apierrors.IsTimeout(err) || apierrors.IsConflict(err) {
+			if apierrors.IsTimeout(err) || apierrors.IsConflict(err) || apierrors.IsServerTimeout(err) || apierrors.IsServiceUnavailable(err) {
 				return false, nil
 			}
 			return false, *lastError
@@ -341,8 +329,6 @@ func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Nod
 
 // GetConfigMapWithRetry tries to retrieve a ConfigMap using the given client,
 // retrying if we get an unexpected error.
-//
-// TODO: evaluate if this can be done better. Potentially remove the retry if feasible.
 func GetConfigMapWithRetry(client clientset.Interface, namespace, name string) (*v1.ConfigMap, error) {
 	var cm *v1.ConfigMap
 	var lastError error

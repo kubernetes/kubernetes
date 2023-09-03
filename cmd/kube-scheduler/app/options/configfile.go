@@ -26,20 +26,20 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	configv1beta2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
-	configv1beta3 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
+	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 )
 
-func loadConfigFromFile(file string) (*config.KubeSchedulerConfiguration, error) {
+// LoadConfigFromFile loads scheduler config from the specified file path
+func LoadConfigFromFile(logger klog.Logger, file string) (*config.KubeSchedulerConfiguration, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	return loadConfig(data)
+	return loadConfig(logger, data)
 }
 
-func loadConfig(data []byte) (*config.KubeSchedulerConfiguration, error) {
+func loadConfig(logger klog.Logger, data []byte) (*config.KubeSchedulerConfiguration, error) {
 	// The UniversalDecoder runs defaulting and returns the internal type by default.
 	obj, gvk, err := scheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
@@ -66,12 +66,10 @@ func encodeConfig(cfg *config.KubeSchedulerConfiguration) (*bytes.Buffer, error)
 
 	var encoder runtime.Encoder
 	switch cfg.TypeMeta.APIVersion {
-	case configv1beta2.SchemeGroupVersion.String():
-		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta2.SchemeGroupVersion)
-	case configv1beta3.SchemeGroupVersion.String():
-		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta3.SchemeGroupVersion)
+	case configv1.SchemeGroupVersion.String():
+		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1.SchemeGroupVersion)
 	default:
-		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta3.SchemeGroupVersion)
+		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1.SchemeGroupVersion)
 	}
 	if err := encoder.Encode(cfg, buf); err != nil {
 		return buf, err
@@ -80,9 +78,9 @@ func encodeConfig(cfg *config.KubeSchedulerConfiguration) (*bytes.Buffer, error)
 }
 
 // LogOrWriteConfig logs the completed component config and writes it into the given file name as YAML, if either is enabled
-func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, completedProfiles []config.KubeSchedulerProfile) error {
-	klogV := klog.V(2)
-	if !klogV.Enabled() && len(fileName) == 0 {
+func LogOrWriteConfig(logger klog.Logger, fileName string, cfg *config.KubeSchedulerConfiguration, completedProfiles []config.KubeSchedulerProfile) error {
+	loggerV := logger.V(2)
+	if !loggerV.Enabled() && len(fileName) == 0 {
 		return nil
 	}
 	cfg.Profiles = completedProfiles
@@ -92,8 +90,8 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 		return err
 	}
 
-	if klogV.Enabled() {
-		klogV.InfoS("Using component config", "config", buf.String())
+	if loggerV.Enabled() {
+		loggerV.Info("Using component config", "config", buf.String())
 	}
 
 	if len(fileName) > 0 {
@@ -105,7 +103,7 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 		if _, err := io.Copy(configFile, buf); err != nil {
 			return err
 		}
-		klog.InfoS("Wrote configuration", "file", fileName)
+		logger.Info("Wrote configuration", "file", fileName)
 		os.Exit(0)
 	}
 	return nil

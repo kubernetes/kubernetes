@@ -20,11 +20,13 @@ import (
 	"errors"
 	"net"
 	"reflect"
+	"strings"
 	"syscall"
 )
 
 // IPNetEqual checks if the two input IPNets are representing the same subnet.
 // For example,
+//
 //	10.0.0.1/24 and 10.0.0.0/24 are the same subnet.
 //	10.0.0.1/24 and 10.0.0.0/25 are not the same subnet.
 func IPNetEqual(ipnet1, ipnet2 *net.IPNet) bool {
@@ -44,6 +46,11 @@ func IsConnectionReset(err error) bool {
 		return errno == syscall.ECONNRESET
 	}
 	return false
+}
+
+// Returns if the given err is "http2: client connection lost" error.
+func IsHTTP2ConnectionLost(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "http2: client connection lost")
 }
 
 // Returns if the given err is "connection refused" error

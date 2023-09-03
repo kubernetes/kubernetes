@@ -42,19 +42,19 @@ type UserProvidedDecorator interface {
 // object implements the same subset of those interfaces as the inner http.ResponseWriter.
 //
 // This function handles the following three casses.
-// - The inner ResponseWriter implements `http.CloseNotifier`, `http.Flusher`,
-//   and `http.Hijacker` (an HTTP/1.1 sever provides such a ResponseWriter).
-// - The inner ResponseWriter implements `http.CloseNotifier` and `http.Flusher`
-//   but not `http.Hijacker` (an HTTP/2 server provides such a ResponseWriter).
-// - All the other cases collapse to this one, in which the given ResponseWriter is returned.
+//   - The inner ResponseWriter implements `http.CloseNotifier`, `http.Flusher`,
+//     and `http.Hijacker` (an HTTP/1.1 sever provides such a ResponseWriter).
+//   - The inner ResponseWriter implements `http.CloseNotifier` and `http.Flusher`
+//     but not `http.Hijacker` (an HTTP/2 server provides such a ResponseWriter).
+//   - All the other cases collapse to this one, in which the given ResponseWriter is returned.
 //
 // There are three applicable terms:
-//  - "outer": this is the ResponseWriter object returned by the WrapForHTTP1Or2 function.
-//  - "user-provided decorator" or "middle": this is the user-provided decorator
+//   - "outer": this is the ResponseWriter object returned by the WrapForHTTP1Or2 function.
+//   - "user-provided decorator" or "middle": this is the user-provided decorator
 //     that decorates an inner ResponseWriter object. A user-provided decorator
 //     implements the UserProvidedDecorator interface. A user-provided decorator
 //     may or may not implement http.CloseNotifier, http.Flusher or http.Hijacker.
-//  - "inner": the ResponseWriter that the user-provided decorator extends.
+//   - "inner": the ResponseWriter that the user-provided decorator extends.
 func WrapForHTTP1Or2(decorator UserProvidedDecorator) http.ResponseWriter {
 	// from go net/http documentation:
 	// The default HTTP/1.x and HTTP/2 ResponseWriter implementations support Flusher

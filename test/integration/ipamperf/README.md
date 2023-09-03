@@ -18,8 +18,6 @@ How to run
 
 ```shell
 # In kubernetes root path
-make generated_files
-
 cd test/integration/ipamperf
 ./test-performance.sh
 ```

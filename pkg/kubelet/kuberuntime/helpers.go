@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -93,12 +94,13 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 
 	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
 	return &kubecontainer.Container{
-		ID:      kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
-		Name:    c.GetMetadata().GetName(),
-		ImageID: c.ImageRef,
-		Image:   c.Image.Image,
-		Hash:    annotatedInfo.Hash,
-		State:   toKubeContainerState(c.State),
+		ID:                   kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
+		Name:                 c.GetMetadata().GetName(),
+		ImageID:              c.ImageRef,
+		Image:                c.Image.Image,
+		Hash:                 annotatedInfo.Hash,
+		HashWithoutResources: annotatedInfo.HashWithoutResources,
+		State:                toKubeContainerState(c.State),
 	}, nil
 }
 
@@ -119,8 +121,8 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSand
 
 // getImageUser gets uid or user name that will run the command(s) from image. The function
 // guarantees that only one of them is set.
-func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, error) {
-	resp, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image}, false)
+func (m *kubeGenericRuntimeManager) getImageUser(ctx context.Context, image string) (*int64, string, error) {
+	resp, err := m.imageService.ImageStatus(ctx, &runtimeapi.ImageSpec{Image: image}, false)
 	if err != nil {
 		return nil, "", err
 	}
@@ -210,100 +212,40 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
-func fieldProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) string {
-	if scmp == nil {
-		if fallbackToRuntimeDefault {
-			return v1.SeccompProfileRuntimeDefault
-		}
-		return ""
-	}
-	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
-		return v1.SeccompProfileRuntimeDefault
-	}
-	if scmp.Type == v1.SeccompProfileTypeLocalhost && scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
-		fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
-		return v1.SeccompLocalhostProfileNamePrefix + fname
-	}
-	if scmp.Type == v1.SeccompProfileTypeUnconfined {
-		return v1.SeccompProfileNameUnconfined
-	}
-
-	if fallbackToRuntimeDefault {
-		return v1.SeccompProfileRuntimeDefault
-	}
-	return ""
-}
-
-func annotationProfile(profile, profileRootPath string) string {
-	if strings.HasPrefix(profile, v1.SeccompLocalhostProfileNamePrefix) {
-		name := strings.TrimPrefix(profile, v1.SeccompLocalhostProfileNamePrefix)
-		fname := filepath.Join(profileRootPath, filepath.FromSlash(name))
-		return v1.SeccompLocalhostProfileNamePrefix + fname
-	}
-	return profile
-}
-
-func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string]string, containerName string,
-	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) string {
-	// container fields are applied first
-	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
-		return fieldProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
-	}
-
-	// if container field does not exist, try container annotation (deprecated)
-	if containerName != "" {
-		if profile, ok := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]; ok {
-			return annotationProfile(profile, m.seccompProfileRoot)
-		}
-	}
-
-	// when container seccomp is not defined, try to apply from pod field
-	if podSecContext != nil && podSecContext.SeccompProfile != nil {
-		return fieldProfile(podSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
-	}
-
-	// as last resort, try to apply pod annotation (deprecated)
-	if profile, ok := annotations[v1.SeccompPodAnnotationKey]; ok {
-		return annotationProfile(profile, m.seccompProfileRoot)
-	}
-
-	if fallbackToRuntimeDefault {
-		return v1.SeccompProfileRuntimeDefault
-	}
-
-	return ""
-}
-
-func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) *runtimeapi.SecurityProfile {
+func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) (*runtimeapi.SecurityProfile, error) {
 	if scmp == nil {
 		if fallbackToRuntimeDefault {
 			return &runtimeapi.SecurityProfile{
 				ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
-			}
+			}, nil
 		}
 		return &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_Unconfined,
-		}
+		}, nil
 	}
 	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
 		return &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
-		}
+		}, nil
 	}
-	if scmp.Type == v1.SeccompProfileTypeLocalhost && scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
-		fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
-		return &runtimeapi.SecurityProfile{
-			ProfileType:  runtimeapi.SecurityProfile_Localhost,
-			LocalhostRef: fname,
+	if scmp.Type == v1.SeccompProfileTypeLocalhost {
+		if scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
+			fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
+			return &runtimeapi.SecurityProfile{
+				ProfileType:  runtimeapi.SecurityProfile_Localhost,
+				LocalhostRef: fname,
+			}, nil
+		} else {
+			return nil, fmt.Errorf("localhostProfile must be set if seccompProfile type is Localhost.")
 		}
 	}
 	return &runtimeapi.SecurityProfile{
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
-	}
+	}, nil
 }
 
 func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,
-	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) *runtimeapi.SecurityProfile {
+	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) (*runtimeapi.SecurityProfile, error) {
 	// container fields are applied first
 	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
 		return fieldSeccompProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
@@ -317,47 +259,10 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 	if fallbackToRuntimeDefault {
 		return &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
-		}
+		}, nil
 	}
 
 	return &runtimeapi.SecurityProfile{
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
-	}
-}
-
-func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil && pod.Spec.HostIPC {
-		return runtimeapi.NamespaceMode_NODE
-	}
-	return runtimeapi.NamespaceMode_POD
-}
-
-func networkNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil && pod.Spec.HostNetwork {
-		return runtimeapi.NamespaceMode_NODE
-	}
-	return runtimeapi.NamespaceMode_POD
-}
-
-func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil {
-		if pod.Spec.HostPID {
-			return runtimeapi.NamespaceMode_NODE
-		}
-		if pod.Spec.ShareProcessNamespace != nil && *pod.Spec.ShareProcessNamespace {
-			return runtimeapi.NamespaceMode_POD
-		}
-	}
-	// Note that PID does not default to the zero value for v1.Pod
-	return runtimeapi.NamespaceMode_CONTAINER
-}
-
-// namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
-// An empty or nil pod can be used to get the namespace defaults for v1.Pod.
-func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
-	return &runtimeapi.NamespaceOption{
-		Ipc:     ipcNamespaceForPod(pod),
-		Network: networkNamespaceForPod(pod),
-		Pid:     pidNamespaceForPod(pod),
-	}
+	}, nil
 }

@@ -32,7 +32,7 @@ func NewLengthDelimitedFrameWriter(w io.Writer) io.Writer {
 	return &lengthDelimitedFrameWriter{w: w}
 }
 
-// Write writes a single frame to the nested writer, prepending it with the length in
+// Write writes a single frame to the nested writer, prepending it with the length
 // in bytes of data (as a 4 byte, bigendian uint32).
 func (w *lengthDelimitedFrameWriter) Write(data []byte) (int, error) {
 	binary.BigEndian.PutUint32(w.h[:], uint32(len(data)))
@@ -56,10 +56,10 @@ type lengthDelimitedFrameReader struct {
 //
 // The protocol is:
 //
-//   stream: message ...
-//   message: prefix body
-//   prefix: 4 byte uint32 in BigEndian order, denotes length of body
-//   body: bytes (0..prefix)
+//	stream: message ...
+//	message: prefix body
+//	prefix: 4 byte uint32 in BigEndian order, denotes length of body
+//	body: bytes (0..prefix)
 //
 // If the buffer passed to Read is not long enough to contain an entire frame, io.ErrShortRead
 // will be returned along with the number of bytes read.

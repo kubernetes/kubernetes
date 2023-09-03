@@ -17,11 +17,13 @@ limitations under the License.
 package runtime
 
 import (
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
 
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog/v2"
 	utilsexec "k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -42,6 +44,7 @@ type ContainerRuntime interface {
 	RemoveContainers(containers []string) error
 	PullImage(image string) error
 	ImageExists(image string) (bool, error)
+	SandboxImage() (string, error)
 }
 
 // CRIRuntime is a struct that interfaces with the CRI
@@ -68,7 +71,9 @@ func (runtime *CRIRuntime) Socket() string {
 
 // crictl creates a crictl command for the provided args.
 func (runtime *CRIRuntime) crictl(args ...string) utilsexec.Cmd {
-	return runtime.exec.Command(runtime.crictlPath, append([]string{"-r", runtime.Socket()}, args...)...)
+	cmd := runtime.exec.Command(runtime.crictlPath, append([]string{"-r", runtime.Socket(), "-i", runtime.Socket()}, args...)...)
+	cmd.SetEnv(os.Environ())
+	return cmd
 }
 
 // IsRunning checks if runtime is running
@@ -81,7 +86,10 @@ func (runtime *CRIRuntime) IsRunning() error {
 
 // ListKubeContainers lists running k8s CRI pods
 func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
-	out, err := runtime.crictl("pods", "-q").CombinedOutput()
+	// Disable debug mode regardless how the crictl is configured so that the debug info won't be
+	// iterpreted to the Pod ID.
+	args := []string{"-D=false", "pods", "-q"}
+	out, err := runtime.crictl(args...).CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrapf(err, "output: %s, error", string(out))
 	}
@@ -94,15 +102,25 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 	errs := []error{}
 	for _, container := range containers {
-		out, err := runtime.crictl("stopp", container).CombinedOutput()
-		if err != nil {
-			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, errors.Wrapf(err, "failed to stop running pod %s: output: %s, error", container, string(out)))
-		} else {
+		var lastErr error
+		for i := 0; i < constants.RemoveContainerRetry; i++ {
+			klog.V(5).Infof("Attempting to remove container %v", container)
+			out, err := runtime.crictl("stopp", container).CombinedOutput()
+			if err != nil {
+				lastErr = errors.Wrapf(err, "failed to stop running pod %s: output: %s", container, string(out))
+				continue
+			}
 			out, err = runtime.crictl("rmp", container).CombinedOutput()
 			if err != nil {
-				errs = append(errs, errors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
+				lastErr = errors.Wrapf(err, "failed to remove running container %s: output: %s", container, string(out))
+				continue
 			}
+			lastErr = nil
+			break
+		}
+
+		if lastErr != nil {
+			errs = append(errs, lastErr)
 		}
 	}
 	return errorsutil.NewAggregate(errs)
@@ -155,4 +173,20 @@ func detectCRISocketImpl(isSocket func(string) bool, knownCRISockets []string) (
 // DetectCRISocket uses a list of known CRI sockets to detect one. If more than one or none is discovered, an error is returned.
 func DetectCRISocket() (string, error) {
 	return detectCRISocketImpl(isExistingSocket, defaultKnownCRISockets)
+}
+
+// SandboxImage returns the sandbox image used by the container runtime
+func (runtime *CRIRuntime) SandboxImage() (string, error) {
+	args := []string{"-D=false", "info", "-o", "go-template", "--template", "{{.config.sandboxImage}}"}
+	out, err := runtime.crictl(args...).CombinedOutput()
+	if err != nil {
+		return "", errors.Wrapf(err, "output: %s, error", string(out))
+	}
+
+	sandboxImage := strings.TrimSpace(string(out))
+	if len(sandboxImage) > 0 {
+		return sandboxImage, nil
+	}
+
+	return "", errors.Errorf("the detected sandbox image is empty")
 }

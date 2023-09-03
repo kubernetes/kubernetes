@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package internal // import "go.opentelemetry.io/otel/internal"
 
 import (
 	"math"
 	"unsafe"
 )
 
-func BoolToRaw(b bool) uint64 {
+func BoolToRaw(b bool) uint64 { // nolint:revive  // b is not a control flag.
 	if b {
 		return 1
 	}

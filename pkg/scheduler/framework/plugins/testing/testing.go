@@ -43,7 +43,7 @@ func SetupPluginWithInformers(
 ) framework.Plugin {
 	objs = append([]runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, objs...)
 	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(objs...), 0)
-	fh, err := frameworkruntime.NewFramework(nil, nil,
+	fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
 		frameworkruntime.WithSnapshotSharedLister(sharedLister),
 		frameworkruntime.WithInformerFactory(informerFactory))
 	if err != nil {
@@ -61,12 +61,13 @@ func SetupPluginWithInformers(
 // SetupPlugin creates a plugin using a framework handle that includes
 // the provided sharedLister.
 func SetupPlugin(
+	ctx context.Context,
 	tb testing.TB,
 	pf frameworkruntime.PluginFactory,
 	config runtime.Object,
 	sharedLister framework.SharedLister,
 ) framework.Plugin {
-	fh, err := frameworkruntime.NewFramework(nil, nil,
+	fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
 		frameworkruntime.WithSnapshotSharedLister(sharedLister))
 	if err != nil {
 		tb.Fatalf("Failed creating framework runtime: %v", err)

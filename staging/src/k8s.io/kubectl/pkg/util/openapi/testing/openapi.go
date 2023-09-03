@@ -53,6 +53,19 @@ func (f *FakeResources) LookupResource(gvk schema.GroupVersionKind) proto.Schema
 	return resources.LookupResource(gvk)
 }
 
+func (f *FakeResources) GetConsumes(gvk schema.GroupVersionKind, operation string) []string {
+	s, err := f.fake.OpenAPISchema()
+	if err != nil {
+		panic(err)
+	}
+
+	resources, err := openapi.NewOpenAPIData(s)
+	if err != nil {
+		panic(err)
+	}
+	return resources.GetConsumes(gvk, operation)
+}
+
 // EmptyResources implement a Resources that just doesn't have any resources.
 type EmptyResources struct{}
 
@@ -60,6 +73,10 @@ var _ openapi.Resources = EmptyResources{}
 
 // LookupResource will always return nil. It doesn't have any resources.
 func (f EmptyResources) LookupResource(gvk schema.GroupVersionKind) proto.Schema {
+	return nil
+}
+
+func (f EmptyResources) GetConsumes(gvk schema.GroupVersionKind, operation string) []string {
 	return nil
 }
 

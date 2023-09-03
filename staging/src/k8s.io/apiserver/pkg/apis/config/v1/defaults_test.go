@@ -34,12 +34,12 @@ func TestKMSProviderTimeoutDefaults(t *testing.T) {
 		{
 			desc: "timeout not supplied",
 			in:   &KMSConfiguration{},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize},
+			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize, APIVersion: defaultAPIVersion},
 		},
 		{
 			desc: "timeout supplied",
 			in:   &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}},
-			want: &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}, CacheSize: &defaultCacheSize},
+			want: &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}, CacheSize: &defaultCacheSize, APIVersion: defaultAPIVersion},
 		},
 	}
 
@@ -55,8 +55,9 @@ func TestKMSProviderTimeoutDefaults(t *testing.T) {
 
 func TestKMSProviderCacheDefaults(t *testing.T) {
 	var (
-		zero int32 = 0
-		ten  int32 = 10
+		zero     int32 = 0
+		ten      int32 = 10
+		negative int32 = -1
 	)
 
 	testCases := []struct {
@@ -67,17 +68,65 @@ func TestKMSProviderCacheDefaults(t *testing.T) {
 		{
 			desc: "cache size not supplied",
 			in:   &KMSConfiguration{},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize},
+			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize, APIVersion: defaultAPIVersion},
 		},
 		{
 			desc: "cache of zero size supplied",
 			in:   &KMSConfiguration{CacheSize: &zero},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &zero},
+			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &zero, APIVersion: defaultAPIVersion},
 		},
 		{
 			desc: "positive cache size supplied",
 			in:   &KMSConfiguration{CacheSize: &ten},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &ten},
+			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &ten, APIVersion: defaultAPIVersion},
+		},
+		{
+			desc: "negative cache size supplied",
+			in:   &KMSConfiguration{CacheSize: &negative},
+			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &negative, APIVersion: defaultAPIVersion},
+		},
+		{
+			desc: "cache size not supplied but API version is v2",
+			in:   &KMSConfiguration{APIVersion: "v2"},
+			want: &KMSConfiguration{Timeout: defaultTimeout, APIVersion: "v2"},
+		},
+		{
+			desc: "cache size not supplied with API version v1",
+			in:   &KMSConfiguration{APIVersion: "v1"},
+			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize, APIVersion: defaultAPIVersion},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			SetDefaults_KMSConfiguration(tt.in)
+			if d := cmp.Diff(tt.want, tt.in); d != "" {
+				t.Fatalf("KMS Provider mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+func TestKMSProviderAPIVersionDefaults(t *testing.T) {
+	testCases := []struct {
+		desc string
+		in   *KMSConfiguration
+		want *KMSConfiguration
+	}{
+		{
+			desc: "apiVersion not supplied",
+			in:   &KMSConfiguration{},
+			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize, APIVersion: defaultAPIVersion},
+		},
+		{
+			desc: "apiVersion supplied",
+			in:   &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}, APIVersion: "v1"},
+			want: &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}, CacheSize: &defaultCacheSize, APIVersion: "v1"},
+		},
+		{
+			desc: "apiVersion v2 supplied, cache size not defaulted",
+			in:   &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}, APIVersion: "v2"},
+			want: &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}, APIVersion: "v2"},
 		},
 	}
 

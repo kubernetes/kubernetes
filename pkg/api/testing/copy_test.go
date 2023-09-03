@@ -23,13 +23,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
@@ -71,7 +70,7 @@ func doDeepCopyTest(t *testing.T, kind schema.GroupVersionKind, f *fuzz.Fuzzer) 
 	}
 
 	if !bytes.Equal(prefuzzData.Bytes(), postfuzzData.Bytes()) {
-		t.Log(diff.StringDiff(prefuzzData.String(), postfuzzData.String()))
+		t.Log(cmp.Diff(prefuzzData.String(), postfuzzData.String()))
 		t.Errorf("Fuzzing copy modified original of %#v", kind)
 		return
 	}

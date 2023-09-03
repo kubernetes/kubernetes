@@ -135,7 +135,7 @@ var _ timer = &realTimer{}
 // runs are "accumulated" over time, one per minInterval up to burstRuns total.
 // This can be used, for example, to mitigate the impact of expensive operations
 // being called in response to user-initiated operations. Run requests that
-// would violate the minInterval are coallesced and run at the next opportunity.
+// would violate the minInterval are coalesced and run at the next opportunity.
 //
 // The function will be run at least once per maxInterval. For example, this can
 // force periodic refreshes of state in the absence of anyone calling Run.

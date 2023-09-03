@@ -82,7 +82,7 @@ var (
 		## Write bash completion code to a file and source it from .bash_profile
 		    kubectl completion bash > ~/.kube/completion.bash.inc
 		    printf "
-		      # Kubectl shell completion
+		      # kubectl shell completion
 		      source '$HOME/.kube/completion.bash.inc'
 		      " >> $HOME/.bash_profile
 		    source $HOME/.bash_profile
@@ -95,7 +95,7 @@ var (
 
 		# Load the kubectl completion code for fish[2] into the current shell
 		    kubectl completion fish | source
-		# To load completions for each session, execute once: 
+		# To load completions for each session, execute once:
 		    kubectl completion fish > ~/.config/fish/completions/kubectl.fish
 
 		# Load the kubectl completion code for powershell into the current shell
@@ -131,7 +131,7 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "completion SHELL",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Output shell completion code for the specified shell (bash, zsh or fish)"),
+		Short:                 i18n.T("Output shell completion code for the specified shell (bash, zsh, fish, or powershell)"),
 		Long:                  completionLong,
 		Example:               completionExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -167,7 +167,7 @@ func runCompletionBash(out io.Writer, boilerPlate string, kubectl *cobra.Command
 		return err
 	}
 
-	return kubectl.GenBashCompletionV2(out, false) // TODO: Upgrade to Cobra 1.3.0 or later before including descriptions (See https://github.com/spf13/cobra/pull/1509)
+	return kubectl.GenBashCompletionV2(out, true)
 }
 
 func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {

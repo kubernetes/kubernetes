@@ -53,7 +53,9 @@ import (
 // an interval as invalid iff we need to copy events from the
 // watchCache and we end up needing events that have already
 // been popped off. This translates to the following condition:
-//  watchCacheInterval::startIndex >= watchCache::startIndex.
+//
+//	watchCacheInterval::startIndex >= watchCache::startIndex.
+//
 // When this condition becomes false, the interval is no longer
 // valid and should not be used to retrieve and serve elements
 // from the underlying source.

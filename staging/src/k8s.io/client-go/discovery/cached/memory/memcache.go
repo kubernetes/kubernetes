@@ -22,16 +22,18 @@ import (
 	"sync"
 	"syscall"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"
 	cachedopenapi "k8s.io/client-go/openapi/cached"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 type cacheEntry struct {
@@ -47,17 +49,27 @@ type cacheEntry struct {
 type memCacheClient struct {
 	delegate discovery.DiscoveryInterface
 
-	lock                   sync.RWMutex
-	groupToServerResources map[string]*cacheEntry
-	groupList              *metav1.APIGroupList
-	cacheValid             bool
-	openapiClient          openapi.Client
+	lock                        sync.RWMutex
+	groupToServerResources      map[string]*cacheEntry
+	groupList                   *metav1.APIGroupList
+	cacheValid                  bool
+	openapiClient               openapi.Client
+	receivedAggregatedDiscovery bool
 }
 
 // Error Constants
 var (
 	ErrCacheNotFound = errors.New("not found")
 )
+
+// Server returning empty ResourceList for Group/Version.
+type emptyResponseError struct {
+	gv string
+}
+
+func (e *emptyResponseError) Error() string {
+	return fmt.Sprintf("received empty response for: %s", e.gv)
+}
 
 var _ discovery.CachedDiscoveryInterface = &memCacheClient{}
 
@@ -101,7 +113,13 @@ func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*m
 	if cachedVal.err != nil && isTransientError(cachedVal.err) {
 		r, err := d.serverResourcesForGroupVersion(groupVersion)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
+			// Don't log "empty response" as an error; it is a common response for metrics.
+			if _, emptyErr := err.(*emptyResponseError); emptyErr {
+				// Log at same verbosity as disk cache.
+				klog.V(3).Infof("%v", err)
+			} else {
+				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
+			}
 		}
 		cachedVal = &cacheEntry{r, err}
 		d.groupToServerResources[groupVersion] = cachedVal
@@ -115,15 +133,45 @@ func (d *memCacheClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*meta
 	return discovery.ServerGroupsAndResources(d)
 }
 
-func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
+// GroupsAndMaybeResources returns the list of APIGroups, and possibly the map of group/version
+// to resources. The returned groups will never be nil, but the resources map can be nil
+// if there are no cached resources.
+func (d *memCacheClient) GroupsAndMaybeResources() (*metav1.APIGroupList, map[schema.GroupVersion]*metav1.APIResourceList, map[schema.GroupVersion]error, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
+
 	if !d.cacheValid {
 		if err := d.refreshLocked(); err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 	}
-	return d.groupList, nil
+	// Build the resourceList from the cache?
+	var resourcesMap map[schema.GroupVersion]*metav1.APIResourceList
+	var failedGVs map[schema.GroupVersion]error
+	if d.receivedAggregatedDiscovery && len(d.groupToServerResources) > 0 {
+		resourcesMap = map[schema.GroupVersion]*metav1.APIResourceList{}
+		failedGVs = map[schema.GroupVersion]error{}
+		for gv, cacheEntry := range d.groupToServerResources {
+			groupVersion, err := schema.ParseGroupVersion(gv)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to parse group version (%v): %v", gv, err)
+			}
+			if cacheEntry.err != nil {
+				failedGVs[groupVersion] = cacheEntry.err
+			} else {
+				resourcesMap[groupVersion] = cacheEntry.resourceList
+			}
+		}
+	}
+	return d.groupList, resourcesMap, failedGVs, nil
+}
+
+func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
+	groups, _, _, err := d.GroupsAndMaybeResources()
+	if err != nil {
+		return nil, err
+	}
+	return groups, nil
 }
 
 func (d *memCacheClient) RESTClient() restclient.Interface {
@@ -176,6 +224,10 @@ func (d *memCacheClient) Invalidate() {
 	d.groupToServerResources = nil
 	d.groupList = nil
 	d.openapiClient = nil
+	d.receivedAggregatedDiscovery = false
+	if ad, ok := d.delegate.(discovery.CachedDiscoveryInterface); ok {
+		ad.Invalidate()
+	}
 }
 
 // refreshLocked refreshes the state of cache. The caller must hold d.lock for
@@ -184,7 +236,31 @@ func (d *memCacheClient) refreshLocked() error {
 	// TODO: Could this multiplicative set of calls be replaced by a single call
 	// to ServerResources? If it's possible for more than one resulting
 	// APIResourceList to have the same GroupVersion, the lists would need merged.
-	gl, err := d.delegate.ServerGroups()
+	var gl *metav1.APIGroupList
+	var err error
+
+	if ad, ok := d.delegate.(discovery.AggregatedDiscoveryInterface); ok {
+		var resources map[schema.GroupVersion]*metav1.APIResourceList
+		var failedGVs map[schema.GroupVersion]error
+		gl, resources, failedGVs, err = ad.GroupsAndMaybeResources()
+		if resources != nil && err == nil {
+			// Cache the resources.
+			d.groupToServerResources = map[string]*cacheEntry{}
+			d.groupList = gl
+			for gv, resources := range resources {
+				d.groupToServerResources[gv.String()] = &cacheEntry{resources, nil}
+			}
+			// Cache GroupVersion discovery errors
+			for gv, err := range failedGVs {
+				d.groupToServerResources[gv.String()] = &cacheEntry{nil, err}
+			}
+			d.receivedAggregatedDiscovery = true
+			d.cacheValid = true
+			return nil
+		}
+	} else {
+		gl, err = d.delegate.ServerGroups()
+	}
 	if err != nil || len(gl.Groups) == 0 {
 		utilruntime.HandleError(fmt.Errorf("couldn't get current server API group list: %v", err))
 		return err
@@ -203,7 +279,13 @@ func (d *memCacheClient) refreshLocked() error {
 
 				r, err := d.serverResourcesForGroupVersion(gv)
 				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", gv, err))
+					// Don't log "empty response" as an error; it is a common response for metrics.
+					if _, emptyErr := err.(*emptyResponseError); emptyErr {
+						// Log at same verbosity as disk cache.
+						klog.V(3).Infof("%v", err)
+					} else {
+						utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", gv, err))
+					}
 				}
 
 				resultLock.Lock()
@@ -225,9 +307,15 @@ func (d *memCacheClient) serverResourcesForGroupVersion(groupVersion string) (*m
 		return r, err
 	}
 	if len(r.APIResources) == 0 {
-		return r, fmt.Errorf("Got empty response for: %v", groupVersion)
+		return r, &emptyResponseError{gv: groupVersion}
 	}
 	return r, nil
+}
+
+// WithLegacy returns current memory-cached discovery client;
+// current client does not support legacy-only discovery.
+func (d *memCacheClient) WithLegacy() discovery.DiscoveryInterface {
+	return d
 }
 
 // NewMemCacheClient creates a new CachedDiscoveryInterface which caches
@@ -237,7 +325,8 @@ func (d *memCacheClient) serverResourcesForGroupVersion(groupVersion string) (*m
 // NOTE: The client will NOT resort to live lookups on cache misses.
 func NewMemCacheClient(delegate discovery.DiscoveryInterface) discovery.CachedDiscoveryInterface {
 	return &memCacheClient{
-		delegate:               delegate,
-		groupToServerResources: map[string]*cacheEntry{},
+		delegate:                    delegate,
+		groupToServerResources:      map[string]*cacheEntry{},
+		receivedAggregatedDiscovery: false,
 	}
 }

@@ -15,7 +15,7 @@ import (
 //
 // If a non-existent path is specified, an appropriate error is returned.
 // In case the caller is not interested in this particular error, it should
-// be handled separately using e.g. errors.Is(err, os.ErrNotExist).
+// be handled separately using e.g. errors.Is(err, fs.ErrNotExist).
 //
 // This function is only available on Linux. When available (since kernel
 // v5.6), openat2(2) syscall is used to reliably detect all mounts. Otherwise,

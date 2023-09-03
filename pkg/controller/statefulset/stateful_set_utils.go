@@ -17,22 +17,24 @@ limitations under the License.
 package statefulset
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var patchCodec = scheme.Codecs.LegacyCodec(apps.SchemeGroupVersion)
@@ -78,10 +80,33 @@ func getParentName(pod *v1.Pod) string {
 	return parent
 }
 
-//  getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
+// getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
 func getOrdinal(pod *v1.Pod) int {
 	_, ordinal := getParentNameAndOrdinal(pod)
 	return ordinal
+}
+
+// getStartOrdinal gets the first possible ordinal (inclusive).
+// Returns spec.ordinals.start if spec.ordinals is set, otherwise returns 0.
+func getStartOrdinal(set *apps.StatefulSet) int {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
+		if set.Spec.Ordinals != nil {
+			return int(set.Spec.Ordinals.Start)
+		}
+	}
+	return 0
+}
+
+// getEndOrdinal gets the last possible ordinal (inclusive).
+func getEndOrdinal(set *apps.StatefulSet) int {
+	return getStartOrdinal(set) + int(*set.Spec.Replicas) - 1
+}
+
+// podInOrdinalRange returns true if the pod ordinal is within the allowed
+// range of ordinals that this StatefulSet is set to control.
+func podInOrdinalRange(pod *v1.Pod, set *apps.StatefulSet) bool {
+	ordinal := getOrdinal(pod)
+	return ordinal >= getStartOrdinal(set) && ordinal <= getEndOrdinal(set)
 }
 
 // getPodName gets the name of set's child Pod with an ordinal index of ordinal
@@ -147,13 +172,13 @@ func getPersistentVolumeClaimRetentionPolicy(set *apps.StatefulSet) apps.Statefu
 
 // claimOwnerMatchesSetAndPod returns false if the ownerRefs of the claim are not set consistently with the
 // PVC deletion policy for the StatefulSet.
-func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
-	policy := set.Spec.PersistentVolumeClaimRetentionPolicy
+func claimOwnerMatchesSetAndPod(logger klog.Logger, claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+	policy := getPersistentVolumeClaimRetentionPolicy(set)
 	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
 	default:
-		klog.Errorf("Unknown policy %v; treating as Retain", set.Spec.PersistentVolumeClaimRetentionPolicy)
+		logger.Error(nil, "Unknown policy, treating as Retain", "policy", set.Spec.PersistentVolumeClaimRetentionPolicy)
 		fallthrough
 	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
 		if hasOwnerRef(claim, set) ||
@@ -169,12 +194,12 @@ func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.State
 		if hasOwnerRef(claim, set) {
 			return false
 		}
-		podScaledDown := getOrdinal(pod) >= int(*set.Spec.Replicas)
+		podScaledDown := !podInOrdinalRange(pod, set)
 		if podScaledDown != hasOwnerRef(claim, pod) {
 			return false
 		}
 	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
-		podScaledDown := getOrdinal(pod) >= int(*set.Spec.Replicas)
+		podScaledDown := !podInOrdinalRange(pod, set)
 		// If a pod is scaled down, there should be no set ref and a pod ref;
 		// if the pod is not scaled down it's the other way around.
 		if podScaledDown == hasOwnerRef(claim, set) {
@@ -189,7 +214,7 @@ func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.State
 
 // updateClaimOwnerRefForSetAndPod updates the ownerRefs for the claim according to the deletion policy of
 // the StatefulSet. Returns true if the claim was changed and should be updated and false otherwise.
-func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+func updateClaimOwnerRefForSetAndPod(logger klog.Logger, claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
 	needsUpdate := false
 	// Sometimes the version and kind are not set {pod,set}.TypeMeta. These are necessary for the ownerRef.
 	// This is the case both in real clusters and the unittests.
@@ -210,12 +235,12 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.
 	updateMeta(&podMeta, "Pod")
 	setMeta := set.TypeMeta
 	updateMeta(&setMeta, "StatefulSet")
-	policy := set.Spec.PersistentVolumeClaimRetentionPolicy
+	policy := getPersistentVolumeClaimRetentionPolicy(set)
 	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
 	default:
-		klog.Errorf("Unknown policy %v, treating as Retain", set.Spec.PersistentVolumeClaimRetentionPolicy)
+		logger.Error(nil, "Unknown policy, treating as Retain", "policy", set.Spec.PersistentVolumeClaimRetentionPolicy)
 		fallthrough
 	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
 		needsUpdate = removeOwnerRef(claim, set) || needsUpdate
@@ -225,7 +250,7 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.
 		needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
 	case policy.WhenScaled == delete && policy.WhenDeleted == retain:
 		needsUpdate = removeOwnerRef(claim, set) || needsUpdate
-		podScaledDown := getOrdinal(pod) >= int(*set.Spec.Replicas)
+		podScaledDown := !podInOrdinalRange(pod, set)
 		if podScaledDown {
 			needsUpdate = setOwnerRef(claim, pod, &podMeta) || needsUpdate
 		}
@@ -233,7 +258,7 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.
 			needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
 		}
 	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
-		podScaledDown := getOrdinal(pod) >= int(*set.Spec.Replicas)
+		podScaledDown := !podInOrdinalRange(pod, set)
 		if podScaledDown {
 			needsUpdate = removeOwnerRef(claim, set) || needsUpdate
 			needsUpdate = setOwnerRef(claim, pod, &podMeta) || needsUpdate
@@ -365,12 +390,16 @@ func initIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 // updateIdentity updates pod's name, hostname, and subdomain, and StatefulSetPodNameLabel to conform to set's name
 // and headless service.
 func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
-	pod.Name = getPodName(set, getOrdinal(pod))
+	ordinal := getOrdinal(pod)
+	pod.Name = getPodName(set, ordinal)
 	pod.Namespace = set.Namespace
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+		pod.Labels[apps.PodIndexLabel] = strconv.Itoa(ordinal)
+	}
 }
 
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
@@ -385,6 +414,11 @@ func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *v1.Pod) bool {
 	return pod.Status.Phase != ""
+}
+
+// isPending returns true if pod has a Phase of PodPending
+func isPending(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodPending
 }
 
 // isFailed returns true if pod has a Phase of PodFailed
@@ -439,8 +473,8 @@ func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 // returned error is nil, the returned Pod is valid.
 func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, currentRevision, updateRevision string, ordinal int) *v1.Pod {
 	if currentSet.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
-		(currentSet.Spec.UpdateStrategy.RollingUpdate == nil && ordinal < int(currentSet.Status.CurrentReplicas)) ||
-		(currentSet.Spec.UpdateStrategy.RollingUpdate != nil && ordinal < int(*currentSet.Spec.UpdateStrategy.RollingUpdate.Partition)) {
+		(currentSet.Spec.UpdateStrategy.RollingUpdate == nil && ordinal < (getStartOrdinal(currentSet)+int(currentSet.Status.CurrentReplicas))) ||
+		(currentSet.Spec.UpdateStrategy.RollingUpdate != nil && ordinal < (getStartOrdinal(currentSet)+int(*currentSet.Spec.UpdateStrategy.RollingUpdate.Partition))) {
 		pod := newStatefulSetPod(currentSet, ordinal)
 		setPodRevision(pod, currentRevision)
 		return pod
@@ -448,18 +482,6 @@ func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, current
 	pod := newStatefulSetPod(updateSet, ordinal)
 	setPodRevision(pod, updateRevision)
 	return pod
-}
-
-// Match check if the given StatefulSet's template matches the template stored in the given history.
-func Match(ss *apps.StatefulSet, history *apps.ControllerRevision) (bool, error) {
-	// Encoding the set for the patch may update its GVK metadata, which causes data races if this
-	// set is in an informer cache.
-	clone := ss.DeepCopy()
-	patch, err := getPatch(clone)
-	if err != nil {
-		return false, err
-	}
-	return bytes.Equal(patch, history.Data.Raw), nil
 }
 
 // getPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a
@@ -582,4 +604,39 @@ func (ao ascendingOrdinal) Swap(i, j int) {
 
 func (ao ascendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(ao[i]) < getOrdinal(ao[j])
+}
+
+// descendingOrdinal is a sort.Interface that Sorts a list of Pods based on the ordinals extracted
+// from the Pod. Pod's that have not been constructed by StatefulSet's have an ordinal of -1, and are therefore pushed
+// to the end of the list.
+type descendingOrdinal []*v1.Pod
+
+func (do descendingOrdinal) Len() int {
+	return len(do)
+}
+
+func (do descendingOrdinal) Swap(i, j int) {
+	do[i], do[j] = do[j], do[i]
+}
+
+func (do descendingOrdinal) Less(i, j int) bool {
+	return getOrdinal(do[i]) > getOrdinal(do[j])
+}
+
+// getStatefulSetMaxUnavailable calculates the real maxUnavailable number according to the replica count
+// and maxUnavailable from rollingUpdateStrategy. The number defaults to 1 if the maxUnavailable field is
+// not set, and it will be round down to at least 1 if the maxUnavailable value is a percentage.
+// Note that API validation has already guaranteed the maxUnavailable field to be >1 if it is an integer
+// or 0% < value <= 100% if it is a percentage, so we don't have to consider other cases.
+func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCount int) (int, error) {
+	maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt32(1)), replicaCount, false)
+	if err != nil {
+		return 0, err
+	}
+	// maxUnavailable might be zero for small percentage with round down.
+	// So we have to enforce it not to be less than 1.
+	if maxUnavailableNum < 1 {
+		maxUnavailableNum = 1
+	}
+	return maxUnavailableNum, nil
 }

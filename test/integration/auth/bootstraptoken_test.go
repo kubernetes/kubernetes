@@ -18,6 +18,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,10 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	"k8s.io/client-go/rest"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type bootstrapSecrets []*corev1.Secret
@@ -116,18 +121,30 @@ func TestBootstrapTokenAuth(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret})))
-			// Set up an API server
-			controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-			controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
-			_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-			defer closeFn()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
-			ns := framework.CreateTestingNamespace("auth-bootstrap-token", s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret})))
+
+			kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Authorization.Modes = []string{"AlwaysAllow"}
+				},
+				ModifyServerConfig: func(config *controlplane.Config) {
+					config.GenericConfig.Authentication.Authenticator = authenticator
+				},
+			})
+			defer tearDownFn()
+
+			ns := framework.CreateNamespaceOrDie(kubeClient, "auth-bootstrap-token", t)
+			defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
 			previousResourceVersion := make(map[string]float64)
-			transport := http.DefaultTransport
+			transport, err := rest.TransportFor(kubeConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			token := validTokenID + "." + validSecret
 			var bodyStr string
@@ -144,7 +161,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 			}
 			test.request.body = bodyStr
 			bodyBytes := bytes.NewReader([]byte(bodyStr))
-			req, err := http.NewRequest(test.request.verb, s.URL+test.request.URL, bodyBytes)
+			req, err := http.NewRequest(test.request.verb, kubeConfig.Host+test.request.URL, bodyBytes)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

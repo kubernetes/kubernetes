@@ -37,17 +37,17 @@ type SigningPolicy interface {
 // PermissiveSigningPolicy is the signing policy historically used by the local
 // signer.
 //
-//  * It forwards all SANs from the original signing request.
-//  * It sets allowed usages as configured in the policy.
-//  * It zeros all extensions.
-//  * It sets BasicConstraints to true.
-//  * It sets IsCA to false.
-//  * It validates that the signer has not expired.
-//  * It sets NotBefore and NotAfter:
-//    All certificates set NotBefore = Now() - Backdate.
-//    Long-lived certificates set NotAfter = Now() + TTL - Backdate.
-//    Short-lived certificates set NotAfter = Now() + TTL.
-//    All certificates truncate NotAfter to the expiration date of the signer.
+//   - It forwards all SANs from the original signing request.
+//   - It sets allowed usages as configured in the policy.
+//   - It zeros all extensions.
+//   - It sets BasicConstraints to true.
+//   - It sets IsCA to false.
+//   - It validates that the signer has not expired.
+//   - It sets NotBefore and NotAfter:
+//     All certificates set NotBefore = Now() - Backdate.
+//     Long-lived certificates set NotAfter = Now() + TTL - Backdate.
+//     Short-lived certificates set NotAfter = Now() + TTL.
+//     All certificates truncate NotAfter to the expiration date of the signer.
 type PermissiveSigningPolicy struct {
 	// TTL is used in certificate NotAfter calculation as described above.
 	TTL time.Duration

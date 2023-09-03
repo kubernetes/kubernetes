@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/filters/annotations"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
@@ -108,7 +108,7 @@ func (m *resWrangler) Replace(res *resource.Resource) (int, error) {
 	id := res.CurId()
 	i, err := m.GetIndexOfCurrentId(id)
 	if err != nil {
-		return -1, errors.Wrap(err, "in Replace")
+		return -1, errors.WrapPrefixf(err, "in Replace")
 	}
 	if i < 0 {
 		return -1, fmt.Errorf("cannot find resource with id %s to replace", id)
@@ -286,7 +286,7 @@ func (m *resWrangler) AsYaml() ([]byte, error) {
 		out, err := res.AsYAML()
 		if err != nil {
 			m, _ := res.Map()
-			return nil, errors.Wrapf(err, "%#v", m)
+			return nil, errors.WrapPrefixf(err, "%#v", m)
 		}
 		if firstObj {
 			firstObj = false
@@ -429,7 +429,6 @@ func getNamespacesForRoleBinding(r *resource.Resource) (map[string]bool, error) 
 	if r.GetKind() != "RoleBinding" {
 		return result, nil
 	}
-	//nolint staticcheck
 	subjects, err := r.GetSlice("subjects")
 	if err != nil || subjects == nil {
 		return result, nil
@@ -442,7 +441,7 @@ func getNamespacesForRoleBinding(r *resource.Resource) (map[string]bool, error) 
 					if n, ok3 := ns.(string); ok3 {
 						result[n] = true
 					} else {
-						return nil, errors.New(fmt.Sprintf("Invalid Input: namespace is blank for resource %q\n", r.CurId()))
+						return nil, errors.Errorf("Invalid Input: namespace is blank for resource %q\n", r.CurId())
 					}
 				}
 			}

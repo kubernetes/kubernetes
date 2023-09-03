@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -25,20 +26,20 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("crictl", func() {
 	f := framework.NewDefaultFramework("crictl")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// `crictl` is not available on all cloud providers.
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
-	ginkgo.It("should be able to run crictl on the node", func() {
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
+	ginkgo.It("should be able to run crictl on the node", func(ctx context.Context) {
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
 		framework.ExpectNoError(err)
 
 		testCases := []string{
@@ -52,7 +53,7 @@ var _ = SIGDescribe("crictl", func() {
 			for _, node := range nodes.Items {
 				ginkgo.By(fmt.Sprintf("Testing %q on node %q ", testCase, node.GetName()))
 
-				res, err := hostExec.Execute(testCase, &node)
+				res, err := hostExec.Execute(ctx, testCase, &node)
 				framework.ExpectNoError(err)
 
 				if res.Stdout == "" && res.Stderr == "" {

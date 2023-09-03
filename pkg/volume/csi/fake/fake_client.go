@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -41,11 +40,6 @@ const (
 // IdentityClient is a CSI identity client used for testing
 type IdentityClient struct {
 	nextErr error
-}
-
-// NewIdentityClient returns a new IdentityClient
-func NewIdentityClient() *IdentityClient {
-	return &IdentityClient{}
 }
 
 // SetNextError injects expected error
@@ -210,7 +204,7 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 	// "Creation of target_path is the responsibility of the SP."
 	// Our plugin depends on it.
 	if req.VolumeCapability.GetBlock() != nil {
-		if err := ioutil.WriteFile(req.TargetPath, []byte{}, 0644); err != nil {
+		if err := os.WriteFile(req.TargetPath, []byte{}, 0644); err != nil {
 			return nil, fmt.Errorf("cannot create target path %s for block file: %s", req.TargetPath, err)
 		}
 	} else {
@@ -439,11 +433,6 @@ func (f *NodeClient) NodeGetVolumeStats(ctx context.Context, req *csipb.NodeGetV
 type ControllerClient struct {
 	nextCapabilities []*csipb.ControllerServiceCapability
 	nextErr          error
-}
-
-// NewControllerClient returns a ControllerClient
-func NewControllerClient() *ControllerClient {
-	return &ControllerClient{}
 }
 
 // SetNextError injects next expected error

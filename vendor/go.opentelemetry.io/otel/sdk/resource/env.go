@@ -21,37 +21,64 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 )
 
-// envVar is the environment variable name OpenTelemetry Resource information can be assigned to.
-const envVar = "OTEL_RESOURCE_ATTRIBUTES"
+const (
+	// resourceAttrKey is the environment variable name OpenTelemetry Resource information will be read from.
+	resourceAttrKey = "OTEL_RESOURCE_ATTRIBUTES"
+
+	// svcNameKey is the environment variable name that Service Name information will be read from.
+	svcNameKey = "OTEL_SERVICE_NAME"
+)
 
 var (
 	// errMissingValue is returned when a resource value is missing.
 	errMissingValue = fmt.Errorf("%w: missing value", ErrPartialResource)
 )
 
-// FromEnv is a Detector that implements the Detector and collects
+// fromEnv is a Detector that implements the Detector and collects
 // resources from environment.  This Detector is included as a
-// builtin.  If these resource attributes are not wanted, use the
-// WithFromEnv(nil) or WithoutBuiltin() options to explicitly disable
-// them.
-type FromEnv struct{}
+// builtin.
+type fromEnv struct{}
 
-// compile time assertion that FromEnv implements Detector interface
-var _ Detector = FromEnv{}
+// compile time assertion that FromEnv implements Detector interface.
+var _ Detector = fromEnv{}
 
-// Detect collects resources from environment
-func (FromEnv) Detect(context.Context) (*Resource, error) {
-	attrs := strings.TrimSpace(os.Getenv(envVar))
+// Detect collects resources from environment.
+func (fromEnv) Detect(context.Context) (*Resource, error) {
+	attrs := strings.TrimSpace(os.Getenv(resourceAttrKey))
+	svcName := strings.TrimSpace(os.Getenv(svcNameKey))
 
-	if attrs == "" {
+	if attrs == "" && svcName == "" {
 		return Empty(), nil
 	}
-	return constructOTResources(attrs)
+
+	var res *Resource
+
+	if svcName != "" {
+		res = NewSchemaless(semconv.ServiceNameKey.String(svcName))
+	}
+
+	r2, err := constructOTResources(attrs)
+
+	// Ensure that the resource with the service name from OTEL_SERVICE_NAME
+	// takes precedence, if it was defined.
+	res, err2 := Merge(r2, res)
+
+	if err == nil {
+		err = err2
+	} else if err2 != nil {
+		err = fmt.Errorf("detecting resources: %s", []string{err.Error(), err2.Error()})
+	}
+
+	return res, err
 }
 
 func constructOTResources(s string) (*Resource, error) {
+	if s == "" {
+		return Empty(), nil
+	}
 	pairs := strings.Split(s, ",")
 	attrs := []attribute.KeyValue{}
 	var invalid []string
@@ -68,5 +95,5 @@ func constructOTResources(s string) (*Resource, error) {
 	if len(invalid) > 0 {
 		err = fmt.Errorf("%w: %v", errMissingValue, invalid)
 	}
-	return NewWithAttributes(attrs...), err
+	return NewSchemaless(attrs...), err
 }

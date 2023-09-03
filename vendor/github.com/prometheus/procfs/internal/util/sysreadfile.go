@@ -11,7 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build linux,!appengine
+//go:build (linux || darwin) && !appengine
+// +build linux darwin
+// +build !appengine
 
 package util
 
@@ -21,7 +23,7 @@ import (
 	"syscall"
 )
 
-// SysReadFile is a simplified ioutil.ReadFile that invokes syscall.Read directly.
+// SysReadFile is a simplified os.ReadFile that invokes syscall.Read directly.
 // https://github.com/prometheus/node_exporter/pull/728/files
 //
 // Note that this function will not read files larger than 128 bytes.
@@ -33,7 +35,7 @@ func SysReadFile(file string) (string, error) {
 	defer f.Close()
 
 	// On some machines, hwmon drivers are broken and return EAGAIN.  This causes
-	// Go's ioutil.ReadFile implementation to poll forever.
+	// Go's os.ReadFile implementation to poll forever.
 	//
 	// Since we either want to read data or bail immediately, do the simplest
 	// possible read using syscall directly.

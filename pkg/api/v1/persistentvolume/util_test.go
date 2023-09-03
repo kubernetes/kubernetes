@@ -266,7 +266,7 @@ func TestPVSecrets(t *testing.T) {
 func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.Type) sets.String {
 	secretPaths := sets.NewString()
 
-	if tp.Kind() == reflect.Ptr {
+	if tp.Kind() == reflect.Pointer {
 		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
 		return secretPaths
 	}
@@ -276,7 +276,7 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 	}
 
 	switch tp.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
 		// ObjectMeta should not have any field with the word "secret" in it;

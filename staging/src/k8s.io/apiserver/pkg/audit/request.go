@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
 	"time"
 
 	authnv1 "k8s.io/api/authentication/v1"
@@ -29,15 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -45,20 +40,18 @@ const (
 	userAgentTruncateSuffix = "...TRUNCATED"
 )
 
-func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
-	ev := &auditinternal.Event{
-		RequestReceivedTimestamp: metav1.NewMicroTime(requestReceivedTimestamp),
-		Verb:                     attribs.GetVerb(),
-		RequestURI:               req.URL.RequestURI(),
-		UserAgent:                maybeTruncateUserAgent(req),
-		Level:                    level,
+func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedTimestamp time.Time, level auditinternal.Level, attribs authorizer.Attributes) {
+	ac := AuditContextFrom(ctx)
+	if !ac.Enabled() {
+		return
 	}
+	ev := &ac.Event
 
-	auditID, found := request.AuditIDFrom(req.Context())
-	if !found {
-		auditID = types.UID(uuid.New().String())
-	}
-	ev.AuditID = auditID
+	ev.RequestReceivedTimestamp = metav1.NewMicroTime(requestReceivedTimestamp)
+	ev.Verb = attribs.GetVerb()
+	ev.RequestURI = req.URL.RequestURI()
+	ev.UserAgent = maybeTruncateUserAgent(req)
+	ev.Level = level
 
 	ips := utilnet.SourceIPs(req)
 	ev.SourceIPs = make([]string, len(ips))
@@ -86,10 +79,6 @@ func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, 
 			APIVersion:  attribs.GetAPIVersion(),
 		}
 	}
-
-	addAuditAnnotationsFrom(req.Context(), ev)
-
-	return ev, nil
 }
 
 // LogImpersonatedUser fills in the impersonated user attributes into an audit event.
@@ -154,7 +143,7 @@ func LogRequestObject(ctx context.Context, obj runtime.Object, objGV schema.Grou
 	if shouldOmitManagedFields(ctx) {
 		copy, ok, err := copyWithoutManagedFields(obj)
 		if err != nil {
-			klog.Warningf("error while dropping managed fields from the request for %q error: %v", reflect.TypeOf(obj).Name(), err)
+			klog.ErrorS(err, "Error while dropping managed fields from the request", "auditID", ae.AuditID)
 		}
 		if ok {
 			obj = copy
@@ -166,7 +155,7 @@ func LogRequestObject(ctx context.Context, obj runtime.Object, objGV schema.Grou
 	ae.RequestObject, err = encodeObject(obj, objGV, s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
-		klog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
+		klog.ErrorS(err, "Encoding failed of request object", "auditID", ae.AuditID, "gvr", gvr.String(), "obj", obj)
 		return
 	}
 }
@@ -209,7 +198,7 @@ func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupV
 	if shouldOmitManagedFields(ctx) {
 		copy, ok, err := copyWithoutManagedFields(obj)
 		if err != nil {
-			klog.Warningf("error while dropping managed fields from the response for %q error: %v", reflect.TypeOf(obj).Name(), err)
+			klog.ErrorS(err, "Error while dropping managed fields from the response", "auditID", ae.AuditID)
 		}
 		if ok {
 			obj = copy
@@ -220,7 +209,7 @@ func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupV
 	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)
 	if err != nil {
-		klog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
+		klog.ErrorS(err, "Encoding failed of response object", "auditID", ae.AuditID, "obj", obj)
 	}
 }
 
@@ -239,7 +228,7 @@ func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime
 
 	return &runtime.Unknown{
 		Raw:         buf.Bytes(),
-		ContentType: runtime.ContentTypeJSON,
+		ContentType: mediaType,
 	}, nil
 }
 

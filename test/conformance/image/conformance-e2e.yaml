@@ -55,7 +55,7 @@ metadata:
 spec:
   containers:
   - name: conformance-container
-    image: k8s.gcr.io/conformance-amd64:v1.14
+    image: registry.k8s.io/conformance-amd64:v1.14
     imagePullPolicy: IfNotPresent
     env:
     - name: E2E_FOCUS

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,12 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/features"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -56,11 +58,11 @@ type customResourceStrategy struct {
 	kind              schema.GroupVersionKind
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, structuralSchemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator validation.SchemaValidator, structuralSchemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
 	celValidators := map[string]*cel.Validator{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) {
 		for name, s := range structuralSchemas {
-			v := cel.NewValidator(s, cel.PerCallLimit) // CEL programs are compiled and cached here
+			v := cel.NewValidator(s, true, celconfig.PerCallLimit) // CEL programs are compiled and cached here
 			if v != nil {
 				celValidators[name] = v
 			}
@@ -177,7 +179,7 @@ func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object
 			if has, err := hasBlockingErr(errs); has {
 				errs = append(errs, err)
 			} else {
-				err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], u.Object, nil, cel.RuntimeCELCostBudget)
+				err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], u.Object, nil, celconfig.RuntimeCELCostBudget)
 				errs = append(errs, err...)
 			}
 		}
@@ -187,8 +189,32 @@ func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (customResourceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+func (a customResourceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return generateWarningsFromObj(obj, nil)
+}
+
+func generateWarningsFromObj(obj, old runtime.Object) []string {
+	var allWarnings []string
+	fldPath := field.NewPath("metadata", "finalizers")
+	newObjAccessor, err := meta.Accessor(obj)
+	if err != nil {
+		return allWarnings
+	}
+
+	newAdded := sets.NewString(newObjAccessor.GetFinalizers()...)
+	if old != nil {
+		oldObjAccessor, err := meta.Accessor(old)
+		if err != nil {
+			return allWarnings
+		}
+		newAdded = newAdded.Difference(sets.NewString(oldObjAccessor.GetFinalizers()...))
+	}
+
+	for _, finalizer := range newAdded.List() {
+		allWarnings = append(allWarnings, validateKubeFinalizerName(finalizer, fldPath)...)
+	}
+
+	return allWarnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -234,7 +260,7 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 		if has, err := hasBlockingErr(errs); has {
 			errs = append(errs, err)
 		} else {
-			err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], uNew.Object, uOld.Object, cel.RuntimeCELCostBudget)
+			err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
 			errs = append(errs, err...)
 		}
 	}
@@ -243,8 +269,8 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 }
 
 // WarningsOnUpdate returns warnings for the given update.
-func (customResourceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+func (a customResourceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return generateWarningsFromObj(obj, old)
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

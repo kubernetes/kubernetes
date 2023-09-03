@@ -22,6 +22,7 @@ enableProfiling: false
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: true
   masqueradeAll: false
   masqueradeBit: 14
   minSyncPeriod: 1s
@@ -36,13 +37,19 @@ ipvs:
   tcpTimeout: 0s
   udpTimeout: 0s
 kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 5s
+  format: text
+  options:
+    json:
+      infoBufferSize: "0"
+  verbosity: 0
 metricsBindAddress: 127.0.0.1:10249
 mode: ""
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
 showHiddenMetricsForVersion: ""
-udpIdleTimeout: 250ms
 winkernel:
   enableDSR: false
   forwardHealthCheckVip: false

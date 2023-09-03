@@ -24,9 +24,11 @@ import (
 	"reflect"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -35,6 +37,7 @@ var testKnownTargets = []string{
 	"kube-apiserver",
 	"kube-controller-manager",
 	"kube-scheduler",
+	"kubeletconfiguration",
 }
 
 const testDirPattern = "patch-files"
@@ -171,7 +174,7 @@ func TestGetPatchSetsForPathMustBeDirectory(t *testing.T) {
 	if err != nil {
 		t.Errorf("error creating temporary file: %v", err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer utiltesting.CloseAndRemove(t, tempFile)
 
 	_, _, _, err = getPatchSetsFromPath(tempFile.Name(), testKnownTargets, io.Discard)
 	var pathErr *os.PathError
@@ -308,6 +311,21 @@ func TestGetPatchManagerForPath(t *testing.T) {
 			files: []*file{
 				{
 					name: "kube-apiserver+json.json",
+					data: `[{"op": "replace", "path": "/foo", "value": "zzz"}]`,
+				},
+			},
+		},
+		{
+			name: "valid: kubeletconfiguration target is patched with json patch",
+			patchTarget: &PatchTarget{
+				Name:                      "kubeletconfiguration",
+				StrategicMergePatchObject: nil,
+				Data:                      []byte("foo: bar\n"),
+			},
+			expectedData: []byte(`{"foo":"zzz"}`),
+			files: []*file{
+				{
+					name: "kubeletconfiguration+json.json",
 					data: `[{"op": "replace", "path": "/foo", "value": "zzz"}]`,
 				},
 			},

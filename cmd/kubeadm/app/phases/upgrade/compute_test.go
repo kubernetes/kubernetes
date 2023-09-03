@@ -26,11 +26,11 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 type fakeVersionGetter struct {
@@ -82,7 +82,7 @@ metadata:
 spec:
   containers:
   - name: etcd
-    image: k8s.gcr.io/etcd:` + fakeCurrentEtcdVersion
+    image: registry.k8s.io/etcd:` + fakeCurrentEtcdVersion
 
 func getEtcdVersion(v *versionutil.Version) string {
 	etcdVer, _, _ := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, v.String())
@@ -97,11 +97,11 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	// variables are in the form v{MAJOR}{MINOR}{PATCH}, where MINOR is a variable so test are automatically uptodate to the latest MinimumControlPlaneVersion/
 
 	// v1.X series, e.g. v1.14
-	v1X0 := version.MustParseSemantic("v1.14.0")
+	v1X0 := versionutil.MustParseSemantic("v1.14.0")
 	v1X5 := v1X0.WithPatch(5)
 
 	// v1.Y series, where Y = X+1, e.g. v1.15
-	v1Y0 := version.MustParseSemantic("v1.15.0")
+	v1Y0 := versionutil.MustParseSemantic("v1.15.0")
 	v1Y0alpha0 := v1Y0.WithPreRelease("alpha.0")
 	v1Y0alpha1 := v1Y0.WithPreRelease("alpha.1")
 	v1Y1 := v1Y0.WithPatch(1)
@@ -110,7 +110,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	v1Y5 := v1Y0.WithPatch(5)
 
 	// v1.Z series, where Z = Y+1, e.g. v1.16
-	v1Z0 := version.MustParseSemantic("v1.16.0")
+	v1Z0 := versionutil.MustParseSemantic("v1.16.0")
 	v1Z0alpha1 := v1Z0.WithPreRelease("alpha.1")
 	v1Z0alpha2 := v1Z0.WithPreRelease("alpha.2")
 	v1Z0beta1 := v1Z0.WithPreRelease("beta.1")
@@ -137,7 +137,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				stableVersion:      v1Y0.String(),
 			},
 			beforeDNSVersion:  fakeCurrentCoreDNSVersion,
-			expectedUpgrades:  []Upgrade{},
+			expectedUpgrades:  nil,
 			allowExperimental: false,
 			errExpected:       false,
 		},
@@ -342,7 +342,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				latestVersion:      v1Z0alpha2.String(),
 			},
 			beforeDNSVersion:  fakeCurrentCoreDNSVersion,
-			expectedUpgrades:  []Upgrade{},
+			expectedUpgrades:  nil,
 			allowExperimental: true,
 			errExpected:       false,
 		},
@@ -652,7 +652,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				t.Fatalf("Unable to create test static pod manifest: %v", err)
 			}
 
-			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.externalEtcd, client, manifestsDir)
+			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.externalEtcd, client, manifestsDir, &output.TextPrinter{})
 			if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)
 			}
@@ -779,6 +779,63 @@ func TestGetBranchFromVersion(t *testing.T) {
 			v := getBranchFromVersion(tc.version)
 			if v != tc.expectedVersion {
 				t.Errorf("expected version %s, got %s", tc.expectedVersion, v)
+			}
+		})
+	}
+}
+
+func TestGetSuggestedEtcdVersion(t *testing.T) {
+	constants.SupportedEtcdVersion = map[uint8]string{
+		16: "3.3.17-0",
+		17: "3.4.3-0",
+		18: "3.4.3-0",
+		19: "3.4.13-0",
+		20: "3.4.13-0",
+		21: "3.4.13-0",
+		22: "3.5.5-0",
+	}
+
+	tests := []struct {
+		name              string
+		externalEtcd      bool
+		kubernetesVersion string
+		expectedVersion   string
+	}{
+		{
+			name:              "external etcd: no version",
+			externalEtcd:      true,
+			kubernetesVersion: "1.1.0",
+			expectedVersion:   "",
+		},
+		{
+			name:              "local etcd: illegal kubernetes version",
+			externalEtcd:      false,
+			kubernetesVersion: "1.x.5",
+			expectedVersion:   "N/A",
+		},
+		{
+			name:              "local etcd: no supported version for 1.10.5, return the nearest version",
+			externalEtcd:      false,
+			kubernetesVersion: "1.10.5",
+			expectedVersion:   "3.3.17-0",
+		},
+		{
+			name:              "local etcd: has supported version for 1.17.0",
+			externalEtcd:      false,
+			kubernetesVersion: "1.17.0",
+			expectedVersion:   "3.4.3-0",
+		},
+		{
+			name:              "local etcd: no supported version for v1.99.0, return the nearest version",
+			externalEtcd:      false,
+			kubernetesVersion: "v1.99.0",
+			expectedVersion:   "3.5.5-0",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getSuggestedEtcdVersion(tt.externalEtcd, tt.kubernetesVersion); got != tt.expectedVersion {
+				t.Errorf("getSuggestedEtcdVersion() want %v, got %v", tt.expectedVersion, got)
 			}
 		})
 	}

@@ -70,7 +70,11 @@ func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs se
 	}
 
 	decoder := codecs.DecoderToVersion(info.Serializer, gv)
-	return runtime.Decode(decoder, buffer)
+	obj, err := runtime.Decode(decoder, buffer)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to decode %s into runtime.Object", buffer)
+	}
+	return obj, nil
 }
 
 // SplitYAMLDocuments reads the YAML bytes per-document, unmarshals the TypeMeta information from each document
@@ -153,4 +157,9 @@ func GroupVersionKindsHasInitConfiguration(gvks ...schema.GroupVersionKind) bool
 // GroupVersionKindsHasJoinConfiguration returns whether the following gvk slice contains a JoinConfiguration object
 func GroupVersionKindsHasJoinConfiguration(gvks ...schema.GroupVersionKind) bool {
 	return GroupVersionKindsHasKind(gvks, constants.JoinConfigurationKind)
+}
+
+// GroupVersionKindsHasResetConfiguration returns whether the following gvk slice contains a ResetConfiguration object
+func GroupVersionKindsHasResetConfiguration(gvks ...schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.ResetConfigurationKind)
 }

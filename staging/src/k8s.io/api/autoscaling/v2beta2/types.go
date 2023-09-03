@@ -62,9 +62,11 @@ type HorizontalPodAutoscalerSpec struct {
 	// available.
 	// +optional
 	MinReplicas *int32 `json:"minReplicas,omitempty" protobuf:"varint,2,opt,name=minReplicas"`
+
 	// maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
 	// It cannot be less that minReplicas.
 	MaxReplicas int32 `json:"maxReplicas" protobuf:"varint,3,opt,name=maxReplicas"`
+
 	// metrics contains the specifications for which to use to calculate the
 	// desired replica count (the maximum replica count across all metrics will
 	// be used).  The desired replica count is calculated multiplying the
@@ -85,11 +87,13 @@ type HorizontalPodAutoscalerSpec struct {
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
-	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+	// kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
-	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
+
+	// name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
-	// API version of the referent
+
+	// apiVersion is the API version of the referent
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
 }
@@ -107,11 +111,13 @@ type MetricSpec struct {
 	// (for example, hits-per-second on an Ingress object).
 	// +optional
 	Object *ObjectMetricSource `json:"object,omitempty" protobuf:"bytes,2,opt,name=object"`
+
 	// pods refers to a metric describing each pod in the current scale target
 	// (for example, transactions-processed-per-second).  The values will be
 	// averaged together before being compared to the target value.
 	// +optional
 	Pods *PodsMetricSource `json:"pods,omitempty" protobuf:"bytes,3,opt,name=pods"`
+
 	// resource refers to a resource metric (such as those specified in
 	// requests and limits) known to Kubernetes describing each pod in the
 	// current scale target (e.g. CPU or memory). Such metrics are built in to
@@ -119,6 +125,7 @@ type MetricSpec struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricSource `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
+
 	// container resource refers to a resource metric (such as those specified in
 	// requests and limits) known to Kubernetes describing a single container in
 	// each pod of the current scale target (e.g. CPU or memory). Such metrics are
@@ -127,6 +134,7 @@ type MetricSpec struct {
 	// This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
 	// +optional
 	ContainerResource *ContainerResourceMetricSource `json:"containerResource,omitempty" protobuf:"bytes,7,opt,name=containerResource"`
+
 	// external refers to a global metric that is not associated
 	// with any Kubernetes object. It allows autoscaling based on information
 	// coming from components running outside of cluster
@@ -146,6 +154,7 @@ type HorizontalPodAutoscalerBehavior struct {
 	// No stabilization is used.
 	// +optional
 	ScaleUp *HPAScalingRules `json:"scaleUp,omitempty" protobuf:"bytes,1,opt,name=scaleUp"`
+
 	// scaleDown is scaling policy for scaling Down.
 	// If not set, the default value is to allow to scale down to minReplicas pods, with a
 	// 300 second stabilization window (i.e., the highest recommendation for
@@ -173,7 +182,7 @@ const (
 // number of replicas is not set instantly, instead, the safest value from the stabilization
 // window is chosen.
 type HPAScalingRules struct {
-	// StabilizationWindowSeconds is the number of seconds for which past recommendations should be
+	// stabilizationWindowSeconds is the number of seconds for which past recommendations should be
 	// considered while scaling up or scaling down.
 	// StabilizationWindowSeconds must be greater than or equal to zero and less than or equal to 3600 (one hour).
 	// If not set, use the default values:
@@ -181,10 +190,12 @@ type HPAScalingRules struct {
 	// - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
 	// +optional
 	StabilizationWindowSeconds *int32 `json:"stabilizationWindowSeconds,omitempty" protobuf:"varint,3,opt,name=stabilizationWindowSeconds"`
+
 	// selectPolicy is used to specify which policy should be used.
 	// If not set, the default value MaxPolicySelect is used.
 	// +optional
 	SelectPolicy *ScalingPolicySelect `json:"selectPolicy,omitempty" protobuf:"bytes,1,opt,name=selectPolicy"`
+
 	// policies is a list of potential scaling polices which can be used during scaling.
 	// At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
 	// +optional
@@ -204,12 +215,14 @@ const (
 
 // HPAScalingPolicy is a single policy which must hold true for a specified past interval.
 type HPAScalingPolicy struct {
-	// Type is used to specify the scaling policy.
+	// type is used to specify the scaling policy.
 	Type HPAScalingPolicyType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=HPAScalingPolicyType"`
-	// Value contains the amount of change which is permitted by the policy.
+
+	// value contains the amount of change which is permitted by the policy.
 	// It must be greater than zero
 	Value int32 `json:"value" protobuf:"varint,2,opt,name=value"`
-	// PeriodSeconds specifies the window of time for which the policy should hold true.
+
+	// periodSeconds specifies the window of time for which the policy should hold true.
 	// PeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).
 	PeriodSeconds int32 `json:"periodSeconds" protobuf:"varint,3,opt,name=periodSeconds"`
 }
@@ -251,6 +264,7 @@ type ObjectMetricSource struct {
 	DescribedObject CrossVersionObjectReference `json:"describedObject" protobuf:"bytes,1,name=describedObject"`
 	// target specifies the target value for the given metric
 	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
+
 	// metric identifies the target metric by name and selector
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,3,name=metric"`
 }
@@ -262,6 +276,7 @@ type ObjectMetricSource struct {
 type PodsMetricSource struct {
 	// metric identifies the target metric by name and selector
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+
 	// target specifies the target value for the given metric
 	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
 }
@@ -276,6 +291,7 @@ type PodsMetricSource struct {
 type ResourceMetricSource struct {
 	// name is the name of the resource in question.
 	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
+
 	// target specifies the target value for the given metric
 	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
 }
@@ -290,8 +306,10 @@ type ResourceMetricSource struct {
 type ContainerResourceMetricSource struct {
 	// name is the name of the resource in question.
 	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
+
 	// target specifies the target value for the given metric
 	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
+
 	// container is the name of the container in the pods of the scaling target
 	Container string `json:"container" protobuf:"bytes,3,opt,name=container"`
 }
@@ -302,6 +320,7 @@ type ContainerResourceMetricSource struct {
 type ExternalMetricSource struct {
 	// metric identifies the target metric by name and selector
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+
 	// target specifies the target value for the given metric
 	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
 }
@@ -310,6 +329,7 @@ type ExternalMetricSource struct {
 type MetricIdentifier struct {
 	// name is the name of the given metric
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
 	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
 	// When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping.
 	// When unset, just the metricName will be used to gather metrics.
@@ -321,13 +341,16 @@ type MetricIdentifier struct {
 type MetricTarget struct {
 	// type represents whether the metric type is Utilization, Value, or AverageValue
 	Type MetricTargetType `json:"type" protobuf:"bytes,1,name=type"`
+
 	// value is the target value of the metric (as a quantity).
 	// +optional
 	Value *resource.Quantity `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
+
 	// averageValue is the target value of the average of the
 	// metric across all relevant pods (as a quantity)
 	// +optional
 	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,3,opt,name=averageValue"`
+
 	// averageUtilization is the target value of the average of the
 	// resource metric across all relevant pods, represented as a percentage of
 	// the requested value of the resource for the pods.
@@ -399,15 +422,19 @@ const (
 type HorizontalPodAutoscalerCondition struct {
 	// type describes the current condition
 	Type HorizontalPodAutoscalerConditionType `json:"type" protobuf:"bytes,1,name=type"`
+
 	// status is the status of the condition (True, False, Unknown)
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,name=status"`
+
 	// lastTransitionTime is the last time the condition transitioned from
 	// one status to another
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
+
 	// reason is the reason for the condition's last transition.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+
 	// message is a human-readable explanation containing details about
 	// the transition
 	// +optional
@@ -426,6 +453,7 @@ type MetricStatus struct {
 	// (for example, hits-per-second on an Ingress object).
 	// +optional
 	Object *ObjectMetricStatus `json:"object,omitempty" protobuf:"bytes,2,opt,name=object"`
+
 	// pods refers to a metric describing each pod in the current scale target
 	// (for example, transactions-processed-per-second).  The values will be
 	// averaged together before being compared to the target value.
@@ -438,13 +466,15 @@ type MetricStatus struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricStatus `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
-	// container resource refers to a resource metric (such as those specified in
+
+	// containerResource refers to a resource metric (such as those specified in
 	// requests and limits) known to Kubernetes describing a single container in each pod in the
 	// current scale target (e.g. CPU or memory). Such metrics are built in to
 	// Kubernetes, and have special scaling options on top of those available
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	ContainerResource *ContainerResourceMetricStatus `json:"containerResource,omitempty" protobuf:"bytes,7,opt,name=containerResource"`
+
 	// external refers to a global metric that is not associated
 	// with any Kubernetes object. It allows autoscaling based on information
 	// coming from components running outside of cluster
@@ -459,6 +489,7 @@ type MetricStatus struct {
 type ObjectMetricStatus struct {
 	// metric identifies the target metric by name and selector
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+
 	// current contains the current value for the given metric
 	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
 
@@ -470,6 +501,7 @@ type ObjectMetricStatus struct {
 type PodsMetricStatus struct {
 	// metric identifies the target metric by name and selector
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+
 	// current contains the current value for the given metric
 	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
 }
@@ -480,8 +512,9 @@ type PodsMetricStatus struct {
 // Kubernetes, and have special scaling options on top of those available to
 // normal per-pod metrics using the "pods" source.
 type ResourceMetricStatus struct {
-	// Name is the name of the resource in question.
+	// name is the name of the resource in question.
 	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
+
 	// current contains the current value for the given metric
 	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
 }
@@ -492,11 +525,13 @@ type ResourceMetricStatus struct {
 // Kubernetes, and have special scaling options on top of those available to
 // normal per-pod metrics using the "pods" source.
 type ContainerResourceMetricStatus struct {
-	// Name is the name of the resource in question.
+	// name is the name of the resource in question.
 	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
+
 	// current contains the current value for the given metric
 	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
-	// Container is the name of the container in the pods of the scaling target
+
+	// container is the name of the container in the pods of the scaling target
 	Container string `json:"container" protobuf:"bytes,3,opt,name=container"`
 }
 
@@ -505,6 +540,7 @@ type ContainerResourceMetricStatus struct {
 type ExternalMetricStatus struct {
 	// metric identifies the target metric by name and selector
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+
 	// current contains the current value for the given metric
 	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
 }
@@ -514,11 +550,13 @@ type MetricValueStatus struct {
 	// value is the current value of the metric (as a quantity).
 	// +optional
 	Value *resource.Quantity `json:"value,omitempty" protobuf:"bytes,1,opt,name=value"`
+
 	// averageValue is the current value of the average of the
 	// metric across all relevant pods (as a quantity)
 	// +optional
 	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,2,opt,name=averageValue"`
-	// currentAverageUtilization is the current value of the average of the
+
+	// averageUtilization is the current value of the average of the
 	// resource metric across all relevant pods, represented as a percentage of
 	// the requested value of the resource for the pods.
 	// +optional

@@ -104,10 +104,7 @@ func (g *Cloud) DeleteTPU(ctx context.Context, name, zone string) error {
 		return err
 	}
 	err = getErrorFromTPUOp(op)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // GetTPU returns the Cloud TPU with the specified name in the specified zone.

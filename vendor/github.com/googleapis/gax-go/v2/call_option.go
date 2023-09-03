@@ -30,9 +30,11 @@
 package gax
 
 import (
+	"errors"
 	"math/rand"
 	"time"
 
+	"google.golang.org/api/googleapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -47,7 +49,7 @@ type CallOption interface {
 
 // Retryer is used by Invoke to determine retry behavior.
 type Retryer interface {
-	// Retry reports whether a request should be retriedand how long to pause before retrying
+	// Retry reports whether a request should be retried and how long to pause before retrying
 	// if the previous attempt returned with err. Invoke never calls Retry with nil error.
 	Retry(err error) (pause time.Duration, shouldRetry bool)
 }
@@ -61,6 +63,31 @@ func (o retryerOption) Resolve(s *CallSettings) {
 // WithRetry sets CallSettings.Retry to fn.
 func WithRetry(fn func() Retryer) CallOption {
 	return retryerOption(fn)
+}
+
+// OnErrorFunc returns a Retryer that retries if and only if the previous attempt
+// returns an error that satisfies shouldRetry.
+//
+// Pause times between retries are specified by bo. bo is only used for its
+// parameters; each Retryer has its own copy.
+func OnErrorFunc(bo Backoff, shouldRetry func(err error) bool) Retryer {
+	return &errorRetryer{
+		shouldRetry: shouldRetry,
+		backoff:     bo,
+	}
+}
+
+type errorRetryer struct {
+	backoff     Backoff
+	shouldRetry func(err error) bool
+}
+
+func (r *errorRetryer) Retry(err error) (time.Duration, bool) {
+	if r.shouldRetry(err) {
+		return r.backoff.Pause(), true
+	}
+
+	return 0, false
 }
 
 // OnCodes returns a Retryer that retries if and only if
@@ -94,22 +121,60 @@ func (r *boRetryer) Retry(err error) (time.Duration, bool) {
 	return 0, false
 }
 
-// Backoff implements exponential backoff.
-// The wait time between retries is a random value between 0 and the "retry envelope".
-// The envelope starts at Initial and increases by the factor of Multiplier every retry,
-// but is capped at Max.
+// OnHTTPCodes returns a Retryer that retries if and only if
+// the previous attempt returns a googleapi.Error whose status code is stored in
+// cc. Pause times between retries are specified by bo.
+//
+// bo is only used for its parameters; each Retryer has its own copy.
+func OnHTTPCodes(bo Backoff, cc ...int) Retryer {
+	codes := make(map[int]bool, len(cc))
+	for _, c := range cc {
+		codes[c] = true
+	}
+
+	return &httpRetryer{
+		backoff: bo,
+		codes:   codes,
+	}
+}
+
+type httpRetryer struct {
+	backoff Backoff
+	codes   map[int]bool
+}
+
+func (r *httpRetryer) Retry(err error) (time.Duration, bool) {
+	var gerr *googleapi.Error
+	if !errors.As(err, &gerr) {
+		return 0, false
+	}
+
+	if r.codes[gerr.Code] {
+		return r.backoff.Pause(), true
+	}
+
+	return 0, false
+}
+
+// Backoff implements exponential backoff. The wait time between retries is a
+// random value between 0 and the "retry period" - the time between retries. The
+// retry period starts at Initial and increases by the factor of Multiplier
+// every retry, but is capped at Max.
+//
+// Note: MaxNumRetries / RPCDeadline is specifically not provided. These should
+// be built on top of Backoff.
 type Backoff struct {
-	// Initial is the initial value of the retry envelope, defaults to 1 second.
+	// Initial is the initial value of the retry period, defaults to 1 second.
 	Initial time.Duration
 
-	// Max is the maximum value of the retry envelope, defaults to 30 seconds.
+	// Max is the maximum value of the retry period, defaults to 30 seconds.
 	Max time.Duration
 
-	// Multiplier is the factor by which the retry envelope increases.
+	// Multiplier is the factor by which the retry period increases.
 	// It should be greater than 1 and defaults to 2.
 	Multiplier float64
 
-	// cur is the current retry envelope
+	// cur is the current retry period.
 	cur time.Duration
 }
 
@@ -145,6 +210,21 @@ func (o grpcOpt) Resolve(s *CallSettings) {
 	s.GRPC = o
 }
 
+type pathOpt struct {
+	p string
+}
+
+func (p pathOpt) Resolve(s *CallSettings) {
+	s.Path = p.p
+}
+
+// WithPath applies a Path override to the HTTP-based APICall.
+//
+// This is for internal use only.
+func WithPath(p string) CallOption {
+	return &pathOpt{p: p}
+}
+
 // WithGRPCOptions allows passing gRPC call options during client creation.
 func WithGRPCOptions(opt ...grpc.CallOption) CallOption {
 	return grpcOpt(append([]grpc.CallOption(nil), opt...))
@@ -158,4 +238,7 @@ type CallSettings struct {
 
 	// CallOptions to be forwarded to GRPC.
 	GRPC []grpc.CallOption
+
+	// Path is an HTTP override for an APICall.
+	Path string
 }

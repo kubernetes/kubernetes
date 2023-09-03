@@ -26,11 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	allocatorstore "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -59,7 +56,7 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, ipallocator.Interfa
 	if err != nil {
 		t.Fatalf("unexpected error creating etcd: %v", err)
 	}
-	s, d, err := generic.NewRawStorage(configForAllocations, nil)
+	s, d, err := generic.NewRawStorage(configForAllocations, nil, nil, "")
 	if err != nil {
 		t.Fatalf("Couldn't create storage: %v", err)
 	}
@@ -121,8 +118,6 @@ func TestStore(t *testing.T) {
 }
 
 func TestAllocateReserved(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
-
 	_, storage, _, si, destroyFunc := newStorage(t)
 	defer destroyFunc()
 	if err := si.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
@@ -169,8 +164,6 @@ func TestAllocateReserved(t *testing.T) {
 }
 
 func TestAllocateReservedDynamicBlockExhausted(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
-
 	_, storage, _, si, destroyFunc := newStorage(t)
 	defer destroyFunc()
 	if err := si.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {

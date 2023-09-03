@@ -18,7 +18,7 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/tracing"
 	netutils "k8s.io/utils/net"
 )
 
@@ -156,6 +157,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/healthz/poststarthook/delegate-post-start-hook",
 		"/healthz/poststarthook/generic-apiserver-start-informers",
 		"/healthz/poststarthook/max-in-flight-filter",
+		"/healthz/poststarthook/storage-object-count-tracker-hook",
 		"/healthz/poststarthook/wrapping-post-start-hook",
 		"/healthz/wrapping-health",
 		"/livez",
@@ -165,8 +167,10 @@ func TestNewWithDelegate(t *testing.T) {
 		"/livez/poststarthook/delegate-post-start-hook",
 		"/livez/poststarthook/generic-apiserver-start-informers",
 		"/livez/poststarthook/max-in-flight-filter",
+		"/livez/poststarthook/storage-object-count-tracker-hook",
 		"/livez/poststarthook/wrapping-post-start-hook",
 		"/metrics",
+		"/metrics/slis",
 		"/readyz",
 		"/readyz/delegate-health",
 		"/readyz/informer-sync",
@@ -175,6 +179,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/readyz/poststarthook/delegate-post-start-hook",
 		"/readyz/poststarthook/generic-apiserver-start-informers",
 		"/readyz/poststarthook/max-in-flight-filter",
+		"/readyz/poststarthook/storage-object-count-tracker-hook",
 		"/readyz/poststarthook/wrapping-post-start-hook",
 		"/readyz/shutdown",
 	}
@@ -187,7 +192,7 @@ func TestNewWithDelegate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		data, _ := ioutil.ReadAll(resp.Body)
+		data, _ := io.ReadAll(resp.Body)
 		if http.StatusOK != resp.StatusCode {
 			t.Logf("got %d", resp.StatusCode)
 			t.Log(string(data))
@@ -203,6 +208,7 @@ func TestNewWithDelegate(t *testing.T) {
 [-]delegate-health failed: reason withheld
 [+]poststarthook/generic-apiserver-start-informers ok
 [+]poststarthook/max-in-flight-filter ok
+[+]poststarthook/storage-object-count-tracker-hook ok
 [+]poststarthook/delegate-post-start-hook ok
 [+]poststarthook/wrapping-post-start-hook ok
 healthz check failed
@@ -227,7 +233,7 @@ func checkPath(url string, expectedStatusCode int, expectedBody string, t *testi
 		dump, _ := httputil.DumpResponse(resp, true)
 		t.Log(string(dump))
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -250,7 +256,7 @@ func checkExpectedPathsAtRoot(url string, expectedPaths []string, t *testing.T) 
 		dump, _ := httputil.DumpResponse(resp, true)
 		t.Log(string(dump))
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -279,11 +285,6 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		// confirm that we can set an audit annotation in a handler before WithAudit
 		audit.AddAuditAnnotation(req.Context(), "pandas", "are awesome")
 
-		// confirm that trying to use the audit event directly would never work
-		if ae := audit.AuditEventFrom(req.Context()); ae != nil {
-			t.Errorf("expected nil audit event, got %v", ae)
-		}
-
 		return &authenticator.Response{User: &user.DefaultInfo{}}, true, nil
 	})
 	backend := &testBackend{}
@@ -293,16 +294,17 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		AuditPolicyRuleEvaluator: policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil),
 
 		// avoid nil panics
-		HandlerChainWaitGroup: &waitgroup.SafeWaitGroup{},
-		RequestInfoResolver:   &request.RequestInfoFactory{},
-		RequestTimeout:        10 * time.Second,
-		LongRunningFunc:       func(_ *http.Request, _ *request.RequestInfo) bool { return false },
-		lifecycleSignals:      newLifecycleSignals(),
+		NonLongRunningRequestWaitGroup: &waitgroup.SafeWaitGroup{},
+		RequestInfoResolver:            &request.RequestInfoFactory{},
+		RequestTimeout:                 10 * time.Second,
+		LongRunningFunc:                func(_ *http.Request, _ *request.RequestInfo) bool { return false },
+		lifecycleSignals:               newLifecycleSignals(),
+		TracerProvider:                 tracing.NewNoopTracerProvider(),
 	}
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// confirm this is a no-op
-		if r.Context() != audit.WithAuditAnnotations(r.Context()) {
+		if r.Context() != audit.WithAuditContext(r.Context()) {
 			t.Error("unexpected double wrapping of context")
 		}
 

@@ -44,6 +44,10 @@ type ResourceInfo struct {
 	// DirectlyDecodableVersions is a list of versions that the converter for REST storage knows how to convert.  This
 	// contains items like apiextensions.k8s.io/v1beta1 even if we don't serve that version.
 	DirectlyDecodableVersions []schema.GroupVersion
+
+	// ServedVersions holds a list of all versions of GroupResource that are served.  Note that a server may be able to
+	// decode a particular version, but still not serve it.
+	ServedVersions []string
 }
 
 // Manager records the resources whose StorageVersions need updates, and provides a method to update those StorageVersions.
@@ -64,7 +68,7 @@ var _ Manager = &defaultManager{}
 
 // defaultManager indicates if an apiserver has completed reporting its storage versions.
 type defaultManager struct {
-	completed atomic.Value
+	completed atomic.Bool
 
 	mu sync.RWMutex
 	// managedResourceInfos records the ResourceInfos whose StorageVersions will get updated in the next
@@ -143,7 +147,10 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 		if len(gr.Group) == 0 {
 			gr.Group = "core"
 		}
-		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, decodableVersions); err != nil {
+
+		servedVersions := r.ServedVersions
+
+		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
 			s.recordStatusFailure(&r, err)
 			hasFailure = true
@@ -268,7 +275,7 @@ func (s *defaultManager) setComplete() {
 
 // Completed returns if updating StorageVersions has completed.
 func (s *defaultManager) Completed() bool {
-	return s.completed.Load().(bool)
+	return s.completed.Load()
 }
 
 func decodableVersions(directlyDecodableVersions []schema.GroupVersion, e runtime.EquivalentResourceRegistry, gr schema.GroupResource) []string {

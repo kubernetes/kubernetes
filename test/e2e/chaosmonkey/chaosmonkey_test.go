@@ -17,27 +17,28 @@ limitations under the License.
 package chaosmonkey
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 )
 
 func TestDoWithPanic(t *testing.T) {
 	var counter int64
-	cm := New(func() {})
+	cm := New(func(ctx context.Context) {})
 	tests := []Test{
 		// No panic
-		func(sem *Semaphore) {
+		func(ctx context.Context, sem *Semaphore) {
 			defer atomic.AddInt64(&counter, 1)
 			sem.Ready()
 		},
 		// Panic after sem.Ready()
-		func(sem *Semaphore) {
+		func(ctx context.Context, sem *Semaphore) {
 			defer atomic.AddInt64(&counter, 1)
 			sem.Ready()
 			panic("Panic after calling sem.Ready()")
 		},
 		// Panic before sem.Ready()
-		func(sem *Semaphore) {
+		func(ctx context.Context, sem *Semaphore) {
 			defer atomic.AddInt64(&counter, 1)
 			panic("Panic before calling sem.Ready()")
 		},
@@ -45,7 +46,7 @@ func TestDoWithPanic(t *testing.T) {
 	for _, test := range tests {
 		cm.Register(test)
 	}
-	cm.Do()
+	cm.Do(context.Background())
 	// Check that all funcs in tests were called.
 	if int(counter) != len(tests) {
 		t.Errorf("Expected counter to be %v, but it was %v", len(tests), counter)

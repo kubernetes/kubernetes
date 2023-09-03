@@ -23,14 +23,33 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TestWipeObjectMetaSystemFields validates that system populated fields are set on an object
+func TestWipeObjectMetaSystemFields(t *testing.T) {
+	resource := metav1.ObjectMeta{}
+	WipeObjectMetaSystemFields(&resource)
+	if !resource.CreationTimestamp.Time.IsZero() {
+		t.Errorf("resource.CreationTimestamp is set")
+	}
+	if len(resource.UID) != 0 {
+		t.Errorf("resource.UID is set")
+	}
+	if resource.DeletionTimestamp != nil {
+		t.Errorf("resource.DeletionTimestamp is set")
+	}
+	if resource.DeletionGracePeriodSeconds != nil {
+		t.Errorf("resource.DeletionGracePeriodSeconds is set")
+	}
+	if len(resource.SelfLink) != 0 {
+		t.Errorf("resource.SelfLink is set")
+	}
+}
+
 // TestFillObjectMetaSystemFields validates that system populated fields are set on an object
 func TestFillObjectMetaSystemFields(t *testing.T) {
 	resource := metav1.ObjectMeta{}
 	FillObjectMetaSystemFields(&resource)
 	if resource.CreationTimestamp.Time.IsZero() {
 		t.Errorf("resource.CreationTimestamp is zero")
-	} else if len(resource.UID) == 0 {
-		t.Errorf("resource.UID missing")
 	}
 	if len(resource.UID) == 0 {
 		t.Errorf("resource.UID missing")

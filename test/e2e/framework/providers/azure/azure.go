@@ -46,12 +46,15 @@ func newProvider() (framework.ProviderInterface, error) {
 		defer config.Close()
 	}
 	azureCloud, err := azure.NewCloud(config)
+	if err != nil {
+		return nil, err
+	}
 	return &Provider{
 		azureCloud: azureCloud.(*azure.Cloud),
-	}, err
+	}, nil
 }
 
-//Provider is a structure to handle Azure clouds for e2e testing
+// Provider is a structure to handle Azure clouds for e2e testing
 type Provider struct {
 	framework.NullProvider
 

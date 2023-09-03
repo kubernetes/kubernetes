@@ -17,11 +17,12 @@ limitations under the License.
 package plugin
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 	"time"
+
+	utiltesting "k8s.io/client-go/util/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -230,6 +231,52 @@ providers:
 			},
 		},
 		{
+			name: "v1 config with multiple providers",
+			configData: `---
+kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+  - name: test1
+    matchImages:
+    - "registry.io/one"
+    defaultCacheDuration: 10m
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+  - name: test2
+    matchImages:
+    - "registry.io/two"
+    defaultCacheDuration: 10m
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+    args:
+    - --v=5
+    env:
+    - name: FOO
+      value: BAR`,
+
+			config: &kubeletconfig.CredentialProviderConfig{
+				Providers: []kubeletconfig.CredentialProvider{
+					{
+						Name:                 "test1",
+						MatchImages:          []string{"registry.io/one"},
+						DefaultCacheDuration: &metav1.Duration{Duration: 10 * time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
+					},
+					{
+						Name:                 "test2",
+						MatchImages:          []string{"registry.io/two"},
+						DefaultCacheDuration: &metav1.Duration{Duration: 10 * time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
+						Args:                 []string{"--v=5"},
+						Env: []kubeletconfig.ExecEnvVar{
+							{
+								Name:  "FOO",
+								Value: "BAR",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "config with wrong Kind",
 			configData: `---
 kind: WrongKind
@@ -271,11 +318,11 @@ providers:
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			file, err := ioutil.TempFile("", "config.yaml")
+			file, err := os.CreateTemp("", "config.yaml")
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer os.Remove(file.Name())
+			defer utiltesting.CloseAndRemove(t, file)
 
 			_, err = file.WriteString(testcase.configData)
 			if err != nil {

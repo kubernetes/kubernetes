@@ -77,7 +77,9 @@ const (
 	//   is a boolean false or has an invalid boolean representation
 	//   (if the cluster operator sets it to 'false' it will be stomped)
 	// - any changes to the spec made by the cluster operator will be
-	//   stomped.
+	//   stomped, except for changes to the `nominalConcurrencyShares`
+	//   and `lendablePercent` fields of the PriorityLevelConfiguration
+	//   named "exempt".
 	//
 	// The kube-apiserver will apply updates on the suggested configuration if:
 	// - the cluster operator has enabled auto-update by setting the annotation
@@ -105,6 +107,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.23
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta3,FlowSchema
 
 // FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with
 // similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
@@ -126,6 +129,7 @@ type FlowSchema struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.23
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta3,FlowSchemaList
 
 // FlowSchemaList is a list of FlowSchema objects.
 type FlowSchemaList struct {
@@ -380,6 +384,7 @@ type FlowSchemaConditionType string
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.23
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta3,PriorityLevelConfiguration
 
 // PriorityLevelConfiguration represents the configuration of a priority level.
 type PriorityLevelConfiguration struct {
@@ -400,6 +405,7 @@ type PriorityLevelConfiguration struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.23
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta3,PriorityLevelConfigurationList
 
 // PriorityLevelConfigurationList is a list of PriorityLevelConfiguration objects.
 type PriorityLevelConfigurationList struct {
@@ -431,6 +437,14 @@ type PriorityLevelConfigurationSpec struct {
 	// This field must be non-empty if and only if `type` is `"Limited"`.
 	// +optional
 	Limited *LimitedPriorityLevelConfiguration `json:"limited,omitempty" protobuf:"bytes,2,opt,name=limited"`
+
+	// `exempt` specifies how requests are handled for an exempt priority level.
+	// This field MUST be empty if `type` is `"Limited"`.
+	// This field MAY be non-empty if `type` is `"Exempt"`.
+	// If empty and `type` is `"Exempt"` then the default values
+	// for `ExemptPriorityLevelConfiguration` apply.
+	// +optional
+	Exempt *ExemptPriorityLevelConfiguration `json:"exempt,omitempty" protobuf:"bytes,3,opt,name=exempt"`
 }
 
 // PriorityLevelEnablement indicates whether limits on execution are enabled for the priority level
@@ -447,8 +461,8 @@ const (
 
 // LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits.
 // It addresses two issues:
-//  * How are requests for this priority level limited?
-//  * What should be done with requests that exceed the limit?
+//   - How are requests for this priority level limited?
+//   - What should be done with requests that exceed the limit?
 type LimitedPriorityLevelConfiguration struct {
 	// `assuredConcurrencyShares` (ACS) configures the execution
 	// limit, which is a limit on the number of requests of this
@@ -470,6 +484,72 @@ type LimitedPriorityLevelConfiguration struct {
 
 	// `limitResponse` indicates what to do with requests that can not be executed right now
 	LimitResponse LimitResponse `json:"limitResponse,omitempty" protobuf:"bytes,2,opt,name=limitResponse"`
+
+	// `lendablePercent` prescribes the fraction of the level's NominalCL that
+	// can be borrowed by other priority levels. The value of this
+	// field must be between 0 and 100, inclusive, and it defaults to 0.
+	// The number of seats that other levels can borrow from this level, known
+	// as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.
+	//
+	// LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
+	//
+	// +optional
+	LendablePercent *int32 `json:"lendablePercent,omitempty" protobuf:"varint,3,opt,name=lendablePercent"`
+
+	// `borrowingLimitPercent`, if present, configures a limit on how many
+	// seats this priority level can borrow from other priority levels.
+	// The limit is known as this level's BorrowingConcurrencyLimit
+	// (BorrowingCL) and is a limit on the total number of seats that this
+	// level may borrow at any one time.
+	// This field holds the ratio of that limit to the level's nominal
+	// concurrency limit. When this field is non-nil, it must hold a
+	// non-negative integer and the limit is calculated as follows.
+	//
+	// BorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )
+	//
+	// The value of this field can be more than 100, implying that this
+	// priority level can borrow a number of seats that is greater than
+	// its own nominal concurrency limit (NominalCL).
+	// When this field is left `nil`, the limit is effectively infinite.
+	// +optional
+	BorrowingLimitPercent *int32 `json:"borrowingLimitPercent,omitempty" protobuf:"varint,4,opt,name=borrowingLimitPercent"`
+}
+
+// ExemptPriorityLevelConfiguration describes the configurable aspects
+// of the handling of exempt requests.
+// In the mandatory exempt configuration object the values in the fields
+// here can be modified by authorized users, unlike the rest of the `spec`.
+type ExemptPriorityLevelConfiguration struct {
+	// `nominalConcurrencyShares` (NCS) contributes to the computation of the
+	// NominalConcurrencyLimit (NominalCL) of this level.
+	// This is the number of execution seats nominally reserved for this priority level.
+	// This DOES NOT limit the dispatching from this priority level
+	// but affects the other priority levels through the borrowing mechanism.
+	// The server's concurrency limit (ServerCL) is divided among all the
+	// priority levels in proportion to their NCS values:
+	//
+	// NominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs )
+	// sum_ncs = sum[priority level k] NCS(k)
+	//
+	// Bigger numbers mean a larger nominal concurrency limit,
+	// at the expense of every other priority level.
+	// This field has a default value of zero.
+	// +optional
+	NominalConcurrencyShares *int32 `json:"nominalConcurrencyShares,omitempty" protobuf:"varint,1,opt,name=nominalConcurrencyShares"`
+	// `lendablePercent` prescribes the fraction of the level's NominalCL that
+	// can be borrowed by other priority levels.  This value of this
+	// field must be between 0 and 100, inclusive, and it defaults to 0.
+	// The number of seats that other levels can borrow from this level, known
+	// as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.
+	//
+	// LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
+	//
+	// +optional
+	LendablePercent *int32 `json:"lendablePercent,omitempty" protobuf:"varint,2,opt,name=lendablePercent"`
+	// The `BorrowingCL` of an Exempt priority level is implicitly `ServerCL`.
+	// In other words, an exempt priority level
+	// has no meaningful limit on how much it borrows.
+	// There is no explicit representation of that here.
 }
 
 // LimitResponse defines how to handle requests that can not be executed right now.

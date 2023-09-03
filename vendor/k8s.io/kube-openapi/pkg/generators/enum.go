@@ -55,6 +55,10 @@ func newEnumContext(c *generator.Context) *enumContext {
 // If the given type is a known enum type, returns the enumType, true
 // Otherwise, returns nil, false
 func (ec *enumContext) EnumType(t *types.Type) (enum *enumType, isEnum bool) {
+	// if t is a pointer, use its underlying type instead
+	if t.Kind == types.Pointer {
+		t = t.Elem
+	}
 	enum, ok := ec.enumTypes[t.Name]
 	return enum, ok
 }
@@ -74,9 +78,12 @@ func (et *enumType) ValueStrings() []string {
 // DescriptionLines returns a description of the enum in this format:
 //
 // Possible enum values:
-//  - `"value1"` description 1
-//  - `"value2"` description 2
+//   - `"value1"` description 1
+//   - `"value2"` description 2
 func (et *enumType) DescriptionLines() []string {
+	if len(et.Values) == 0 {
+		return nil
+	}
 	var lines []string
 	for _, value := range et.Values {
 		lines = append(lines, value.Description())
@@ -90,9 +97,9 @@ func parseEnums(c *generator.Context) enumMap {
 	// First, find the builtin "string" type
 	stringType := c.Universe.Type(types.Name{Name: "string"})
 
+	// find all enum types.
 	enumTypes := make(enumMap)
 	for _, p := range c.Universe {
-		// find all enum types.
 		for _, t := range p.Types {
 			if isEnumType(stringType, t) {
 				if _, ok := enumTypes[t.Name]; !ok {
@@ -102,7 +109,10 @@ func parseEnums(c *generator.Context) enumMap {
 				}
 			}
 		}
-		// find all enum values from constants, and try to match each with its type.
+	}
+
+	// find all enum values from constants, and try to match each with its type.
+	for _, p := range c.Universe {
 		for _, c := range p.Constants {
 			enumType := c.Underlying
 			if _, ok := enumTypes[enumType.Name]; ok {
@@ -125,7 +135,7 @@ func (et *enumType) appendValue(value *enumValue) {
 
 // Description returns the description line for the enumValue
 // with the format:
-//  - `"FooValue"` is the Foo value
+//   - `"FooValue"` is the Foo value
 func (ev *enumValue) Description() string {
 	comment := strings.TrimSpace(ev.Comment)
 	// The comment should starts with the type name, trim it first.

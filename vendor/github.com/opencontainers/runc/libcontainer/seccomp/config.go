@@ -29,13 +29,15 @@ func KnownOperators() []string {
 }
 
 var actions = map[string]configs.Action{
-	"SCMP_ACT_KILL":   configs.Kill,
-	"SCMP_ACT_ERRNO":  configs.Errno,
-	"SCMP_ACT_TRAP":   configs.Trap,
-	"SCMP_ACT_ALLOW":  configs.Allow,
-	"SCMP_ACT_TRACE":  configs.Trace,
-	"SCMP_ACT_LOG":    configs.Log,
-	"SCMP_ACT_NOTIFY": configs.Notify,
+	"SCMP_ACT_KILL":         configs.Kill,
+	"SCMP_ACT_ERRNO":        configs.Errno,
+	"SCMP_ACT_TRAP":         configs.Trap,
+	"SCMP_ACT_ALLOW":        configs.Allow,
+	"SCMP_ACT_TRACE":        configs.Trace,
+	"SCMP_ACT_LOG":          configs.Log,
+	"SCMP_ACT_NOTIFY":       configs.Notify,
+	"SCMP_ACT_KILL_THREAD":  configs.KillThread,
+	"SCMP_ACT_KILL_PROCESS": configs.KillProcess,
 }
 
 // KnownActions returns the list of the known actions.
@@ -64,6 +66,7 @@ var archs = map[string]string{
 	"SCMP_ARCH_PPC":         "ppc",
 	"SCMP_ARCH_PPC64":       "ppc64",
 	"SCMP_ARCH_PPC64LE":     "ppc64le",
+	"SCMP_ARCH_RISCV64":     "riscv64",
 	"SCMP_ARCH_S390":        "s390",
 	"SCMP_ARCH_S390X":       "s390x",
 }

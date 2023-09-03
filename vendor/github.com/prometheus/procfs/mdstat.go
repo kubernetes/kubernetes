@@ -15,7 +15,7 @@ package procfs
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -64,7 +64,7 @@ type MDStat struct {
 // structs containing the relevant info.  More information available here:
 // https://raid.wiki.kernel.org/index.php/Mdstat
 func (fs FS) MDStat() ([]MDStat, error) {
-	data, err := ioutil.ReadFile(fs.proc.Path("mdstat"))
+	data, err := os.ReadFile(fs.proc.Path("mdstat"))
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +166,12 @@ func parseMDStat(mdStatData []byte) ([]MDStat, error) {
 }
 
 func evalStatusLine(deviceLine, statusLine string) (active, total, down, size int64, err error) {
+	statusFields := strings.Fields(statusLine)
+	if len(statusFields) < 1 {
+		return 0, 0, 0, 0, fmt.Errorf("unexpected statusLine %q", statusLine)
+	}
 
-	sizeStr := strings.Fields(statusLine)[0]
+	sizeStr := statusFields[0]
 	size, err = strconv.ParseInt(sizeStr, 10, 64)
 	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("unexpected statusLine %q: %w", statusLine, err)

@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -294,8 +293,8 @@ func TestCreateConfigMap(t *testing.T) {
 		"create_get_env_from_env_file_configmap": {
 			configMapName: "get_env",
 			setup: func() func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
-				os.Setenv("g_key1", "1")
-				os.Setenv("g_key2", "2")
+				t.Setenv("g_key1", "1")
+				t.Setenv("g_key2", "2")
 				return setupEnvFile([][]string{{"g_key1", "g_key2="}})
 			}(),
 			fromEnvFile: []string{"file.env"},
@@ -317,8 +316,8 @@ func TestCreateConfigMap(t *testing.T) {
 		"create_get_env_from_env_file_hash_configmap": {
 			configMapName: "get_env",
 			setup: func() func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
-				os.Setenv("g_key1", "1")
-				os.Setenv("g_key2", "2")
+				t.Setenv("g_key1", "1")
+				t.Setenv("g_key2", "2")
 				return setupEnvFile([][]string{{"g_key1", "g_key2="}})
 			}(),
 			fromEnvFile: []string{"file.env"},
@@ -465,7 +464,7 @@ func setupEnvFile(lines [][]string) func(*testing.T, *ConfigMapOptions) func() {
 		files := []*os.File{}
 		filenames := configMapOptions.EnvFileSources
 		for _, filename := range filenames {
-			file, err := ioutil.TempFile("", filename)
+			file, err := os.CreateTemp("", filename)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -489,11 +488,11 @@ func setupEnvFile(lines [][]string) func(*testing.T, *ConfigMapOptions) func() {
 
 func setupBinaryFile(data []byte) func(*testing.T, *ConfigMapOptions) func() {
 	return func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
-		tmp, _ := ioutil.TempDir("", "")
+		tmp, _ := os.MkdirTemp("", "")
 		files := configMapOptions.FileSources
 		for i, file := range files {
 			f := tmp + "/" + file
-			ioutil.WriteFile(f, data, 0644)
+			os.WriteFile(f, data, 0644)
 			configMapOptions.FileSources[i] = f
 		}
 		return func() {

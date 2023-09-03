@@ -67,8 +67,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 func (plugin *portworxVolumePlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
 }
 
 func (plugin *portworxVolumePlugin) Init(host volume.VolumeHost) error {
@@ -161,7 +160,7 @@ func (plugin *portworxVolumePlugin) newUnmounterInternal(volName string, podUID 
 		}}, nil
 }
 
-func (plugin *portworxVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *portworxVolumePlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterInternal(spec, plugin.util)
 }
 
@@ -179,7 +178,7 @@ func (plugin *portworxVolumePlugin) newDeleterInternal(spec *volume.Spec, manage
 		}}, nil
 }
 
-func (plugin *portworxVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *portworxVolumePlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	return plugin.newProvisionerInternal(options, plugin.util)
 }
 
@@ -211,7 +210,7 @@ func (plugin *portworxVolumePlugin) ExpandVolumeDevice(
 	return newSize, nil
 }
 
-func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	portworxVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -220,7 +219,9 @@ func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath st
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(portworxVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(portworxVolume),
+	}, nil
 }
 
 func (plugin *portworxVolumePlugin) SupportsMountOption() bool {
@@ -229,6 +230,10 @@ func (plugin *portworxVolumePlugin) SupportsMountOption() bool {
 
 func (plugin *portworxVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
+}
+
+func (plugin *portworxVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
 }
 
 func getVolumeSource(
@@ -330,7 +335,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterAr
 		return err
 	}
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
+		volume.SetVolumeOwnership(b, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 	klog.Infof("Portworx Volume %s setup at %s", b.volumeID, dir)
 	return nil

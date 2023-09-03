@@ -49,14 +49,15 @@ func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 }
 
 // ValidatePriorityClassUpdate tests if required fields in the PriorityClass are
-// set and are valid. PriorityClass does not allow updating Name, and Value.
+// set and are valid. PriorityClass does not allow updating name, value, and preemptionPolicy.
 func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.ErrorList {
+	// name is immutable and is checked by the ObjectMeta validator.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&pc.ObjectMeta, &oldPc.ObjectMeta, field.NewPath("metadata"))
-	// Name is immutable and is checked by the ObjectMeta validator.
+	// value is immutable.
 	if pc.Value != oldPc.Value {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("Value"), "may not be changed in an update."))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("value"), "may not be changed in an update."))
 	}
-	// PreemptionPolicy is immutable and is checked by the ObjectMeta validator.
+	// preemptionPolicy is immutable.
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
 	return allErrs
 }

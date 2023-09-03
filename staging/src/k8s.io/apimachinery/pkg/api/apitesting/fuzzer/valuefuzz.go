@@ -40,7 +40,7 @@ func valueFuzz(obj reflect.Value) {
 				valueFuzz(obj.Index(i))
 			}
 		}
-	case reflect.Interface, reflect.Ptr:
+	case reflect.Interface, reflect.Pointer:
 		if obj.IsNil() {
 			// TODO: set non-nil value
 		} else {

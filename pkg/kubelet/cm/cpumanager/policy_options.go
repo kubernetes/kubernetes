@@ -23,16 +23,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
+// Names of the options, as part of the user interface.
 const (
 	FullPCPUsOnlyOption            string = "full-pcpus-only"
 	DistributeCPUsAcrossNUMAOption string = "distribute-cpus-across-numa"
+	AlignBySocketOption            string = "align-by-socket"
 )
 
 var (
 	alphaOptions = sets.NewString(
 		DistributeCPUsAcrossNUMAOption,
+		AlignBySocketOption,
 	)
 	betaOptions = sets.NewString(
 		FullPCPUsOnlyOption,
@@ -40,6 +45,8 @@ var (
 	stableOptions = sets.NewString()
 )
 
+// CheckPolicyOptionAvailable verifies if the given option can be used depending on the Feature Gate Settings.
+// returns nil on success, or an error describing the failure on error.
 func CheckPolicyOptionAvailable(option string) error {
 	if !alphaOptions.Has(option) && !betaOptions.Has(option) && !stableOptions.Has(option) {
 		return fmt.Errorf("unknown CPU Manager Policy option: %q", option)
@@ -56,6 +63,7 @@ func CheckPolicyOptionAvailable(option string) error {
 	return nil
 }
 
+// StaticPolicyOptions holds the parsed value of the policy options, ready to be consumed internally.
 type StaticPolicyOptions struct {
 	// flag to enable extra allocation restrictions to avoid
 	// different containers to possibly end up on the same core.
@@ -69,8 +77,12 @@ type StaticPolicyOptions struct {
 	// Flag to evenly distribute CPUs across NUMA nodes in cases where more
 	// than one NUMA node is required to satisfy the allocation.
 	DistributeCPUsAcrossNUMA bool
+	// Flag to ensure CPUs are considered aligned at socket boundary rather than
+	// NUMA boundary
+	AlignBySocket bool
 }
 
+// NewStaticPolicyOptions creates a StaticPolicyOptions struct from the user configuration.
 func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOptions, error) {
 	opts := StaticPolicyOptions{}
 	for name, value := range policyOptions {
@@ -91,6 +103,12 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.DistributeCPUsAcrossNUMA = optValue
+		case AlignBySocketOption:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.AlignBySocket = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
@@ -98,4 +116,19 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 		}
 	}
 	return opts, nil
+}
+
+// ValidateStaticPolicyOptions ensures that the requested policy options are compatible with the machine on which the CPUManager is running.
+func ValidateStaticPolicyOptions(opts StaticPolicyOptions, topology *topology.CPUTopology, topologyManager topologymanager.Store) error {
+	if opts.AlignBySocket {
+		// Not compatible with topology manager single-numa-node policy option.
+		if topologyManager.GetPolicy().Name() == topologymanager.PolicySingleNumaNode {
+			return fmt.Errorf("Topolgy manager %s policy is incompatible with CPUManager %s policy option", topologymanager.PolicySingleNumaNode, AlignBySocketOption)
+		}
+		// Not compatible with topology when number of sockets are more than number of NUMA nodes.
+		if topology.NumSockets > topology.NumNUMANodes {
+			return fmt.Errorf("Align by socket is not compatible with hardware where number of sockets are more than number of NUMA")
+		}
+	}
+	return nil
 }

@@ -18,18 +18,18 @@ package framework_test
 
 import (
 	"errors"
-	"regexp"
-	"sort"
-	"strings"
+	"os"
+	"path"
 	"testing"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/reporters"
-	"github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/internal/output"
 )
 
 // The line number of the following code is checked in TestFailureOutput below.
@@ -37,19 +37,20 @@ import (
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
 //
-//
-//
-//
-//
+// This must be line #39.
 
-func runTests(t *testing.T, reporter ginkgo.Reporter) {
-	// This source code line will be part of the stack dump comparison.
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Logging Suite", []ginkgo.Reporter{reporter})
+// This is included in a stack backtrace.
+func failHelper(msg string) {
+	framework.Fail(msg)
 }
 
 var _ = ginkgo.Describe("log", func() {
 	ginkgo.BeforeEach(func() {
 		framework.Logf("before")
+	})
+	ginkgo.AfterEach(func() {
+		framework.Logf("after")
+		framework.ExpectEqual(true, false, "true is never false either")
 	})
 	ginkgo.It("fails", func() {
 		func() {
@@ -66,219 +67,249 @@ var _ = ginkgo.Describe("log", func() {
 	ginkgo.It("equal", func() {
 		framework.ExpectEqual(0, 1, "of course it's not equal...")
 	})
-	ginkgo.AfterEach(func() {
-		framework.Logf("after")
-		framework.ExpectEqual(true, false, "true is never false either")
+	ginkgo.It("fails with helper", func() {
+		failHelper("I'm failing with helper.")
+	})
+	ginkgo.It("redirects klog", func() {
+		klog.Info("hello world")
+		klog.Error(nil, "not really an error")
 	})
 })
 
 func TestFailureOutput(t *testing.T) {
-	// Run the Ginkgo suite with output collected by a custom
-	// reporter in adddition to the default one. To see what the full
-	// Ginkgo report looks like, run this test with "go test -v".
-	config.DefaultReporterConfig.FullTrace = true
-	gomega.RegisterFailHandler(framework.Fail)
-	fakeT := &testing.T{}
-	reporter := reporters.NewFakeReporter()
-	runTests(fakeT, reporter)
+	expected := output.TestResult{
+		Suite: reporters.JUnitTestSuite{
+			Tests:    6,
+			Failures: 6,
+			Errors:   0,
+			Disabled: 0,
+			Skipped:  0,
 
-	// Now check the output.
-	actual := normalizeReport(*reporter)
+			TestCases: []reporters.JUnitTestCase{
+				{
+					Name:   "[It] log fails",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] I'm failing.
+In [It] at: log_test.go:57 <time>
 
-	// output from AfterEach
-	commonOutput := `
-
-INFO: after
-FAIL: true is never false either
-Expected
-    <bool>: true
-to equal
-    <bool>: false
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
-	log_test.go:71
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-
-`
-
-	// Sorted by name!
-	expected := suiteResults{
-		testResult{
-			name: "[Top Level] log asserts",
-			output: `INFO: before
-FAIL: false is never true
-Expected
-    <bool>: false
-to equal
-    <bool>: true
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
-	log_test.go:60
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
-			failure: `false is never true
-Expected
-    <bool>: false
-to equal
-    <bool>: true`,
-			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
-	log_test.go:60
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
+There were additional failures detected after the initial failure. These are visible in the timeline
 `,
-		},
-		testResult{
-			name: "[Top Level] log equal",
-			output: `INFO: before
-FAIL: of course it's not equal...
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] fails - log_test.go:55 <time>
+[FAILED] I'm failing.
+In [It] at: log_test.go:57 <time>
+< Exit [It] fails - log_test.go:55 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+				{
+					Name:   "[It] log asserts",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] false is never true
+Expected
+    <bool>: false
+to equal
+    <bool>: true
+In [It] at: log_test.go:61 <time>
+
+There were additional failures detected after the initial failure. These are visible in the timeline
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] asserts - log_test.go:60 <time>
+[FAILED] false is never true
+Expected
+    <bool>: false
+to equal
+    <bool>: true
+In [It] at: log_test.go:61 <time>
+< Exit [It] asserts - log_test.go:60 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+				{
+					Name:   "[It] log error",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] hard-coded error: an error with a long, useless description
+In [It] at: log_test.go:65 <time>
+
+There were additional failures detected after the initial failure. These are visible in the timeline
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] error - log_test.go:63 <time>
+INFO: Unexpected error: hard-coded error: 
+    <*errors.errorString>: 
+    an error with a long, useless description
+    {
+        s: "an error with a long, useless description",
+    }
+[FAILED] hard-coded error: an error with a long, useless description
+In [It] at: log_test.go:65 <time>
+< Exit [It] error - log_test.go:63 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+				{
+					Name:   "[It] log equal",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] of course it's not equal...
 Expected
     <int>: 0
 to equal
     <int>: 1
+In [It] at: log_test.go:68 <time>
 
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
-	log_test.go:67
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
-			failure: `of course it's not equal...
+There were additional failures detected after the initial failure. These are visible in the timeline
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] equal - log_test.go:67 <time>
+[FAILED] of course it's not equal...
 Expected
     <int>: 0
 to equal
-    <int>: 1`,
-			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
-	log_test.go:67
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
+    <int>: 1
+In [It] at: log_test.go:68 <time>
+< Exit [It] equal - log_test.go:67 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
 `,
-		},
-		testResult{
-			name: "[Top Level] log error",
-			output: `INFO: before
-FAIL: hard-coded error
-Unexpected error:
-    <*errors.errorString>: {
-        s: "an error with a long, useless description",
-    }
-    an error with a long, useless description
-occurred
+				},
+				{
+					Name:   "[It] log fails with helper",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] I'm failing with helper.
+In [It] at: log_test.go:44 <time>
 
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
-	log_test.go:64
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
-			failure: `hard-coded error
-Unexpected error:
-    <*errors.errorString>: {
-        s: "an error with a long, useless description",
-    }
-    an error with a long, useless description
-occurred`,
-			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
-	log_test.go:64
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
+There were additional failures detected after the initial failure. These are visible in the timeline
 `,
-		},
-		testResult{
-			name: "[Top Level] log fails",
-			output: `INFO: before
-FAIL: I'm failing.
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
-	log_test.go:57
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
-			failure: "I'm failing.",
-			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
-	log_test.go:57
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] fails with helper - log_test.go:70 <time>
+[FAILED] I'm failing with helper.
+In [It] at: log_test.go:44 <time>
+< Exit [It] fails with helper - log_test.go:70 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
 `,
+				},
+				{
+					Name:   "[It] log redirects klog",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] redirects klog - log_test.go:73 <time>
+<klog> log_test.go:74] hello world
+<klog> log_test.go:75] <nil>not really an error
+< Exit [It] redirects klog - log_test.go:73 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+			},
 		},
 	}
-	// assert.Equal prints a useful diff if the slices are not
-	// equal. However, the diff does not show changes inside the
-	// strings. Therefore we also compare the individual fields.
-	if !assert.Equal(t, expected, actual) {
-		for i := 0; i < len(expected) && i < len(actual); i++ {
-			assert.Equal(t, expected[i].output, actual[i].output, "output from test #%d: %s", i, expected[i].name)
-			assert.Equal(t, expected[i].stack, actual[i].stack, "stack from test #%d: %s", i, expected[i].name)
-		}
-	}
-}
 
-type testResult struct {
-	name string
-	// output written to GinkgoWriter during test.
-	output string
-	// failure is SpecSummary.Failure.Message with varying parts stripped.
-	failure string
-	// stack is a normalized version (just file names, function parametes stripped) of
-	// Ginkgo's FullStackTrace of a failure. Empty if no failure.
-	stack string
-}
+	// Simulate the test setup as in a normal e2e test which uses the
+	// framework, but remember to restore klog settings when we are done.
+	state := klog.CaptureState()
+	defer state.Restore()
+	var testContext framework.TestContextType
+	framework.AfterReadingAllFlags(&testContext)
 
-type suiteResults []testResult
+	oldStderr := os.Stderr
+	tmp := t.TempDir()
+	filename := path.Join(tmp, "stderr.log")
+	f, err := os.Create(filename)
+	require.NoError(t, err, "create temporary file")
+	os.Stderr = f
+	defer func() {
+		os.Stderr = oldStderr
 
-func normalizeReport(report reporters.FakeReporter) suiteResults {
-	var results suiteResults
-	for _, spec := range report.SpecSummaries {
-		results = append(results, testResult{
-			name:    strings.Join(spec.ComponentTexts, " "),
-			output:  normalizeLocation(stripAddresses(stripTimes(spec.CapturedOutput))),
-			failure: stripAddresses(stripTimes(spec.Failure.Message)),
-			stack:   normalizeLocation(spec.Failure.Location.FullStackTrace),
-		})
-	}
-	sort.Slice(results, func(i, j int) bool {
-		return strings.Compare(results[i].name, results[j].name) < 0
-	})
-	return results
-}
+		err := f.Close()
+		require.NoError(t, err, "close temporary file")
+		actual, err := os.ReadFile(filename)
+		require.NoError(t, err, "read temporary file")
+		assert.Empty(t, string(actual), "no output on stderr")
+	}()
 
-// timePrefix matches "Jul 17 08:08:25.950: " at the beginning of each line.
-var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}.[[:digit:]]{3}: `)
-
-func stripTimes(in string) string {
-	return timePrefix.ReplaceAllString(in, "")
-}
-
-// instanceAddr matches " | 0xc0003dec60>"
-var instanceAddr = regexp.MustCompile(` \| 0x[0-9a-fA-F]+>`)
-
-func stripAddresses(in string) string {
-	return instanceAddr.ReplaceAllString(in, ">")
-}
-
-// stackLocation matches "<some path>/<file>.go:75 +0x1f1" after a slash (built
-// locally) or one of a few relative paths (built in the Kubernetes CI).
-var stackLocation = regexp.MustCompile(`(?:/|vendor/|test/|GOROOT/).*/([[:^space:]]+.go:[[:digit:]]+)( \+0x[0-9a-fA-F]+)?`)
-
-// functionArgs matches "<function name>(...)".
-var functionArgs = regexp.MustCompile(`([[:alpha:]]+)\(.*\)`)
-
-// testFailureOutput matches TestFailureOutput() and its source followed by additional stack entries:
-//
-// k8s.io/kubernetes/test/e2e/framework_test.TestFailureOutput(0xc000558800)
-//	/nvme/gopath/src/k8s.io/kubernetes/test/e2e/framework/log/log_test.go:73 +0x1c9
-// testing.tRunner(0xc000558800, 0x1af2848)
-// 	/nvme/gopath/go/src/testing/testing.go:865 +0xc0
-// created by testing.(*T).Run
-//	/nvme/gopath/go/src/testing/testing.go:916 +0x35a
-var testFailureOutput = regexp.MustCompile(`(?m)^k8s.io/kubernetes/test/e2e/framework_test\.TestFailureOutput\(.*\n\t.*(\n.*\n\t.*)*`)
-
-// normalizeLocation removes path prefix and function parameters and certain stack entries
-// that we don't care about.
-func normalizeLocation(in string) string {
-	out := in
-	out = stackLocation.ReplaceAllString(out, "$1")
-	out = functionArgs.ReplaceAllString(out, "$1()")
-	out = testFailureOutput.ReplaceAllString(out, "")
-	return out
+	output.TestGinkgoOutput(t, expected)
 }

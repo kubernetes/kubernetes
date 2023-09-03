@@ -24,9 +24,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/pod-security-admission/api"
@@ -40,13 +40,11 @@ const updateEnvVar = "UPDATE_POD_SECURITY_FIXTURE_DATA"
 // and that in-memory fixtures match serialized fixtures in testdata.
 // When adding new versions or checks, serialized fixtures can be updated by running:
 //
-//     UPDATE_POD_SECURITY_FIXTURE_DATA=true go test k8s.io/pod-security-admission/test
+//	UPDATE_POD_SECURITY_FIXTURE_DATA=true go test k8s.io/pod-security-admission/test
 func TestFixtures(t *testing.T) {
 	expectedFiles := sets.NewString("testdata/README.md")
 
 	defaultChecks := policy.DefaultChecks()
-
-	const newestMinorVersionToTest = 23
 
 	policyVersions := computeVersionsToTest(t, defaultChecks)
 	newestMinorVersionWithPolicyChanges := policyVersions[len(policyVersions)-1].Minor()
@@ -61,11 +59,25 @@ func TestFixtures(t *testing.T) {
 			failDir := filepath.Join("testdata", string(level), fmt.Sprintf("v1.%d", version), "fail")
 
 			// render the minimal valid pod fixture
-			validPod, err := GetMinimalValidPod(level, api.MajorMinorVersion(1, version))
+			osNeutralPod, err := GetMinimalValidPod(level, api.MajorMinorVersion(1, version))
 			if err != nil {
 				t.Fatal(err)
 			}
-			expectedFiles.Insert(testFixtureFile(t, passDir, "base", validPod))
+			expectedFiles.Insert(testFixtureFile(t, passDir, "base", osNeutralPod))
+			// Don't generate OS specific pods when version < 1.25 as pod os field based restriction is not enabled.
+			if level == api.LevelRestricted && version >= podOSBasedRestrictionEnabledVersion {
+				linuxPod, err := GetMinimalValidLinuxPod(level, api.MajorMinorVersion(1, version))
+				if err != nil {
+					t.Fatal(err)
+				}
+				expectedFiles.Insert(testFixtureFile(t, passDir, "base_linux", linuxPod))
+
+				windowsPod, err := GetMinimalValidWindowsPod(level, api.MajorMinorVersion(1, version))
+				if err != nil {
+					t.Fatal(err)
+				}
+				expectedFiles.Insert(testFixtureFile(t, passDir, "base_windows", windowsPod))
+			}
 
 			// render check-specific fixtures
 			checkIDs, err := checksForLevelAndVersion(defaultChecks, level, api.MajorMinorVersion(1, version))
@@ -155,7 +167,7 @@ func testFixtureFile(t *testing.T, dir, name string, pod *corev1.Pod) string {
 				t.Logf("Could not update data in %s: %v", filename, err)
 			}
 		} else {
-			t.Logf("Diff between generated data and fixture data in %s:\n-------------\n%s", filename, diff.StringDiff(string(yamlData), string(expectedYAML)))
+			t.Logf("Diff between generated data and fixture data in %s:\n-------------\n%s", filename, cmp.Diff(string(yamlData), string(expectedYAML)))
 			t.Logf("If the change is expected, re-run with %s=true to update the fixtures", updateEnvVar)
 		}
 	}

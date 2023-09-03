@@ -23,7 +23,7 @@ import (
 	//  Import the crypto/sha512 algorithm for the docker image parser to work with 384 and 512 sha hashes
 	_ "crypto/sha512"
 
-	dockerref "github.com/docker/distribution/reference"
+	dockerref "github.com/distribution/reference"
 )
 
 // ParseImageName parses a docker image string into three parts: repo, tag and digest.
@@ -31,7 +31,7 @@ import (
 func ParseImageName(image string) (string, string, string, error) {
 	named, err := dockerref.ParseNormalizedNamed(image)
 	if err != nil {
-		return "", "", "", fmt.Errorf("couldn't parse image name: %v", err)
+		return "", "", "", fmt.Errorf("couldn't parse image name %q: %v", image, err)
 	}
 
 	repoToPull := named.Name()

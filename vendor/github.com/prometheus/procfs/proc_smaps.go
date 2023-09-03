@@ -11,6 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !windows
 // +build !windows
 
 package procfs
@@ -28,30 +29,30 @@ import (
 )
 
 var (
-	// match the header line before each mapped zone in /proc/pid/smaps
+	// match the header line before each mapped zone in `/proc/pid/smaps`.
 	procSMapsHeaderLine = regexp.MustCompile(`^[a-f0-9].*$`)
 )
 
 type ProcSMapsRollup struct {
-	// Amount of the mapping that is currently resident in RAM
+	// Amount of the mapping that is currently resident in RAM.
 	Rss uint64
-	// Process's proportional share of this mapping
+	// Process's proportional share of this mapping.
 	Pss uint64
-	// Size in bytes of clean shared pages
+	// Size in bytes of clean shared pages.
 	SharedClean uint64
-	// Size in bytes of dirty shared pages
+	// Size in bytes of dirty shared pages.
 	SharedDirty uint64
-	// Size in bytes of clean private pages
+	// Size in bytes of clean private pages.
 	PrivateClean uint64
-	// Size in bytes of dirty private pages
+	// Size in bytes of dirty private pages.
 	PrivateDirty uint64
-	// Amount of memory currently marked as referenced or accessed
+	// Amount of memory currently marked as referenced or accessed.
 	Referenced uint64
-	// Amount of memory that does not belong to any file
+	// Amount of memory that does not belong to any file.
 	Anonymous uint64
-	// Amount would-be-anonymous memory currently on swap
+	// Amount would-be-anonymous memory currently on swap.
 	Swap uint64
-	// Process's proportional memory on swap
+	// Process's proportional memory on swap.
 	SwapPss uint64
 }
 

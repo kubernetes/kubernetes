@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -62,7 +62,7 @@ func TestReplaceObject(t *testing.T) {
 			}
 		}),
 	}
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
 	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
@@ -132,7 +132,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 			}
 		}),
 	}
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
 	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
@@ -189,7 +189,7 @@ func TestReplaceDirectory(t *testing.T) {
 			}
 		}),
 	}
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
 	cmd.Flags().Set("filename", "../../../testdata/replace/legacy")
@@ -235,7 +235,7 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 			}
 		}),
 	}
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
 	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")

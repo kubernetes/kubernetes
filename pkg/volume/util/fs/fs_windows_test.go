@@ -18,7 +18,6 @@ package fs
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"testing"
@@ -28,24 +27,30 @@ import (
 
 func TestDiskUsage(t *testing.T) {
 
-	dir1, err := ioutil.TempDir("", "dir_1")
+	dir1, err := os.MkdirTemp("", "dir_1")
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
 	defer os.RemoveAll(dir1)
 
-	tmpfile1, err := ioutil.TempFile(dir1, "test")
+	tmpfile1, err := os.CreateTemp(dir1, "test")
 	if _, err = tmpfile1.WriteString("just for testing"); err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
-	dir2, err := ioutil.TempDir(dir1, "dir_2")
+	dir2, err := os.MkdirTemp(dir1, "dir_2")
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
-	tmpfile2, err := ioutil.TempFile(dir2, "test")
+	tmpfile2, err := os.CreateTemp(dir2, "test")
 	if _, err = tmpfile2.WriteString("just for testing"); err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
+
+	// File creation is not atomic. If we're calculating the DiskUsage before the data is flushed,
+	// we'd get zeroes for sizes, and fail with this error:
+	// TestDiskUsage failed: expected 0, got -1
+	tmpfile1.Sync()
+	tmpfile2.Sync()
 
 	dirInfo1, err := os.Lstat(dir1)
 	if err != nil {
@@ -86,7 +91,7 @@ func TestDiskUsage(t *testing.T) {
 }
 
 func TestInfo(t *testing.T) {
-	dir1, err := ioutil.TempDir("", "dir_1")
+	dir1, err := os.MkdirTemp("", "dir_1")
 	if err != nil {
 		t.Fatalf("TestInfo failed: %s", err.Error())
 	}
@@ -101,7 +106,7 @@ func TestInfo(t *testing.T) {
 	validateInfo(t, availablebytes, capacity, usage, inodesTotal, inodeUsage, inodesFree)
 
 	// should pass for file
-	tmpfile1, err := ioutil.TempFile(dir1, "test")
+	tmpfile1, err := os.CreateTemp(dir1, "test")
 	if _, err = tmpfile1.WriteString("just for testing"); err != nil {
 		t.Fatalf("TestInfo failed: %s", err.Error())
 	}

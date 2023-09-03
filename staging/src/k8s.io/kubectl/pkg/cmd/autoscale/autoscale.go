@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
@@ -74,18 +75,17 @@ type AutoscaleOptions struct {
 	enforceNamespace bool
 	namespace        string
 	dryRunStrategy   cmdutil.DryRunStrategy
-	dryRunVerifier   *resource.QueryParamVerifier
 	builder          *resource.Builder
 	fieldManager     string
 
 	HPAClient         autoscalingv1client.HorizontalPodAutoscalersGetter
 	scaleKindResolver scale.ScaleKindResolver
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewAutoscaleOptions creates the options for autoscale
-func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOptions {
+func NewAutoscaleOptions(ioStreams genericiooptions.IOStreams) *AutoscaleOptions {
 	return &AutoscaleOptions{
 		PrintFlags:      genericclioptions.NewPrintFlags("autoscaled").WithTypeSetter(scheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
@@ -97,7 +97,7 @@ func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOption
 }
 
 // NewCmdAutoscale returns the autoscale Cobra command
-func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewAutoscaleOptions(ioStreams)
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}
@@ -138,15 +138,10 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
 	discoveryClient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
 	o.scaleKindResolver = scale.NewDiscoveryScaleKindResolver(discoveryClient)
@@ -242,9 +237,6 @@ func (o *AutoscaleOptions) Run() error {
 			createOptions.FieldManager = o.fieldManager
 		}
 		if o.dryRunStrategy == cmdutil.DryRunServer {
-			if err := o.dryRunVerifier.HasSupport(hpa.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		actualHPA, err := o.HPAClient.HorizontalPodAutoscalers(o.namespace).Create(context.TODO(), hpa, createOptions)

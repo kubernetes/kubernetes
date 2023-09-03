@@ -23,6 +23,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const (
+	DefAgeBuckets = prometheus.DefAgeBuckets
+	DefBufCap     = prometheus.DefBufCap
+	DefMaxAge     = prometheus.DefMaxAge
+)
+
 // Summary is our internal representation for our wrapping struct around prometheus
 // summaries. Summary implements both kubeCollector and ObserverMetric
 //
@@ -43,7 +49,7 @@ func NewSummary(opts *SummaryOpts) *Summary {
 
 	s := &Summary{
 		SummaryOpts: opts,
-		lazyMetric:  lazyMetric{},
+		lazyMetric:  lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	s.setPrometheusSummary(noopMetric{})
 	s.lazyInit(s, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
@@ -112,7 +118,7 @@ func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
 	v := &SummaryVec{
 		SummaryOpts:    opts,
 		originalLabels: labels,
-		lazyMetric:     lazyMetric{},
+		lazyMetric:     lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	v.lazyInit(v, fqName)
 	return v

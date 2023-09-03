@@ -13,19 +13,72 @@
 
 package promhttp
 
-// Option are used to configure a middleware or round tripper..
-type Option func(*option)
+import (
+	"context"
 
-type option struct {
-	extraMethods []string
+	"github.com/prometheus/client_golang/prometheus"
+)
+
+// Option are used to configure both handler (middleware) or round tripper.
+type Option interface {
+	apply(*options)
 }
+
+// LabelValueFromCtx are used to compute the label value from request context.
+// Context can be filled with values from request through middleware.
+type LabelValueFromCtx func(ctx context.Context) string
+
+// options store options for both a handler or round tripper.
+type options struct {
+	extraMethods       []string
+	getExemplarFn      func(requestCtx context.Context) prometheus.Labels
+	extraLabelsFromCtx map[string]LabelValueFromCtx
+}
+
+func defaultOptions() *options {
+	return &options{
+		getExemplarFn:      func(ctx context.Context) prometheus.Labels { return nil },
+		extraLabelsFromCtx: map[string]LabelValueFromCtx{},
+	}
+}
+
+func (o *options) emptyDynamicLabels() prometheus.Labels {
+	labels := prometheus.Labels{}
+
+	for label := range o.extraLabelsFromCtx {
+		labels[label] = ""
+	}
+
+	return labels
+}
+
+type optionApplyFunc func(*options)
+
+func (o optionApplyFunc) apply(opt *options) { o(opt) }
 
 // WithExtraMethods adds additional HTTP methods to the list of allowed methods.
 // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods for the default list.
 //
 // See the example for ExampleInstrumentHandlerWithExtraMethods for example usage.
 func WithExtraMethods(methods ...string) Option {
-	return func(o *option) {
+	return optionApplyFunc(func(o *options) {
 		o.extraMethods = methods
-	}
+	})
+}
+
+// WithExemplarFromContext allows to inject function that will get exemplar from context that will be put to counter and histogram metrics.
+// If the function returns nil labels or the metric does not support exemplars, no exemplar will be added (noop), but
+// metric will continue to observe/increment.
+func WithExemplarFromContext(getExemplarFn func(requestCtx context.Context) prometheus.Labels) Option {
+	return optionApplyFunc(func(o *options) {
+		o.getExemplarFn = getExemplarFn
+	})
+}
+
+// WithLabelFromCtx registers a label for dynamic resolution with access to context.
+// See the example for ExampleInstrumentHandlerWithLabelResolver for example usage
+func WithLabelFromCtx(name string, valueFn LabelValueFromCtx) Option {
+	return optionApplyFunc(func(o *options) {
+		o.extraLabelsFromCtx[name] = valueFn
+	})
 }

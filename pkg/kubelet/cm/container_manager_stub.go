@@ -17,10 +17,13 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -41,7 +44,7 @@ type containerManagerStub struct {
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
+func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
 	klog.V(2).InfoS("Starting stub container manager")
 	return nil
 }
@@ -74,7 +77,10 @@ func (cm *containerManagerStub) GetNodeAllocatableReservation() v1.ResourceList 
 	return nil
 }
 
-func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
+func (cm *containerManagerStub) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+	if !localStorageCapacityIsolation {
+		return v1.ResourceList{}
+	}
 	c := v1.ResourceList{
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(
 			int64(0),
@@ -89,6 +95,14 @@ func (cm *containerManagerStub) GetPluginRegistrationHandler() cache.PluginHandl
 
 func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
 	return cm.extendedPluginResources, cm.extendedPluginResources, []string{}
+}
+
+func (m *podContainerManagerStub) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*ResourceConfig, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *podContainerManagerStub) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
@@ -147,8 +161,24 @@ func (cm *containerManagerStub) GetAllocatableMemory() []*podresourcesapi.Contai
 	return nil
 }
 
+func (cm *containerManagerStub) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+	return nil
+}
+
 func (cm *containerManagerStub) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
+}
+
+func (cm *containerManagerStub) PrepareDynamicResources(pod *v1.Pod) error {
+	return nil
+}
+
+func (cm *containerManagerStub) UnprepareDynamicResources(*v1.Pod) error {
+	return nil
+}
+
+func (cm *containerManagerStub) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return false
 }
 
 func NewStubContainerManager() ContainerManager {

@@ -40,7 +40,7 @@ var (
 
 // IsListType returns true if the provided Object has a slice called Items.
 // TODO: Replace the code in this check with an interface comparison by
-//   creating and enforcing that lists implement a list accessor.
+// creating and enforcing that lists implement a list accessor.
 func IsListType(obj runtime.Object) bool {
 	switch t := obj.(type) {
 	case runtime.Unstructured:
@@ -97,7 +97,7 @@ func getItemsPtr(list runtime.Object) (interface{}, error) {
 		return nil, errExpectFieldItems
 	}
 	switch items.Kind() {
-	case reflect.Interface, reflect.Ptr:
+	case reflect.Interface, reflect.Pointer:
 		target := reflect.TypeOf(items.Interface()).Elem()
 		if target.Kind() != reflect.Slice {
 			return nil, errExpectSliceItems
@@ -112,8 +112,27 @@ func getItemsPtr(list runtime.Object) (interface{}, error) {
 
 // EachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
 // the loop.
+//
+// If items passed to fn are retained for different durations, and you want to avoid
+// retaining all items in obj as long as any item is referenced, use EachListItemWithAlloc instead.
 func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
+	return eachListItem(obj, fn, false)
+}
+
+// EachListItemWithAlloc works like EachListItem, but avoids retaining references to the items slice in obj.
+// It does this by making a shallow copy of non-pointer items in obj.
+//
+// If the items passed to fn are not retained, or are retained for the same duration, use EachListItem instead for memory efficiency.
+func EachListItemWithAlloc(obj runtime.Object, fn func(runtime.Object) error) error {
+	return eachListItem(obj, fn, true)
+}
+
+// allocNew: Whether shallow copy is required when the elements in Object.Items are struct
+func eachListItem(obj runtime.Object, fn func(runtime.Object) error, allocNew bool) error {
 	if unstructured, ok := obj.(runtime.Unstructured); ok {
+		if allocNew {
+			return unstructured.EachListItemWithAlloc(fn)
+		}
 		return unstructured.EachListItem(fn)
 	}
 	// TODO: Change to an interface call?
@@ -130,7 +149,7 @@ func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
 		return nil
 	}
 	takeAddr := false
-	if elemType := items.Type().Elem(); elemType.Kind() != reflect.Ptr && elemType.Kind() != reflect.Interface {
+	if elemType := items.Type().Elem(); elemType.Kind() != reflect.Pointer && elemType.Kind() != reflect.Interface {
 		if !items.Index(0).CanAddr() {
 			return fmt.Errorf("unable to take address of items in %T for EachListItem", obj)
 		}
@@ -140,8 +159,19 @@ func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
 	for i := 0; i < len; i++ {
 		raw := items.Index(i)
 		if takeAddr {
-			raw = raw.Addr()
+			if allocNew {
+				// shallow copy to avoid retaining a reference to the original list item
+				itemCopy := reflect.New(raw.Type())
+				// assign to itemCopy and type-assert
+				itemCopy.Elem().Set(raw)
+				// reflect.New will guarantee that itemCopy must be a pointer.
+				raw = itemCopy
+			} else {
+				raw = raw.Addr()
+			}
 		}
+		// raw must be a pointer or an interface
+		// allocate a pointer is cheap
 		switch item := raw.Interface().(type) {
 		case *runtime.RawExtension:
 			if err := fn(item.Object); err != nil {
@@ -166,7 +196,23 @@ func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
 
 // ExtractList returns obj's Items element as an array of runtime.Objects.
 // Returns an error if obj is not a List type (does not have an Items member).
+//
+// If items in the returned list are retained for different durations, and you want to avoid
+// retaining all items in obj as long as any item is referenced, use ExtractListWithAlloc instead.
 func ExtractList(obj runtime.Object) ([]runtime.Object, error) {
+	return extractList(obj, false)
+}
+
+// ExtractListWithAlloc works like ExtractList, but avoids retaining references to the items slice in obj.
+// It does this by making a shallow copy of non-pointer items in obj.
+//
+// If the items in the returned list are not retained, or are retained for the same duration, use ExtractList instead for memory efficiency.
+func ExtractListWithAlloc(obj runtime.Object) ([]runtime.Object, error) {
+	return extractList(obj, true)
+}
+
+// allocNew: Whether shallow copy is required when the elements in Object.Items are struct
+func extractList(obj runtime.Object, allocNew bool) ([]runtime.Object, error) {
 	itemsPtr, err := GetItemsPtr(obj)
 	if err != nil {
 		return nil, err
@@ -176,10 +222,17 @@ func ExtractList(obj runtime.Object) ([]runtime.Object, error) {
 		return nil, err
 	}
 	list := make([]runtime.Object, items.Len())
+	if len(list) == 0 {
+		return list, nil
+	}
+	elemType := items.Type().Elem()
+	isRawExtension := elemType == rawExtensionObjectType
+	implementsObject := elemType.Implements(objectType)
 	for i := range list {
 		raw := items.Index(i)
-		switch item := raw.Interface().(type) {
-		case runtime.RawExtension:
+		switch {
+		case isRawExtension:
+			item := raw.Interface().(runtime.RawExtension)
 			switch {
 			case item.Object != nil:
 				list[i] = item.Object
@@ -189,8 +242,18 @@ func ExtractList(obj runtime.Object) ([]runtime.Object, error) {
 			default:
 				list[i] = nil
 			}
-		case runtime.Object:
-			list[i] = item
+		case implementsObject:
+			list[i] = raw.Interface().(runtime.Object)
+		case allocNew:
+			// shallow copy to avoid retaining a reference to the original list item
+			itemCopy := reflect.New(raw.Type())
+			// assign to itemCopy and type-assert
+			itemCopy.Elem().Set(raw)
+			var ok bool
+			// reflect.New will guarantee that itemCopy must be a pointer.
+			if list[i], ok = itemCopy.Interface().(runtime.Object); !ok {
+				return nil, fmt.Errorf("%v: item[%v]: Expected object, got %#v(%s)", obj, i, raw.Interface(), raw.Kind())
+			}
 		default:
 			var found bool
 			if list[i], found = raw.Addr().Interface().(runtime.Object); !found {
@@ -201,8 +264,12 @@ func ExtractList(obj runtime.Object) ([]runtime.Object, error) {
 	return list, nil
 }
 
-// objectSliceType is the type of a slice of Objects
-var objectSliceType = reflect.TypeOf([]runtime.Object{})
+var (
+	// objectSliceType is the type of a slice of Objects
+	objectSliceType        = reflect.TypeOf([]runtime.Object{})
+	objectType             = reflect.TypeOf((*runtime.Object)(nil)).Elem()
+	rawExtensionObjectType = reflect.TypeOf(runtime.RawExtension{})
+)
 
 // LenList returns the length of this list or 0 if it is not a list.
 func LenList(list runtime.Object) int {
@@ -237,7 +304,7 @@ func SetList(list runtime.Object, objects []runtime.Object) error {
 	slice := reflect.MakeSlice(items.Type(), len(objects), len(objects))
 	for i := range objects {
 		dest := slice.Index(i)
-		if dest.Type() == reflect.TypeOf(runtime.RawExtension{}) {
+		if dest.Type() == rawExtensionObjectType {
 			dest = dest.FieldByName("Object")
 		}
 

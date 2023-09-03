@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 )
@@ -48,11 +49,25 @@ type NodeScore struct {
 	Score int64
 }
 
-// PluginToNodeScores declares a map from plugin name to its NodeScoreList.
-type PluginToNodeScores map[string]NodeScoreList
-
 // NodeToStatusMap declares map from node name to its status.
 type NodeToStatusMap map[string]*Status
+
+// NodePluginScores is a struct with node name and scores for that node.
+type NodePluginScores struct {
+	// Name is node name.
+	Name string
+	// Scores is scores from plugins and extenders.
+	Scores []PluginScore
+	// TotalScore is the total score in Scores.
+	TotalScore int64
+}
+
+// PluginScore is a struct with plugin/extender name and score.
+type PluginScore struct {
+	// Name is the name of plugin or extender.
+	Name  string
+	Score int64
+}
 
 // Code is the Status code/type which is returned from plugins.
 type Code int
@@ -65,32 +80,27 @@ const (
 	// Error is used for internal plugin errors, unexpected input, etc.
 	Error
 	// Unschedulable is used when a plugin finds a pod unschedulable. The scheduler might attempt to
-	// preempt other pods to get this pod scheduled. Use UnschedulableAndUnresolvable to make the
-	// scheduler skip preemption.
+	// run other postFilter plugins like preemption to get this pod scheduled.
+	// Use UnschedulableAndUnresolvable to make the scheduler skipping other postFilter plugins.
 	// The accompanying status message should explain why the pod is unschedulable.
 	Unschedulable
 	// UnschedulableAndUnresolvable is used when a plugin finds a pod unschedulable and
-	// preemption would not change anything. Plugins should return Unschedulable if it is possible
-	// that the pod can get scheduled with preemption.
+	// other postFilter plugins like preemption would not change anything.
+	// Plugins should return Unschedulable if it is possible that the pod can get scheduled
+	// after running other postFilter plugins.
 	// The accompanying status message should explain why the pod is unschedulable.
 	UnschedulableAndUnresolvable
 	// Wait is used when a Permit plugin finds a pod scheduling should wait.
 	Wait
-	// Skip is used when a Bind plugin chooses to skip binding.
+	// Skip is used in the following scenarios:
+	// - when a Bind plugin chooses to skip binding.
+	// - when a PreFilter plugin returns Skip so that coupled Filter plugin/PreFilterExtensions() will be skipped.
+	// - when a PreScore plugin returns Skip so that coupled Score plugin will be skipped.
 	Skip
 )
 
 // This list should be exactly the same as the codes iota defined above in the same order.
 var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip"}
-
-// statusPrecedence defines a map from status to its precedence, larger value means higher precedent.
-var statusPrecedence = map[Code]int{
-	Error:                        3,
-	UnschedulableAndUnresolvable: 2,
-	Unschedulable:                1,
-	// Any other statuses we know today, `Skip` or `Wait`, will take precedence over `Success`.
-	Success: -1,
-}
 
 func (c Code) String() string {
 	return codes[c]
@@ -145,6 +155,11 @@ type Status struct {
 	failedPlugin string
 }
 
+func (s *Status) WithError(err error) *Status {
+	s.err = err
+	return s
+}
+
 // Code returns code of the Status.
 func (s *Status) Code() Code {
 	if s == nil {
@@ -158,7 +173,7 @@ func (s *Status) Message() string {
 	if s == nil {
 		return ""
 	}
-	return strings.Join(s.reasons, ", ")
+	return strings.Join(s.Reasons(), ", ")
 }
 
 // SetFailedPlugin sets the given plugin name to s.failedPlugin.
@@ -180,6 +195,9 @@ func (s *Status) FailedPlugin() string {
 
 // Reasons returns reasons of the Status.
 func (s *Status) Reasons() []string {
+	if s.err != nil {
+		return append([]string{s.err.Error()}, s.reasons...)
+	}
 	return s.reasons
 }
 
@@ -209,7 +227,7 @@ func (s *Status) IsUnschedulable() bool {
 	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
 
-// AsError returns nil if the status is a success or a wait; otherwise returns an "error" object
+// AsError returns nil if the status is a success, a wait or a skip; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
 	if s.IsSuccess() || s.IsWait() || s.IsSkip() {
@@ -230,10 +248,13 @@ func (s *Status) Equal(x *Status) bool {
 	if s.code != x.code {
 		return false
 	}
-	if s.code == Error {
-		return cmp.Equal(s.err, x.err, cmpopts.EquateErrors())
+	if !cmp.Equal(s.err, x.err, cmpopts.EquateErrors()) {
+		return false
 	}
-	return cmp.Equal(s.reasons, x.reasons)
+	if !cmp.Equal(s.reasons, x.reasons) {
+		return false
+	}
+	return cmp.Equal(s.failedPlugin, x.failedPlugin)
 }
 
 // NewStatus makes a Status out of the given arguments and returns its pointer.
@@ -242,49 +263,18 @@ func NewStatus(code Code, reasons ...string) *Status {
 		code:    code,
 		reasons: reasons,
 	}
-	if code == Error {
-		s.err = errors.New(s.Message())
-	}
 	return s
 }
 
 // AsStatus wraps an error in a Status.
 func AsStatus(err error) *Status {
-	return &Status{
-		code:    Error,
-		reasons: []string{err.Error()},
-		err:     err,
-	}
-}
-
-// PluginToStatus maps plugin name to status. Currently used to identify which Filter plugin
-// returned which status.
-type PluginToStatus map[string]*Status
-
-// Merge merges the statuses in the map into one. The resulting status code have the following
-// precedence: Error, UnschedulableAndUnresolvable, Unschedulable.
-func (p PluginToStatus) Merge() *Status {
-	if len(p) == 0 {
+	if err == nil {
 		return nil
 	}
-
-	finalStatus := NewStatus(Success)
-	for _, s := range p {
-		if s.Code() == Error {
-			finalStatus.err = s.AsError()
-		}
-		if statusPrecedence[s.Code()] > statusPrecedence[finalStatus.code] {
-			finalStatus.code = s.Code()
-			// Same as code, we keep the most relevant failedPlugin in the returned Status.
-			finalStatus.failedPlugin = s.FailedPlugin()
-		}
-
-		for _, r := range s.reasons {
-			finalStatus.AppendReason(r)
-		}
+	return &Status{
+		code: Error,
+		err:  err,
 	}
-
-	return finalStatus
 }
 
 // WaitingPod represents a pod currently waiting in the permit phase.
@@ -306,6 +296,17 @@ type Plugin interface {
 	Name() string
 }
 
+// PreEnqueuePlugin is an interface that must be implemented by "PreEnqueue" plugins.
+// These plugins are called prior to adding Pods to activeQ.
+// Note: an preEnqueue plugin is expected to be lightweight and efficient, so it's not expected to
+// involve expensive calls like accessing external endpoints; otherwise it'd block other
+// Pods' enqueuing in event handlers.
+type PreEnqueuePlugin interface {
+	Plugin
+	// PreEnqueue is called prior to adding Pods to activeQ.
+	PreEnqueue(ctx context.Context, p *v1.Pod) *Status
+}
+
 // LessFunc is the function to sort pod info
 type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
 
@@ -322,13 +323,15 @@ type QueueSortPlugin interface {
 // move unschedulable Pods in internal scheduling queues. Plugins
 // that fail pod scheduling (e.g., Filter plugins) are expected to implement this interface.
 type EnqueueExtensions interface {
+	Plugin
 	// EventsToRegister returns a series of possible events that may cause a Pod
-	// failed by this plugin schedulable.
+	// failed by this plugin schedulable. Each event has a callback function that
+	// filters out events to reduce useless retry of Pod's scheduling.
 	// The events will be registered when instantiating the internal scheduling queue,
 	// and leveraged to build event handlers dynamically.
 	// Note: the returned list needs to be static (not depend on configuration parameters);
 	// otherwise it would lead to undefined behavior.
-	EventsToRegister() []ClusterEvent
+	EventsToRegister() []ClusterEventWithHint
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
@@ -351,6 +354,8 @@ type PreFilterPlugin interface {
 	// plugins must return success or the pod will be rejected. PreFilter could optionally
 	// return a PreFilterResult to influence which nodes to evaluate downstream. This is useful
 	// for cases where it is possible to determine the subset of nodes to process in O(1) time.
+	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
+	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
 	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
@@ -410,6 +415,8 @@ type PreScorePlugin interface {
 	// PreScore is called by the scheduling framework after a list of nodes
 	// passed the filtering phase. All prescore plugins must return success or
 	// the pod will be rejected
+	// When it returns Skip status, other fields in status are just ignored,
+	// and coupled Score plugin will be skipped in this scheduling cycle.
 	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
 }
 
@@ -504,6 +511,13 @@ type BindPlugin interface {
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	Handle
+
+	// PreEnqueuePlugins returns the registered preEnqueue plugins.
+	PreEnqueuePlugins() []PreEnqueuePlugin
+
+	// EnqueueExtensions returns the registered Enqueue extensions.
+	EnqueueExtensions() []EnqueueExtensions
+
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
 
@@ -571,8 +585,14 @@ type Framework interface {
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() *config.Plugins
 
-	// ProfileName returns the profile name associated to this framework.
+	// ProfileName returns the profile name associated to a profile.
 	ProfileName() string
+
+	// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
+	PercentageOfNodesToScore() *int32
+
+	// SetPodNominator sets the PodNominator
+	SetPodNominator(nominator PodNominator)
 }
 
 // Handle provides data and some tools that plugins can use. It is
@@ -627,7 +647,7 @@ type Handle interface {
 type PreFilterResult struct {
 	// The set of nodes that should be considered downstream; if nil then
 	// all nodes are eligible.
-	NodeNames sets.String
+	NodeNames sets.Set[string]
 }
 
 func (p *PreFilterResult) AllNodes() bool {
@@ -641,11 +661,11 @@ func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
 
 	r := PreFilterResult{}
 	if p.AllNodes() {
-		r.NodeNames = sets.NewString(in.NodeNames.UnsortedList()...)
+		r.NodeNames = in.NodeNames.Clone()
 		return &r
 	}
 	if in.AllNodes() {
-		r.NodeNames = sets.NewString(p.NodeNames.UnsortedList()...)
+		r.NodeNames = p.NodeNames.Clone()
 		return &r
 	}
 
@@ -690,11 +710,11 @@ func (ni *NominatingInfo) Mode() NominatingMode {
 type PodNominator interface {
 	// AddNominatedPod adds the given pod to the nominator or
 	// updates it if it already exists.
-	AddNominatedPod(pod *PodInfo, nominatingInfo *NominatingInfo)
+	AddNominatedPod(logger klog.Logger, pod *PodInfo, nominatingInfo *NominatingInfo)
 	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.
 	DeleteNominatedPodIfExists(pod *v1.Pod)
 	// UpdateNominatedPod updates the <oldPod> with <newPod>.
-	UpdateNominatedPod(oldPod *v1.Pod, newPodInfo *PodInfo)
+	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo *PodInfo)
 	// NominatedPodsForNode returns nominatedPods on the given node.
 	NominatedPodsForNode(nodeName string) []*PodInfo
 }
@@ -706,11 +726,11 @@ type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
 	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) *Status
-	// RunScorePlugins runs the set of configured Score plugins. It returns a map that
-	// stores for each Score plugin name the corresponding NodeScoreList(s).
+	// RunScorePlugins runs the set of configured scoring plugins.
+	// It returns a list that stores scores from each plugin and total score for each Node.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) (PluginToNodeScores, *Status)
+	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) ([]NodePluginScores, *Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods
@@ -718,7 +738,7 @@ type PluginsRunner interface {
 	// preemption, we may pass a copy of the original nodeInfo object that has some pods
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
-	RunFilterPlugins(context.Context, *CycleState, *v1.Pod, *NodeInfo) PluginToStatus
+	RunFilterPlugins(context.Context, *CycleState, *v1.Pod, *NodeInfo) *Status
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.

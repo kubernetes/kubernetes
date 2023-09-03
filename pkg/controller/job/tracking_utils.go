@@ -20,9 +20,12 @@ import (
 	"fmt"
 	"sync"
 
+	batch "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/job/metrics"
 )
 
 // uidSetKeyFunc to parse out the key from a uidSet.
@@ -37,7 +40,7 @@ var uidSetKeyFunc = func(obj interface{}) (string, error) {
 // uidTrackingExpectations to remember which UID it has seen/still waiting for.
 type uidSet struct {
 	sync.RWMutex
-	set sets.String
+	set sets.Set[string]
 	key string
 }
 
@@ -57,13 +60,13 @@ func (u *uidTrackingExpectations) getSet(controllerKey string) *uidSet {
 	return nil
 }
 
-func (u *uidTrackingExpectations) getExpectedUIDs(controllerKey string) sets.String {
+func (u *uidTrackingExpectations) getExpectedUIDs(controllerKey string) sets.Set[string] {
 	uids := u.getSet(controllerKey)
 	if uids == nil {
 		return nil
 	}
 	uids.RLock()
-	set := sets.NewString(uids.set.UnsortedList()...)
+	set := uids.set.Clone()
 	uids.RUnlock()
 	return set
 }
@@ -71,14 +74,14 @@ func (u *uidTrackingExpectations) getExpectedUIDs(controllerKey string) sets.Str
 // ExpectDeletions records expectations for the given deleteKeys, against the
 // given job-key.
 // This is thread-safe across different job keys.
-func (u *uidTrackingExpectations) expectFinalizersRemoved(jobKey string, deletedKeys []string) error {
-	klog.V(4).InfoS("Expecting tracking finalizers removed", "job", jobKey, "podUIDs", deletedKeys)
+func (u *uidTrackingExpectations) expectFinalizersRemoved(logger klog.Logger, jobKey string, deletedKeys []string) error {
+	logger.V(4).Info("Expecting tracking finalizers removed", "key", jobKey, "podUIDs", deletedKeys)
 
 	uids := u.getSet(jobKey)
 	if uids == nil {
 		uids = &uidSet{
 			key: jobKey,
-			set: sets.NewString(),
+			set: sets.New[string](),
 		}
 		if err := u.store.Add(uids); err != nil {
 			return err
@@ -91,12 +94,12 @@ func (u *uidTrackingExpectations) expectFinalizersRemoved(jobKey string, deleted
 }
 
 // FinalizerRemovalObserved records the given deleteKey as a deletion, for the given job.
-func (u *uidTrackingExpectations) finalizerRemovalObserved(jobKey, deleteKey string) {
+func (u *uidTrackingExpectations) finalizerRemovalObserved(logger klog.Logger, jobKey, deleteKey string) {
 	uids := u.getSet(jobKey)
 	if uids != nil {
 		uids.Lock()
 		if uids.set.Has(deleteKey) {
-			klog.V(4).InfoS("Observed tracking finalizer removed", "job", jobKey, "podUID", deleteKey)
+			logger.V(4).Info("Observed tracking finalizer removed", "key", jobKey, "podUID", deleteKey)
 			uids.set.Delete(deleteKey)
 		}
 		uids.Unlock()
@@ -104,9 +107,12 @@ func (u *uidTrackingExpectations) finalizerRemovalObserved(jobKey, deleteKey str
 }
 
 // DeleteExpectations deletes the UID set.
-func (u *uidTrackingExpectations) deleteExpectations(jobKey string) {
-	if err := u.store.Delete(jobKey); err != nil {
-		klog.ErrorS(err, "deleting tracking annotation UID expectations", "job", jobKey)
+func (u *uidTrackingExpectations) deleteExpectations(logger klog.Logger, jobKey string) {
+	set := u.getSet(jobKey)
+	if set != nil {
+		if err := u.store.Delete(set); err != nil {
+			logger.Error(err, "Could not delete tracking annotation UID expectations", "key", jobKey)
+		}
 	}
 }
 
@@ -114,4 +120,33 @@ func (u *uidTrackingExpectations) deleteExpectations(jobKey string) {
 // ControllerExpectations that is aware of deleteKeys.
 func newUIDTrackingExpectations() *uidTrackingExpectations {
 	return &uidTrackingExpectations{store: cache.NewStore(uidSetKeyFunc)}
+}
+
+func hasJobTrackingFinalizer(pod *v1.Pod) bool {
+	for _, fin := range pod.Finalizers {
+		if fin == batch.JobTrackingFinalizer {
+			return true
+		}
+	}
+	return false
+}
+
+func recordFinishedPodWithTrackingFinalizer(oldPod, newPod *v1.Pod) {
+	was := isFinishedPodWithTrackingFinalizer(oldPod)
+	is := isFinishedPodWithTrackingFinalizer(newPod)
+	if was == is {
+		return
+	}
+	var event = metrics.Delete
+	if is {
+		event = metrics.Add
+	}
+	metrics.TerminatedPodsTrackingFinalizerTotal.WithLabelValues(event).Inc()
+}
+
+func isFinishedPodWithTrackingFinalizer(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	return (pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded) && hasJobTrackingFinalizer(pod)
 }

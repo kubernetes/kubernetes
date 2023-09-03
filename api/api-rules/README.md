@@ -29,7 +29,7 @@ exception.
 If you're removing violations from the exception list, or if you have good
 reasons to add new violations to this list, please update the file using:
 
- - `make generated_files UPDATE_API_KNOWN_VIOLATIONS=true`
+ - `UPDATE_API_KNOWN_VIOLATIONS=true ./hack/update-codegen.sh`
 
 It is up to API reviewers to review the list and make sure new APIs follow our API conventions.
 

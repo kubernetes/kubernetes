@@ -1,5 +1,5 @@
 # Do not edit, downloaded from https://github.com/kubernetes-csi/external-health-monitor/raw/v0.4.0/deploy/kubernetes/external-health-monitor-controller/rbac.yaml
-# for csi-driver-host-path v1.7.3
+# for csi-driver-host-path v1.8.0
 # by ./update-hostpath.sh
 #
 # This YAML file contains all RBAC objects that are necessary to run external

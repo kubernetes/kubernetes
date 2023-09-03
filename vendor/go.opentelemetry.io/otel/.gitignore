@@ -10,10 +10,12 @@ coverage.*
 
 gen/
 
+/example/fib/fib
+/example/fib/traces.txt
 /example/jaeger/jaeger
 /example/namedtracer/namedtracer
 /example/opencensus/opencensus
+/example/passthrough/passthrough
 /example/prometheus/prometheus
-/example/prom-collector/prom-collector
 /example/zipkin/zipkin
 /example/otel-collector/otel-collector

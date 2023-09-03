@@ -53,12 +53,24 @@ var (
 // DialMetrics instruments dials to proxy server with prometheus metrics.
 type DialMetrics struct {
 	clock     clock.Clock
+	starts    *metrics.CounterVec
 	latencies *metrics.HistogramVec
 	failures  *metrics.CounterVec
 }
 
 // newDialMetrics create a new DialMetrics, configured with default metric names.
 func newDialMetrics() *DialMetrics {
+	starts := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "dial_start_total",
+			Help:           "Dial starts, labeled by the protocol (http-connect or grpc) and transport (tcp or uds).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"protocol", "transport"},
+	)
+
 	latencies := metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Namespace:      namespace,
@@ -82,9 +94,10 @@ func newDialMetrics() *DialMetrics {
 		[]string{"protocol", "transport", "stage"},
 	)
 
+	legacyregistry.MustRegister(starts)
 	legacyregistry.MustRegister(latencies)
 	legacyregistry.MustRegister(failures)
-	return &DialMetrics{latencies: latencies, failures: failures, clock: clock.RealClock{}}
+	return &DialMetrics{starts: starts, latencies: latencies, failures: failures, clock: clock.RealClock{}}
 }
 
 // Clock returns the clock.
@@ -99,8 +112,14 @@ func (m *DialMetrics) SetClock(c clock.Clock) {
 
 // Reset resets the metrics.
 func (m *DialMetrics) Reset() {
+	m.starts.Reset()
 	m.latencies.Reset()
 	m.failures.Reset()
+}
+
+// ObserveDialStart records the start of a dial attempt, labeled by protocol, transport.
+func (m *DialMetrics) ObserveDialStart(protocol, transport string) {
+	m.starts.WithLabelValues(protocol, transport).Inc()
 }
 
 // ObserveDialLatency records the latency of a dial, labeled by protocol, transport.

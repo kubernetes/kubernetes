@@ -174,7 +174,7 @@ type testAllocator struct {
 }
 
 func (ta *testAllocator) Allocate(n uint64) []byte {
-	ta.buf = make([]byte, n, n)
+	ta.buf = make([]byte, n)
 	ta.allocateCount++
 	return ta.buf
 }

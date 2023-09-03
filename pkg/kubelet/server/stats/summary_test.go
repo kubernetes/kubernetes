@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -48,6 +49,7 @@ var (
 )
 
 func TestSummaryProviderGetStats(t *testing.T) {
+	ctx := context.Background()
 	assert := assert.New(t)
 
 	podStats := []statsapi.PodStats{
@@ -77,9 +79,9 @@ func TestSummaryProviderGetStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
-	mockStatsProvider.EXPECT().ListPodStats().Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage().Return(podStats, nil)
-	mockStatsProvider.EXPECT().ImageFsStats().Return(imageFsStats, nil)
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, nil)
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
 	mockStatsProvider.EXPECT().RlimitStats().Return(rlimitStats, nil)
 	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
@@ -91,13 +93,14 @@ func TestSummaryProviderGetStats(t *testing.T) {
 	kubeletCreationTime := metav1.Now()
 	systemBootTime := metav1.Now()
 	provider := summaryProviderImpl{kubeletCreationTime: kubeletCreationTime, systemBootTime: systemBootTime, provider: mockStatsProvider}
-	summary, err := provider.Get(true)
+	summary, err := provider.Get(ctx, true)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")
 	assert.Equal(summary.Node.StartTime, systemBootTime)
 	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
 	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
+	assert.Equal(summary.Node.Swap, cgroupStatsMap["/"].cs.Swap)
 	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ImageFs: imageFsStats})
@@ -110,6 +113,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/kubelet"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/kubelet"].cs.Swap,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "misc",
@@ -118,6 +122,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/misc"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/misc"].cs.Swap,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "runtime",
@@ -126,6 +131,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/runtime"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/runtime"].cs.Swap,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "pods",
@@ -134,11 +140,13 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/pods"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/pods"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/pods"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/pods"].cs.Swap,
 	})
 	assert.Equal(summary.Pods, podStats)
 }
 
 func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
+	ctx := context.Background()
 	assert := assert.New(t)
 
 	podStats := []statsapi.PodStats{
@@ -165,7 +173,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
-	mockStatsProvider.EXPECT().ListPodCPUAndMemoryStats().Return(podStats, nil)
+	mockStatsProvider.EXPECT().ListPodCPUAndMemoryStats(ctx).Return(podStats, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/", false).Return(cgroupStatsMap["/"].cs, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/runtime", false).Return(cgroupStatsMap["/runtime"].cs, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/misc", false).Return(cgroupStatsMap["/misc"].cs, nil)
@@ -173,7 +181,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubepods", false).Return(cgroupStatsMap["/pods"].cs, nil)
 
 	provider := NewSummaryProvider(mockStatsProvider)
-	summary, err := provider.GetCPUAndMemoryStats()
+	summary, err := provider.GetCPUAndMemoryStats(ctx)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")

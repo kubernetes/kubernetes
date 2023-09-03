@@ -17,23 +17,24 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
+	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
+	"k8s.io/utils/pointer"
 )
 
-func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
+func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	podInitialBackoffSeconds := int64(1)
 	podMaxBackoffSeconds := int64(1)
 	validConfig := &config.KubeSchedulerConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: v1beta2.SchemeGroupVersion.String(),
+			APIVersion: configv1.SchemeGroupVersion.String(),
 		},
 		Parallelism: 8,
 		ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
@@ -43,7 +44,7 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 			Burst:              10,
 		},
 		LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-			ResourceLock:      "configmap",
+			ResourceLock:      "leases",
 			LeaderElect:       true,
 			LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 			RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
@@ -53,43 +54,37 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 		},
 		PodInitialBackoffSeconds: podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
-		PercentageOfNodesToScore: 35,
-		Profiles: []config.KubeSchedulerProfile{
-			{
-				SchedulerName: "me",
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Score: config.PluginSet{
-						Disabled: []config.Plugin{{Name: "*"}},
-					},
+		Profiles: []config.KubeSchedulerProfile{{
+			SchedulerName:            "me",
+			PercentageOfNodesToScore: pointer.Int32(35),
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
 				},
-				PluginConfig: []config.PluginConfig{
-					{
-						Name: "DefaultPreemption",
-						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
-					},
+				Score: config.PluginSet{
+					Disabled: []config.Plugin{{Name: "*"}},
 				},
 			},
-			{
-				SchedulerName: "other",
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Bind: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomBind"}},
-					},
+			PluginConfig: []config.PluginConfig{{
+				Name: "DefaultPreemption",
+				Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+			}},
+		}, {
+			SchedulerName:            "other",
+			PercentageOfNodesToScore: pointer.Int32(35),
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomBind"}},
 				},
 			},
-		},
-		Extenders: []config.Extender{
-			{
-				PrioritizeVerb: "prioritize",
-				Weight:         1,
-			},
-		},
+		}},
+		Extenders: []config.Extender{{
+			PrioritizeVerb: "prioritize",
+			Weight:         1,
+		}},
 	}
 
 	invalidParallelismValue := validConfig.DeepCopy()
@@ -100,6 +95,9 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 
 	resourceNamespaceNotSet := validConfig.DeepCopy()
 	resourceNamespaceNotSet.LeaderElection.ResourceNamespace = ""
+
+	resourceLockNotLeases := validConfig.DeepCopy()
+	resourceLockNotLeases.LeaderElection.ResourceLock = "configmap"
 
 	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
 	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
@@ -112,13 +110,22 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 	healthzBindAddrInvalid.HealthzBindAddress = "0.0.0.0:9090"
 
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
-	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
+	percentageOfNodesToScore101.PercentageOfNodesToScore = pointer.Int32(101)
+
+	percentageOfNodesToScoreNegative := validConfig.DeepCopy()
+	percentageOfNodesToScoreNegative.PercentageOfNodesToScore = pointer.Int32(-1)
 
 	schedulerNameNotSet := validConfig.DeepCopy()
 	schedulerNameNotSet.Profiles[1].SchedulerName = ""
 
 	repeatedSchedulerName := validConfig.DeepCopy()
 	repeatedSchedulerName.Profiles[0].SchedulerName = "other"
+
+	profilePercentageOfNodesToScore101 := validConfig.DeepCopy()
+	profilePercentageOfNodesToScore101.Profiles[1].PercentageOfNodesToScore = pointer.Int32(101)
+
+	profilePercentageOfNodesToScoreNegative := validConfig.DeepCopy()
+	profilePercentageOfNodesToScoreNegative.Profiles[1].PercentageOfNodesToScore = pointer.Int32(-1)
 
 	differentQueueSort := validConfig.DeepCopy()
 	differentQueueSort.Profiles[1].Plugins.QueueSort.Enabled[0].Name = "AnotherSort"
@@ -130,65 +137,51 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 	extenderNegativeWeight.Extenders[0].Weight = -1
 
 	invalidNodePercentage := validConfig.DeepCopy()
-	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
-		},
-	}
+	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "DefaultPreemption",
+		Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
+	}}
 
 	invalidPluginArgs := validConfig.DeepCopy()
-	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.InterPodAffinityArgs{},
-		},
-	}
+	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "DefaultPreemption",
+		Args: &config.InterPodAffinityArgs{},
+	}}
 
 	duplicatedPluginConfig := validConfig.DeepCopy()
-	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "config",
-		},
-		{
-			Name: "config",
-		},
-	}
+	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "config",
+	}, {
+		Name: "config",
+	}}
 
 	mismatchQueueSort := validConfig.DeepCopy()
-	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{
-		{
-			SchedulerName: "me",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "PrioritySort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "PrioritySort",
-				},
+	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{{
+		SchedulerName: "me",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: "PrioritySort"}},
 			},
 		},
-		{
-			SchedulerName: "other",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "CustomSort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "CustomSort",
-				},
+		PluginConfig: []config.PluginConfig{{
+			Name: "PrioritySort",
+		}},
+	}, {
+		SchedulerName: "other",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: "CustomSort"}},
 			},
 		},
-	}
+		PluginConfig: []config.PluginConfig{{
+			Name: "CustomSort",
+		}},
+	}}
 
 	extenderDuplicateManagedResource := validConfig.DeepCopy()
 	extenderDuplicateManagedResource.Extenders[0].ManagedResources = []config.ExtenderManagedResource{
-		{Name: "foo", IgnoredByScheduler: false},
-		{Name: "foo", IgnoredByScheduler: false},
+		{Name: "example.com/foo", IgnoredByScheduler: false},
+		{Name: "example.com/foo", IgnoredByScheduler: false},
 	}
 
 	extenderDuplicateBind := validConfig.DeepCopy()
@@ -196,381 +189,219 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 	extenderDuplicateBind.Extenders = append(extenderDuplicateBind.Extenders, config.Extender{
 		PrioritizeVerb: "prioritize",
 		BindVerb:       "bar",
+		Weight:         1,
 	})
 
-	goodRemovedPlugins2 := validConfig.DeepCopy()
-	goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
+	validPlugins := validConfig.DeepCopy()
+	validPlugins.Profiles[0].Plugins.Score.Enabled = append(validPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
 
 	scenarios := map[string]struct {
-		expectedToFail bool
-		config         *config.KubeSchedulerConfiguration
-		errorString    string
+		config   *config.KubeSchedulerConfiguration
+		wantErrs field.ErrorList
 	}{
 		"good": {
-			expectedToFail: false,
-			config:         validConfig,
+			config: validConfig,
 		},
 		"bad-parallelism-invalid-value": {
-			expectedToFail: true,
-			config:         invalidParallelismValue,
+			config: invalidParallelismValue,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "parallelism",
+				},
+			},
 		},
 		"bad-resource-name-not-set": {
-			expectedToFail: true,
-			config:         resourceNameNotSet,
+			config: resourceNameNotSet,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "leaderElection.resourceName",
+				},
+			},
 		},
 		"bad-resource-namespace-not-set": {
-			expectedToFail: true,
-			config:         resourceNamespaceNotSet,
+			config: resourceNamespaceNotSet,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "leaderElection.resourceNamespace",
+				},
+			},
+		},
+		"bad-resource-lock-not-leases": {
+			config: resourceLockNotLeases,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "leaderElection.resourceLock",
+				},
+			},
 		},
 		"non-empty-metrics-bind-addr": {
-			expectedToFail: true,
-			config:         metricsBindAddrInvalid,
+			config: metricsBindAddrInvalid,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "metricsBindAddress",
+				},
+			},
 		},
 		"non-empty-healthz-bind-addr": {
-			expectedToFail: true,
-			config:         healthzBindAddrInvalid,
+			config: healthzBindAddrInvalid,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "healthzBindAddress",
+				},
+			},
 		},
 		"bad-percentage-of-nodes-to-score": {
-			expectedToFail: true,
-			config:         percentageOfNodesToScore101,
+			config: percentageOfNodesToScore101,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "percentageOfNodesToScore",
+				},
+			},
+		},
+		"negative-percentage-of-nodes-to-score": {
+			config: percentageOfNodesToScoreNegative,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "percentageOfNodesToScore",
+				},
+			},
 		},
 		"scheduler-name-not-set": {
-			expectedToFail: true,
-			config:         schedulerNameNotSet,
+			config: schedulerNameNotSet,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeRequired,
+					Field: "profiles[1].schedulerName",
+				},
+			},
 		},
 		"repeated-scheduler-name": {
-			expectedToFail: true,
-			config:         repeatedSchedulerName,
+			config: repeatedSchedulerName,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeDuplicate,
+					Field: "profiles[1].schedulerName",
+				},
+			},
+		},
+		"greater-than-100-profile-percentage-of-nodes-to-score": {
+			config: profilePercentageOfNodesToScore101,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[1].percentageOfNodesToScore",
+				},
+			},
+		},
+		"negative-profile-percentage-of-nodes-to-score": {
+			config: profilePercentageOfNodesToScoreNegative,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[1].percentageOfNodesToScore",
+				},
+			},
 		},
 		"different-queue-sort": {
-			expectedToFail: true,
-			config:         differentQueueSort,
+			config: differentQueueSort,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[1].plugins.queueSort",
+				},
+			},
 		},
 		"one-empty-queue-sort": {
-			expectedToFail: true,
-			config:         oneEmptyQueueSort,
+			config: oneEmptyQueueSort,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[1].plugins.queueSort",
+				},
+			},
 		},
 		"extender-negative-weight": {
-			expectedToFail: true,
-			config:         extenderNegativeWeight,
+			config: extenderNegativeWeight,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "extenders[0].weight",
+				},
+			},
 		},
 		"extender-duplicate-managed-resources": {
-			expectedToFail: true,
-			config:         extenderDuplicateManagedResource,
+			config: extenderDuplicateManagedResource,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "extenders[0].managedResources[1].name",
+				},
+			},
 		},
 		"extender-duplicate-bind": {
-			expectedToFail: true,
-			config:         extenderDuplicateBind,
+			config: extenderDuplicateBind,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "extenders",
+				},
+			},
 		},
 		"invalid-node-percentage": {
-			expectedToFail: true,
-			config:         invalidNodePercentage,
+			config: invalidNodePercentage,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[0].pluginConfig[0].args.minCandidateNodesPercentage",
+				},
+			},
 		},
 		"invalid-plugin-args": {
-			expectedToFail: true,
-			config:         invalidPluginArgs,
+			config: invalidPluginArgs,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[0].pluginConfig[0].args",
+				},
+			},
 		},
 		"duplicated-plugin-config": {
-			expectedToFail: true,
-			config:         duplicatedPluginConfig,
+			config: duplicatedPluginConfig,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeDuplicate,
+					Field: "profiles[0].pluginConfig[1]",
+				},
+			},
 		},
 		"mismatch-queue-sort": {
-			expectedToFail: true,
-			config:         mismatchQueueSort,
+			config: mismatchQueueSort,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[1].plugins.queueSort",
+				},
+			},
 		},
-		"good-removed-plugins-2": {
-			expectedToFail: false,
-			config:         goodRemovedPlugins2,
+		"valid-plugins": {
+			config: validPlugins,
 		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			errs := ValidateKubeSchedulerConfiguration(scenario.config)
-			if errs == nil && scenario.expectedToFail {
-				t.Error("Unexpected success")
-			}
-			if errs != nil && !scenario.expectedToFail {
-				t.Errorf("Unexpected failure: %+v", errs)
-			}
-			fmt.Println(errs)
-
-			if errs != nil && scenario.errorString != "" && errs.Error() != scenario.errorString {
-				t.Errorf("Unexpected error string\n want:\t%s\n got:\t%s", scenario.errorString, errs.Error())
-			}
-		})
-	}
-}
-
-func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
-	podInitialBackoffSeconds := int64(1)
-	podMaxBackoffSeconds := int64(1)
-	validConfig := &config.KubeSchedulerConfiguration{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: v1beta3.SchemeGroupVersion.String(),
-		},
-		Parallelism: 8,
-		ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-			AcceptContentTypes: "application/json",
-			ContentType:        "application/json",
-			QPS:                10,
-			Burst:              10,
-		},
-		LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-			ResourceLock:      "configmap",
-			LeaderElect:       true,
-			LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
-			RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
-			RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
-			ResourceNamespace: "name",
-			ResourceName:      "name",
-		},
-		PodInitialBackoffSeconds: podInitialBackoffSeconds,
-		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
-		PercentageOfNodesToScore: 35,
-		Profiles: []config.KubeSchedulerProfile{
-			{
-				SchedulerName: "me",
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Score: config.PluginSet{
-						Disabled: []config.Plugin{{Name: "*"}},
-					},
-				},
-				PluginConfig: []config.PluginConfig{
-					{
-						Name: "DefaultPreemption",
-						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
-					},
-				},
-			},
-			{
-				SchedulerName: "other",
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Bind: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomBind"}},
-					},
-				},
-			},
-		},
-		Extenders: []config.Extender{
-			{
-				PrioritizeVerb: "prioritize",
-				Weight:         1,
-			},
-		},
-	}
-
-	invalidParallelismValue := validConfig.DeepCopy()
-	invalidParallelismValue.Parallelism = 0
-
-	resourceNameNotSet := validConfig.DeepCopy()
-	resourceNameNotSet.LeaderElection.ResourceName = ""
-
-	resourceNamespaceNotSet := validConfig.DeepCopy()
-	resourceNamespaceNotSet.LeaderElection.ResourceNamespace = ""
-
-	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
-	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
-	enableContentProfilingSetWithoutEnableProfiling.EnableContentionProfiling = true
-
-	metricsBindAddrInvalid := validConfig.DeepCopy()
-	metricsBindAddrInvalid.MetricsBindAddress = "0.0.0.0:9090"
-
-	healthzBindAddrInvalid := validConfig.DeepCopy()
-	healthzBindAddrInvalid.HealthzBindAddress = "0.0.0.0:9090"
-
-	percentageOfNodesToScore101 := validConfig.DeepCopy()
-	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
-
-	schedulerNameNotSet := validConfig.DeepCopy()
-	schedulerNameNotSet.Profiles[1].SchedulerName = ""
-
-	repeatedSchedulerName := validConfig.DeepCopy()
-	repeatedSchedulerName.Profiles[0].SchedulerName = "other"
-
-	differentQueueSort := validConfig.DeepCopy()
-	differentQueueSort.Profiles[1].Plugins.QueueSort.Enabled[0].Name = "AnotherSort"
-
-	oneEmptyQueueSort := validConfig.DeepCopy()
-	oneEmptyQueueSort.Profiles[0].Plugins = nil
-
-	extenderNegativeWeight := validConfig.DeepCopy()
-	extenderNegativeWeight.Extenders[0].Weight = -1
-
-	invalidNodePercentage := validConfig.DeepCopy()
-	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
-		},
-	}
-
-	invalidPluginArgs := validConfig.DeepCopy()
-	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.InterPodAffinityArgs{},
-		},
-	}
-
-	duplicatedPluginConfig := validConfig.DeepCopy()
-	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "config",
-		},
-		{
-			Name: "config",
-		},
-	}
-
-	mismatchQueueSort := validConfig.DeepCopy()
-	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{
-		{
-			SchedulerName: "me",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "PrioritySort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "PrioritySort",
-				},
-			},
-		},
-		{
-			SchedulerName: "other",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "CustomSort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "CustomSort",
-				},
-			},
-		},
-	}
-
-	extenderDuplicateManagedResource := validConfig.DeepCopy()
-	extenderDuplicateManagedResource.Extenders[0].ManagedResources = []config.ExtenderManagedResource{
-		{Name: "foo", IgnoredByScheduler: false},
-		{Name: "foo", IgnoredByScheduler: false},
-	}
-
-	extenderDuplicateBind := validConfig.DeepCopy()
-	extenderDuplicateBind.Extenders[0].BindVerb = "foo"
-	extenderDuplicateBind.Extenders = append(extenderDuplicateBind.Extenders, config.Extender{
-		PrioritizeVerb: "prioritize",
-		BindVerb:       "bar",
-	})
-
-	goodRemovedPlugins2 := validConfig.DeepCopy()
-	goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
-
-	scenarios := map[string]struct {
-		expectedToFail bool
-		config         *config.KubeSchedulerConfiguration
-		errorString    string
-	}{
-		"good": {
-			expectedToFail: false,
-			config:         validConfig,
-		},
-		"bad-parallelism-invalid-value": {
-			expectedToFail: true,
-			config:         invalidParallelismValue,
-		},
-		"bad-resource-name-not-set": {
-			expectedToFail: true,
-			config:         resourceNameNotSet,
-		},
-		"bad-resource-namespace-not-set": {
-			expectedToFail: true,
-			config:         resourceNamespaceNotSet,
-		},
-		"non-empty-metrics-bind-addr": {
-			expectedToFail: true,
-			config:         metricsBindAddrInvalid,
-		},
-		"non-empty-healthz-bind-addr": {
-			expectedToFail: true,
-			config:         healthzBindAddrInvalid,
-		},
-		"bad-percentage-of-nodes-to-score": {
-			expectedToFail: true,
-			config:         percentageOfNodesToScore101,
-		},
-		"scheduler-name-not-set": {
-			expectedToFail: true,
-			config:         schedulerNameNotSet,
-		},
-		"repeated-scheduler-name": {
-			expectedToFail: true,
-			config:         repeatedSchedulerName,
-		},
-		"different-queue-sort": {
-			expectedToFail: true,
-			config:         differentQueueSort,
-		},
-		"one-empty-queue-sort": {
-			expectedToFail: true,
-			config:         oneEmptyQueueSort,
-		},
-		"extender-negative-weight": {
-			expectedToFail: true,
-			config:         extenderNegativeWeight,
-		},
-		"extender-duplicate-managed-resources": {
-			expectedToFail: true,
-			config:         extenderDuplicateManagedResource,
-		},
-		"extender-duplicate-bind": {
-			expectedToFail: true,
-			config:         extenderDuplicateBind,
-		},
-		"invalid-node-percentage": {
-			expectedToFail: true,
-			config:         invalidNodePercentage,
-		},
-		"invalid-plugin-args": {
-			expectedToFail: true,
-			config:         invalidPluginArgs,
-		},
-		"duplicated-plugin-config": {
-			expectedToFail: true,
-			config:         duplicatedPluginConfig,
-		},
-		"mismatch-queue-sort": {
-			expectedToFail: true,
-			config:         mismatchQueueSort,
-		},
-		"good-removed-plugins-2": {
-			expectedToFail: false,
-			config:         goodRemovedPlugins2,
-		},
-	}
-
-	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) {
-			errs := ValidateKubeSchedulerConfiguration(scenario.config)
-			if errs == nil && scenario.expectedToFail {
-				t.Error("Unexpected success")
-			}
-			if errs != nil && !scenario.expectedToFail {
-				t.Errorf("Unexpected failure: %+v", errs)
-			}
-			fmt.Println(errs)
-
-			if errs != nil && scenario.errorString != "" && errs.Error() != scenario.errorString {
-				t.Errorf("Unexpected error string\n want:\t%s\n got:\t%s", scenario.errorString, errs.Error())
+			diff := cmp.Diff(scenario.wantErrs.ToAggregate(), errs, ignoreBadValueDetail)
+			if diff != "" {
+				t.Errorf("KubeSchedulerConfiguration returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}

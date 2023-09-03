@@ -79,6 +79,9 @@ func TestValidateLeaderElectionConfiguration(t *testing.T) {
 		ResourceName:      "name",
 	}
 
+	renewDeadlineEqualToLeaseDuration := validConfig.DeepCopy()
+	renewDeadlineEqualToLeaseDuration.RenewDeadline = metav1.Duration{Duration: 30 * time.Second}
+
 	renewDeadlineExceedsLeaseDuration := validConfig.DeepCopy()
 	renewDeadlineExceedsLeaseDuration.RenewDeadline = metav1.Duration{Duration: 45 * time.Second}
 
@@ -121,6 +124,10 @@ func TestValidateLeaderElectionConfiguration(t *testing.T) {
 		"good-dont-check-leader-config-if-not-enabled": {
 			expectedToFail: false,
 			config:         LeaderElectButLeaderElectNotEnabled,
+		},
+		"bad-renew-deadline-equal-to-lease-duration": {
+			expectedToFail: true,
+			config:         renewDeadlineEqualToLeaseDuration,
 		},
 		"bad-renew-deadline-exceeds-lease-duration": {
 			expectedToFail: true,

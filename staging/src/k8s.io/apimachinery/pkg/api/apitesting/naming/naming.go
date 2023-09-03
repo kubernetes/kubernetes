@@ -39,7 +39,7 @@ func VerifyGroupNames(scheme *runtime.Scheme, legacyUnsuffixedGroups sets.String
 	errs := []error{}
 	for _, gv := range scheme.PrioritizedVersionsAllGroups() {
 		if !strings.HasSuffix(gv.Group, ".k8s.io") && !legacyUnsuffixedGroups.Has(gv.Group) {
-			errs = append(errs, fmt.Errorf("Group %s does not have the standard kubernetes API group suffix of .k8s.io", gv.Group))
+			errs = append(errs, fmt.Errorf("group %s does not have the standard kubernetes API group suffix of .k8s.io", gv.Group))
 		}
 	}
 	return errors.NewAggregate(errs)
@@ -76,7 +76,7 @@ func ensureNoTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflec
 	parents = append(parents, tp)
 
 	switch tp.Kind() {
-	case reflect.Map, reflect.Slice, reflect.Ptr:
+	case reflect.Map, reflect.Slice, reflect.Pointer:
 		errs = append(errs, ensureNoTags(gvk, tp.Elem(), parents, typesAllowedTags)...)
 
 	case reflect.String, reflect.Bool, reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Interface:
@@ -91,14 +91,14 @@ func ensureNoTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflec
 			jsonTag := f.Tag.Get("json")
 			protoTag := f.Tag.Get("protobuf")
 			if len(jsonTag) > 0 || len(protoTag) > 0 {
-				errs = append(errs, fmt.Errorf("Internal types should not have json or protobuf tags. %#v has tag on field %v: %v.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
+				errs = append(errs, fmt.Errorf("internal types should not have json or protobuf tags. %#v has tag on field %v: %v.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
 			}
 
 			errs = append(errs, ensureNoTags(gvk, f.Type, parents, typesAllowedTags)...)
 		}
 
 	default:
-		errs = append(errs, fmt.Errorf("Unexpected type %v in %#v.\n%s", tp.Kind(), gvk, fmtParentString(parents)))
+		errs = append(errs, fmt.Errorf("unexpected type %v in %#v.\n%s", tp.Kind(), gvk, fmtParentString(parents)))
 	}
 	return errs
 }
@@ -106,7 +106,7 @@ func ensureNoTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflec
 func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.Type, allowedNonstandardJSONNames map[reflect.Type]string) []error {
 	errs := []error{}
 	// This type handles its own encoding/decoding and doesn't need json tags
-	if tp.Implements(marshalerType) && (tp.Implements(unmarshalerType) || reflect.PtrTo(tp).Implements(unmarshalerType)) {
+	if tp.Implements(marshalerType) && (tp.Implements(unmarshalerType) || reflect.PointerTo(tp).Implements(unmarshalerType)) {
 		return errs
 	}
 
@@ -117,7 +117,7 @@ func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.
 	parents = append(parents, tp)
 
 	switch tp.Kind() {
-	case reflect.Map, reflect.Slice, reflect.Ptr:
+	case reflect.Map, reflect.Slice, reflect.Pointer:
 		errs = append(errs, ensureTags(gvk, tp.Elem(), parents, allowedNonstandardJSONNames)...)
 
 	case reflect.String, reflect.Bool, reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Interface:
@@ -140,7 +140,7 @@ func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.
 		}
 
 	default:
-		errs = append(errs, fmt.Errorf("Unexpected type %v in %#v.\n%s", tp.Kind(), gvk, fmtParentString(parents)))
+		errs = append(errs, fmt.Errorf("unexpected type %v in %#v.\n%s", tp.Kind(), gvk, fmtParentString(parents)))
 	}
 	return errs
 }

@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -34,7 +33,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -52,12 +50,18 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
-	flowcontrollister "k8s.io/client-go/listers/flowcontrol/v1beta2"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolapplyconfiguration "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
+	flowcontrollister "k8s.io/client-go/listers/flowcontrol/v1beta3"
 )
 
 const timeFmt = "2006-01-02T15:04:05.999"
+
+const (
+	// priorityLevelMaxSeatsPercent is the percentage of the nominalCL used as max seats allocatable from work estimator
+	priorityLevelMaxSeatsPercent = float64(0.15)
+)
 
 // This file contains a simple local (to the apiserver) controller
 // that digests API Priority and Fairness config objects (FlowSchema
@@ -67,6 +71,22 @@ const timeFmt = "2006-01-02T15:04:05.999"
 // change to any config object, or when any priority level that is
 // undesired becomes completely unused, all the config objects are
 // read and processed as a whole.
+
+const (
+	// Borrowing among priority levels will be accomplished by periodically
+	// adjusting the current concurrency limits (CurrentCLs);
+	// borrowingAdjustmentPeriod is that period.
+	borrowingAdjustmentPeriod = 10 * time.Second
+
+	// The input to the seat borrowing is smoothed seat demand figures.
+	// This constant controls the decay rate of that smoothing,
+	// as described in the comment on the `seatDemandStats` field of `priorityLevelState`.
+	// The particular number appearing here has the property that half-life
+	// of that decay is 5 minutes.
+	// This is a very preliminary guess at a good value and is likely to be tweaked
+	// once we get some experience with borrowing.
+	seatDemandSmoothingCoefficient = 0.977
+)
 
 // The funcs in this package follow the naming convention that the suffix
 // "Locked" means the relevant mutex must be locked at the start of each
@@ -99,11 +119,11 @@ type RequestDigest struct {
 // this type and cfgMeal follow the convention that the suffix
 // "Locked" means that the caller must hold the configController lock.
 type configController struct {
-	name                  string // varies in tests of fighting controllers
-	clock                 clock.PassiveClock
-	queueSetFactory       fq.QueueSetFactory
-	reqsObsPairGenerator  metrics.RatioedChangeObserverPairGenerator
-	execSeatsObsGenerator metrics.RatioedChangeObserverGenerator
+	name              string // varies in tests of fighting controllers
+	clock             clock.PassiveClock
+	queueSetFactory   fq.QueueSetFactory
+	reqsGaugeVec      metrics.RatioedGaugeVec
+	execSeatsGaugeVec metrics.RatioedGaugeVec
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 	asFieldManager string
@@ -123,7 +143,7 @@ type configController struct {
 	fsLister         flowcontrollister.FlowSchemaLister
 	fsInformerSynced cache.InformerSynced
 
-	flowcontrolClient flowcontrolclient.FlowcontrolV1beta2Interface
+	flowcontrolClient flowcontrolclient.FlowcontrolV1beta3Interface
 
 	// serverConcurrencyLimit is the limit on the server's total
 	// number of non-exempt requests being served at once.  This comes
@@ -136,6 +156,12 @@ type configController struct {
 	// watchTracker implements the necessary WatchTracker interface.
 	WatchTracker
 
+	// MaxSeatsTracker tracks the maximum seats that should be allocatable from the
+	// work estimator for a given priority level. This controller does not enforce
+	// any limits on max seats stored in this tracker, it is up to the work estimator
+	// to set lower/upper limits on max seats (currently min=1, max=10).
+	MaxSeatsTracker
+
 	// the most recent update attempts, ordered by increasing age.
 	// Consumer trims to keep only the last minute's worth of entries.
 	// The controller uses this to limit itself to at most six updates
@@ -143,8 +169,8 @@ type configController struct {
 	// This may only be accessed from the one and only worker goroutine.
 	mostRecentUpdates []updateAttempt
 
-	// This must be locked while accessing flowSchemas or
-	// priorityLevelStates.  A lock for writing is needed
+	// This must be locked while accessing the later fields.
+	// A lock for writing is needed
 	// for writing to any of the following:
 	// - the flowSchemas field
 	// - the slice held in the flowSchemas field
@@ -162,6 +188,12 @@ type configController struct {
 	// name to the state for that level.  Every name referenced from a
 	// member of `flowSchemas` has an entry here.
 	priorityLevelStates map[string]*priorityLevelState
+
+	// nominalCLSum is the sum of the nominalCL fields in the priorityLevelState records.
+	// This can exceed serverConcurrencyLimit because of the deliberate rounding up
+	// in the computation of the nominalCL values.
+	// This is tracked because it is an input to the allocation adjustment algorithm.
+	nominalCLSum int
 }
 
 type updateAttempt struct {
@@ -176,16 +208,15 @@ type priorityLevelState struct {
 	pl *flowcontrol.PriorityLevelConfiguration
 
 	// qsCompleter holds the QueueSetCompleter derived from `config`
-	// and `queues` if config is not exempt, nil otherwise.
+	// and `queues`.
 	qsCompleter fq.QueueSetCompleter
 
-	// The QueueSet for this priority level.  This is nil if and only
-	// if the priority level is exempt.
+	// The QueueSet for this priority level.
+	// Never nil.
 	queues fq.QueueSet
 
 	// quiescing==true indicates that this priority level should be
-	// removed when its queues have all drained.  May be true only if
-	// queues is non-nil.
+	// removed when its queues have all drained.
 	quiescing bool
 
 	// number of goroutines between Controller::Match and calling the
@@ -193,10 +224,56 @@ type priorityLevelState struct {
 	numPending int
 
 	// Observers tracking number of requests waiting, executing
-	reqsObsPair metrics.RatioedChangeObserverPair
+	reqsGaugePair metrics.RatioedGaugePair
 
 	// Observer of number of seats occupied throughout execution
-	execSeatsObs metrics.RatioedChangeObserver
+	execSeatsObs metrics.RatioedGauge
+
+	// Integrator of seat demand, reset every CurrentCL adjustment period
+	seatDemandIntegrator fq.Integrator
+
+	// Gauge of seat demand / nominalCL
+	seatDemandRatioedGauge metrics.RatioedGauge
+
+	// seatDemandStats is derived from periodically examining the seatDemandIntegrator.
+	// The average, standard deviation, and high watermark come directly from the integrator.
+	// envelope = avg + stdDev.
+	// Periodically smoothed gets replaced with `max(envelope, A*smoothed + (1-A)*envelope)`,
+	// where A is seatDemandSmoothingCoefficient.
+	seatDemandStats seatDemandStats
+
+	// nominalCL is the nominal concurrency limit configured in the PriorityLevelConfiguration
+	nominalCL int
+
+	// minCL is the nominal limit less the lendable amount
+	minCL int
+
+	//maxCL is the nominal limit plus the amount that may be borrowed
+	maxCL int
+
+	// currentCL is the dynamically derived concurrency limit to impose for now
+	currentCL int
+}
+
+type seatDemandStats struct {
+	avg           float64
+	stdDev        float64
+	highWatermark float64
+	smoothed      float64
+}
+
+func (stats *seatDemandStats) update(obs fq.IntegratorResults) {
+	stats.highWatermark = obs.Max
+	if obs.Duration <= 0 {
+		return
+	}
+	if math.IsNaN(obs.Deviation) {
+		obs.Deviation = 0
+	}
+	stats.avg = obs.Average
+	stats.stdDev = obs.Deviation
+	envelope := obs.Average + obs.Deviation
+	stats.smoothed = math.Max(envelope, seatDemandSmoothingCoefficient*stats.smoothed+(1-seatDemandSmoothingCoefficient)*envelope)
 }
 
 // NewTestableController is extra flexible to facilitate testing
@@ -205,8 +282,8 @@ func newTestableController(config TestableConfig) *configController {
 		name:                   config.Name,
 		clock:                  config.Clock,
 		queueSetFactory:        config.QueueSetFactory,
-		reqsObsPairGenerator:   config.ReqsObsPairGenerator,
-		execSeatsObsGenerator:  config.ExecSeatsObsGenerator,
+		reqsGaugeVec:           config.ReqsGaugeVec,
+		execSeatsGaugeVec:      config.ExecSeatsGaugeVec,
 		asFieldManager:         config.AsFieldManager,
 		foundToDangling:        config.FoundToDangling,
 		serverConcurrencyLimit: config.ServerConcurrencyLimit,
@@ -214,6 +291,7 @@ func newTestableController(config TestableConfig) *configController {
 		flowcontrolClient:      config.FlowcontrolClient,
 		priorityLevelStates:    make(map[string]*priorityLevelState),
 		WatchTracker:           NewWatchTracker(),
+		MaxSeatsTracker:        NewMaxSeatsTracker(),
 	}
 	klog.V(2).Infof("NewTestableController %q with serverConcurrencyLimit=%d, requestWaitLimit=%s, name=%s, asFieldManager=%q", cfgCtlr.name, cfgCtlr.serverConcurrencyLimit, cfgCtlr.requestWaitLimit, cfgCtlr.name, cfgCtlr.asFieldManager)
 	// Start with longish delay because conflicts will be between
@@ -221,7 +299,7 @@ func newTestableController(config TestableConfig) *configController {
 	cfgCtlr.configQueue = workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "priority_and_fairness_config_queue")
 	// ensure the data structure reflects the mandatory config
 	cfgCtlr.lockAndDigestConfigObjects(nil, nil)
-	fci := config.InformerFactory.Flowcontrol().V1beta2()
+	fci := config.InformerFactory.Flowcontrol().V1beta3()
 	pli := fci.PriorityLevelConfigurations()
 	fsi := fci.FlowSchemas()
 	cfgCtlr.plLister = pli.Lister()
@@ -291,23 +369,6 @@ func newTestableController(config TestableConfig) *configController {
 	return cfgCtlr
 }
 
-// MaintainObservations keeps the observers from
-// metrics.PriorityLevelConcurrencyObserverPairGenerator from falling
-// too far behind
-func (cfgCtlr *configController) MaintainObservations(stopCh <-chan struct{}) {
-	wait.Until(cfgCtlr.updateObservations, 10*time.Second, stopCh)
-}
-
-func (cfgCtlr *configController) updateObservations() {
-	cfgCtlr.lock.RLock()
-	defer cfgCtlr.lock.RUnlock()
-	for _, plc := range cfgCtlr.priorityLevelStates {
-		if plc.queues != nil {
-			plc.queues.UpdateObservations()
-		}
-	}
-}
-
 func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
@@ -322,9 +383,83 @@ func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
 	klog.Info("Running API Priority and Fairness config worker")
 	go wait.Until(cfgCtlr.runWorker, time.Second, stopCh)
 
+	klog.Info("Running API Priority and Fairness periodic rebalancing process")
+	go wait.Until(cfgCtlr.updateBorrowing, borrowingAdjustmentPeriod, stopCh)
+
 	<-stopCh
 	klog.Info("Shutting down API Priority and Fairness config worker")
 	return nil
+}
+
+func (cfgCtlr *configController) updateBorrowing() {
+	cfgCtlr.lock.Lock()
+	defer cfgCtlr.lock.Unlock()
+	cfgCtlr.updateBorrowingLocked(true, cfgCtlr.priorityLevelStates)
+}
+
+func (cfgCtlr *configController) updateBorrowingLocked(setCompleters bool, plStates map[string]*priorityLevelState) {
+	items := make([]allocProblemItem, 0, len(plStates))
+	plNames := make([]string, 0, len(plStates))
+	for plName, plState := range plStates {
+		obs := plState.seatDemandIntegrator.Reset()
+		plState.seatDemandStats.update(obs)
+		// Lower bound on this priority level's adjusted concurreny limit is the lesser of:
+		// - its seat demamd high watermark over the last adjustment period, and
+		// - its configured concurrency limit.
+		// BUT: we do not want this to be lower than the lower bound from configuration.
+		// See KEP-1040 for a more detailed explanation.
+		minCurrentCL := math.Max(float64(plState.minCL), math.Min(float64(plState.nominalCL), plState.seatDemandStats.highWatermark))
+		plNames = append(plNames, plName)
+		items = append(items, allocProblemItem{
+			lowerBound: minCurrentCL,
+			upperBound: float64(plState.maxCL),
+			target:     math.Max(minCurrentCL, plState.seatDemandStats.smoothed),
+		})
+	}
+	if len(items) == 0 && cfgCtlr.nominalCLSum > 0 {
+		klog.ErrorS(nil, "Impossible: no priority levels", "plStates", cfgCtlr.priorityLevelStates)
+		return
+	}
+	allocs, fairFrac, err := computeConcurrencyAllocation(cfgCtlr.nominalCLSum, items)
+	if err != nil {
+		klog.ErrorS(err, "Unable to derive new concurrency limits", "plNames", plNames, "items", items)
+		allocs = make([]float64, len(items))
+		for idx, plName := range plNames {
+			plState := plStates[plName]
+			allocs[idx] = float64(plState.currentCL)
+		}
+	}
+	for idx, plName := range plNames {
+		plState := plStates[plName]
+		if setCompleters {
+			qsCompleter, err := queueSetCompleterForPL(cfgCtlr.queueSetFactory, plState.queues,
+				plState.pl, cfgCtlr.requestWaitLimit, plState.reqsGaugePair, plState.execSeatsObs,
+				metrics.NewUnionGauge(plState.seatDemandIntegrator, plState.seatDemandRatioedGauge))
+			if err != nil {
+				klog.ErrorS(err, "Inconceivable!  Configuration error in existing priority level", "pl", plState.pl)
+				continue
+			}
+			plState.qsCompleter = qsCompleter
+		}
+		currentCL := int(math.Round(float64(allocs[idx])))
+		relChange := relDiff(float64(currentCL), float64(plState.currentCL))
+		plState.currentCL = currentCL
+		metrics.NotePriorityLevelConcurrencyAdjustment(plState.pl.Name, plState.seatDemandStats.highWatermark, plState.seatDemandStats.avg, plState.seatDemandStats.stdDev, plState.seatDemandStats.smoothed, float64(items[idx].target), currentCL)
+		logLevel := klog.Level(4)
+		if relChange >= 0.05 {
+			logLevel = 2
+		}
+		var concurrencyDenominator int
+		if currentCL > 0 {
+			concurrencyDenominator = currentCL
+		} else {
+			concurrencyDenominator = int(math.Max(1, math.Round(float64(cfgCtlr.serverConcurrencyLimit)/10)))
+		}
+		plState.seatDemandRatioedGauge.SetDenominator(float64(concurrencyDenominator))
+		klog.V(logLevel).InfoS("Update CurrentCL", "plName", plName, "seatDemandHighWatermark", plState.seatDemandStats.highWatermark, "seatDemandAvg", plState.seatDemandStats.avg, "seatDemandStdev", plState.seatDemandStats.stdDev, "seatDemandSmoothed", plState.seatDemandStats.smoothed, "fairFrac", fairFrac, "currentCL", currentCL, "concurrencyDenominator", concurrencyDenominator, "backstop", err != nil)
+		plState.queues = plState.qsCompleter.Complete(fq.DispatchingConfig{ConcurrencyLimit: currentCL, ConcurrencyDenominator: concurrencyDenominator})
+	}
+	metrics.SetFairFrac(float64(fairFrac))
 }
 
 // runWorker is the logic of the one and only worker goroutine.  We
@@ -404,6 +539,8 @@ type cfgMeal struct {
 	// provoking a call into this controller while the lock held
 	// waiting on that request to complete.
 	fsStatusUpdates []fsStatusUpdate
+
+	maxWaitingRequests, maxExecutingRequests int
 }
 
 // A buffered set of status updates for FlowSchemas
@@ -435,19 +572,12 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 
 		// if we are going to issue an update, be sure we track every name we update so we know if we update it too often.
 		currResult.updatedItems.Insert(fsu.flowSchema.Name)
-		patchBytes, err := makeFlowSchemaConditionPatch(fsu.condition)
-		if err != nil {
-			// should never happen because these conditions are created here and well formed
-			panic(fmt.Sprintf("Failed to json.Marshall(%#+v): %s", fsu.condition, err.Error()))
-		}
 		if klogV := klog.V(4); klogV.Enabled() {
 			klogV.Infof("%s writing Condition %s to FlowSchema %s, which had ResourceVersion=%s, because its previous value was %s, diff: %s",
 				cfgCtlr.name, fsu.condition, fsu.flowSchema.Name, fsu.flowSchema.ResourceVersion, fcfmt.Fmt(fsu.oldValue), cmp.Diff(fsu.oldValue, fsu.condition))
 		}
-		fsIfc := cfgCtlr.flowcontrolClient.FlowSchemas()
-		patchOptions := metav1.PatchOptions{FieldManager: cfgCtlr.asFieldManager}
-		_, err = fsIfc.Patch(context.TODO(), fsu.flowSchema.Name, apitypes.StrategicMergePatchType, patchBytes, patchOptions, "status")
-		if err != nil {
+
+		if err := apply(cfgCtlr.flowcontrolClient.FlowSchemas(), fsu, cfgCtlr.asFieldManager); err != nil {
 			if apierrors.IsNotFound(err) {
 				// This object has been deleted.  A notification is coming
 				// and nothing more needs to be done here.
@@ -462,18 +592,27 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 	return suggestedDelay, utilerrors.NewAggregate(errs)
 }
 
-// makeFlowSchemaConditionPatch takes in a condition and returns the patch status as a json.
-func makeFlowSchemaConditionPatch(condition flowcontrol.FlowSchemaCondition) ([]byte, error) {
-	o := struct {
-		Status flowcontrol.FlowSchemaStatus `json:"status"`
-	}{
-		Status: flowcontrol.FlowSchemaStatus{
-			Conditions: []flowcontrol.FlowSchemaCondition{
-				condition,
-			},
-		},
-	}
-	return json.Marshal(o)
+func apply(client flowcontrolclient.FlowSchemaInterface, fsu fsStatusUpdate, asFieldManager string) error {
+	applyOptions := metav1.ApplyOptions{FieldManager: asFieldManager, Force: true}
+
+	// the condition field in fsStatusUpdate holds the new condition we want to update.
+	// TODO: this will break when we have multiple conditions for a flowschema
+	_, err := client.ApplyStatus(context.TODO(), toFlowSchemaApplyConfiguration(fsu), applyOptions)
+	return err
+}
+
+func toFlowSchemaApplyConfiguration(fsUpdate fsStatusUpdate) *flowcontrolapplyconfiguration.FlowSchemaApplyConfiguration {
+	condition := flowcontrolapplyconfiguration.FlowSchemaCondition().
+		WithType(fsUpdate.condition.Type).
+		WithStatus(fsUpdate.condition.Status).
+		WithReason(fsUpdate.condition.Reason).
+		WithLastTransitionTime(fsUpdate.condition.LastTransitionTime).
+		WithMessage(fsUpdate.condition.Message)
+
+	return flowcontrolapplyconfiguration.FlowSchema(fsUpdate.flowSchema.Name).
+		WithStatus(flowcontrolapplyconfiguration.FlowSchemaStatus().
+			WithConditions(condition),
+		)
 }
 
 // shouldDelayUpdate checks to see if a flowschema has been updated too often and returns true if a delay is needed.
@@ -528,7 +667,13 @@ func (cfgCtlr *configController) lockAndDigestConfigObjects(newPLs []*flowcontro
 
 	// The new config has been constructed
 	cfgCtlr.priorityLevelStates = meal.newPLStates
-	klog.V(5).Infof("Switched to new API Priority and Fairness configuration")
+	klog.V(5).InfoS("Switched to new API Priority and Fairness configuration", "maxWaitingRequests", meal.maxWaitingRequests, "maxExecutinRequests", meal.maxExecutingRequests)
+
+	metrics.GetWaitingReadonlyConcurrency().SetDenominator(float64(meal.maxWaitingRequests))
+	metrics.GetWaitingMutatingConcurrency().SetDenominator(float64(meal.maxWaitingRequests))
+	metrics.GetExecutingReadonlyConcurrency().SetDenominator(float64(meal.maxExecutingRequests))
+	metrics.GetExecutingMutatingConcurrency().SetDenominator(float64(meal.maxExecutingRequests))
+
 	return meal.fsStatusUpdates
 }
 
@@ -539,9 +684,16 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 		state := meal.cfgCtlr.priorityLevelStates[pl.Name]
 		if state == nil {
 			labelValues := []string{pl.Name}
-			state = &priorityLevelState{reqsObsPair: meal.cfgCtlr.reqsObsPairGenerator.Generate(1, 1, labelValues), execSeatsObs: meal.cfgCtlr.execSeatsObsGenerator.Generate(0, 1, labelValues)}
+			state = &priorityLevelState{
+				reqsGaugePair:          metrics.RatioedGaugeVecPhasedElementPair(meal.cfgCtlr.reqsGaugeVec, 1, 1, labelValues),
+				execSeatsObs:           meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues),
+				seatDemandIntegrator:   fq.NewNamedIntegrator(meal.cfgCtlr.clock, pl.Name),
+				seatDemandRatioedGauge: metrics.ApiserverSeatDemands.NewForLabelValuesSafe(0, 1, []string{pl.Name}),
+			}
 		}
-		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues, pl, meal.cfgCtlr.requestWaitLimit, state.reqsObsPair, state.execSeatsObs)
+		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues,
+			pl, meal.cfgCtlr.requestWaitLimit, state.reqsGaugePair, state.execSeatsObs,
+			metrics.NewUnionGauge(state.seatDemandIntegrator, state.seatDemandRatioedGauge))
 		if err != nil {
 			klog.Warningf("Ignoring PriorityLevelConfiguration object %s because its spec (%s) is broken: %s", pl.Name, fcfmt.Fmt(pl.Spec), err)
 			continue
@@ -553,9 +705,8 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 			klog.V(3).Infof("Priority level %q was undesired and has become desired again", pl.Name)
 			state.quiescing = false
 		}
-		if state.pl.Spec.Limited != nil {
-			meal.shareSum += float64(state.pl.Spec.Limited.AssuredConcurrencyShares)
-		}
+		nominalConcurrencyShares, _, _ := plSpecCommons(state.pl)
+		meal.shareSum += float64(nominalConcurrencyShares)
 		meal.haveExemptPL = meal.haveExemptPL || pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt
 		meal.haveCatchAllPL = meal.haveCatchAllPL || pl.Name == flowcontrol.PriorityLevelConfigurationNameCatchAll
 	}
@@ -628,15 +779,16 @@ func (meal *cfgMeal) processOldPLsLocked() {
 			continue
 		}
 		if plName == flowcontrol.PriorityLevelConfigurationNameExempt && !meal.haveExemptPL || plName == flowcontrol.PriorityLevelConfigurationNameCatchAll && !meal.haveCatchAllPL {
-			// BTW, we know the Spec has not changed because the
-			// mandatory objects have immutable Specs
+			// BTW, we know the Spec has not changed what is says about queuing because the
+			// mandatory objects have immutable Specs as far as queuing is concerned.
 			klog.V(3).Infof("Retaining mandatory priority level %q despite lack of API object", plName)
 		} else {
-			if plState.queues == nil || plState.numPending == 0 && plState.queues.IsIdle() {
-				// Either there are no queues or they are done
+			if plState.numPending == 0 && plState.queues.IsIdle() {
+				// The QueueSet is done
 				// draining and no use is coming from another
 				// goroutine
-				klog.V(3).Infof("Removing undesired priority level %q (nilQueues=%v), Type=%v", plName, plState.queues == nil, plState.pl.Spec.Type)
+				klog.V(3).Infof("Removing undesired priority level %q, Type=%v", plName, plState.pl.Spec.Type)
+				meal.cfgCtlr.MaxSeatsTracker.ForgetPriorityLevel(plName)
 				continue
 			}
 			if !plState.quiescing {
@@ -645,20 +797,21 @@ func (meal *cfgMeal) processOldPLsLocked() {
 			}
 		}
 		var err error
-		plState.qsCompleter, err = queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, plState.queues, plState.pl, meal.cfgCtlr.requestWaitLimit, plState.reqsObsPair, plState.execSeatsObs)
+		plState.qsCompleter, err = queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, plState.queues,
+			plState.pl, meal.cfgCtlr.requestWaitLimit, plState.reqsGaugePair, plState.execSeatsObs,
+			metrics.NewUnionGauge(plState.seatDemandIntegrator, plState.seatDemandRatioedGauge))
 		if err != nil {
 			// This can not happen because queueSetCompleterForPL already approved this config
 			panic(fmt.Sprintf("%s from name=%q spec=%s", err, plName, fcfmt.Fmt(plState.pl.Spec)))
 		}
-		if plState.pl.Spec.Limited != nil {
-			// We deliberately include the lingering priority levels
-			// here so that their queues get some concurrency and they
-			// continue to drain.  During this interim a lingering
-			// priority level continues to get a concurrency
-			// allocation determined by all the share values in the
-			// regular way.
-			meal.shareSum += float64(plState.pl.Spec.Limited.AssuredConcurrencyShares)
-		}
+		// We deliberately include the lingering priority levels
+		// here so that their queues get some concurrency and they
+		// continue to drain.  During this interim a lingering
+		// priority level continues to get a concurrency
+		// allocation determined by all the share values in the
+		// regular way.
+		nominalConcurrencyShares, _, _ := plSpecCommons(plState.pl)
+		meal.shareSum += float64(nominalConcurrencyShares)
 		meal.haveExemptPL = meal.haveExemptPL || plName == flowcontrol.PriorityLevelConfigurationNameExempt
 		meal.haveCatchAllPL = meal.haveCatchAllPL || plName == flowcontrol.PriorityLevelConfigurationNameCatchAll
 		meal.newPLStates[plName] = plState
@@ -670,63 +823,100 @@ func (meal *cfgMeal) processOldPLsLocked() {
 // QueueSets.
 func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 	for plName, plState := range meal.newPLStates {
-		if plState.pl.Spec.Limited == nil {
-			klog.V(5).Infof("Using exempt priority level %q: quiescing=%v", plName, plState.quiescing)
-			continue
-		}
-
+		nominalConcurrencyShares, lendablePercent, borrowingLimitPercent := plSpecCommons(plState.pl)
 		// The use of math.Ceil here means that the results might sum
 		// to a little more than serverConcurrencyLimit but the
 		// difference will be negligible.
-		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtlr.serverConcurrencyLimit) * float64(plState.pl.Spec.Limited.AssuredConcurrencyShares) / meal.shareSum))
-		metrics.UpdateSharedConcurrencyLimit(plName, concurrencyLimit)
-
-		if plState.queues == nil {
-			klog.V(5).Infof("Introducing queues for priority level %q: config=%s, concurrencyLimit=%d, quiescing=%v (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, plState.quiescing, plState.pl.Spec.Limited.AssuredConcurrencyShares, meal.shareSum)
-		} else {
-			klog.V(5).Infof("Retaining queues for priority level %q: config=%s, concurrencyLimit=%d, quiescing=%v, numPending=%d (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, plState.quiescing, plState.numPending, plState.pl.Spec.Limited.AssuredConcurrencyShares, meal.shareSum)
+		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtlr.serverConcurrencyLimit) * float64(nominalConcurrencyShares) / meal.shareSum))
+		var lendableCL, borrowingCL int
+		if lendablePercent != nil {
+			lendableCL = int(math.Round(float64(concurrencyLimit) * float64(*lendablePercent) / 100))
 		}
-		plState.queues = plState.qsCompleter.Complete(fq.DispatchingConfig{ConcurrencyLimit: concurrencyLimit})
+		if borrowingLimitPercent != nil {
+			borrowingCL = int(math.Round(float64(concurrencyLimit) * float64(*borrowingLimitPercent) / 100))
+		} else {
+			borrowingCL = meal.cfgCtlr.serverConcurrencyLimit
+		}
+
+		metrics.SetPriorityLevelConfiguration(plName, concurrencyLimit, concurrencyLimit-lendableCL, concurrencyLimit+borrowingCL)
+		cfgChanged := plState.nominalCL != concurrencyLimit || plState.minCL != concurrencyLimit-lendableCL || plState.maxCL != concurrencyLimit+borrowingCL
+		plState.nominalCL = concurrencyLimit
+		plState.minCL = concurrencyLimit - lendableCL
+		plState.maxCL = concurrencyLimit + borrowingCL
+		meal.maxExecutingRequests += concurrencyLimit
+		if limited := plState.pl.Spec.Limited; limited != nil {
+			if qCfg := limited.LimitResponse.Queuing; qCfg != nil {
+				meal.maxWaitingRequests += int(qCfg.Queues * qCfg.QueueLengthLimit)
+
+				// Max seats allocatable from work estimator is calculated as MAX(1, MIN(0.15 * nominalCL, nominalCL/handSize)).
+				// This is to keep max seats relative to total available concurrency with a minimum value of 1.
+				// 15% of nominal concurrency was chosen since it preserved the previous max seats of 10 for default priority levels
+				// when using apiserver's default total server concurrency of 600 (--max-requests-inflight=400, --max-mutating-requests-inflight=200).
+				// This ensures that clusters with relatively high inflight requests will continue to use a max seats of 10
+				// while clusters with lower inflight requests will use max seats no greater than nominalCL/handSize.
+				// Calculated max seats can return arbitrarily high values but work estimator currently limits max seats at 10.
+				handSize := plState.pl.Spec.Limited.LimitResponse.Queuing.HandSize
+				maxSeats := uint64(math.Max(1, math.Min(math.Ceil(float64(concurrencyLimit)*priorityLevelMaxSeatsPercent), float64(int32(concurrencyLimit)/handSize))))
+				meal.cfgCtlr.MaxSeatsTracker.SetMaxSeats(plName, maxSeats)
+			}
+		}
+		if plState.queues == nil {
+			initialCL := concurrencyLimit - lendableCL/2
+			klog.V(2).Infof("Introducing queues for priority level %q: config=%s, nominalCL=%d, lendableCL=%d, borrowingCL=%d, currentCL=%d, quiescing=%v (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, lendableCL, borrowingCL, initialCL, plState.quiescing, nominalConcurrencyShares, meal.shareSum)
+			plState.seatDemandStats = seatDemandStats{}
+			plState.currentCL = initialCL
+		} else {
+			logLevel := klog.Level(5)
+			if cfgChanged {
+				logLevel = 2
+			}
+			klog.V(logLevel).Infof("Retaining queues for priority level %q: config=%s, nominalCL=%d, lendableCL=%d, borrowingCL=%d, currentCL=%d, quiescing=%v, numPending=%d (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, lendableCL, borrowingCL, plState.currentCL, plState.quiescing, plState.numPending, nominalConcurrencyShares, meal.shareSum)
+		}
 	}
+	meal.cfgCtlr.nominalCLSum = meal.maxExecutingRequests
+	meal.cfgCtlr.updateBorrowingLocked(false, meal.newPLStates)
 }
 
 // queueSetCompleterForPL returns an appropriate QueueSetCompleter for the
-// given priority level configuration.  Returns nil if that config
-// does not call for limiting.  Returns nil and an error if the given
+// given priority level configuration.  Returns nil and an error if the given
 // object is malformed in a way that is a problem for this package.
-func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedChangeObserverPair, execSeatsObs metrics.RatioedChangeObserver) (fq.QueueSetCompleter, error) {
-	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Spec.Limited == nil) {
-		return nil, errors.New("broken union structure at the top")
+func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedGaugePair, execSeatsObs metrics.RatioedGauge, seatDemandGauge metrics.Gauge) (fq.QueueSetCompleter, error) {
+	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementLimited) != (pl.Spec.Limited != nil) {
+		return nil, errors.New("broken union structure at the top, for Limited")
+	}
+	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Spec.Exempt != nil) {
+		return nil, errors.New("broken union structure at the top, for Exempt")
 	}
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt) {
 		// This package does not attempt to cope with a priority level dynamically switching between exempt and not.
 		return nil, errors.New("non-alignment between name and type")
 	}
-	if pl.Spec.Limited == nil {
-		return nil, nil
-	}
-	if (pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeReject) != (pl.Spec.Limited.LimitResponse.Queuing == nil) {
-		return nil, errors.New("broken union structure for limit response")
-	}
-	qcAPI := pl.Spec.Limited.LimitResponse.Queuing
 	qcQS := fq.QueuingConfig{Name: pl.Name}
-	if qcAPI != nil {
-		qcQS = fq.QueuingConfig{Name: pl.Name,
-			DesiredNumQueues: int(qcAPI.Queues),
-			QueueLengthLimit: int(qcAPI.QueueLengthLimit),
-			HandSize:         int(qcAPI.HandSize),
-			RequestWaitLimit: requestWaitLimit,
+	if pl.Spec.Limited != nil {
+		if (pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeReject) != (pl.Spec.Limited.LimitResponse.Queuing == nil) {
+			return nil, errors.New("broken union structure for limit response")
 		}
+		qcAPI := pl.Spec.Limited.LimitResponse.Queuing
+		if qcAPI != nil {
+			qcQS = fq.QueuingConfig{Name: pl.Name,
+				DesiredNumQueues: int(qcAPI.Queues),
+				QueueLengthLimit: int(qcAPI.QueueLengthLimit),
+				HandSize:         int(qcAPI.HandSize),
+				RequestWaitLimit: requestWaitLimit,
+			}
+		}
+	} else {
+		qcQS = fq.QueuingConfig{Name: pl.Name, DesiredNumQueues: -1}
 	}
 	var qsc fq.QueueSetCompleter
 	var err error
 	if queues != nil {
 		qsc, err = queues.BeginConfigChange(qcQS)
 	} else {
-		qsc, err = qsf.BeginConstruction(qcQS, reqsIntPair, execSeatsObs)
+		qsc, err = qsf.BeginConstruction(qcQS, reqsIntPair, execSeatsObs, seatDemandGauge)
 	}
 	if err != nil {
-		err = fmt.Errorf("priority level %q has QueuingConfiguration %#+v, which is invalid: %w", pl.Name, qcAPI, err)
+		err = fmt.Errorf("priority level %q has QueuingConfiguration %#+v, which is invalid: %w", pl.Name, qcQS, err)
 	}
 	return qsc, err
 }
@@ -769,30 +959,28 @@ func (meal *cfgMeal) presyncFlowSchemaStatus(fs *flowcontrol.FlowSchema, isDangl
 func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration) {
 	klog.V(3).Infof("No %s PriorityLevelConfiguration found, imagining one", proto.Name)
 	labelValues := []string{proto.Name}
-	reqsObsPair := meal.cfgCtlr.reqsObsPairGenerator.Generate(1, 1, labelValues)
-	execSeatsObs := meal.cfgCtlr.execSeatsObsGenerator.Generate(0, 1, labelValues)
-	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto, requestWaitLimit, reqsObsPair, execSeatsObs)
+	reqsGaugePair := metrics.RatioedGaugeVecPhasedElementPair(meal.cfgCtlr.reqsGaugeVec, 1, 1, labelValues)
+	execSeatsObs := meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues)
+	seatDemandIntegrator := fq.NewNamedIntegrator(meal.cfgCtlr.clock, proto.Name)
+	seatDemandRatioedGauge := metrics.ApiserverSeatDemands.NewForLabelValuesSafe(0, 1, []string{proto.Name})
+	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto,
+		requestWaitLimit, reqsGaugePair, execSeatsObs,
+		metrics.NewUnionGauge(seatDemandIntegrator, seatDemandRatioedGauge))
 	if err != nil {
 		// This can not happen because proto is one of the mandatory
 		// objects and these are not erroneous
 		panic(err)
 	}
 	meal.newPLStates[proto.Name] = &priorityLevelState{
-		pl:           proto,
-		qsCompleter:  qsCompleter,
-		reqsObsPair:  reqsObsPair,
-		execSeatsObs: execSeatsObs,
+		pl:                     proto,
+		qsCompleter:            qsCompleter,
+		reqsGaugePair:          reqsGaugePair,
+		execSeatsObs:           execSeatsObs,
+		seatDemandIntegrator:   seatDemandIntegrator,
+		seatDemandRatioedGauge: seatDemandRatioedGauge,
 	}
-	if proto.Spec.Limited != nil {
-		meal.shareSum += float64(proto.Spec.Limited.AssuredConcurrencyShares)
-	}
-}
-
-type immediateRequest struct{}
-
-func (immediateRequest) Finish(execute func()) bool {
-	execute()
-	return false
+	nominalConcurrencyShares, _, _ := plSpecCommons(proto)
+	meal.shareSum += float64(nominalConcurrencyShares)
 }
 
 // startRequest classifies and, if appropriate, enqueues the request.
@@ -833,32 +1021,31 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	}
 	plName := selectedFlowSchema.Spec.PriorityLevelConfiguration.Name
 	plState := cfgCtlr.priorityLevelStates[plName]
-	if plState.pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt {
-		noteFn(selectedFlowSchema, plState.pl, "")
-		klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, immediate", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName)
-		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}
-	}
 	var numQueues int32
-	if plState.pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeQueue {
-		numQueues = plState.pl.Spec.Limited.LimitResponse.Queuing.Queues
-	}
-	var flowDistinguisher string
 	var hashValue uint64
-	if numQueues > 1 {
-		flowDistinguisher = computeFlowDistinguisher(rd, selectedFlowSchema.Spec.DistinguisherMethod)
-		hashValue = hashFlowID(selectedFlowSchema.Name, flowDistinguisher)
+	var flowDistinguisher string
+	if plState.pl.Spec.Type != flowcontrol.PriorityLevelEnablementExempt {
+		if plState.pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeQueue {
+			numQueues = plState.pl.Spec.Limited.LimitResponse.Queuing.Queues
+		}
+		if numQueues > 1 {
+			flowDistinguisher = computeFlowDistinguisher(rd, selectedFlowSchema.Spec.DistinguisherMethod)
+			hashValue = hashFlowID(selectedFlowSchema.Name, flowDistinguisher)
+		}
 	}
 
 	noteFn(selectedFlowSchema, plState.pl, flowDistinguisher)
 	workEstimate := workEstimator()
 
-	startWaitingTime = time.Now()
+	if plState.pl.Spec.Type != flowcontrol.PriorityLevelEnablementExempt {
+		startWaitingTime = cfgCtlr.clock.Now()
+	}
 	klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName, numQueues)
 	req, idle := plState.queues.StartRequest(ctx, &workEstimate, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)
 	if idle {
 		cfgCtlr.maybeReapReadLocked(plName, plState)
 	}
-	return selectedFlowSchema, plState.pl, false, req, startWaitingTime
+	return selectedFlowSchema, plState.pl, plState.pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt, req, startWaitingTime
 }
 
 // maybeReap will remove the last internal traces of the named
@@ -872,12 +1059,10 @@ func (cfgCtlr *configController) maybeReap(plName string) {
 		klog.V(7).Infof("plName=%s, plState==nil", plName)
 		return
 	}
-	if plState.queues != nil {
-		useless := plState.quiescing && plState.numPending == 0 && plState.queues.IsIdle()
-		klog.V(7).Infof("plState.quiescing=%v, plState.numPending=%d, useless=%v", plState.quiescing, plState.numPending, useless)
-		if !useless {
-			return
-		}
+	useless := plState.quiescing && plState.numPending == 0 && plState.queues.IsIdle()
+	klog.V(7).Infof("plState.quiescing=%v, plState.numPending=%d, useless=%v", plState.quiescing, plState.numPending, useless)
+	if !useless {
+		return
 	}
 	klog.V(3).Infof("Triggered API priority and fairness config reloading because priority level %s is undesired and idle", plName)
 	cfgCtlr.configQueue.Add(0)
@@ -921,4 +1106,26 @@ func hashFlowID(fsName, fDistinguisher string) uint64 {
 	var sum [32]byte
 	hash.Sum(sum[:0])
 	return binary.LittleEndian.Uint64(sum[:8])
+}
+
+func relDiff(x, y float64) float64 {
+	diff := math.Abs(x - y)
+	den := math.Max(math.Abs(x), math.Abs(y))
+	if den == 0 {
+		return 0
+	}
+	return diff / den
+}
+
+// plSpecCommons returns the (NominalConcurrencyShares, LendablePercent, BorrowingLimitPercent) of the given priority level config
+func plSpecCommons(pl *flowcontrol.PriorityLevelConfiguration) (int32, *int32, *int32) {
+	if limiter := pl.Spec.Limited; limiter != nil {
+		return limiter.NominalConcurrencyShares, limiter.LendablePercent, limiter.BorrowingLimitPercent
+	}
+	limiter := pl.Spec.Exempt
+	var nominalConcurrencyShares int32
+	if limiter.NominalConcurrencyShares != nil {
+		nominalConcurrencyShares = *limiter.NominalConcurrencyShares
+	}
+	return nominalConcurrencyShares, limiter.LendablePercent, nil
 }

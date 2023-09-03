@@ -39,7 +39,6 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/version"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
@@ -48,7 +47,6 @@ import (
 	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
@@ -60,9 +58,9 @@ const (
 	bridgenf6                   = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
 	ipv4Forward                 = "/proc/sys/net/ipv4/ip_forward"
 	ipv6DefaultForwarding       = "/proc/sys/net/ipv6/conf/default/forwarding"
-	externalEtcdRequestTimeout  = time.Duration(10 * time.Second)
+	externalEtcdRequestTimeout  = 10 * time.Second
 	externalEtcdRequestRetries  = 3
-	externalEtcdRequestInterval = time.Duration(5 * time.Second)
+	externalEtcdRequestInterval = 5 * time.Second
 )
 
 var (
@@ -386,7 +384,7 @@ func (ipc InPathCheck) Check() (warnings, errs []error) {
 	return nil, nil
 }
 
-// HostnameCheck checks if hostname match dns sub domain regex.
+// HostnameCheck checks if hostname match dns subdomain regex.
 // If hostname doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
 type HostnameCheck struct {
 	nodeName string
@@ -397,7 +395,7 @@ func (HostnameCheck) Name() string {
 	return "Hostname"
 }
 
-// Check validates if hostname match dns sub domain regex.
+// Check validates if hostname match dns subdomain regex.
 // Check hostname length and format
 func (hc HostnameCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("checking whether the given node name is valid and reachable using net.LookupHost")
@@ -527,12 +525,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
 	var validators = []system.Validator{
 		&system.KernelValidator{Reporter: reporter}}
 
-	if runtime.GOOS == "linux" {
-		//add linux validators
-		validators = append(validators,
-			&system.OSValidator{Reporter: reporter},
-			&system.CgroupsValidator{Reporter: reporter})
-	}
+	validators = addOSValidator(validators, reporter)
 
 	// Run all validators
 	for _, v := range validators {
@@ -585,8 +578,8 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
 
 	// Checks if k8sVersion greater or equal than the first unsupported versions by current version of kubeadm,
 	// that is major.minor+1 (all patch and pre-releases versions included)
-	// NB. in semver patches number is a numeric, while prerelease is a string where numeric identifiers always have lower precedence than non-numeric identifiers.
-	//     thus setting the value to x.y.0-0 we are defining the very first patch - prereleases within x.y minor release.
+	// NB. in semver patches number is a numeric, while pre-release is a string where numeric identifiers always have lower precedence than non-numeric identifiers.
+	//     thus setting the value to x.y.0-0 we are defining the very first patch - pre-releases within x.y minor release.
 	firstUnsupportedVersion := versionutil.MustParseSemantic(fmt.Sprintf("%d.%d.%s", kadmVersion.Major(), kadmVersion.Minor()+1, "0-0"))
 	if k8sVersion.AtLeast(firstUnsupportedVersion) {
 		return []error{errors.Errorf("Kubernetes version is greater than kubeadm version. Please consider to upgrade kubeadm. Kubernetes version: %s. Kubeadm version: %d.%d.x", k8sVersion, kadmVersion.Components()[0], kadmVersion.Components()[1])}, nil
@@ -598,7 +591,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
 // KubeletVersionCheck validates installed kubelet version
 type KubeletVersionCheck struct {
 	KubernetesVersion string
-	minKubeletVersion *version.Version
+	minKubeletVersion *versionutil.Version
 	exec              utilsexec.Interface
 }
 
@@ -615,7 +608,7 @@ func (kubever KubeletVersionCheck) Check() (warnings, errorList []error) {
 		return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
 	}
 	if kubever.minKubeletVersion == nil {
-		kubever.minKubeletVersion = constants.MinimumKubeletVersion
+		kubever.minKubeletVersion = kubeadmconstants.MinimumKubeletVersion
 	}
 	if kubeletVersion.LessThan(kubever.minKubeletVersion) {
 		return nil, []error{errors.Errorf("Kubelet version %q is lower than kubeadm can support. Please upgrade kubelet", kubeletVersion)}
@@ -660,7 +653,7 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 	}
 
 	if len(buf) > 1 {
-		return []error{errors.New("swap is enabled; production deployments should disable swap unless testing the NodeSwap feature gate of the kubelet")}, nil
+		return []error{errors.New("swap is supported for cgroup v2 only; the NodeSwap feature gate of the kubelet is beta but disabled by default")}, nil
 	}
 
 	return nil, nil
@@ -820,6 +813,7 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 type ImagePullCheck struct {
 	runtime         utilruntime.ContainerRuntime
 	imageList       []string
+	sandboxImage    string
 	imagePullPolicy v1.PullPolicy
 }
 
@@ -833,6 +827,15 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	policy := ipc.imagePullPolicy
 	klog.V(1).Infof("using image pull policy: %s", policy)
 	for _, image := range ipc.imageList {
+		if image == ipc.sandboxImage {
+			criSandboxImage, err := ipc.runtime.SandboxImage()
+			if err != nil {
+				klog.V(4).Infof("failed to detect the sandbox image for local container runtime, %v", err)
+			} else if criSandboxImage != ipc.sandboxImage {
+				klog.Warningf("detected that the sandbox image %q of the container runtime is inconsistent with that used by kubeadm. It is recommended that using %q as the CRI sandbox image.",
+					criSandboxImage, ipc.sandboxImage)
+			}
+		}
 		switch policy {
 		case v1.PullNever:
 			klog.V(1).Infof("skipping pull of image: %s", image)
@@ -890,15 +893,11 @@ func (MemCheck) Name() string {
 	return "Mem"
 }
 
-// RunInitNodeChecks executes all individual, applicable to control-plane node checks.
-// The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
-// The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
-// If the flag is set to true we should skip checks already executed by RunJoinNodeChecks.
-func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool, downloadCerts bool) error {
+func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) ([]Checker, error) {
 	if !isSecondaryControlPlane {
 		// First, check if we're root separately from the other preflight checks and fail fast
 		if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -919,13 +918,36 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestsDir)},
 		HTTPProxyCheck{Proto: "https", Host: cfg.LocalAPIEndpoint.AdvertiseAddress},
 	}
+
+	// File content check for IPV4 and IPV6 are needed if it is:
+	// (dual stack)  `--service-cidr` or `--pod-network-cidr` is set with an IPV4 and IPV6 CIDR, `--apiserver-advertise-address` is optional as it can be auto-detected.
+	// (single stack) which is decided by the `--apiserver-advertise-address`.
+	// Note that for the case of dual stack, user might only give IPV6 CIDR for `--service-cidr` and leave the `--apiserver-advertise-address` a default value which will be
+	// auto-detected and properly bound to an IPV4 address, this will make the cluster non-functional eventually. The case like this should be avoided by the validation instead,
+	// i.e. We don't care whether the input values for those parameters are set correctly here but if it's an IPV4 scoped CIDR or address we will add the file content check for IPV4,
+	// as does the IPV6.
+	IPV4Check := false
+	IPV6Check := false
 	cidrs := strings.Split(cfg.Networking.ServiceSubnet, ",")
 	for _, cidr := range cidrs {
 		checks = append(checks, HTTPProxyCIDRCheck{Proto: "https", CIDR: cidr})
+		if !IPV4Check && netutils.IsIPv4CIDRString(cidr) {
+			IPV4Check = true
+		}
+		if !IPV6Check && netutils.IsIPv6CIDRString(cidr) {
+			IPV6Check = true
+		}
+
 	}
 	cidrs = strings.Split(cfg.Networking.PodSubnet, ",")
 	for _, cidr := range cidrs {
 		checks = append(checks, HTTPProxyCIDRCheck{Proto: "https", CIDR: cidr})
+		if !IPV4Check && netutils.IsIPv4CIDRString(cidr) {
+			IPV4Check = true
+		}
+		if !IPV6Check && netutils.IsIPv6CIDRString(cidr) {
+			IPV6Check = true
+		}
 	}
 
 	if !isSecondaryControlPlane {
@@ -933,12 +955,19 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
 		if ip := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if netutils.IsIPv6(ip) && runtime.GOOS == "linux" {
-				checks = append(checks,
-					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
-				)
+			if !IPV4Check && netutils.IsIPv4(ip) {
+				IPV4Check = true
 			}
+			if !IPV6Check && netutils.IsIPv6(ip) {
+				IPV6Check = true
+			}
+		}
+
+		if IPV4Check {
+			checks = addIPv4Checks(checks)
+		}
+		if IPV6Check {
+			checks = addIPv6Checks(checks)
 		}
 
 		// if using an external etcd
@@ -969,15 +998,25 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.KeyFile, Label: "ExternalEtcdClientCertificates"})
 		}
 	}
+	return checks, nil
+}
 
+// RunInitNodeChecks executes all individual, applicable to control-plane node checks.
+// The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
+// The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
+// If the flag is set to true we should skip checks already executed by RunJoinNodeChecks.
+func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) error {
+	checks, err := InitNodeChecks(execer, cfg, ignorePreflightErrors, isSecondaryControlPlane, downloadCerts)
+	if err != nil {
+		return err
+	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
-// RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.String) error {
+func JoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) ([]Checker, error) {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
-		return err
+		return nil, err
 	}
 
 	checks := []Checker{
@@ -989,7 +1028,6 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
 	}
 
-	addIPv6Checks := false
 	if cfg.Discovery.BootstrapToken != nil {
 		ipstr, _, err := net.SplitHostPort(cfg.Discovery.BootstrapToken.APIServerEndpoint)
 		if err == nil {
@@ -997,19 +1035,24 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 				HTTPProxyCheck{Proto: "https", Host: ipstr},
 			)
 			if ip := netutils.ParseIPSloppy(ipstr); ip != nil {
+				if netutils.IsIPv4(ip) {
+					checks = addIPv4Checks(checks)
+				}
 				if netutils.IsIPv6(ip) {
-					addIPv6Checks = true
+					checks = addIPv6Checks(checks)
 				}
 			}
 		}
 	}
-	if addIPv6Checks && runtime.GOOS == "linux" {
-		checks = append(checks,
-			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
-		)
-	}
+	return checks, nil
+}
 
+// RunJoinNodeChecks executes all individual, applicable to node checks.
+func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) error {
+	checks, err := JoinNodeChecks(execer, cfg, ignorePreflightErrors)
+	if err != nil {
+		return err
+	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
@@ -1024,23 +1067,8 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 	}
 
 	// non-windows checks
-	if runtime.GOOS == "linux" {
-		checks = append(checks,
-			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
-			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
-			SwapCheck{},
-			InPathCheck{executable: "crictl", mandatory: true, exec: execer},
-			InPathCheck{executable: "conntrack", mandatory: true, exec: execer},
-			InPathCheck{executable: "ip", mandatory: true, exec: execer},
-			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
-			InPathCheck{executable: "mount", mandatory: true, exec: execer},
-			InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
-			InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
-			InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
-			InPathCheck{executable: "socat", mandatory: false, exec: execer},
-			InPathCheck{executable: "tc", mandatory: false, exec: execer},
-			InPathCheck{executable: "touch", mandatory: false, exec: execer})
-	}
+	checks = addSwapCheck(checks)
+	checks = addExecChecks(checks, execer)
 	checks = append(checks,
 		SystemVerificationCheck{},
 		HostnameCheck{nodeName: nodeReg.Name},
@@ -1051,7 +1079,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 }
 
 // RunRootCheckOnly initializes checks slice of structs and call RunChecks
-func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
+func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
 		IsPrivilegedUserCheck{},
 	}
@@ -1060,21 +1088,26 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 }
 
 // RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
-func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
+func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
 	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.NodeRegistration.CRISocket)
 	if err != nil {
 		return &Error{Msg: err.Error()}
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration), imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy},
+		ImagePullCheck{
+			runtime:         containerRuntime,
+			imageList:       images.GetControlPlaneImages(&cfg.ClusterConfiguration),
+			sandboxImage:    images.GetPauseImage(&cfg.ClusterConfiguration),
+			imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy,
+		},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
-// RunChecks runs each check, displays it's warnings/errors, and once all
+// RunChecks runs each check, displays its warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String) error {
+func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[string]) error {
 	var errsBuffer bytes.Buffer
 
 	for _, c := range checks {
@@ -1100,8 +1133,8 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 	return nil
 }
 
-// setHasItemOrAll is helper function that return true if item is present in the set (case insensitive) or special key 'all' is present
-func setHasItemOrAll(s sets.String, item string) bool {
+// setHasItemOrAll is helper function that return true if item is present in the set (case-insensitive) or special key 'all' is present
+func setHasItemOrAll(s sets.Set[string], item string) bool {
 	if s.Has("all") || s.Has(strings.ToLower(item)) {
 		return true
 	}
@@ -1109,7 +1142,7 @@ func setHasItemOrAll(s sets.String, item string) bool {
 }
 
 // normalizeURLString returns the normalized string, or an error if it can't be parsed into an URL object.
-// It takes an URL string as input.
+// It takes a URL string as input.
 func normalizeURLString(s string) (string, error) {
 	u, err := url.Parse(s)
 	if err != nil {

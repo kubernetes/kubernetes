@@ -23,8 +23,9 @@ import (
 // GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
 // it returns empty-string for no zone.
 // Since there are currently two separate zone keys:
-//   * "failure-domain.beta.kubernetes.io/zone"
-//   * "topology.kubernetes.io/zone"
+//   - "failure-domain.beta.kubernetes.io/zone"
+//   - "topology.kubernetes.io/zone"
+//
 // GetZoneKey will first check failure-domain.beta.kubernetes.io/zone and if not exists, will then check
 // topology.kubernetes.io/zone
 func GetZoneKey(node *v1.Node) string {

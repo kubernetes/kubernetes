@@ -24,17 +24,20 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"k8s.io/klog/v2"
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
+// DevicePlugin interface provides methods for accessing Device Plugin resources, API and unix socket.
 type DevicePlugin interface {
-	Api() api.DevicePluginClient
+	API() api.DevicePluginClient
 	Resource() string
 	SocketPath() string
 }
 
+// Client interface provides methods for establishing/closing gRPC connection and running the device plugin gRPC client.
 type Client interface {
 	Connect() error
 	Run()
@@ -50,6 +53,7 @@ type client struct {
 	client   api.DevicePluginClient
 }
 
+// NewPluginClient returns an initialized device plugin client.
 func NewPluginClient(r string, socketPath string, h ClientHandler) Client {
 	return &client{
 		resource: r,
@@ -58,6 +62,7 @@ func NewPluginClient(r string, socketPath string, h ClientHandler) Client {
 	}
 }
 
+// Connect is for establishing a gRPC connection between device manager and device plugin.
 func (c *client) Connect() error {
 	client, conn, err := dial(c.socket)
 	if err != nil {
@@ -69,6 +74,7 @@ func (c *client) Connect() error {
 	return c.handler.PluginConnected(c.resource, c)
 }
 
+// Run is for running the device plugin gRPC client.
 func (c *client) Run() {
 	stream, err := c.client.ListAndWatch(context.Background(), &api.Empty{})
 	if err != nil {
@@ -87,6 +93,7 @@ func (c *client) Run() {
 	}
 }
 
+// Disconnect is for closing gRPC connection between device manager and device plugin.
 func (c *client) Disconnect() error {
 	c.mutex.Lock()
 	if c.grpc != nil {
@@ -104,7 +111,7 @@ func (c *client) Resource() string {
 	return c.resource
 }
 
-func (c *client) Api() api.DevicePluginClient {
+func (c *client) API() api.DevicePluginClient {
 	return c.client
 }
 
@@ -117,7 +124,10 @@ func dial(unixSocketPath string) (api.DevicePluginClient, *grpc.ClientConn, erro
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	c, err := grpc.DialContext(ctx, unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
+	c, err := grpc.DialContext(ctx, unixSocketPath,
+		grpc.WithAuthority("localhost"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),

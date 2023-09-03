@@ -25,6 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -47,8 +48,13 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	clusterConfigurationToUpload := cfg.ClusterConfiguration.DeepCopy()
 	clusterConfigurationToUpload.ComponentConfigs = kubeadmapi.ComponentConfigMap{}
 
+	// restore the resolved Kubernetes version as CI Kubernetes version if needed
+	if len(clusterConfigurationToUpload.CIKubernetesVersion) > 0 {
+		clusterConfigurationToUpload.KubernetesVersion = clusterConfigurationToUpload.CIKubernetesVersion
+	}
+
 	// Marshal the ClusterConfiguration into YAML
-	clusterConfigurationYaml, err := configutil.MarshalKubeadmConfigObject(clusterConfigurationToUpload)
+	clusterConfigurationYaml, err := configutil.MarshalKubeadmConfigObject(clusterConfigurationToUpload, kubeadmapiv1.SchemeGroupVersion)
 	if err != nil {
 		return err
 	}

@@ -57,10 +57,9 @@ type lbConfig struct {
 type ServiceConfig struct {
 	serviceconfig.Config
 
-	// LB is the load balancer the service providers recommends. The balancer
-	// specified via grpc.WithBalancerName will override this.  This is deprecated;
-	// lbConfigs is preferred.  If lbConfig and LB are both present, lbConfig
-	// will be used.
+	// LB is the load balancer the service providers recommends.  This is
+	// deprecated; lbConfigs is preferred.  If lbConfig and LB are both present,
+	// lbConfig will be used.
 	LB *string
 
 	// lbConfig is the service config's load balancing configuration.  If
@@ -218,7 +217,7 @@ type jsonSC struct {
 }
 
 func init() {
-	internal.ParseServiceConfigForTesting = parseServiceConfig
+	internal.ParseServiceConfig = parseServiceConfig
 }
 func parseServiceConfig(js string) *serviceconfig.ParseResult {
 	if len(js) == 0 {
@@ -227,7 +226,7 @@ func parseServiceConfig(js string) *serviceconfig.ParseResult {
 	var rsc jsonSC
 	err := json.Unmarshal([]byte(js), &rsc)
 	if err != nil {
-		logger.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
+		logger.Warningf("grpc: unmarshaling service config %s: %v", js, err)
 		return &serviceconfig.ParseResult{Err: err}
 	}
 	sc := ServiceConfig{
@@ -255,7 +254,7 @@ func parseServiceConfig(js string) *serviceconfig.ParseResult {
 		}
 		d, err := parseDuration(m.Timeout)
 		if err != nil {
-			logger.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
+			logger.Warningf("grpc: unmarshaling service config %s: %v", js, err)
 			return &serviceconfig.ParseResult{Err: err}
 		}
 
@@ -264,7 +263,7 @@ func parseServiceConfig(js string) *serviceconfig.ParseResult {
 			Timeout:      d,
 		}
 		if mc.RetryPolicy, err = convertRetryPolicy(m.RetryPolicy); err != nil {
-			logger.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
+			logger.Warningf("grpc: unmarshaling service config %s: %v", js, err)
 			return &serviceconfig.ParseResult{Err: err}
 		}
 		if m.MaxRequestMessageBytes != nil {
@@ -284,13 +283,13 @@ func parseServiceConfig(js string) *serviceconfig.ParseResult {
 		for i, n := range *m.Name {
 			path, err := n.generatePath()
 			if err != nil {
-				logger.Warningf("grpc: parseServiceConfig error unmarshaling %s due to methodConfig[%d]: %v", js, i, err)
+				logger.Warningf("grpc: error unmarshaling service config %s due to methodConfig[%d]: %v", js, i, err)
 				return &serviceconfig.ParseResult{Err: err}
 			}
 
 			if _, ok := paths[path]; ok {
 				err = errDuplicatedName
-				logger.Warningf("grpc: parseServiceConfig error unmarshaling %s due to methodConfig[%d]: %v", js, i, err)
+				logger.Warningf("grpc: error unmarshaling service config %s due to methodConfig[%d]: %v", js, i, err)
 				return &serviceconfig.ParseResult{Err: err}
 			}
 			paths[path] = struct{}{}
@@ -381,6 +380,9 @@ func init() {
 //
 // If any of them is NOT *ServiceConfig, return false.
 func equalServiceConfig(a, b serviceconfig.Config) bool {
+	if a == nil && b == nil {
+		return true
+	}
 	aa, ok := a.(*ServiceConfig)
 	if !ok {
 		return false

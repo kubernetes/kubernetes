@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -246,7 +247,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 				Namespace: "namespace",
 			},
 			Spec: v1.ReplicationControllerSpec{
-				Replicas:        utilpointer.Int32Ptr(1),
+				Replicas:        utilpointer.Int32(1),
 				MinReadySeconds: 32,
 				Selector:        map[string]string{"foo": "bar", "bar": "foo"},
 				Template: &v1.PodTemplateSpec{
@@ -702,5 +703,84 @@ func Test_v1_NodeSpec_to_core_NodeSpec(t *testing.T) {
 				t.Errorf("%v:Convert v1.NodeSpec to core.NodeSpec failed core.PodCIDRs[%v]=%v expected %v", i, idx, coreNodeSpec.PodCIDRs[idx], testInput.PodCIDRs[idx])
 			}
 		}
+	}
+}
+
+func TestConvert_v1_Pod_To_core_Pod(t *testing.T) {
+	type args struct {
+		in  *v1.Pod
+		out *core.Pod
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+		wantOut *core.Pod
+	}{
+		{
+			args: args{
+				in: &v1.Pod{
+					Spec: v1.PodSpec{
+						TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+					},
+				},
+				out: &core.Pod{},
+			},
+			wantOut: &core.Pod{
+				Spec: core.PodSpec{
+					TerminationGracePeriodSeconds: utilpointer.Int64(1),
+					SecurityContext:               &core.PodSecurityContext{},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := corev1.Convert_v1_Pod_To_core_Pod(tt.args.in, tt.args.out, nil); (err != nil) != tt.wantErr {
+				t.Errorf("Convert_v1_Pod_To_core_Pod() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if diff := cmp.Diff(tt.args.out, tt.wantOut); diff != "" {
+				t.Errorf("Convert_v1_Pod_To_core_Pod() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestConvert_core_Pod_To_v1_Pod(t *testing.T) {
+	type args struct {
+		in  *core.Pod
+		out *v1.Pod
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+		wantOut *v1.Pod
+	}{
+		{
+			args: args{
+				in: &core.Pod{
+					Spec: core.PodSpec{
+						TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+					},
+				},
+				out: &v1.Pod{},
+			},
+			wantOut: &v1.Pod{
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: utilpointer.Int64(1),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := corev1.Convert_core_Pod_To_v1_Pod(tt.args.in, tt.args.out, nil); (err != nil) != tt.wantErr {
+				t.Errorf("Convert_core_Pod_To_v1_Pod() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if diff := cmp.Diff(tt.args.out, tt.wantOut); diff != "" {
+				t.Errorf("Convert_core_Pod_To_v1_Pod() mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

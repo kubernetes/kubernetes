@@ -56,11 +56,10 @@ const (
 )
 
 var testingFuncs = map[string]testingFunc{
-	verifyTagNaming:                 verifyTagNamingFunc,
-	verifyGroupNameSuffix:           verifyGroupNameSuffixFunc,
-	verifyGroupNameMatch:            verifyGroupNameMatchFunc,
-	verifyCorrectGroupName:          verifyCorrectGroupNameFunc,
-	verifyComponentConfigKindExists: verifyComponentConfigKindExistsFunc,
+	verifyTagNaming:        verifyTagNamingFunc,
+	verifyGroupNameSuffix:  verifyGroupNameSuffixFunc,
+	verifyGroupNameMatch:   verifyGroupNameMatchFunc,
+	verifyCorrectGroupName: verifyCorrectGroupNameFunc,
 }
 
 // VerifyExternalTypePackage tests if external component config package is defined correctly
@@ -94,7 +93,8 @@ func VerifyInternalTypePackage(pkginfo *ComponentConfigPackage) error {
 		return fmt.Errorf("test setup error: %v", err)
 	}
 	extraFns := map[string]testingFunc{
-		verifyInternalAPIVersion: verifyInternalAPIVersionFunc,
+		verifyInternalAPIVersion:        verifyInternalAPIVersionFunc,
+		verifyComponentConfigKindExists: verifyComponentConfigKindExistsFunc,
 	}
 	return runFuncs(scheme, pkginfo, extraFns)
 }

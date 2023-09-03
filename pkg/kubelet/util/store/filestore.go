@@ -41,7 +41,7 @@ type FileStore struct {
 
 // NewFileStore returns an instance of FileStore.
 func NewFileStore(path string, fs utilfs.Filesystem) (Store, error) {
-	if err := ensureDirectory(fs, path); err != nil {
+	if err := fs.MkdirAll(path, 0755); err != nil {
 		return nil, err
 	}
 	return &FileStore{directoryPath: path, filesystem: fs}, nil
@@ -52,7 +52,7 @@ func (f *FileStore) Write(key string, data []byte) error {
 	if err := ValidateKey(key); err != nil {
 		return err
 	}
-	if err := ensureDirectory(f.filesystem, f.directoryPath); err != nil {
+	if err := f.filesystem.MkdirAll(f.directoryPath, 0755); err != nil {
 		return err
 	}
 
@@ -97,15 +97,6 @@ func (f *FileStore) List() ([]string, error) {
 // getPathByKey returns the full path of the file for the key.
 func (f *FileStore) getPathByKey(key string) string {
 	return filepath.Join(f.directoryPath, key)
-}
-
-// ensureDirectory creates the directory if it does not exist.
-func ensureDirectory(fs utilfs.Filesystem, path string) error {
-	if _, err := fs.Stat(path); err != nil {
-		// MkdirAll returns nil if directory already exists.
-		return fs.MkdirAll(path, 0755)
-	}
-	return nil
 }
 
 // writeFile writes data to path in a single transaction.

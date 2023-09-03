@@ -18,11 +18,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/containers"
+	"github.com/google/cel-go/common/functions"
 	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/interpreter/functions"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
@@ -38,11 +39,11 @@ type interpretablePlanner interface {
 // functions, types, and namespaced identifiers at plan time rather than at runtime since
 // it only needs to be done once and may be semi-expensive to compute.
 func newPlanner(disp Dispatcher,
-	provider ref.TypeProvider,
-	adapter ref.TypeAdapter,
+	provider types.Provider,
+	adapter types.Adapter,
 	attrFactory AttributeFactory,
 	cont *containers.Container,
-	checked *exprpb.CheckedExpr,
+	checked *ast.CheckedAST,
 	decorators ...InterpretableDecorator) interpretablePlanner {
 	return &planner{
 		disp:        disp,
@@ -50,8 +51,8 @@ func newPlanner(disp Dispatcher,
 		adapter:     adapter,
 		attrFactory: attrFactory,
 		container:   cont,
-		refMap:      checked.GetReferenceMap(),
-		typeMap:     checked.GetTypeMap(),
+		refMap:      checked.ReferenceMap,
+		typeMap:     checked.TypeMap,
 		decorators:  decorators,
 	}
 }
@@ -60,8 +61,8 @@ func newPlanner(disp Dispatcher,
 // TypeAdapter, and Container to resolve functions and types at plan time. Namespaces present in
 // Select expressions are resolved lazily at evaluation time.
 func newUncheckedPlanner(disp Dispatcher,
-	provider ref.TypeProvider,
-	adapter ref.TypeAdapter,
+	provider types.Provider,
+	adapter types.Adapter,
 	attrFactory AttributeFactory,
 	cont *containers.Container,
 	decorators ...InterpretableDecorator) interpretablePlanner {
@@ -71,8 +72,8 @@ func newUncheckedPlanner(disp Dispatcher,
 		adapter:     adapter,
 		attrFactory: attrFactory,
 		container:   cont,
-		refMap:      make(map[int64]*exprpb.Reference),
-		typeMap:     make(map[int64]*exprpb.Type),
+		refMap:      make(map[int64]*ast.ReferenceInfo),
+		typeMap:     make(map[int64]*types.Type),
 		decorators:  decorators,
 	}
 }
@@ -80,12 +81,12 @@ func newUncheckedPlanner(disp Dispatcher,
 // planner is an implementation of the interpretablePlanner interface.
 type planner struct {
 	disp        Dispatcher
-	provider    ref.TypeProvider
-	adapter     ref.TypeAdapter
+	provider    types.Provider
+	adapter     types.Adapter
 	attrFactory AttributeFactory
 	container   *containers.Container
-	refMap      map[int64]*exprpb.Reference
-	typeMap     map[int64]*exprpb.Type
+	refMap      map[int64]*ast.ReferenceInfo
+	typeMap     map[int64]*types.Type
 	decorators  []InterpretableDecorator
 }
 
@@ -95,7 +96,7 @@ type planner struct {
 // such as state-tracking, expression re-write, and possibly efficient thread-safe memoization of
 // repeated expressions.
 func (p *planner) Plan(expr *exprpb.Expr) (Interpretable, error) {
-	switch expr.ExprKind.(type) {
+	switch expr.GetExprKind().(type) {
 	case *exprpb.Expr_CallExpr:
 		return p.decorate(p.planCall(expr))
 	case *exprpb.Expr_IdentExpr:
@@ -144,19 +145,16 @@ func (p *planner) planIdent(expr *exprpb.Expr) (Interpretable, error) {
 	}, nil
 }
 
-func (p *planner) planCheckedIdent(id int64, identRef *exprpb.Reference) (Interpretable, error) {
+func (p *planner) planCheckedIdent(id int64, identRef *ast.ReferenceInfo) (Interpretable, error) {
 	// Plan a constant reference if this is the case for this simple identifier.
 	if identRef.Value != nil {
-		return p.Plan(&exprpb.Expr{Id: id,
-			ExprKind: &exprpb.Expr_ConstExpr{
-				ConstExpr: identRef.Value,
-			}})
+		return NewConstValue(id, identRef.Value), nil
 	}
 
 	// Check to see whether the type map indicates this is a type name. All types should be
 	// registered with the provider.
 	cType := p.typeMap[id]
-	if cType.GetType() != nil {
+	if cType.Kind() == types.TypeKind {
 		cVal, found := p.provider.FindIdent(identRef.Name)
 		if !found {
 			return nil, fmt.Errorf("reference to undefined type: %s", identRef.Name)
@@ -172,9 +170,10 @@ func (p *planner) planCheckedIdent(id int64, identRef *exprpb.Reference) (Interp
 }
 
 // planSelect creates an Interpretable with either:
-//  a) selects a field from a map or proto.
-//  b) creates a field presence test for a select within a has() macro.
-//  c) resolves the select expression to a namespaced identifier.
+//
+//	a) selects a field from a map or proto.
+//	b) creates a field presence test for a select within a has() macro.
+//	c) resolves the select expression to a namespaced identifier.
 func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 	// If the Select id appears in the reference map from the CheckedExpr proto then it is either
 	// a namespaced identifier or enum value.
@@ -188,16 +187,7 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Determine the field type if this is a proto message type.
-	var fieldType *ref.FieldType
 	opType := p.typeMap[sel.GetOperand().GetId()]
-	if opType.GetMessageType() != "" {
-		ft, found := p.provider.FindFieldType(opType.GetMessageType(), sel.Field)
-		if found && ft.IsSet != nil && ft.GetFrom != nil {
-			fieldType = ft
-		}
-	}
 
 	// If the Select was marked TestOnly, this is a presence test.
 	//
@@ -210,37 +200,31 @@ func (p *planner) planSelect(expr *exprpb.Expr) (Interpretable, error) {
 	// If a string named 'a.b.c' is declared in the environment and referenced within `has(a.b.c)`,
 	// it is not clear whether has should error or follow the convention defined for structured
 	// values.
-	if sel.TestOnly {
-		// Return the test only eval expression.
-		return &evalTestOnly{
-			id:        expr.Id,
-			field:     types.String(sel.Field),
-			fieldType: fieldType,
-			op:        op,
-		}, nil
-	}
-	// Build a qualifier.
-	qual, err := p.attrFactory.NewQualifier(
-		opType, expr.Id, sel.Field)
-	if err != nil {
-		return nil, err
-	}
-	// Lastly, create a field selection Interpretable.
+
+	// Establish the attribute reference.
 	attr, isAttr := op.(InterpretableAttribute)
-	if isAttr {
-		_, err = attr.AddQualifier(qual)
-		return attr, err
+	if !isAttr {
+		attr, err = p.relativeAttr(op.ID(), op, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	relAttr, err := p.relativeAttr(op.ID(), op)
+	// Build a qualifier for the attribute.
+	qual, err := p.attrFactory.NewQualifier(opType, expr.GetId(), sel.GetField(), false)
 	if err != nil {
 		return nil, err
 	}
-	_, err = relAttr.AddQualifier(qual)
-	if err != nil {
-		return nil, err
+	// Modify the attribute to be test-only.
+	if sel.GetTestOnly() {
+		attr = &evalTestOnly{
+			id:                     expr.GetId(),
+			InterpretableAttribute: attr,
+		}
 	}
-	return relAttr, nil
+	// Append the qualifier on the attribute.
+	_, err = attr.AddQualifier(qual)
+	return attr, err
 }
 
 // planCall creates a callable Interpretable while specializing for common functions and invocation
@@ -285,7 +269,9 @@ func (p *planner) planCall(expr *exprpb.Expr) (Interpretable, error) {
 	case operators.NotEquals:
 		return p.planCallNotEqual(expr, args)
 	case operators.Index:
-		return p.planCallIndex(expr, args)
+		return p.planCallIndex(expr, args, false)
+	case operators.OptSelect, operators.OptIndex:
+		return p.planCallIndex(expr, args, true)
 	}
 
 	// Otherwise, generate Interpretable calls specialized by argument count.
@@ -302,8 +288,18 @@ func (p *planner) planCall(expr *exprpb.Expr) (Interpretable, error) {
 	case 0:
 		return p.planCallZero(expr, fnName, oName, fnDef)
 	case 1:
+		// If the FunctionOp has been used, then use it as it may exist for the purposes
+		// of dynamic dispatch within a singleton function implementation.
+		if fnDef != nil && fnDef.Unary == nil && fnDef.Function != nil {
+			return p.planCallVarArgs(expr, fnName, oName, fnDef, args)
+		}
 		return p.planCallUnary(expr, fnName, oName, fnDef, args)
 	case 2:
+		// If the FunctionOp has been used, then use it as it may exist for the purposes
+		// of dynamic dispatch within a singleton function implementation.
+		if fnDef != nil && fnDef.Binary == nil && fnDef.Function != nil {
+			return p.planCallVarArgs(expr, fnName, oName, fnDef, args)
+		}
 		return p.planCallBinary(expr, fnName, oName, fnDef, args)
 	default:
 		return p.planCallVarArgs(expr, fnName, oName, fnDef, args)
@@ -319,7 +315,7 @@ func (p *planner) planCallZero(expr *exprpb.Expr,
 		return nil, fmt.Errorf("no such overload: %s()", function)
 	}
 	return &evalZeroArity{
-		id:       expr.Id,
+		id:       expr.GetId(),
 		function: function,
 		overload: overload,
 		impl:     impl.Function,
@@ -334,20 +330,23 @@ func (p *planner) planCallUnary(expr *exprpb.Expr,
 	args []Interpretable) (Interpretable, error) {
 	var fn functions.UnaryOp
 	var trait int
+	var nonStrict bool
 	if impl != nil {
 		if impl.Unary == nil {
 			return nil, fmt.Errorf("no such overload: %s(arg)", function)
 		}
 		fn = impl.Unary
 		trait = impl.OperandTrait
+		nonStrict = impl.NonStrict
 	}
 	return &evalUnary{
-		id:       expr.Id,
-		function: function,
-		overload: overload,
-		arg:      args[0],
-		trait:    trait,
-		impl:     fn,
+		id:        expr.GetId(),
+		function:  function,
+		overload:  overload,
+		arg:       args[0],
+		trait:     trait,
+		impl:      fn,
+		nonStrict: nonStrict,
 	}, nil
 }
 
@@ -359,21 +358,24 @@ func (p *planner) planCallBinary(expr *exprpb.Expr,
 	args []Interpretable) (Interpretable, error) {
 	var fn functions.BinaryOp
 	var trait int
+	var nonStrict bool
 	if impl != nil {
 		if impl.Binary == nil {
 			return nil, fmt.Errorf("no such overload: %s(lhs, rhs)", function)
 		}
 		fn = impl.Binary
 		trait = impl.OperandTrait
+		nonStrict = impl.NonStrict
 	}
 	return &evalBinary{
-		id:       expr.Id,
-		function: function,
-		overload: overload,
-		lhs:      args[0],
-		rhs:      args[1],
-		trait:    trait,
-		impl:     fn,
+		id:        expr.GetId(),
+		function:  function,
+		overload:  overload,
+		lhs:       args[0],
+		rhs:       args[1],
+		trait:     trait,
+		impl:      fn,
+		nonStrict: nonStrict,
 	}, nil
 }
 
@@ -385,68 +387,63 @@ func (p *planner) planCallVarArgs(expr *exprpb.Expr,
 	args []Interpretable) (Interpretable, error) {
 	var fn functions.FunctionOp
 	var trait int
+	var nonStrict bool
 	if impl != nil {
 		if impl.Function == nil {
 			return nil, fmt.Errorf("no such overload: %s(...)", function)
 		}
 		fn = impl.Function
 		trait = impl.OperandTrait
+		nonStrict = impl.NonStrict
 	}
 	return &evalVarArgs{
-		id:       expr.Id,
-		function: function,
-		overload: overload,
-		args:     args,
-		trait:    trait,
-		impl:     fn,
+		id:        expr.GetId(),
+		function:  function,
+		overload:  overload,
+		args:      args,
+		trait:     trait,
+		impl:      fn,
+		nonStrict: nonStrict,
 	}, nil
 }
 
 // planCallEqual generates an equals (==) Interpretable.
-func (p *planner) planCallEqual(expr *exprpb.Expr,
-	args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallEqual(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
 	return &evalEq{
-		id:  expr.Id,
+		id:  expr.GetId(),
 		lhs: args[0],
 		rhs: args[1],
 	}, nil
 }
 
 // planCallNotEqual generates a not equals (!=) Interpretable.
-func (p *planner) planCallNotEqual(expr *exprpb.Expr,
-	args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallNotEqual(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
 	return &evalNe{
-		id:  expr.Id,
+		id:  expr.GetId(),
 		lhs: args[0],
 		rhs: args[1],
 	}, nil
 }
 
 // planCallLogicalAnd generates a logical and (&&) Interpretable.
-func (p *planner) planCallLogicalAnd(expr *exprpb.Expr,
-	args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallLogicalAnd(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
 	return &evalAnd{
-		id:  expr.Id,
-		lhs: args[0],
-		rhs: args[1],
+		id:    expr.GetId(),
+		terms: args,
 	}, nil
 }
 
 // planCallLogicalOr generates a logical or (||) Interpretable.
-func (p *planner) planCallLogicalOr(expr *exprpb.Expr,
-	args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallLogicalOr(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
 	return &evalOr{
-		id:  expr.Id,
-		lhs: args[0],
-		rhs: args[1],
+		id:    expr.GetId(),
+		terms: args,
 	}, nil
 }
 
 // planCallConditional generates a conditional / ternary (c ? t : f) Interpretable.
-func (p *planner) planCallConditional(expr *exprpb.Expr,
-	args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallConditional(expr *exprpb.Expr, args []Interpretable) (Interpretable, error) {
 	cond := args[0]
-
 	t := args[1]
 	var tAttr Attribute
 	truthyAttr, isTruthyAttr := t.(InterpretableAttribute)
@@ -467,54 +464,60 @@ func (p *planner) planCallConditional(expr *exprpb.Expr,
 
 	return &evalAttr{
 		adapter: p.adapter,
-		attr:    p.attrFactory.ConditionalAttribute(expr.Id, cond, tAttr, fAttr),
+		attr:    p.attrFactory.ConditionalAttribute(expr.GetId(), cond, tAttr, fAttr),
 	}, nil
 }
 
 // planCallIndex either extends an attribute with the argument to the index operation, or creates
 // a relative attribute based on the return of a function call or operation.
-func (p *planner) planCallIndex(expr *exprpb.Expr,
-	args []Interpretable) (Interpretable, error) {
+func (p *planner) planCallIndex(expr *exprpb.Expr, args []Interpretable, optional bool) (Interpretable, error) {
 	op := args[0]
 	ind := args[1]
-	opAttr, err := p.relativeAttr(op.ID(), op)
-	if err != nil {
-		return nil, err
-	}
-	opType := p.typeMap[expr.GetCallExpr().GetTarget().GetId()]
-	indConst, isIndConst := ind.(InterpretableConst)
-	if isIndConst {
-		qual, err := p.attrFactory.NewQualifier(
-			opType, expr.GetId(), indConst.Value())
+	opType := p.typeMap[op.ID()]
+
+	// Establish the attribute reference.
+	var err error
+	attr, isAttr := op.(InterpretableAttribute)
+	if !isAttr {
+		attr, err = p.relativeAttr(op.ID(), op, false)
 		if err != nil {
 			return nil, err
 		}
-		_, err = opAttr.AddQualifier(qual)
-		return opAttr, err
 	}
-	indAttr, isIndAttr := ind.(InterpretableAttribute)
-	if isIndAttr {
-		qual, err := p.attrFactory.NewQualifier(
-			opType, expr.GetId(), indAttr)
-		if err != nil {
-			return nil, err
-		}
-		_, err = opAttr.AddQualifier(qual)
-		return opAttr, err
+
+	// Construct the qualifier type.
+	var qual Qualifier
+	switch ind := ind.(type) {
+	case InterpretableConst:
+		qual, err = p.attrFactory.NewQualifier(opType, expr.GetId(), ind.Value(), optional)
+	case InterpretableAttribute:
+		qual, err = p.attrFactory.NewQualifier(opType, expr.GetId(), ind, optional)
+	default:
+		qual, err = p.relativeAttr(expr.GetId(), ind, optional)
 	}
-	indQual, err := p.relativeAttr(expr.GetId(), ind)
 	if err != nil {
 		return nil, err
 	}
-	_, err = opAttr.AddQualifier(indQual)
-	return opAttr, err
+
+	// Add the qualifier to the attribute
+	_, err = attr.AddQualifier(qual)
+	return attr, err
 }
 
 // planCreateList generates a list construction Interpretable.
 func (p *planner) planCreateList(expr *exprpb.Expr) (Interpretable, error) {
 	list := expr.GetListExpr()
-	elems := make([]Interpretable, len(list.GetElements()))
-	for i, elem := range list.GetElements() {
+	optionalIndices := list.GetOptionalIndices()
+	elements := list.GetElements()
+	optionals := make([]bool, len(elements))
+	for _, index := range optionalIndices {
+		if index < 0 || index >= int32(len(elements)) {
+			return nil, fmt.Errorf("optional index %d out of element bounds [0, %d]", index, len(elements))
+		}
+		optionals[index] = true
+	}
+	elems := make([]Interpretable, len(elements))
+	for i, elem := range elements {
 		elemVal, err := p.Plan(elem)
 		if err != nil {
 			return nil, err
@@ -522,9 +525,11 @@ func (p *planner) planCreateList(expr *exprpb.Expr) (Interpretable, error) {
 		elems[i] = elemVal
 	}
 	return &evalList{
-		id:      expr.Id,
-		elems:   elems,
-		adapter: p.adapter,
+		id:           expr.GetId(),
+		elems:        elems,
+		optionals:    optionals,
+		hasOptionals: len(optionals) != 0,
+		adapter:      p.adapter,
 	}, nil
 }
 
@@ -535,6 +540,7 @@ func (p *planner) planCreateStruct(expr *exprpb.Expr) (Interpretable, error) {
 		return p.planCreateObj(expr)
 	}
 	entries := str.GetEntries()
+	optionals := make([]bool, len(entries))
 	keys := make([]Interpretable, len(entries))
 	vals := make([]Interpretable, len(entries))
 	for i, entry := range entries {
@@ -549,23 +555,27 @@ func (p *planner) planCreateStruct(expr *exprpb.Expr) (Interpretable, error) {
 			return nil, err
 		}
 		vals[i] = valVal
+		optionals[i] = entry.GetOptionalEntry()
 	}
 	return &evalMap{
-		id:      expr.Id,
-		keys:    keys,
-		vals:    vals,
-		adapter: p.adapter,
+		id:           expr.GetId(),
+		keys:         keys,
+		vals:         vals,
+		optionals:    optionals,
+		hasOptionals: len(optionals) != 0,
+		adapter:      p.adapter,
 	}, nil
 }
 
 // planCreateObj generates an object construction Interpretable.
 func (p *planner) planCreateObj(expr *exprpb.Expr) (Interpretable, error) {
 	obj := expr.GetStructExpr()
-	typeName, defined := p.resolveTypeName(obj.MessageName)
+	typeName, defined := p.resolveTypeName(obj.GetMessageName())
 	if !defined {
-		return nil, fmt.Errorf("unknown type: %s", typeName)
+		return nil, fmt.Errorf("unknown type: %s", obj.GetMessageName())
 	}
 	entries := obj.GetEntries()
+	optionals := make([]bool, len(entries))
 	fields := make([]string, len(entries))
 	vals := make([]Interpretable, len(entries))
 	for i, entry := range entries {
@@ -575,13 +585,16 @@ func (p *planner) planCreateObj(expr *exprpb.Expr) (Interpretable, error) {
 			return nil, err
 		}
 		vals[i] = val
+		optionals[i] = entry.GetOptionalEntry()
 	}
 	return &evalObj{
-		id:       expr.Id,
-		typeName: typeName,
-		fields:   fields,
-		vals:     vals,
-		provider: p.provider,
+		id:           expr.GetId(),
+		typeName:     typeName,
+		fields:       fields,
+		vals:         vals,
+		optionals:    optionals,
+		hasOptionals: len(optionals) != 0,
+		provider:     p.provider,
 	}, nil
 }
 
@@ -609,7 +622,7 @@ func (p *planner) planComprehension(expr *exprpb.Expr) (Interpretable, error) {
 		return nil, err
 	}
 	return &evalFold{
-		id:        expr.Id,
+		id:        expr.GetId(),
 		accuVar:   fold.AccuVar,
 		accu:      accu,
 		iterVar:   fold.IterVar,
@@ -627,12 +640,12 @@ func (p *planner) planConst(expr *exprpb.Expr) (Interpretable, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewConstValue(expr.Id, val), nil
+	return NewConstValue(expr.GetId(), val), nil
 }
 
 // constValue converts a proto Constant value to a ref.Val.
 func (p *planner) constValue(c *exprpb.Constant) (ref.Val, error) {
-	switch c.ConstantKind.(type) {
+	switch c.GetConstantKind().(type) {
 	case *exprpb.Constant_BoolValue:
 		return p.adapter.NativeToValue(c.GetBoolValue()), nil
 	case *exprpb.Constant_BytesValue:
@@ -659,7 +672,7 @@ func (p *planner) constValue(c *exprpb.Constant) (ref.Val, error) {
 // namespace resolution rules to it in a scan over possible matching types in the TypeProvider.
 func (p *planner) resolveTypeName(typeName string) (string, bool) {
 	for _, qualifiedTypeName := range p.container.ResolveCandidateNames(typeName) {
-		if _, found := p.provider.FindType(qualifiedTypeName); found {
+		if _, found := p.provider.FindStructType(qualifiedTypeName); found {
 			return qualifiedTypeName, true
 		}
 	}
@@ -686,8 +699,8 @@ func (p *planner) resolveFunction(expr *exprpb.Expr) (*exprpb.Expr, string, stri
 	// function name as the fnName value.
 	oRef, hasOverload := p.refMap[expr.GetId()]
 	if hasOverload {
-		if len(oRef.GetOverloadId()) == 1 {
-			return target, fnName, oRef.GetOverloadId()[0]
+		if len(oRef.OverloadIDs) == 1 {
+			return target, fnName, oRef.OverloadIDs[0]
 		}
 		// Note, this namespaced function name will not appear as a fully qualified name in ASTs
 		// built and stored before cel-go v0.5.0; however, this functionality did not work at all
@@ -733,14 +746,18 @@ func (p *planner) resolveFunction(expr *exprpb.Expr) (*exprpb.Expr, string, stri
 	return target, fnName, ""
 }
 
-func (p *planner) relativeAttr(id int64, eval Interpretable) (InterpretableAttribute, error) {
+// relativeAttr indicates that the attribute in this case acts as a qualifier and as such needs to
+// be observed to ensure that it's evaluation value is properly recorded for state tracking.
+func (p *planner) relativeAttr(id int64, eval Interpretable, opt bool) (InterpretableAttribute, error) {
 	eAttr, ok := eval.(InterpretableAttribute)
 	if !ok {
 		eAttr = &evalAttr{
-			adapter: p.adapter,
-			attr:    p.attrFactory.RelativeAttribute(id, eval),
+			adapter:  p.adapter,
+			attr:     p.attrFactory.RelativeAttribute(id, eval),
+			optional: opt,
 		}
 	}
+	// This looks like it should either decorate the new evalAttr node, or early return the InterpretableAttribute
 	decAttr, err := p.decorate(eAttr, nil)
 	if err != nil {
 		return nil, err

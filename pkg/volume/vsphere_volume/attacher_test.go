@@ -22,6 +22,8 @@ package vsphere_volume
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -89,6 +91,7 @@ func TestAttachDetach(t *testing.T) {
 	diskName := "[local] volumes/test"
 	nodeName := types.NodeName("host")
 	spec := createVolSpec(diskName)
+	expectedDevice := filepath.FromSlash("/dev/disk/by-id/wwn-0x" + uuid)
 	attachError := errors.New("fake attach error")
 	detachError := errors.New("fake detach error")
 	diskCheckError := errors.New("fake DiskIsAttached error")
@@ -101,7 +104,7 @@ func TestAttachDetach(t *testing.T) {
 				attacher := newAttacher(testcase)
 				return attacher.Attach(spec, nodeName)
 			},
-			expectedDevice: "/dev/disk/by-id/wwn-0x" + uuid,
+			expectedDevice: expectedDevice,
 		},
 
 		// Attach call fails
@@ -176,7 +179,7 @@ func TestAttachDetach(t *testing.T) {
 // newPlugin creates a new vsphereVolumePlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
 func newPlugin(t *testing.T) *vsphereVolumePlugin {
-	host := volumetest.NewFakeVolumeHost(t, "/tmp", nil, nil)
+	host := volumetest.NewFakeVolumeHost(t, os.TempDir(), nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)

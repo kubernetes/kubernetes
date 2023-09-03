@@ -821,8 +821,8 @@ func (t *Tester) testDeleteNonExist(obj runtime.Object, opts metav1.DeleteOption
 
 }
 
-//  This test the fast-fail path. We test that the precondition gets verified
-//  again before deleting the object in tests of pkg/storage/etcd.
+// This test the fast-fail path. We test that the precondition gets verified
+// again before deleting the object in tests of pkg/storage/etcd.
 func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc, opts metav1.DeleteOptions) {
 	ctx := t.TestContext()
 
@@ -858,8 +858,8 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	}
 }
 
-//  This test the fast-fail path. We test that the precondition gets verified
-//  again before deleting the object in tests of pkg/storage/etcd.
+// This test the fast-fail path. We test that the precondition gets verified
+// again before deleting the object in tests of pkg/storage/etcd.
 func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc, opts metav1.DeleteOptions) {
 	ctx := t.TestContext()
 

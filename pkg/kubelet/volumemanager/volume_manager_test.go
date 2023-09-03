@@ -21,6 +21,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,19 +32,13 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
-	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -56,8 +51,6 @@ const (
 )
 
 func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
-
 	tests := []struct {
 		name            string
 		pvMode, podMode v1.PersistentVolumeMode
@@ -94,7 +87,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 				t.Fatalf("can't make a temp dir: %v", err)
 			}
 			defer os.RemoveAll(tmpDir)
-			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+			podManager := kubepod.NewBasicPodManager()
 
 			node, pod, pv, claim := createObjects(test.pvMode, test.podMode)
 			kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
@@ -112,7 +105,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 				stopCh,
 				manager)
 
-			err = manager.WaitForAttachAndMount(pod)
+			err = manager.WaitForAttachAndMount(context.Background(), pod)
 			if err != nil && !test.expectError {
 				t.Errorf("Expected success: %v", err)
 			}
@@ -144,15 +137,109 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	}
 }
 
-func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
-
+func TestWaitForAttachAndMountError(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	podManager := kubepod.NewBasicPodManager()
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "abc",
+			Namespace: "nsA",
+			UID:       "1234",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volumetest.FailMountDeviceVolumeName,
+							MountPath: "/vol1",
+						},
+						{
+							Name:      "vol2",
+							MountPath: "/vol2",
+						},
+						{
+							Name:      "vol02",
+							MountPath: "/vol02",
+						},
+						{
+							Name:      "vol3",
+							MountPath: "/vol3",
+						},
+						{
+							Name:      "vol03",
+							MountPath: "/vol03",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: volumetest.FailMountDeviceVolumeName,
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{},
+					},
+				},
+				{
+					Name: "vol2",
+					VolumeSource: v1.VolumeSource{
+						RBD: &v1.RBDVolumeSource{},
+					},
+				},
+				{
+					Name: "vol02",
+					VolumeSource: v1.VolumeSource{
+						RBD: &v1.RBDVolumeSource{},
+					},
+				},
+				{
+					Name: "vol3",
+					VolumeSource: v1.VolumeSource{
+						AzureDisk: &v1.AzureDiskVolumeSource{},
+					},
+				},
+				{
+					Name: "vol03",
+					VolumeSource: v1.VolumeSource{
+						AzureDisk: &v1.AzureDiskVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+
+	kubeClient := fake.NewSimpleClientset(pod)
+
+	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, nil)
+
+	stopCh := runVolumeManager(manager)
+	defer close(stopCh)
+
+	podManager.SetPods([]*v1.Pod{pod})
+
+	err = manager.WaitForAttachAndMount(context.Background(), pod)
+	if err == nil {
+		t.Errorf("Expected error, got none")
+	}
+	if !strings.Contains(err.Error(),
+		"unattached volumes=[vol02 vol2], failed to process volumes=[vol03 vol3]") {
+		t.Errorf("Unexpected error info: %v", err)
+	}
+}
+
+func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	podManager := kubepod.NewBasicPodManager()
 
 	node, pod, pv, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
 	claim.Status = v1.PersistentVolumeClaimStatus{
@@ -178,7 +265,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	go delayClaimBecomesBound(kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
 
 	err = wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
-		err = manager.WaitForAttachAndMount(pod)
+		err = manager.WaitForAttachAndMount(context.Background(), pod)
 		if err != nil {
 			// Few "PVC not bound" errors are expected
 			return false, nil
@@ -192,14 +279,12 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
-
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	podManager := kubepod.NewBasicPodManager()
 
 	node, pod, _, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
 
@@ -238,8 +323,8 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			},
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
-					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-						PDName: "fake-device",
+					RBD: &v1.RBDPersistentVolumeSource{
+						RBDImage: "fake-device",
 					},
 				},
 				ClaimRef: &v1.ObjectReference{
@@ -264,7 +349,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			stopCh,
 			manager)
 
-		err = manager.WaitForAttachAndMount(pod)
+		err = manager.WaitForAttachAndMount(context.Background(), pod)
 		if err != nil {
 			t.Errorf("Expected success: %v", err)
 			continue
@@ -293,14 +378,29 @@ func (p *fakePodStateProvider) ShouldPodContainersBeTerminating(uid kubetypes.UI
 }
 
 func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manager, kubeClient clientset.Interface, node *v1.Node) VolumeManager {
-	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	attachablePlug := &volumetest.FakeVolumePlugin{
+		PluginName: "fake",
+		Host:       nil,
+		CanSupportFn: func(spec *volume.Spec) bool {
+			return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD != nil) ||
+				(spec.Volume != nil && spec.Volume.RBD != nil)
+		},
+	}
+	unattachablePlug := &volumetest.FakeVolumePlugin{
+		PluginName:    "unattachable-fake-plugin",
+		Host:          nil,
+		NonAttachable: true,
+		CanSupportFn: func(spec *volume.Spec) bool {
+			return spec.Volume != nil && spec.Volume.ConfigMap != nil
+		},
+	}
 	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
 	// TODO (#51147) inject mock prober
 	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, kubeClient, nil)
 	fakeVolumeHost.WithNode(node)
 
-	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, nil /* prober */, fakeVolumeHost)
+	plugMgr.InitPlugins([]volume.VolumePlugin{attachablePlug, unattachablePlug}, nil /* prober */, fakeVolumeHost)
 	stateProvider := &fakePodStateProvider{}
 	fakePathHandler := volumetest.NewBlockVolumePathHandler()
 	vm := NewVolumeManager(
@@ -385,8 +485,8 @@ func createObjects(pvMode, podMode v1.PersistentVolumeMode) (*v1.Node, *v1.Pod, 
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-					PDName: "fake-device",
+				RBD: &v1.RBDPersistentVolumeSource{
+					RBDImage: "fake-device",
 				},
 			},
 			ClaimRef: &v1.ObjectReference{

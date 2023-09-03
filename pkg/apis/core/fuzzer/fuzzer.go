@@ -91,6 +91,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.EnableServiceLinks = &enableServiceLinks
 			}
 		},
+		func(s *core.PodStatus, c fuzz.Continue) {
+			c.Fuzz(&s)
+			s.HostIPs = []core.HostIP{{IP: s.HostIP}}
+		},
 		func(j *core.PodPhase, c fuzz.Continue) {
 			statuses := []core.PodPhase{core.PodPending, core.PodRunning, core.PodFailed, core.PodUnknown}
 			*j = statuses[c.Rand.Intn(len(statuses))]
@@ -293,12 +297,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			selected := types[c.Rand.Intn(len(types))]
 			*p = selected
 		},
-		func(p *core.ServiceExternalTrafficPolicyType, c fuzz.Continue) {
-			types := []core.ServiceExternalTrafficPolicyType{core.ServiceExternalTrafficPolicyTypeCluster, core.ServiceExternalTrafficPolicyTypeLocal}
+		func(p *core.ServiceExternalTrafficPolicy, c fuzz.Continue) {
+			types := []core.ServiceExternalTrafficPolicy{core.ServiceExternalTrafficPolicyCluster, core.ServiceExternalTrafficPolicyLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
-		func(p *core.ServiceInternalTrafficPolicyType, c fuzz.Continue) {
-			types := []core.ServiceInternalTrafficPolicyType{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
+		func(p *core.ServiceInternalTrafficPolicy, c fuzz.Continue) {
+			types := []core.ServiceInternalTrafficPolicy{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *core.Container, c fuzz.Continue) {
@@ -524,7 +528,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				ss.SessionAffinityConfig = nil
 			}
 			if ss.AllocateLoadBalancerNodePorts == nil {
-				ss.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+				ss.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
 			}
 		},
 		func(s *core.NodeStatus, c fuzz.Continue) {

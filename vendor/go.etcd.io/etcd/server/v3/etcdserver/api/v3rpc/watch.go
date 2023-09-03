@@ -16,6 +16,7 @@ package v3rpc
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"math/rand"
 	"sync"
@@ -24,6 +25,7 @@ import (
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/auth"
 	"go.etcd.io/etcd/server/v3/etcdserver"
 	"go.etcd.io/etcd/server/v3/mvcc"
@@ -142,6 +144,10 @@ type serverWatchStream struct {
 	// records fragmented watch IDs
 	fragment map[mvcc.WatchID]bool
 
+	// indicates whether we have an outstanding global progress
+	// notification to send
+	deferredProgress bool
+
 	// closec indicates the stream is closed.
 	closec chan struct{}
 
@@ -170,6 +176,8 @@ func (ws *watchServer) Watch(stream pb.Watch_WatchServer) (err error) {
 		progress: make(map[mvcc.WatchID]bool),
 		prevKV:   make(map[mvcc.WatchID]bool),
 		fragment: make(map[mvcc.WatchID]bool),
+
+		deferredProgress: false,
 
 		closec: make(chan struct{}),
 	}
@@ -223,16 +231,16 @@ func (ws *watchServer) Watch(stream pb.Watch_WatchServer) (err error) {
 	return err
 }
 
-func (sws *serverWatchStream) isWatchPermitted(wcr *pb.WatchCreateRequest) bool {
+func (sws *serverWatchStream) isWatchPermitted(wcr *pb.WatchCreateRequest) error {
 	authInfo, err := sws.ag.AuthInfoFromCtx(sws.gRPCStream.Context())
 	if err != nil {
-		return false
+		return err
 	}
 	if authInfo == nil {
 		// if auth is enabled, IsRangePermitted() can cause an error
 		authInfo = &auth.AuthInfo{}
 	}
-	return sws.ag.AuthStore().IsRangePermitted(authInfo, wcr.Key, wcr.RangeEnd) == nil
+	return sws.ag.AuthStore().IsRangePermitted(authInfo, wcr.Key, wcr.RangeEnd)
 }
 
 func (sws *serverWatchStream) recvLoop() error {
@@ -266,13 +274,29 @@ func (sws *serverWatchStream) recvLoop() error {
 				creq.RangeEnd = []byte{}
 			}
 
-			if !sws.isWatchPermitted(creq) {
+			err := sws.isWatchPermitted(creq)
+			if err != nil {
+				var cancelReason string
+				switch err {
+				case auth.ErrInvalidAuthToken:
+					cancelReason = rpctypes.ErrGRPCInvalidAuthToken.Error()
+				case auth.ErrAuthOldRevision:
+					cancelReason = rpctypes.ErrGRPCAuthOldRevision.Error()
+				case auth.ErrUserEmpty:
+					cancelReason = rpctypes.ErrGRPCUserEmpty.Error()
+				default:
+					if err != auth.ErrPermissionDenied {
+						sws.lg.Error("unexpected error code", zap.Error(err))
+					}
+					cancelReason = rpctypes.ErrGRPCPermissionDenied.Error()
+				}
+
 				wr := &pb.WatchResponse{
 					Header:       sws.newResponseHeader(sws.watchStream.Rev()),
-					WatchId:      creq.WatchId,
+					WatchId:      clientv3.InvalidWatchID,
 					Canceled:     true,
 					Created:      true,
-					CancelReason: rpctypes.ErrGRPCPermissionDenied.Error(),
+					CancelReason: cancelReason,
 				}
 
 				select {
@@ -303,7 +327,10 @@ func (sws *serverWatchStream) recvLoop() error {
 					sws.fragment[id] = true
 				}
 				sws.mu.Unlock()
+			} else {
+				id = clientv3.InvalidWatchID
 			}
+
 			wr := &pb.WatchResponse{
 				Header:   sws.newResponseHeader(wsrev),
 				WatchId:  int64(id),
@@ -338,10 +365,16 @@ func (sws *serverWatchStream) recvLoop() error {
 			}
 		case *pb.WatchRequest_ProgressRequest:
 			if uv.ProgressRequest != nil {
-				sws.ctrlStream <- &pb.WatchResponse{
-					Header:  sws.newResponseHeader(sws.watchStream.Rev()),
-					WatchId: -1, // response is not associated with any WatchId and will be broadcast to all watch channels
+				sws.mu.Lock()
+				// Ignore if deferred progress notification is already in progress
+				if !sws.deferredProgress {
+					// Request progress for all watchers,
+					// force generation of a response
+					if !sws.watchStream.RequestProgressAll() {
+						sws.deferredProgress = true
+					}
 				}
+				sws.mu.Unlock()
 			}
 		default:
 			// we probably should not shutdown the entire stream when
@@ -409,11 +442,15 @@ func (sws *serverWatchStream) sendLoop() {
 				Canceled:        canceled,
 			}
 
-			if _, okID := ids[wresp.WatchID]; !okID {
-				// buffer if id not yet announced
-				wrs := append(pending[wresp.WatchID], wr)
-				pending[wresp.WatchID] = wrs
-				continue
+			// Progress notifications can have WatchID -1
+			// if they announce on behalf of multiple watchers
+			if wresp.WatchID != clientv3.InvalidWatchID {
+				if _, okID := ids[wresp.WatchID]; !okID {
+					// buffer if id not yet announced
+					wrs := append(pending[wresp.WatchID], wr)
+					pending[wresp.WatchID] = wrs
+					continue
+				}
 			}
 
 			mvcc.ReportEventReceived(len(evs))
@@ -444,6 +481,11 @@ func (sws *serverWatchStream) sendLoop() {
 				// elide next progress update if sent a key update
 				sws.progress[wresp.WatchID] = false
 			}
+			if sws.deferredProgress {
+				if sws.watchStream.RequestProgressAll() {
+					sws.deferredProgress = false
+				}
+			}
 			sws.mu.Unlock()
 
 		case c, ok := <-sws.ctrlStream:
@@ -463,7 +505,12 @@ func (sws *serverWatchStream) sendLoop() {
 
 			// track id creation
 			wid := mvcc.WatchID(c.WatchId)
-			if c.Canceled {
+
+			if !(!(c.Canceled && c.Created) || wid == clientv3.InvalidWatchID) {
+				panic(fmt.Sprintf("unexpected watchId: %d, wanted: %d, since both 'Canceled' and 'Created' are true", wid, clientv3.InvalidWatchID))
+			}
+
+			if c.Canceled && wid != clientv3.InvalidWatchID {
 				delete(ids, wid)
 				continue
 			}

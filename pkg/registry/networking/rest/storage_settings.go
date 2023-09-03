@@ -18,14 +18,17 @@ package rest
 
 import (
 	networkingapiv1 "k8s.io/api/networking/v1"
+	networkingapiv1alpha1 "k8s.io/api/networking/v1alpha1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	clustercidrstore "k8s.io/kubernetes/pkg/registry/networking/clustercidr/storage"
 	ingressstore "k8s.io/kubernetes/pkg/registry/networking/ingress/storage"
 	ingressclassstore "k8s.io/kubernetes/pkg/registry/networking/ingressclass/storage"
+	ipaddressstore "k8s.io/kubernetes/pkg/registry/networking/ipaddress/storage"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 )
 
@@ -35,6 +38,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(networking.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
+
+	if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1alpha1.SchemeGroupVersion.Version] = storageMap
+	}
 
 	if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
 		return genericapiserver.APIGroupInfo{}, err
@@ -50,12 +59,11 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 
 	// networkpolicies
 	if resource := "networkpolicies"; apiResourceConfigSource.ResourceEnabled(networkingapiv1.SchemeGroupVersion.WithResource(resource)) {
-		networkPolicyStorage, networkPolicyStatusStorage, err := networkpolicystore.NewREST(restOptionsGetter)
+		networkPolicyStorage, err := networkpolicystore.NewREST(restOptionsGetter)
 		if err != nil {
 			return storage, err
 		}
 		storage[resource] = networkPolicyStorage
-		storage[resource+"/status"] = networkPolicyStatusStorage
 	}
 
 	// ingresses
@@ -77,6 +85,28 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource] = ingressClassStorage
 	}
 
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+	// clustercidrs
+	if resource := "clustercidrs"; apiResourceConfigSource.ResourceEnabled(networkingapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		clusterCIDRCStorage, err := clustercidrstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = clusterCIDRCStorage
+	}
+
+	// ipaddress
+	if resource := "ipaddresses"; apiResourceConfigSource.ResourceEnabled(networkingapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		ipAddressStorage, err := ipaddressstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = ipAddressStorage
+	}
 	return storage, nil
 }
 

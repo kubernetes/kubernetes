@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 
 	"k8s.io/kube-openapi/pkg/openapiconv"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -246,38 +246,42 @@ var schemaTypeFormatMap = map[string]typeInfo{
 // the spec does not need to be simple type,format) or can even return a simple type,format (e.g. IntOrString). For simple
 // type formats, the benefit of adding OpenAPIDefinitionGetter interface is to keep both type and property documentation.
 // Example:
-// type Sample struct {
-//      ...
-//      // port of the server
-//      port IntOrString
-//      ...
-// }
+//
+//	type Sample struct {
+//	     ...
+//	     // port of the server
+//	     port IntOrString
+//	     ...
+//	}
+//
 // // IntOrString documentation...
 // type IntOrString { ... }
 //
 // Adding IntOrString to this function:
-// "port" : {
-//           format:      "string",
-//           type:        "int-or-string",
-//           Description: "port of the server"
-// }
+//
+//	"port" : {
+//	          format:      "string",
+//	          type:        "int-or-string",
+//	          Description: "port of the server"
+//	}
 //
 // Implement OpenAPIDefinitionGetter for IntOrString:
 //
-// "port" : {
-//           $Ref:    "#/definitions/IntOrString"
-//           Description: "port of the server"
-// }
+//	"port" : {
+//	          $Ref:    "#/definitions/IntOrString"
+//	          Description: "port of the server"
+//	}
+//
 // ...
 // definitions:
-// {
-//           "IntOrString": {
-//                     format:      "string",
-//                     type:        "int-or-string",
-//                     Description: "IntOrString documentation..."    // new
-//           }
-// }
 //
+//	{
+//	          "IntOrString": {
+//	                    format:      "string",
+//	                    type:        "int-or-string",
+//	                    Description: "IntOrString documentation..."    // new
+//	          }
+//	}
 func OpenAPITypeFormat(typeName string) (string, string) {
 	mapped, ok := schemaTypeFormatMap[typeName]
 	if !ok {

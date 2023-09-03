@@ -31,8 +31,7 @@ import (
 
 func Test_UpgradeService(t *testing.T) {
 	etcdOptions := framework.SharedEtcd()
-	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
-	s := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, nil, etcdOptions)
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, etcdOptions)
 	defer s.TearDownFn()
 	serviceName := "test-old-service"
 	ns := "old-service-ns"

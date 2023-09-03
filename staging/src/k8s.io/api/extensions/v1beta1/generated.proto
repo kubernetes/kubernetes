@@ -30,37 +30,6 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/extensions/v1beta1";
 
-// AllowedCSIDriver represents a single inline CSI Driver that is allowed to be used.
-message AllowedCSIDriver {
-  // Name is the registered name of the CSI driver
-  optional string name = 1;
-}
-
-// AllowedFlexVolume represents a single Flexvolume that is allowed to be used.
-// Deprecated: use AllowedFlexVolume from policy API Group instead.
-message AllowedFlexVolume {
-  // driver is the name of the Flexvolume driver.
-  optional string driver = 1;
-}
-
-// AllowedHostPath defines the host volume conditions that will be enabled by a policy
-// for pods to use. It requires the path prefix to be defined.
-// Deprecated: use AllowedHostPath from policy API Group instead.
-message AllowedHostPath {
-  // pathPrefix is the path prefix that the host volume must match.
-  // It does not support `*`.
-  // Trailing slashes are trimmed when validating the path prefix with a host path.
-  //
-  // Examples:
-  // `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
-  // `/foo` would not allow `/food` or `/etc/foo`
-  optional string pathPrefix = 1;
-
-  // when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.
-  // +optional
-  optional bool readOnly = 2;
-}
-
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
 // more information.
 // DaemonSet represents the configuration of a daemon set.
@@ -398,19 +367,6 @@ message DeploymentStrategy {
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 
-// FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
-// Deprecated: use FSGroupStrategyOptions from policy API Group instead.
-message FSGroupStrategyOptions {
-  // rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
-  // +optional
-  optional string rule = 1;
-
-  // ranges are the allowed ranges of fs groups.  If you would like to force a single
-  // fs group then supply a single range with the same start and end. Required for MustRunAs.
-  // +optional
-  repeated IDRange ranges = 2;
-}
-
 // HTTPIngressPath associates a path with a backend. Incoming urls matching the
 // path are forwarded to the backend.
 message HTTPIngressPath {
@@ -453,38 +409,17 @@ message HTTPIngressRuleValue {
   repeated HTTPIngressPath paths = 1;
 }
 
-// HostPortRange defines a range of host ports that will be enabled by a policy
-// for pods to use.  It requires both the start and end to be defined.
-// Deprecated: use HostPortRange from policy API Group instead.
-message HostPortRange {
-  // min is the start of the range, inclusive.
-  optional int32 min = 1;
-
-  // max is the end of the range, inclusive.
-  optional int32 max = 2;
-}
-
-// IDRange provides a min/max of an allowed range of IDs.
-// Deprecated: use IDRange from policy API Group instead.
-message IDRange {
-  // min is the start of the range, inclusive.
-  optional int64 min = 1;
-
-  // max is the end of the range, inclusive.
-  optional int64 max = 2;
-}
-
 // DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock.
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// IPBlock describes a particular CIDR (Ex. "192.168.1.0/24","2001:db8::/64") that is allowed
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
 message IPBlock {
   // CIDR is a string representing the IP Block
-  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+  // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
   optional string cidr = 1;
 
   // Except is a slice of CIDRs that should not be included within an IP Block
-  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+  // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
   // Except values will be rejected if they are outside the CIDR range
   // +optional
   repeated string except = 2;
@@ -538,6 +473,53 @@ message IngressList {
 
   // Items is the list of Ingress.
   repeated Ingress items = 2;
+}
+
+// IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
+message IngressLoadBalancerIngress {
+  // IP is set for load-balancer ingress points that are IP based.
+  // +optional
+  optional string ip = 1;
+
+  // Hostname is set for load-balancer ingress points that are DNS based.
+  // +optional
+  optional string hostname = 2;
+
+  // Ports provides information about the ports exposed by this LoadBalancer.
+  // +listType=atomic
+  // +optional
+  repeated IngressPortStatus ports = 4;
+}
+
+// LoadBalancerStatus represents the status of a load-balancer.
+message IngressLoadBalancerStatus {
+  // Ingress is a list containing ingress points for the load-balancer.
+  // +optional
+  repeated IngressLoadBalancerIngress ingress = 1;
+}
+
+// IngressPortStatus represents the error condition of a service port
+message IngressPortStatus {
+  // Port is the port number of the ingress port.
+  optional int32 port = 1;
+
+  // Protocol is the protocol of the ingress port.
+  // The supported values are: "TCP", "UDP", "SCTP"
+  optional string protocol = 2;
+
+  // Error is to record the problem with the service port
+  // The format of the error shall comply with the following rules:
+  // - built-in error values shall be specified in this file and those shall use
+  //   CamelCase names
+  // - cloud provider specific error values must have names that comply with the
+  //   format foo.example.com/CamelCase.
+  // ---
+  // The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+  // +optional
+  // +kubebuilder:validation:Required
+  // +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
+  // +kubebuilder:validation:MaxLength=316
+  optional string error = 3;
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to
@@ -632,7 +614,7 @@ message IngressSpec {
 message IngressStatus {
   // LoadBalancer contains the current status of the load-balancer.
   // +optional
-  optional k8s.io.api.core.v1.LoadBalancerStatus loadBalancer = 1;
+  optional IngressLoadBalancerStatus loadBalancer = 1;
 }
 
 // IngressTLS describes the transport layer security associated with an Ingress.
@@ -664,11 +646,6 @@ message NetworkPolicy {
   // Specification of the desired behavior for this NetworkPolicy.
   // +optional
   optional NetworkPolicySpec spec = 2;
-
-  // Status is the current state of the NetworkPolicy.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
-  optional NetworkPolicyStatus status = 3;
 }
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyEgressRule is deprecated by networking/v1/NetworkPolicyEgressRule.
@@ -769,8 +746,6 @@ message NetworkPolicyPort {
   // should be allowed by the policy. This field cannot be defined if the port field
   // is not defined or if the port field is defined as a named (string) port.
   // The endPort must be equal or greater than port.
-  // This feature is in Beta state and is enabled by default.
-  // It can be disabled using the Feature Gate "NetworkPolicyEndPort".
   // +optional
   optional int32 endPort = 3;
 }
@@ -816,176 +791,6 @@ message NetworkPolicySpec {
   // This field is beta-level in 1.8
   // +optional
   repeated string policyTypes = 4;
-}
-
-// NetworkPolicyStatus describe the current state of the NetworkPolicy.
-message NetworkPolicyStatus {
-  // Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
-  // Current service state
-  // +optional
-  // +patchMergeKey=type
-  // +patchStrategy=merge
-  // +listType=map
-  // +listMapKey=type
-  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
-}
-
-// PodSecurityPolicy governs the ability to make requests that affect the Security Context
-// that will be applied to a pod and container.
-// Deprecated: use PodSecurityPolicy from policy API Group instead.
-message PodSecurityPolicy {
-  // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // spec defines the policy enforced.
-  // +optional
-  optional PodSecurityPolicySpec spec = 2;
-}
-
-// PodSecurityPolicyList is a list of PodSecurityPolicy objects.
-// Deprecated: use PodSecurityPolicyList from policy API Group instead.
-message PodSecurityPolicyList {
-  // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // items is a list of schema objects.
-  repeated PodSecurityPolicy items = 2;
-}
-
-// PodSecurityPolicySpec defines the policy enforced.
-// Deprecated: use PodSecurityPolicySpec from policy API Group instead.
-message PodSecurityPolicySpec {
-  // privileged determines if a pod can request to be run as privileged.
-  // +optional
-  optional bool privileged = 1;
-
-  // defaultAddCapabilities is the default set of capabilities that will be added to the container
-  // unless the pod spec specifically drops the capability.  You may not list a capability in both
-  // defaultAddCapabilities and requiredDropCapabilities. Capabilities added here are implicitly
-  // allowed, and need not be included in the allowedCapabilities list.
-  // +optional
-  repeated string defaultAddCapabilities = 2;
-
-  // requiredDropCapabilities are the capabilities that will be dropped from the container.  These
-  // are required to be dropped and cannot be added.
-  // +optional
-  repeated string requiredDropCapabilities = 3;
-
-  // allowedCapabilities is a list of capabilities that can be requested to add to the container.
-  // Capabilities in this field may be added at the pod author's discretion.
-  // You must not list a capability in both allowedCapabilities and requiredDropCapabilities.
-  // +optional
-  repeated string allowedCapabilities = 4;
-
-  // volumes is an allowlist of volume plugins. Empty indicates that
-  // no volumes may be used. To allow all volumes you may use '*'.
-  // +optional
-  repeated string volumes = 5;
-
-  // hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.
-  // +optional
-  optional bool hostNetwork = 6;
-
-  // hostPorts determines which host port ranges are allowed to be exposed.
-  // +optional
-  repeated HostPortRange hostPorts = 7;
-
-  // hostPID determines if the policy allows the use of HostPID in the pod spec.
-  // +optional
-  optional bool hostPID = 8;
-
-  // hostIPC determines if the policy allows the use of HostIPC in the pod spec.
-  // +optional
-  optional bool hostIPC = 9;
-
-  // seLinux is the strategy that will dictate the allowable labels that may be set.
-  optional SELinuxStrategyOptions seLinux = 10;
-
-  // runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
-  optional RunAsUserStrategyOptions runAsUser = 11;
-
-  // RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set.
-  // If this field is omitted, the pod's RunAsGroup can take any value. This field requires the
-  // RunAsGroup feature gate to be enabled.
-  // +optional
-  optional RunAsGroupStrategyOptions runAsGroup = 22;
-
-  // supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
-  optional SupplementalGroupsStrategyOptions supplementalGroups = 12;
-
-  // fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.
-  optional FSGroupStrategyOptions fsGroup = 13;
-
-  // readOnlyRootFilesystem when set to true will force containers to run with a read only root file
-  // system.  If the container specifically requests to run with a non-read only root file system
-  // the PSP should deny the pod.
-  // If set to false the container may run with a read only root file system if it wishes but it
-  // will not be forced to.
-  // +optional
-  optional bool readOnlyRootFilesystem = 14;
-
-  // defaultAllowPrivilegeEscalation controls the default setting for whether a
-  // process can gain more privileges than its parent process.
-  // +optional
-  optional bool defaultAllowPrivilegeEscalation = 15;
-
-  // allowPrivilegeEscalation determines if a pod can request to allow
-  // privilege escalation. If unspecified, defaults to true.
-  // +optional
-  optional bool allowPrivilegeEscalation = 16;
-
-  // allowedHostPaths is an allowlist of host paths. Empty indicates
-  // that all host paths may be used.
-  // +optional
-  repeated AllowedHostPath allowedHostPaths = 17;
-
-  // allowedFlexVolumes is an allowlist of Flexvolumes.  Empty or nil indicates that all
-  // Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
-  // is allowed in the "volumes" field.
-  // +optional
-  repeated AllowedFlexVolume allowedFlexVolumes = 18;
-
-  // AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
-  // An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
-  // +optional
-  repeated AllowedCSIDriver allowedCSIDrivers = 23;
-
-  // allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
-  // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
-  // as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
-  // Kubelet has to allowlist all unsafe sysctls explicitly to avoid rejection.
-  //
-  // Examples:
-  // e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
-  // e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
-  // +optional
-  repeated string allowedUnsafeSysctls = 19;
-
-  // forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
-  // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
-  // as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.
-  //
-  // Examples:
-  // e.g. "foo/*" forbids "foo/bar", "foo/baz", etc.
-  // e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
-  // +optional
-  repeated string forbiddenSysctls = 20;
-
-  // AllowedProcMountTypes is an allowlist of allowed ProcMountTypes.
-  // Empty or nil indicates that only the DefaultProcMountType may be used.
-  // This requires the ProcMountType feature flag to be enabled.
-  // +optional
-  repeated string allowedProcMountTypes = 21;
-
-  // runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
-  // If this field is omitted, the pod's runtimeClassName field is unrestricted.
-  // Enforcement of this field depends on the RuntimeClass feature gate being enabled.
-  // +optional
-  optional RuntimeClassStrategyOptions runtimeClass = 24;
 }
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
@@ -1076,7 +881,7 @@ message ReplicaSetSpec {
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 message ReplicaSetStatus {
-  // Replicas is the most recently oberved number of replicas.
+  // Replicas is the most recently observed number of replicas.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
   optional int32 replicas = 1;
 
@@ -1182,57 +987,6 @@ message RollingUpdateDeployment {
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
-// RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.
-// Deprecated: use RunAsGroupStrategyOptions from policy API Group instead.
-message RunAsGroupStrategyOptions {
-  // rule is the strategy that will dictate the allowable RunAsGroup values that may be set.
-  optional string rule = 1;
-
-  // ranges are the allowed ranges of gids that may be used. If you would like to force a single gid
-  // then supply a single range with the same start and end. Required for MustRunAs.
-  // +optional
-  repeated IDRange ranges = 2;
-}
-
-// RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.
-// Deprecated: use RunAsUserStrategyOptions from policy API Group instead.
-message RunAsUserStrategyOptions {
-  // rule is the strategy that will dictate the allowable RunAsUser values that may be set.
-  optional string rule = 1;
-
-  // ranges are the allowed ranges of uids that may be used. If you would like to force a single uid
-  // then supply a single range with the same start and end. Required for MustRunAs.
-  // +optional
-  repeated IDRange ranges = 2;
-}
-
-// RuntimeClassStrategyOptions define the strategy that will dictate the allowable RuntimeClasses
-// for a pod.
-message RuntimeClassStrategyOptions {
-  // allowedRuntimeClassNames is an allowlist of RuntimeClass names that may be specified on a pod.
-  // A value of "*" means that any RuntimeClass name is allowed, and must be the only item in the
-  // list. An empty list requires the RuntimeClassName field to be unset.
-  repeated string allowedRuntimeClassNames = 1;
-
-  // defaultRuntimeClassName is the default RuntimeClassName to set on the pod.
-  // The default MUST be allowed by the allowedRuntimeClassNames list.
-  // A value of nil does not mutate the Pod.
-  // +optional
-  optional string defaultRuntimeClassName = 2;
-}
-
-// SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
-// Deprecated: use SELinuxStrategyOptions from policy API Group instead.
-message SELinuxStrategyOptions {
-  // rule is the strategy that will dictate the allowable labels that may be set.
-  optional string rule = 1;
-
-  // seLinuxOptions required to run as; required for MustRunAs
-  // More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
-  // +optional
-  optional k8s.io.api.core.v1.SELinuxOptions seLinuxOptions = 2;
-}
-
 // represents a scaling request for a resource.
 message Scale {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -1260,7 +1014,7 @@ message ScaleStatus {
   // actual number of observed instances of the scaled object.
   optional int32 replicas = 1;
 
-  // label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+  // selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
   // +optional
   // +mapType=atomic
   map<string, string> selector = 2;
@@ -1273,18 +1027,5 @@ message ScaleStatus {
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
   optional string targetSelector = 3;
-}
-
-// SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
-// Deprecated: use SupplementalGroupsStrategyOptions from policy API Group instead.
-message SupplementalGroupsStrategyOptions {
-  // rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
-  // +optional
-  optional string rule = 1;
-
-  // ranges are the allowed ranges of supplemental groups.  If you would like to force a single
-  // supplemental group then supply a single range with the same start and end. Required for MustRunAs.
-  // +optional
-  repeated IDRange ranges = 2;
 }
 

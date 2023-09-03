@@ -22,15 +22,16 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -73,7 +74,7 @@ type testRun struct {
 // http://kubernetes.io/docs/admin/garbage-collection/
 var _ = SIGDescribe("GarbageCollect [Serial][NodeFeature:GarbageCollect]", func() {
 	f := framework.NewDefaultFramework("garbage-collect-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	containerNamePrefix := "gc-test-container-"
 	podNamePrefix := "gc-test-pod-"
 
@@ -137,11 +138,12 @@ var _ = SIGDescribe("GarbageCollect [Serial][NodeFeature:GarbageCollect]", func(
 })
 
 // Tests the following:
-// 	pods are created, and all containers restart the specified number of times
-// 	while containers are running, the number of copies of a single container does not exceed maxPerPodContainer
-// 	while containers are running, the total number of containers does not exceed maxTotalContainers
-// 	while containers are running, if not constrained by maxPerPodContainer or maxTotalContainers, keep an extra copy of each container
-// 	once pods are killed, all containers are eventually cleaned up
+//
+//	pods are created, and all containers restart the specified number of times
+//	while containers are running, the number of copies of a single container does not exceed maxPerPodContainer
+//	while containers are running, the total number of containers does not exceed maxTotalContainers
+//	while containers are running, if not constrained by maxPerPodContainer or maxTotalContainers, keep an extra copy of each container
+//	once pods are killed, all containers are eventually cleaned up
 func containerGCTest(f *framework.Framework, test testRun) {
 	var runtime internalapi.RuntimeService
 	ginkgo.BeforeEach(func() {
@@ -153,7 +155,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		// Initialize the getContainerNames function to use CRI runtime client.
 		pod.getContainerNames = func() ([]string, error) {
 			relevantContainers := []string{}
-			containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
+			containers, err := runtime.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
 				LabelSelector: map[string]string{
 					types.KubernetesPodNameLabel:      pod.podName,
 					types.KubernetesPodNamespaceLabel: f.Namespace.Name,
@@ -170,13 +172,13 @@ func containerGCTest(f *framework.Framework, test testRun) {
 	}
 
 	ginkgo.Context(fmt.Sprintf("Garbage Collection Test: %s", test.testName), func() {
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			realPods := getPods(test.testPods)
-			f.PodClient().CreateBatch(realPods)
+			e2epod.NewPodClient(f).CreateBatch(ctx, realPods)
 			ginkgo.By("Making sure all containers restart the specified number of times")
-			gomega.Eventually(func() error {
+			gomega.Eventually(ctx, func(ctx context.Context) error {
 				for _, podSpec := range test.testPods {
-					err := verifyPodRestartCount(f, podSpec.podName, podSpec.numContainers, podSpec.restartCount)
+					err := verifyPodRestartCount(ctx, f, podSpec.podName, podSpec.numContainers, podSpec.restartCount)
 					if err != nil {
 						return err
 					}
@@ -185,12 +187,12 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			}, setupDuration, runtimePollInterval).Should(gomega.BeNil())
 		})
 
-		ginkgo.It(fmt.Sprintf("Should eventually garbage collect containers when we exceed the number of dead containers per container"), func() {
+		ginkgo.It("Should eventually garbage collect containers when we exceed the number of dead containers per container", func(ctx context.Context) {
 			totalContainers := 0
 			for _, pod := range test.testPods {
 				totalContainers += pod.numContainers*2 + 1
 			}
-			gomega.Eventually(func() error {
+			gomega.Eventually(ctx, func() error {
 				total := 0
 				for _, pod := range test.testPods {
 					containerNames, err := pod.getContainerNames()
@@ -221,7 +223,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 
 			if maxPerPodContainer >= 2 && maxTotalContainers < 0 { // make sure constraints wouldn't make us gc old containers
 				ginkgo.By("Making sure the kubelet consistently keeps around an extra copy of each container.")
-				gomega.Consistently(func() error {
+				gomega.Consistently(ctx, func() error {
 					for _, pod := range test.testPods {
 						containerNames, err := pod.getContainerNames()
 						if err != nil {
@@ -244,14 +246,14 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			}
 		})
 
-		ginkgo.AfterEach(func() {
+		ginkgo.AfterEach(func(ctx context.Context) {
 			for _, pod := range test.testPods {
 				ginkgo.By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				f.PodClient().DeleteSync(pod.podName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+				e2epod.NewPodClient(f).DeleteSync(ctx, pod.podName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 			}
 
 			ginkgo.By("Making sure all containers get cleaned up")
-			gomega.Eventually(func() error {
+			gomega.Eventually(ctx, func() error {
 				for _, pod := range test.testPods {
 					containerNames, err := pod.getContainerNames()
 					if err != nil {
@@ -264,9 +266,9 @@ func containerGCTest(f *framework.Framework, test testRun) {
 				return nil
 			}, garbageCollectDuration, runtimePollInterval).Should(gomega.BeNil())
 
-			if ginkgo.CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
-				logNodeEvents(f)
-				logPodEvents(f)
+			if ginkgo.CurrentSpecReport().Failed() && framework.TestContext.DumpLogsOnFailure {
+				logNodeEvents(ctx, f)
+				logPodEvents(ctx, f)
 			}
 		})
 	})
@@ -315,8 +317,8 @@ func getRestartingContainerCommand(path string, containerNum int, restarts int32
 	}
 }
 
-func verifyPodRestartCount(f *framework.Framework, podName string, expectedNumContainers int, expectedRestartCount int32) error {
-	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podName, metav1.GetOptions{})
+func verifyPodRestartCount(ctx context.Context, f *framework.Framework, podName string, expectedNumContainers int, expectedRestartCount int32) error {
+	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

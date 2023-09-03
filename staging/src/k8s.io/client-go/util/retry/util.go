@@ -74,30 +74,30 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 // backoff, and then try again. On a non-"Conflict" error, or if it retries too many times
 // and gives up, RetryOnConflict will return an error to the caller.
 //
-//     err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-//         // Fetch the resource here; you need to refetch it on every try, since
-//         // if you got a conflict on the last update attempt then you need to get
-//         // the current version before making your own changes.
-//         pod, err := c.Pods("mynamespace").Get(name, metav1.GetOptions{})
-//         if err != nil {
-//             return err
-//         }
+//	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+//	    // Fetch the resource here; you need to refetch it on every try, since
+//	    // if you got a conflict on the last update attempt then you need to get
+//	    // the current version before making your own changes.
+//	    pod, err := c.Pods("mynamespace").Get(name, metav1.GetOptions{})
+//	    if err != nil {
+//	        return err
+//	    }
 //
-//         // Make whatever updates to the resource are needed
-//         pod.Status.Phase = v1.PodFailed
+//	    // Make whatever updates to the resource are needed
+//	    pod.Status.Phase = v1.PodFailed
 //
-//         // Try to update
-//         _, err = c.Pods("mynamespace").UpdateStatus(pod)
-//         // You have to return err itself here (not wrapped inside another error)
-//         // so that RetryOnConflict can identify it correctly.
-//         return err
-//     })
-//     if err != nil {
-//         // May be conflict if max retries were hit, or may be something unrelated
-//         // like permissions or a network error
-//         return err
-//     }
-//     ...
+//	    // Try to update
+//	    _, err = c.Pods("mynamespace").UpdateStatus(pod)
+//	    // You have to return err itself here (not wrapped inside another error)
+//	    // so that RetryOnConflict can identify it correctly.
+//	    return err
+//	})
+//	if err != nil {
+//	    // May be conflict if max retries were hit, or may be something unrelated
+//	    // like permissions or a network error
+//	    return err
+//	}
+//	...
 //
 // TODO: Make Backoff an interface?
 func RetryOnConflict(backoff wait.Backoff, fn func() error) error {

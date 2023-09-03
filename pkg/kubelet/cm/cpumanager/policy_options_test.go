@@ -23,6 +23,8 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
 type optionAvailTest struct {
@@ -54,7 +56,7 @@ func TestPolicyDefaultsAvailable(t *testing.T) {
 	}
 }
 
-func TestPolicyBetaOptionsAvailable(t *testing.T) {
+func TestPolicyOptionsAvailable(t *testing.T) {
 	testCases := []optionAvailTest{
 		{
 			option:            "this-option-does-not-exist",
@@ -80,6 +82,18 @@ func TestPolicyBetaOptionsAvailable(t *testing.T) {
 			featureGateEnable: false,
 			expectedAvailable: false,
 		},
+		{
+			option:            AlignBySocketOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            AlignBySocketOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
+			featureGateEnable: true,
+			expectedAvailable: false,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
@@ -88,6 +102,77 @@ func TestPolicyBetaOptionsAvailable(t *testing.T) {
 			isEnabled := (err == nil)
 			if isEnabled != testCase.expectedAvailable {
 				t.Errorf("option %q available got=%v expected=%v", testCase.option, isEnabled, testCase.expectedAvailable)
+			}
+		})
+	}
+}
+
+func TestValidateStaticPolicyOptions(t *testing.T) {
+	testCases := []struct {
+		description   string
+		policyOption  map[string]string
+		topology      *topology.CPUTopology
+		topoMgrPolicy string
+		expectedErr   bool
+	}{
+		{
+			description:   "Align by socket not enabled",
+			policyOption:  map[string]string{FullPCPUsOnlyOption: "true"},
+			topology:      topoDualSocketMultiNumaPerSocketHT,
+			topoMgrPolicy: topologymanager.PolicySingleNumaNode,
+			expectedErr:   false,
+		},
+		{
+			description:   "Align by socket enabled with topology manager single numa node",
+			policyOption:  map[string]string{AlignBySocketOption: "true"},
+			topology:      topoDualSocketMultiNumaPerSocketHT,
+			topoMgrPolicy: topologymanager.PolicySingleNumaNode,
+			expectedErr:   true,
+		},
+		{
+			description:   "Align by socket enabled with num_sockets > num_numa",
+			policyOption:  map[string]string{AlignBySocketOption: "true"},
+			topology:      fakeTopoMultiSocketDualSocketPerNumaHT,
+			topoMgrPolicy: topologymanager.PolicyNone,
+			expectedErr:   true,
+		},
+		{
+			description:   "Align by socket enabled: with topology manager None policy",
+			policyOption:  map[string]string{AlignBySocketOption: "true"},
+			topology:      topoDualSocketMultiNumaPerSocketHT,
+			topoMgrPolicy: topologymanager.PolicyNone,
+			expectedErr:   false,
+		},
+		{
+			description:   "Align by socket enabled: with topology manager best-effort policy",
+			policyOption:  map[string]string{AlignBySocketOption: "true"},
+			topology:      topoDualSocketMultiNumaPerSocketHT,
+			topoMgrPolicy: topologymanager.PolicyBestEffort,
+			expectedErr:   false,
+		},
+		{
+			description:   "Align by socket enabled: with topology manager restricted policy",
+			policyOption:  map[string]string{AlignBySocketOption: "true"},
+			topology:      topoDualSocketMultiNumaPerSocketHT,
+			topoMgrPolicy: topologymanager.PolicyRestricted,
+			expectedErr:   false,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			topoMgrPolicy := topologymanager.NewNonePolicy()
+			if testCase.topoMgrPolicy == topologymanager.PolicySingleNumaNode {
+				topoMgrPolicy = topologymanager.NewSingleNumaNodePolicy(&topologymanager.NUMAInfo{}, topologymanager.PolicyOptions{})
+
+			}
+			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(topoMgrPolicy)
+
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
+			policyOpt, _ := NewStaticPolicyOptions(testCase.policyOption)
+			err := ValidateStaticPolicyOptions(policyOpt, testCase.topology, topoMgrStore)
+			gotError := (err != nil)
+			if gotError != testCase.expectedErr {
+				t.Errorf("testCase %q failed, got %v expected %v", testCase.description, gotError, testCase.expectedErr)
 			}
 		})
 	}

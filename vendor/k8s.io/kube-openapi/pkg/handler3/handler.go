@@ -21,35 +21,28 @@ import (
 	"crypto/sha512"
 	"encoding/json"
 	"fmt"
-	"mime"
 	"net/http"
 	"net/url"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	openapi_v3 "github.com/google/gnostic/openapiv3"
+	openapi_v3 "github.com/google/gnostic-models/openapiv3"
+	"github.com/google/uuid"
 	"github.com/munnerz/goautoneg"
+	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/common"
-	"k8s.io/kube-openapi/pkg/internal/handler"
 	"k8s.io/kube-openapi/pkg/spec3"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const (
-	jsonExt = ".json"
-
-	mimeJson = "application/json"
-	// TODO(mehdy): change @68f4ded to a version tag when gnostic add version tags.
-	mimePb   = "application/com.github.googleapis.gnostic.OpenAPIv3@68f4ded+protobuf"
-	mimePbGz = "application/x-gzip"
-
-	subTypeProtobuf = "com.github.proto-openapi.spec.v3@v1.0+protobuf"
-	subTypeJSON     = "json"
+	subTypeProtobufDeprecated = "com.github.proto-openapi.spec.v3@v1.0+protobuf"
+	subTypeProtobuf           = "com.github.proto-openapi.spec.v3.v1.0+protobuf"
+	subTypeJSON               = "json"
 )
 
 // OpenAPIV3Discovery is the format of the Discovery document for OpenAPI V3
@@ -65,29 +58,63 @@ type OpenAPIV3DiscoveryGroupVersion struct {
 	ServerRelativeURL string `json:"serverRelativeURL"`
 }
 
+func ToV3ProtoBinary(json []byte) ([]byte, error) {
+	document, err := openapi_v3.ParseDocument(json)
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(document)
+}
+
+type timedSpec struct {
+	spec         []byte
+	lastModified time.Time
+}
+
+// This type is protected by the lock on OpenAPIService.
+type openAPIV3Group struct {
+	specCache cached.Replaceable[*spec3.OpenAPI]
+	pbCache   cached.Data[timedSpec]
+	jsonCache cached.Data[timedSpec]
+}
+
+func newOpenAPIV3Group() *openAPIV3Group {
+	o := &openAPIV3Group{}
+	o.jsonCache = cached.NewTransformer[*spec3.OpenAPI](func(result cached.Result[*spec3.OpenAPI]) cached.Result[timedSpec] {
+		if result.Err != nil {
+			return cached.NewResultErr[timedSpec](result.Err)
+		}
+		json, err := json.Marshal(result.Data)
+		if err != nil {
+			return cached.NewResultErr[timedSpec](err)
+		}
+		return cached.NewResultOK(timedSpec{spec: json, lastModified: time.Now()}, computeETag(json))
+	}, &o.specCache)
+	o.pbCache = cached.NewTransformer(func(result cached.Result[timedSpec]) cached.Result[timedSpec] {
+		if result.Err != nil {
+			return cached.NewResultErr[timedSpec](result.Err)
+		}
+		proto, err := ToV3ProtoBinary(result.Data.spec)
+		if err != nil {
+			return cached.NewResultErr[timedSpec](err)
+		}
+		return cached.NewResultOK(timedSpec{spec: proto, lastModified: result.Data.lastModified}, result.Etag)
+	}, o.jsonCache)
+	return o
+}
+
+func (o *openAPIV3Group) UpdateSpec(openapi cached.Data[*spec3.OpenAPI]) {
+	o.specCache.Replace(openapi)
+}
+
 // OpenAPIService is the service responsible for serving OpenAPI spec. It has
 // the ability to safely change the spec while serving it.
 type OpenAPIService struct {
-	// rwMutex protects All members of this service.
-	rwMutex      sync.RWMutex
-	lastModified time.Time
-	v3Schema     map[string]*OpenAPIV3Group
-}
+	// Mutex protects the schema map.
+	mutex    sync.Mutex
+	v3Schema map[string]*openAPIV3Group
 
-type OpenAPIV3Group struct {
-	rwMutex sync.RWMutex
-
-	lastModified time.Time
-
-	pbCache   handler.HandlerCache
-	jsonCache handler.HandlerCache
-	etagCache handler.HandlerCache
-}
-
-func init() {
-	mime.AddExtensionType(".json", mimeJson)
-	mime.AddExtensionType(".pb-v1", mimePb)
-	mime.AddExtensionType(".gz", mimePbGz)
+	discoveryCache cached.Replaceable[timedSpec]
 }
 
 func computeETag(data []byte) string {
@@ -106,92 +133,90 @@ func constructServerRelativeURL(gvString, etag string) string {
 }
 
 // NewOpenAPIService builds an OpenAPIService starting with the given spec.
-func NewOpenAPIService(spec *spec.Swagger) (*OpenAPIService, error) {
+func NewOpenAPIService() *OpenAPIService {
 	o := &OpenAPIService{}
-	o.v3Schema = make(map[string]*OpenAPIV3Group)
-	return o, nil
+	o.v3Schema = make(map[string]*openAPIV3Group)
+	// We're not locked because we haven't shared the structure yet.
+	o.discoveryCache.Replace(o.buildDiscoveryCacheLocked())
+	return o
 }
 
-func (o *OpenAPIService) getGroupBytes() ([]byte, error) {
-	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
-	keys := make([]string, len(o.v3Schema))
-	i := 0
-	for k := range o.v3Schema {
-		keys[i] = k
-		i++
+func (o *OpenAPIService) buildDiscoveryCacheLocked() cached.Data[timedSpec] {
+	caches := make(map[string]cached.Data[timedSpec], len(o.v3Schema))
+	for gvName, group := range o.v3Schema {
+		caches[gvName] = group.jsonCache
 	}
-
-	sort.Strings(keys)
-	discovery := &OpenAPIV3Discovery{Paths: make(map[string]OpenAPIV3DiscoveryGroupVersion)}
-	for gvString, groupVersion := range o.v3Schema {
-		etagBytes, err := groupVersion.etagCache.Get()
+	return cached.NewMerger(func(results map[string]cached.Result[timedSpec]) cached.Result[timedSpec] {
+		discovery := &OpenAPIV3Discovery{Paths: make(map[string]OpenAPIV3DiscoveryGroupVersion)}
+		for gvName, result := range results {
+			if result.Err != nil {
+				return cached.NewResultErr[timedSpec](result.Err)
+			}
+			discovery.Paths[gvName] = OpenAPIV3DiscoveryGroupVersion{
+				ServerRelativeURL: constructServerRelativeURL(gvName, result.Etag),
+			}
+		}
+		j, err := json.Marshal(discovery)
 		if err != nil {
-			return nil, err
+			return cached.NewResultErr[timedSpec](err)
 		}
-		discovery.Paths[gvString] = OpenAPIV3DiscoveryGroupVersion{
-			ServerRelativeURL: constructServerRelativeURL(gvString, string(etagBytes)),
-		}
-	}
-	j, err := json.Marshal(discovery)
-	if err != nil {
-		return nil, err
-	}
-	return j, nil
+		return cached.NewResultOK(timedSpec{spec: j, lastModified: time.Now()}, computeETag(j))
+	}, caches)
 }
 
 func (o *OpenAPIService) getSingleGroupBytes(getType string, group string) ([]byte, string, time.Time, error) {
-	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
 	v, ok := o.v3Schema[group]
 	if !ok {
 		return nil, "", time.Now(), fmt.Errorf("Cannot find CRD group %s", group)
 	}
-	if getType == subTypeJSON {
-		specBytes, err := v.jsonCache.Get()
-		if err != nil {
-			return nil, "", v.lastModified, err
-		}
-		etagBytes, err := v.etagCache.Get()
-		return specBytes, string(etagBytes), v.lastModified, err
-	} else if getType == subTypeProtobuf {
-		specPb, err := v.pbCache.Get()
-		if err != nil {
-			return nil, "", v.lastModified, err
-		}
-		etagBytes, err := v.etagCache.Get()
-		return specPb, string(etagBytes), v.lastModified, err
+	result := cached.Result[timedSpec]{}
+	switch getType {
+	case subTypeJSON:
+		result = v.jsonCache.Get()
+	case subTypeProtobuf, subTypeProtobufDeprecated:
+		result = v.pbCache.Get()
+	default:
+		return nil, "", time.Now(), fmt.Errorf("Invalid accept clause %s", getType)
 	}
-	return nil, "", time.Now(), fmt.Errorf("Invalid accept clause %s", getType)
+	return result.Data.spec, result.Etag, result.Data.lastModified, result.Err
 }
 
-func (o *OpenAPIService) UpdateGroupVersion(group string, openapi *spec3.OpenAPI) (err error) {
-	o.rwMutex.Lock()
-	defer o.rwMutex.Unlock()
-
+// UpdateGroupVersionLazy adds or updates an existing group with the new cached.
+func (o *OpenAPIService) UpdateGroupVersionLazy(group string, openapi cached.Data[*spec3.OpenAPI]) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
 	if _, ok := o.v3Schema[group]; !ok {
-		o.v3Schema[group] = &OpenAPIV3Group{}
+		o.v3Schema[group] = newOpenAPIV3Group()
+		// Since there is a new item, we need to re-build the cache map.
+		o.discoveryCache.Replace(o.buildDiscoveryCacheLocked())
 	}
-	return o.v3Schema[group].UpdateSpec(openapi)
+	o.v3Schema[group].UpdateSpec(openapi)
+}
+
+func (o *OpenAPIService) UpdateGroupVersion(group string, openapi *spec3.OpenAPI) {
+	o.UpdateGroupVersionLazy(group, cached.NewResultOK(openapi, uuid.New().String()))
 }
 
 func (o *OpenAPIService) DeleteGroupVersion(group string) {
-	o.rwMutex.Lock()
-	defer o.rwMutex.Unlock()
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
 	delete(o.v3Schema, group)
-}
-
-func ToV3ProtoBinary(json []byte) ([]byte, error) {
-	document, err := openapi_v3.ParseDocument(json)
-	if err != nil {
-		return nil, err
-	}
-	return proto.Marshal(document)
+	// Rebuild the merge cache map since the items have changed.
+	o.discoveryCache.Replace(o.buildDiscoveryCacheLocked())
 }
 
 func (o *OpenAPIService) HandleDiscovery(w http.ResponseWriter, r *http.Request) {
-	data, _ := o.getGroupBytes()
-	http.ServeContent(w, r, "/openapi/v3", time.Now(), bytes.NewReader(data))
+	result := o.discoveryCache.Get()
+	if result.Err != nil {
+		klog.Errorf("Error serving discovery: %s", result.Err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Etag", strconv.Quote(result.Etag))
+	w.Header().Set("Content-Type", "application/json")
+	http.ServeContent(w, r, "/openapi/v3", result.Data.lastModified, bytes.NewReader(result.Data.spec))
 }
 
 func (o *OpenAPIService) HandleGroupVersion(w http.ResponseWriter, r *http.Request) {
@@ -210,11 +235,13 @@ func (o *OpenAPIService) HandleGroupVersion(w http.ResponseWriter, r *http.Reque
 	}
 
 	accepted := []struct {
-		Type    string
-		SubType string
+		Type                string
+		SubType             string
+		ReturnedContentType string
 	}{
-		{"application", subTypeJSON},
-		{"application", subTypeProtobuf},
+		{"application", subTypeJSON, "application/" + subTypeJSON},
+		{"application", subTypeProtobuf, "application/" + subTypeProtobuf},
+		{"application", subTypeProtobufDeprecated, "application/" + subTypeProtobuf},
 	}
 
 	for _, clause := range clauses {
@@ -229,6 +256,9 @@ func (o *OpenAPIService) HandleGroupVersion(w http.ResponseWriter, r *http.Reque
 			if err != nil {
 				return
 			}
+			// Set Content-Type header in the reponse
+			w.Header().Set("Content-Type", accepts.ReturnedContentType)
+
 			// ETag must be enclosed in double quotes: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag
 			w.Header().Set("Etag", strconv.Quote(etag))
 
@@ -260,32 +290,5 @@ func (o *OpenAPIService) HandleGroupVersion(w http.ResponseWriter, r *http.Reque
 func (o *OpenAPIService) RegisterOpenAPIV3VersionedService(servePath string, handler common.PathHandlerByGroupVersion) error {
 	handler.Handle(servePath, http.HandlerFunc(o.HandleDiscovery))
 	handler.HandlePrefix(servePath+"/", http.HandlerFunc(o.HandleGroupVersion))
-	return nil
-}
-
-func (o *OpenAPIV3Group) UpdateSpec(openapi *spec3.OpenAPI) (err error) {
-	o.rwMutex.Lock()
-	defer o.rwMutex.Unlock()
-
-	o.jsonCache = o.jsonCache.New(func() ([]byte, error) {
-		return json.Marshal(openapi)
-	})
-	o.pbCache = o.pbCache.New(func() ([]byte, error) {
-		json, err := o.jsonCache.Get()
-		if err != nil {
-			return nil, err
-		}
-		return ToV3ProtoBinary(json)
-	})
-	// TODO: This forces a json marshal of corresponding group-versions.
-	// We should look to replace this with a faster hashing mechanism.
-	o.etagCache = o.etagCache.New(func() ([]byte, error) {
-		json, err := o.jsonCache.Get()
-		if err != nil {
-			return nil, err
-		}
-		return []byte(computeETag(json)), nil
-	})
-	o.lastModified = time.Now()
 	return nil
 }

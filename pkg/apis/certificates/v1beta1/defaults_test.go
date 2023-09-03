@@ -49,6 +49,11 @@ func TestIsKubeletServingCSR(t *testing.T) {
 			usages: kubeletServerUsages,
 			exp:    true,
 		},
+		"defaults without key encipherment for kubelet-serving": {
+			req:    newCSR(kubeletServerPEMOptions),
+			usages: kubeletServerUsagesNoRSA,
+			exp:    true,
+		},
 		"does not default to kube-apiserver-client-kubelet if org is not 'system:nodes'": {
 			req:    newCSR(kubeletServerPEMOptions, pemOptions{org: "not-system:nodes"}),
 			usages: kubeletServerUsages,
@@ -154,6 +159,16 @@ func TestIsKubeletClientCSR(t *testing.T) {
 			usages: kubeletClientUsages[1:],
 			exp:    false,
 		},
+		"does not default to kube-apiserver-client-kubelet if it is missing an expected usage without key encipherment": {
+			req:    newCSR(kubeletClientPEMOptions),
+			usages: kubeletClientUsagesNoRSA[1:],
+			exp:    false,
+		},
+		"default to kube-apiserver-client-kubelet without key encipherment": {
+			req:    newCSR(kubeletClientPEMOptions),
+			usages: kubeletClientUsagesNoRSA,
+			exp:    true,
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -171,6 +186,10 @@ var (
 		capi.UsageKeyEncipherment,
 		capi.UsageClientAuth,
 	}
+	kubeletClientUsagesNoRSA = []capi.KeyUsage{
+		capi.UsageDigitalSignature,
+		capi.UsageClientAuth,
+	}
 	kubeletClientPEMOptions = pemOptions{
 		cn:  "system:node:nodename",
 		org: "system:nodes",
@@ -179,6 +198,10 @@ var (
 	kubeletServerUsages = []capi.KeyUsage{
 		capi.UsageDigitalSignature,
 		capi.UsageKeyEncipherment,
+		capi.UsageServerAuth,
+	}
+	kubeletServerUsagesNoRSA = []capi.KeyUsage{
+		capi.UsageDigitalSignature,
 		capi.UsageServerAuth,
 	}
 	kubeletServerPEMOptions = pemOptions{

@@ -19,6 +19,7 @@ package apiserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,15 +30,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	k8sfeatures "k8s.io/kubernetes/pkg/features"
 
-	//k8sfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/image"
@@ -56,8 +52,6 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("extensions", "v1beta1", "ingresses"):                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                     `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
-	gvr("extensions", "v1beta1", "networkpolicies"):                 `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
-	gvr("networking.k8s.io", "v1", "networkpolicies"):               `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 25}}`,
 	gvr("autoscaling", "v2", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 25}}`,
 	gvr("batch", "v1", "cronjobs"):                                  `{"status": {"lastScheduleTime":  "2020-01-01T00:00:00Z"}}`,
@@ -65,17 +59,18 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("storage.k8s.io", "v1", "volumeattachments"):                `{"status": {"attached": false}}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                     `{"status": {"currentHealthy": 25}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                `{"status": {"currentHealthy": 25}}`,
+	gvr("resource.k8s.io", "v1alpha2", "podschedulingcontexts"):     `{"status": {"resourceClaims": [{"name": "my-claim", "unsuitableNodes": ["node2"]}]}}`, // Not really a conflict with status_test.go: Apply just stores both nodes. Conflict testing therefore gets disabled for podschedulingcontexts.
+	gvr("resource.k8s.io", "v1alpha2", "resourceclaims"):            `{"status": {"driverName": "other.example.com"}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
+	// standard for []metav1.Condition
+	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 }
 
 // resetFieldsStatusDefault conflicts with statusDefault
 const resetFieldsStatusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"False"}]}}`
 
-var resetFieldsSkippedResources = map[string]struct{}{
-	// TODO: flowschemas is flaking,
-	// possible bug in the flowschemas controller.
-	"flowschemas": {},
-}
+var resetFieldsSkippedResources = map[string]struct{}{}
 
 // noConflicts is the set of reources for which
 // a conflict cannot occur.
@@ -89,6 +84,10 @@ var noConflicts = map[string]struct{}{
 	// namespaces only have a spec.finalizers field which is also skipped,
 	// thus it will never have a conflict.
 	"namespaces": {},
+	// podschedulingcontexts.status only has a list which contains items with a list,
+	// therefore apply works because it simply merges either the outer or
+	// the inner list.
+	"podschedulingcontexts": {},
 }
 
 var image2 = image.GetE2EImage(image.Etcd)
@@ -108,7 +107,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("", "v1", "pods"):                                                          `{"metadata": {"deletionTimestamp": "2020-01-01T00:00:00Z", "ownerReferences":[]}, "spec": {"containers": [{"image": "` + image2 + `", "name": "container7"}]}}`,
 	gvr("", "v1", "replicationcontrollers"):                                        `{"spec": {"selector": {"new": "stuff2"}}}`,
 	gvr("", "v1", "resourcequotas"):                                                `{"spec": {"hard": {"cpu": "25M"}}}`,
-	gvr("", "v1", "services"):                                                      `{"spec": {"externalName": "service2name"}}`,
+	gvr("", "v1", "services"):                                                      `{"spec": {"type": "ClusterIP"}}`,
 	gvr("apps", "v1", "daemonsets"):                                                `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container6"}]}}}}`,
 	gvr("apps", "v1", "deployments"):                                               `{"metadata": {"labels": {"a":"c"}}, "spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container6"}]}}}}`,
 	gvr("apps", "v1", "replicasets"):                                               `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container4"}]}}}}`,
@@ -125,14 +124,14 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "flowschemas"):                 `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "flowschemas"):                  `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "flowschemas"):                  `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
+	gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"):                  `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"): `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"assuredConcurrencyShares": 23}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "prioritylevelconfigurations"):  `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"assuredConcurrencyShares": 23}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "prioritylevelconfigurations"):  `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"assuredConcurrencyShares": 23}}}`,
+	gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"):  `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"nominalConcurrencyShares": 23}}}`,
 	gvr("extensions", "v1beta1", "ingresses"):                                      `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                               `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                                    `{"spec": {"defaultBackend": {"service": {"name": "service2"}}}}`,
-	gvr("extensions", "v1beta1", "networkpolicies"):                                `{"spec":{"podSelector":{"matchLabels":{"app":"web"}},"ingress":[]}}`,
-	gvr("networking.k8s.io", "v1", "networkpolicies"):                              `{"spec":{"podSelector":{"matchLabels":{"app":"web"}},"ingress":[]}}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                                    `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                               `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("storage.k8s.io", "v1alpha1", "volumeattachments"):                         `{"metadata": {"name": "vaName2"}, "spec": {"nodeName": "localhost2"}}`,
@@ -143,7 +142,13 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("awesome.bears.com", "v3", "pandas"):                                       `{"spec": {"replicas": 302}}`,
 	gvr("apiregistration.k8s.io", "v1beta1", "apiservices"):                        `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
 	gvr("apiregistration.k8s.io", "v1", "apiservices"):                             `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
+	gvr("resource.k8s.io", "v1alpha2", "podschedulingcontexts"):                    `{"spec": {"selectedNode": "node2name"}}`,
+	gvr("resource.k8s.io", "v1alpha2", "resourceclasses"):                          `{"driverName": "other.example.com"}`,
+	gvr("resource.k8s.io", "v1alpha2", "resourceclaims"):                           `{"spec": {"resourceClassName": "class2name"}}`, // ResourceClassName is immutable, but that doesn't matter for the test.
+	gvr("resource.k8s.io", "v1alpha2", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):                `{}`,
+	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
+	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
 }
 
 // TestResetFields makes sure that fieldManager does not own fields reset by the storage strategy.
@@ -152,9 +157,6 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 // confirms that the fieldmanager1 is wiped of the status and fieldmanager2 is wiped of the spec.
 // We then attempt to apply obj2 to the spec endpoint which fails with an expected conflict.
 func TestApplyResetFields(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, k8sfeatures.NetworkPolicyStatus, true)()
-
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -268,24 +270,28 @@ func TestApplyResetFields(t *testing.T) {
 				// skip checking for conflicts on resources
 				// that will never have conflicts
 				if _, ok = noConflicts[mapping.Resource.Resource]; !ok {
+					var objRet *unstructured.Unstructured
+
 					// reapply second object to the spec endpoint
 					// that should fail with a conflict
-					_, err = dynamicClient.
+					objRet, err = dynamicClient.
 						Resource(mapping.Resource).
 						Namespace(namespace).
 						Apply(context.TODO(), name, obj2, metav1.ApplyOptions{FieldManager: "fieldmanager2"})
-					if err == nil || !strings.Contains(err.Error(), "conflict") {
-						t.Fatalf("expected conflict, got error %v", err)
+					err = expectConflict(objRet, err, dynamicClient, mapping.Resource, namespace, name)
+					if err != nil {
+						t.Fatalf("Did not get expected conflict in spec of %s %s/%s: %v", mapping.Resource, namespace, name, err)
 					}
 
 					// reapply first object to the status endpoint
 					// that should fail with a conflict
-					_, err = dynamicClient.
+					objRet, err = dynamicClient.
 						Resource(mapping.Resource).
 						Namespace(namespace).
 						ApplyStatus(context.TODO(), name, &obj1, metav1.ApplyOptions{FieldManager: "fieldmanager1"})
-					if err == nil || !strings.Contains(err.Error(), "conflict") {
-						t.Fatalf("expected conflict, got error %v", err)
+					err = expectConflict(objRet, err, dynamicClient, mapping.Resource, namespace, name)
+					if err != nil {
+						t.Fatalf("Did not get expected conflict in status of %s %s/%s: %v", mapping.Resource, namespace, name, err)
 					}
 				}
 
@@ -297,4 +303,31 @@ func TestApplyResetFields(t *testing.T) {
 			})
 		}
 	}
+}
+
+func expectConflict(objRet *unstructured.Unstructured, err error, dynamicClient dynamic.Interface, resource schema.GroupVersionResource, namespace, name string) error {
+	if err != nil && strings.Contains(err.Error(), "conflict") {
+		return nil
+	}
+	which := "returned"
+	// something unexpected is going on here, let's not assume that objRet==nil if any only if err!=nil
+	if objRet == nil {
+		which = "subsequently fetched"
+		var err2 error
+		objRet, err2 = dynamicClient.
+			Resource(resource).
+			Namespace(namespace).
+			Get(context.TODO(), name, metav1.GetOptions{})
+		if err2 != nil {
+			return fmt.Errorf("instead got error %w, and failed to Get object: %v", err, err2)
+		}
+	}
+	marshBytes, marshErr := json.Marshal(objRet)
+	var gotten string
+	if marshErr == nil {
+		gotten = string(marshBytes)
+	} else {
+		gotten = fmt.Sprintf("<failed to json.Marshall(%#+v): %v>", objRet, marshErr)
+	}
+	return fmt.Errorf("instead got error %w; %s object is %s", err, which, gotten)
 }

@@ -24,13 +24,20 @@ import (
 // and end of a Span's lifecycle, and are called in the order they are
 // registered.
 type SpanProcessor interface {
+	// DO NOT CHANGE: any modification will not be backwards compatible and
+	// must never be done outside of a new major release.
+
 	// OnStart is called when a span is started. It is called synchronously
 	// and should not block.
 	OnStart(parent context.Context, s ReadWriteSpan)
+	// DO NOT CHANGE: any modification will not be backwards compatible and
+	// must never be done outside of a new major release.
 
 	// OnEnd is called when span is finished. It is called synchronously and
 	// hence not block.
 	OnEnd(s ReadOnlySpan)
+	// DO NOT CHANGE: any modification will not be backwards compatible and
+	// must never be done outside of a new major release.
 
 	// Shutdown is called when the SDK shuts down. Any cleanup or release of
 	// resources held by the processor should be done in this call.
@@ -41,12 +48,16 @@ type SpanProcessor interface {
 	// All timeouts and cancellations contained in ctx must be honored, this
 	// should not block indefinitely.
 	Shutdown(ctx context.Context) error
+	// DO NOT CHANGE: any modification will not be backwards compatible and
+	// must never be done outside of a new major release.
 
 	// ForceFlush exports all ended spans to the configured Exporter that have not yet
 	// been exported.  It should only be called when absolutely necessary, such as when
 	// using a FaaS provider that may suspend the process after an invocation, but before
 	// the Processor can export the completed spans.
 	ForceFlush(ctx context.Context) error
+	// DO NOT CHANGE: any modification will not be backwards compatible and
+	// must never be done outside of a new major release.
 }
 
 type spanProcessorState struct {

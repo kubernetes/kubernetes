@@ -226,8 +226,10 @@ func contains(list []rbacv1.Subject, item rbacv1.Subject) bool {
 }
 
 // diffSubjectLists returns lists containing the items unique to each provided list:
-//   list1Only = list1 - list2
-//   list2Only = list2 - list1
+//
+//	list1Only = list1 - list2
+//	list2Only = list2 - list1
+//
 // if both returned lists are empty, the provided lists are equal
 func diffSubjectLists(list1 []rbacv1.Subject, list2 []rbacv1.Subject) (list1Only []rbacv1.Subject, list2Only []rbacv1.Subject) {
 	for _, list1Item := range list1 {

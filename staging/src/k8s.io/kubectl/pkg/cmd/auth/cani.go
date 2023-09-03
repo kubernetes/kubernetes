@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -35,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	discovery "k8s.io/client-go/discovery"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/kubectl/pkg/describe"
 	rbacutil "k8s.io/kubectl/pkg/util/rbac"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -62,7 +62,8 @@ type CanIOptions struct {
 	ResourceName   string
 	List           bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
+	WarningPrinter *printers.WarningPrinter
 }
 
 var (
@@ -81,6 +82,11 @@ var (
 
 		# Check to see if I can list deployments in my current namespace
 		kubectl auth can-i list deployments.apps
+
+		# Check to see if service account "foo" of namespace "dev" can list pods
+		# in the namespace "prod".
+		# You must be allowed to use impersonation for the global option "--as".
+		kubectl auth can-i list pods --as=system:serviceaccount:dev:foo -n prod
 
 		# Check to see if I can do everything in my current namespace ("*" means all)
 		kubectl auth can-i '*' '*'
@@ -104,7 +110,7 @@ var (
 )
 
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command
-func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCanI(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &CanIOptions{
 		IOStreams: streams,
 	}
@@ -144,13 +150,18 @@ func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 // Complete completes all the required options
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
+	// Set default WarningPrinter if not already set.
+	if o.WarningPrinter == nil {
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	}
+
 	if o.List {
 		if len(args) != 0 {
 			return errors.New("list option must be specified with no arguments")
 		}
 	} else {
 		if o.Quiet {
-			o.Out = ioutil.Discard
+			o.Out = io.Discard
 		}
 
 		switch len(args) {
@@ -170,7 +181,9 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 				o.ResourceName = resourceTokens[1]
 			}
 		default:
-			return errors.New("you must specify two or three arguments: verb, resource, and optional resourceName")
+			errString := "you must specify two arguments: verb resource or verb resource/resourceName."
+			usageString := "See 'kubectl auth can-i -h' for help and examples."
+			return errors.New(fmt.Sprintf("%s\n%s", errString, usageString))
 		}
 	}
 
@@ -201,6 +214,10 @@ func (o *CanIOptions) Validate() error {
 		return nil
 	}
 
+	if o.WarningPrinter == nil {
+		return fmt.Errorf("WarningPrinter can not be used without initialization")
+	}
+
 	if o.NonResourceURL != "" {
 		if o.Subresource != "" {
 			return fmt.Errorf("--subresource can not be used with NonResourceURL")
@@ -209,20 +226,19 @@ func (o *CanIOptions) Validate() error {
 			return fmt.Errorf("NonResourceURL and ResourceName can not specified together")
 		}
 		if !isKnownNonResourceVerb(o.Verb) {
-			fmt.Fprintf(o.ErrOut, "Warning: verb '%s' is not a known verb\n", o.Verb)
+			o.WarningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
 		}
 	} else if !o.Resource.Empty() && !o.AllNamespaces && o.DiscoveryClient != nil {
 		if namespaced, err := isNamespaced(o.Resource, o.DiscoveryClient); err == nil && !namespaced {
 			if len(o.Resource.Group) == 0 {
-				fmt.Fprintf(o.ErrOut, "Warning: resource '%s' is not namespace scoped\n", o.Resource.Resource)
+				o.WarningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped\n", o.Resource.Resource))
 			} else {
-				fmt.Fprintf(o.ErrOut, "Warning: resource '%s' is not namespace scoped in group '%s'\n", o.Resource.Resource, o.Resource.Group)
+				o.WarningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped in group '%s'\n", o.Resource.Resource, o.Resource.Group))
 			}
 		}
 		if !isKnownResourceVerb(o.Verb) {
-			fmt.Fprintf(o.ErrOut, "Warning: verb '%s' is not a known verb\n", o.Verb)
+			o.WarningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
 		}
-
 	}
 
 	if o.NoHeaders {
@@ -309,9 +325,9 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 		if err != nil {
 			if !nonStandardResourceNames.Has(groupResource.String()) {
 				if len(groupResource.Group) == 0 {
-					fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
+					o.WarningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s'\n", groupResource.Resource))
 				} else {
-					fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
+					o.WarningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group))
 				}
 			}
 			return schema.GroupVersionResource{Resource: resourceArg}
@@ -323,7 +339,7 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 
 func (o *CanIOptions) printStatus(status authorizationv1.SubjectRulesReviewStatus) error {
 	if status.Incomplete {
-		fmt.Fprintf(o.ErrOut, "warning: the list may be incomplete: %v\n", status.EvaluationError)
+		o.WarningPrinter.Print(fmt.Sprintf("the list may be incomplete: %v", status.EvaluationError))
 	}
 
 	breakdownRules := []rbacv1.PolicyRule{}

@@ -39,7 +39,7 @@ func RunWithPrivateKeyFixtureDirectory(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// Reset() indicates a new test is starting and previously returned private key fixtures may be reused.
+// Reset indicates a new test is starting and previously returned private key fixtures may be reused.
 func Reset() {
 	lock.Lock()
 	defer lock.Unlock()
@@ -48,7 +48,7 @@ func Reset() {
 }
 
 var (
-	testFunction = regexp.MustCompile(`.*\.Test[^./]+(.func[0-9]*)?$`)
+	testFunction = regexp.MustCompile(`.*\.Test[^./]+(.func\d*)?$`)
 
 	lock       = sync.Mutex{}
 	fixtureDir = ""

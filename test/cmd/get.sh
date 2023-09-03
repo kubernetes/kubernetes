@@ -134,9 +134,9 @@ run_kubectl_get_tests() {
 
   ### Test kubectl get chunk size does not result in a --watch error when resource list is served in multiple chunks
   # Pre-condition: ConfigMap one two tree does not exist
-  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"one\\\" }}found{{end}}{{end}}:" ':'
-  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"two\\\" }}found{{end}}{{end}}:" ':'
-  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"three\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \"one\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \"two\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \"three\" }}found{{end}}{{end}}:" ':'
 
   # Post-condition: Create three configmaps and ensure that we can --watch them with a --chunk-size of 1
   kubectl create cm one "${kube_flags[@]}"
@@ -253,6 +253,48 @@ run_retrieve_multiple_tests() {
   set +o errexit
 }
 
+run_kubectl_response_compression_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing kubectl get objects with/without response compression"
+
+  ### Test creation of large configmap objects
+  # Pre-condition: no configmaps exists
+  kube::test::get_object_assert configmaps "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Commands to create 3 configmaps each of size 50KB. Sum of their sizes should be >128KB (defaultGzipThresholdBytes)
+  # for apiserver to allow gzip compression of the response. This is required to test the disable-compression option
+  # from client-side
+  some_string=$(dd status=none if=/dev/urandom bs=1K count=50 2>/dev/null | base64)
+  kubectl create configmap "cm-one" --from-literal=somekey="${some_string}"
+  kubectl create configmap "cm-two" --from-literal=somekey="${some_string}"
+  kubectl create configmap "cm-three" --from-literal=somekey="${some_string}"
+  output_message=$(kubectl get configmaps 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: All configmaps should be created
+  kube::test::if_has_string "${output_message}" "cm-one"
+  kube::test::if_has_string "${output_message}" "cm-two"
+  kube::test::if_has_string "${output_message}" "cm-three"
+
+  ### Test list call WITH compression
+  output_message=$(kubectl get configmaps --v=8 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: Response headers should include "accept-encoding" header
+  kube::test::if_has_string "${output_message}" "Vary: Accept-Encoding"
+
+  ### Test list call WITHOUT compression
+  output_message=$(kubectl get configmaps --disable-compression=true --v=8 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: Response headers should NOT include "accept-encoding" header
+  kube::test::if_has_not_string "${output_message}" "Vary: Accept-Encoding"
+
+  # cleanup
+  kubectl delete configmap "cm-one"
+  kubectl delete configmap "cm-two"
+  kubectl delete configmap "cm-three"
+
+  set +o nounset
+  set +o errexit
+}
+
 run_kubectl_sort_by_tests() {
   set -o nounset
   set -o errexit
@@ -363,7 +405,7 @@ run_kubectl_all_namespace_tests() {
   kube::log::status "Testing kubectl --all-namespace"
 
   # Pre-condition: the "default" namespace exists
-  kube::test::get_object_assert namespaces "{{range.items}}{{if eq $id_field \\\"default\\\"}}{{$id_field}}:{{end}}{{end}}" 'default:'
+  kube::test::get_object_assert namespaces "{{range.items}}{{if eq $id_field \"default\"}}{{$id_field}}:{{end}}{{end}}" 'default:'
 
   ### Create POD
   # Pre-condition: no POD exists
@@ -470,7 +512,7 @@ __EOF__
   local tries=5
   for i in $(seq 1 $tries); do
       local output
-      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group example.com -oname)
+      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group example.com -oname || true)
       if kube::test::if_has_string "$output" deprecated.example.com; then
           break
       fi

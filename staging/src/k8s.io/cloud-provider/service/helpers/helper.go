@@ -101,7 +101,7 @@ func RequestsOnlyLocalTraffic(service *v1.Service) bool {
 		service.Spec.Type != v1.ServiceTypeNodePort {
 		return false
 	}
-	return service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
+	return service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal
 }
 
 // NeedsHealthCheck checks if service needs health check.
@@ -178,6 +178,9 @@ func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
 		return false
 	}
 	if lhs.Hostname != rhs.Hostname {
+		return false
+	}
+	if lhs.IPMode != rhs.IPMode {
 		return false
 	}
 	return true

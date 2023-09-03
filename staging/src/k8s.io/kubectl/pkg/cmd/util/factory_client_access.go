@@ -30,10 +30,11 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	openapiclient "k8s.io/client-go/openapi"
+	"k8s.io/client-go/openapi/cached"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/util/openapi"
-	openapivalidation "k8s.io/kubectl/pkg/util/openapi/validation"
 	"k8s.io/kubectl/pkg/validation"
 )
 
@@ -42,7 +43,7 @@ type factoryImpl struct {
 
 	// Caches OpenAPI document and parsed resources
 	openAPIParser *openapi.CachedOpenAPIParser
-	openAPIGetter *openapi.CachedOpenAPIGetter
+	oapi          *openapi.CachedOpenAPIGetter
 	parser        sync.Once
 	getter        sync.Once
 }
@@ -142,7 +143,7 @@ func (f *factoryImpl) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 	return restclient.RESTClientFor(cfg)
 }
 
-func (f *factoryImpl) Validator(validationDirective string, verifier *resource.QueryParamVerifier) (validation.Schema, error) {
+func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, error) {
 	// client-side schema validation is only performed
 	// when the validationDirective is strict.
 	// If the directive is warn, we rely on the ParamVerifyingSchema
@@ -159,16 +160,33 @@ func (f *factoryImpl) Validator(validationDirective string, verifier *resource.Q
 	}
 
 	schema := validation.ConjunctiveSchema{
-		openapivalidation.NewSchemaValidation(resources),
+		validation.NewSchemaValidation(resources),
 		validation.NoDoubleKeySchema{},
 	}
-	return validation.NewParamVerifyingSchema(schema, verifier, string(validationDirective)), nil
+
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	// Create the FieldValidationVerifier for use in the ParamVerifyingSchema.
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	// Memory-cache the OpenAPI V3 responses. The disk cache behavior is determined by
+	// the discovery client.
+	oapiV3Client := cached.NewClient(discoveryClient.OpenAPIV3())
+	queryParam := resource.QueryParamFieldValidation
+	primary := resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam)
+	secondary := resource.NewQueryParamVerifier(dynamicClient, f.openAPIGetter(), queryParam)
+	fallback := resource.NewFallbackQueryParamVerifier(primary, secondary)
+	return validation.NewParamVerifyingSchema(schema, fallback, string(validationDirective)), nil
 }
 
 // OpenAPISchema returns metadata and structural information about
 // Kubernetes object definitions.
 func (f *factoryImpl) OpenAPISchema() (openapi.Resources, error) {
-	openAPIGetter := f.OpenAPIGetter()
+	openAPIGetter := f.openAPIGetter()
 	if openAPIGetter == nil {
 		return nil, errors.New("no openapi getter")
 	}
@@ -176,21 +194,30 @@ func (f *factoryImpl) OpenAPISchema() (openapi.Resources, error) {
 	// Lazily initialize the OpenAPIParser once
 	f.parser.Do(func() {
 		// Create the caching OpenAPIParser
-		f.openAPIParser = openapi.NewOpenAPIParser(f.OpenAPIGetter())
+		f.openAPIParser = openapi.NewOpenAPIParser(f.openAPIGetter())
 	})
 
 	// Delegate to the OpenAPIPArser
 	return f.openAPIParser.Parse()
 }
 
-func (f *factoryImpl) OpenAPIGetter() discovery.OpenAPISchemaInterface {
+func (f *factoryImpl) openAPIGetter() discovery.OpenAPISchemaInterface {
 	discovery, err := f.clientGetter.ToDiscoveryClient()
 	if err != nil {
 		return nil
 	}
 	f.getter.Do(func() {
-		f.openAPIGetter = openapi.NewOpenAPIGetter(discovery)
+		f.oapi = openapi.NewOpenAPIGetter(discovery)
 	})
 
-	return f.openAPIGetter
+	return f.oapi
+}
+
+func (f *factoryImpl) OpenAPIV3Client() (openapiclient.Client, error) {
+	discovery, err := f.clientGetter.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	return discovery.OpenAPIV3(), nil
 }

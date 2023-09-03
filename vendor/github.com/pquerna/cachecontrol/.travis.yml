@@ -1,10 +1,8 @@
+arch:
+  - amd64
+  - ppc64le
 language: go
 
-install:
-  - go get -d -v ./...
-  - go get -u github.com/stretchr/testify/require
-
 go:
-  - 1.7
-  - 1.8
-  - tip
+  - "1.15"
+  - "1.16"

@@ -23,7 +23,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -39,7 +39,7 @@ import (
 var _ = common.SIGDescribe("HostPort", func() {
 
 	f := framework.NewDefaultFramework("hostport")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		cs clientset.Interface
@@ -60,7 +60,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 		Windows.
 	*/
 
-	framework.ConformanceIt("validates that there is no conflict between pods with same hostPort but different hostIP and protocol [LinuxOnly]", func() {
+	framework.ConformanceIt("validates that there is no conflict between pods with same hostPort but different hostIP and protocol [LinuxOnly]", func(ctx context.Context) {
 
 		localhost := "127.0.0.1"
 		family := v1.IPv4Protocol
@@ -69,7 +69,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 			family = v1.IPv6Protocol
 		}
 		// Get a node where to schedule the pods
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 1)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 1)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
 			framework.Failf("No nodes available")
@@ -86,13 +86,13 @@ var _ = common.SIGDescribe("HostPort", func() {
 
 		// Create pods with the same HostPort
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod1) with hostport %v and hostIP %s and expect scheduled", port, localhost))
-		createHostPortPodOnNode(f, "pod1", ns, localhost, port, v1.ProtocolTCP, randomNode.Name)
+		createHostPortPodOnNode(ctx, f, "pod1", ns, localhost, port, v1.ProtocolTCP, randomNode.Name)
 
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod2) with hostport %v but hostIP %s on the node which pod1 resides and expect scheduled", port, hostIP))
-		createHostPortPodOnNode(f, "pod2", ns, hostIP, port, v1.ProtocolTCP, randomNode.Name)
+		createHostPortPodOnNode(ctx, f, "pod2", ns, hostIP, port, v1.ProtocolTCP, randomNode.Name)
 
 		ginkgo.By(fmt.Sprintf("Trying to create a third pod(pod3) with hostport %v, hostIP %s but use UDP protocol on the node which pod2 resides", port, hostIP))
-		createHostPortPodOnNode(f, "pod3", ns, hostIP, port, v1.ProtocolUDP, randomNode.Name)
+		createHostPortPodOnNode(ctx, f, "pod3", ns, hostIP, port, v1.ProtocolUDP, randomNode.Name)
 
 		// check that the port is being actually exposed to each container
 		// create a pod on the host network in the same node
@@ -112,26 +112,26 @@ var _ = common.SIGDescribe("HostPort", func() {
 				},
 			},
 		}
-		f.PodClient().CreateSync(hostExecPod)
+		e2epod.NewPodClient(f).CreateSync(ctx, hostExecPod)
 
 		// use a 5 seconds timeout per connection
 		timeout := 5
 		// IPv6 doesn't NAT from localhost -> localhost, it doesn't have the route_localnet kernel hack, so we need to specify the source IP
 		cmdPod1 := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v --interface %s http://%s/hostname", timeout, hostIP, net.JoinHostPort(localhost, strconv.Itoa(int(port))))}
 		cmdPod2 := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v http://%s/hostname", timeout, net.JoinHostPort(hostIP, strconv.Itoa(int(port))))}
-		cmdPod3 := []string{"/bin/sh", "-c", fmt.Sprintf("nc -vuz -w %v %s %d", timeout, hostIP, port)}
+		cmdPod3 := []string{"/bin/sh", "-c", fmt.Sprintf("echo hostname | nc -u -w %v %s %d", timeout, hostIP, port)}
 		// try 5 times to connect to the exposed ports
 		for i := 0; i < 5; i++ {
 			// check pod1
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, localhost, port))
-			hostname1, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod1...)
+			hostname1, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, hostExecPod.Name, "e2e-host-exec", cmdPod1...)
 			if err != nil {
 				framework.Logf("Can not connect from %s to pod(pod1) to serverIP: %s, port: %d", hostExecPod.Name, localhost, port)
 				continue
 			}
 			// check pod2
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port))
-			hostname2, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod2...)
+			hostname2, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, hostExecPod.Name, "e2e-host-exec", cmdPod2...)
 			if err != nil {
 				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
 				continue
@@ -143,9 +143,17 @@ var _ = common.SIGDescribe("HostPort", func() {
 			}
 			// check pod3
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d UDP", hostExecPod.Name, hostIP, port))
-			_, _, err = f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod3...)
+			hostname3, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, hostExecPod.Name, "e2e-host-exec", cmdPod3...)
 			if err != nil {
 				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
+				continue
+			}
+			if hostname1 == hostname3 {
+				framework.Logf("pods must have different hostname: pod1 has hostname %s, pod3 has hostname %s", hostname1, hostname3)
+				continue
+			}
+			if hostname2 == hostname3 {
+				framework.Logf("pods must have different hostname: pod2 has hostname %s, pod3 has hostname %s", hostname2, hostname3)
 				continue
 			}
 			return
@@ -156,7 +164,19 @@ var _ = common.SIGDescribe("HostPort", func() {
 
 // create pod which using hostport on the specified node according to the nodeSelector
 // it starts an http server on the exposed port
-func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeName string) {
+func createHostPortPodOnNode(ctx context.Context, f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeName string) {
+
+	var netexecArgs []string
+	var readinessProbePort int32
+
+	if protocol == v1.ProtocolTCP {
+		readinessProbePort = 8080
+		netexecArgs = []string{"--http-port=8080", "--udp-port=-1"}
+	} else {
+		readinessProbePort = 8008
+		netexecArgs = []string{"--http-port=8008", "--udp-port=8080"}
+	}
+
 	hostPortPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -166,7 +186,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 				{
 					Name:  "agnhost",
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"netexec", "--http-port=8080", "--udp-port=8080"},
+					Args:  append([]string{"netexec"}, netexecArgs...),
 					Ports: []v1.ContainerPort{
 						{
 							HostPort:      port,
@@ -180,7 +200,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 							HTTPGet: &v1.HTTPGetAction{
 								Path: "/hostname",
 								Port: intstr.IntOrString{
-									IntVal: int32(8080),
+									IntVal: readinessProbePort,
 								},
 								Scheme: v1.URISchemeHTTP,
 							},
@@ -191,11 +211,11 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 			NodeName: nodeName,
 		},
 	}
-	if _, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), hostPortPod, metav1.CreateOptions{}); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(ns).Create(ctx, hostPortPod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("error creating pod %s, err:%v", podName, err)
 	}
 
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, ns, framework.PodStartTimeout); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, podName, ns, framework.PodStartTimeout); err != nil {
 		framework.Failf("wait for pod %s timeout, err:%v", podName, err)
 	}
 }

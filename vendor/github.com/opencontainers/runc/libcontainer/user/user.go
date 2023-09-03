@@ -201,7 +201,7 @@ func ParseGroupFilter(r io.Reader, filter func(Group) bool) ([]Group, error) {
 			if err != nil {
 				// We should return no error if EOF is reached
 				// without a match.
-				if err == io.EOF { //nolint:errorlint // comparison with io.EOF is legit, https://github.com/polyfloyd/go-errorlint/pull/12
+				if err == io.EOF {
 					err = nil
 				}
 				return out, err
@@ -280,13 +280,13 @@ func GetExecUserPath(userSpec string, defaults *ExecUser, passwdPath, groupPath 
 // found in any entry in passwd and group respectively.
 //
 // Examples of valid user specifications are:
-//     * ""
-//     * "user"
-//     * "uid"
-//     * "user:group"
-//     * "uid:gid
-//     * "user:gid"
-//     * "uid:group"
+//   - ""
+//   - "user"
+//   - "uid"
+//   - "user:group"
+//   - "uid:gid
+//   - "user:gid"
+//   - "uid:group"
 //
 // It should be noted that if you specify a numeric user or group id, they will
 // not be evaluated as usernames (only the metadata will be filled). So attempting

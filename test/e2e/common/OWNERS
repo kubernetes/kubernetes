@@ -5,11 +5,11 @@ approvers:
   - derekwaynecarr
   - tallclair
   - yujuhong
-  - ehashman
   - SergeyKanzhelev
   - endocrimes
 emeritus_approvers:
   - vishh
   - dchen1107
+  - ehashman
 reviewers:
   - sig-node-reviewers

@@ -18,10 +18,13 @@ package validation
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/robfig/cron/v3"
+
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,12 +42,53 @@ import (
 // .status.completedIndexes.
 const maxParallelismForIndexedJob = 100000
 
-// ValidateGeneratedSelector validates that the generated selector on a controller object match the controller object
+// maxFailedIndexesForIndexedJob is the maximum number of failed indexes that
+// an Indexed Job is allowed to have. This threshold allows to cap the length of
+// .status.completedIndexes and .status.failedIndexes.
+const maxFailedIndexesForIndexedJob = 100_000
+
+const (
+	completionsSoftLimit                    = 100_000
+	parallelismLimitForHighCompletions      = 10_000
+	maxFailedIndexesLimitForHighCompletions = 10_000
+
+	// maximum number of rules in pod failure policy
+	maxPodFailurePolicyRules = 20
+
+	// maximum number of values for a OnExitCodes requirement in pod failure policy
+	maxPodFailurePolicyOnExitCodesValues = 255
+
+	// maximum number of patterns for a OnPodConditions requirement in pod failure policy
+	maxPodFailurePolicyOnPodConditionsPatterns = 20
+)
+
+var (
+	supportedPodFailurePolicyActions = sets.New(
+		string(batch.PodFailurePolicyActionCount),
+		string(batch.PodFailurePolicyActionFailIndex),
+		string(batch.PodFailurePolicyActionFailJob),
+		string(batch.PodFailurePolicyActionIgnore))
+
+	supportedPodFailurePolicyOnExitCodesOperator = sets.New(
+		string(batch.PodFailurePolicyOnExitCodesOpIn),
+		string(batch.PodFailurePolicyOnExitCodesOpNotIn))
+
+	supportedPodFailurePolicyOnPodConditionsStatus = sets.New(
+		string(api.ConditionFalse),
+		string(api.ConditionTrue),
+		string(api.ConditionUnknown))
+
+	supportedPodReplacementPolicy = sets.New(
+		string(batch.Failed),
+		string(batch.TerminatingOrFailed))
+)
+
+// validateGeneratedSelector validates that the generated selector on a controller object match the controller object
 // metadata, and the labels on the pod template are as generated.
 //
 // TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and
 // move to new location.  Replace batch.Job with an interface.
-func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
+func validateGeneratedSelector(obj *batch.Job, validateBatchLabels bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if obj.Spec.ManualSelector != nil && *obj.Spec.ManualSelector {
 		return allErrs
@@ -67,14 +111,22 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 	// backward-compatibility, and experimentation with new
 	// labeling/selection schemes.  Automatic selector generation should
 	// have placed certain labels on the pod, but this could have failed if
-	// the user added coflicting labels.  Validate that the expected
+	// the user added conflicting labels.  Validate that the expected
 	// generated ones are there.
-
-	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), "controller-uid", string(obj.UID))...)
-	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), "job-name", string(obj.Name))...)
+	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyControllerUidLabel, string(obj.UID))...)
+	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyJobNameLabel, string(obj.Name))...)
 	expectedLabels := make(map[string]string)
-	expectedLabels["controller-uid"] = string(obj.UID)
-	expectedLabels["job-name"] = string(obj.Name)
+	if validateBatchLabels {
+		allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.ControllerUidLabel, string(obj.UID))...)
+		allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.JobNameLabel, string(obj.Name))...)
+		expectedLabels[batch.ControllerUidLabel] = string(obj.UID)
+		expectedLabels[batch.JobNameLabel] = string(obj.Name)
+	}
+	// Labels created by the Kubernetes project should have a Kubernetes prefix.
+	// These labels are set due to legacy reasons.
+
+	expectedLabels[batch.LegacyControllerUidLabel] = string(obj.UID)
+	expectedLabels[batch.LegacyJobNameLabel] = string(obj.Name)
 	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
 	if selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector); err == nil {
 		if !selector.Matches(labels.Set(expectedLabels)) {
@@ -89,11 +141,8 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	// Jobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateGeneratedSelector(job)...)
+	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts.PodValidationOptions)...)
-	if !opts.AllowTrackingAnnotation && hasJobTrackingAnnotation(job) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata").Child("annotations").Key(batch.JobTrackingFinalizer), "cannot add this annotation"))
-	}
 	if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion && job.Spec.Completions != nil && *job.Spec.Completions > 0 {
 		// For indexed job, the job controller appends a suffix (`-$INDEX`)
 		// to the pod hostname when indexed job create pods.
@@ -107,22 +156,16 @@ func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	return allErrs
 }
 
-func hasJobTrackingAnnotation(job *batch.Job) bool {
-	if job.Annotations == nil {
-		return false
-	}
-	_, ok := job.Annotations[batch.JobTrackingFinalizer]
-	return ok
-}
-
 // ValidateJobSpec validates a JobSpec and returns an ErrorList with any errors.
 func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := validateJobSpec(spec, fldPath, opts)
-
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
+			AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
+		}
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOpts, fldPath.Child("selector"))...)
 	}
 
 	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
@@ -153,7 +196,15 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	if spec.TTLSecondsAfterFinished != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.TTLSecondsAfterFinished), fldPath.Child("ttlSecondsAfterFinished"))...)
 	}
-	// CompletionMode might be nil when IndexedJob feature gate is disabled.
+	if spec.BackoffLimitPerIndex != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.BackoffLimitPerIndex), fldPath.Child("backoffLimitPerIndex"))...)
+	}
+	if spec.MaxFailedIndexes != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.MaxFailedIndexes), fldPath.Child("maxFailedIndexes"))...)
+		if spec.BackoffLimitPerIndex == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("backoffLimitPerIndex"), fmt.Sprintf("when maxFailedIndexes is specified")))
+		}
+	}
 	if spec.CompletionMode != nil {
 		if *spec.CompletionMode != batch.NonIndexedCompletion && *spec.CompletionMode != batch.IndexedCompletion {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("completionMode"), spec.CompletionMode, []string{string(batch.NonIndexedCompletion), string(batch.IndexedCompletion)}))
@@ -165,8 +216,39 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 			if spec.Parallelism != nil && *spec.Parallelism > maxParallelismForIndexedJob {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("parallelism"), *spec.Parallelism, fmt.Sprintf("must be less than or equal to %d when completion mode is %s", maxParallelismForIndexedJob, batch.IndexedCompletion)))
 			}
+			if spec.Completions != nil && spec.MaxFailedIndexes != nil && *spec.MaxFailedIndexes > *spec.Completions {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("maxFailedIndexes"), *spec.MaxFailedIndexes, "must be less than or equal to completions"))
+			}
+			if spec.MaxFailedIndexes != nil && *spec.MaxFailedIndexes > maxFailedIndexesForIndexedJob {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("maxFailedIndexes"), *spec.MaxFailedIndexes, fmt.Sprintf("must be less than or equal to %d", maxFailedIndexesForIndexedJob)))
+			}
+			if spec.Completions != nil && *spec.Completions > completionsSoftLimit && spec.BackoffLimitPerIndex != nil {
+				if spec.MaxFailedIndexes == nil {
+					allErrs = append(allErrs, field.Required(fldPath.Child("maxFailedIndexes"), fmt.Sprintf("must be specified when completions is above %d", completionsSoftLimit)))
+				}
+				if spec.Parallelism != nil && *spec.Parallelism > parallelismLimitForHighCompletions {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("parallelism"), *spec.Parallelism, fmt.Sprintf("must be less than or equal to %d when completions are above %d and used with backoff limit per index", parallelismLimitForHighCompletions, completionsSoftLimit)))
+				}
+				if spec.MaxFailedIndexes != nil && *spec.MaxFailedIndexes > maxFailedIndexesLimitForHighCompletions {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("maxFailedIndexes"), *spec.MaxFailedIndexes, fmt.Sprintf("must be less than or equal to %d when completions are above %d and used with backoff limit per index", maxFailedIndexesLimitForHighCompletions, completionsSoftLimit)))
+				}
+			}
 		}
 	}
+	if spec.CompletionMode == nil || *spec.CompletionMode == batch.NonIndexedCompletion {
+		if spec.BackoffLimitPerIndex != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("backoffLimitPerIndex"), *spec.BackoffLimitPerIndex, "requires indexed completion mode"))
+		}
+		if spec.MaxFailedIndexes != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxFailedIndexes"), *spec.MaxFailedIndexes, "requires indexed completion mode"))
+		}
+	}
+
+	if spec.PodFailurePolicy != nil {
+		allErrs = append(allErrs, validatePodFailurePolicy(spec, fldPath.Child("podFailurePolicy"))...)
+	}
+
+	allErrs = append(allErrs, validatePodReplacementPolicy(spec, fldPath.Child("podReplacementPolicy"))...)
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
 
@@ -179,7 +261,130 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	} else if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure && spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"),
 			spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
+	} else if spec.PodFailurePolicy != nil && spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "spec", "restartPolicy"),
+			spec.Template.Spec.RestartPolicy, fmt.Sprintf("only %q is supported when podFailurePolicy is specified", api.RestartPolicyNever)))
 	}
+	return allErrs
+}
+
+func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	rulesPath := fldPath.Child("rules")
+	if len(spec.PodFailurePolicy.Rules) > maxPodFailurePolicyRules {
+		allErrs = append(allErrs, field.TooMany(rulesPath, len(spec.PodFailurePolicy.Rules), maxPodFailurePolicyRules))
+	}
+	containerNames := sets.NewString()
+	for _, containerSpec := range spec.Template.Spec.Containers {
+		containerNames.Insert(containerSpec.Name)
+	}
+	for _, containerSpec := range spec.Template.Spec.InitContainers {
+		containerNames.Insert(containerSpec.Name)
+	}
+	for i, rule := range spec.PodFailurePolicy.Rules {
+		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulesPath.Index(i), containerNames)...)
+	}
+	return allErrs
+}
+
+func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.PodReplacementPolicy != nil {
+		// If PodFailurePolicy is specified then we only allow Failed.
+		if spec.PodFailurePolicy != nil {
+			if *spec.PodReplacementPolicy != batch.Failed {
+				allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, []string{string(batch.Failed)}))
+			}
+			// If PodFailurePolicy not specified we allow values in supportedPodReplacementPolicy.
+		} else if !supportedPodReplacementPolicy.Has(string(*spec.PodReplacementPolicy)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, sets.List(supportedPodReplacementPolicy)))
+		}
+	}
+	return allErrs
+}
+
+func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.String) field.ErrorList {
+	var allErrs field.ErrorList
+	actionPath := rulePath.Child("action")
+	if rule.Action == "" {
+		allErrs = append(allErrs, field.Required(actionPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyActions))))
+	} else if rule.Action == batch.PodFailurePolicyActionFailIndex {
+		if spec.BackoffLimitPerIndex == nil {
+			allErrs = append(allErrs, field.Invalid(actionPath, rule.Action, "requires the backoffLimitPerIndex to be set"))
+		}
+	} else if !supportedPodFailurePolicyActions.Has(string(rule.Action)) {
+		allErrs = append(allErrs, field.NotSupported(actionPath, rule.Action, sets.List(supportedPodFailurePolicyActions)))
+	}
+	if rule.OnExitCodes != nil {
+		allErrs = append(allErrs, validatePodFailurePolicyRuleOnExitCodes(rule.OnExitCodes, rulePath.Child("onExitCodes"), containerNames)...)
+	}
+	if len(rule.OnPodConditions) > 0 {
+		allErrs = append(allErrs, validatePodFailurePolicyRuleOnPodConditions(rule.OnPodConditions, rulePath.Child("onPodConditions"))...)
+	}
+	if rule.OnExitCodes != nil && len(rule.OnPodConditions) > 0 {
+		allErrs = append(allErrs, field.Invalid(rulePath, field.OmitValueType{}, "specifying both OnExitCodes and OnPodConditions is not supported"))
+	}
+	if rule.OnExitCodes == nil && len(rule.OnPodConditions) == 0 {
+		allErrs = append(allErrs, field.Invalid(rulePath, field.OmitValueType{}, "specifying one of OnExitCodes and OnPodConditions is required"))
+	}
+	return allErrs
+}
+
+func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFailurePolicyOnPodConditionsPattern, onPodConditionsPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(onPodConditions) > maxPodFailurePolicyOnPodConditionsPatterns {
+		allErrs = append(allErrs, field.TooMany(onPodConditionsPath, len(onPodConditions), maxPodFailurePolicyOnPodConditionsPatterns))
+	}
+	for j, pattern := range onPodConditions {
+		patternPath := onPodConditionsPath.Index(j)
+		statusPath := patternPath.Child("status")
+		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(string(pattern.Type), patternPath.Child("type"))...)
+		if pattern.Status == "" {
+			allErrs = append(allErrs, field.Required(statusPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyOnPodConditionsStatus))))
+		} else if !supportedPodFailurePolicyOnPodConditionsStatus.Has(string(pattern.Status)) {
+			allErrs = append(allErrs, field.NotSupported(statusPath, pattern.Status, sets.List(supportedPodFailurePolicyOnPodConditionsStatus)))
+		}
+	}
+	return allErrs
+}
+
+func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.String) field.ErrorList {
+	var allErrs field.ErrorList
+	operatorPath := onExitCodesPath.Child("operator")
+	if onExitCode.Operator == "" {
+		allErrs = append(allErrs, field.Required(operatorPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyOnExitCodesOperator))))
+	} else if !supportedPodFailurePolicyOnExitCodesOperator.Has(string(onExitCode.Operator)) {
+		allErrs = append(allErrs, field.NotSupported(operatorPath, onExitCode.Operator, sets.List(supportedPodFailurePolicyOnExitCodesOperator)))
+	}
+	if onExitCode.ContainerName != nil && !containerNames.Has(*onExitCode.ContainerName) {
+		allErrs = append(allErrs, field.Invalid(onExitCodesPath.Child("containerName"), *onExitCode.ContainerName, "must be one of the container or initContainer names in the pod template"))
+	}
+	valuesPath := onExitCodesPath.Child("values")
+	if len(onExitCode.Values) == 0 {
+		allErrs = append(allErrs, field.Invalid(valuesPath, onExitCode.Values, "at least one value is required"))
+	} else if len(onExitCode.Values) > maxPodFailurePolicyOnExitCodesValues {
+		allErrs = append(allErrs, field.TooMany(valuesPath, len(onExitCode.Values), maxPodFailurePolicyOnExitCodesValues))
+	}
+	isOrdered := true
+	uniqueValues := sets.NewInt32()
+	for j, exitCodeValue := range onExitCode.Values {
+		valuePath := valuesPath.Index(j)
+		if onExitCode.Operator == batch.PodFailurePolicyOnExitCodesOpIn && exitCodeValue == 0 {
+			allErrs = append(allErrs, field.Invalid(valuePath, exitCodeValue, "must not be 0 for the In operator"))
+		}
+		if uniqueValues.Has(exitCodeValue) {
+			allErrs = append(allErrs, field.Duplicate(valuePath, exitCodeValue))
+		} else {
+			uniqueValues.Insert(exitCodeValue)
+		}
+		if j > 0 && onExitCode.Values[j-1] > exitCodeValue {
+			isOrdered = false
+		}
+	}
+	if !isOrdered {
+		allErrs = append(allErrs, field.Invalid(valuesPath, onExitCode.Values, "must be ordered"))
+	}
+
 	return allErrs
 }
 
@@ -191,6 +396,9 @@ func validateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.Error
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Failed), fldPath.Child("failed"))...)
 	if status.Ready != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.Ready), fldPath.Child("ready"))...)
+	}
+	if status.Terminating != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.Terminating), fldPath.Child("terminating"))...)
 	}
 	if status.UncountedTerminatedPods != nil {
 		path := fldPath.Child("uncountedTerminatedPods")
@@ -237,10 +445,12 @@ func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
 func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath, opts.PodValidationOptions)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath.Child("completions"))...)
+	allErrs = append(allErrs, validateCompletions(spec, oldSpec, fldPath.Child("completions"), opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, validatePodTemplateUpdate(spec, oldSpec, fldPath, opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.CompletionMode, oldSpec.CompletionMode, fldPath.Child("completionMode"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodFailurePolicy, oldSpec.PodFailurePolicy, fldPath.Child("podFailurePolicy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.BackoffLimitPerIndex, oldSpec.BackoffLimitPerIndex, fldPath.Child("backoffLimitPerIndex"))...)
 	return allErrs
 }
 
@@ -264,10 +474,11 @@ func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path,
 			// allow the NodeAffinity field to skip immutability checking
 			oldTemplate.Spec.Affinity.NodeAffinity = template.Spec.Affinity.NodeAffinity // +k8s:verify-mutation:reason=clone
 		}
-		oldTemplate.Spec.NodeSelector = template.Spec.NodeSelector // +k8s:verify-mutation:reason=clone
-		oldTemplate.Spec.Tolerations = template.Spec.Tolerations   // +k8s:verify-mutation:reason=clone
-		oldTemplate.Annotations = template.Annotations             // +k8s:verify-mutation:reason=clone
-		oldTemplate.Labels = template.Labels                       // +k8s:verify-mutation:reason=clone
+		oldTemplate.Spec.NodeSelector = template.Spec.NodeSelector       // +k8s:verify-mutation:reason=clone
+		oldTemplate.Spec.Tolerations = template.Spec.Tolerations         // +k8s:verify-mutation:reason=clone
+		oldTemplate.Annotations = template.Annotations                   // +k8s:verify-mutation:reason=clone
+		oldTemplate.Labels = template.Labels                             // +k8s:verify-mutation:reason=clone
+		oldTemplate.Spec.SchedulingGates = template.Spec.SchedulingGates // +k8s:verify-mutation:reason=clone
 	}
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
 	return allErrs
@@ -365,6 +576,16 @@ func validateScheduleFormat(schedule string, timeZone *string, fldPath *field.Pa
 	return allErrs
 }
 
+// https://data.iana.org/time-zones/theory.html#naming
+// * A name must not be empty, or contain '//', or start or end with '/'.
+// * Do not use the file name components '.' and '..'.
+// * Within a file name component, use only ASCII letters, '.', '-' and '_'.
+// * Do not use digits, as that might create an ambiguity with POSIX TZ strings.
+// * A file name component must not exceed 14 characters or start with '-'
+//
+// 0-9 and + characters are tolerated to accommodate legacy compatibility names
+var validTimeZoneCharacters = regexp.MustCompile(`^[A-Za-z\.\-_0-9+]{1,14}$`)
+
 func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if timeZone == nil {
@@ -376,6 +597,13 @@ func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 		return allErrs
 	}
 
+	for _, part := range strings.Split(*timeZone, "/") {
+		if part == "." || part == ".." || strings.HasPrefix(part, "-") || !validTimeZoneCharacters.MatchString(part) {
+			allErrs = append(allErrs, field.Invalid(fldPath, timeZone, fmt.Sprintf("unknown time zone %s", *timeZone)))
+			return allErrs
+		}
+	}
+
 	if strings.EqualFold(*timeZone, "Local") {
 		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, "timeZone must be an explicit time zone as defined in https://www.iana.org/time-zones"))
 	}
@@ -384,14 +612,6 @@ func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, err.Error()))
 	}
 
-	return allErrs
-}
-
-// ValidateJobTemplate validates a JobTemplate and returns an ErrorList with any errors.
-func ValidateJobTemplate(job *batch.JobTemplate, opts apivalidation.PodValidationOptions) field.ErrorList {
-	// this method should be identical to ValidateJob
-	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateJobTemplateSpec(&job.Template, field.NewPath("template"), opts)...)
 	return allErrs
 }
 
@@ -409,10 +629,41 @@ func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, o
 	return allErrs
 }
 
+func validateCompletions(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
+	if !opts.AllowElasticIndexedJobs {
+		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
+	}
+
+	// Completions is immutable for non-indexed jobs.
+	// For Indexed Jobs, if ElasticIndexedJob feature gate is not enabled,
+	// fall back to validating that spec.Completions is always immutable.
+	isIndexedJob := spec.CompletionMode != nil && *spec.CompletionMode == batch.IndexedCompletion
+	if !isIndexedJob {
+		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
+	}
+
+	var allErrs field.ErrorList
+	if apiequality.Semantic.DeepEqual(spec.Completions, oldSpec.Completions) {
+		return allErrs
+	}
+	// Indexed Jobs cannot set completions to nil. The nil check
+	// is already performed in validateJobSpec, no need to add another error.
+	if spec.Completions == nil {
+		return allErrs
+	}
+
+	if *spec.Completions != *spec.Parallelism {
+		allErrs = append(allErrs, field.Invalid(fldPath, spec.Completions, fmt.Sprintf("can only be modified in tandem with %s", fldPath.Root().Child("parallelism").String())))
+	}
+	return allErrs
+}
+
 type JobValidationOptions struct {
 	apivalidation.PodValidationOptions
-	// Allow Job to have the annotation batch.kubernetes.io/job-tracking
-	AllowTrackingAnnotation bool
 	// Allow mutable node affinity, selector and tolerations of the template
 	AllowMutableSchedulingDirectives bool
+	// Allow elastic indexed jobs
+	AllowElasticIndexedJobs bool
+	// Require Job to have the label on batch.kubernetes.io/job-name and batch.kubernetes.io/controller-uid
+	RequirePrefixedLabels bool
 }

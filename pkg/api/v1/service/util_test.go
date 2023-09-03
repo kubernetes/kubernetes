@@ -129,6 +129,49 @@ func TestAllowAll(t *testing.T) {
 	checkAllowAll(true, "192.168.0.1/32", "0.0.0.0/0")
 }
 
+func TestExternallyAccessible(t *testing.T) {
+	checkExternallyAccessible := func(expect bool, service *v1.Service) {
+		res := ExternallyAccessible(service)
+		if res != expect {
+			t.Errorf("Expected ExternallyAccessible = %v, got %v", expect, res)
+		}
+	}
+
+	checkExternallyAccessible(false, &v1.Service{})
+	checkExternallyAccessible(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeClusterIP,
+		},
+	})
+	checkExternallyAccessible(true, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:        v1.ServiceTypeClusterIP,
+			ExternalIPs: []string{"1.2.3.4"},
+		},
+	})
+	checkExternallyAccessible(true, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+		},
+	})
+	checkExternallyAccessible(true, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeNodePort,
+		},
+	})
+	checkExternallyAccessible(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeExternalName,
+		},
+	})
+	checkExternallyAccessible(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:        v1.ServiceTypeExternalName,
+			ExternalIPs: []string{"1.2.3.4"},
+		},
+	})
+}
+
 func TestExternalPolicyLocal(t *testing.T) {
 	checkExternalPolicyLocal := func(requestsOnlyLocalTraffic bool, service *v1.Service) {
 		res := ExternalPolicyLocal(service)
@@ -146,31 +189,51 @@ func TestExternalPolicyLocal(t *testing.T) {
 	})
 	checkExternalPolicyLocal(false, &v1.Service{
 		Spec: v1.ServiceSpec{
+			Type:        v1.ServiceTypeClusterIP,
+			ExternalIPs: []string{"1.2.3.4"},
+		},
+	})
+	checkExternalPolicyLocal(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:                  v1.ServiceTypeClusterIP,
+			ExternalIPs:           []string{"1.2.3.4"},
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
+		},
+	})
+	checkExternalPolicyLocal(true, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:                  v1.ServiceTypeClusterIP,
+			ExternalIPs:           []string{"1.2.3.4"},
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
+		},
+	})
+	checkExternalPolicyLocal(false, &v1.Service{
+		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
 		},
 	})
 	checkExternalPolicyLocal(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 		},
 	})
 	checkExternalPolicyLocal(true, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 		},
 	})
 	checkExternalPolicyLocal(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 		},
 	})
 	checkExternalPolicyLocal(true, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 		},
 	})
 }
@@ -192,25 +255,25 @@ func TestNeedsHealthCheck(t *testing.T) {
 	checkNeedsHealthCheck(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 		},
 	})
 	checkNeedsHealthCheck(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 		},
 	})
 	checkNeedsHealthCheck(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 		},
 	})
 	checkNeedsHealthCheck(true, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 		},
 	})
 }

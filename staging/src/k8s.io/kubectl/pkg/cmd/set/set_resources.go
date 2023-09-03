@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -86,14 +87,13 @@ type SetResourcesOptions struct {
 
 	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
-	DryRunVerifier         *resource.QueryParamVerifier
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewResourcesOptions returns a ResourcesOptions indicating all containers in the selected
 // pod templates are selected by default.
-func NewResourcesOptions(streams genericclioptions.IOStreams) *SetResourcesOptions {
+func NewResourcesOptions(streams genericiooptions.IOStreams) *SetResourcesOptions {
 	return &SetResourcesOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("resource requirements updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -107,7 +107,7 @@ func NewResourcesOptions(streams genericclioptions.IOStreams) *SetResourcesOptio
 }
 
 // NewCmdResources returns initialized Command instance for the 'set resources' sub command
-func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdResources(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewResourcesOptions(streams)
 
 	cmd := &cobra.Command{
@@ -157,11 +157,6 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -199,10 +194,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	}
 
 	o.Infos, err = builder.Do().Infos()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Validate makes sure that provided values in ResourcesOptions are valid
@@ -289,13 +281,6 @@ func (o *SetResourcesOptions) Run() error {
 				allErrs = append(allErrs, err)
 			}
 			continue
-		}
-
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				allErrs = append(allErrs, fmt.Errorf("failed to patch resources update to pod template %v", err))
-				continue
-			}
 		}
 
 		actual, err := resource.

@@ -1,8 +1,15 @@
+# gopls gets indigestion without go.work, CI gets indigestion WITH go.work
+/go.work
+/go.work.sum
+
 # OSX leaves these everywhere on SMB shares
 ._*
 
 # OSX trash
 .DS_Store
+
+# Developers can store local stuff in dirs named __something
+__*
 
 # Eclipse files
 .classpath
@@ -61,6 +68,9 @@ network_closure.sh
 /third_party/etcd*
 /default.etcd
 
+# Also ignore protoc installed by hack/install-protoc.sh
+/third_party/protoc*
+
 # User cluster configs
 .kubeconfig
 
@@ -105,9 +115,6 @@ kubernetes.tar.gz
 
 # Phony test files used as part of coverage generation
 zz_generated_*_test.go
-
-# make-related metadata
-/.make/
 
 # Just in time generated data in the source, should never be committed
 /test/e2e/generated/bindata.go

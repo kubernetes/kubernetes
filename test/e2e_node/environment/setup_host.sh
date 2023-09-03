@@ -25,10 +25,6 @@
 # - centos 7
 # - debian jessie
 
-# RHEL os detection
-cat /etc/*-release | grep "ID=\"rhel\""
-OS_RHEL=$?
-
 # On a systemd environment, enable cpu and memory accounting for all processes by default.
 if [ -d /etc/systemd ]; then
   cat <<EOF >kubernetes-accounting.conf
@@ -70,19 +66,9 @@ if cat /etc/*-release | grep "ID=ubuntu"; then
 fi
 
 # Install docker
-if ! hash docker 2>/dev/null; then
-  # RHEL platforms should always install from RHEL repository
-  # This will install the latest supported stable docker platform on RHEL
-  if [ $OS_RHEL -eq 0 ]; then
-    sudo yum install -y docker-latest
-    sudo groupadd docker
-    sudo systemctl enable docker-latest.service
-    sudo systemctl start docker-latest.service
-  else
-    curl -fsSL https://get.docker.com/ | sh
-    sudo service docker start
-    sudo systemctl enable docker.service
-  fi
+if ! hash containerd 2>/dev/null; then
+  echo "Please install containerd, see the getting started guide here: https://github.com/containerd/containerd/blob/main/docs/getting-started.md"
+  echo "For a docker CLI replacement, we suggest nerdctl: https://github.com/containerd/nerdctl#install"
 fi
 
 # Allow jenkins access to docker

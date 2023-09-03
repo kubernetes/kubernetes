@@ -17,9 +17,11 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestMakeBindOpts(t *testing.T) {
@@ -36,7 +38,6 @@ func TestMakeBindOpts(t *testing.T) {
 			[]string{},
 		},
 		{
-
 			[]string{"bind", "vers=2", "ro", "_netdev"},
 			true,
 			[]string{"bind", "_netdev"},
@@ -78,7 +79,6 @@ func TestMakeBindOptsSensitive(t *testing.T) {
 			expectedSensitiveRemountOpts: []string{"user=foo", "pass=bar"},
 		},
 		{
-
 			mountOptions:                 []string{"vers=2", "ro", "_netdev"},
 			sensitiveMountOptions:        []string{"user=foo", "pass=bar", "bind"},
 			isBind:                       true,
@@ -103,7 +103,6 @@ func TestMakeBindOptsSensitive(t *testing.T) {
 			expectedSensitiveRemountOpts: []string{"user=foo", "pass=bar"},
 		},
 		{
-
 			mountOptions:                 []string{"vers=2", "bind", "ro", "_netdev"},
 			sensitiveMountOptions:        []string{"user=foo", "remount", "pass=bar"},
 			isBind:                       true,
@@ -112,7 +111,6 @@ func TestMakeBindOptsSensitive(t *testing.T) {
 			expectedSensitiveRemountOpts: []string{"user=foo", "pass=bar"},
 		},
 		{
-
 			mountOptions:                 []string{"vers=2", "bind", "ro", "_netdev"},
 			sensitiveMountOptions:        []string{"user=foo", "remount", "pass=bar"},
 			isBind:                       true,
@@ -142,7 +140,6 @@ func TestMakeBindOptsSensitive(t *testing.T) {
 }
 
 func TestOptionsForLogging(t *testing.T) {
-	// Arrange
 	testcases := []struct {
 		options          []string
 		sensitiveOptions []string
@@ -165,10 +162,8 @@ func TestOptionsForLogging(t *testing.T) {
 	}
 
 	for _, v := range testcases {
-		// Act
 		maskedStr := sanitizedOptionsForLogging(v.options, v.sensitiveOptions)
 
-		// Assert
 		for _, sensitiveOption := range v.sensitiveOptions {
 			if strings.Contains(maskedStr, sensitiveOption) {
 				t.Errorf("Found sensitive log option %q in %q", sensitiveOption, maskedStr)
@@ -180,5 +175,47 @@ func TestOptionsForLogging(t *testing.T) {
 		if actualCount != expectedCount {
 			t.Errorf("Found %v instances of %q in %q. Expected %v", actualCount, sensitiveOptionsRemoved, maskedStr, expectedCount)
 		}
+	}
+}
+
+func TestWithMaxConcurrentFormat(t *testing.T) {
+	const timeout = 1 * time.Minute
+
+	tests := []struct {
+		max     int
+		wantSem bool
+	}{
+		{
+			max: 0,
+		},
+		{
+			max: -1,
+		},
+		{
+			max:     1,
+			wantSem: true,
+		},
+		{
+			max:     3,
+			wantSem: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("max=%d,timeout=%s", tc.max, timeout.String()), func(t *testing.T) {
+			mounter := NewSafeFormatAndMount(nil, nil, WithMaxConcurrentFormat(tc.max, timeout))
+
+			if gotSem := mounter.formatSem != nil; gotSem != tc.wantSem {
+				t.Errorf("NewSafeFormatAndMount() got formatSem: %t, want: %t", gotSem, tc.wantSem)
+			}
+			if tc.wantSem {
+				if gotCap := cap(mounter.formatSem); gotCap != tc.max {
+					t.Errorf("NewSafeFormatAndMount() got cap(formatSem): %d, want: %d", gotCap, tc.max)
+				}
+				if mounter.formatTimeout != timeout {
+					t.Errorf("NewSafeFormatAndMount() got formatTimeout: %s, want: %s", mounter.formatTimeout.String(), timeout.String())
+				}
+			}
+		})
 	}
 }

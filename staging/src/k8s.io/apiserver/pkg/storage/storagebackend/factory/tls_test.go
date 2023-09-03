@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"go.etcd.io/etcd/client/pkg/v3/transport"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,25 +62,26 @@ func TestTLSConnection(t *testing.T) {
 		KeyFile:       keyFile,
 		TrustedCAFile: caFile,
 	}
-	for i := range etcdConfig.LCUrls {
-		etcdConfig.LCUrls[i].Scheme = "https"
+	for i := range etcdConfig.ListenClientUrls {
+		etcdConfig.ListenClientUrls[i].Scheme = "https"
 	}
-	for i := range etcdConfig.ACUrls {
-		etcdConfig.ACUrls[i].Scheme = "https"
+	for i := range etcdConfig.AdvertiseClientUrls {
+		etcdConfig.AdvertiseClientUrls[i].Scheme = "https"
 	}
 
 	client := testserver.RunEtcd(t, etcdConfig)
 	cfg := storagebackend.Config{
 		Type: storagebackend.StorageTypeETCD3,
 		Transport: storagebackend.TransportConfig{
-			ServerList:    client.Endpoints(),
-			CertFile:      certFile,
-			KeyFile:       keyFile,
-			TrustedCAFile: caFile,
+			ServerList:     client.Endpoints(),
+			CertFile:       certFile,
+			KeyFile:        keyFile,
+			TrustedCAFile:  caFile,
+			TracerProvider: oteltrace.NewNoopTracerProvider(),
 		},
 		Codec: codec,
 	}
-	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil)
+	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "")
 	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)

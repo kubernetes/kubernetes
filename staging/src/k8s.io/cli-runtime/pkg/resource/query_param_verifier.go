@@ -20,8 +20,9 @@ import (
 	"errors"
 	"fmt"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	yaml "gopkg.in/yaml.v2"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -38,16 +39,10 @@ func NewQueryParamVerifier(dynamicClient dynamic.Interface, openAPIGetter discov
 // QueryParamVerifier verifies if a given group-version-kind supports a
 // given VerifiableQueryParam against the current server.
 //
-// Currently supported query params are:
-// 1. dryRun
-// 2. fieldValidation
+// Currently supported query params are: fieldValidation
 //
-// Support for each of these query params needs to be verified because:
-//
-// 1. Sending dryRun requests to apiserver that
-// don't support it will result in objects being unwillingly persisted.
-//
-// 2. We determine whether or not to perform server-side or client-side
+// Support for each of these query params needs to be verified because
+// we determine whether or not to perform server-side or client-side
 // schema validation based on whether the fieldValidation query param is
 // supported or not.
 //
@@ -73,12 +68,15 @@ type Verifier interface {
 type VerifiableQueryParam string
 
 const (
-	QueryParamDryRun          VerifiableQueryParam = "dryRun"
 	QueryParamFieldValidation VerifiableQueryParam = "fieldValidation"
 )
 
 // HasSupport checks if the given gvk supports the query param configured on v
 func (v *QueryParamVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	if (gvk == schema.GroupVersionKind{Version: "v1", Kind: "List"}) {
+		return NewParamUnsupportedError(gvk, v.queryParam)
+	}
+
 	oapi, err := v.openAPIGetter.OpenAPISchema()
 	if err != nil {
 		return fmt.Errorf("failed to download openapi: %v", err)
@@ -149,6 +147,11 @@ func hasGVKExtension(extensions []*openapi_v2.NamedAny, gvk schema.GroupVersionK
 // specific group-version-kind supports the specific query parameter for
 // the PATCH end-point.
 func supportsQueryParam(doc *openapi_v2.Document, gvk schema.GroupVersionKind, queryParam VerifiableQueryParam) (bool, error) {
+	globalParams := map[string]*openapi_v2.NamedParameter{}
+	for _, p := range doc.GetParameters().GetAdditionalProperties() {
+		globalParams["#/parameters/"+p.GetName()] = p
+	}
+
 	for _, path := range doc.GetPaths().GetPath() {
 		// Is this describing the gvk we're looking for?
 		if !hasGVKExtension(path.GetValue().GetPatch().GetVendorExtension(), gvk) {
@@ -157,6 +160,13 @@ func supportsQueryParam(doc *openapi_v2.Document, gvk schema.GroupVersionKind, q
 		for _, param := range path.GetValue().GetPatch().GetParameters() {
 			if param.GetParameter().GetNonBodyParameter().GetQueryParameterSubSchema().GetName() == string(queryParam) {
 				return true, nil
+			}
+
+			// lookup global parameters
+			if ref := param.GetJsonReference().GetXRef(); ref != "" {
+				if globalParam, ok := globalParams[ref]; ok && globalParam != nil && globalParam.GetValue().GetNonBodyParameter().GetQueryParameterSubSchema().GetName() == string(queryParam) {
+					return true, nil
+				}
 			}
 		}
 		return false, nil

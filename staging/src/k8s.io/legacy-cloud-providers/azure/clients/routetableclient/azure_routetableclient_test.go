@@ -30,7 +30,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
@@ -39,6 +38,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 // 2065-01-24 05:20:00 +0000 UTC
@@ -203,7 +203,7 @@ func TestCreateOrUpdate(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
 	}
-	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(rt1.ID), rt1, gomock.Any()).Return(response, nil).Times(1)
+	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), pointer.StringDeref(rt1.ID, ""), rt1, gomock.Any()).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	rtClient := getTestRouteTableClient(armClient)
@@ -264,7 +264,7 @@ func TestCreateOrUpdateThrottle(t *testing.T) {
 
 	rt1 := getTestRouteTable("rt1")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(rt1.ID), rt1, gomock.Any()).Return(response, throttleErr).Times(1)
+	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), pointer.StringDeref(rt1.ID, ""), rt1, gomock.Any()).Return(response, throttleErr).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	routetableClient := getTestRouteTableClient(armClient)
@@ -283,7 +283,7 @@ func TestCreateOrUpdateWithCreateOrUpdateResponderError(t *testing.T) {
 		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
 	}
 
-	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(rt1.ID), rt1, gomock.Any()).Return(response, nil).Times(1)
+	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), pointer.StringDeref(rt1.ID, ""), rt1, gomock.Any()).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	routetableClient := getTestRouteTableClient(armClient)
@@ -293,9 +293,9 @@ func TestCreateOrUpdateWithCreateOrUpdateResponderError(t *testing.T) {
 
 func getTestRouteTable(name string) network.RouteTable {
 	return network.RouteTable{
-		ID:       to.StringPtr(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/routeTables/%s", name)),
-		Name:     to.StringPtr(name),
-		Location: to.StringPtr("eastus"),
+		ID:       pointer.String(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/routeTables/%s", name)),
+		Name:     pointer.String(name),
+		Location: pointer.String("eastus"),
 	}
 }
 

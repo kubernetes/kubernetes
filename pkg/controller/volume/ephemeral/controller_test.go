@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
@@ -213,7 +212,7 @@ func makePod(name, namespace string, uid types.UID, volumes ...v1.Volume) *v1.Po
 }
 
 func podKey(pod *v1.Pod) string {
-	key, _ := kcache.DeletionHandlingMetaNamespaceKeyFunc(testPodWithEphemeral)
+	key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(testPodWithEphemeral)
 	return key
 }
 

@@ -17,7 +17,6 @@ limitations under the License.
 package fixtures
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -26,22 +25,40 @@ import (
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
-	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	servertesting "k8s.io/apiextensions-apiserver/pkg/cmd/server/testing"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
 // StartDefaultServer starts a test server.
-func StartDefaultServer(t servertesting.Logger, flags ...string) (func(), *rest.Config, *options.CustomResourceDefinitionsServerOptions, error) {
-	// create kubeconfig which will not actually be used. But authz/authn needs it to startup.
-	fakeKubeConfig, err := ioutil.TempFile("", "kubeconfig")
+func StartDefaultServer(t servertesting.Logger, flags ...string) (func(), *rest.Config, *serveroptions.CustomResourceDefinitionsServerOptions, error) {
+	tearDownFn, s, err := startDefaultServer(t, flags...)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	return tearDownFn, s.ClientConfig, s.ServerOpts, nil
+}
+
+func StartDefaultServerWithConfigAccess(t servertesting.Logger, flags ...string) (func(), *rest.Config, apiserver.CompletedConfig, error) {
+	tearDownFn, s, err := startDefaultServer(t, flags...)
+	if err != nil {
+		return nil, nil, apiserver.CompletedConfig{}, err
+	}
+	return tearDownFn, s.ClientConfig, s.CompletedConfig, nil
+}
+
+func startDefaultServer(t servertesting.Logger, flags ...string) (func(), servertesting.TestServer, error) {
+	// create kubeconfig which will not actually be used. But authz/authn needs it to startup.
+	fakeKubeConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		return nil, servertesting.TestServer{}, err
 	}
 	fakeKubeConfig.WriteString(`
 apiVersion: v1
@@ -71,12 +88,14 @@ users:
 		"--authentication-kubeconfig", fakeKubeConfig.Name(),
 		"--authorization-kubeconfig", fakeKubeConfig.Name(),
 		"--kubeconfig", fakeKubeConfig.Name(),
+		// disable admission and filters that require talking to kube-apiserver
+		"--enable-priority-and-fairness=false",
 		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"},
 		flags...,
 	), nil)
 	if err != nil {
 		os.Remove(fakeKubeConfig.Name())
-		return nil, nil, nil, err
+		return nil, servertesting.TestServer{}, err
 	}
 
 	tearDownFn := func() {
@@ -84,7 +103,7 @@ users:
 		s.TearDownFn()
 	}
 
-	return tearDownFn, s.ClientConfig, s.ServerOpts, nil
+	return tearDownFn, s, nil
 }
 
 // StartDefaultServerWithClients starts a test server and returns clients for it.
@@ -128,7 +147,15 @@ func StartDefaultServerWithClientsAndEtcd(t servertesting.Logger, extraFlags ...
 		return nil, nil, nil, nil, "", err
 	}
 
-	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd)
+	var resourceTransformers storagevalue.ResourceTransformers
+	if len(options.RecommendedOptions.Etcd.EncryptionProviderConfigFilepath) != 0 {
+		// be clever in tests to reconstruct the transformers, for encryption integration tests
+		config := genericapiserver.Config{}
+		options.RecommendedOptions.Etcd.ApplyTo(&config)
+		resourceTransformers = config.ResourceTransformers
+	}
+
+	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd, resourceTransformers, nil)
 	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "hopefully-ignored-group", Resource: "hopefully-ignored-resources"})
 	if err != nil {
 		return nil, nil, nil, nil, "", err

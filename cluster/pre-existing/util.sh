@@ -42,15 +42,4 @@ function detect-project() {
 
 function create-certs {
   execute-cmd-on-pre-existing-master-with-retries 'sudo cat /etc/kubernetes/admin.conf' > /tmp/kubeconfig
-
-  # CA_CERT_BASE64, KUBELET_CERT_BASE64 and KUBELET_KEY_BASE64 might be used
-  # in test/kubemark/iks/util.sh
-  # If it becomes clear that the variables are not used anywhere, then we can
-  # remove them:
-  CA_CERT_BASE64=$(grep certificate-authority /tmp/kubeconfig | awk '{print $2}' | head -n 1)
-  KUBELET_CERT_BASE64=$(grep client-certificate-data /tmp/kubeconfig | awk '{print $2}' | head -n 1)
-  KUBELET_KEY_BASE64=$(grep client-key-data /tmp/kubeconfig | awk '{print $2}' | head -n 1)
-  export CA_CERT_BASE64
-  export KUBELET_CERT_BASE64
-  export KUBELET_KEY_BASE64
 }

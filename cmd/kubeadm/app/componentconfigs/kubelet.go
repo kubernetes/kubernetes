@@ -20,11 +20,10 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -70,30 +69,13 @@ var kubeletHandler = handler{
 	fromCluster: kubeletConfigFromCluster,
 }
 
-func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, clusterCfg *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
-	// Read the ConfigMap from the cluster based on what version the kubelet is
-	k8sVersion, err := version.ParseGeneric(clusterCfg.KubernetesVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: https://github.com/kubernetes/kubeadm/issues/1582
-	// During the first "kubeadm upgrade apply" when the feature gate goes "true" by default and
-	// a preferred user value is missing in the ClusterConfiguration, "kubeadm upgrade apply" will try
-	// to fetch using the new format and that CM will not exist yet.
-	// Tollerate both the old a new format until UnversionedKubeletConfigMap goes GA and is locked.
-	// This makes it easier for the users and the code base (avoids changes in /cmd/upgrade/common.go#enforceRequirements).
-	configMapNameLegacy := constants.GetKubeletConfigMapName(k8sVersion, true)
-	configMapName := constants.GetKubeletConfigMapName(k8sVersion, false)
-	klog.V(1).Infof("attempting to download the KubeletConfiguration from the new format location (UnversionedKubeletConfigMap=true)")
+func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
+	configMapName := constants.KubeletBaseConfigurationConfigMap
+	klog.V(1).Infof("attempting to download the KubeletConfiguration from ConfigMap %q", configMapName)
 	cm, err := h.fromConfigMap(clientset, configMapName, constants.KubeletBaseConfigurationConfigMapKey, true)
 	if err != nil {
-		klog.V(1).Infof("attempting to download the KubeletConfiguration from the DEPRECATED location (UnversionedKubeletConfigMap=false)")
-		cm, err = h.fromConfigMap(clientset, configMapNameLegacy, constants.KubeletBaseConfigurationConfigMapKey, true)
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not download the kubelet configuration from ConfigMap %q or %q",
-				configMapName, configMapNameLegacy)
-		}
+		return nil, errors.Wrapf(err, "could not download the kubelet configuration from ConfigMap %q",
+			configMapName)
 	}
 	return cm, nil
 }
@@ -169,7 +151,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	}
 
 	if kc.config.Authentication.Anonymous.Enabled == nil {
-		kc.config.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(kubeletAuthenticationAnonymousEnabled)
+		kc.config.Authentication.Anonymous.Enabled = pointer.Bool(kubeletAuthenticationAnonymousEnabled)
 	} else if *kc.config.Authentication.Anonymous.Enabled {
 		warnDefaultComponentConfigValue(kind, "authentication.anonymous.enabled", kubeletAuthenticationAnonymousEnabled, *kc.config.Authentication.Anonymous.Enabled)
 	}
@@ -184,7 +166,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 
 	// Let clients using other authentication methods like ServiceAccount tokens also access the kubelet API
 	if kc.config.Authentication.Webhook.Enabled == nil {
-		kc.config.Authentication.Webhook.Enabled = utilpointer.BoolPtr(kubeletAuthenticationWebhookEnabled)
+		kc.config.Authentication.Webhook.Enabled = pointer.Bool(kubeletAuthenticationWebhookEnabled)
 	} else if !*kc.config.Authentication.Webhook.Enabled {
 		warnDefaultComponentConfigValue(kind, "authentication.webhook.enabled", kubeletAuthenticationWebhookEnabled, *kc.config.Authentication.Webhook.Enabled)
 	}
@@ -197,7 +179,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	}
 
 	if kc.config.HealthzPort == nil {
-		kc.config.HealthzPort = utilpointer.Int32Ptr(constants.KubeletHealthzPort)
+		kc.config.HealthzPort = pointer.Int32(constants.KubeletHealthzPort)
 	} else if *kc.config.HealthzPort != constants.KubeletHealthzPort {
 		warnDefaultComponentConfigValue(kind, "healthzPort", constants.KubeletHealthzPort, *kc.config.HealthzPort)
 	}
@@ -221,7 +203,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	}
 	if ok {
 		if kc.config.ResolverConfig == nil {
-			kc.config.ResolverConfig = utilpointer.String(kubeletSystemdResolverConfig)
+			kc.config.ResolverConfig = pointer.String(kubeletSystemdResolverConfig)
 		} else {
 			if *kc.config.ResolverConfig != kubeletSystemdResolverConfig {
 				warnDefaultComponentConfigValue(kind, "resolvConf", kubeletSystemdResolverConfig, *kc.config.ResolverConfig)

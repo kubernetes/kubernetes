@@ -33,12 +33,12 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	azstorage "github.com/Azure/azure-sdk-for-go/storage"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/rubiojr/go-vhd/vhd"
 
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 // Attention: blob disk feature is deprecated
@@ -57,7 +57,7 @@ type storageAccountState struct {
 	defaultContainerCreated bool
 }
 
-//BlobDiskController : blob disk controller struct
+// BlobDiskController : blob disk controller struct
 type BlobDiskController struct {
 	common   *controllerCommon
 	accounts map[string]*storageAccountState
@@ -227,7 +227,7 @@ func (c *BlobDiskController) deleteVhdBlob(accountName, accountKey, blobName str
 	return blob.Delete(nil)
 }
 
-//CreateBlobDisk : create a blob disk in a node
+// CreateBlobDisk : create a blob disk in a node
 func (c *BlobDiskController) CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error) {
 	klog.V(4).Infof("azureDisk - creating blob data disk named:%s on StorageAccountType:%s", dataDiskName, storageAccountType)
 
@@ -253,7 +253,7 @@ func (c *BlobDiskController) CreateBlobDisk(dataDiskName string, storageAccountT
 	return diskURI, nil
 }
 
-//DeleteBlobDisk : delete a blob disk from a node
+// DeleteBlobDisk : delete a blob disk from a node
 func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 	storageAccountName, vhdName, err := diskNameAndSANameFromURI(diskURI)
 	if err != nil {
@@ -504,14 +504,14 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 			Sku: &storage.Sku{Name: storageAccountType},
 			// switch to use StorageV2 as it's recommended according to https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
 			Kind:     defaultStorageAccountKind,
-			Tags:     map[string]*string{"created-by": to.StringPtr("azure-dd")},
+			Tags:     map[string]*string{"created-by": pointer.String("azure-dd")},
 			Location: &location}
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
 		err := c.common.cloud.StorageAccountClient.Create(ctx, c.common.resourceGroup, storageAccountName, cp)
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("Create Storage Account: %s, error: %v", storageAccountName, err))
+			return fmt.Errorf("Create Storage Account: %s, error: %v", storageAccountName, err)
 		}
 
 		newAccountState := &storageAccountState{
@@ -602,7 +602,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 	return SAName, nil
 }
 
-//Gets storage account exist, provisionStatus, Error if any
+// Gets storage account exist, provisionStatus, Error if any
 func (c *BlobDiskController) getStorageAccountState(storageAccountName string) (bool, storage.ProvisioningState, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()

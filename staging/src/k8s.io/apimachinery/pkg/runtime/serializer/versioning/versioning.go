@@ -147,7 +147,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 	}
 
 	if d, ok := obj.(runtime.NestedObjectDecoder); ok {
-		if err := d.DecodeNestedObjects(runtime.WithoutVersionDecoder{c.decoder}); err != nil {
+		if err := d.DecodeNestedObjects(runtime.WithoutVersionDecoder{Decoder: c.decoder}); err != nil {
 			if strictErr, ok := runtime.AsStrictDecodingError(err); ok {
 				// save the strictDecodingError let and the caller decide what to do with it
 				strictDecodingErrs = append(strictDecodingErrs, strictErr.Errors()...)

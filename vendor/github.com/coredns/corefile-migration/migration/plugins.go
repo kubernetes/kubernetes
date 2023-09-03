@@ -247,6 +247,12 @@ var plugins = map[string]map[string]plugin{
 				"consolidate": {},
 			},
 		},
+		"v3": plugin{
+			namedOptions: map[string]option{
+				"consolidate": {},
+				"stacktrace":  {},
+			},
+		},
 	},
 
 	"health": {
@@ -303,6 +309,17 @@ var plugins = map[string]map[string]plugin{
 				"ttl":         {}, // new option
 			},
 		},
+		"v3": plugin{
+			namedOptions: map[string]option{
+				"type":        {},
+				"class":       {},
+				"name":        {},
+				"answer name": {},
+				"edns0":       {},
+				"ttl":         {}, 
+				"cname_target": {}, // new option
+			},
+		},
 	},
 
 	"log": {
@@ -327,6 +344,15 @@ var plugins = map[string]map[string]plugin{
 				"denial":      {},
 				"prefetch":    {},
 				"serve_stale": {}, // new option
+			},
+		},
+		"v3": plugin{
+			namedOptions: map[string]option{
+				"success":     {},
+				"denial":      {},
+				"prefetch":    {},
+				"serve_stale": {}, 
+				"keepttl":     {}, // new option
 			},
 		},
 	},
@@ -398,6 +424,13 @@ var plugins = map[string]map[string]plugin{
 			namedOptions: map[string]option{
 				"apex": {},
 				"ttl":  {},
+			},
+		},
+		"v2": plugin{
+			namedOptions: map[string]option{
+				"apex": {},
+				"ttl":  {},
+				"fallthrough": {}, // new option
 			},
 		},
 	},

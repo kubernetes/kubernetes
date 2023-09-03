@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -152,11 +151,6 @@ func (kvh *kubeletVolumeHost) GetSubpather() subpath.Interface {
 	return kvh.kubelet.subpather
 }
 
-func (kvh *kubeletVolumeHost) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
-	// FilteredDial is not needed in the kubelet.
-	return nil
-}
-
 func (kvh *kubeletVolumeHost) GetHostUtil() hostutil.HostUtils {
 	return kvh.kubelet.hostutil
 }
@@ -247,11 +241,21 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 }
 
 func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return kvh.secretManager.GetSecret
+	if kvh.secretManager != nil {
+		return kvh.secretManager.GetSecret
+	}
+	return func(namespace, name string) (*v1.Secret, error) {
+		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")
+	}
 }
 
 func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return kvh.configMapManager.GetConfigMap
+	if kvh.configMapManager != nil {
+		return kvh.configMapManager.GetConfigMap
+	}
+	return func(namespace, name string) (*v1.ConfigMap, error) {
+		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")
+	}
 }
 
 func (kvh *kubeletVolumeHost) GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {

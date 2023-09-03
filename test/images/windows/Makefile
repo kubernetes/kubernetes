@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REGISTRY ?= k8s.gcr.io/e2e-test-images
+REGISTRY ?= registry.k8s.io/e2e-test-images
 REMOTE_DOCKER_URL ?=
 DOCKER_CERT_PATH ?= "$(HOME)/.docker"
 export

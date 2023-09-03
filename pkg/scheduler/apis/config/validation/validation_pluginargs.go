@@ -31,6 +31,13 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
+// supportedScoringStrategyTypes has to be a set of strings for use with field.Unsupported
+var supportedScoringStrategyTypes = sets.New(
+	string(config.LeastAllocated),
+	string(config.MostAllocated),
+	string(config.RequestedToCapacityRatio),
+)
+
 // ValidateDefaultPreemptionArgs validates that DefaultPreemptionArgs are correct.
 func ValidateDefaultPreemptionArgs(path *field.Path, args *config.DefaultPreemptionArgs) error {
 	var allErrs field.ErrorList
@@ -142,13 +149,13 @@ func validateTopologyKey(p *field.Path, v string) field.ErrorList {
 }
 
 func validateWhenUnsatisfiable(p *field.Path, v v1.UnsatisfiableConstraintAction) *field.Error {
-	supportedScheduleActions := sets.NewString(string(v1.DoNotSchedule), string(v1.ScheduleAnyway))
+	supportedScheduleActions := sets.New(string(v1.DoNotSchedule), string(v1.ScheduleAnyway))
 
 	if len(v) == 0 {
 		return field.Required(p, "can not be empty")
 	}
 	if !supportedScheduleActions.Has(string(v)) {
-		return field.NotSupported(p, v, supportedScheduleActions.List())
+		return field.NotSupported(p, v, sets.List(supportedScheduleActions))
 	}
 	return nil
 }
@@ -215,7 +222,7 @@ func validateResources(resources []config.ResourceSpec, p *field.Path) field.Err
 // ValidateNodeResourcesBalancedAllocationArgs validates that NodeResourcesBalancedAllocationArgs are set correctly.
 func ValidateNodeResourcesBalancedAllocationArgs(path *field.Path, args *config.NodeResourcesBalancedAllocationArgs) error {
 	var allErrs field.ErrorList
-	seenResources := sets.NewString()
+	seenResources := sets.New[string]()
 	for i, resource := range args.Resources {
 		if seenResources.Has(resource.Name) {
 			allErrs = append(allErrs, field.Duplicate(path.Child("resources").Index(i).Child("name"), resource.Name))
@@ -264,7 +271,7 @@ func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs)
 	})
 }
 
-// ValidateVolumeBindingArgs validates that VolumeBindingArgs with scheduler features.
+// ValidateVolumeBindingArgsWithOptions validates that VolumeBindingArgs and VolumeBindingArgsValidationOptions with scheduler features.
 func ValidateVolumeBindingArgsWithOptions(path *field.Path, args *config.VolumeBindingArgs, opts VolumeBindingArgsValidationOptions) error {
 	var allErrs field.ErrorList
 
@@ -304,10 +311,14 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 		}
 	}
 
+	strategyPath := path.Child("scoringStrategy")
 	if args.ScoringStrategy != nil {
-		allErrs = append(allErrs, validateResources(args.ScoringStrategy.Resources, path.Child("resources"))...)
+		if !supportedScoringStrategyTypes.Has(string(args.ScoringStrategy.Type)) {
+			allErrs = append(allErrs, field.NotSupported(strategyPath.Child("type"), args.ScoringStrategy.Type, sets.List(supportedScoringStrategyTypes)))
+		}
+		allErrs = append(allErrs, validateResources(args.ScoringStrategy.Resources, strategyPath.Child("resources"))...)
 		if args.ScoringStrategy.RequestedToCapacityRatio != nil {
-			allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, path.Child("shape"))...)
+			allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, strategyPath.Child("shape"))...)
 		}
 	}
 

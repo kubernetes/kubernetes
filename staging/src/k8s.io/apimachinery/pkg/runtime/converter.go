@@ -231,13 +231,13 @@ func (c *fromUnstructuredContext) pushKey(key string) {
 
 }
 
-// FromUnstructuredWIthValidation converts an object from map[string]interface{} representation into a concrete type.
+// FromUnstructuredWithValidation converts an object from map[string]interface{} representation into a concrete type.
 // It uses encoding/json/Unmarshaler if object implements it or reflection if not.
 // It takes a validationDirective that indicates how to behave when it encounters unknown fields.
 func (c *unstructuredConverter) FromUnstructuredWithValidation(u map[string]interface{}, obj interface{}, returnUnknownFields bool) error {
 	t := reflect.TypeOf(obj)
 	value := reflect.ValueOf(obj)
-	if t.Kind() != reflect.Ptr || value.IsNil() {
+	if t.Kind() != reflect.Pointer || value.IsNil() {
 		return fmt.Errorf("FromUnstructured requires a non-nil pointer to an object, got %v", t)
 	}
 
@@ -291,7 +291,7 @@ func fromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) error 
 	st, dt := sv.Type(), dv.Type()
 
 	switch dt.Kind() {
-	case reflect.Map, reflect.Slice, reflect.Ptr, reflect.Struct, reflect.Interface:
+	case reflect.Map, reflect.Slice, reflect.Pointer, reflect.Struct, reflect.Interface:
 		// Those require non-trivial conversion.
 	default:
 		// This should handle all simple types.
@@ -353,7 +353,7 @@ func fromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) error 
 		return mapFromUnstructured(sv, dv, ctx)
 	case reflect.Slice:
 		return sliceFromUnstructured(sv, dv, ctx)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return pointerFromUnstructured(sv, dv, ctx)
 	case reflect.Struct:
 		return structFromUnstructured(sv, dv, ctx)
@@ -465,7 +465,7 @@ func sliceFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) e
 			}
 			dv.SetBytes(data)
 		} else {
-			dv.Set(reflect.Zero(dt))
+			dv.Set(reflect.MakeSlice(dt, 0, 0))
 		}
 		return nil
 	}
@@ -496,13 +496,13 @@ func sliceFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) e
 func pointerFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) error {
 	st, dt := sv.Type(), dv.Type()
 
-	if st.Kind() == reflect.Ptr && sv.IsNil() {
+	if st.Kind() == reflect.Pointer && sv.IsNil() {
 		dv.Set(reflect.Zero(dt))
 		return nil
 	}
 	dv.Set(reflect.New(dt.Elem()))
 	switch st.Kind() {
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		return fromUnstructured(sv.Elem(), dv.Elem(), ctx)
 	default:
 		return fromUnstructured(sv, dv.Elem(), ctx)
@@ -579,7 +579,7 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 	} else {
 		t := reflect.TypeOf(obj)
 		value := reflect.ValueOf(obj)
-		if t.Kind() != reflect.Ptr || value.IsNil() {
+		if t.Kind() != reflect.Pointer || value.IsNil() {
 			return nil, fmt.Errorf("ToUnstructured requires a non-nil pointer to an object, got %v", t)
 		}
 		u = map[string]interface{}{}
@@ -686,7 +686,7 @@ func toUnstructured(sv, dv reflect.Value) error {
 		return mapToUnstructured(sv, dv)
 	case reflect.Slice:
 		return sliceToUnstructured(sv, dv)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return pointerToUnstructured(sv, dv)
 	case reflect.Struct:
 		return structToUnstructured(sv, dv)
@@ -790,7 +790,7 @@ func isZero(v reflect.Value) bool {
 	case reflect.Map, reflect.Slice:
 		// TODO: It seems that 0-len maps are ignored in it.
 		return v.IsNil() || v.Len() == 0
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		return v.IsNil()
 	}
 	return false

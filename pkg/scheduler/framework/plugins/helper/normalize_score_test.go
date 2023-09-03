@@ -61,6 +61,15 @@ func TestDefaultNormalizeScore(t *testing.T) {
 			scores:         []int64{0, 1, 1, 1},
 			expectedScores: []int64{100, 0, 0, 0},
 		},
+		{
+			scores:         []int64{0, 0, 0, 0},
+			expectedScores: []int64{0, 0, 0, 0},
+		},
+		{
+			reverse:        true,
+			scores:         []int64{0, 0, 0, 0},
+			expectedScores: []int64{100, 100, 100, 100},
+		},
 	}
 
 	for i, test := range tests {

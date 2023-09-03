@@ -22,16 +22,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"net/http"
-	"net/url"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/probe"
@@ -43,7 +42,7 @@ type fakeHttpProber struct {
 	err    error
 }
 
-func (f *fakeHttpProber) Probe(*url.URL, http.Header, time.Duration) (probe.Result, string, error) {
+func (f *fakeHttpProber) Probe(*http.Request, time.Duration) (probe.Result, string, error) {
 	return f.result, f.body, f.err
 }
 
@@ -60,9 +59,9 @@ func NewTestREST(resp testResponse) *REST {
 		err:    resp.err,
 	}
 	return &REST{
-		GetServersToValidate: func() map[string]*Server {
-			return map[string]*Server{
-				"test1": {Addr: "testserver1", Port: 8000, Path: "/healthz", Prober: prober},
+		GetServersToValidate: func() map[string]Server {
+			return map[string]Server{
+				"test1": &HttpServer{Addr: "testserver1", Port: 8000, Path: "/healthz", Prober: prober},
 			}
 		},
 	}
@@ -88,7 +87,7 @@ func TestList_NoError(t *testing.T) {
 		Items: []api.ComponentStatus{*(createTestStatus("test1", api.ConditionTrue, "ok", ""))},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", cmp.Diff(e, a))
 	}
 }
 
@@ -107,7 +106,7 @@ func TestList_WithLabelSelectors(t *testing.T) {
 		Items: []api.ComponentStatus{},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", cmp.Diff(e, a))
 	}
 }
 
@@ -126,7 +125,7 @@ func TestList_WithFieldSelectors(t *testing.T) {
 		Items: []api.ComponentStatus{},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", cmp.Diff(e, a))
 	}
 }
 
@@ -141,7 +140,7 @@ func TestList_FailedCheck(t *testing.T) {
 			*(createTestStatus("test1", api.ConditionFalse, "", ""))},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", cmp.Diff(e, a))
 	}
 }
 
@@ -156,7 +155,7 @@ func TestList_UnknownError(t *testing.T) {
 			*(createTestStatus("test1", api.ConditionUnknown, "", "fizzbuzz error"))},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", cmp.Diff(e, a))
 	}
 }
 
@@ -168,7 +167,7 @@ func TestGet_NoError(t *testing.T) {
 	}
 	expect := createTestStatus("test1", api.ConditionTrue, "ok", "")
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object. Diff: %s", diff.ObjectDiff(e, a))
+		t.Errorf("Got unexpected object. Diff: %s", cmp.Diff(e, a))
 	}
 }
 

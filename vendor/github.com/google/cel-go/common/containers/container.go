@@ -98,12 +98,12 @@ func (c *Container) Name() string {
 //
 // Given a container name a.b.c.M.N and a type name R.s, this will deliver in order:
 //
-//     a.b.c.M.N.R.s
-//     a.b.c.M.R.s
-//     a.b.c.R.s
-//     a.b.R.s
-//     a.R.s
-//     R.s
+//	a.b.c.M.N.R.s
+//	a.b.c.M.R.s
+//	a.b.c.R.s
+//	a.b.R.s
+//	a.R.s
+//	R.s
 //
 // If aliases or abbreviations are configured for the container, then alias names will take
 // precedence over containerized names.
@@ -145,9 +145,9 @@ func (c *Container) aliasSet() map[string]string {
 // If the name is qualified, the first component of the qualified name is checked against known
 // aliases. Any alias that is found in a qualified name is expanded in the result:
 //
-//     alias: R -> my.alias.R
-//     name: R.S.T
-//     output: my.alias.R.S.T
+//	alias: R -> my.alias.R
+//	name: R.S.T
+//	output: my.alias.R.S.T
 //
 // Note, the name must not have a leading dot.
 func (c *Container) findAlias(name string) (string, bool) {
@@ -177,19 +177,19 @@ type ContainerOption func(*Container) (*Container, error)
 // Abbreviations can be useful when working with variables, functions, and especially types from
 // multiple namespaces:
 //
-//    // CEL object construction
-//    qual.pkg.version.ObjTypeName{
-//       field: alt.container.ver.FieldTypeName{value: ...}
-//    }
+//	// CEL object construction
+//	qual.pkg.version.ObjTypeName{
+//	   field: alt.container.ver.FieldTypeName{value: ...}
+//	}
 //
 // Only one the qualified names above may be used as the CEL container, so at least one of these
 // references must be a long qualified name within an otherwise short CEL program. Using the
 // following abbreviations, the program becomes much simpler:
 //
-//    // CEL Go option
-//    Abbrevs("qual.pkg.version.ObjTypeName", "alt.container.ver.FieldTypeName")
-//    // Simplified Object construction
-//    ObjTypeName{field: FieldTypeName{value: ...}}
+//	// CEL Go option
+//	Abbrevs("qual.pkg.version.ObjTypeName", "alt.container.ver.FieldTypeName")
+//	// Simplified Object construction
+//	ObjTypeName{field: FieldTypeName{value: ...}}
 //
 // There are a few rules for the qualified names and the simple abbreviations generated from them:
 // - Qualified names must be dot-delimited, e.g. `package.subpkg.name`.
@@ -198,13 +198,13 @@ type ContainerOption func(*Container) (*Container, error)
 // - The abbreviation must not collide with unqualified names in use.
 //
 // Abbreviations are distinct from container-based references in the following important ways:
-// - Abbreviations must expand to a fully-qualified name.
-// - Expanded abbreviations do not participate in namespace resolution.
-// - Abbreviation expansion is done instead of the container search for a matching identifier.
-// - Containers follow C++ namespace resolution rules with searches from the most qualified name
-//   to the least qualified name.
-// - Container references within the CEL program may be relative, and are resolved to fully
-//   qualified names at either type-check time or program plan time, whichever comes first.
+//   - Abbreviations must expand to a fully-qualified name.
+//   - Expanded abbreviations do not participate in namespace resolution.
+//   - Abbreviation expansion is done instead of the container search for a matching identifier.
+//   - Containers follow C++ namespace resolution rules with searches from the most qualified name
+//     to the least qualified name.
+//   - Container references within the CEL program may be relative, and are resolved to fully
+//     qualified names at either type-check time or program plan time, whichever comes first.
 //
 // If there is ever a case where an identifier could be in both the container and as an
 // abbreviation, the abbreviation wins as this will ensure that the meaning of a program is
@@ -298,18 +298,18 @@ func Name(name string) ContainerOption {
 // ToQualifiedName converts an expression AST into a qualified name if possible, with a boolean
 // 'found' value that indicates if the conversion is successful.
 func ToQualifiedName(e *exprpb.Expr) (string, bool) {
-	switch e.ExprKind.(type) {
+	switch e.GetExprKind().(type) {
 	case *exprpb.Expr_IdentExpr:
 		id := e.GetIdentExpr()
-		return id.Name, true
+		return id.GetName(), true
 	case *exprpb.Expr_SelectExpr:
 		sel := e.GetSelectExpr()
 		// Test only expressions are not valid as qualified names.
 		if sel.GetTestOnly() {
 			return "", false
 		}
-		if qual, found := ToQualifiedName(sel.Operand); found {
-			return qual + "." + sel.Field, true
+		if qual, found := ToQualifiedName(sel.GetOperand()); found {
+			return qual + "." + sel.GetField(), true
 		}
 	}
 	return "", false

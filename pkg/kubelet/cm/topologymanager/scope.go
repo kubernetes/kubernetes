@@ -31,6 +31,8 @@ const (
 	containerTopologyScope = "container"
 	// podTopologyScope specifies the TopologyManagerScope per pod.
 	podTopologyScope = "pod"
+	// noneTopologyScope specifies the TopologyManagerScope when topologyPolicyName is none.
+	noneTopologyScope = "none"
 )
 
 type podTopologyHints map[string]map[string]TopologyHint
@@ -38,6 +40,7 @@ type podTopologyHints map[string]map[string]TopologyHint
 // Scope interface for Topology Manager
 type Scope interface {
 	Name() string
+	GetPolicy() Policy
 	Admit(pod *v1.Pod) lifecycle.PodAdmitResult
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
@@ -86,6 +89,10 @@ func (s *scope) setTopologyHints(podUID string, containerName string, th Topolog
 
 func (s *scope) GetAffinity(podUID string, containerName string) TopologyHint {
 	return s.getTopologyHints(podUID, containerName)
+}
+
+func (s *scope) GetPolicy() Policy {
+	return s.policy
 }
 
 func (s *scope) AddHintProvider(h HintProvider) {

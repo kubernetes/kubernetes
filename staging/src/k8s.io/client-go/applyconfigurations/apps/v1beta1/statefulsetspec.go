@@ -37,6 +37,7 @@ type StatefulSetSpecApplyConfiguration struct {
 	RevisionHistoryLimit                 *int32                                                             `json:"revisionHistoryLimit,omitempty"`
 	MinReadySeconds                      *int32                                                             `json:"minReadySeconds,omitempty"`
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
+	Ordinals                             *StatefulSetOrdinalsApplyConfiguration                             `json:"ordinals,omitempty"`
 }
 
 // StatefulSetSpecApplyConfiguration constructs an declarative configuration of the StatefulSetSpec type for use with
@@ -127,5 +128,13 @@ func (b *StatefulSetSpecApplyConfiguration) WithMinReadySeconds(value int32) *St
 // If called multiple times, the PersistentVolumeClaimRetentionPolicy field is set to the value of the last call.
 func (b *StatefulSetSpecApplyConfiguration) WithPersistentVolumeClaimRetentionPolicy(value *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration) *StatefulSetSpecApplyConfiguration {
 	b.PersistentVolumeClaimRetentionPolicy = value
+	return b
+}
+
+// WithOrdinals sets the Ordinals field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Ordinals field is set to the value of the last call.
+func (b *StatefulSetSpecApplyConfiguration) WithOrdinals(value *StatefulSetOrdinalsApplyConfiguration) *StatefulSetSpecApplyConfiguration {
+	b.Ordinals = value
 	return b
 }

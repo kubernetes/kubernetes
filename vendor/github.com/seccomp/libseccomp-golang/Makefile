@@ -4,7 +4,7 @@
 
 all: check-build
 
-check: vet test
+check: lint test
 
 check-build:
 	go build
@@ -16,7 +16,7 @@ fix-syntax:
 	gofmt -w .
 
 vet:
-	go vet -v
+	go vet -v ./...
 
 # Previous bugs have made the tests freeze until the timeout. Golang default
 # timeout for tests is 10 minutes, which is too long, considering current tests
@@ -28,5 +28,4 @@ test:
 	go test -v -timeout $(TEST_TIMEOUT)
 
 lint:
-	@$(if $(shell which golint),true,$(error "install golint and include it in your PATH"))
-	golint -set_exit_status
+	golangci-lint run .

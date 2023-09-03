@@ -46,24 +46,32 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// NewServerHandlerTransport returns a ServerTransport handling gRPC
-// from inside an http.Handler. It requires that the http Server
-// supports HTTP/2.
-func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats stats.Handler) (ServerTransport, error) {
+// NewServerHandlerTransport returns a ServerTransport handling gRPC from
+// inside an http.Handler, or writes an HTTP error to w and returns an error.
+// It requires that the http Server supports HTTP/2.
+func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats []stats.Handler) (ServerTransport, error) {
 	if r.ProtoMajor != 2 {
-		return nil, errors.New("gRPC requires HTTP/2")
+		msg := "gRPC requires HTTP/2"
+		http.Error(w, msg, http.StatusBadRequest)
+		return nil, errors.New(msg)
 	}
 	if r.Method != "POST" {
-		return nil, errors.New("invalid gRPC request method")
+		msg := fmt.Sprintf("invalid gRPC request method %q", r.Method)
+		http.Error(w, msg, http.StatusBadRequest)
+		return nil, errors.New(msg)
 	}
 	contentType := r.Header.Get("Content-Type")
 	// TODO: do we assume contentType is lowercase? we did before
 	contentSubtype, validContentType := grpcutil.ContentSubtype(contentType)
 	if !validContentType {
-		return nil, errors.New("invalid gRPC request content-type")
+		msg := fmt.Sprintf("invalid gRPC request content-type %q", contentType)
+		http.Error(w, msg, http.StatusUnsupportedMediaType)
+		return nil, errors.New(msg)
 	}
 	if _, ok := w.(http.Flusher); !ok {
-		return nil, errors.New("gRPC requires a ResponseWriter supporting http.Flusher")
+		msg := "gRPC requires a ResponseWriter supporting http.Flusher"
+		http.Error(w, msg, http.StatusInternalServerError)
+		return nil, errors.New(msg)
 	}
 
 	st := &serverHandlerTransport{
@@ -79,7 +87,9 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats sta
 	if v := r.Header.Get("grpc-timeout"); v != "" {
 		to, err := decodeTimeout(v)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "malformed time-out: %v", err)
+			msg := fmt.Sprintf("malformed grpc-timeout: %v", err)
+			http.Error(w, msg, http.StatusBadRequest)
+			return nil, status.Error(codes.Internal, msg)
 		}
 		st.timeoutSet = true
 		st.timeout = to
@@ -97,7 +107,9 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats sta
 		for _, v := range vv {
 			v, err := decodeMetadataHeader(k, v)
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "malformed binary metadata: %v", err)
+				msg := fmt.Sprintf("malformed binary metadata %q in header %q: %v", v, k, err)
+				http.Error(w, msg, http.StatusBadRequest)
+				return nil, status.Error(codes.Internal, msg)
 			}
 			metakv = append(metakv, k, v)
 		}
@@ -138,14 +150,17 @@ type serverHandlerTransport struct {
 	// TODO make sure this is consistent across handler_server and http2_server
 	contentSubtype string
 
-	stats stats.Handler
+	stats []stats.Handler
 }
 
-func (ht *serverHandlerTransport) Close() {
-	ht.closeOnce.Do(ht.closeCloseChanOnce)
+func (ht *serverHandlerTransport) Close(err error) {
+	ht.closeOnce.Do(func() {
+		if logger.V(logLevel) {
+			logger.Infof("Closing serverHandlerTransport: %v", err)
+		}
+		close(ht.closedCh)
+	})
 }
-
-func (ht *serverHandlerTransport) closeCloseChanOnce() { close(ht.closedCh) }
 
 func (ht *serverHandlerTransport) RemoteAddr() net.Addr { return strAddr(ht.req.RemoteAddr) }
 
@@ -228,15 +243,15 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, st *status.Status) erro
 	})
 
 	if err == nil { // transport has not been closed
-		if ht.stats != nil {
-			// Note: The trailer fields are compressed with hpack after this call returns.
-			// No WireLength field is set here.
-			ht.stats.HandleRPC(s.Context(), &stats.OutTrailer{
+		// Note: The trailer fields are compressed with hpack after this call returns.
+		// No WireLength field is set here.
+		for _, sh := range ht.stats {
+			sh.HandleRPC(s.Context(), &stats.OutTrailer{
 				Trailer: s.trailer.Copy(),
 			})
 		}
 	}
-	ht.Close()
+	ht.Close(errors.New("finished writing status"))
 	return err
 }
 
@@ -314,10 +329,10 @@ func (ht *serverHandlerTransport) WriteHeader(s *Stream, md metadata.MD) error {
 	})
 
 	if err == nil {
-		if ht.stats != nil {
+		for _, sh := range ht.stats {
 			// Note: The header fields are compressed with hpack after this call returns.
 			// No WireLength field is set here.
-			ht.stats.HandleRPC(s.Context(), &stats.OutHeader{
+			sh.HandleRPC(s.Context(), &stats.OutHeader{
 				Header:      md.Copy(),
 				Compression: s.sendCompress,
 			})
@@ -346,7 +361,7 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), trace
 		case <-ht.req.Context().Done():
 		}
 		cancel()
-		ht.Close()
+		ht.Close(errors.New("request is done processing"))
 	}()
 
 	req := ht.req
@@ -369,14 +384,14 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), trace
 	}
 	ctx = metadata.NewIncomingContext(ctx, ht.headerMD)
 	s.ctx = peer.NewContext(ctx, pr)
-	if ht.stats != nil {
-		s.ctx = ht.stats.TagRPC(s.ctx, &stats.RPCTagInfo{FullMethodName: s.method})
+	for _, sh := range ht.stats {
+		s.ctx = sh.TagRPC(s.ctx, &stats.RPCTagInfo{FullMethodName: s.method})
 		inHeader := &stats.InHeader{
 			FullMethod:  s.method,
 			RemoteAddr:  ht.RemoteAddr(),
 			Compression: s.recvCompress,
 		}
-		ht.stats.HandleRPC(s.ctx, inHeader)
+		sh.HandleRPC(s.ctx, inHeader)
 	}
 	s.trReader = &transportReader{
 		reader:        &recvBufferReader{ctx: s.ctx, ctxDone: s.ctx.Done(), recv: s.buf, freeBuffer: func(*bytes.Buffer) {}},
@@ -442,10 +457,10 @@ func (ht *serverHandlerTransport) Drain() {
 // mapRecvMsgError returns the non-nil err into the appropriate
 // error value as expected by callers of *grpc.parser.recvMsg.
 // In particular, in can only be:
-//   * io.EOF
-//   * io.ErrUnexpectedEOF
-//   * of type transport.ConnectionError
-//   * an error from the status package
+//   - io.EOF
+//   - io.ErrUnexpectedEOF
+//   - of type transport.ConnectionError
+//   - an error from the status package
 func mapRecvMsgError(err error) error {
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		return err

@@ -40,7 +40,7 @@ Bash:
   # Linux:
   $ %[1]s completion bash > /etc/bash_completion.d/%[1]s
   # macOS:
-  $ %[1]s completion bash > /usr/local/etc/bash_completion.d/%[1]s
+  $ %[1]s completion bash > $(brew --prefix)/etc/bash_completion.d/%[1]s
 
 Zsh:
 
@@ -71,7 +71,7 @@ PowerShell:
 `,cmd.Root().Name()),
 	DisableFlagsInUseLine: true,
 	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
-	Args:                  cobra.ExactValidArgs(1),
+	Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	Run: func(cmd *cobra.Command, args []string) {
 		switch args[0] {
 		case "bash":
@@ -99,6 +99,11 @@ To tell Cobra *not* to provide the default `completion` command:
 rootCmd.CompletionOptions.DisableDefaultCmd = true
 ```
 
+To tell Cobra to mark the default `completion` command as *hidden*:
+```
+rootCmd.CompletionOptions.HiddenDefaultCmd = true
+```
+
 To tell Cobra *not* to provide the user with the `--no-descriptions` flag to the completion sub-commands:
 ```
 rootCmd.CompletionOptions.DisableNoDescFlag = true
@@ -122,7 +127,7 @@ For example, if you want `kubectl get [tab][tab]` to show a list of valid "nouns
 Some simplified code from `kubectl get` looks like:
 
 ```go
-validArgs []string = { "pod", "node", "service", "replicationcontroller" }
+validArgs = []string{ "pod", "node", "service", "replicationcontroller" }
 
 cmd := &cobra.Command{
 	Use:     "get [(-o|--output=)json|yaml|template|...] (RESOURCE [NAME] | RESOURCE/NAME ...)",
@@ -148,7 +153,7 @@ node   pod   replicationcontroller   service
 If your nouns have aliases, you can define them alongside `ValidArgs` using `ArgAliases`:
 
 ```go
-argAliases []string = { "pods", "nodes", "services", "svc", "replicationcontrollers", "rc" }
+argAliases = []string { "pods", "nodes", "services", "svc", "replicationcontrollers", "rc" }
 
 cmd := &cobra.Command{
     ...
@@ -157,16 +162,7 @@ cmd := &cobra.Command{
 }
 ```
 
-The aliases are not shown to the user on tab completion, but they are accepted as valid nouns by
-the completion algorithm if entered manually, e.g. in:
-
-```bash
-$ kubectl get rc [tab][tab]
-backend        frontend       database
-```
-
-Note that without declaring `rc` as an alias, the completion algorithm would not know to show the list of
-replication controllers following `rc`.
+The aliases are shown to the user on tab completion only if no completions were found within sub-commands or `ValidArgs`.
 
 ### Dynamic completion of nouns
 
@@ -232,6 +228,10 @@ ShellCompDirectiveFilterFileExt
 //    return []string{"themes"}, ShellCompDirectiveFilterDirs
 //
 ShellCompDirectiveFilterDirs
+
+// ShellCompDirectiveKeepOrder indicates that the shell should preserve the order
+// in which the completions are provided
+ShellCompDirectiveKeepOrder
 ```
 
 ***Note***: When using the `ValidArgsFunction`, Cobra will call your registered function after having parsed all flags and arguments provided in the command-line.  You therefore don't need to do this parsing yourself.  For example, when a user calls `helm status --namespace my-rook-ns [tab][tab]`, Cobra will call your registered `ValidArgsFunction` after having parsed the `--namespace` flag, as it would have done when calling the `RunE` function.
@@ -379,6 +379,19 @@ ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([
 or
 ```go
 ValidArgs: []string{"bash\tCompletions for bash", "zsh\tCompletions for zsh"}
+```
+
+If you don't want to show descriptions in the completions, you can add `--no-descriptions` to the default `completion` command to disable them, like:
+
+```bash
+$ source <(helm completion bash)
+$ helm completion [tab][tab]
+bash        (generate autocompletion script for bash)        powershell  (generate autocompletion script for powershell)
+fish        (generate autocompletion script for fish)        zsh         (generate autocompletion script for zsh)
+
+$ source <(helm completion bash --no-descriptions)
+$ helm completion [tab][tab]
+bash        fish        powershell  zsh
 ```
 ## Bash completions
 
@@ -530,6 +543,21 @@ search for a keyword in charts
 $ helm s[tab]
 search  show  status
 ```
+### Aliases
+
+You can also configure `powershell` aliases for your program and they will also support completions.
+
+```
+$ sal aliasname origcommand
+$ Register-ArgumentCompleter -CommandName 'aliasname' -ScriptBlock $__origcommandCompleterBlock
+
+# and now when you run `aliasname` completion will make
+# suggestions as it did for `origcommand`.
+
+$ aliasname <tab>
+completion     firstcommand   secondcommand
+```
+The name of the completer block variable is of the form `$__<programName>CompleterBlock` where every `-` and `:` in the program name have been replaced with `_`, to respect powershell naming syntax.
 
 ### Limitations
 

@@ -115,7 +115,7 @@ func findNameStep(parts []string, typeOptions sets.String) string {
 
 // getPotentialTypeValues takes a type and looks up the tags used to represent its fields when serialized.
 func getPotentialTypeValues(typeValue reflect.Type) (map[string]reflect.Type, error) {
-	if typeValue.Kind() == reflect.Ptr {
+	if typeValue.Kind() == reflect.Pointer {
 		typeValue = typeValue.Elem()
 	}
 

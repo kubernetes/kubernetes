@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -80,23 +79,15 @@ func newLB(t *testing.T, serverURL string) *tcpLB {
 	return &lb
 }
 
-func setEnv(key, value string) func() {
-	originalValue := os.Getenv(key)
-	os.Setenv(key, value)
-	return func() {
-		os.Setenv(key, originalValue)
-	}
-}
-
 const (
 	readIdleTimeout int = 1
 	pingTimeout     int = 1
 )
 
 func TestReconnectBrokenTCP(t *testing.T) {
-	defer setEnv("HTTP2_READ_IDLE_TIMEOUT_SECONDS", strconv.Itoa(readIdleTimeout))()
-	defer setEnv("HTTP2_PING_TIMEOUT_SECONDS", strconv.Itoa(pingTimeout))()
-	defer setEnv("DISABLE_HTTP2", "")()
+	t.Setenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS", strconv.Itoa(readIdleTimeout))
+	t.Setenv("HTTP2_PING_TIMEOUT_SECONDS", strconv.Itoa(pingTimeout))
+	t.Setenv("DISABLE_HTTP2", "")
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, %s", r.Proto)
 	}))
@@ -169,7 +160,7 @@ func TestReconnectBrokenTCP(t *testing.T) {
 // 2. the connection has keepalive enabled so it will be reused
 // 3. break the TCP connection stopping the proxy
 // 4. close the idle connection to force creating a new connection
-// 5. count that there are 2 connection to the server (we didn't reuse the original connection)
+// 5. count that there are 2 connections to the server (we didn't reuse the original connection)
 func TestReconnectBrokenTCP_HTTP1(t *testing.T) {
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, %s", r.Proto)
@@ -245,7 +236,7 @@ func TestReconnectBrokenTCP_HTTP1(t *testing.T) {
 // 1. connect to https server with http1.1 using a TCP proxy making the connection to timeout
 // 2. the connection has keepalive enabled so it will be reused
 // 3. close the in-flight connection to force creating a new connection
-// 4. count that there are 2 connection on the LB but only one succeeds
+// 4. count that there are 2 connections on the LB but only one succeeds
 func TestReconnectBrokenTCPInFlight_HTTP1(t *testing.T) {
 	done := make(chan struct{})
 	defer close(done)

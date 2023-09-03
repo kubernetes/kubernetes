@@ -21,15 +21,15 @@ import (
 	"time"
 )
 
-// ShortHumanDuration returns a succint representation of the provided duration
+// ShortHumanDuration returns a succinct representation of the provided duration
 // with limited precision for consumption by humans.
 func ShortHumanDuration(d time.Duration) string {
 	// Allow deviation no more than 2 seconds(excluded) to tolerate machine time
 	// inconsistence, it can be considered as almost now.
 	if seconds := int(d.Seconds()); seconds < -1 {
-		return fmt.Sprintf("<invalid>")
+		return "<invalid>"
 	} else if seconds < 0 {
-		return fmt.Sprintf("0s")
+		return "0s"
 	} else if seconds < 60 {
 		return fmt.Sprintf("%ds", seconds)
 	} else if minutes := int(d.Minutes()); minutes < 60 {
@@ -42,16 +42,16 @@ func ShortHumanDuration(d time.Duration) string {
 	return fmt.Sprintf("%dy", int(d.Hours()/24/365))
 }
 
-// HumanDuration returns a succint representation of the provided duration
+// HumanDuration returns a succinct representation of the provided duration
 // with limited precision for consumption by humans. It provides ~2-3 significant
 // figures of duration.
 func HumanDuration(d time.Duration) string {
 	// Allow deviation no more than 2 seconds(excluded) to tolerate machine time
 	// inconsistence, it can be considered as almost now.
 	if seconds := int(d.Seconds()); seconds < -1 {
-		return fmt.Sprintf("<invalid>")
+		return "<invalid>"
 	} else if seconds < 0 {
-		return fmt.Sprintf("0s")
+		return "0s"
 	} else if seconds < 60*2 {
 		return fmt.Sprintf("%ds", seconds)
 	}

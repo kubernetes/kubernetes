@@ -68,6 +68,9 @@ type Backend interface {
 	Defrag() error
 	ForceCommit()
 	Close() error
+
+	// SetTxPostLockInsideApplyHook sets a txPostLockInsideApplyHook.
+	SetTxPostLockInsideApplyHook(func())
 }
 
 type Snapshot interface {
@@ -100,8 +103,9 @@ type backend struct {
 	// mlock prevents backend database file to be swapped
 	mlock bool
 
-	mu sync.RWMutex
-	db *bolt.DB
+	mu    sync.RWMutex
+	bopts *bolt.Options
+	db    *bolt.DB
 
 	batchInterval time.Duration
 	batchLimit    int
@@ -118,6 +122,9 @@ type backend struct {
 	donec chan struct{}
 
 	hooks Hooks
+
+	// txPostLockInsideApplyHook is called each time right after locking the tx.
+	txPostLockInsideApplyHook func()
 
 	lg *zap.Logger
 }
@@ -185,7 +192,8 @@ func newBackend(bcfg BackendConfig) *backend {
 	// In future, may want to make buffering optional for low-concurrency systems
 	// or dynamically swap between buffered/non-buffered depending on workload.
 	b := &backend{
-		db: db,
+		bopts: bopts,
+		db:    db,
 
 		batchInterval: bcfg.BatchInterval,
 		batchLimit:    bcfg.BatchLimit,
@@ -227,6 +235,14 @@ func newBackend(bcfg BackendConfig) *backend {
 // The write result is isolated with other txs until the current one get committed.
 func (b *backend) BatchTx() BatchTx {
 	return b.batchTx
+}
+
+func (b *backend) SetTxPostLockInsideApplyHook(hook func()) {
+	// It needs to lock the batchTx, because the periodic commit
+	// may be accessing the txPostLockInsideApplyHook at the moment.
+	b.batchTx.lock()
+	defer b.batchTx.Unlock()
+	b.txPostLockInsideApplyHook = hook
 }
 
 func (b *backend) ReadTx() ReadTx { return b.readTx }
@@ -432,11 +448,13 @@ func (b *backend) Defrag() error {
 
 func (b *backend) defrag() error {
 	now := time.Now()
+	isDefragActive.Set(1)
+	defer isDefragActive.Set(0)
 
 	// TODO: make this non-blocking?
 	// lock batchTx to ensure nobody is using previous tx, and then
 	// close previous ongoing tx.
-	b.batchTx.Lock()
+	b.batchTx.LockOutsideApply()
 	defer b.batchTx.Unlock()
 
 	// lock database after lock tx to avoid deadlock.
@@ -509,13 +527,7 @@ func (b *backend) defrag() error {
 		b.lg.Fatal("failed to rename tmp database", zap.Error(err))
 	}
 
-	defragmentedBoltOptions := bolt.Options{}
-	if boltOpenOptions != nil {
-		defragmentedBoltOptions = *boltOpenOptions
-	}
-	defragmentedBoltOptions.Mlock = b.mlock
-
-	b.db, err = bolt.Open(dbp, 0600, &defragmentedBoltOptions)
+	b.db, err = bolt.Open(dbp, 0600, b.bopts)
 	if err != nil {
 		b.lg.Fatal("failed to open database", zap.String("path", dbp), zap.Error(err))
 	}

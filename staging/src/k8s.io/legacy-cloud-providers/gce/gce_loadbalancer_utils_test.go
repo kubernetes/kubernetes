@@ -73,7 +73,7 @@ func fakeLoadbalancerServiceHelper(lbType string, annotationKey string) *v1.Serv
 }
 
 var (
-	FilewallChangeMsg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
+	FirewallChangeMsg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 )
 
 func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v1.Node, error) {
@@ -112,11 +112,6 @@ func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v
 					Labels: map[string]string{
 						v1.LabelHostname:              name,
 						v1.LabelFailureDomainBetaZone: zoneName,
-					},
-				},
-				Status: v1.NodeStatus{
-					NodeInfo: v1.NodeSystemInfo{
-						KubeProxyVersion: "v1.7.2",
 					},
 				},
 			},

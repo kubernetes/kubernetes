@@ -96,6 +96,9 @@ func (c *Client) Stats(name string, request *v2.RequestOptions) (map[string]v2.C
 		"count":     []string{strconv.Itoa(request.Count)},
 		"recursive": []string{strconv.FormatBool(request.Recursive)},
 	}
+	if request.MaxAge != nil {
+		data.Set("max_age", request.MaxAge.String())
+	}
 
 	u = fmt.Sprintf("%s?%s", u, data.Encode())
 	if err := c.httpGetJSONData(&ret, nil, u, "stats"); err != nil {

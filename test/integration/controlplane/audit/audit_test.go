@@ -40,8 +40,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	utiltesting "k8s.io/client-go/util/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
@@ -246,7 +246,7 @@ func runTestWithVersion(t *testing.T, version string) {
 	if err != nil {
 		t.Fatalf("Failed to create audit log file: %v", err)
 	}
-	defer os.Remove(logFile.Name())
+	defer utiltesting.CloseAndRemove(t, logFile)
 
 	// start api server
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil,
@@ -258,7 +258,7 @@ func runTestWithVersion(t *testing.T, version string) {
 		framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
+	kubeclient, err := clientset.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -391,7 +391,7 @@ func runTestWithVersion(t *testing.T, version string) {
 	}
 }
 
-func testAudit(t *testing.T, version string, level auditinternal.Level, enableMutatingWebhook bool, namespace string, kubeclient kubernetes.Interface, logFile *os.File) {
+func testAudit(t *testing.T, version string, level auditinternal.Level, enableMutatingWebhook bool, namespace string, kubeclient clientset.Interface, logFile *os.File) {
 	var lastMissingReport string
 	createNamespace(t, kubeclient, namespace)
 
@@ -419,7 +419,7 @@ func testAudit(t *testing.T, version string, level auditinternal.Level, enableMu
 	}
 }
 
-func testAuditCrossGroupSubResource(t *testing.T, version string, expEvents []utils.AuditEvent, namespace string, kubeclient kubernetes.Interface, logFile *os.File) {
+func testAuditCrossGroupSubResource(t *testing.T, version string, expEvents []utils.AuditEvent, namespace string, kubeclient clientset.Interface, logFile *os.File) {
 	var (
 		lastMissingReport string
 		sa                *apiv1.ServiceAccount
@@ -526,7 +526,7 @@ func getExpectedEvents(level auditinternal.Level, enableMutatingWebhook bool, na
 // configMapOperations is a set of known operations performed on the configmap type
 // which correspond to the expected events.
 // This is shared by the dynamic test
-func configMapOperations(t *testing.T, kubeclient kubernetes.Interface, namespace string) {
+func configMapOperations(t *testing.T, kubeclient clientset.Interface, namespace string) {
 	// create, get, watch, update, patch, list and delete configmap.
 	configMap := &apiv1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -571,7 +571,7 @@ func configMapOperations(t *testing.T, kubeclient kubernetes.Interface, namespac
 	expectNoError(t, err, "failed to delete audit-configmap")
 }
 
-func tokenRequestOperations(t *testing.T, kubeClient kubernetes.Interface, namespace, name string) {
+func tokenRequestOperations(t *testing.T, kubeClient clientset.Interface, namespace, name string) {
 	var (
 		treq = &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
@@ -584,7 +584,7 @@ func tokenRequestOperations(t *testing.T, kubeClient kubernetes.Interface, names
 	expectNoError(t, err, "failed to create audit-tokenRequest")
 }
 
-func scaleOperations(t *testing.T, kubeClient kubernetes.Interface, namespace, name string) {
+func scaleOperations(t *testing.T, kubeClient clientset.Interface, namespace, name string) {
 	var (
 		scale = &autoscalingv1.Scale{
 			ObjectMeta: metav1.ObjectMeta{

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -141,10 +142,14 @@ func getDefaultClass(lister networkingv1listers.IngressClassLister) (*networking
 	if len(defaultClasses) == 0 {
 		return nil, nil
 	}
-
+	sort.Slice(defaultClasses, func(i, j int) bool {
+		if defaultClasses[i].CreationTimestamp.UnixNano() == defaultClasses[j].CreationTimestamp.UnixNano() {
+			return defaultClasses[i].Name < defaultClasses[j].Name
+		}
+		return defaultClasses[i].CreationTimestamp.UnixNano() > defaultClasses[j].CreationTimestamp.UnixNano()
+	})
 	if len(defaultClasses) > 1 {
-		klog.V(3).Infof("%d default IngressClasses were found, only 1 allowed", len(defaultClasses))
-		return nil, errors.NewInternalError(fmt.Errorf("%d default IngressClasses were found, only 1 allowed", len(defaultClasses)))
+		klog.V(4).Infof("%d default IngressClasses were found, choosing the newest: %s", len(defaultClasses), defaultClasses[0].Name)
 	}
 
 	return defaultClasses[0], nil

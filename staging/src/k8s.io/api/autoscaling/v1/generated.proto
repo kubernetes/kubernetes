@@ -87,13 +87,13 @@ message ContainerResourceMetricStatus {
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 // +structType=atomic
 message CrossVersionObjectReference {
-  // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+  // kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   optional string kind = 1;
 
-  // Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
+  // name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
   optional string name = 2;
 
-  // API version of the referent
+  // apiVersion is the API version of the referent
   // +optional
   optional string apiVersion = 3;
 }
@@ -147,11 +147,11 @@ message HorizontalPodAutoscaler {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+  // spec defines the behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional
   optional HorizontalPodAutoscalerSpec spec = 2;
 
-  // current information about the autoscaler.
+  // status is the current information about the autoscaler.
   // +optional
   optional HorizontalPodAutoscalerStatus status = 3;
 }
@@ -186,7 +186,7 @@ message HorizontalPodAutoscalerList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // list of horizontal pod autoscaler objects.
+  // items is the list of horizontal pod autoscaler objects.
   repeated HorizontalPodAutoscaler items = 2;
 }
 
@@ -204,10 +204,10 @@ message HorizontalPodAutoscalerSpec {
   // +optional
   optional int32 minReplicas = 2;
 
-  // upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
+  // maxReplicas is the upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
   optional int32 maxReplicas = 3;
 
-  // target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
+  // targetCPUUtilizationPercentage is the target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
   // if not specified the default autoscaling policy will be used.
   // +optional
   optional int32 targetCPUUtilizationPercentage = 4;
@@ -215,22 +215,22 @@ message HorizontalPodAutoscalerSpec {
 
 // current status of a horizontal pod autoscaler
 message HorizontalPodAutoscalerStatus {
-  // most recent generation observed by this autoscaler.
+  // observedGeneration is the most recent generation observed by this autoscaler.
   // +optional
   optional int64 observedGeneration = 1;
 
-  // last time the HorizontalPodAutoscaler scaled the number of pods;
+  // lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods;
   // used by the autoscaler to control how often the number of pods is changed.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastScaleTime = 2;
 
-  // current number of replicas of pods managed by this autoscaler.
+  // currentReplicas is the current number of replicas of pods managed by this autoscaler.
   optional int32 currentReplicas = 3;
 
-  // desired number of replicas of pods managed by this autoscaler.
+  // desiredReplicas is the  desired number of replicas of pods managed by this autoscaler.
   optional int32 desiredReplicas = 4;
 
-  // current average CPU utilization over all pods, represented as a percentage of requested CPU,
+  // currentCPUUtilizationPercentage is the current average CPU utilization over all pods, represented as a percentage of requested CPU,
   // e.g. 70 means that an average pod is using now 70% of its requested CPU.
   // +optional
   optional int32 currentCPUUtilizationPercentage = 5;
@@ -264,7 +264,7 @@ message MetricSpec {
   // +optional
   optional ResourceMetricSource resource = 4;
 
-  // container resource refers to a resource metric (such as those specified in
+  // containerResource refers to a resource metric (such as those specified in
   // requests and limits) known to Kubernetes describing a single container in each pod of the
   // current scale target (e.g. CPU or memory). Such metrics are built in to
   // Kubernetes, and have special scaling options on top of those available
@@ -309,7 +309,7 @@ message MetricStatus {
   // +optional
   optional ResourceMetricStatus resource = 4;
 
-  // container resource refers to a resource metric (such as those specified in
+  // containerResource refers to a resource metric (such as those specified in
   // requests and limits) known to Kubernetes describing a single container in each pod in the
   // current scale target (e.g. CPU or memory). Such metrics are built in to
   // Kubernetes, and have special scaling options on top of those available
@@ -464,31 +464,31 @@ message Scale {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+  // spec defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional
   optional ScaleSpec spec = 2;
 
-  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
+  // status is the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
   // +optional
   optional ScaleStatus status = 3;
 }
 
 // ScaleSpec describes the attributes of a scale subresource.
 message ScaleSpec {
-  // desired number of instances for the scaled object.
+  // replicas is the desired number of instances for the scaled object.
   // +optional
   optional int32 replicas = 1;
 }
 
 // ScaleStatus represents the current status of a scale subresource.
 message ScaleStatus {
-  // actual number of observed instances of the scaled object.
+  // replicas is the actual number of observed instances of the scaled object.
   optional int32 replicas = 1;
 
-  // label query over pods that should match the replicas count. This is same
+  // selector is the label query over pods that should match the replicas count. This is same
   // as the label selector but in the string format to avoid introspection
   // by clients. The string will be in the same format as the query-param syntax.
-  // More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
+  // More info about label selectors: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
   // +optional
   optional string selector = 2;
 }

@@ -75,17 +75,17 @@ func (c *counterRaiser) IncreaseMetricsCounter(req *http.Request) {
 // NewDeprecatedCertificateRoundTripperWrapperConstructor returns a RoundTripper wrapper that's usable within ClientConfig.Wrap.
 //
 // It increases the `missingSAN` counter whenever:
-// 1. we get a x509.HostnameError with string `x509: certificate relies on legacy Common Name field`
-//    which indicates an error caused by the deprecation of Common Name field when veryfing remote
-//    hostname
-// 2. the server certificate in response contains no SAN. This indicates that this binary run
-//    with the GODEBUG=x509ignoreCN=0 in env
+//  1. we get a x509.HostnameError with string `x509: certificate relies on legacy Common Name field`
+//     which indicates an error caused by the deprecation of Common Name field when veryfing remote
+//     hostname
+//  2. the server certificate in response contains no SAN. This indicates that this binary run
+//     with the GODEBUG=x509ignoreCN=0 in env
 //
 // It increases the `sha1` counter whenever:
-// 1. we get a x509.InsecureAlgorithmError with string `SHA1`
-//    which indicates an error caused by an insecure SHA1 signature
-// 2. the server certificate in response contains a SHA1WithRSA or ECDSAWithSHA1 signature.
-//    This indicates that this binary run with the GODEBUG=x509sha1=1 in env
+//  1. we get a x509.InsecureAlgorithmError with string `SHA1`
+//     which indicates an error caused by an insecure SHA1 signature
+//  2. the server certificate in response contains a SHA1WithRSA or ECDSAWithSHA1 signature.
+//     This indicates that this binary run with the GODEBUG=x509sha1=1 in env
 func NewDeprecatedCertificateRoundTripperWrapperConstructor(missingSAN, sha1 *metrics.Counter) func(rt http.RoundTripper) http.RoundTripper {
 	return func(rt http.RoundTripper) http.RoundTripper {
 		return &x509DeprecatedCertificateMetricsRTWrapper{

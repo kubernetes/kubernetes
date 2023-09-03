@@ -5,6 +5,11 @@ Under windows platform, the Console API is used. Under other systems, ANSI text 
 */
 package ct
 
+import (
+	"io"
+	"os"
+)
+
 // Color is the type of color to be set.
 type Color int
 
@@ -20,6 +25,9 @@ const (
 	Cyan
 	White
 )
+
+// Writer is the io.Writer where ANSI escape codes will be written to
+var Writer io.Writer = os.Stdout
 
 // ResetColor resets the foreground and background to original colors
 func ResetColor() {

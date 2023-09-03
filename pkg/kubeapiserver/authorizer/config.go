@@ -23,6 +23,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
@@ -78,6 +79,10 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 		authorizers   []authorizer.Authorizer
 		ruleResolvers []authorizer.RuleResolver
 	)
+
+	// Add SystemPrivilegedGroup as an authorizing group
+	superuserAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+	authorizers = append(authorizers, superuserAuthorizer)
 
 	for _, authorizationMode := range config.AuthorizationModes {
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.

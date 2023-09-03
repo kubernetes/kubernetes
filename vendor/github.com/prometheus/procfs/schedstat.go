@@ -40,7 +40,7 @@ type Schedstat struct {
 	CPUs []*SchedstatCPU
 }
 
-// SchedstatCPU contains the values from one "cpu<N>" line
+// SchedstatCPU contains the values from one "cpu<N>" line.
 type SchedstatCPU struct {
 	CPUNum string
 
@@ -49,14 +49,14 @@ type SchedstatCPU struct {
 	RunTimeslices      uint64
 }
 
-// ProcSchedstat contains the values from /proc/<pid>/schedstat
+// ProcSchedstat contains the values from `/proc/<pid>/schedstat`.
 type ProcSchedstat struct {
 	RunningNanoseconds uint64
 	WaitingNanoseconds uint64
 	RunTimeslices      uint64
 }
 
-// Schedstat reads data from /proc/schedstat
+// Schedstat reads data from `/proc/schedstat`.
 func (fs FS) Schedstat() (*Schedstat, error) {
 	file, err := os.Open(fs.proc.Path("schedstat"))
 	if err != nil {

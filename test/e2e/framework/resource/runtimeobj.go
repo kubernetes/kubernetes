@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -43,18 +44,18 @@ var (
 
 // GetRuntimeObjectForKind returns a runtime.Object based on its GroupKind,
 // namespace and name.
-func GetRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, name string) (runtime.Object, error) {
+func GetRuntimeObjectForKind(ctx context.Context, c clientset.Interface, kind schema.GroupKind, ns, name string) (runtime.Object, error) {
 	switch kind {
 	case kindReplicationController:
-		return c.CoreV1().ReplicationControllers(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		return c.CoreV1().ReplicationControllers(ns).Get(ctx, name, metav1.GetOptions{})
 	case kindExtensionsReplicaSet, kindAppsReplicaSet:
-		return c.AppsV1().ReplicaSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		return c.AppsV1().ReplicaSets(ns).Get(ctx, name, metav1.GetOptions{})
 	case kindExtensionsDeployment, kindAppsDeployment:
-		return c.AppsV1().Deployments(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		return c.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
 	case kindExtensionsDaemonSet:
-		return c.AppsV1().DaemonSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		return c.AppsV1().DaemonSets(ns).Get(ctx, name, metav1.GetOptions{})
 	case kindBatchJob:
-		return c.BatchV1().Jobs(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		return c.BatchV1().Jobs(ns).Get(ctx, name, metav1.GetOptions{})
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting runtime object: %v", kind)
 	}
@@ -79,6 +80,12 @@ func GetSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *batchv1.Job:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *autoscalingv1.Scale:
+		selector, err := metav1.ParseToLabelSelector(typed.Status.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("Parsing selector for: %v encountered an error: %w", obj, err)
+		}
+		return metav1.LabelSelectorAsSelector(selector)
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting selector: %v", obj)
 	}
@@ -124,6 +131,8 @@ func GetReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 			return *typed.Spec.Parallelism, nil
 		}
 		return 0, nil
+	case *autoscalingv1.Scale:
+		return typed.Status.Replicas, nil
 	default:
 		return -1, fmt.Errorf("Unsupported kind when getting number of replicas: %v", obj)
 	}

@@ -18,6 +18,8 @@ package rest
 
 import (
 	authenticationv1 "k8s.io/api/authentication/v1"
+	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -25,6 +27,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/kubernetes/pkg/registry/authentication/selfsubjectreview"
 	"k8s.io/kubernetes/pkg/registry/authentication/tokenreview"
 )
 
@@ -43,6 +46,14 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
+	if storageMap := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1alpha1.SchemeGroupVersion.Version] = storageMap
+	}
+
+	if storageMap := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1beta1.SchemeGroupVersion.Version] = storageMap
+	}
+
 	if storageMap := p.v1Storage(apiResourceConfigSource, restOptionsGetter); len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1.SchemeGroupVersion.Version] = storageMap
 	}
@@ -58,7 +69,33 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		tokenReviewStorage := tokenreview.NewREST(p.Authenticator, p.APIAudiences)
 		storage[resource] = tokenReviewStorage
 	}
+	if resource := "selfsubjectreviews"; apiResourceConfigSource.ResourceEnabled(authenticationv1.SchemeGroupVersion.WithResource(resource)) {
+		selfSRStorage := selfsubjectreview.NewREST()
+		storage[resource] = selfSRStorage
+	}
 
+	return storage
+}
+
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	storage := map[string]rest.Storage{}
+
+	// selfsubjectreviews
+	if resource := "selfsubjectreviews"; apiResourceConfigSource.ResourceEnabled(authenticationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		selfSRStorage := selfsubjectreview.NewREST()
+		storage[resource] = selfSRStorage
+	}
+	return storage
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	storage := map[string]rest.Storage{}
+
+	// selfsubjectreviews
+	if resource := "selfsubjectreviews"; apiResourceConfigSource.ResourceEnabled(authenticationv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		selfSRStorage := selfsubjectreview.NewREST()
+		storage[resource] = selfSRStorage
+	}
 	return storage
 }
 

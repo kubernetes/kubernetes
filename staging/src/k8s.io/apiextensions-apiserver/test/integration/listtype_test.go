@@ -137,7 +137,7 @@ func TestListTypes(t *testing.T) {
 	}
 
 	t.Logf("Creating CR and expect list-type errors")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural})
 	invalidInstance := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(listTypeResourceInstance), &invalidInstance.Object); err != nil {
 		t.Fatal(err)

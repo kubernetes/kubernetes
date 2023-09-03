@@ -28,7 +28,9 @@ limitations under the License.
 // that efficiently convert between same-name types in the two
 // (internal, external) packages.  The generated functions include
 // ones named
-//     autoConvert_<pkg1>_<type>_To_<pkg2>_<type>
+//
+//	autoConvert_<pkg1>_<type>_To_<pkg2>_<type>
+//
 // for each such pair of types --- both with (pkg1,pkg2) =
 // (internal,external) and (pkg1,pkg2) = (external,internal).  The
 // generated conversion functions recurse on the structure of the data
@@ -43,7 +45,9 @@ limitations under the License.
 //
 // For each pair of types `conversion-gen` will also generate a
 // function named
-//     Convert_<pkg1>_<type>_To_<pkg2>_<type>
+//
+//	Convert_<pkg1>_<type>_To_<pkg2>_<type>
+//
 // if both of two conditions are met: (1) the destination package does
 // not contain a function of that name in a non-generated file and (2)
 // the generation of the corresponding autoConvert_...  function did
@@ -65,12 +69,16 @@ limitations under the License.
 // package's `doc.go` file (currently anywhere in that file is
 // acceptable, but the recommended location is above the `package`
 // statement), of the form:
-//   // +k8s:conversion-gen=<import-path-of-internal-package>
+//
+//	// +k8s:conversion-gen=<import-path-of-internal-package>
+//
 // This introduces a conversion task, for which the destination
 // package is the one containing the file with the tag and the tag
 // identifies a package containing internal types.  If there is also a
 // tag of the form
-//   // +k8s:conversion-gen-external-types=<import-path-of-external-package>
+//
+//	// +k8s:conversion-gen-external-types=<import-path-of-external-package>
+//
 // then it identifies the package containing the external types;
 // otherwise they are in the destination package.
 //
@@ -82,7 +90,8 @@ limitations under the License.
 //
 // When generating for a package, individual types or fields of structs may opt
 // out of Conversion generation by specifying a comment on the of the form:
-//   // +k8s:conversion-gen=false
+//
+//	// +k8s:conversion-gen=false
 package main
 
 import (
@@ -93,16 +102,11 @@ import (
 
 	generatorargs "k8s.io/code-generator/cmd/conversion-gen/args"
 	"k8s.io/code-generator/cmd/conversion-gen/generators"
-	"k8s.io/code-generator/pkg/util"
 )
 
 func main() {
 	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
-
-	// Override defaults.
-	// TODO: move this out of conversion-gen
-	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)

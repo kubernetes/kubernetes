@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +37,9 @@ type FakeCustomResourceDefinitions struct {
 	Fake *FakeApiextensionsV1beta1
 }
 
-var customresourcedefinitionsResource = schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1beta1", Resource: "customresourcedefinitions"}
+var customresourcedefinitionsResource = v1beta1.SchemeGroupVersion.WithResource("customresourcedefinitions")
 
-var customresourcedefinitionsKind = schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1beta1", Kind: "CustomResourceDefinition"}
+var customresourcedefinitionsKind = v1beta1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
 
 // Get takes name of the customResourceDefinition, and returns the corresponding customResourceDefinition object, and an error if there is any.
 func (c *FakeCustomResourceDefinitions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CustomResourceDefinition, err error) {
@@ -126,6 +128,49 @@ func (c *FakeCustomResourceDefinitions) DeleteCollection(ctx context.Context, op
 func (c *FakeCustomResourceDefinitions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CustomResourceDefinition, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, name, pt, data, subresources...), &v1beta1.CustomResourceDefinition{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.CustomResourceDefinition), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied customResourceDefinition.
+func (c *FakeCustomResourceDefinitions) Apply(ctx context.Context, customResourceDefinition *apiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CustomResourceDefinition, err error) {
+	if customResourceDefinition == nil {
+		return nil, fmt.Errorf("customResourceDefinition provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(customResourceDefinition)
+	if err != nil {
+		return nil, err
+	}
+	name := customResourceDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("customResourceDefinition.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, *name, types.ApplyPatchType, data), &v1beta1.CustomResourceDefinition{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.CustomResourceDefinition), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeCustomResourceDefinitions) ApplyStatus(ctx context.Context, customResourceDefinition *apiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CustomResourceDefinition, err error) {
+	if customResourceDefinition == nil {
+		return nil, fmt.Errorf("customResourceDefinition provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(customResourceDefinition)
+	if err != nil {
+		return nil, err
+	}
+	name := customResourceDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("customResourceDefinition.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, *name, types.ApplyPatchType, data, "status"), &v1beta1.CustomResourceDefinition{})
 	if obj == nil {
 		return nil, err
 	}

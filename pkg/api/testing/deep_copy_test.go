@@ -64,7 +64,7 @@ var benchmarkPod = api.Pod{
 		Containers: []api.Container{
 			{
 				Name:  "etcd-container",
-				Image: "k8s.gcr.io/etcd:2.0.9",
+				Image: "registry.k8s.io/etcd:2.0.9",
 				Command: []string{
 					"/usr/local/bin/etcd",
 					"--addr",
@@ -120,7 +120,7 @@ var benchmarkPod = api.Pod{
 				},
 				Ready:        true,
 				RestartCount: 0,
-				Image:        "k8s.gcr.io/etcd:2.0.9",
+				Image:        "registry.k8s.io/etcd:2.0.9",
 				ImageID:      "docker://b6b9a86dc06aa1361357ca1b105feba961f6a4145adca6c54e142c0be0fe87b0",
 				ContainerID:  "docker://3cbbf818f1addfc252957b4504f56ef2907a313fe6afc47fc75373674255d46d",
 			},

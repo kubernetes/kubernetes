@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -30,13 +31,14 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
@@ -95,15 +97,15 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 // - Makes sure the control plane images are available locally on the control-plane(s)
 // - Upgrades the control plane components
 // - Applies the other resources that'd be created with kubeadm init as well, like
-//   - Creating the RBAC rules for the bootstrap tokens and the cluster-info ConfigMap
-//   - Applying new CorDNS and kube-proxy manifests
 //   - Uploads the newly used configuration to the cluster ConfigMap
+//   - Creating the RBAC rules for the bootstrap tokens and the cluster-info ConfigMap
+//   - Applying new CoreDNS and kube-proxy manifests
 func runApply(flags *applyFlags, args []string) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, flags.dryRun, true)
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, flags.dryRun, true, &output.TextPrinter{}, loadConfig)
 	if err != nil {
 		return err
 	}
@@ -132,7 +134,7 @@ func runApply(flags *applyFlags, args []string) error {
 
 	// If the current session is interactive, ask the user whether they really want to upgrade.
 	if flags.sessionIsInteractive() {
-		if err := InteractivelyConfirmUpgrade("Are you sure you want to proceed with the upgrade?"); err != nil {
+		if err := cmdutil.InteractivelyConfirmAction("upgrade", "Are you sure you want to proceed?", os.Stdin); err != nil {
 			return err
 		}
 	}
@@ -141,7 +143,7 @@ func runApply(flags *applyFlags, args []string) error {
 		fmt.Println("[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster")
 		fmt.Println("[upgrade/prepull] This might take a minute or two, depending on the speed of your internet connection")
 		fmt.Println("[upgrade/prepull] You can also perform this action in beforehand using 'kubeadm config images pull'")
-		if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, sets.NewString(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
+		if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, sets.New(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
 			return err
 		}
 	} else {
@@ -155,31 +157,14 @@ func runApply(flags *applyFlags, args []string) error {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Removing the deprecated label %s='' from all control plane Nodes. "+
-		"After this step only the label %s='' will be present on control plane Nodes.\n",
-		kubeadmconstants.LabelNodeRoleOldControlPlane, kubeadmconstants.LabelNodeRoleControlPlane)
-	if err := upgrade.RemoveOldControlPlaneLabel(client); err != nil {
-		return err
-	}
-
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Adding the new taint %s to all control plane Nodes. "+
-		"After this step both taints %s and %s should be present on control plane Nodes.\n",
-		kubeadmconstants.ControlPlaneTaint.String(), kubeadmconstants.ControlPlaneTaint.String(),
-		kubeadmconstants.OldControlPlaneTaint.String())
-	if err := upgrade.AddNewControlPlaneTaint(client); err != nil {
-		return err
-	}
-
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.dryRun); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.patchesDir, flags.dryRun, flags.applyPlanFlags.out); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}
 
 	if flags.dryRun {
-		fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
+		fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 		return nil
 	}
 

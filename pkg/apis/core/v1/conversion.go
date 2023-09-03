@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/core"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -41,6 +42,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.restartPolicy",
 				"spec.schedulerName",
 				"spec.serviceAccountName",
+				"spec.hostNetwork",
 				"status.phase",
 				"status.podIP",
 				"status.podIPs",
@@ -303,6 +305,7 @@ func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s con
 		out.HostNetwork = in.SecurityContext.HostNetwork
 		out.HostIPC = in.SecurityContext.HostIPC
 		out.ShareProcessNamespace = in.SecurityContext.ShareProcessNamespace
+		out.HostUsers = in.SecurityContext.HostUsers
 	}
 
 	return nil
@@ -358,6 +361,7 @@ func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s con
 	out.SecurityContext.HostPID = in.HostPID
 	out.SecurityContext.HostIPC = in.HostIPC
 	out.SecurityContext.ShareProcessNamespace = in.ShareProcessNamespace
+	out.SecurityContext.HostUsers = in.HostUsers
 
 	return nil
 }
@@ -370,6 +374,11 @@ func Convert_v1_Pod_To_core_Pod(in *v1.Pod, out *core.Pod, s conversion.Scope) e
 	// drop init container annotations so they don't show up as differences when receiving requests from old clients
 	out.Annotations = dropInitContainerAnnotations(out.Annotations)
 
+	// Forcing the value of TerminationGracePeriodSeconds to 1 if it is negative.
+	// Just for Pod, not for PodSpec, because we don't want to change the behavior of the PodTemplate.
+	if in.Spec.TerminationGracePeriodSeconds != nil && *in.Spec.TerminationGracePeriodSeconds < 0 {
+		out.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(1)
+	}
 	return nil
 }
 
@@ -382,6 +391,11 @@ func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) e
 	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
 	out.Annotations = dropInitContainerAnnotations(out.Annotations)
 
+	// Forcing the value of TerminationGracePeriodSeconds to 1 if it is negative.
+	// Just for Pod, not for PodSpec, because we don't want to change the behavior of the PodTemplate.
+	if in.Spec.TerminationGracePeriodSeconds != nil && *in.Spec.TerminationGracePeriodSeconds < 0 {
+		out.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(1)
+	}
 	return nil
 }
 

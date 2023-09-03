@@ -43,6 +43,7 @@ rc=0
 
 # List of dependencies we need to avoid dragging back into kubernetes/kubernetes
 # Check if unwanted dependencies are removed
+# The array and map in `unwanted-dependencies.json` are in alphabetical order.
 go run k8s.io/kubernetes/cmd/dependencyverifier "${KUBE_ROOT}/hack/unwanted-dependencies.json"
 
 outdated=$(go list -m -json all | jq -r "
@@ -65,6 +66,20 @@ if [[ -n "${outdated}" ]]; then
   echo "${outdated}"
 fi
 
+noncanonical=$(go list -m -json all | jq -r "
+  select(.Replace.Version != null) |
+  select(.Path != .Replace.Path) |
+  select(.Path) |
+  \"  \(.Path) is replaced with \(.Replace.Path)\"
+")
+if [[ -n "${noncanonical}" ]]; then
+  echo ""
+  echo "These modules are pinned to non-canonical repos."
+  echo "Revert to using the canonical repo for these modules before merge"
+  echo ""
+  echo "${noncanonical}"
+fi
+
 unused=$(comm -23 \
   <(go mod edit -json | jq -r '.Replace[] | select(.New.Version != null) | .Old.Path' | sort) \
   <(go list -m -json all | jq -r .Path | sort))
@@ -74,9 +89,10 @@ if [[ -n "${unused}" ]]; then
   echo "${unused}" | xargs -L 1 echo 'GO111MODULE=on go mod edit -dropreplace'
 fi
 
-if [[ -n "${unused}${outdated}" ]]; then
+if [[ -n "${unused}${outdated}${noncanonical}" ]]; then
   rc=1
+else
+  echo "All pinned versions of checked dependencies match their preferred version."
 fi
 
-echo "All pinned versions of checked dependencies match their preferred version."
 exit $rc

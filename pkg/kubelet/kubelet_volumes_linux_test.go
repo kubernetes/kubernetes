@@ -21,7 +21,6 @@ package kubelet
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,7 +34,7 @@ import (
 )
 
 func validateDirExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
+	_, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
@@ -43,7 +42,7 @@ func validateDirExists(dir string) error {
 }
 
 func validateDirNotExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
+	_, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -54,6 +53,10 @@ func validateDirNotExists(dir string) error {
 }
 
 func TestCleanupOrphanedPodDirs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	testCases := map[string]struct {
 		pods         []*v1.Pod
 		prepareFunc  func(kubelet *Kubelet) error
@@ -142,7 +145,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 				if err := os.MkdirAll(volumePath, 0750); err != nil {
 					return err
 				}
-				return ioutil.WriteFile(filepath.Join(volumePath, "test.txt"), []byte("test1"), 0640)
+				return os.WriteFile(filepath.Join(volumePath, "test.txt"), []byte("test1"), 0640)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -156,7 +159,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 				if err := os.MkdirAll(subPath, 0750); err != nil {
 					return err
 				}
-				return ioutil.WriteFile(filepath.Join(subPath, "test.txt"), []byte("test1"), 0640)
+				return os.WriteFile(filepath.Join(subPath, "test.txt"), []byte("test1"), 0640)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")

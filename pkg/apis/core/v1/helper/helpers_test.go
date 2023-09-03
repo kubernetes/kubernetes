@@ -54,6 +54,7 @@ func TestIsNativeResource(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
 			t.Parallel()
 			v := IsNativeResource(tc.resourceName)
@@ -94,6 +95,8 @@ func TestHugePageSizeFromResourceName(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
+		i := i
+		tc := tc
 		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
 			t.Parallel()
 			v, err := HugePageSizeFromResourceName(tc.resourceName)
@@ -161,6 +164,8 @@ func TestHugePageSizeFromMedium(t *testing.T) {
 		},
 	}
 	for i, tc := range testCases {
+		i := i
+		tc := tc
 		t.Run(tc.description, func(t *testing.T) {
 			t.Parallel()
 			v, err := HugePageSizeFromMedium(tc.medium)
@@ -201,6 +206,7 @@ func TestIsOvercommitAllowed(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
 			t.Parallel()
 			v := IsOvercommitAllowed(tc.resourceName)
@@ -544,7 +550,7 @@ func TestNodeSelectorRequirementKeyExistsInNodeSelectorTerms(t *testing.T) {
 			exists: true,
 		},
 		{
-			name: "key existence in terms with one of the keys specfied",
+			name: "key existence in terms with one of the keys specified",
 			reqs: []v1.NodeSelectorRequirement{
 				{
 					Key:      "key1",

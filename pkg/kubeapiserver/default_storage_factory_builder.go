@@ -22,30 +22,28 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
 var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
-	{Group: "", Resource: "replicationcontrollers"}:        "controllers",
-	{Group: "", Resource: "endpoints"}:                     "services/endpoints",
-	{Group: "", Resource: "nodes"}:                         "minions",
-	{Group: "", Resource: "services"}:                      "services/specs",
-	{Group: "extensions", Resource: "ingresses"}:           "ingress",
-	{Group: "networking.k8s.io", Resource: "ingresses"}:    "ingress",
-	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
-	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
+	{Group: "", Resource: "replicationcontrollers"}:     "controllers",
+	{Group: "", Resource: "endpoints"}:                  "services/endpoints",
+	{Group: "", Resource: "nodes"}:                      "minions",
+	{Group: "", Resource: "services"}:                   "services/specs",
+	{Group: "extensions", Resource: "ingresses"}:        "ingress",
+	{Group: "networking.k8s.io", Resource: "ingresses"}: "ingress",
 }
 
 // DefaultWatchCacheSizes defines default resources for which watchcache
@@ -59,11 +57,23 @@ func DefaultWatchCacheSizes() map[schema.GroupResource]int {
 
 // NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
-
 	resources := []schema.GroupVersionResource{
-		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in
-		// 1.25.
-		apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
+		// If a resource has to be stored in a version that is not the
+		// latest, then it can be listed here. Usually this is the case
+		// when a new version for a resource gets introduced and a
+		// downgrade to an older apiserver that doesn't know the new
+		// version still needs to be supported for one release.
+		//
+		// Example from Kubernetes 1.24 where csistoragecapacities had just
+		// graduated to GA:
+		//
+		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
+		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
+		admissionregistration.Resource("validatingadmissionpolicies").WithVersion("v1beta1"),
+		admissionregistration.Resource("validatingadmissionpolicybindings").WithVersion("v1beta1"),
+		networking.Resource("clustercidrs").WithVersion("v1alpha1"),
+		networking.Resource("ipaddresses").WithVersion("v1alpha1"),
+		certificates.Resource("clustertrustbundles").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{
@@ -75,23 +85,22 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 
 // StorageFactoryConfig is a configuration for creating storage factory.
 type StorageFactoryConfig struct {
-	StorageConfig                    storagebackend.Config
-	APIResourceConfig                *serverstorage.ResourceConfig
-	DefaultResourceEncoding          *serverstorage.DefaultResourceEncodingConfig
-	DefaultStorageMediaType          string
-	Serializer                       runtime.StorageSerializer
-	ResourceEncodingOverrides        []schema.GroupVersionResource
-	EtcdServersOverrides             []string
-	EncryptionProviderConfigFilepath string
+	StorageConfig             storagebackend.Config
+	APIResourceConfig         *serverstorage.ResourceConfig
+	DefaultResourceEncoding   *serverstorage.DefaultResourceEncodingConfig
+	DefaultStorageMediaType   string
+	Serializer                runtime.StorageSerializer
+	ResourceEncodingOverrides []schema.GroupVersionResource
+	EtcdServersOverrides      []string
 }
 
 // Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.
-func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) (*completedStorageFactoryConfig, error) {
+// This method mutates the receiver (StorageFactoryConfig).  It must never mutate the inputs.
+func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) *completedStorageFactoryConfig {
 	c.StorageConfig = etcdOptions.StorageConfig
 	c.DefaultStorageMediaType = etcdOptions.DefaultStorageMediaType
 	c.EtcdServersOverrides = etcdOptions.EtcdServersOverrides
-	c.EncryptionProviderConfigFilepath = etcdOptions.EncryptionProviderConfigFilepath
-	return &completedStorageFactoryConfig{c}, nil
+	return &completedStorageFactoryConfig{c}
 }
 
 // completedStorageFactoryConfig is a wrapper around StorageFactoryConfig completed with etcd options.
@@ -132,15 +141,6 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 
 		servers := strings.Split(tokens[1], ";")
 		storageFactory.SetEtcdLocation(groupResource, servers)
-	}
-	if len(c.EncryptionProviderConfigFilepath) != 0 {
-		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(c.EncryptionProviderConfigFilepath)
-		if err != nil {
-			return nil, err
-		}
-		for groupResource, transformer := range transformerOverrides {
-			storageFactory.SetTransformer(groupResource, transformer)
-		}
 	}
 	return storageFactory, nil
 }

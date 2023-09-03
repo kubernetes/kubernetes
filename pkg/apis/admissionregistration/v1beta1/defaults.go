@@ -27,6 +27,30 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
+// SetDefaults_ValidatingAdmissionPolicySpec sets defaults for ValidatingAdmissionPolicySpec
+func SetDefaults_ValidatingAdmissionPolicySpec(obj *admissionregistrationv1beta1.ValidatingAdmissionPolicySpec) {
+	if obj.FailurePolicy == nil {
+		policy := admissionregistrationv1beta1.Fail
+		obj.FailurePolicy = &policy
+	}
+}
+
+// SetDefaults_MatchResources sets defaults for MatchResources
+func SetDefaults_MatchResources(obj *admissionregistrationv1beta1.MatchResources) {
+	if obj.MatchPolicy == nil {
+		policy := admissionregistrationv1beta1.Equivalent
+		obj.MatchPolicy = &policy
+	}
+	if obj.NamespaceSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.NamespaceSelector = &selector
+	}
+	if obj.ObjectSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.ObjectSelector = &selector
+	}
+}
+
 // SetDefaults_ValidatingWebhook sets defaults for webhook validating
 func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1beta1.ValidatingWebhook) {
 	if obj.FailurePolicy == nil {
@@ -97,17 +121,9 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebho
 	}
 }
 
-// SetDefaults_Rule sets defaults for webhook rule
-func SetDefaults_Rule(obj *admissionregistrationv1beta1.Rule) {
-	if obj.Scope == nil {
-		s := admissionregistrationv1beta1.AllScopes
-		obj.Scope = &s
-	}
-}
-
 // SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference
 func SetDefaults_ServiceReference(obj *admissionregistrationv1beta1.ServiceReference) {
 	if obj.Port == nil {
-		obj.Port = utilpointer.Int32Ptr(443)
+		obj.Port = utilpointer.Int32(443)
 	}
 }

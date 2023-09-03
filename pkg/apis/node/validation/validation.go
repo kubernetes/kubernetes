@@ -54,7 +54,7 @@ func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 
 func validateOverhead(overhead *node.Overhead, fldPath *field.Path) field.ErrorList {
 	// reuse the ResourceRequirements validation logic
-	return corevalidation.ValidateResourceRequirements(&core.ResourceRequirements{Limits: overhead.PodFixed}, fldPath,
+	return corevalidation.ValidateResourceRequirements(&core.ResourceRequirements{Limits: overhead.PodFixed}, nil, fldPath,
 		corevalidation.PodValidationOptions{})
 }
 

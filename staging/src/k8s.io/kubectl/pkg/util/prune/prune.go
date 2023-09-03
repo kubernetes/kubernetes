@@ -22,7 +22,32 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 )
+
+// default allowlist of namespaced resources
+var defaultNamespacedPruneResources = []Resource{
+	{"", "v1", "ConfigMap", true},
+	{"", "v1", "Endpoints", true},
+	{"", "v1", "PersistentVolumeClaim", true},
+	{"", "v1", "Pod", true},
+	{"", "v1", "ReplicationController", true},
+	{"", "v1", "Secret", true},
+	{"", "v1", "Service", true},
+	{"batch", "v1", "Job", true},
+	{"batch", "v1", "CronJob", true},
+	{"networking.k8s.io", "v1", "Ingress", true},
+	{"apps", "v1", "DaemonSet", true},
+	{"apps", "v1", "Deployment", true},
+	{"apps", "v1", "ReplicaSet", true},
+	{"apps", "v1", "StatefulSet", true},
+}
+
+// default allowlist of non-namespaced resources
+var defaultNonNamespacedPruneResources = []Resource{
+	{"", "v1", "Namespace", false},
+	{"", "v1", "PersistentVolume", false},
+}
 
 type Resource struct {
 	group      string
@@ -35,26 +60,15 @@ func (pr Resource) String() string {
 	return fmt.Sprintf("%v/%v, Kind=%v, Namespaced=%v", pr.group, pr.version, pr.kind, pr.namespaced)
 }
 
-func GetRESTMappings(mapper meta.RESTMapper, pruneResources []Resource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
+// if namespace is explicitly specified, the default allow list should not include non-namespaced resources.
+// if pruneResources is specified by user, respect the user setting.
+func GetRESTMappings(mapper meta.RESTMapper, pruneResources []Resource, namespaceSpecified bool) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
 	if len(pruneResources) == 0 {
-		// default allowlist
-		pruneResources = []Resource{
-			{"", "v1", "ConfigMap", true},
-			{"", "v1", "Endpoints", true},
-			{"", "v1", "Namespace", false},
-			{"", "v1", "PersistentVolumeClaim", true},
-			{"", "v1", "PersistentVolume", false},
-			{"", "v1", "Pod", true},
-			{"", "v1", "ReplicationController", true},
-			{"", "v1", "Secret", true},
-			{"", "v1", "Service", true},
-			{"batch", "v1", "Job", true},
-			{"batch", "v1", "CronJob", true},
-			{"networking.k8s.io", "v1", "Ingress", true},
-			{"apps", "v1", "DaemonSet", true},
-			{"apps", "v1", "Deployment", true},
-			{"apps", "v1", "ReplicaSet", true},
-			{"apps", "v1", "StatefulSet", true},
+		pruneResources = defaultNamespacedPruneResources
+		// TODO in kubectl v1.29, add back non-namespaced resource only if namespace is not specified
+		pruneResources = append(pruneResources, defaultNonNamespacedPruneResources...)
+		if namespaceSpecified {
+			klog.Warning("Deprecated: kubectl apply will no longer prune non-namespaced resources by default when used with the --namespace flag in a future release. To preserve the current behaviour, list the resources you want to target explicitly in the --prune-allowlist flag.")
 		}
 	}
 

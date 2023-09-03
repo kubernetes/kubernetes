@@ -94,7 +94,7 @@ func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Reque
 
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
-		errorMsg := fmt.Sprintf("unable to upgrade: unable to hijack response")
+		errorMsg := "unable to upgrade: unable to hijack response"
 		http.Error(w, errorMsg, http.StatusInternalServerError)
 		return nil
 	}

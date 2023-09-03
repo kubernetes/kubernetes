@@ -76,9 +76,10 @@ type pluginConfig struct {
 // If the file is not supplied, it defaults to ""
 // The format in a file:
 // podNodeSelectorPluginConfig:
-//  clusterDefaultNodeSelector: <node-selectors-labels>
-//  namespace1: <node-selectors-labels>
-//  namespace2: <node-selectors-labels>
+//
+//	clusterDefaultNodeSelector: <node-selectors-labels>
+//	namespace1: <node-selectors-labels>
+//	namespace2: <node-selectors-labels>
 func readConfig(config io.Reader) *pluginConfig {
 	defaultConfig := &pluginConfig{}
 	if config == nil || reflect.ValueOf(config).IsNil() {

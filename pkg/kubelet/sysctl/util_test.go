@@ -92,6 +92,6 @@ func TestConvertPodSysctlsVariableToDotsSeparator(t *testing.T) {
 	}
 
 	ConvertPodSysctlsVariableToDotsSeparator(securityContext)
-	assert.Equalf(t, securityContext.Sysctls, exceptSysctls, "The sysctls name was not converted correctly. got: %s, want: %s", securityContext.Sysctls, exceptSysctls)
+	assert.Equalf(t, exceptSysctls, securityContext.Sysctls, "The sysctls name was not converted correctly. got: %s, want: %s", securityContext.Sysctls, exceptSysctls)
 
 }

@@ -27,16 +27,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/drain"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 )
 
 type DrainCmdOptions struct {
@@ -48,7 +50,8 @@ type DrainCmdOptions struct {
 	drainer   *drain.Helper
 	nodeInfos []*resource.Info
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
+	WarningPrinter *printers.WarningPrinter
 }
 
 var (
@@ -60,7 +63,7 @@ var (
 		kubectl cordon foo`))
 )
 
-func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCordon(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
@@ -89,7 +92,7 @@ var (
 		kubectl uncordon foo`))
 )
 
-func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdUncordon(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
@@ -136,14 +139,14 @@ var (
 		![Workflow](https://kubernetes.io/images/docs/kubectl_drain.svg)`))
 
 	drainExample = templates.Examples(i18n.T(`
-		# Drain node "foo", even if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set on it
+		# Drain node "foo", even if there are pods not managed by a replication controller, replica set, job, daemon set, or stateful set on it
 		kubectl drain foo --force
 
-		# As above, but abort if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set, and use a grace period of 15 minutes
+		# As above, but abort if there are pods not managed by a replication controller, replica set, job, daemon set, or stateful set, and use a grace period of 15 minutes
 		kubectl drain foo --grace-period=900`))
 )
 
-func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainCmdOptions {
+func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *DrainCmdOptions {
 	o := &DrainCmdOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -154,28 +157,57 @@ func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 			ChunkSize:          cmdutil.DefaultChunkSize,
 		},
 	}
-	o.drainer.OnPodDeletedOrEvicted = o.onPodDeletedOrEvicted
+	o.drainer.OnPodDeletionOrEvictionFinished = o.onPodDeletionOrEvictionFinished
+	o.drainer.OnPodDeletionOrEvictionStarted = o.onPodDeletionOrEvictionStarted
 	return o
 }
 
-// onPodDeletedOrEvicted is called by drain.Helper, when the pod has been deleted or evicted
-func (o *DrainCmdOptions) onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction bool) {
+// onPodDeletionOrEvictionFinished is called by drain.Helper, when eviction/deletetion of the pod is finished
+func (o *DrainCmdOptions) onPodDeletionOrEvictionFinished(pod *corev1.Pod, usingEviction bool, err error) {
 	var verbStr string
 	if usingEviction {
-		verbStr = "evicted"
+		if err != nil {
+			verbStr = "eviction failed"
+		} else {
+			verbStr = "evicted"
+		}
 	} else {
-		verbStr = "deleted"
+		if err != nil {
+			verbStr = "deletion failed"
+		} else {
+			verbStr = "deleted"
+		}
 	}
 	printObj, err := o.ToPrinter(verbStr)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "error building printer: %v\n", err)
 		fmt.Fprintf(o.Out, "pod %s/%s %s\n", pod.Namespace, pod.Name, verbStr)
 	} else {
-		printObj(pod, o.Out)
+		_ = printObj(pod, o.Out)
 	}
 }
 
-func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+// onPodDeletionOrEvictionStarted is called by drain.Helper, when eviction/deletion of the pod is started
+func (o *DrainCmdOptions) onPodDeletionOrEvictionStarted(pod *corev1.Pod, usingEviction bool) {
+	if !klog.V(2).Enabled() {
+		return
+	}
+	var verbStr string
+	if usingEviction {
+		verbStr = "eviction started"
+	} else {
+		verbStr = "deletion started"
+	}
+	printObj, err := o.ToPrinter(verbStr)
+	if err != nil {
+		fmt.Fprintf(o.ErrOut, "error building printer: %v\n", err)
+		fmt.Fprintf(o.Out, "pod %s/%s %s\n", pod.Namespace, pod.Name, verbStr)
+	} else {
+		_ = printObj(pod, o.Out)
+	}
+}
+
+func NewCmdDrain(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewDrainCmdOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
@@ -223,11 +255,6 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.drainer.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
@@ -256,6 +283,11 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		}
 
 		return printer.PrintObj, nil
+	}
+
+	// Set default WarningPrinter if not already set.
+	if o.WarningPrinter == nil {
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
 	}
 
 	builder := f.NewBuilder().
@@ -338,7 +370,7 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 		return utilerrors.NewAggregate(errs)
 	}
 	if warnings := list.Warnings(); warnings != "" {
-		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", warnings)
+		o.WarningPrinter.Print(warnings)
 	}
 	if o.drainer.DryRunStrategy == cmdutil.DryRunClient {
 		for _, pod := range list.Pods() {
@@ -397,12 +429,6 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 				printObj(nodeInfo.Object, o.Out)
 			} else {
 				if o.drainer.DryRunStrategy != cmdutil.DryRunClient {
-					if o.drainer.DryRunStrategy == cmdutil.DryRunServer {
-						if err := o.drainer.DryRunVerifier.HasSupport(gvk); err != nil {
-							printError(err)
-							continue
-						}
-					}
 					err, patchErr := c.PatchOrReplace(o.drainer.Client, o.drainer.DryRunStrategy == cmdutil.DryRunServer)
 					if patchErr != nil {
 						printError(patchErr)

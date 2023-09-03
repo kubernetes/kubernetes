@@ -58,7 +58,7 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 		case LabelSelectorOpDoesNotExist:
 			op = selection.DoesNotExist
 		default:
-			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
+			return nil, fmt.Errorf("%q is not a valid label selector operator", expr.Operator)
 		}
 		r, err := labels.NewRequirement(expr.Key, op, append([]string(nil), expr.Values...))
 		if err != nil {

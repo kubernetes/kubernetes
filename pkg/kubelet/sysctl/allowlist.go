@@ -26,8 +26,7 @@ import (
 )
 
 const (
-	AnnotationInvalidReason = "InvalidSysctlAnnotation"
-	ForbiddenReason         = "SysctlForbidden"
+	ForbiddenReason = "SysctlForbidden"
 )
 
 // patternAllowlist takes a list of sysctls or sysctl patterns (ending in *) and
@@ -48,7 +47,7 @@ func NewAllowlist(patterns []string) (*patternAllowlist, error) {
 	}
 
 	for _, s := range patterns {
-		if !policyvalidation.IsValidSysctlPattern(s, true) {
+		if !policyvalidation.IsValidSysctlPattern(s) {
 			return nil, fmt.Errorf("sysctl %q must have at most %d characters and match regex %s",
 				s,
 				validation.SysctlMaxLength,
@@ -117,13 +116,8 @@ func (w *patternAllowlist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 		}
 	}
 
-	var hostNet, hostIPC bool
-	if pod.Spec.SecurityContext != nil {
-		hostNet = pod.Spec.HostNetwork
-		hostIPC = pod.Spec.HostIPC
-	}
 	for _, s := range pod.Spec.SecurityContext.Sysctls {
-		if err := w.validateSysctl(s.Name, hostNet, hostIPC); err != nil {
+		if err := w.validateSysctl(s.Name, pod.Spec.HostNetwork, pod.Spec.HostIPC); err != nil {
 			return lifecycle.PodAdmitResult{
 				Admit:   false,
 				Reason:  ForbiddenReason,

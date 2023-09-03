@@ -20,13 +20,17 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/utils/cpuset"
 )
 
 const (
@@ -41,14 +45,19 @@ const (
 
 // SMTAlignmentError represents an error due to SMT alignment
 type SMTAlignmentError struct {
-	RequestedCPUs int
-	CpusPerCore   int
+	RequestedCPUs         int
+	CpusPerCore           int
+	AvailablePhysicalCPUs int
 }
 
 func (e SMTAlignmentError) Error() string {
+	if e.AvailablePhysicalCPUs > 0 {
+		return fmt.Sprintf("SMT Alignment Error: not enough free physical CPUs: available physical CPUs = %d, requested CPUs = %d, CPUs per core = %d", e.AvailablePhysicalCPUs, e.RequestedCPUs, e.CpusPerCore)
+	}
 	return fmt.Sprintf("SMT Alignment Error: requested %d cpus not multiple cpus per core = %d", e.RequestedCPUs, e.CpusPerCore)
 }
 
+// Type returns human-readable type of this error. Used in the admission control to populate Admission Failure reason.
 func (e SMTAlignmentError) Type() string {
 	return ErrorSMTAlignment
 }
@@ -65,24 +74,24 @@ func (e SMTAlignmentError) Type() string {
 //
 // The static policy maintains the following sets of logical CPUs:
 //
-// - SHARED: Burstable, BestEffort, and non-integral Guaranteed containers
-//   run here. Initially this contains all CPU IDs on the system. As
-//   exclusive allocations are created and destroyed, this CPU set shrinks
-//   and grows, accordingly. This is stored in the state as the default
-//   CPU set.
+//   - SHARED: Burstable, BestEffort, and non-integral Guaranteed containers
+//     run here. Initially this contains all CPU IDs on the system. As
+//     exclusive allocations are created and destroyed, this CPU set shrinks
+//     and grows, accordingly. This is stored in the state as the default
+//     CPU set.
 //
-// - RESERVED: A subset of the shared pool which is not exclusively
-//   allocatable. The membership of this pool is static for the lifetime of
-//   the Kubelet. The size of the reserved pool is
-//   ceil(systemreserved.cpu + kubereserved.cpu).
-//   Reserved CPUs are taken topologically starting with lowest-indexed
-//   physical core, as reported by cAdvisor.
+//   - RESERVED: A subset of the shared pool which is not exclusively
+//     allocatable. The membership of this pool is static for the lifetime of
+//     the Kubelet. The size of the reserved pool is
+//     ceil(systemreserved.cpu + kubereserved.cpu).
+//     Reserved CPUs are taken topologically starting with lowest-indexed
+//     physical core, as reported by cAdvisor.
 //
-// - ASSIGNABLE: Equal to SHARED - RESERVED. Exclusive CPUs are allocated
-//   from this pool.
+//   - ASSIGNABLE: Equal to SHARED - RESERVED. Exclusive CPUs are allocated
+//     from this pool.
 //
-// - EXCLUSIVE ALLOCATIONS: CPU sets assigned exclusively to one container.
-//   These are stored as explicit assignments in the state.
+//   - EXCLUSIVE ALLOCATIONS: CPU sets assigned exclusively to one container.
+//     These are stored as explicit assignments in the state.
 //
 // When an exclusive allocation is made, the static policy also updates the
 // default cpuset in the state abstraction. The CPU manager's periodic
@@ -95,7 +104,13 @@ type staticPolicy struct {
 	// cpu socket topology
 	topology *topology.CPUTopology
 	// set of CPUs that is not available for exclusive assignment
-	reserved cpuset.CPUSet
+	reservedCPUs cpuset.CPUSet
+	// Superset of reservedCPUs. It includes not just the reservedCPUs themselves,
+	// but also any siblings of those reservedCPUs on the same physical die.
+	// NOTE: If the reserved set includes full physical CPUs from the beginning
+	// (e.g. only reserved pairs of core siblings) this set is expected to be
+	// identical to the reserved set.
+	reservedPhysicalCPUs cpuset.CPUSet
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
 	// set of CPUs to reuse across allocations in a pod
@@ -112,6 +127,10 @@ var _ Policy = &staticPolicy{}
 // container process starts.
 func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cpuPolicyOptions map[string]string) (Policy, error) {
 	opts, err := NewStaticPolicyOptions(cpuPolicyOptions)
+	if err != nil {
+		return nil, err
+	}
+	err = ValidateStaticPolicyOptions(opts, topology, affinity)
 	if err != nil {
 		return nil, err
 	}
@@ -143,8 +162,18 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		return nil, err
 	}
 
-	klog.InfoS("Reserved CPUs not available for exclusive assignment", "reservedSize", reserved.Size(), "reserved", reserved)
-	policy.reserved = reserved
+	var reservedPhysicalCPUs cpuset.CPUSet
+	for _, cpu := range reserved.UnsortedList() {
+		core, err := topology.CPUCoreID(cpu)
+		if err != nil {
+			return nil, fmt.Errorf("[cpumanager] unable to build the reserved physical CPUs from the reserved set: %w", err)
+		}
+		reservedPhysicalCPUs = reservedPhysicalCPUs.Union(topology.CPUDetails.CPUsInCores(core))
+	}
+
+	klog.InfoS("Reserved CPUs not available for exclusive assignment", "reservedSize", reserved.Size(), "reserved", reserved, "reservedPhysicalCPUs", reservedPhysicalCPUs)
+	policy.reservedCPUs = reserved
+	policy.reservedPhysicalCPUs = reservedPhysicalCPUs
 
 	return policy, nil
 }
@@ -180,9 +209,9 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// 1. Check if the reserved cpuset is not part of default cpuset because:
 	// - kube/system reserved have changed (increased) - may lead to some containers not being able to start
 	// - user tampered with file
-	if !p.reserved.Intersection(tmpDefaultCPUset).Equals(p.reserved) {
+	if !p.reservedCPUs.Intersection(tmpDefaultCPUset).Equals(p.reservedCPUs) {
 		return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
-			p.reserved.String(), tmpDefaultCPUset.String())
+			p.reservedCPUs.String(), tmpDefaultCPUset.String())
 	}
 
 	// 2. Check if state for static policy is consistent
@@ -210,7 +239,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 			tmpCPUSets = append(tmpCPUSets, cset)
 		}
 	}
-	totalKnownCPUs = totalKnownCPUs.UnionAll(tmpCPUSets)
+	totalKnownCPUs = totalKnownCPUs.Union(tmpCPUSets...)
 	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
 			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
@@ -219,9 +248,18 @@ func (p *staticPolicy) validateState(s state.State) error {
 	return nil
 }
 
-// GetAllocatableCPUs returns the set of unassigned CPUs minus the reserved set.
+// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 func (p *staticPolicy) GetAllocatableCPUs(s state.State) cpuset.CPUSet {
-	return s.GetDefaultCPUSet().Difference(p.reserved)
+	return p.topology.CPUDetails.CPUs().Difference(p.reservedCPUs)
+}
+
+// GetAvailableCPUs returns the set of unassigned CPUs minus the reserved set.
+func (p *staticPolicy) GetAvailableCPUs(s state.State) cpuset.CPUSet {
+	return s.GetDefaultCPUSet().Difference(p.reservedCPUs)
+}
+
+func (p *staticPolicy) GetAvailablePhysicalCPUs(s state.State) cpuset.CPUSet {
+	return s.GetDefaultCPUSet().Difference(p.reservedPhysicalCPUs)
 }
 
 func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, cset cpuset.CPUSet) {
@@ -233,7 +271,7 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	}
 	// If no cpuset exists for cpusToReuse by this pod yet, create one.
 	if _, ok := p.cpusToReuse[string(pod.UID)]; !ok {
-		p.cpusToReuse[string(pod.UID)] = cpuset.NewCPUSet()
+		p.cpusToReuse[string(pod.UID)] = cpuset.New()
 	}
 	// Check if the container is an init container.
 	// If so, add its cpuset to the cpuset of reusable CPUs for any new allocations.
@@ -248,12 +286,25 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	p.cpusToReuse[string(pod.UID)] = p.cpusToReuse[string(pod.UID)].Difference(cset)
 }
 
-func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
-	if numCPUs := p.guaranteedCPUs(pod, container); numCPUs != 0 {
-		klog.InfoS("Static policy: Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
-		// container belongs in an exclusively allocated pool
+func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+	numCPUs := p.guaranteedCPUs(pod, container)
+	if numCPUs == 0 {
+		// container belongs in the shared pool (nothing to do; use default cpuset)
+		return nil
+	}
 
-		if p.options.FullPhysicalCPUsOnly && ((numCPUs % p.topology.CPUsPerCore()) != 0) {
+	klog.InfoS("Static policy: Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
+	// container belongs in an exclusively allocated pool
+	metrics.CPUManagerPinningRequestsTotal.Inc()
+	defer func() {
+		if rerr != nil {
+			metrics.CPUManagerPinningErrorsTotal.Inc()
+		}
+	}()
+
+	if p.options.FullPhysicalCPUsOnly {
+		CPUsPerCore := p.topology.CPUsPerCore()
+		if (numCPUs % CPUsPerCore) != 0 {
 			// Since CPU Manager has been enabled requesting strict SMT alignment, it means a guaranteed pod can only be admitted
 			// if the CPU requested is a multiple of the number of virtual cpus per physical cores.
 			// In case CPU request is not a multiple of the number of virtual cpus per physical cores the Pod will be put
@@ -265,37 +316,50 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 			// CPUs on a physical core. Allocation of individual threads would never have to occur.
 			return SMTAlignmentError{
 				RequestedCPUs: numCPUs,
-				CpusPerCore:   p.topology.CPUsPerCore(),
+				CpusPerCore:   CPUsPerCore,
 			}
 		}
-		if cpuset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
-			p.updateCPUsToReuse(pod, container, cpuset)
-			klog.InfoS("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
-			return nil
+
+		availablePhysicalCPUs := p.GetAvailablePhysicalCPUs(s).Size()
+
+		// It's legal to reserve CPUs which are not core siblings. In this case the CPU allocator can descend to single cores
+		// when picking CPUs. This will void the guarantee of FullPhysicalCPUsOnly. To prevent this, we need to additionally consider
+		// all the core siblings of the reserved CPUs as unavailable when computing the free CPUs, before to start the actual allocation.
+		// This way, by construction all possible CPUs allocation whose number is multiple of the SMT level are now correct again.
+		if numCPUs > availablePhysicalCPUs {
+			return SMTAlignmentError{
+				RequestedCPUs:         numCPUs,
+				CpusPerCore:           CPUsPerCore,
+				AvailablePhysicalCPUs: availablePhysicalCPUs,
+			}
 		}
-
-		// Call Topology Manager to get the aligned socket affinity across all hint providers.
-		hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
-		klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
-
-		// Allocate CPUs according to the NUMA affinity contained in the hint.
-		cpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
-		if err != nil {
-			klog.ErrorS(err, "Unable to allocate CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
-			return err
-		}
-		s.SetCPUSet(string(pod.UID), container.Name, cpuset)
-		p.updateCPUsToReuse(pod, container, cpuset)
-
 	}
-	// container belongs in the shared pool (nothing to do; use default cpuset)
+	if cpuset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+		p.updateCPUsToReuse(pod, container, cpuset)
+		klog.InfoS("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
+		return nil
+	}
+
+	// Call Topology Manager to get the aligned socket affinity across all hint providers.
+	hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
+	klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
+
+	// Allocate CPUs according to the NUMA affinity contained in the hint.
+	cpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
+	if err != nil {
+		klog.ErrorS(err, "Unable to allocate CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
+		return err
+	}
+	s.SetCPUSet(string(pod.UID), container.Name, cpuset)
+	p.updateCPUsToReuse(pod, container, cpuset)
+
 	return nil
 }
 
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
 func getAssignedCPUsOfSiblings(s state.State, podUID string, containerName string) cpuset.CPUSet {
 	assignments := s.GetCPUAssignments()
-	cset := cpuset.NewCPUSet()
+	cset := cpuset.New()
 	for name, cpus := range assignments[podUID] {
 		if containerName == name {
 			continue
@@ -320,15 +384,12 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bitmask.BitMask, reusableCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
 	klog.InfoS("AllocateCPUs", "numCPUs", numCPUs, "socket", numaAffinity)
 
-	allocatableCPUs := p.GetAllocatableCPUs(s).Union(reusableCPUs)
+	allocatableCPUs := p.GetAvailableCPUs(s).Union(reusableCPUs)
 
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
-	result := cpuset.NewCPUSet()
+	result := cpuset.New()
 	if numaAffinity != nil {
-		alignedCPUs := cpuset.NewCPUSet()
-		for _, numaNodeID := range numaAffinity.GetBits() {
-			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
-		}
+		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
 
 		numAlignedToAlloc := alignedCPUs.Size()
 		if numCPUs < numAlignedToAlloc {
@@ -337,7 +398,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 
 		alignedCPUs, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
 		if err != nil {
-			return cpuset.NewCPUSet(), err
+			return cpuset.New(), err
 		}
 
 		result = result.Union(alignedCPUs)
@@ -346,7 +407,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
 	remainingCPUs, err := p.takeByTopology(allocatableCPUs.Difference(result), numCPUs-result.Size())
 	if err != nil {
-		return cpuset.NewCPUSet(), err
+		return cpuset.New(), err
 	}
 	result = result.Union(remainingCPUs)
 
@@ -362,6 +423,15 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 		return 0
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
+	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
+	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
+	// We should return this value because this is what kubelet agreed to allocate for the container
+	// and the value configured with runtime.
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+			cpuQuantity = cs.AllocatedResources[v1.ResourceCPU]
+		}
+	}
 	if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
 		return 0
 	}
@@ -441,7 +511,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 	}
 
 	// Get a list of available CPUs.
-	available := p.GetAllocatableCPUs(s)
+	available := p.GetAvailableCPUs(s)
 
 	// Get a list of reusable CPUs (e.g. CPUs reused from initContainers).
 	// It should be an empty CPUSet for a newly created pod.
@@ -468,7 +538,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 		return nil
 	}
 
-	assignedCPUs := cpuset.NewCPUSet()
+	assignedCPUs := cpuset.New()
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		requestedByContainer := p.guaranteedCPUs(pod, &container)
 		// Short circuit to regenerate the same hints if there are already
@@ -496,7 +566,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 	}
 
 	// Get a list of available CPUs.
-	available := p.GetAllocatableCPUs(s)
+	available := p.GetAvailableCPUs(s)
 
 	// Get a list of reusable CPUs (e.g. CPUs reused from initContainers).
 	// It should be an empty CPUSet for a newly created pod.
@@ -514,7 +584,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 	}
 }
 
-// generateCPUtopologyHints generates a set of TopologyHints given the set of
+// generateCPUTopologyHints generates a set of TopologyHints given the set of
 // available CPUs and the number of CPUs being requested.
 //
 // It follows the convention of marking all hints that have the same number of
@@ -526,7 +596,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 
 	// Iterate through all combinations of numa nodes bitmask and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().ToSlice(), func(mask bitmask.BitMask) {
+	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().List(), func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
 		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
@@ -536,7 +606,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 		// Then check to see if we have enough CPUs available on the current
 		// numa node bitmask to satisfy the CPU request.
 		numMatching := 0
-		for _, c := range reusableCPUs.ToSlice() {
+		for _, c := range reusableCPUs.List() {
 			// Disregard this mask if its NUMANode isn't part of it.
 			if !mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
 				return
@@ -546,7 +616,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 
 		// Finally, check to see if enough available CPUs remain on the current
 		// NUMA node combination to satisfy the CPU request.
-		for _, c := range availableCPUs.ToSlice() {
+		for _, c := range availableCPUs.List() {
 			if mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
 				numMatching++
 			}
@@ -571,10 +641,50 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	// to the minAffinitySize. Only those with an equal number of bits set (and
 	// with a minimal set of numa nodes) will be considered preferred.
 	for i := range hints {
+		if p.options.AlignBySocket && p.isHintSocketAligned(hints[i], minAffinitySize) {
+			hints[i].Preferred = true
+			continue
+		}
 		if hints[i].NUMANodeAffinity.Count() == minAffinitySize {
 			hints[i].Preferred = true
 		}
 	}
 
 	return hints
+}
+
+// isHintSocketAligned function return true if numa nodes in hint are socket aligned.
+func (p *staticPolicy) isHintSocketAligned(hint topologymanager.TopologyHint, minAffinitySize int) bool {
+	numaNodesBitMask := hint.NUMANodeAffinity.GetBits()
+	numaNodesPerSocket := p.topology.NumNUMANodes / p.topology.NumSockets
+	if numaNodesPerSocket == 0 {
+		return false
+	}
+	// minSockets refers to minimum number of socket required to satify allocation.
+	// A hint is considered socket aligned if sockets across which numa nodes span is equal to minSockets
+	minSockets := (minAffinitySize + numaNodesPerSocket - 1) / numaNodesPerSocket
+	return p.topology.CPUDetails.SocketsInNUMANodes(numaNodesBitMask...).Size() == minSockets
+}
+
+// getAlignedCPUs return set of aligned CPUs based on numa affinity mask and configured policy options.
+func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableCPUs cpuset.CPUSet) cpuset.CPUSet {
+	alignedCPUs := cpuset.New()
+	numaBits := numaAffinity.GetBits()
+
+	// If align-by-socket policy option is enabled, NUMA based hint is expanded to
+	// socket aligned hint. It will ensure that first socket aligned available CPUs are
+	// allocated before we try to find CPUs across socket to satisfy allocation request.
+	if p.options.AlignBySocket {
+		socketBits := p.topology.CPUDetails.SocketsInNUMANodes(numaBits...).UnsortedList()
+		for _, socketID := range socketBits {
+			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInSockets(socketID)))
+		}
+		return alignedCPUs
+	}
+
+	for _, numaNodeID := range numaBits {
+		alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
+	}
+
+	return alignedCPUs
 }

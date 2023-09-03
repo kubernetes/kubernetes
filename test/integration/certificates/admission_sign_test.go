@@ -60,6 +60,11 @@ func TestCSRSignerNameSigningPlugin(t *testing.T) {
 			defer s.TearDownFn()
 			client := clientset.NewForConfigOrDie(s.ClientConfig)
 
+			// Drop the default RBAC superuser permissions to rely on the internal superuser authorizer
+			if err := client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "cluster-admin", metav1.DeleteOptions{}); err != nil {
+				t.Fatal(err)
+			}
+
 			// Grant 'test-user' permission to sign CertificateSigningRequests with the specified signerName.
 			const username = "test-user"
 			grantUserPermissionToSignFor(t, client, username, test.allowedSignerName)
@@ -100,6 +105,12 @@ dgA7Fe4tMAoGCCqGSM49BAMCA0gAMEUCIQCTT1YWQZaAqfQ2oBxzOkJE2BqLFxhz
 -----END CERTIFICATE-----
 Trailing non-PEM content
 `)
+
+			// superuser should always have permission to sign; dry-run so we don't actually modify the CSR so the non-superuser can attempt as well
+			if _, err := client.CertificatesV1().CertificateSigningRequests().UpdateStatus(context.TODO(), csr, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
+				t.Errorf("expected no superuser error but got: %v", err)
+			}
+
 			_, err := testuserClient.CertificatesV1().CertificateSigningRequests().UpdateStatus(context.TODO(), csr, metav1.UpdateOptions{})
 			if err != nil && test.error != err.Error() {
 				t.Errorf("expected error %q but got: %v", test.error, err)

@@ -1,0 +1,161 @@
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "nameValue",
+    "generateName": "generateNameValue",
+    "namespace": "namespaceValue",
+    "selfLink": "selfLinkValue",
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue",
+    "generation": 7,
+    "creationTimestamp": "2008-01-01T01:01:01Z",
+    "deletionTimestamp": "2009-01-01T01:01:01Z",
+    "deletionGracePeriodSeconds": 10,
+    "labels": {
+      "labelsKey": "labelsValue"
+    },
+    "annotations": {
+      "annotationsKey": "annotationsValue"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "apiVersionValue",
+        "kind": "kindValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "controller": true,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "finalizersValue"
+    ],
+    "managedFields": [
+      {
+        "manager": "managerValue",
+        "operation": "operationValue",
+        "apiVersion": "apiVersionValue",
+        "time": "2004-01-01T01:01:01Z",
+        "fieldsType": "fieldsTypeValue",
+        "fieldsV1": {},
+        "subresource": "subresourceValue"
+      }
+    ]
+  },
+  "spec": {
+    "podCIDR": "podCIDRValue",
+    "podCIDRs": [
+      "podCIDRsValue"
+    ],
+    "providerID": "providerIDValue",
+    "unschedulable": true,
+    "taints": [
+      {
+        "key": "keyValue",
+        "value": "valueValue",
+        "effect": "effectValue",
+        "timeAdded": "2004-01-01T01:01:01Z"
+      }
+    ],
+    "configSource": {
+      "configMap": {
+        "namespace": "namespaceValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "resourceVersion": "resourceVersionValue",
+        "kubeletConfigKey": "kubeletConfigKeyValue"
+      }
+    },
+    "externalID": "externalIDValue"
+  },
+  "status": {
+    "capacity": {
+      "capacityKey": "0"
+    },
+    "allocatable": {
+      "allocatableKey": "0"
+    },
+    "phase": "phaseValue",
+    "conditions": [
+      {
+        "type": "typeValue",
+        "status": "statusValue",
+        "lastHeartbeatTime": "2003-01-01T01:01:01Z",
+        "lastTransitionTime": "2004-01-01T01:01:01Z",
+        "reason": "reasonValue",
+        "message": "messageValue"
+      }
+    ],
+    "addresses": [
+      {
+        "type": "typeValue",
+        "address": "addressValue"
+      }
+    ],
+    "daemonEndpoints": {
+      "kubeletEndpoint": {
+        "Port": 1
+      }
+    },
+    "nodeInfo": {
+      "machineID": "machineIDValue",
+      "systemUUID": "systemUUIDValue",
+      "bootID": "bootIDValue",
+      "kernelVersion": "kernelVersionValue",
+      "osImage": "osImageValue",
+      "containerRuntimeVersion": "containerRuntimeVersionValue",
+      "kubeletVersion": "kubeletVersionValue",
+      "kubeProxyVersion": "kubeProxyVersionValue",
+      "operatingSystem": "operatingSystemValue",
+      "architecture": "architectureValue"
+    },
+    "images": [
+      {
+        "names": [
+          "namesValue"
+        ],
+        "sizeBytes": 2
+      }
+    ],
+    "volumesInUse": [
+      "volumesInUseValue"
+    ],
+    "volumesAttached": [
+      {
+        "name": "nameValue",
+        "devicePath": "devicePathValue"
+      }
+    ],
+    "config": {
+      "assigned": {
+        "configMap": {
+          "namespace": "namespaceValue",
+          "name": "nameValue",
+          "uid": "uidValue",
+          "resourceVersion": "resourceVersionValue",
+          "kubeletConfigKey": "kubeletConfigKeyValue"
+        }
+      },
+      "active": {
+        "configMap": {
+          "namespace": "namespaceValue",
+          "name": "nameValue",
+          "uid": "uidValue",
+          "resourceVersion": "resourceVersionValue",
+          "kubeletConfigKey": "kubeletConfigKeyValue"
+        }
+      },
+      "lastKnownGood": {
+        "configMap": {
+          "namespace": "namespaceValue",
+          "name": "nameValue",
+          "uid": "uidValue",
+          "resourceVersion": "resourceVersionValue",
+          "kubeletConfigKey": "kubeletConfigKeyValue"
+        }
+      },
+      "error": "errorValue"
+    }
+  }
+}

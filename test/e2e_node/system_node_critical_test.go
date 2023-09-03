@@ -17,11 +17,12 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
@@ -30,13 +31,13 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
 	f := framework.NewDefaultFramework("system-node-critical-pod-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true
 
@@ -49,9 +50,9 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 	})
 
 	ginkgo.Context("when create a system-node-critical pod", func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			diskConsumed := resource.MustParse("200Mi")
-			summary := eventuallyGetSummary()
+			summary := eventuallyGetSummary(ctx)
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -62,11 +63,11 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 			var staticPodName, mirrorPodName, podPath string
 			ns := kubeapi.NamespaceSystem
 
-			ginkgo.BeforeEach(func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
 				ginkgo.By("create a static system-node-critical pod")
 				staticPodName = "static-disk-hog-" + string(uuid.NewUUID())
 				mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
-				podPath = framework.TestContext.KubeletConfig.StaticPodPath
+				podPath = kubeletCfg.StaticPodPath
 				// define a static pod consuming disk gradually
 				// the upper limit is 1024 (iterations) * 10485760 bytes (10MB) = 10GB
 				err := createStaticSystemNodeCriticalPod(
@@ -76,25 +77,25 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 				ginkgo.By("wait for the mirror pod to be running")
-				gomega.Eventually(func() error {
-					return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
-				}, time.Minute, time.Second*2).Should(gomega.BeNil())
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				}, time.Minute, time.Second*2).Should(gomega.Succeed())
 			})
 
-			ginkgo.It("should not be evicted upon DiskPressure", func() {
+			ginkgo.It("should not be evicted upon DiskPressure", func(ctx context.Context) {
 				ginkgo.By("wait for the node to have DiskPressure condition")
-				gomega.Eventually(func() error {
-					if hasNodeCondition(f, v1.NodeDiskPressure) {
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					if hasNodeCondition(ctx, f, v1.NodeDiskPressure) {
 						return nil
 					}
 					msg := fmt.Sprintf("NodeCondition: %s not encountered yet", v1.NodeDiskPressure)
 					framework.Logf(msg)
 					return fmt.Errorf(msg)
-				}, time.Minute*2, time.Second*4).Should(gomega.BeNil())
+				}, time.Minute*2, time.Second*4).Should(gomega.Succeed())
 
 				ginkgo.By("check if it's running all the time")
-				gomega.Consistently(func() error {
-					err := checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					err := checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 					if err == nil {
 						framework.Logf("mirror pod %q is running", mirrorPodName)
 					} else {
@@ -103,7 +104,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 					return err
 				}, time.Minute*8, time.Second*4).ShouldNot(gomega.HaveOccurred())
 			})
-			ginkgo.AfterEach(func() {
+			ginkgo.AfterEach(func(ctx context.Context) {
 				defer func() {
 					if framework.TestContext.PrepullImages {
 						// The test may cause the prepulled images to be evicted,
@@ -116,17 +117,17 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 				ginkgo.By("wait for the mirror pod to disappear")
-				gomega.Eventually(func() error {
-					return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
-				}, time.Minute, time.Second*2).Should(gomega.BeNil())
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
+				}, time.Minute, time.Second*2).Should(gomega.Succeed())
 
 				ginkgo.By("making sure that node no longer has DiskPressure")
-				gomega.Eventually(func() error {
-					if hasNodeCondition(f, v1.NodeDiskPressure) {
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					if hasNodeCondition(ctx, f, v1.NodeDiskPressure) {
 						return fmt.Errorf("Conditions haven't returned to normal, node still has DiskPressure")
 					}
 					return nil
-				}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
+				}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.Succeed())
 			})
 		})
 	})
@@ -145,11 +146,11 @@ spec:
   containers:
   - name: %s
     image: %s
-    restartPolicy: %s
     command: ["sh", "-c", "i=0; while [ $i -lt %d ]; do %s i=$(($i+1)); done; while true; do sleep 5; done"]
+  restartPolicy: %s
 `
 	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, name, image, string(restart), iterations, command)
+	podYaml := fmt.Sprintf(template, name, namespace, name, image, iterations, command, string(restart))
 
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {

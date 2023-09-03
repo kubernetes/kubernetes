@@ -1,24 +1,31 @@
-// Copyright (c) 2014-2017 TSUYUSATO Kitsune
+// Copyright (c) 2014-2019 TSUYUSATO Kitsune
 // This software is released under the MIT License.
 // http://opensource.org/licenses/mit-license.php
 
 // Package heredoc provides creation of here-documents from raw strings.
 //
 // Golang supports raw-string syntax.
+//
 //     doc := `
 //     	Foo
 //     	Bar
 //     `
+//
 // But raw-string cannot recognize indentation. Thus such content is an indented string, equivalent to
+//
 //     "\n\tFoo\n\tBar\n"
+//
 // I dont't want this!
 //
 // However this problem is solved by package heredoc.
+//
 //     doc := heredoc.Doc(`
 //     	Foo
 //     	Bar
 //     `)
+//
 // Is equivalent to
+//
 //     "Foo\nBar\n"
 package heredoc
 
@@ -33,7 +40,7 @@ const maxInt = int(^uint(0) >> 1)
 // Doc returns un-indented string as here-document.
 func Doc(raw string) string {
 	skipFirstLine := false
-	if raw[0] == '\n' {
+	if len(raw) > 0 && raw[0] == '\n' {
 		raw = raw[1:]
 	} else {
 		skipFirstLine = true

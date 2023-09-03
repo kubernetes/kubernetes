@@ -23,19 +23,19 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	configv1 "k8s.io/kube-scheduler/config/v1"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -53,7 +53,7 @@ import (
 const (
 	// Duration the scheduler will wait before expiring an assumed pod.
 	// See issue #106361 for more details about this parameter and its value.
-	durationToExpireAssumedPod = 15 * time.Minute
+	durationToExpireAssumedPod time.Duration = 0
 )
 
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
@@ -72,11 +72,10 @@ type Scheduler struct {
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func() *framework.QueuedPodInfo
+	NextPod func() (*framework.QueuedPodInfo, error)
 
-	// Error is called if there is an error. It is passed the pod in
-	// question, and the error
-	Error func(*framework.QueuedPodInfo, error)
+	// FailureHandler is called upon a scheduling failure.
+	FailureHandler FailureHandlerFn
 
 	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
 	// Return a struct of ScheduleResult with the name of suggested host on success,
@@ -99,11 +98,25 @@ type Scheduler struct {
 	percentageOfNodesToScore int32
 
 	nextStartNodeIndex int
+
+	// logger *must* be initialized when creating a Scheduler,
+	// otherwise logging functions will access a nil sink and
+	// panic.
+	logger klog.Logger
+
+	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
+	registeredHandlers []cache.ResourceEventHandlerRegistration
+}
+
+func (sched *Scheduler) applyDefaultHandlers() {
+	sched.SchedulePod = sched.schedulePod
+	sched.FailureHandler = sched.handleSchedulingFailure
 }
 
 type schedulerOptions struct {
-	componentConfigVersion            string
-	kubeConfig                        *restclient.Config
+	componentConfigVersion string
+	kubeConfig             *restclient.Config
+	// Overridden by profile level percentageOfNodesToScore if set in v1.
 	percentageOfNodesToScore          int32
 	podInitialBackoffSeconds          int64
 	podMaxBackoffSeconds              int64
@@ -129,12 +142,14 @@ type ScheduleResult struct {
 	EvaluatedNodes int
 	// The number of nodes out of the evaluated ones that fit the pod.
 	FeasibleNodes int
+	// The nominating info for scheduling cycle.
+	nominatingInfo *framework.NominatingInfo
 }
 
 // WithComponentConfigVersion sets the component config version to the
 // KubeSchedulerConfiguration version used. The string should be the full
 // scheme group/version of the external type we converted from (for example
-// "kubescheduler.config.k8s.io/v1beta2")
+// "kubescheduler.config.k8s.io/v1")
 func WithComponentConfigVersion(apiVersion string) Option {
 	return func(o *schedulerOptions) {
 		o.componentConfigVersion = apiVersion
@@ -164,10 +179,13 @@ func WithParallelism(threads int32) Option {
 	}
 }
 
-// WithPercentageOfNodesToScore sets percentageOfNodesToScore for Scheduler, the default value is 50
-func WithPercentageOfNodesToScore(percentageOfNodesToScore int32) Option {
+// WithPercentageOfNodesToScore sets percentageOfNodesToScore for Scheduler.
+// The default value of 0 will use an adaptive percentage: 50 - (num of nodes)/125.
+func WithPercentageOfNodesToScore(percentageOfNodesToScore *int32) Option {
 	return func(o *schedulerOptions) {
-		o.percentageOfNodesToScore = percentageOfNodesToScore
+		if percentageOfNodesToScore != nil {
+			o.percentageOfNodesToScore = *percentageOfNodesToScore
+		}
 	}
 }
 
@@ -231,17 +249,15 @@ var defaultSchedulerOptions = schedulerOptions{
 }
 
 // New returns a Scheduler
-func New(client clientset.Interface,
+func New(ctx context.Context,
+	client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	recorderFactory profile.RecorderFactory,
-	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
-	stopEverything := stopCh
-	if stopEverything == nil {
-		stopEverything = wait.NeverStop
-	}
+	logger := klog.FromContext(ctx)
+	stopEverything := ctx.Done()
 
 	options := defaultSchedulerOptions
 	for _, opt := range opts {
@@ -249,7 +265,7 @@ func New(client clientset.Interface,
 	}
 
 	if options.applyDefaultProfile {
-		var versionedCfg v1beta3.KubeSchedulerConfiguration
+		var versionedCfg configv1.KubeSchedulerConfiguration
 		scheme.Scheme.Default(&versionedCfg)
 		cfg := schedulerapi.KubeSchedulerConfiguration{}
 		if err := scheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
@@ -265,7 +281,7 @@ func New(client clientset.Interface,
 
 	metrics.Register()
 
-	extenders, err := buildExtenders(options.extenders, options.profiles)
+	extenders, err := buildExtenders(logger, options.extenders, options.profiles)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't build extenders: %w", err)
 	}
@@ -273,22 +289,19 @@ func New(client clientset.Interface,
 	podLister := informerFactory.Core().V1().Pods().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 
-	// The nominator will be passed all the way to framework instantiation.
-	nominator := internalqueue.NewPodNominator(podLister)
 	snapshot := internalcache.NewEmptySnapshot()
-	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
+	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
 
-	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory,
+	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithKubeConfig(options.kubeConfig),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
-		frameworkruntime.WithPodNominator(nominator),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
-		frameworkruntime.WithClusterEventMap(clusterEventMap),
 		frameworkruntime.WithParallelism(int(options.parallelism)),
 		frameworkruntime.WithExtenders(extenders),
+		frameworkruntime.WithMetricsRecorder(metricsRecorder),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
@@ -298,95 +311,103 @@ func New(client clientset.Interface,
 		return nil, errors.New("at least one profile is required")
 	}
 
+	preEnqueuePluginMap := make(map[string][]framework.PreEnqueuePlugin)
+	queueingHintsPerProfile := make(internalqueue.QueueingHintMapPerProfile)
+	for profileName, profile := range profiles {
+		preEnqueuePluginMap[profileName] = profile.PreEnqueuePlugins()
+		queueingHintsPerProfile[profileName] = buildQueueingHintMap(profile.EnqueueExtensions())
+	}
+
 	podQueue := internalqueue.NewSchedulingQueue(
 		profiles[options.profiles[0].SchedulerName].QueueSortFunc(),
 		informerFactory,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(options.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(options.podMaxBackoffSeconds)*time.Second),
-		internalqueue.WithPodNominator(nominator),
-		internalqueue.WithClusterEventMap(clusterEventMap),
+		internalqueue.WithPodLister(podLister),
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
+		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
+		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
+		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
+		internalqueue.WithMetricsRecorder(*metricsRecorder),
 	)
 
-	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
+	for _, fwk := range profiles {
+		fwk.SetPodNominator(podQueue)
+	}
+
+	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod)
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(nodeLister, podLister, schedulerCache, podQueue)
-	debugger.ListenForSignal(stopEverything)
+	debugger.ListenForSignal(ctx)
 
-	sched := newScheduler(
-		schedulerCache,
-		extenders,
-		internalqueue.MakeNextPodFunc(podQueue),
-		MakeDefaultErrorFunc(client, podLister, podQueue, schedulerCache),
-		stopEverything,
-		podQueue,
-		profiles,
-		client,
-		snapshot,
-		options.percentageOfNodesToScore,
-	)
+	sched := &Scheduler{
+		Cache:                    schedulerCache,
+		client:                   client,
+		nodeInfoSnapshot:         snapshot,
+		percentageOfNodesToScore: options.percentageOfNodesToScore,
+		Extenders:                extenders,
+		StopEverything:           stopEverything,
+		SchedulingQueue:          podQueue,
+		Profiles:                 profiles,
+		logger:                   logger,
+	}
+	sched.NextPod = podQueue.Pop
+	sched.applyDefaultHandlers()
 
-	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
+	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(queueingHintsPerProfile)); err != nil {
+		return nil, fmt.Errorf("adding event handlers: %w", err)
+	}
 
 	return sched, nil
 }
 
-// Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
-func (sched *Scheduler) Run(ctx context.Context) {
-	sched.SchedulingQueue.Run()
-	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
-	sched.SchedulingQueue.Close()
+// defaultQueueingHintFn is the default queueing hint function.
+// It always returns QueueAfterBackoff as the queueing hint.
+var defaultQueueingHintFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) framework.QueueingHint {
+	return framework.QueueAfterBackoff
 }
 
-// MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.QueuedPodInfo, error) {
-	return func(podInfo *framework.QueuedPodInfo, err error) {
-		pod := podInfo.Pod
-		if err == ErrNoNodesAvailable {
-			klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
-		} else if fitError, ok := err.(*framework.FitError); ok {
-			// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
-			podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
-			klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
-		} else if apierrors.IsNotFound(err) {
-			klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", err)
-			if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
-				nodeName := errStatus.Status().Details.Name
-				// when node is not found, We do not remove the node right away. Trying again to get
-				// the node and if the node is still not found, then remove it from the scheduler cache.
-				_, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-				if err != nil && apierrors.IsNotFound(err) {
-					node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-					if err := schedulerCache.RemoveNode(&node); err != nil {
-						klog.V(4).InfoS("Node is not found; failed to remove it from the cache", "node", node.Name)
-					}
-				}
+func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.QueueingHintMap {
+	queueingHintMap := make(internalqueue.QueueingHintMap)
+	for _, e := range es {
+		events := e.EventsToRegister()
+
+		// Note: Rarely, a plugin implements EnqueueExtensions but returns nil.
+		// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
+		// cannot be moved by any regular cluster event.
+		// So, we can just ignore such EventsToRegister here.
+
+		for _, event := range events {
+			fn := event.QueueingHintFn
+			if fn == nil || !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+				fn = defaultQueueingHintFn
 			}
-		} else {
-			klog.ErrorS(err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
-		}
 
-		// Check if the Pod exists in informer cache.
-		cachedPod, err := podLister.Pods(pod.Namespace).Get(pod.Name)
-		if err != nil {
-			klog.InfoS("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", err)
-			return
-		}
-
-		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
-		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
-		if len(cachedPod.Spec.NodeName) != 0 {
-			klog.InfoS("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
-			return
-		}
-
-		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
-		podInfo.PodInfo = framework.NewPodInfo(cachedPod.DeepCopy())
-		if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podQueue.SchedulingCycle()); err != nil {
-			klog.ErrorS(err, "Error occurred")
+			queueingHintMap[event.Event] = append(queueingHintMap[event.Event], &internalqueue.QueueingHintFunction{
+				PluginName:     e.Name(),
+				QueueingHintFn: fn,
+			})
 		}
 	}
+	return queueingHintMap
+}
+
+// Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
+func (sched *Scheduler) Run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	sched.SchedulingQueue.Run(logger)
+
+	// We need to start scheduleOne loop in a dedicated goroutine,
+	// because scheduleOne function hangs on getting the next item
+	// from the SchedulingQueue.
+	// If there are no new pods to schedule, it will be hanging there
+	// and if done in this goroutine it will be blocking closing
+	// SchedulingQueue, in effect causing a deadlock on shutdown.
+	go wait.UntilWithContext(ctx, sched.scheduleOne, 0)
+
+	<-ctx.Done()
+	sched.SchedulingQueue.Close()
 }
 
 // NewInformerFactory creates a SharedInformerFactory and initializes a scheduler specific
@@ -397,7 +418,7 @@ func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration) info
 	return informerFactory
 }
 
-func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.KubeSchedulerProfile) ([]framework.Extender, error) {
+func buildExtenders(logger klog.Logger, extenders []schedulerapi.Extender, profiles []schedulerapi.KubeSchedulerProfile) ([]framework.Extender, error) {
 	var fExtenders []framework.Extender
 	if len(extenders) == 0 {
 		return nil, nil
@@ -406,7 +427,7 @@ func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.K
 	var ignoredExtendedResources []string
 	var ignorableExtenders []framework.Extender
 	for i := range extenders {
-		klog.V(2).InfoS("Creating extender", "extender", extenders[i])
+		logger.V(2).Info("Creating extender", "extender", extenders[i])
 		extender, err := NewHTTPExtender(&extenders[i])
 		if err != nil {
 			return nil, err
@@ -455,51 +476,39 @@ func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.K
 	return fExtenders, nil
 }
 
-// newScheduler creates a Scheduler object.
-func newScheduler(
-	cache internalcache.Cache,
-	extenders []framework.Extender,
-	nextPod func() *framework.QueuedPodInfo,
-	Error func(*framework.QueuedPodInfo, error),
-	stopEverything <-chan struct{},
-	schedulingQueue internalqueue.SchedulingQueue,
-	profiles profile.Map,
-	client clientset.Interface,
-	nodeInfoSnapshot *internalcache.Snapshot,
-	percentageOfNodesToScore int32) *Scheduler {
-	sched := Scheduler{
-		Cache:                    cache,
-		Extenders:                extenders,
-		NextPod:                  nextPod,
-		Error:                    Error,
-		StopEverything:           stopEverything,
-		SchedulingQueue:          schedulingQueue,
-		Profiles:                 profiles,
-		client:                   client,
-		nodeInfoSnapshot:         nodeInfoSnapshot,
-		percentageOfNodesToScore: percentageOfNodesToScore,
-	}
-	sched.SchedulePod = sched.schedulePod
-	return &sched
-}
+type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time)
 
-func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {
+func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[framework.GVK]framework.ActionType {
 	gvkMap := make(map[framework.GVK]framework.ActionType)
-	for evt := range m {
-		if _, ok := gvkMap[evt.Resource]; ok {
-			gvkMap[evt.Resource] |= evt.ActionType
-		} else {
-			gvkMap[evt.Resource] = evt.ActionType
+	for _, queueingHints := range queueingHintsPerProfile {
+		for evt := range queueingHints {
+			if _, ok := gvkMap[evt.Resource]; ok {
+				gvkMap[evt.Resource] |= evt.ActionType
+			} else {
+				gvkMap[evt.Resource] = evt.ActionType
+			}
 		}
 	}
 	return gvkMap
 }
 
 // newPodInformer creates a shared index informer that returns only non-terminal pods.
+// The PodInformer allows indexers to be added, but note that only non-conflict indexers are allowed.
 func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	selector := fmt.Sprintf("status.phase!=%v,status.phase!=%v", v1.PodSucceeded, v1.PodFailed)
 	tweakListOptions := func(options *metav1.ListOptions) {
 		options.FieldSelector = selector
 	}
-	return coreinformers.NewFilteredPodInformer(cs, metav1.NamespaceAll, resyncPeriod, nil, tweakListOptions)
+	informer := coreinformers.NewFilteredPodInformer(cs, metav1.NamespaceAll, resyncPeriod, cache.Indexers{}, tweakListOptions)
+
+	// Dropping `.metadata.managedFields` to improve memory usage.
+	// The Extract workflow (i.e. `ExtractPod`) should be unused.
+	trim := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			accessor.SetManagedFields(nil)
+		}
+		return obj, nil
+	}
+	informer.SetTransform(trim)
+	return informer
 }

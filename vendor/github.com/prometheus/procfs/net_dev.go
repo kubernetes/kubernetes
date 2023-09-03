@@ -87,17 +87,17 @@ func newNetDev(file string) (NetDev, error) {
 // parseLine parses a single line from the /proc/net/dev file. Header lines
 // must be filtered prior to calling this method.
 func (netDev NetDev) parseLine(rawLine string) (*NetDevLine, error) {
-	parts := strings.SplitN(rawLine, ":", 2)
-	if len(parts) != 2 {
+	idx := strings.LastIndex(rawLine, ":")
+	if idx == -1 {
 		return nil, errors.New("invalid net/dev line, missing colon")
 	}
-	fields := strings.Fields(strings.TrimSpace(parts[1]))
+	fields := strings.Fields(strings.TrimSpace(rawLine[idx+1:]))
 
 	var err error
 	line := &NetDevLine{}
 
 	// Interface Name
-	line.Name = strings.TrimSpace(parts[0])
+	line.Name = strings.TrimSpace(rawLine[:idx])
 	if line.Name == "" {
 		return nil, errors.New("invalid net/dev line, empty interface name")
 	}

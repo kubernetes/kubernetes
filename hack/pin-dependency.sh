@@ -94,16 +94,15 @@ echo "Running: go mod edit -require ${dep}@${rev}"
 go mod edit -require "${dep}@${rev}"
 
 # Add the replace directive
-echo "Running: go mod edit -replace ${dep}=${replacement}@${rev}"
-go mod edit -replace "${dep}=${replacement}@${rev}"
+if [ "${replacement}" != "${dep}" ]; then
+  echo "Running: go mod edit -replace ${dep}=${replacement}@${rev}"
+  go mod edit -replace "${dep}=${replacement}@${rev}"
+fi
 
-# Propagate pinned version to staging repos that also have that dependency
+# Propagate pinned version to staging repos
 for repo in $(kube::util::list_staging_repos); do
   pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
-    if go mod edit -json | jq -e -r ".Require[] | select(.Path == \"${dep}\")" > /dev/null 2>&1; then
-      go mod edit -require "${dep}@${rev}"
-      go mod edit -replace "${dep}=${replacement}@${rev}"
-    fi
+    go mod edit -require "${dep}@${rev}"
 
     # When replacing with a fork, always add a replace statement in all go.mod
     # files (not just the root of the staging repos!) because there might be

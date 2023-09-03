@@ -48,7 +48,8 @@ func NewCmdOptions(out io.Writer) *cobra.Command {
 	// function call will fall back to stderr.
 	//
 	// See https://github.com/kubernetes/kubernetes/pull/46394 for details.
-	cmd.SetOutput(out)
+	cmd.SetOut(out)
+	cmd.SetErr(out)
 
 	templates.UseOptionsTemplates(cmd)
 	return cmd

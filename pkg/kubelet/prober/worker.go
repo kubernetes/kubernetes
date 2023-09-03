@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"math/rand"
 	"time"
 
@@ -74,6 +75,10 @@ type worker struct {
 	proberResultsSuccessfulMetricLabels metrics.Labels
 	proberResultsFailedMetricLabels     metrics.Labels
 	proberResultsUnknownMetricLabels    metrics.Labels
+	// proberDurationMetricLabels holds the labels attached to this worker
+	// for the ProberDuration metric by result.
+	proberDurationSuccessfulMetricLabels metrics.Labels
+	proberDurationUnknownMetricLabels    metrics.Labels
 }
 
 // Creates and starts a new probe worker.
@@ -115,6 +120,13 @@ func newWorker(
 		"pod_uid":    string(w.pod.UID),
 	}
 
+	proberDurationLabels := metrics.Labels{
+		"probe_type": w.probeType.String(),
+		"container":  w.container.Name,
+		"pod":        w.pod.Name,
+		"namespace":  w.pod.Namespace,
+	}
+
 	w.proberResultsSuccessfulMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
 	w.proberResultsSuccessfulMetricLabels["result"] = probeResultSuccessful
 
@@ -124,11 +136,15 @@ func newWorker(
 	w.proberResultsUnknownMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
 	w.proberResultsUnknownMetricLabels["result"] = probeResultUnknown
 
+	w.proberDurationSuccessfulMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
+	w.proberDurationUnknownMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
+
 	return w
 }
 
 // run periodically probes the container.
 func (w *worker) run() {
+	ctx := context.Background()
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
 	// If kubelet restarted the probes could be started in rapid succession.
@@ -151,10 +167,12 @@ func (w *worker) run() {
 		ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
 		ProberResults.Delete(w.proberResultsFailedMetricLabels)
 		ProberResults.Delete(w.proberResultsUnknownMetricLabels)
+		ProberDuration.Delete(w.proberDurationSuccessfulMetricLabels)
+		ProberDuration.Delete(w.proberDurationUnknownMetricLabels)
 	}()
 
 probeLoop:
-	for w.doProbe() {
+	for w.doProbe(ctx) {
 		// Wait for next probe tick.
 		select {
 		case <-w.stopCh:
@@ -177,10 +195,11 @@ func (w *worker) stop() {
 
 // doProbe probes the container once and records the result.
 // Returns whether the worker should continue.
-func (w *worker) doProbe() (keepGoing bool) {
+func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
 
+	startTime := time.Now()
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.
@@ -197,10 +216,13 @@ func (w *worker) doProbe() (keepGoing bool) {
 
 	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)
 	if !ok || len(c.ContainerID) == 0 {
-		// Either the container has not been created yet, or it was deleted.
-		klog.V(3).InfoS("Probe target container not found",
-			"pod", klog.KObj(w.pod), "containerName", w.container.Name)
-		return true // Wait for more information.
+		c, ok = podutil.GetContainerStatus(status.InitContainerStatuses, w.container.Name)
+		if !ok || len(c.ContainerID) == 0 {
+			// Either the container has not been created yet, or it was deleted.
+			klog.V(3).InfoS("Probe target container not found",
+				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
+			return true // Wait for more information.
+		}
 	}
 
 	if w.containerID.String() != c.ContainerID {
@@ -261,10 +283,8 @@ func (w *worker) doProbe() (keepGoing bool) {
 		}
 	}
 
-	// TODO: in order for exec probes to correctly handle downward API env, we must be able to reconstruct
-	// the full container environment here, OR we must make a call to the CRI in order to get those environment
-	// values from the running container.
-	result, err := w.probeManager.prober.probe(w.probeType, w.pod, status, w.container, w.containerID)
+	// Note, exec probe does NOT have access to pod environment variables or downward API
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
@@ -273,10 +293,12 @@ func (w *worker) doProbe() (keepGoing bool) {
 	switch result {
 	case results.Success:
 		ProberResults.With(w.proberResultsSuccessfulMetricLabels).Inc()
+		ProberDuration.With(w.proberDurationSuccessfulMetricLabels).Observe(time.Since(startTime).Seconds())
 	case results.Failure:
 		ProberResults.With(w.proberResultsFailedMetricLabels).Inc()
 	default:
 		ProberResults.With(w.proberResultsUnknownMetricLabels).Inc()
+		ProberDuration.With(w.proberDurationUnknownMetricLabels).Observe(time.Since(startTime).Seconds())
 	}
 
 	if w.lastResult == result {

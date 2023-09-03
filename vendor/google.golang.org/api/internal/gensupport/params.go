@@ -37,15 +37,21 @@ func (u URLParams) SetMulti(key string, values []string) {
 	u[key] = values
 }
 
-// Encode encodes the values into ``URL encoded'' form
+// Encode encodes the values into “URL encoded” form
 // ("bar=baz&foo=quux") sorted by key.
 func (u URLParams) Encode() string {
 	return url.Values(u).Encode()
 }
 
-// SetOptions sets the URL params and any additional call options.
+// SetOptions sets the URL params and any additional `CallOption` or
+// `MultiCallOption` passed in.
 func SetOptions(u URLParams, opts ...googleapi.CallOption) {
 	for _, o := range opts {
+		m, ok := o.(googleapi.MultiCallOption)
+		if ok {
+			u.SetMulti(m.GetMulti())
+			continue
+		}
 		u.Set(o.Get())
 	}
 }

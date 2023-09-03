@@ -18,12 +18,14 @@ package storage
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -41,7 +42,10 @@ import (
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -605,7 +609,7 @@ func TestConvertToTableList(t *testing.T) {
 			continue
 		}
 		if !apiequality.Semantic.DeepEqual(test.out, out) {
-			t.Errorf("%d: mismatch: %s", i, diff.ObjectReflectDiff(test.out, out))
+			t.Errorf("%d: mismatch: %s", i, cmp.Diff(test.out, out))
 		}
 	}
 }
@@ -742,6 +746,85 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 	_, err = bindingStorage.Create(ctx, binding.Name, &binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err == nil || !errors.IsConflict(err) {
 		t.Fatalf("expected resource conflict error, not: %v", err)
+	}
+}
+
+func TestEtcdCreateWithSchedulingGates(t *testing.T) {
+	tests := []struct {
+		name            string
+		featureEnabled  bool
+		schedulingGates []api.PodSchedulingGate
+		wantErr         error
+	}{
+		{
+			name:           "pod with non-nil schedulingGates, feature disabled",
+			featureEnabled: false,
+			schedulingGates: []api.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+			},
+			wantErr: nil,
+		},
+		{
+			name:           "pod with non-nil schedulingGates, feature enabled",
+			featureEnabled: true,
+			schedulingGates: []api.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+			},
+			wantErr: goerrors.New(`Operation cannot be fulfilled on pods/binding "foo": pod foo has non-empty .spec.schedulingGates`),
+		},
+		{
+			name:            "pod with nil schedulingGates, feature disabled",
+			featureEnabled:  false,
+			schedulingGates: nil,
+			wantErr:         nil,
+		},
+		{
+			name:            "pod with nil schedulingGates, feature enabled",
+			featureEnabled:  true,
+			schedulingGates: nil,
+			wantErr:         nil,
+		},
+	}
+
+	for _, tt := range tests {
+		for _, flipFeatureGateBeforeBinding := range []bool{false, true} {
+			if flipFeatureGateBeforeBinding {
+				tt.name = fmt.Sprintf("%v and flipped before binding", tt.name)
+			}
+			t.Run(tt.name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+				storage, bindingStorage, _, server := newStorage(t)
+				defer server.Terminate(t)
+				defer storage.Store.DestroyFunc()
+				ctx := genericapirequest.NewDefaultContext()
+
+				pod := validNewPod()
+				pod.Spec.SchedulingGates = tt.schedulingGates
+				if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if flipFeatureGateBeforeBinding {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, !tt.featureEnabled)()
+				}
+				_, err := bindingStorage.Create(ctx, "foo", &api.Binding{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
+					Target:     api.ObjectReference{Name: "machine"},
+				}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+				if tt.wantErr == nil {
+					if err != nil {
+						t.Errorf("Want nil err, but got %v", err)
+					}
+				} else {
+					if err == nil {
+						t.Errorf("Want %v, but got nil err", tt.wantErr)
+					} else if tt.wantErr.Error() != err.Error() {
+						t.Errorf("Want %v, but got %v", tt.wantErr, err)
+					}
+				}
+			})
+		}
 	}
 }
 
@@ -991,7 +1074,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	podOut := obj.(*api.Pod)
 	// validChangedPod only changes the Labels, so were checking the update was valid
 	if !apiequality.Semantic.DeepEqual(podIn.Labels, podOut.Labels) {
-		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, podIn))
+		t.Errorf("objects differ: %v", cmp.Diff(podOut, podIn))
 	}
 }
 
@@ -1064,7 +1147,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 	podOut := obj.(*api.Pod)
 	// Check to verify the Spec and Label updates match from change above.  Those are the fields changed.
 	if !apiequality.Semantic.DeepEqual(podOut.Spec, podIn.Spec) || !apiequality.Semantic.DeepEqual(podOut.Labels, podIn.Labels) {
-		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, podIn))
+		t.Errorf("objects differ: %v", cmp.Diff(podOut, podIn))
 	}
 
 }
@@ -1179,7 +1262,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(podOut.Spec, expected.Spec) ||
 			!apiequality.Semantic.DeepEqual(podOut.Labels, expected.Labels) ||
 			!apiequality.Semantic.DeepEqual(podOut.Status, expected.Status) {
-			t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, expected))
+			t.Errorf("objects differ: %v", cmp.Diff(podOut, expected))
 		}
 	}
 }

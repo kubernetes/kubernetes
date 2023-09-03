@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/component-base/metrics"
 )
 
@@ -308,6 +310,21 @@ var _ = custom.NewCounter(
 	)
 `},
 		{
+			testName: "Custom import NewDesc",
+			metric: metric{
+				Name:           "apiserver_storage_size_bytes",
+				Help:           "Size of the storage database file physically allocated in bytes.",
+				Labels:         []string{"server"},
+				StabilityLevel: "STABLE",
+				Type:           customType,
+				ConstLabels:    map[string]string{},
+			},
+			src: `
+package test
+import custom "k8s.io/component-base/metrics"
+var _ = custom.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"server"}, nil, custom.STABLE, "")
+`},
+		{
 			testName: "Const",
 			metric: metric{
 				Name:           "metric",
@@ -526,8 +543,8 @@ var _ = compbasemetrics.NewCounter(
 			if test.metric.Labels == nil {
 				test.metric.Labels = []string{}
 			}
-			if !reflect.DeepEqual(metrics[0], test.metric) {
-				t.Errorf("metric:\ngot  %v\nwant %v", metrics[0], test.metric)
+			if diff := cmp.Diff(metrics[0], test.metric); diff != "" {
+				t.Errorf("metric diff: %s", diff)
 			}
 		})
 	}
@@ -539,18 +556,6 @@ func TestIncorrectStableMetricDeclarations(t *testing.T) {
 		src      string
 		err      error
 	}{
-		{
-			testName: "Fail on stable summary metric (Summary is DEPRECATED)",
-			err:      fmt.Errorf("testdata/metric.go:4:9: Stable summary metric is not supported"),
-			src: `
-package test
-import "k8s.io/component-base/metrics"
-var _ = metrics.NewSummary(
-		&metrics.SummaryOpts{
-			StabilityLevel: metrics.STABLE,
-		},
-	)
-`},
 		{
 			testName: "Fail on stable metric with attribute set to unknown variable",
 			err:      fmt.Errorf("testdata/metric.go:6:4: Metric attribute was not correctly set. Please use only global consts in same file"),
@@ -596,7 +601,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "Fail on metric with stability set to function return",
-			err:      fmt.Errorf("testdata/metric.go:9:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
+			err:      fmt.Errorf("testdata/metric.go:9:20: %s", errStabilityLevel),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
@@ -611,7 +616,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "error for passing stability as string",
-			err:      fmt.Errorf("testdata/metric.go:6:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
+			err:      fmt.Errorf("testdata/metric.go:6:20: %s", errStabilityLevel),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
@@ -622,20 +627,8 @@ var _ = metrics.NewCounter(
 	)
 `},
 		{
-			testName: "error for passing stability as unknown const",
-			err:      fmt.Errorf("testdata/metric.go:6:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
-			src: `
-package test
-import "k8s.io/component-base/metrics"
-var _ = metrics.NewCounter(
-		&metrics.CounterOpts{
-			StabilityLevel: metrics.UNKNOWN,
-		},
-	)
-`},
-		{
 			testName: "error for passing stability as variable",
-			err:      fmt.Errorf("testdata/metric.go:7:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
+			err:      fmt.Errorf("testdata/metric.go:7:20: %s", errStabilityLevel),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
@@ -685,18 +678,6 @@ var _ = RegisterMetric(
 `},
 		{
 			testName: "error stable metric opts passed to imported function",
-			err:      fmt.Errorf("testdata/metric.go:4:9: Opts for STABLE metric was not directly passed to new metric function"),
-			src: `
-package test
-import "k8s.io/component-base/metrics"
-var _ = test.RegisterMetric(
-		&metrics.CounterOpts{
-			StabilityLevel: metrics.STABLE,
-		},
-	)
-`},
-		{
-			testName: "error stable metric opts passed to imported function",
 			err:      fmt.Errorf("testdata/metric.go:6:4: Positional arguments are not supported"),
 			src: `
 package test
@@ -708,7 +689,7 @@ var _ = metrics.NewCounter(
 	)
 `},
 		{
-			testName: "error stable historgram with unknown prometheus bucket variable",
+			testName: "error stable histogram with unknown prometheus bucket variable",
 			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
 			src: `
 package test
@@ -723,17 +704,17 @@ var _ = metrics.NewHistogram(
 	)
 `},
 		{
-			testName: "error stable historgram with unknown bucket variable",
-			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
+			testName: "error stable summary with unknown prometheus objective variable",
+			err:      fmt.Errorf("testdata/metric.go:9:16: Objectives should be set to map of floats to floats"),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
-var buckets = []float64{1, 2, 3}
-var _ = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Name: "histogram",
+import "github.com/prometheus/client_golang/prometheus"
+var _ = metrics.NewSummary(
+		&metrics.SummaryOpts{
+			Name: "summary",
 			StabilityLevel: metrics.STABLE,
-			Buckets: buckets,
+			Objectives: prometheus.FakeObjectives,
 		},
 	)
 `},
@@ -756,7 +737,7 @@ var _ = metrics.NewHistogram(
 		t.Run(test.testName, func(t *testing.T) {
 			_, errors := searchFileForStableMetrics(fakeFilename, test.src)
 			if len(errors) != 1 {
-				t.Fatalf("Unexpected number of errors, got %d, want 1", len(errors))
+				t.Errorf("Unexpected number of errors, got %d, want 1", len(errors))
 			}
 			if !reflect.DeepEqual(errors[0], test.err) {
 				t.Errorf("error:\ngot  %v\nwant %v", errors[0], test.err)

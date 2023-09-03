@@ -12,7 +12,14 @@ is designed so the following goals can be achieved.
   * [Semantic import
     versioning](https://github.com/golang/go/wiki/Modules#semantic-import-versioning)
     will be used.
-    * Versions will comply with [semver 2.0](https://semver.org/spec/v2.0.0.html).
+    * Versions will comply with [semver
+      2.0](https://semver.org/spec/v2.0.0.html) with the following exceptions.
+      * New methods may be added to exported API interfaces. All exported
+        interfaces that fall within this exception will include the following
+        paragraph in their public documentation.
+
+        > Warning: methods may be added to this interface in minor releases.
+
     * If a module is version `v2` or higher, the major version of the module
       must be included as a `/vN` at the end of the module paths used in
       `go.mod` files (e.g., `module go.opentelemetry.io/otel/v2`, `require
@@ -143,10 +150,10 @@ The `otel` package is refactored to remove its dependencies on `otel/metric` so
 it can be released as stable as well. With that done the following release
 candidates are made:
 
-* `otel`: `v1.0.0-rc.1`
-* `otel/trace`: `v1.0.0-rc.1`
-* `otel/baggage`: `v1.0.0-rc.1`
-* `otel/sdk/trace`: `v1.0.0-rc.1`
+* `otel`: `v1.0.0-RC1`
+* `otel/trace`: `v1.0.0-RC1`
+* `otel/baggage`: `v1.0.0-RC1`
+* `otel/sdk/trace`: `v1.0.0-RC1`
 
 The `otel/metric` and `otel/sdk/metric` modules remain at `v0.14.0`.
 
@@ -154,10 +161,10 @@ A few minor issues are discovered in the `otel/trace` package. These issues are
 resolved with some minor, but backwards incompatible, changes and are released
 as a second release candidate:
 
-* `otel`: `v1.0.0-rc.2`
-* `otel/trace`: `v1.0.0-rc.2`
-* `otel/baggage`: `v1.0.0-rc.2`
-* `otel/sdk/trace`: `v1.0.0-rc.2`
+* `otel`: `v1.0.0-RC2`
+* `otel/trace`: `v1.0.0-RC2`
+* `otel/baggage`: `v1.0.0-RC2`
+* `otel/sdk/trace`: `v1.0.0-RC2`
 
 Notice that all module version numbers are incremented to adhere to our
 versioning policy.
@@ -198,12 +205,12 @@ As we progress, the `otel/metric` and `otel/sdk/metric` packages have reached a
 point where they should be evaluated for stability. The `otel` module is
 reintegrated with the `otel/metric` package and the following release is made:
 
-* `otel`: `v1.1.0-rc.1`
-* `otel/trace`: `v1.1.0-rc.1`
-* `otel/metric`: `v1.1.0-rc.1`
-* `otel/baggage`: `v1.1.0-rc.1`
-* `otel/sdk/trace`: `v1.1.0-rc.1`
-* `otel/sdk/metric`: `v1.1.0-rc.1`
+* `otel`: `v1.1.0-RC1`
+* `otel/trace`: `v1.1.0-RC1`
+* `otel/metric`: `v1.1.0-RC1`
+* `otel/baggage`: `v1.1.0-RC1`
+* `otel/sdk/trace`: `v1.1.0-RC1`
+* `otel/sdk/metric`: `v1.1.0-RC1`
 
 All the modules are evaluated and determined to a viable stable release. They
 are then released as version `v1.1.0` (the minor version is incremented to

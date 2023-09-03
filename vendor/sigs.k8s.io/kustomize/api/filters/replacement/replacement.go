@@ -10,7 +10,9 @@ import (
 	"sigs.k8s.io/kustomize/api/internal/utils"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/resid"
+	kyaml_utils "sigs.k8s.io/kustomize/kyaml/utils"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -20,11 +22,11 @@ type Filter struct {
 
 // Filter replaces values of targets with values from sources
 func (f Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
-	for _, r := range f.Replacements {
+	for i, r := range f.Replacements {
 		if r.Source == nil || r.Targets == nil {
 			return nil, fmt.Errorf("replacements must specify a source and at least one target")
 		}
-		value, err := getReplacement(nodes, &r)
+		value, err := getReplacement(nodes, &f.Replacements[i])
 		if err != nil {
 			return nil, err
 		}
@@ -36,22 +38,86 @@ func (f Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 	return nodes, nil
 }
 
-func applyReplacement(nodes []*yaml.RNode, value *yaml.RNode, targets []*types.TargetSelector) ([]*yaml.RNode, error) {
-	for _, t := range targets {
-		if t.Select == nil {
-			return nil, fmt.Errorf("target must specify resources to select")
+func getReplacement(nodes []*yaml.RNode, r *types.Replacement) (*yaml.RNode, error) {
+	source, err := selectSourceNode(nodes, r.Source)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.Source.FieldPath == "" {
+		r.Source.FieldPath = types.DefaultReplacementFieldPath
+	}
+	fieldPath := kyaml_utils.SmarterPathSplitter(r.Source.FieldPath, ".")
+
+	rn, err := source.Pipe(yaml.Lookup(fieldPath...))
+	if err != nil {
+		return nil, fmt.Errorf("error looking up replacement source: %w", err)
+	}
+	if rn.IsNilOrEmpty() {
+		return nil, fmt.Errorf("fieldPath `%s` is missing for replacement source %s", r.Source.FieldPath, r.Source.ResId)
+	}
+
+	return getRefinedValue(r.Source.Options, rn)
+}
+
+// selectSourceNode finds the node that matches the selector, returning
+// an error if multiple or none are found
+func selectSourceNode(nodes []*yaml.RNode, selector *types.SourceSelector) (*yaml.RNode, error) {
+	var matches []*yaml.RNode
+	for _, n := range nodes {
+		ids, err := utils.MakeResIds(n)
+		if err != nil {
+			return nil, fmt.Errorf("error getting node IDs: %w", err)
 		}
-		if len(t.FieldPaths) == 0 {
-			t.FieldPaths = []string{types.DefaultReplacementFieldPath}
+		for _, id := range ids {
+			if id.IsSelectedBy(selector.ResId) {
+				if len(matches) > 0 {
+					return nil, fmt.Errorf(
+						"multiple matches for selector %s", selector)
+				}
+				matches = append(matches, n)
+				break
+			}
 		}
-		for _, n := range nodes {
-			ids, err := utils.MakeResIds(n)
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("nothing selected by %s", selector)
+	}
+	return matches[0], nil
+}
+
+func getRefinedValue(options *types.FieldOptions, rn *yaml.RNode) (*yaml.RNode, error) {
+	if options == nil || options.Delimiter == "" {
+		return rn, nil
+	}
+	if rn.YNode().Kind != yaml.ScalarNode {
+		return nil, fmt.Errorf("delimiter option can only be used with scalar nodes")
+	}
+	value := strings.Split(yaml.GetValue(rn), options.Delimiter)
+	if options.Index >= len(value) || options.Index < 0 {
+		return nil, fmt.Errorf("options.index %d is out of bounds for value %s", options.Index, yaml.GetValue(rn))
+	}
+	n := rn.Copy()
+	n.YNode().Value = value[options.Index]
+	return n, nil
+}
+
+func applyReplacement(nodes []*yaml.RNode, value *yaml.RNode, targetSelectors []*types.TargetSelector) ([]*yaml.RNode, error) {
+	for _, selector := range targetSelectors {
+		if selector.Select == nil {
+			return nil, errors.Errorf("target must specify resources to select")
+		}
+		if len(selector.FieldPaths) == 0 {
+			selector.FieldPaths = []string{types.DefaultReplacementFieldPath}
+		}
+		for _, possibleTarget := range nodes {
+			ids, err := utils.MakeResIds(possibleTarget)
 			if err != nil {
 				return nil, err
 			}
 
 			// filter targets by label and annotation selectors
-			selectByAnnoAndLabel, err := selectByAnnoAndLabel(n, t)
+			selectByAnnoAndLabel, err := selectByAnnoAndLabel(possibleTarget, selector)
 			if err != nil {
 				return nil, err
 			}
@@ -60,9 +126,9 @@ func applyReplacement(nodes []*yaml.RNode, value *yaml.RNode, targets []*types.T
 			}
 
 			// filter targets by matching resource IDs
-			for _, id := range ids {
-				if id.IsSelectedBy(t.Select.ResId) && !rejectId(t.Reject, &id) {
-					err := applyToNode(n, value, t)
+			for i, id := range ids {
+				if id.IsSelectedBy(selector.Select.ResId) && !rejectId(selector.Reject, &ids[i]) {
+					err := copyValueToTarget(possibleTarget, value, selector)
 					if err != nil {
 						return nil, err
 					}
@@ -111,21 +177,28 @@ func rejectId(rejects []*types.Selector, id *resid.ResId) bool {
 	return false
 }
 
-func applyToNode(node *yaml.RNode, value *yaml.RNode, target *types.TargetSelector) error {
-	for _, fp := range target.FieldPaths {
-		fieldPath := utils.SmarterPathSplitter(fp, ".")
-		var t *yaml.RNode
-		var err error
-		if target.Options != nil && target.Options.Create {
-			t, err = node.Pipe(yaml.LookupCreate(value.YNode().Kind, fieldPath...))
-		} else {
-			t, err = node.Pipe(&yaml.PathMatcher{Path: fieldPath})
+func copyValueToTarget(target *yaml.RNode, value *yaml.RNode, selector *types.TargetSelector) error {
+	for _, fp := range selector.FieldPaths {
+		createKind := yaml.Kind(0) // do not create
+		if selector.Options != nil && selector.Options.Create {
+			createKind = value.YNode().Kind
 		}
+		targetFieldList, err := target.Pipe(&yaml.PathMatcher{
+			Path:   kyaml_utils.SmarterPathSplitter(fp, "."),
+			Create: createKind})
 		if err != nil {
-			return err
+			return errors.WrapPrefixf(err, fieldRetrievalError(fp, createKind != 0))
 		}
-		if t != nil {
-			if err = applyToOneNode(target.Options, t, value); err != nil {
+		targetFields, err := targetFieldList.Elements()
+		if err != nil {
+			return errors.WrapPrefixf(err, fieldRetrievalError(fp, createKind != 0))
+		}
+		if len(targetFields) == 0 {
+			return errors.Errorf(fieldRetrievalError(fp, createKind != 0))
+		}
+
+		for _, t := range targetFields {
+			if err := setFieldValue(selector.Options, t, value); err != nil {
 				return err
 			}
 		}
@@ -133,34 +206,20 @@ func applyToNode(node *yaml.RNode, value *yaml.RNode, target *types.TargetSelect
 	return nil
 }
 
-func applyToOneNode(options *types.FieldOptions, t *yaml.RNode, value *yaml.RNode) error {
-	if len(t.YNode().Content) == 0 {
-		if err := setTargetValue(options, t, value); err != nil {
-			return err
-		}
-		return nil
+func fieldRetrievalError(fieldPath string, isCreate bool) string {
+	if isCreate {
+		return fmt.Sprintf("unable to find or create field %q in replacement target", fieldPath)
 	}
-
-	for _, scalarNode := range t.YNode().Content {
-		if options != nil && options.Create {
-			return fmt.Errorf("cannot use create option in a multi-value target")
-		}
-		rn := yaml.NewRNode(scalarNode)
-		if err := setTargetValue(options, rn, value); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return fmt.Sprintf("unable to find field %q in replacement target", fieldPath)
 }
 
-func setTargetValue(options *types.FieldOptions, t *yaml.RNode, value *yaml.RNode) error {
+func setFieldValue(options *types.FieldOptions, targetField *yaml.RNode, value *yaml.RNode) error {
 	value = value.Copy()
 	if options != nil && options.Delimiter != "" {
-		if t.YNode().Kind != yaml.ScalarNode {
+		if targetField.YNode().Kind != yaml.ScalarNode {
 			return fmt.Errorf("delimiter option can only be used with scalar nodes")
 		}
-		tv := strings.Split(t.YNode().Value, options.Delimiter)
+		tv := strings.Split(targetField.YNode().Value, options.Delimiter)
 		v := yaml.GetValue(value)
 		// TODO: Add a way to remove an element
 		switch {
@@ -174,76 +233,12 @@ func setTargetValue(options *types.FieldOptions, t *yaml.RNode, value *yaml.RNod
 		value.YNode().Value = strings.Join(tv, options.Delimiter)
 	}
 
-	if t.YNode().Kind == yaml.ScalarNode {
+	if targetField.YNode().Kind == yaml.ScalarNode {
 		// For scalar, only copy the value (leave any type intact to auto-convert int->string or string->int)
-		t.YNode().Value = value.YNode().Value
+		targetField.YNode().Value = value.YNode().Value
 	} else {
-		t.SetYNode(value.YNode())
+		targetField.SetYNode(value.YNode())
 	}
 
 	return nil
-}
-
-func getReplacement(nodes []*yaml.RNode, r *types.Replacement) (*yaml.RNode, error) {
-	source, err := selectSourceNode(nodes, r.Source)
-	if err != nil {
-		return nil, err
-	}
-
-	if r.Source.FieldPath == "" {
-		r.Source.FieldPath = types.DefaultReplacementFieldPath
-	}
-	fieldPath := utils.SmarterPathSplitter(r.Source.FieldPath, ".")
-
-	rn, err := source.Pipe(yaml.Lookup(fieldPath...))
-	if err != nil {
-		return nil, err
-	}
-	if rn.IsNilOrEmpty() {
-		return nil, fmt.Errorf("fieldPath `%s` is missing for replacement source %s", r.Source.FieldPath, r.Source.ResId)
-	}
-
-	return getRefinedValue(r.Source.Options, rn)
-}
-
-func getRefinedValue(options *types.FieldOptions, rn *yaml.RNode) (*yaml.RNode, error) {
-	if options == nil || options.Delimiter == "" {
-		return rn, nil
-	}
-	if rn.YNode().Kind != yaml.ScalarNode {
-		return nil, fmt.Errorf("delimiter option can only be used with scalar nodes")
-	}
-	value := strings.Split(yaml.GetValue(rn), options.Delimiter)
-	if options.Index >= len(value) || options.Index < 0 {
-		return nil, fmt.Errorf("options.index %d is out of bounds for value %s", options.Index, yaml.GetValue(rn))
-	}
-	n := rn.Copy()
-	n.YNode().Value = value[options.Index]
-	return n, nil
-}
-
-// selectSourceNode finds the node that matches the selector, returning
-// an error if multiple or none are found
-func selectSourceNode(nodes []*yaml.RNode, selector *types.SourceSelector) (*yaml.RNode, error) {
-	var matches []*yaml.RNode
-	for _, n := range nodes {
-		ids, err := utils.MakeResIds(n)
-		if err != nil {
-			return nil, err
-		}
-		for _, id := range ids {
-			if id.IsSelectedBy(selector.ResId) {
-				if len(matches) > 0 {
-					return nil, fmt.Errorf(
-						"multiple matches for selector %s", selector)
-				}
-				matches = append(matches, n)
-				break
-			}
-		}
-	}
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("nothing selected by %s", selector)
-	}
-	return matches[0], nil
 }

@@ -35,7 +35,7 @@ func Verify(value interface{}) []string {
 		}
 	}()
 	t := reflect.ValueOf(value)
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	return datatypes(t)
@@ -82,7 +82,7 @@ func datatypes(v reflect.Value) []string {
 
 		for i := 0; i < numField; i++ {
 			f := t.Field(i)
-			if f.Type.Kind() == reflect.Ptr {
+			if f.Type.Kind() == reflect.Pointer {
 				continue
 			}
 			if reason, ok := f.Tag.Lookup("datapolicy"); ok {

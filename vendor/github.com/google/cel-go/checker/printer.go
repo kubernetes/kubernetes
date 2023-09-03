@@ -15,6 +15,8 @@
 package checker
 
 import (
+	"sort"
+
 	"github.com/google/cel-go/common/debug"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
@@ -26,28 +28,29 @@ type semanticAdorner struct {
 
 var _ debug.Adorner = &semanticAdorner{}
 
-func (a *semanticAdorner) GetMetadata(elem interface{}) string {
+func (a *semanticAdorner) GetMetadata(elem any) string {
 	result := ""
 	e, isExpr := elem.(*exprpb.Expr)
 	if !isExpr {
 		return result
 	}
-	t := a.checks.TypeMap[e.Id]
+	t := a.checks.TypeMap[e.GetId()]
 	if t != nil {
 		result += "~"
 		result += FormatCheckedType(t)
 	}
 
-	switch e.ExprKind.(type) {
+	switch e.GetExprKind().(type) {
 	case *exprpb.Expr_IdentExpr,
 		*exprpb.Expr_CallExpr,
 		*exprpb.Expr_StructExpr,
 		*exprpb.Expr_SelectExpr:
-		if ref, found := a.checks.ReferenceMap[e.Id]; found {
+		if ref, found := a.checks.ReferenceMap[e.GetId()]; found {
 			if len(ref.GetOverloadId()) == 0 {
 				result += "^" + ref.Name
 			} else {
-				for i, overload := range ref.OverloadId {
+				sort.Strings(ref.GetOverloadId())
+				for i, overload := range ref.GetOverloadId() {
 					if i == 0 {
 						result += "^"
 					} else {

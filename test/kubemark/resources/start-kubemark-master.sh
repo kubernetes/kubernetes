@@ -742,7 +742,7 @@ create-addonmanager-kubeconfig
 
 # Setup docker flags and load images of the master components.
 assemble-docker-flags
-DOCKER_REGISTRY="k8s.gcr.io"
+DOCKER_REGISTRY="registry.k8s.io"
 load-docker-images
 
 readonly audit_policy_file="/etc/audit_policy.config"

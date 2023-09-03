@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apiserver/pkg/server"
-	"k8s.io/client-go/rest"
 )
 
 // DeprecatedInsecureServingOptions are for creating an unauthenticated, unauthorized, insecure port.
@@ -68,7 +67,7 @@ func (s *DeprecatedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
-		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 or :: for listening in all interfaces and IP families).")
+		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 or :: for listening on all interfaces and IP address families).")
 	// Though this flag is deprecated, we discovered security concerns over how to do health checks without it e.g. #43784
 	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
 	fs.Lookup("insecure-bind-address").Hidden = false
@@ -87,7 +86,7 @@ func (s *DeprecatedInsecureServingOptions) AddUnqualifiedFlags(fs *pflag.FlagSet
 	}
 
 	fs.IPVar(&s.BindAddress, "address", s.BindAddress,
-		"The IP address on which to serve the insecure --port (set to '0.0.0.0' or '::' for listening in all interfaces and IP families).")
+		"The IP address on which to serve the insecure --port (set to '0.0.0.0' or '::' for listening on all interfaces and IP address families).")
 	fs.MarkDeprecated("address", "see --bind-address instead.")
 	fs.Lookup("address").Hidden = false
 
@@ -121,48 +120,6 @@ func (s *DeprecatedInsecureServingOptions) ApplyTo(c **server.DeprecatedInsecure
 
 	*c = &server.DeprecatedInsecureServingInfo{
 		Listener: s.Listener,
-	}
-
-	return nil
-}
-
-// WithLoopback adds loopback functionality to the serving options.
-func (o *DeprecatedInsecureServingOptions) WithLoopback() *DeprecatedInsecureServingOptionsWithLoopback {
-	return &DeprecatedInsecureServingOptionsWithLoopback{o}
-}
-
-// DeprecatedInsecureServingOptionsWithLoopback adds loopback functionality to the DeprecatedInsecureServingOptions.
-// DEPRECATED: all insecure serving options will be removed in a future version, however note that
-// there are security concerns over how health checks can work here - see e.g. #43784
-type DeprecatedInsecureServingOptionsWithLoopback struct {
-	*DeprecatedInsecureServingOptions
-}
-
-// ApplyTo fills up serving information in the server configuration.
-func (s *DeprecatedInsecureServingOptionsWithLoopback) ApplyTo(insecureServingInfo **server.DeprecatedInsecureServingInfo, loopbackClientConfig **rest.Config) error {
-	if s == nil || s.DeprecatedInsecureServingOptions == nil || insecureServingInfo == nil {
-		return nil
-	}
-
-	if err := s.DeprecatedInsecureServingOptions.ApplyTo(insecureServingInfo); err != nil {
-		return err
-	}
-
-	if *insecureServingInfo == nil || loopbackClientConfig == nil {
-		return nil
-	}
-
-	secureLoopbackClientConfig, err := (*insecureServingInfo).NewLoopbackClientConfig()
-	switch {
-	// if we failed and there's no fallback loopback client config, we need to fail
-	case err != nil && *loopbackClientConfig == nil:
-		return err
-
-		// if we failed, but we already have a fallback loopback client config (usually insecure), allow it
-	case err != nil && *loopbackClientConfig != nil:
-
-	default:
-		*loopbackClientConfig = secureLoopbackClientConfig
 	}
 
 	return nil

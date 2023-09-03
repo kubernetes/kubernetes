@@ -1,14 +1,17 @@
+// Copyright 2022 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
+
 package nameref
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/filters/fieldspec"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -61,7 +64,7 @@ func (f Filter) run(node *yaml.RNode) (*yaml.RNode, error) {
 		FieldSpec: f.NameFieldToUpdate,
 		SetValue:  f.set,
 	}); err != nil {
-		return nil, errors.Wrapf(
+		return nil, errors.WrapPrefixf(
 			err, "updating name reference in '%s' field of '%s'",
 			f.NameFieldToUpdate.Path, f.Referrer.CurId().String())
 	}
@@ -101,7 +104,7 @@ func (f Filter) setMapping(node *yaml.RNode) error {
 	}
 	nameNode, err := node.Pipe(yaml.FieldMatcher{Name: "name"})
 	if err != nil {
-		return errors.Wrap(err, "trying to match 'name' field")
+		return errors.WrapPrefixf(err, "trying to match 'name' field")
 	}
 	if nameNode == nil {
 		// This is a _configuration_ error; the field path
@@ -115,7 +118,9 @@ func (f Filter) setMapping(node *yaml.RNode) error {
 		return err
 	}
 	oldName := nameNode.YNode().Value
-	referral, err := f.selectReferral(oldName, candidates)
+	// use allNamesAndNamespacesAreTheSame to compare referral candidates for functional identity,
+	// because we source both name and namespace values from the referral in this case.
+	referral, err := f.selectReferral(oldName, candidates, allNamesAndNamespacesAreTheSame)
 	if err != nil || referral == nil {
 		// Nil referral means nothing to do.
 		return err
@@ -148,7 +153,7 @@ func (f Filter) filterMapCandidatesByNamespace(
 	node *yaml.RNode) ([]*resource.Resource, error) {
 	namespaceNode, err := node.Pipe(yaml.FieldMatcher{Name: "namespace"})
 	if err != nil {
-		return nil, errors.Wrap(err, "trying to match 'namespace' field")
+		return nil, errors.WrapPrefixf(err, "trying to match 'namespace' field")
 	}
 	if namespaceNode == nil {
 		return f.ReferralCandidates.Resources(), nil
@@ -164,8 +169,10 @@ func (f Filter) filterMapCandidatesByNamespace(
 }
 
 func (f Filter) setScalar(node *yaml.RNode) error {
+	// use allNamesAreTheSame to compare referral candidates for functional identity,
+	// because we only source the name from the referral in this case.
 	referral, err := f.selectReferral(
-		node.YNode().Value, f.ReferralCandidates.Resources())
+		node.YNode().Value, f.ReferralCandidates.Resources(), allNamesAreTheSame)
 	if err != nil || referral == nil {
 		// Nil referral means nothing to do.
 		return err
@@ -308,7 +315,9 @@ func (f Filter) sameCurrentNamespaceAsReferrer() sieveFunc {
 func (f Filter) selectReferral(
 	// The name referral that may need to be updated.
 	oldName string,
-	candidates []*resource.Resource) (*resource.Resource, error) {
+	candidates []*resource.Resource,
+	// function that returns whether two referrals are identical for the purposes of the transformation
+	candidatesIdentical func(resources []*resource.Resource) bool) (*resource.Resource, error) {
 	candidates = doSieve(candidates, previousNameMatches(oldName))
 	candidates = doSieve(candidates, previousIdSelectedByGvk(&f.ReferralTarget))
 	candidates = doSieve(candidates, f.roleRefFilter())
@@ -323,30 +332,38 @@ func (f Filter) selectReferral(
 	if len(candidates) == 0 {
 		return nil, nil
 	}
-	if allNamesAreTheSame(candidates) {
+	if candidatesIdentical(candidates) {
 		// Just take the first one.
 		return candidates[0], nil
 	}
 	ids := getIds(candidates)
-	f.failureDetails(candidates)
-	return nil, fmt.Errorf(" found multiple possible referrals: %s", ids)
+	return nil, fmt.Errorf("found multiple possible referrals: %s\n%s", ids, f.failureDetails(candidates))
 }
 
-func (f Filter) failureDetails(resources []*resource.Resource) {
-	fmt.Printf(
-		"\n**** Too many possible referral targets to referrer:\n%s\n",
-		f.Referrer.MustYaml())
+func (f Filter) failureDetails(resources []*resource.Resource) string {
+	msg := strings.Builder{}
+	msg.WriteString(fmt.Sprintf("\n**** Too many possible referral targets to referrer:\n%s\n", f.Referrer.MustYaml()))
 	for i, r := range resources {
-		fmt.Printf(
-			"--- possible referral %d:\n%s", i, r.MustYaml())
-		fmt.Println("------")
+		msg.WriteString(fmt.Sprintf("--- possible referral %d:\n%s\n", i, r.MustYaml()))
 	}
+	return msg.String()
 }
 
 func allNamesAreTheSame(resources []*resource.Resource) bool {
 	name := resources[0].GetName()
 	for i := 1; i < len(resources); i++ {
 		if name != resources[i].GetName() {
+			return false
+		}
+	}
+	return true
+}
+
+func allNamesAndNamespacesAreTheSame(resources []*resource.Resource) bool {
+	name := resources[0].GetName()
+	namespace := resources[0].GetNamespace()
+	for i := 1; i < len(resources); i++ {
+		if name != resources[i].GetName() || namespace != resources[i].GetNamespace() {
 			return false
 		}
 	}

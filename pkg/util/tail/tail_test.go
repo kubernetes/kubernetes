@@ -18,14 +18,13 @@ package tail
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 )
 
 func TestReadAtMost(t *testing.T) {
-	file, err := ioutil.TempFile("", "TestFileReadAtMost")
+	file, err := os.CreateTemp("", "TestFileReadAtMost")
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}

@@ -33,11 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -99,6 +98,15 @@ type ManagerImpl struct {
 
 	// pendingAdmissionPod contain the pod during the admission phase
 	pendingAdmissionPod *v1.Pod
+
+	// containerMap provides a mapping from (pod, container) -> containerID
+	// for all containers in a pod. Used to detect pods running across a restart
+	containerMap containermap.ContainerMap
+
+	// containerRunningSet identifies which container among those present in `containerMap`
+	// was reported running by the container runtime when `containerMap` was computed.
+	// Used to detect pods running across a restart
+	containerRunningSet sets.String
 }
 
 type endpointInfo struct {
@@ -165,6 +173,8 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 	return manager, nil
 }
 
+// CleanupPluginDirectory is to remove all existing unix sockets
+// from /var/lib/kubelet/device-plugins on Device Plugin Manager start
 func (m *ManagerImpl) CleanupPluginDirectory(dir string) error {
 	d, err := os.Open(dir)
 	if err != nil {
@@ -202,8 +212,10 @@ func (m *ManagerImpl) CleanupPluginDirectory(dir string) error {
 	return errorsutil.NewAggregate(errs)
 }
 
+// PluginConnected is to connect a plugin to a new endpoint.
+// This is done as part of device plugin registration.
 func (m *ManagerImpl) PluginConnected(resourceName string, p plugin.DevicePlugin) error {
-	options, err := p.Api().GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
+	options, err := p.API().GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
 	if err != nil {
 		return fmt.Errorf("failed to get device plugin options: %v", err)
 	}
@@ -214,9 +226,12 @@ func (m *ManagerImpl) PluginConnected(resourceName string, p plugin.DevicePlugin
 	defer m.mutex.Unlock()
 	m.endpoints[resourceName] = endpointInfo{e, options}
 
+	klog.V(2).InfoS("Device plugin connected", "resourceName", resourceName)
 	return nil
 }
 
+// PluginDisconnected is to disconnect a plugin from an endpoint.
+// This is done as part of device plugin deregistration.
 func (m *ManagerImpl) PluginDisconnected(resourceName string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -229,6 +244,10 @@ func (m *ManagerImpl) PluginDisconnected(resourceName string) {
 	m.endpoints[resourceName].e.setStopTime(time.Now())
 }
 
+// PluginListAndWatchReceiver receives ListAndWatchResponse from a device plugin
+// and ensures that an upto date state (e.g. number of devices and device health)
+// is captured. Also, registered device and device to container allocation
+// information is checkpointed to the disk.
 func (m *ManagerImpl) PluginListAndWatchReceiver(resourceName string, resp *pluginapi.ListAndWatchResponse) {
 	var devices []pluginapi.Device
 	for _, d := range resp.Devices {
@@ -238,6 +257,7 @@ func (m *ManagerImpl) PluginListAndWatchReceiver(resourceName string, resp *plug
 }
 
 func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []pluginapi.Device) {
+	healthyCount := 0
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.NewString()
 	m.unhealthyDevices[resourceName] = sets.NewString()
@@ -246,6 +266,7 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 		m.allDevices[resourceName][dev.ID] = dev
 		if dev.Health == pluginapi.Healthy {
 			m.healthyDevices[resourceName].Insert(dev.ID)
+			healthyCount++
 		} else {
 			m.unhealthyDevices[resourceName].Insert(dev.ID)
 		}
@@ -254,6 +275,7 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 	if err := m.writeCheckpoint(); err != nil {
 		klog.ErrorS(err, "Writing checkpoint encountered")
 	}
+	klog.V(2).InfoS("Processed device updates for resource", "resourceName", resourceName, "totalCount", len(devices), "healthyCount", healthyCount)
 }
 
 // GetWatcherHandler returns the plugin handler
@@ -269,11 +291,13 @@ func (m *ManagerImpl) checkpointFile() string {
 // Start starts the Device Plugin Manager and start initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
-func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
+func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.String) error {
 	klog.V(2).InfoS("Starting Device Plugin manager")
 
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
+	m.containerMap = initialContainers
+	m.containerRunningSet = initialContainerRunningSet
 
 	// Loads in allocatedDevices information from disk.
 	err := m.readCheckpoint()
@@ -536,14 +560,52 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 			return nil, fmt.Errorf("pod %q container %q changed request for resource %q from %d to %d", string(podUID), contName, resource, devices.Len(), required)
 		}
 	}
-	if needed == 0 {
-		// No change, no work.
+
+	// We have 3 major flows to handle:
+	// 1. kubelet running, normal allocation (needed > 0, container being  [re]created). Steady state and most common case by far and large.
+	// 2. kubelet restart. In this scenario every other component of the stack (device plugins, app container, runtime) is still running.
+	// 3. node reboot. In this scenario device plugins may not be running yet when we try to allocate devices.
+	//    note: if we get this far the runtime is surely running. This is usually enforced at OS level by startup system services dependencies.
+
+	// First we take care of the exceptional flow (scenarios 2 and 3). In both flows, kubelet is reinitializing, and while kubelet is initializing, sources are NOT all ready.
+	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the informations we got for runtime. If we are asked to allocate devices for containers reported
+	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
+	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
+	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(podUID, contName) {
+		klog.V(3).InfoS("container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
 		return nil, nil
 	}
+
+	// We dealt with scenario 2. If we got this far it's either scenario 3 (node reboot) or scenario 1 (steady state, normal flow).
 	klog.V(3).InfoS("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
-	// Check if resource registered with devicemanager
-	if _, ok := m.healthyDevices[resource]; !ok {
-		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
+	healthyDevices, hasRegistered := m.healthyDevices[resource]
+
+	// The following checks are expected to fail only happen on scenario 3 (node reboot).
+	// The kubelet is reinitializing and got a container from sources. But there's no ordering, so an app container may attempt allocation _before_ the device plugin was created,
+	// has registered and reported back to kubelet the devices.
+	// This can only happen on scenario 3 because at steady state (scenario 1) the scheduler prevents pod to be sent towards node which don't report enough devices.
+	// Note: we need to check the device health and registration status *before* we check how many devices are needed, doing otherwise caused issue #109595
+	// Note: if the scheduler is bypassed, we fall back in scenario 1, so we still need these checks.
+	if !hasRegistered {
+		return nil, fmt.Errorf("cannot allocate unregistered device %s", resource)
+	}
+
+	// Check if registered resource has healthy devices
+	if healthyDevices.Len() == 0 {
+		return nil, fmt.Errorf("no healthy devices present; cannot allocate unhealthy devices %s", resource)
+	}
+
+	// Check if all the previously allocated devices are healthy
+	if !healthyDevices.IsSuperset(devices) {
+		return nil, fmt.Errorf("previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s", resource)
+	}
+
+	// We handled the known error paths in scenario 3 (node reboot), so from now on we can fall back in a common path.
+	// We cover container restart on kubelet steady state with the same flow.
+	if needed == 0 {
+		klog.V(3).InfoS("no devices needed, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
+		// No change, no work.
+		return nil, nil
 	}
 
 	// Declare the list of allocated devices.
@@ -564,14 +626,14 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return false
 	}
 
-	// Allocates from reusableDevices list first.
-	if allocateRemainingFrom(reusableDevices) {
-		return allocated, nil
-	}
-
 	// Needs to allocate additional devices.
 	if m.allocatedDevices[resource] == nil {
 		m.allocatedDevices[resource] = sets.NewString()
+	}
+
+	// Allocates from reusableDevices list first.
+	if allocateRemainingFrom(reusableDevices) {
+		return allocated, nil
 	}
 
 	// Gets Devices in use.
@@ -1005,14 +1067,11 @@ func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceIns
 // depending on whether the node has been recreated. Absence of the checkpoint file strongly indicates the node
 // has been recreated.
 func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins) {
-		checkpoints, err := m.checkpointManager.ListCheckpoints()
-		if err != nil {
-			return false
-		}
-		return len(checkpoints) == 0
+	checkpoints, err := m.checkpointManager.ListCheckpoints()
+	if err != nil {
+		return false
 	}
-	return false
+	return len(checkpoints) == 0
 }
 
 func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
@@ -1020,4 +1079,24 @@ func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
 	defer m.mutex.Unlock()
 
 	m.pendingAdmissionPod = pod
+}
+
+func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {
+	cntID, err := m.containerMap.GetContainerID(podUID, cntName)
+	if err != nil {
+		klog.V(4).InfoS("container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName, "err", err)
+		return false
+	}
+
+	// note that if container runtime is down when kubelet restarts, this set will be empty,
+	// so on kubelet restart containers will again fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559 again.
+	// This scenario should however be rare enough.
+	if !m.containerRunningSet.Has(cntID) {
+		klog.V(4).InfoS("container not present in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+		return false
+	}
+
+	// Once we make it here we know we have a running container.
+	klog.V(4).InfoS("container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+	return true
 }

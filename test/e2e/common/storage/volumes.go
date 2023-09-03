@@ -18,27 +18,24 @@ limitations under the License.
  * This test checks that various VolumeSources are working.
  *
  * There are two ways, how to test the volumes:
- * 1) With containerized server (NFS, Ceph, Gluster, iSCSI, ...)
+ * 1) With containerized server (NFS, Ceph, iSCSI, ...)
  * The test creates a server pod, exporting simple 'index.html' file.
  * Then it uses appropriate VolumeSource to import this file into a client pod
  * and checks that the pod can see the file. It does so by importing the file
- * into web server root and loadind the index.html from it.
+ * into web server root and loading the index.html from it.
  *
  * These tests work only when privileged containers are allowed, exporting
- * various filesystems (NFS, GlusterFS, ...) usually needs some mounting or
+ * various filesystems (ex: NFS) usually needs some mounting or
  * other privileged magic in the server pod.
  *
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
  *
- * 2) With server outside of Kubernetes (Cinder, ...)
- * Appropriate server (e.g. OpenStack Cinder) must exist somewhere outside
+ * 2) With server outside of Kubernetes
+ * Appropriate server must exist somewhere outside
  * the tested Kubernetes cluster. The test itself creates a new volume,
  * and checks, that Kubernetes can use it as a volume.
  */
-
-// GlusterFS test is duplicated from test/e2e/volumes.go.  Any changes made there
-// should be duplicated here
 
 package storage
 
@@ -46,21 +43,19 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // TODO(#99468): Check if these tests are still needed.
 var _ = SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// note that namespace deletion is handled by delete-namespace flag
 	// filled in BeforeEach
@@ -78,9 +73,9 @@ var _ = SIGDescribe("Volumes", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 	ginkgo.Describe("NFSv4", func() {
-		ginkgo.It("should be mountable for NFSv4", func() {
-			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
-			defer e2evolume.TestServerCleanup(f, config)
+		ginkgo.It("should be mountable for NFSv4", func(ctx context.Context) {
+			config, _, serverHost := e2evolume.NewNFSServer(ctx, c, namespace.Name, []string{})
+			ginkgo.DeferCleanup(e2evolume.TestServerCleanup, f, config)
 
 			tests := []e2evolume.Test{
 				{
@@ -97,14 +92,14 @@ var _ = SIGDescribe("Volumes", func() {
 			}
 
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(ctx, f, config, nil, "" /* fsType */, tests)
 		})
 	})
 
 	ginkgo.Describe("NFSv3", func() {
-		ginkgo.It("should be mountable for NFSv3", func() {
-			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
-			defer e2evolume.TestServerCleanup(f, config)
+		ginkgo.It("should be mountable for NFSv3", func(ctx context.Context) {
+			config, _, serverHost := e2evolume.NewNFSServer(ctx, c, namespace.Name, []string{})
+			ginkgo.DeferCleanup(e2evolume.TestServerCleanup, f, config)
 
 			tests := []e2evolume.Test{
 				{
@@ -120,42 +115,7 @@ var _ = SIGDescribe("Volumes", func() {
 				},
 			}
 			// Must match content of test/images/volume-tester/nfs/index.html
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
-		})
-	})
-
-	////////////////////////////////////////////////////////////////////////
-	// Gluster
-	////////////////////////////////////////////////////////////////////////
-	ginkgo.Describe("GlusterFS", func() {
-		ginkgo.It("should be mountable", func() {
-			// create gluster server and endpoints
-			config, _, _ := e2evolume.NewGlusterfsServer(c, namespace.Name)
-			name := config.Prefix + "-server"
-			defer func() {
-				e2evolume.TestServerCleanup(f, config)
-				err := c.CoreV1().Endpoints(namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
-				if !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err, "defer: Gluster delete endpoints failed")
-				}
-			}()
-
-			tests := []e2evolume.Test{
-				{
-					Volume: v1.VolumeSource{
-						Glusterfs: &v1.GlusterfsVolumeSource{
-							EndpointsName: name,
-							// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
-							Path:     "test_vol",
-							ReadOnly: true,
-						},
-					},
-					File: "index.html",
-					// Must match content of test/images/volumes-tester/gluster/index.html
-					ExpectedContent: "Hello from GlusterFS!",
-				},
-			}
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(ctx, f, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

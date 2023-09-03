@@ -21,10 +21,12 @@ package runtime
 
 // TypeMeta is shared by all top level objects. The proper way to use it is to inline it in your type,
 // like this:
-// type MyAwesomeAPIObject struct {
-//      runtime.TypeMeta    `json:",inline"`
-//      ... // other fields
-// }
+//
+//	type MyAwesomeAPIObject struct {
+//	     runtime.TypeMeta    `json:",inline"`
+//	     ... // other fields
+//	}
+//
 // func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *metav1.GroupVersionKind) { metav1.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind
 //
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
@@ -53,32 +55,37 @@ const (
 // various plugin types.
 //
 // // Internal package:
-// type MyAPIObject struct {
-// 	runtime.TypeMeta `json:",inline"`
-//	MyPlugin runtime.Object `json:"myPlugin"`
-// }
-// type PluginA struct {
-//	AOption string `json:"aOption"`
-// }
+//
+//	type MyAPIObject struct {
+//		runtime.TypeMeta `json:",inline"`
+//		MyPlugin runtime.Object `json:"myPlugin"`
+//	}
+//
+//	type PluginA struct {
+//		AOption string `json:"aOption"`
+//	}
 //
 // // External package:
-// type MyAPIObject struct {
-// 	runtime.TypeMeta `json:",inline"`
-//	MyPlugin runtime.RawExtension `json:"myPlugin"`
-// }
-// type PluginA struct {
-//	AOption string `json:"aOption"`
-// }
+//
+//	type MyAPIObject struct {
+//		runtime.TypeMeta `json:",inline"`
+//		MyPlugin runtime.RawExtension `json:"myPlugin"`
+//	}
+//
+//	type PluginA struct {
+//		AOption string `json:"aOption"`
+//	}
 //
 // // On the wire, the JSON will look something like this:
-// {
-//	"kind":"MyAPIObject",
-//	"apiVersion":"v1",
-//	"myPlugin": {
-//		"kind":"PluginA",
-//		"aOption":"foo",
-//	},
-// }
+//
+//	{
+//		"kind":"MyAPIObject",
+//		"apiVersion":"v1",
+//		"myPlugin": {
+//			"kind":"PluginA",
+//			"aOption":"foo",
+//		},
+//	}
 //
 // So what happens? Decode first uses json or yaml to unmarshal the serialized data into
 // your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked.
@@ -116,7 +123,7 @@ type Unknown struct {
 	// Raw will hold the complete serialized object which couldn't be matched
 	// with a registered type. Most likely, nothing should be done with this
 	// except for passing it through the system.
-	Raw []byte `protobuf:"bytes,2,opt,name=raw"`
+	Raw []byte `json:"-" protobuf:"bytes,2,opt,name=raw"`
 	// ContentEncoding is encoding used to encode 'Raw' data.
 	// Unspecified means no encoding.
 	ContentEncoding string `protobuf:"bytes,3,opt,name=contentEncoding"`

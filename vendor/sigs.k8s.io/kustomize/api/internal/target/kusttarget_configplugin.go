@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -285,6 +286,13 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 			if label.IncludeSelectors {
 				fss, err = fss.MergeAll(tc.CommonLabels)
 			} else {
+				// merge spec/template/metadata fieldSpecs if includeTemplate flag is true
+				if label.IncludeTemplates {
+					fss, err = fss.MergeAll(tc.TemplateLabels)
+					if err != nil {
+						return nil, errors.WrapPrefixf(err, "failed to merge template fieldSpec")
+					}
+				}
 				// only add to metadata by default
 				fss, err = fss.MergeOne(types.FieldSpec{Path: "metadata/labels", CreateIfNotPresent: true})
 			}

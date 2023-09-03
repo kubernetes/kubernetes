@@ -27,7 +27,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 
-kube::golang::verify_go_version
+# This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
+kube::golang::setup_env
 kube::util::ensure-temp-dir
 
 
@@ -51,22 +52,13 @@ packages_flagged=()
 packages_url_missing=()
 exit_code=0
 
-git remote add licenses https://github.com/kubernetes/kubernetes >/dev/null 2>&1 || true
-
-
 # Install go-licenses
 echo '[INFO] Installing go-licenses...'
-pushd "${KUBE_TEMP}" >/dev/null
-    git clone https://github.com/google/go-licenses.git >/dev/null 2>&1
-    cd go-licenses
-    go build -o "${GOPATH}/bin"
-popd >/dev/null
-
+go install github.com/google/go-licenses@latest
 
 # Fetching CNCF Approved List Of Licenses
 # Refer: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md
 curl -s 'https://spdx.org/licenses/licenses.json' -o "${KUBE_TEMP}"/licenses.json
-
 
 number_of_licenses=$(jq '.licenses | length' "${KUBE_TEMP}"/licenses.json)
 loop_index_length=$(( number_of_licenses - 1 ))
@@ -85,8 +77,7 @@ done
 
 # Scanning go-packages under the project & verifying against the CNCF approved list of licenses
 echo '[INFO] Starting license scan on go-packages...'
-go-licenses csv --git_remote licenses ./... >> "${KUBE_TEMP}"/licenses.csv 2>/dev/null
-
+go-licenses report ./... >> "${KUBE_TEMP}"/licenses.csv
 
 echo -e 'PACKAGE_NAME  LICENSE_NAME  LICENSE_URL\n' >> "${KUBE_TEMP}"/approved_licenses.dump
 while IFS=, read -r GO_PACKAGE LICENSE_URL LICENSE_NAME
@@ -138,15 +129,11 @@ do
 			echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses.dump
 		fi
 	else
-		echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"notapproved_licenses.dump
+		echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/notapproved_licenses.dump
 		packages_flagged+=("${GO_PACKAGE}")
 	fi
 done < "${KUBE_TEMP}"/licenses.csv
 awk '{ printf "%-100s : %-20s : %s\n", $1, $2, $3 }' "${KUBE_TEMP}"/approved_licenses.dump
-
-
-# cleanup
-git remote remove licenses
 
 
 if [[ ${#packages_url_missing[@]} -gt 0 ]]; then

@@ -4,12 +4,14 @@ approvers:
   - fabriziopandini
   - neolit123
   - SataQiu
+  - pacoxu
 reviewers:
   - fabriziopandini
   - neolit123
   - SataQiu
   - pacoxu
   - RA489
+  - chendave
 emeritus_approvers:
   - luxas
   - timothysc

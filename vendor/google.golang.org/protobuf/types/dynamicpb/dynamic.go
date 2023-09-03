@@ -9,24 +9,24 @@ import (
 	"math"
 
 	"google.golang.org/protobuf/internal/errors"
-	pref "google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/runtime/protoiface"
 	"google.golang.org/protobuf/runtime/protoimpl"
 )
 
 // enum is a dynamic protoreflect.Enum.
 type enum struct {
-	num pref.EnumNumber
-	typ pref.EnumType
+	num protoreflect.EnumNumber
+	typ protoreflect.EnumType
 }
 
-func (e enum) Descriptor() pref.EnumDescriptor { return e.typ.Descriptor() }
-func (e enum) Type() pref.EnumType             { return e.typ }
-func (e enum) Number() pref.EnumNumber         { return e.num }
+func (e enum) Descriptor() protoreflect.EnumDescriptor { return e.typ.Descriptor() }
+func (e enum) Type() protoreflect.EnumType             { return e.typ }
+func (e enum) Number() protoreflect.EnumNumber         { return e.num }
 
 // enumType is a dynamic protoreflect.EnumType.
 type enumType struct {
-	desc pref.EnumDescriptor
+	desc protoreflect.EnumDescriptor
 }
 
 // NewEnumType creates a new EnumType with the provided descriptor.
@@ -35,12 +35,12 @@ type enumType struct {
 // That is, if ed1 == ed2, then NewEnumType(ed1) == NewEnumType(ed2).
 //
 // Enum values created by the EnumType are equal if their numbers are equal.
-func NewEnumType(desc pref.EnumDescriptor) pref.EnumType {
+func NewEnumType(desc protoreflect.EnumDescriptor) protoreflect.EnumType {
 	return enumType{desc}
 }
 
-func (et enumType) New(n pref.EnumNumber) pref.Enum { return enum{n, et} }
-func (et enumType) Descriptor() pref.EnumDescriptor { return et.desc }
+func (et enumType) New(n protoreflect.EnumNumber) protoreflect.Enum { return enum{n, et} }
+func (et enumType) Descriptor() protoreflect.EnumDescriptor         { return et.desc }
 
 // extensionType is a dynamic protoreflect.ExtensionType.
 type extensionType struct {
@@ -64,23 +64,23 @@ type extensionType struct {
 // Operations which modify a Message are not safe for concurrent use.
 type Message struct {
 	typ     messageType
-	known   map[pref.FieldNumber]pref.Value
-	ext     map[pref.FieldNumber]pref.FieldDescriptor
-	unknown pref.RawFields
+	known   map[protoreflect.FieldNumber]protoreflect.Value
+	ext     map[protoreflect.FieldNumber]protoreflect.FieldDescriptor
+	unknown protoreflect.RawFields
 }
 
 var (
-	_ pref.Message         = (*Message)(nil)
-	_ pref.ProtoMessage    = (*Message)(nil)
-	_ protoiface.MessageV1 = (*Message)(nil)
+	_ protoreflect.Message      = (*Message)(nil)
+	_ protoreflect.ProtoMessage = (*Message)(nil)
+	_ protoiface.MessageV1      = (*Message)(nil)
 )
 
 // NewMessage creates a new message with the provided descriptor.
-func NewMessage(desc pref.MessageDescriptor) *Message {
+func NewMessage(desc protoreflect.MessageDescriptor) *Message {
 	return &Message{
 		typ:   messageType{desc},
-		known: make(map[pref.FieldNumber]pref.Value),
-		ext:   make(map[pref.FieldNumber]pref.FieldDescriptor),
+		known: make(map[protoreflect.FieldNumber]protoreflect.Value),
+		ext:   make(map[protoreflect.FieldNumber]protoreflect.FieldDescriptor),
 	}
 }
 
@@ -88,7 +88,7 @@ func NewMessage(desc pref.MessageDescriptor) *Message {
 func (m *Message) ProtoMessage() {}
 
 // ProtoReflect implements the protoreflect.ProtoMessage interface.
-func (m *Message) ProtoReflect() pref.Message {
+func (m *Message) ProtoReflect() protoreflect.Message {
 	return m
 }
 
@@ -99,30 +99,30 @@ func (m *Message) String() string {
 
 // Reset clears the message to be empty, but preserves the dynamic message type.
 func (m *Message) Reset() {
-	m.known = make(map[pref.FieldNumber]pref.Value)
-	m.ext = make(map[pref.FieldNumber]pref.FieldDescriptor)
+	m.known = make(map[protoreflect.FieldNumber]protoreflect.Value)
+	m.ext = make(map[protoreflect.FieldNumber]protoreflect.FieldDescriptor)
 	m.unknown = nil
 }
 
 // Descriptor returns the message descriptor.
-func (m *Message) Descriptor() pref.MessageDescriptor {
+func (m *Message) Descriptor() protoreflect.MessageDescriptor {
 	return m.typ.desc
 }
 
 // Type returns the message type.
-func (m *Message) Type() pref.MessageType {
+func (m *Message) Type() protoreflect.MessageType {
 	return m.typ
 }
 
 // New returns a newly allocated empty message with the same descriptor.
 // See protoreflect.Message for details.
-func (m *Message) New() pref.Message {
+func (m *Message) New() protoreflect.Message {
 	return m.Type().New()
 }
 
 // Interface returns the message.
 // See protoreflect.Message for details.
-func (m *Message) Interface() pref.ProtoMessage {
+func (m *Message) Interface() protoreflect.ProtoMessage {
 	return m
 }
 
@@ -134,7 +134,7 @@ func (m *Message) ProtoMethods() *protoiface.Methods {
 
 // Range visits every populated field in undefined order.
 // See protoreflect.Message for details.
-func (m *Message) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
+func (m *Message) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
 	for num, v := range m.known {
 		fd := m.ext[num]
 		if fd == nil {
@@ -151,7 +151,7 @@ func (m *Message) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
 
 // Has reports whether a field is populated.
 // See protoreflect.Message for details.
-func (m *Message) Has(fd pref.FieldDescriptor) bool {
+func (m *Message) Has(fd protoreflect.FieldDescriptor) bool {
 	m.checkField(fd)
 	if fd.IsExtension() && m.ext[fd.Number()] != fd {
 		return false
@@ -165,7 +165,7 @@ func (m *Message) Has(fd pref.FieldDescriptor) bool {
 
 // Clear clears a field.
 // See protoreflect.Message for details.
-func (m *Message) Clear(fd pref.FieldDescriptor) {
+func (m *Message) Clear(fd protoreflect.FieldDescriptor) {
 	m.checkField(fd)
 	num := fd.Number()
 	delete(m.known, num)
@@ -174,12 +174,12 @@ func (m *Message) Clear(fd pref.FieldDescriptor) {
 
 // Get returns the value of a field.
 // See protoreflect.Message for details.
-func (m *Message) Get(fd pref.FieldDescriptor) pref.Value {
+func (m *Message) Get(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	m.checkField(fd)
 	num := fd.Number()
 	if fd.IsExtension() {
 		if fd != m.ext[num] {
-			return fd.(pref.ExtensionTypeDescriptor).Type().Zero()
+			return fd.(protoreflect.ExtensionTypeDescriptor).Type().Zero()
 		}
 		return m.known[num]
 	}
@@ -199,13 +199,13 @@ func (m *Message) Get(fd pref.FieldDescriptor) pref.Value {
 	}
 	switch {
 	case fd.IsMap():
-		return pref.ValueOfMap(&dynamicMap{desc: fd})
+		return protoreflect.ValueOfMap(&dynamicMap{desc: fd})
 	case fd.IsList():
-		return pref.ValueOfList(emptyList{desc: fd})
+		return protoreflect.ValueOfList(emptyList{desc: fd})
 	case fd.Message() != nil:
-		return pref.ValueOfMessage(&Message{typ: messageType{fd.Message()}})
-	case fd.Kind() == pref.BytesKind:
-		return pref.ValueOfBytes(append([]byte(nil), fd.Default().Bytes()...))
+		return protoreflect.ValueOfMessage(&Message{typ: messageType{fd.Message()}})
+	case fd.Kind() == protoreflect.BytesKind:
+		return protoreflect.ValueOfBytes(append([]byte(nil), fd.Default().Bytes()...))
 	default:
 		return fd.Default()
 	}
@@ -213,7 +213,7 @@ func (m *Message) Get(fd pref.FieldDescriptor) pref.Value {
 
 // Mutable returns a mutable reference to a repeated, map, or message field.
 // See protoreflect.Message for details.
-func (m *Message) Mutable(fd pref.FieldDescriptor) pref.Value {
+func (m *Message) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	m.checkField(fd)
 	if !fd.IsMap() && !fd.IsList() && fd.Message() == nil {
 		panic(errors.New("%v: getting mutable reference to non-composite type", fd.FullName()))
@@ -225,7 +225,7 @@ func (m *Message) Mutable(fd pref.FieldDescriptor) pref.Value {
 	if fd.IsExtension() {
 		if fd != m.ext[num] {
 			m.ext[num] = fd
-			m.known[num] = fd.(pref.ExtensionTypeDescriptor).Type().New()
+			m.known[num] = fd.(protoreflect.ExtensionTypeDescriptor).Type().New()
 		}
 		return m.known[num]
 	}
@@ -242,7 +242,7 @@ func (m *Message) Mutable(fd pref.FieldDescriptor) pref.Value {
 
 // Set stores a value in a field.
 // See protoreflect.Message for details.
-func (m *Message) Set(fd pref.FieldDescriptor, v pref.Value) {
+func (m *Message) Set(fd protoreflect.FieldDescriptor, v protoreflect.Value) {
 	m.checkField(fd)
 	if m.known == nil {
 		panic(errors.New("%v: modification of read-only message", fd.FullName()))
@@ -250,7 +250,7 @@ func (m *Message) Set(fd pref.FieldDescriptor, v pref.Value) {
 	if fd.IsExtension() {
 		isValid := true
 		switch {
-		case !fd.(pref.ExtensionTypeDescriptor).Type().IsValidValue(v):
+		case !fd.(protoreflect.ExtensionTypeDescriptor).Type().IsValidValue(v):
 			isValid = false
 		case fd.IsList():
 			isValid = v.List().IsValid()
@@ -270,7 +270,7 @@ func (m *Message) Set(fd pref.FieldDescriptor, v pref.Value) {
 	m.known[fd.Number()] = v
 }
 
-func (m *Message) clearOtherOneofFields(fd pref.FieldDescriptor) {
+func (m *Message) clearOtherOneofFields(fd protoreflect.FieldDescriptor) {
 	od := fd.ContainingOneof()
 	if od == nil {
 		return
@@ -285,20 +285,20 @@ func (m *Message) clearOtherOneofFields(fd pref.FieldDescriptor) {
 
 // NewField returns a new value for assignable to the field of a given descriptor.
 // See protoreflect.Message for details.
-func (m *Message) NewField(fd pref.FieldDescriptor) pref.Value {
+func (m *Message) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	m.checkField(fd)
 	switch {
 	case fd.IsExtension():
-		return fd.(pref.ExtensionTypeDescriptor).Type().New()
+		return fd.(protoreflect.ExtensionTypeDescriptor).Type().New()
 	case fd.IsMap():
-		return pref.ValueOfMap(&dynamicMap{
+		return protoreflect.ValueOfMap(&dynamicMap{
 			desc: fd,
-			mapv: make(map[interface{}]pref.Value),
+			mapv: make(map[interface{}]protoreflect.Value),
 		})
 	case fd.IsList():
-		return pref.ValueOfList(&dynamicList{desc: fd})
+		return protoreflect.ValueOfList(&dynamicList{desc: fd})
 	case fd.Message() != nil:
-		return pref.ValueOfMessage(NewMessage(fd.Message()).ProtoReflect())
+		return protoreflect.ValueOfMessage(NewMessage(fd.Message()).ProtoReflect())
 	default:
 		return fd.Default()
 	}
@@ -306,7 +306,7 @@ func (m *Message) NewField(fd pref.FieldDescriptor) pref.Value {
 
 // WhichOneof reports which field in a oneof is populated, returning nil if none are populated.
 // See protoreflect.Message for details.
-func (m *Message) WhichOneof(od pref.OneofDescriptor) pref.FieldDescriptor {
+func (m *Message) WhichOneof(od protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
 	for i := 0; i < od.Fields().Len(); i++ {
 		fd := od.Fields().Get(i)
 		if m.Has(fd) {
@@ -318,13 +318,13 @@ func (m *Message) WhichOneof(od pref.OneofDescriptor) pref.FieldDescriptor {
 
 // GetUnknown returns the raw unknown fields.
 // See protoreflect.Message for details.
-func (m *Message) GetUnknown() pref.RawFields {
+func (m *Message) GetUnknown() protoreflect.RawFields {
 	return m.unknown
 }
 
 // SetUnknown sets the raw unknown fields.
 // See protoreflect.Message for details.
-func (m *Message) SetUnknown(r pref.RawFields) {
+func (m *Message) SetUnknown(r protoreflect.RawFields) {
 	if m.known == nil {
 		panic(errors.New("%v: modification of read-only message", m.typ.desc.FullName()))
 	}
@@ -337,9 +337,9 @@ func (m *Message) IsValid() bool {
 	return m.known != nil
 }
 
-func (m *Message) checkField(fd pref.FieldDescriptor) {
+func (m *Message) checkField(fd protoreflect.FieldDescriptor) {
 	if fd.IsExtension() && fd.ContainingMessage().FullName() == m.Descriptor().FullName() {
-		if _, ok := fd.(pref.ExtensionTypeDescriptor); !ok {
+		if _, ok := fd.(protoreflect.ExtensionTypeDescriptor); !ok {
 			panic(errors.New("%v: extension field descriptor does not implement ExtensionTypeDescriptor", fd.FullName()))
 		}
 		return
@@ -355,27 +355,27 @@ func (m *Message) checkField(fd pref.FieldDescriptor) {
 }
 
 type messageType struct {
-	desc pref.MessageDescriptor
+	desc protoreflect.MessageDescriptor
 }
 
 // NewMessageType creates a new MessageType with the provided descriptor.
 //
 // MessageTypes created by this package are equal if their descriptors are equal.
 // That is, if md1 == md2, then NewMessageType(md1) == NewMessageType(md2).
-func NewMessageType(desc pref.MessageDescriptor) pref.MessageType {
+func NewMessageType(desc protoreflect.MessageDescriptor) protoreflect.MessageType {
 	return messageType{desc}
 }
 
-func (mt messageType) New() pref.Message                  { return NewMessage(mt.desc) }
-func (mt messageType) Zero() pref.Message                 { return &Message{typ: messageType{mt.desc}} }
-func (mt messageType) Descriptor() pref.MessageDescriptor { return mt.desc }
-func (mt messageType) Enum(i int) pref.EnumType {
+func (mt messageType) New() protoreflect.Message                  { return NewMessage(mt.desc) }
+func (mt messageType) Zero() protoreflect.Message                 { return &Message{typ: messageType{mt.desc}} }
+func (mt messageType) Descriptor() protoreflect.MessageDescriptor { return mt.desc }
+func (mt messageType) Enum(i int) protoreflect.EnumType {
 	if ed := mt.desc.Fields().Get(i).Enum(); ed != nil {
 		return NewEnumType(ed)
 	}
 	return nil
 }
-func (mt messageType) Message(i int) pref.MessageType {
+func (mt messageType) Message(i int) protoreflect.MessageType {
 	if md := mt.desc.Fields().Get(i).Message(); md != nil {
 		return NewMessageType(md)
 	}
@@ -383,42 +383,46 @@ func (mt messageType) Message(i int) pref.MessageType {
 }
 
 type emptyList struct {
-	desc pref.FieldDescriptor
+	desc protoreflect.FieldDescriptor
 }
 
-func (x emptyList) Len() int                  { return 0 }
-func (x emptyList) Get(n int) pref.Value      { panic(errors.New("out of range")) }
-func (x emptyList) Set(n int, v pref.Value)   { panic(errors.New("modification of immutable list")) }
-func (x emptyList) Append(v pref.Value)       { panic(errors.New("modification of immutable list")) }
-func (x emptyList) AppendMutable() pref.Value { panic(errors.New("modification of immutable list")) }
-func (x emptyList) Truncate(n int)            { panic(errors.New("modification of immutable list")) }
-func (x emptyList) NewElement() pref.Value    { return newListEntry(x.desc) }
-func (x emptyList) IsValid() bool             { return false }
+func (x emptyList) Len() int                     { return 0 }
+func (x emptyList) Get(n int) protoreflect.Value { panic(errors.New("out of range")) }
+func (x emptyList) Set(n int, v protoreflect.Value) {
+	panic(errors.New("modification of immutable list"))
+}
+func (x emptyList) Append(v protoreflect.Value) { panic(errors.New("modification of immutable list")) }
+func (x emptyList) AppendMutable() protoreflect.Value {
+	panic(errors.New("modification of immutable list"))
+}
+func (x emptyList) Truncate(n int)                 { panic(errors.New("modification of immutable list")) }
+func (x emptyList) NewElement() protoreflect.Value { return newListEntry(x.desc) }
+func (x emptyList) IsValid() bool                  { return false }
 
 type dynamicList struct {
-	desc pref.FieldDescriptor
-	list []pref.Value
+	desc protoreflect.FieldDescriptor
+	list []protoreflect.Value
 }
 
 func (x *dynamicList) Len() int {
 	return len(x.list)
 }
 
-func (x *dynamicList) Get(n int) pref.Value {
+func (x *dynamicList) Get(n int) protoreflect.Value {
 	return x.list[n]
 }
 
-func (x *dynamicList) Set(n int, v pref.Value) {
+func (x *dynamicList) Set(n int, v protoreflect.Value) {
 	typecheckSingular(x.desc, v)
 	x.list[n] = v
 }
 
-func (x *dynamicList) Append(v pref.Value) {
+func (x *dynamicList) Append(v protoreflect.Value) {
 	typecheckSingular(x.desc, v)
 	x.list = append(x.list, v)
 }
 
-func (x *dynamicList) AppendMutable() pref.Value {
+func (x *dynamicList) AppendMutable() protoreflect.Value {
 	if x.desc.Message() == nil {
 		panic(errors.New("%v: invalid AppendMutable on list with non-message type", x.desc.FullName()))
 	}
@@ -430,12 +434,12 @@ func (x *dynamicList) AppendMutable() pref.Value {
 func (x *dynamicList) Truncate(n int) {
 	// Zero truncated elements to avoid keeping data live.
 	for i := n; i < len(x.list); i++ {
-		x.list[i] = pref.Value{}
+		x.list[i] = protoreflect.Value{}
 	}
 	x.list = x.list[:n]
 }
 
-func (x *dynamicList) NewElement() pref.Value {
+func (x *dynamicList) NewElement() protoreflect.Value {
 	return newListEntry(x.desc)
 }
 
@@ -444,19 +448,19 @@ func (x *dynamicList) IsValid() bool {
 }
 
 type dynamicMap struct {
-	desc pref.FieldDescriptor
-	mapv map[interface{}]pref.Value
+	desc protoreflect.FieldDescriptor
+	mapv map[interface{}]protoreflect.Value
 }
 
-func (x *dynamicMap) Get(k pref.MapKey) pref.Value { return x.mapv[k.Interface()] }
-func (x *dynamicMap) Set(k pref.MapKey, v pref.Value) {
+func (x *dynamicMap) Get(k protoreflect.MapKey) protoreflect.Value { return x.mapv[k.Interface()] }
+func (x *dynamicMap) Set(k protoreflect.MapKey, v protoreflect.Value) {
 	typecheckSingular(x.desc.MapKey(), k.Value())
 	typecheckSingular(x.desc.MapValue(), v)
 	x.mapv[k.Interface()] = v
 }
-func (x *dynamicMap) Has(k pref.MapKey) bool { return x.Get(k).IsValid() }
-func (x *dynamicMap) Clear(k pref.MapKey)    { delete(x.mapv, k.Interface()) }
-func (x *dynamicMap) Mutable(k pref.MapKey) pref.Value {
+func (x *dynamicMap) Has(k protoreflect.MapKey) bool { return x.Get(k).IsValid() }
+func (x *dynamicMap) Clear(k protoreflect.MapKey)    { delete(x.mapv, k.Interface()) }
+func (x *dynamicMap) Mutable(k protoreflect.MapKey) protoreflect.Value {
 	if x.desc.MapValue().Message() == nil {
 		panic(errors.New("%v: invalid Mutable on map with non-message value type", x.desc.FullName()))
 	}
@@ -468,9 +472,9 @@ func (x *dynamicMap) Mutable(k pref.MapKey) pref.Value {
 	return v
 }
 func (x *dynamicMap) Len() int { return len(x.mapv) }
-func (x *dynamicMap) NewValue() pref.Value {
+func (x *dynamicMap) NewValue() protoreflect.Value {
 	if md := x.desc.MapValue().Message(); md != nil {
-		return pref.ValueOfMessage(NewMessage(md).ProtoReflect())
+		return protoreflect.ValueOfMessage(NewMessage(md).ProtoReflect())
 	}
 	return x.desc.MapValue().Default()
 }
@@ -478,15 +482,15 @@ func (x *dynamicMap) IsValid() bool {
 	return x.mapv != nil
 }
 
-func (x *dynamicMap) Range(f func(pref.MapKey, pref.Value) bool) {
+func (x *dynamicMap) Range(f func(protoreflect.MapKey, protoreflect.Value) bool) {
 	for k, v := range x.mapv {
-		if !f(pref.ValueOf(k).MapKey(), v) {
+		if !f(protoreflect.ValueOf(k).MapKey(), v) {
 			return
 		}
 	}
 }
 
-func isSet(fd pref.FieldDescriptor, v pref.Value) bool {
+func isSet(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 	switch {
 	case fd.IsMap():
 		return v.Map().Len() > 0
@@ -494,34 +498,34 @@ func isSet(fd pref.FieldDescriptor, v pref.Value) bool {
 		return v.List().Len() > 0
 	case fd.ContainingOneof() != nil:
 		return true
-	case fd.Syntax() == pref.Proto3 && !fd.IsExtension():
+	case fd.Syntax() == protoreflect.Proto3 && !fd.IsExtension():
 		switch fd.Kind() {
-		case pref.BoolKind:
+		case protoreflect.BoolKind:
 			return v.Bool()
-		case pref.EnumKind:
+		case protoreflect.EnumKind:
 			return v.Enum() != 0
-		case pref.Int32Kind, pref.Sint32Kind, pref.Int64Kind, pref.Sint64Kind, pref.Sfixed32Kind, pref.Sfixed64Kind:
+		case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind:
 			return v.Int() != 0
-		case pref.Uint32Kind, pref.Uint64Kind, pref.Fixed32Kind, pref.Fixed64Kind:
+		case protoreflect.Uint32Kind, protoreflect.Uint64Kind, protoreflect.Fixed32Kind, protoreflect.Fixed64Kind:
 			return v.Uint() != 0
-		case pref.FloatKind, pref.DoubleKind:
+		case protoreflect.FloatKind, protoreflect.DoubleKind:
 			return v.Float() != 0 || math.Signbit(v.Float())
-		case pref.StringKind:
+		case protoreflect.StringKind:
 			return v.String() != ""
-		case pref.BytesKind:
+		case protoreflect.BytesKind:
 			return len(v.Bytes()) > 0
 		}
 	}
 	return true
 }
 
-func typecheck(fd pref.FieldDescriptor, v pref.Value) {
+func typecheck(fd protoreflect.FieldDescriptor, v protoreflect.Value) {
 	if err := typeIsValid(fd, v); err != nil {
 		panic(err)
 	}
 }
 
-func typeIsValid(fd pref.FieldDescriptor, v pref.Value) error {
+func typeIsValid(fd protoreflect.FieldDescriptor, v protoreflect.Value) error {
 	switch {
 	case !v.IsValid():
 		return errors.New("%v: assigning invalid value", fd.FullName())
@@ -547,40 +551,40 @@ func typeIsValid(fd pref.FieldDescriptor, v pref.Value) error {
 	}
 }
 
-func typecheckSingular(fd pref.FieldDescriptor, v pref.Value) {
+func typecheckSingular(fd protoreflect.FieldDescriptor, v protoreflect.Value) {
 	if err := singularTypeIsValid(fd, v); err != nil {
 		panic(err)
 	}
 }
 
-func singularTypeIsValid(fd pref.FieldDescriptor, v pref.Value) error {
+func singularTypeIsValid(fd protoreflect.FieldDescriptor, v protoreflect.Value) error {
 	vi := v.Interface()
 	var ok bool
 	switch fd.Kind() {
-	case pref.BoolKind:
+	case protoreflect.BoolKind:
 		_, ok = vi.(bool)
-	case pref.EnumKind:
+	case protoreflect.EnumKind:
 		// We could check against the valid set of enum values, but do not.
-		_, ok = vi.(pref.EnumNumber)
-	case pref.Int32Kind, pref.Sint32Kind, pref.Sfixed32Kind:
+		_, ok = vi.(protoreflect.EnumNumber)
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
 		_, ok = vi.(int32)
-	case pref.Uint32Kind, pref.Fixed32Kind:
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
 		_, ok = vi.(uint32)
-	case pref.Int64Kind, pref.Sint64Kind, pref.Sfixed64Kind:
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
 		_, ok = vi.(int64)
-	case pref.Uint64Kind, pref.Fixed64Kind:
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
 		_, ok = vi.(uint64)
-	case pref.FloatKind:
+	case protoreflect.FloatKind:
 		_, ok = vi.(float32)
-	case pref.DoubleKind:
+	case protoreflect.DoubleKind:
 		_, ok = vi.(float64)
-	case pref.StringKind:
+	case protoreflect.StringKind:
 		_, ok = vi.(string)
-	case pref.BytesKind:
+	case protoreflect.BytesKind:
 		_, ok = vi.([]byte)
-	case pref.MessageKind, pref.GroupKind:
-		var m pref.Message
-		m, ok = vi.(pref.Message)
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		var m protoreflect.Message
+		m, ok = vi.(protoreflect.Message)
 		if ok && m.Descriptor().FullName() != fd.Message().FullName() {
 			return errors.New("%v: assigning invalid message type %v", fd.FullName(), m.Descriptor().FullName())
 		}
@@ -594,30 +598,30 @@ func singularTypeIsValid(fd pref.FieldDescriptor, v pref.Value) error {
 	return nil
 }
 
-func newListEntry(fd pref.FieldDescriptor) pref.Value {
+func newListEntry(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.Kind() {
-	case pref.BoolKind:
-		return pref.ValueOfBool(false)
-	case pref.EnumKind:
-		return pref.ValueOfEnum(fd.Enum().Values().Get(0).Number())
-	case pref.Int32Kind, pref.Sint32Kind, pref.Sfixed32Kind:
-		return pref.ValueOfInt32(0)
-	case pref.Uint32Kind, pref.Fixed32Kind:
-		return pref.ValueOfUint32(0)
-	case pref.Int64Kind, pref.Sint64Kind, pref.Sfixed64Kind:
-		return pref.ValueOfInt64(0)
-	case pref.Uint64Kind, pref.Fixed64Kind:
-		return pref.ValueOfUint64(0)
-	case pref.FloatKind:
-		return pref.ValueOfFloat32(0)
-	case pref.DoubleKind:
-		return pref.ValueOfFloat64(0)
-	case pref.StringKind:
-		return pref.ValueOfString("")
-	case pref.BytesKind:
-		return pref.ValueOfBytes(nil)
-	case pref.MessageKind, pref.GroupKind:
-		return pref.ValueOfMessage(NewMessage(fd.Message()).ProtoReflect())
+	case protoreflect.BoolKind:
+		return protoreflect.ValueOfBool(false)
+	case protoreflect.EnumKind:
+		return protoreflect.ValueOfEnum(fd.Enum().Values().Get(0).Number())
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		return protoreflect.ValueOfInt32(0)
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return protoreflect.ValueOfUint32(0)
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		return protoreflect.ValueOfInt64(0)
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return protoreflect.ValueOfUint64(0)
+	case protoreflect.FloatKind:
+		return protoreflect.ValueOfFloat32(0)
+	case protoreflect.DoubleKind:
+		return protoreflect.ValueOfFloat64(0)
+	case protoreflect.StringKind:
+		return protoreflect.ValueOfString("")
+	case protoreflect.BytesKind:
+		return protoreflect.ValueOfBytes(nil)
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		return protoreflect.ValueOfMessage(NewMessage(fd.Message()).ProtoReflect())
 	}
 	panic(errors.New("%v: unknown kind %v", fd.FullName(), fd.Kind()))
 }
@@ -641,73 +645,73 @@ func newListEntry(fd pref.FieldDescriptor) pref.Value {
 // is determined by these methods, and is therefore equivalent to the Go type
 // used to represent a protoreflect.Value. See the protoreflect.Value
 // documentation for more details.
-func NewExtensionType(desc pref.ExtensionDescriptor) pref.ExtensionType {
-	if xt, ok := desc.(pref.ExtensionTypeDescriptor); ok {
+func NewExtensionType(desc protoreflect.ExtensionDescriptor) protoreflect.ExtensionType {
+	if xt, ok := desc.(protoreflect.ExtensionTypeDescriptor); ok {
 		desc = xt.Descriptor()
 	}
 	return extensionType{extensionTypeDescriptor{desc}}
 }
 
-func (xt extensionType) New() pref.Value {
+func (xt extensionType) New() protoreflect.Value {
 	switch {
 	case xt.desc.IsMap():
-		return pref.ValueOfMap(&dynamicMap{
+		return protoreflect.ValueOfMap(&dynamicMap{
 			desc: xt.desc,
-			mapv: make(map[interface{}]pref.Value),
+			mapv: make(map[interface{}]protoreflect.Value),
 		})
 	case xt.desc.IsList():
-		return pref.ValueOfList(&dynamicList{desc: xt.desc})
+		return protoreflect.ValueOfList(&dynamicList{desc: xt.desc})
 	case xt.desc.Message() != nil:
-		return pref.ValueOfMessage(NewMessage(xt.desc.Message()))
+		return protoreflect.ValueOfMessage(NewMessage(xt.desc.Message()))
 	default:
 		return xt.desc.Default()
 	}
 }
 
-func (xt extensionType) Zero() pref.Value {
+func (xt extensionType) Zero() protoreflect.Value {
 	switch {
 	case xt.desc.IsMap():
-		return pref.ValueOfMap(&dynamicMap{desc: xt.desc})
-	case xt.desc.Cardinality() == pref.Repeated:
-		return pref.ValueOfList(emptyList{desc: xt.desc})
+		return protoreflect.ValueOfMap(&dynamicMap{desc: xt.desc})
+	case xt.desc.Cardinality() == protoreflect.Repeated:
+		return protoreflect.ValueOfList(emptyList{desc: xt.desc})
 	case xt.desc.Message() != nil:
-		return pref.ValueOfMessage(&Message{typ: messageType{xt.desc.Message()}})
+		return protoreflect.ValueOfMessage(&Message{typ: messageType{xt.desc.Message()}})
 	default:
 		return xt.desc.Default()
 	}
 }
 
-func (xt extensionType) TypeDescriptor() pref.ExtensionTypeDescriptor {
+func (xt extensionType) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
 	return xt.desc
 }
 
-func (xt extensionType) ValueOf(iv interface{}) pref.Value {
-	v := pref.ValueOf(iv)
+func (xt extensionType) ValueOf(iv interface{}) protoreflect.Value {
+	v := protoreflect.ValueOf(iv)
 	typecheck(xt.desc, v)
 	return v
 }
 
-func (xt extensionType) InterfaceOf(v pref.Value) interface{} {
+func (xt extensionType) InterfaceOf(v protoreflect.Value) interface{} {
 	typecheck(xt.desc, v)
 	return v.Interface()
 }
 
 func (xt extensionType) IsValidInterface(iv interface{}) bool {
-	return typeIsValid(xt.desc, pref.ValueOf(iv)) == nil
+	return typeIsValid(xt.desc, protoreflect.ValueOf(iv)) == nil
 }
 
-func (xt extensionType) IsValidValue(v pref.Value) bool {
+func (xt extensionType) IsValidValue(v protoreflect.Value) bool {
 	return typeIsValid(xt.desc, v) == nil
 }
 
 type extensionTypeDescriptor struct {
-	pref.ExtensionDescriptor
+	protoreflect.ExtensionDescriptor
 }
 
-func (xt extensionTypeDescriptor) Type() pref.ExtensionType {
+func (xt extensionTypeDescriptor) Type() protoreflect.ExtensionType {
 	return extensionType{xt}
 }
 
-func (xt extensionTypeDescriptor) Descriptor() pref.ExtensionDescriptor {
+func (xt extensionTypeDescriptor) Descriptor() protoreflect.ExtensionDescriptor {
 	return xt.ExtensionDescriptor
 }

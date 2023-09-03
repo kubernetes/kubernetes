@@ -20,8 +20,6 @@ import (
 	"fmt"
 
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PolicyRuleBuilder let's us attach methods.  A no-no for API types.
@@ -29,12 +27,6 @@ import (
 // out in a literal and allows us to perform some basic checking during construction
 type PolicyRuleBuilder struct {
 	PolicyRule rbacv1alpha1.PolicyRule `protobuf:"bytes,1,opt,name=policyRule"`
-}
-
-func NewRule(verbs ...string) *PolicyRuleBuilder {
-	return &PolicyRuleBuilder{
-		PolicyRule: rbacv1alpha1.PolicyRule{Verbs: verbs},
-	}
 }
 
 func (r *PolicyRuleBuilder) Groups(groups ...string) *PolicyRuleBuilder {
@@ -95,19 +87,6 @@ func (r *PolicyRuleBuilder) Rule() (rbacv1alpha1.PolicyRule, error) {
 // out in a literal.
 type ClusterRoleBindingBuilder struct {
 	ClusterRoleBinding rbacv1alpha1.ClusterRoleBinding `protobuf:"bytes,1,opt,name=clusterRoleBinding"`
-}
-
-func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
-	return &ClusterRoleBindingBuilder{
-		ClusterRoleBinding: rbacv1alpha1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
-			RoleRef: rbacv1alpha1.RoleRef{
-				APIGroup: GroupName,
-				Kind:     "ClusterRole",
-				Name:     clusterRoleName,
-			},
-		},
-	}
 }
 
 func (r *ClusterRoleBindingBuilder) Groups(groups ...string) *ClusterRoleBindingBuilder {

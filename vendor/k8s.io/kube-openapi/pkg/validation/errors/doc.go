@@ -13,7 +13,6 @@
 // limitations under the License.
 
 /*
-
 Package errors provides an Error interface and several concrete types
 implementing this interface to manage API errors and JSON-schema validation
 errors.
@@ -23,6 +22,5 @@ it defines.
 
 It is used throughout the various go-openapi toolkit libraries
 (https://github.com/go-openapi).
-
 */
 package errors

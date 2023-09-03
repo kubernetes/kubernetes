@@ -1,3 +1,0 @@
-apiVersion: v1
-kind: ServiceProxyOptions
-path: "2"

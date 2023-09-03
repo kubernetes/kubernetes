@@ -19,7 +19,6 @@ package remotecommand
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"k8s.io/api/core/v1"
@@ -29,8 +28,8 @@ import (
 
 // streamProtocolV1 implements the first version of the streaming exec & attach
 // protocol. This version has some bugs, such as not being able to detect when
-// non-interactive stdin data has ended. See http://issues.k8s.io/13394 and
-// http://issues.k8s.io/13395 for more details.
+// non-interactive stdin data has ended. See https://issues.k8s.io/13394 and
+// https://issues.k8s.io/13395 for more details.
 type streamProtocolV1 struct {
 	StreamOptions
 
@@ -111,7 +110,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 
 	// always read from errorStream
 	go func() {
-		message, err := ioutil.ReadAll(p.errorStream)
+		message, err := io.ReadAll(p.errorStream)
 		if err != nil && err != io.EOF {
 			errorChan <- fmt.Errorf("Error reading from error stream: %s", err)
 			return

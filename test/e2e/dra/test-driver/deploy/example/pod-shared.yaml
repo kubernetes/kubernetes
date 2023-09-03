@@ -1,0 +1,61 @@
+# One external resource claim, two pods, two containers in each pod.
+# Pods share the same resource.
+# One container uses resource, one does not.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-claim-parameters
+data:
+  a: b
+---
+apiVersion: resource.k8s.io/v1alpha2
+kind: ResourceClaim
+metadata:
+  name: shared-claim
+spec:
+  resourceClassName: example
+  parametersRef:
+    kind: ConfigMap
+    name: shared-claim-parameters
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-shared-claim
+spec:
+  restartPolicy: Never
+  containers:
+  - name: with-resource
+    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+    resources:
+      claims:
+      - name: resource
+  - name: without-resource
+    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+  resourceClaims:
+  - name: resource
+    source:
+      resourceClaimName: shared-claim
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-shared-claim-2
+spec:
+  restartPolicy: Never
+  containers:
+  - name: with-resource
+    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+    resources:
+      claims:
+      - name: resource
+  - name: without-resource
+    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+  resourceClaims:
+  - name: resource
+    source:
+      resourceClaimName: shared-claim

@@ -19,7 +19,6 @@ Or you can load specific auth plugins:
 import _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 import _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 import _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
-import _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 ```
 
 ### Configuration
@@ -38,7 +37,7 @@ import _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 
 - [**Work queues**](./workqueue): Create a hotloop-free controller with the
   rate-limited workqueue and the [informer framework][informer].
-- [**Custom Resource Definition (successor of TPR)**](https://git.k8s.io/apiextensions-apiserver/examples/client-go):
+- [**Custom Resource Definition (CRD)**](https://git.k8s.io/apiextensions-apiserver/examples/client-go):
   Register a custom resource type with the API, create/update/query this custom
   type, and write a controller that drives the cluster state based on the changes to
   the custom resources.

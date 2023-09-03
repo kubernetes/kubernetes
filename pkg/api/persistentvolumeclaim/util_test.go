@@ -23,7 +23,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -153,23 +155,47 @@ func TestPVCDataSourceSpecFilter(t *testing.T) {
 	}
 }
 
-// TestAnyDataSourceFilter checks to ensure the AnyVolumeDataSource feature gate works
-func TestAnyDataSourceFilter(t *testing.T) {
-	makeDataSource := func(apiGroup, kind, name string) *core.TypedLocalObjectReference {
-		return &core.TypedLocalObjectReference{
-			APIGroup: &apiGroup,
-			Kind:     kind,
-			Name:     name,
-		}
-	}
+var (
+	coreGroup    = ""
+	snapGroup    = "snapshot.storage.k8s.io"
+	genericGroup = "generic.storage.k8s.io"
+	pvcKind      = "PersistentVolumeClaim"
+	snapKind     = "VolumeSnapshot"
+	genericKind  = "Generic"
+	podKind      = "Pod"
+)
 
-	volumeDataSource := makeDataSource("", "PersistentVolumeClaim", "my-vol")
+func makeDataSource(apiGroup, kind, name string) *core.TypedLocalObjectReference {
+	return &core.TypedLocalObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     kind,
+		Name:     name,
+	}
+}
+
+func makeDataSourceRef(apiGroup, kind, name string, namespace *string) *core.TypedObjectReference {
+	return &core.TypedObjectReference{
+		APIGroup:  &apiGroup,
+		Kind:      kind,
+		Name:      name,
+		Namespace: namespace,
+	}
+}
+
+// TestDataSourceFilter checks to ensure the AnyVolumeDataSource feature gate and CrossNamespaceVolumeDataSource works
+func TestDataSourceFilter(t *testing.T) {
+	ns := "ns1"
+	volumeDataSource := makeDataSource(coreGroup, pvcKind, "my-vol")
+	volumeDataSourceRef := makeDataSourceRef(coreGroup, pvcKind, "my-vol", nil)
+	xnsVolumeDataSourceRef := makeDataSourceRef(coreGroup, pvcKind, "my-vol", &ns)
 
 	var tests = map[string]struct {
 		spec       core.PersistentVolumeClaimSpec
+		oldSpec    core.PersistentVolumeClaimSpec
 		anyEnabled bool
+		xnsEnabled bool
 		want       *core.TypedLocalObjectReference
-		wantRef    *core.TypedLocalObjectReference
+		wantRef    *core.TypedObjectReference
 	}{
 		"any disabled with empty ds": {
 			spec: core.PersistentVolumeClaimSpec{},
@@ -179,10 +205,10 @@ func TestAnyDataSourceFilter(t *testing.T) {
 			want: volumeDataSource,
 		},
 		"any disabled with volume ds ref": {
-			spec: core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSource},
+			spec: core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSourceRef},
 		},
 		"any disabled with both data sources": {
-			spec: core.PersistentVolumeClaimSpec{DataSource: volumeDataSource, DataSourceRef: volumeDataSource},
+			spec: core.PersistentVolumeClaimSpec{DataSource: volumeDataSource, DataSourceRef: volumeDataSourceRef},
 			want: volumeDataSource,
 		},
 		"any enabled with empty ds": {
@@ -195,25 +221,63 @@ func TestAnyDataSourceFilter(t *testing.T) {
 			want:       volumeDataSource,
 		},
 		"any enabled with volume ds ref": {
-			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSource},
+			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSourceRef},
 			anyEnabled: true,
-			wantRef:    volumeDataSource,
+			wantRef:    volumeDataSourceRef,
 		},
 		"any enabled with both data sources": {
-			spec:       core.PersistentVolumeClaimSpec{DataSource: volumeDataSource, DataSourceRef: volumeDataSource},
+			spec:       core.PersistentVolumeClaimSpec{DataSource: volumeDataSource, DataSourceRef: volumeDataSourceRef},
 			anyEnabled: true,
 			want:       volumeDataSource,
-			wantRef:    volumeDataSource,
+			wantRef:    volumeDataSourceRef,
+		},
+		"both any and xns enabled with xns volume ds": {
+			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			anyEnabled: true,
+			xnsEnabled: true,
+			wantRef:    xnsVolumeDataSourceRef,
+		},
+		"both any and xns enabled with xns volume ds when xns volume exists in oldSpec": {
+			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			oldSpec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			anyEnabled: true,
+			xnsEnabled: true,
+			wantRef:    xnsVolumeDataSourceRef,
+		},
+		"only xns enabled with xns volume ds": {
+			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			xnsEnabled: true,
+		},
+		"only any enabled with xns volume ds": {
+			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			anyEnabled: true,
+		},
+		"only any enabled with xns volume ds when xns volume exists in oldSpec": {
+			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			oldSpec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			anyEnabled: true,
+			wantRef:    xnsVolumeDataSourceRef, // existing field isn't dropped.
+		},
+		"only any enabled with xns volume ds when volume exists in oldSpec": {
+			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			oldSpec:    core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSourceRef},
+			anyEnabled: true,
+			wantRef:    xnsVolumeDataSourceRef, // existing field isn't dropped.8
 		},
 	}
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)()
-			DropDisabledFields(&test.spec)
-			if test.spec.DataSource != test.want || test.spec.DataSourceRef != test.wantRef {
-				t.Errorf("expected condition was not met, test: %s, anyEnabled: %v, spec: %v, expected: %v %v",
-					testName, test.anyEnabled, test.spec, test.want, test.wantRef)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, test.xnsEnabled)()
+			DropDisabledFields(&test.spec, &test.oldSpec)
+			if test.spec.DataSource != test.want {
+				t.Errorf("expected condition was not met, test: %s, anyEnabled: %v, xnsEnabled: %v, spec: %+v, expected DataSource: %+v",
+					testName, test.anyEnabled, test.xnsEnabled, test.spec, test.want)
+			}
+			if test.spec.DataSourceRef != test.wantRef {
+				t.Errorf("expected condition was not met, test: %s, anyEnabled: %v, xnsEnabled: %v, spec: %+v, expected DataSourceRef: %+v",
+					testName, test.anyEnabled, test.xnsEnabled, test.spec, test.wantRef)
 			}
 		})
 	}
@@ -222,69 +286,99 @@ func TestAnyDataSourceFilter(t *testing.T) {
 // TestDataSourceRef checks to ensure the DataSourceRef field handles backwards
 // compatibility with the DataSource field
 func TestDataSourceRef(t *testing.T) {
-	makeDataSource := func(apiGroup, kind, name string) *core.TypedLocalObjectReference {
-		return &core.TypedLocalObjectReference{
-			APIGroup: &apiGroup,
-			Kind:     kind,
-			Name:     name,
-		}
-	}
-
-	volumeDataSource := makeDataSource("", "PersistentVolumeClaim", "my-vol")
-	snapshotDataSource := makeDataSource("snapshot.storage.k8s.io", "VolumeSnapshot", "my-snap")
-	genericDataSource := makeDataSource("generic.storage.k8s.io", "Generic", "my-foo")
-	coreDataSource := makeDataSource("", "Pod", "my-pod")
+	ns := "ns1"
+	volumeDataSource := makeDataSource(coreGroup, pvcKind, "my-vol")
+	volumeDataSourceRef := makeDataSourceRef(coreGroup, pvcKind, "my-vol", nil)
+	xnsVolumeDataSourceRef := makeDataSourceRef(coreGroup, pvcKind, "my-vol", &ns)
+	snapshotDataSource := makeDataSource(snapGroup, snapKind, "my-snap")
+	snapshotDataSourceRef := makeDataSourceRef(snapGroup, snapKind, "my-snap", nil)
+	xnsSnapshotDataSourceRef := makeDataSourceRef(snapGroup, snapKind, "my-snap", &ns)
+	genericDataSource := makeDataSource(genericGroup, genericKind, "my-foo")
+	genericDataSourceRef := makeDataSourceRef(genericGroup, genericKind, "my-foo", nil)
+	xnsGenericDataSourceRef := makeDataSourceRef(genericGroup, genericKind, "my-foo", &ns)
+	coreDataSource := makeDataSource(coreGroup, podKind, "my-pod")
+	coreDataSourceRef := makeDataSourceRef(coreGroup, podKind, "my-pod", nil)
+	xnsCoreDataSourceRef := makeDataSourceRef(coreGroup, podKind, "my-pod", &ns)
 
 	var tests = map[string]struct {
-		spec core.PersistentVolumeClaimSpec
-		want *core.TypedLocalObjectReference
+		spec    core.PersistentVolumeClaimSpec
+		want    *core.TypedLocalObjectReference
+		wantRef *core.TypedObjectReference
 	}{
 		"empty ds": {
 			spec: core.PersistentVolumeClaimSpec{},
 		},
 		"volume ds": {
-			spec: core.PersistentVolumeClaimSpec{DataSource: volumeDataSource},
-			want: volumeDataSource,
+			spec:    core.PersistentVolumeClaimSpec{DataSource: volumeDataSource},
+			want:    volumeDataSource,
+			wantRef: volumeDataSourceRef,
 		},
 		"snapshot ds": {
-			spec: core.PersistentVolumeClaimSpec{DataSource: snapshotDataSource},
-			want: snapshotDataSource,
+			spec:    core.PersistentVolumeClaimSpec{DataSource: snapshotDataSource},
+			want:    snapshotDataSource,
+			wantRef: snapshotDataSourceRef,
 		},
 		"generic ds": {
-			spec: core.PersistentVolumeClaimSpec{DataSource: genericDataSource},
-			want: genericDataSource,
+			spec:    core.PersistentVolumeClaimSpec{DataSource: genericDataSource},
+			want:    genericDataSource,
+			wantRef: genericDataSourceRef,
 		},
 		"core ds": {
-			spec: core.PersistentVolumeClaimSpec{DataSource: coreDataSource},
-			want: coreDataSource,
+			spec:    core.PersistentVolumeClaimSpec{DataSource: coreDataSource},
+			want:    coreDataSource,
+			wantRef: coreDataSourceRef,
 		},
 		"volume ds ref": {
-			spec: core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSource},
-			want: volumeDataSource,
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSourceRef},
+			want:    volumeDataSource,
+			wantRef: volumeDataSourceRef,
 		},
 		"snapshot ds ref": {
-			spec: core.PersistentVolumeClaimSpec{DataSourceRef: snapshotDataSource},
-			want: snapshotDataSource,
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: snapshotDataSourceRef},
+			want:    snapshotDataSource,
+			wantRef: snapshotDataSourceRef,
 		},
 		"generic ds ref": {
-			spec: core.PersistentVolumeClaimSpec{DataSourceRef: genericDataSource},
-			want: genericDataSource,
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: genericDataSourceRef},
+			want:    genericDataSource,
+			wantRef: genericDataSourceRef,
 		},
 		"core ds ref": {
-			spec: core.PersistentVolumeClaimSpec{DataSourceRef: coreDataSource},
-			want: coreDataSource,
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: coreDataSourceRef},
+			want:    coreDataSource,
+			wantRef: coreDataSourceRef,
+		},
+		"xns volume ds ref": {
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			wantRef: xnsVolumeDataSourceRef,
+		},
+		"xns snapshot ds ref": {
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsSnapshotDataSourceRef},
+			wantRef: xnsSnapshotDataSourceRef,
+		},
+		"xns generic ds ref": {
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsGenericDataSourceRef},
+			wantRef: xnsGenericDataSourceRef,
+		},
+		"xns core ds ref": {
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsCoreDataSourceRef},
+			wantRef: xnsCoreDataSourceRef,
 		},
 	}
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)()
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
 			NormalizeDataSources(&test.spec)
-			if !reflect.DeepEqual(test.spec.DataSource, test.want) ||
-				!reflect.DeepEqual(test.spec.DataSourceRef, test.want) {
-				t.Errorf("expected condition was not met, test: %s, spec: %v, expected: %v",
-					testName, test.spec, test.want)
+			if !reflect.DeepEqual(test.spec.DataSource, test.want) {
+				t.Errorf("expected condition was not met, test: %s, spec.datasource: %+v, want: %+v",
+					testName, test.spec.DataSource, test.want)
+			}
+			if !reflect.DeepEqual(test.spec.DataSourceRef, test.wantRef) {
+				t.Errorf("expected condition was not met, test: %s, spec.datasourceRef: %+v, wantRef: %+v",
+					testName, test.spec.DataSourceRef, test.wantRef)
 			}
 		})
 	}
@@ -336,30 +430,30 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 		{
 			name:     "for:newPVC=hasResizeStatus,oldPVC=nil, featuregate=false should drop field",
 			feature:  false,
-			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 			oldPVC:   nil,
 			expected: getPVC(),
 		},
 		{
 			name:     "for:newPVC=hasResizeStatus,oldPVC=doesnot,featuregate=true; should keep field",
 			feature:  true,
-			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 			oldPVC:   getPVC(),
-			expected: withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			expected: withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 		},
 		{
 			name:     "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=true; should keep field",
 			feature:  true,
-			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
-			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
-			expected: withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			expected: withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 		},
 		{
 			name:     "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=false; should keep field",
 			feature:  false,
-			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
-			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
-			expected: withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			expected: withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 		},
 	}
 
@@ -390,10 +484,102 @@ func withAllocatedResource(q string) *core.PersistentVolumeClaim {
 	}
 }
 
-func withResizeStatus(status core.PersistentVolumeClaimResizeStatus) *core.PersistentVolumeClaim {
+func withResizeStatus(status core.ClaimResourceStatus) *core.PersistentVolumeClaim {
 	return &core.PersistentVolumeClaim{
 		Status: core.PersistentVolumeClaimStatus{
-			ResizeStatus: &status,
+			AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+				core.ResourceStorage: status,
+			},
 		},
+	}
+}
+
+func TestWarnings(t *testing.T) {
+	testcases := []struct {
+		name     string
+		template *core.PersistentVolumeClaim
+		expected []string
+	}{
+		{
+			name:     "null",
+			template: nil,
+			expected: nil,
+		},
+		{
+			name: "200Mi requests no warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("200Mi"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("200Mi"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "200m warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("200m"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("100m"),
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.resources.requests[storage]: fractional byte value "200m" is invalid, must be an integer`,
+				`spec.resources.limits[storage]: fractional byte value "100m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name: "integer no warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("200"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "storageclass annotations warning",
+			template: &core.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+					Annotations: map[string]string{
+						core.BetaStorageClassAnnotation: "",
+					},
+				},
+			},
+			expected: []string{
+				`metadata.annotations[volume.beta.kubernetes.io/storage-class]: deprecated since v1.8; use "storageClassName" attribute instead`,
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run("pvcspec_"+tc.name, func(t *testing.T) {
+			actual := sets.NewString(GetWarningsForPersistentVolumeClaim(tc.template)...)
+			expected := sets.NewString(tc.expected...)
+			for _, missing := range expected.Difference(actual).List() {
+				t.Errorf("missing: %s", missing)
+			}
+			for _, extra := range actual.Difference(expected).List() {
+				t.Errorf("extra: %s", extra)
+			}
+		})
+
 	}
 }

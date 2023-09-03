@@ -241,6 +241,8 @@ func WithBaseURL(baseURL string) PrepareDecorator {
 					return r, fmt.Errorf("autorest: No scheme detected in URL %s", baseURL)
 				}
 				if u.RawQuery != "" {
+					// handle unencoded semicolons (ideally the server would send them already encoded)
+					u.RawQuery = strings.Replace(u.RawQuery, ";", "%3B", -1)
 					q, err := url.ParseQuery(u.RawQuery)
 					if err != nil {
 						return r, err

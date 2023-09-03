@@ -29,23 +29,42 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func newListWorkEstimator(countFn objectCountGetterFunc) WorkEstimatorFunc {
+func newListWorkEstimator(countFn objectCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
 	estimator := &listWorkEstimator{
+		config:        config,
 		countGetterFn: countFn,
+		maxSeatsFn:    maxSeatsFn,
 	}
 	return estimator.estimate
 }
 
 type listWorkEstimator struct {
+	config        *WorkEstimatorConfig
 	countGetterFn objectCountGetterFunc
+	maxSeatsFn    maxSeatsFunc
 }
 
 func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
+	minSeats := e.config.MinimumSeats
+	maxSeats := e.maxSeatsFn(priorityLevelName)
+	if maxSeats == 0 || maxSeats > e.config.MaximumSeatsLimit {
+		maxSeats = e.config.MaximumSeatsLimit
+	}
+
 	requestInfo, ok := apirequest.RequestInfoFrom(r.Context())
 	if !ok {
 		// no RequestInfo should never happen, but to be on the safe side
 		// let's return maximumSeats
-		return WorkEstimate{InitialSeats: maximumSeats}
+		return WorkEstimate{InitialSeats: maxSeats}
+	}
+
+	if requestInfo.Name != "" {
+		// Requests with metadata.name specified are usually executed as get
+		// requests in storage layer so their width should be 1.
+		// Example of such list requests:
+		// /apis/certificates.k8s.io/v1/certificatesigningrequests?fieldSelector=metadata.name%3Dcsr-xxs4m
+		// /api/v1/namespaces/test/configmaps?fieldSelector=metadata.name%3Dbig-deployment-1&limit=500&resourceVersion=0
+		return WorkEstimate{InitialSeats: minSeats}
 	}
 
 	query := r.URL.Query()
@@ -55,9 +74,18 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 
 		// This request is destined to fail in the validation layer,
 		// return maximumSeats for this request to be consistent.
-		return WorkEstimate{InitialSeats: maximumSeats}
+		return WorkEstimate{InitialSeats: maxSeats}
 	}
-	isListFromCache := !shouldListFromStorage(query, &listOptions)
+
+	// For watch requests, we want to adjust the cost only if they explicitly request
+	// sending initial events.
+	if requestInfo.Verb == "watch" {
+		if listOptions.SendInitialEvents == nil || !*listOptions.SendInitialEvents {
+			return WorkEstimate{InitialSeats: e.config.MinimumSeats}
+		}
+	}
+
+	isListFromCache := requestInfo.Verb == "watch" || !shouldListFromStorage(query, &listOptions)
 
 	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {
@@ -66,7 +94,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		// be conservative here and allocate maximum seats to this list request.
 		// NOTE: if a CRD is removed, its count will go stale first and then the
 		// pruner will eventually remove the CRD from the cache.
-		return WorkEstimate{InitialSeats: maximumSeats}
+		return WorkEstimate{InitialSeats: maxSeats}
 	case err == ObjectCountNotFoundErr:
 		// there are multiple scenarios in which we can see this error:
 		//  a. the type is truly unknown, a typo on the caller's part.
@@ -80,17 +108,16 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		// when aggregated API calls are overestimated, we allocate the minimum
 		// possible seats (see #109106 as an example when being more conservative
 		// led to problems).
-		return WorkEstimate{InitialSeats: minimumSeats}
+		return WorkEstimate{InitialSeats: minSeats}
 	case err != nil:
 		// we should never be here since Get returns either ObjectCountStaleErr or
 		// ObjectCountNotFoundErr, return maximumSeats to be on the safe side.
 		klog.ErrorS(err, "Unexpected error from object count tracker")
-		return WorkEstimate{InitialSeats: maximumSeats}
+		return WorkEstimate{InitialSeats: maxSeats}
 	}
 
 	limit := numStored
-	if utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking) && listOptions.Limit > 0 &&
-		listOptions.Limit < numStored {
+	if listOptions.Limit > 0 && listOptions.Limit < numStored {
 		limit = listOptions.Limit
 	}
 
@@ -111,14 +138,14 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	// will be processed by the list request.
 	// we will come up with a different formula for the transformation function and/or
 	// fine tune this number in future iteratons.
-	seats := uint(math.Ceil(float64(estimatedObjectsToBeProcessed) / float64(100)))
+	seats := uint64(math.Ceil(float64(estimatedObjectsToBeProcessed) / e.config.ObjectsPerSeat))
 
 	// make sure we never return a seat of zero
-	if seats < minimumSeats {
-		seats = minimumSeats
+	if seats < minSeats {
+		seats = minSeats
 	}
-	if seats > maximumSeats {
-		seats = maximumSeats
+	if seats > maxSeats {
+		seats = maxSeats
 	}
 	return WorkEstimate{InitialSeats: seats}
 }
@@ -132,11 +159,21 @@ func key(requestInfo *apirequest.RequestInfo) string {
 }
 
 // NOTICE: Keep in sync with shouldDelegateList function in
-//  staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+//
+//	staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
 func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(opts.Continue) > 0
-	hasLimit := pagingEnabled && opts.Limit > 0 && resourceVersion != "0"
-	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	match := opts.ResourceVersionMatch
+	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+
+	// Serve consistent reads from storage if ConsistentListFromCache is disabled
+	consistentReadFromStorage := resourceVersion == "" && !consistentListFromCacheEnabled
+	// Watch cache doesn't support continuations, so serve them from etcd.
+	hasContinuation := len(opts.Continue) > 0
+	// Serve paginated requests about revision "0" from watch cache to avoid overwhelming etcd.
+	hasLimit := opts.Limit > 0 && resourceVersion != "0"
+	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
+	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
+
+	return consistentReadFromStorage || hasContinuation || hasLimit || unsupportedMatch
 }

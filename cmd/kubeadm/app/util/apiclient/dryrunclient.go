@@ -119,8 +119,16 @@ func NewDryRunClientWithOpts(opts DryRunClientOptions) clientset.Interface {
 			Reaction: func(action core.Action) (bool, runtime.Object, error) {
 				getAction, ok := action.(core.GetAction)
 				if !ok {
-					// something's wrong, we can't handle this event
-					return true, nil, errors.New("can't cast get reactor event action object to GetAction interface")
+					// If the GetAction cast fails, this could be an ActionImpl with a "get" verb.
+					// Such actions could be invoked from any of the fake discovery calls, such as ServerVersion().
+					// Attempt the cast to ActionImpl and construct a GetActionImpl from it.
+					actionImpl, ok := action.(core.ActionImpl)
+					if ok {
+						getAction = core.GetActionImpl{ActionImpl: actionImpl}
+					} else {
+						// something's wrong, we can't handle this event
+						return true, nil, errors.New("can't cast get reactor event action object to GetAction interface")
+					}
 				}
 				handled, obj, err := opts.Getter.HandleGetAction(getAction)
 

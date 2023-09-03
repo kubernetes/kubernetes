@@ -47,7 +47,7 @@ type PolicyRule struct {
 	Verbs []string
 
 	// APIGroups is the name of the APIGroup that contains the resources.
-	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.
+	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
 	APIGroups []string
 	// Resources is a list of resources this rule applies to.  '*' represents all resources in the specified apiGroups.
 	// '*/foo' represents the subresource 'foo' for all resources in the specified apiGroups.
@@ -115,6 +115,7 @@ type RoleBinding struct {
 
 	// RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
+	// This field is immutable.
 	RoleRef RoleRef
 }
 
@@ -180,6 +181,7 @@ type ClusterRoleBinding struct {
 
 	// RoleRef can only reference a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
+	// This field is immutable.
 	RoleRef RoleRef
 }
 

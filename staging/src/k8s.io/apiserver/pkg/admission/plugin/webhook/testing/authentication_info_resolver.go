@@ -61,3 +61,22 @@ func (a *authenticationInfoResolver) ClientConfigForService(serviceName, service
 	atomic.AddInt32(a.cacheMisses, 1)
 	return a.restConfig, nil
 }
+
+// NewPanickingAuthenticationInfoResolver creates a fake AuthenticationInfoResolver that panics
+func NewPanickingAuthenticationInfoResolver(panicMessage string) webhook.AuthenticationInfoResolver {
+	return &panickingAuthenticationInfoResolver{
+		panicMessage: panicMessage,
+	}
+}
+
+type panickingAuthenticationInfoResolver struct {
+	panicMessage string
+}
+
+func (a *panickingAuthenticationInfoResolver) ClientConfigFor(hostPort string) (*rest.Config, error) {
+	panic(a.panicMessage)
+}
+
+func (a *panickingAuthenticationInfoResolver) ClientConfigForService(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error) {
+	panic(a.panicMessage)
+}

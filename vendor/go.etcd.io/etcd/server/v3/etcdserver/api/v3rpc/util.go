@@ -53,6 +53,7 @@ var toGRPCErrorMap = map[error]error{
 	etcdserver.ErrTimeout:                    rpctypes.ErrGRPCTimeout,
 	etcdserver.ErrTimeoutDueToLeaderFail:     rpctypes.ErrGRPCTimeoutDueToLeaderFail,
 	etcdserver.ErrTimeoutDueToConnectionLost: rpctypes.ErrGRPCTimeoutDueToConnectionLost,
+	etcdserver.ErrTimeoutWaitAppliedIndex:    rpctypes.ErrGRPCTimeoutWaitAppliedIndex,
 	etcdserver.ErrUnhealthy:                  rpctypes.ErrGRPCUnhealthy,
 	etcdserver.ErrKeyNotFound:                rpctypes.ErrGRPCKeyNotFound,
 	etcdserver.ErrCorrupt:                    rpctypes.ErrGRPCCorrupt,
@@ -84,6 +85,7 @@ var toGRPCErrorMap = map[error]error{
 	auth.ErrAuthNotEnabled:       rpctypes.ErrGRPCAuthNotEnabled,
 	auth.ErrInvalidAuthToken:     rpctypes.ErrGRPCInvalidAuthToken,
 	auth.ErrInvalidAuthMgmt:      rpctypes.ErrGRPCInvalidAuthMgmt,
+	auth.ErrAuthOldRevision:      rpctypes.ErrGRPCAuthOldRevision,
 
 	// In sync with status.FromContextError
 	context.Canceled:         rpctypes.ErrGRPCCanceled,

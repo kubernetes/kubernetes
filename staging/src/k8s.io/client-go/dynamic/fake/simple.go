@@ -387,7 +387,9 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 	}
 
 	list := &unstructured.UnstructuredList{}
+	list.SetRemainingItemCount(entireList.GetRemainingItemCount())
 	list.SetResourceVersion(entireList.GetResourceVersion())
+	list.SetContinue(entireList.GetContinue())
 	list.GetObjectKind().SetGroupVersionKind(listGVK)
 	for i := range entireList.Items {
 		item := &entireList.Items[i]
@@ -491,8 +493,7 @@ func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *uns
 	if err := c.client.scheme.Convert(uncastRet, ret, nil); err != nil {
 		return nil, err
 	}
-	return ret, err
-	return nil, nil
+	return ret, nil
 }
 
 func (c *dynamicResourceClient) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options metav1.ApplyOptions) (*unstructured.Unstructured, error) {

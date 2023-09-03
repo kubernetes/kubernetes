@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,9 +36,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -49,10 +53,7 @@ const (
 // TestVolumeTemplateNoopUpdate ensures embedded StatefulSet objects with embedded PersistentVolumes can be updated
 func TestVolumeTemplateNoopUpdate(t *testing.T) {
 	// Start the server with default storage setup
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	c, err := dynamic.NewForConfig(server.ClientConfig)
@@ -76,7 +77,7 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 			  "terminationGracePeriodSeconds": 10,
 			  "containers": [{
 				  "name": "nginx",
-				  "image": "k8s.gcr.io/nginx-slim:0.8",
+				  "image": "registry.k8s.io/nginx-slim:0.8",
 				  "ports": [{"containerPort": 80,"name": "web"}],
 				  "volumeMounts": [{"name": "www","mountPath": "/usr/share/nginx/html"}]
 			  }]
@@ -123,10 +124,11 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 }
 
 func TestSpecReplicasChange(t *testing.T) {
-	s, closeFn, rm, informers, c := scSetup(t)
+	_, ctx := ktesting.NewTestContext(t)
+	closeFn, rm, informers, c := scSetup(ctx, t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-spec-replicas-change", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-spec-replicas-change", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(rm, informers)
 	defer cancel()
 
@@ -166,10 +168,11 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestDeletingAndFailedPods(t *testing.T) {
-	s, closeFn, rm, informers, c := scSetup(t)
+	_, ctx := ktesting.NewTestContext(t)
+	closeFn, rm, informers, c := scSetup(ctx, t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-deleting-and-failed-pods", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(rm, informers)
 	defer cancel()
 
@@ -247,30 +250,21 @@ func TestStatefulSetAvailable(t *testing.T) {
 		totalReplicas  int32
 		readyReplicas  int32
 		activeReplicas int32
-		enabled        bool
 	}{
 		{
-			name:           "When feature gate is enabled, only certain replicas would become active",
+			name:           "only certain replicas would become active",
 			totalReplicas:  4,
 			readyReplicas:  3,
 			activeReplicas: 2,
-			enabled:        true,
-		},
-		{
-			name:           "When feature gate is disabled, all the ready replicas would become active",
-			totalReplicas:  4,
-			readyReplicas:  3,
-			activeReplicas: 3,
-			enabled:        false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.enabled)()
-			s, closeFn, rm, informers, c := scSetup(t)
+			_, ctx := ktesting.NewTestContext(t)
+			closeFn, rm, informers, c := scSetup(ctx, t)
 			defer closeFn()
-			ns := framework.CreateTestingNamespace("test-available-pods", s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			ns := framework.CreateNamespaceOrDie(c, "test-available-pods", t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
 			cancel := runControllerAndInformers(rm, informers)
 			defer cancel()
 
@@ -357,48 +351,47 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 
 // add for issue: https://github.com/kubernetes/kubernetes/issues/108837
 func TestStatefulSetStatusWithPodFail(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	limitedPodNumber := 2
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.AdmissionControl = &fakePodFailAdmission{
-		limitedPodNumber: limitedPodNumber,
-	}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	c, config, closeFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.AdmissionControl = &fakePodFailAdmission{
+				limitedPodNumber: limitedPodNumber,
+			}
+		},
+	})
 	defer closeFn()
 
-	config := restclient.Config{Host: s.URL}
-	c, err := clientset.NewForConfig(&config)
-	if err != nil {
-		t.Fatalf("Could not create clientset: %v", err)
-	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-informers")), resyncPeriod)
-
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
 	ssc := statefulset.NewStatefulSetController(
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Apps().V1().StatefulSets(),
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Apps().V1().ControllerRevisions(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-controller")),
 	)
 
-	ns := framework.CreateTestingNamespace("test-pod-fail", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-pod-fail", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	informers.Start(ctx.Done())
 	go ssc.Run(ctx, 5)
 
 	sts := newSTS("sts", ns.Name, 4)
-	_, err = c.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
+	_, err := c.AppsV1().StatefulSets(sts.Namespace).Create(ctx, sts, metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("Could not create statefuleSet %s: %v", sts.Name, err)
+		t.Fatalf("Could not create statefulSet %s: %v", sts.Name, err)
 	}
 
 	wantReplicas := limitedPodNumber
 	var gotReplicas int32
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newSTS, err := c.AppsV1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+		newSTS, err := c.AppsV1().StatefulSets(sts.Namespace).Get(ctx, sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -406,5 +399,187 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 		return gotReplicas == int32(wantReplicas), nil
 	}); err != nil {
 		t.Fatalf("StatefulSet %s status has %d replicas, want replicas %d: %v", sts.Name, gotReplicas, wantReplicas, err)
+	}
+}
+
+func TestAutodeleteOwnerRefs(t *testing.T) {
+	tests := []struct {
+		name              string
+		policy            appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy
+		expectPodOwnerRef bool
+		expectSetOwnerRef bool
+	}{
+		{
+			name: "always retain",
+			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			},
+			expectPodOwnerRef: false,
+			expectSetOwnerRef: false,
+		},
+		{
+			name: "delete on scaledown only",
+			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			expectPodOwnerRef: true,
+			expectSetOwnerRef: false,
+		},
+		{
+			name: "delete with set only",
+			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			},
+			expectPodOwnerRef: false,
+			expectSetOwnerRef: true,
+		},
+		{
+			name: "always delete",
+			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			expectPodOwnerRef: true,
+			expectSetOwnerRef: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			_, ctx := ktesting.NewTestContext(t)
+			closeFn, rm, informers, c := scSetup(ctx, t)
+			defer closeFn()
+			ns := framework.CreateNamespaceOrDie(c, "test-autodelete-ownerrefs", t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
+			cancel := runControllerAndInformers(rm, informers)
+			defer cancel()
+
+			sts := newSTS("sts", ns.Name, 3)
+			sts.Spec.PersistentVolumeClaimRetentionPolicy = &test.policy
+			stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+			sts = stss[0]
+			waitSTSStable(t, c, sts)
+
+			// Verify StatefulSet ownerref has been added as appropriate.
+			pvcClient := c.CoreV1().PersistentVolumeClaims(ns.Name)
+			pvcs := getStatefulSetPVCs(t, pvcClient, sts)
+			for _, pvc := range pvcs {
+				verifyOwnerRef(t, pvc, "StatefulSet", test.expectSetOwnerRef)
+				verifyOwnerRef(t, pvc, "Pod", false)
+			}
+
+			// Scale down to 1 pod and verify Pod ownerrefs as appropriate.
+			one := int32(1)
+			sts.Spec.Replicas = &one
+			waitSTSStable(t, c, sts)
+
+			pvcs = getStatefulSetPVCs(t, pvcClient, sts)
+			for i, pvc := range pvcs {
+				verifyOwnerRef(t, pvc, "StatefulSet", test.expectSetOwnerRef)
+				if i == 0 {
+					verifyOwnerRef(t, pvc, "Pod", false)
+				} else {
+					verifyOwnerRef(t, pvc, "Pod", test.expectPodOwnerRef)
+				}
+			}
+		})
+	}
+}
+
+func TestStatefulSetStartOrdinal(t *testing.T) {
+	tests := []struct {
+		ordinals         *appsv1.StatefulSetOrdinals
+		name             string
+		namespace        string
+		replicas         int
+		expectedPodNames []string
+	}{
+		{
+			name:             "default start ordinal, no ordinals set",
+			namespace:        "no-ordinals",
+			replicas:         3,
+			expectedPodNames: []string{"sts-0", "sts-1", "sts-2"},
+		},
+		{
+			name:             "default start ordinal",
+			namespace:        "no-start-ordinals",
+			ordinals:         &appsv1.StatefulSetOrdinals{},
+			replicas:         3,
+			expectedPodNames: []string{"sts-0", "sts-1", "sts-2"},
+		},
+		{
+			name:      "start ordinal 4",
+			namespace: "start-ordinal-4",
+			ordinals: &appsv1.StatefulSetOrdinals{
+				Start: 4,
+			},
+			replicas:         4,
+			expectedPodNames: []string{"sts-4", "sts-5", "sts-6", "sts-7"},
+		},
+		{
+			name:      "start ordinal 5",
+			namespace: "start-ordinal-5",
+			ordinals: &appsv1.StatefulSetOrdinals{
+				Start: 2,
+			},
+			replicas:         7,
+			expectedPodNames: []string{"sts-2", "sts-3", "sts-4", "sts-5", "sts-6", "sts-7", "sts-8"},
+		},
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+	_, ctx := ktesting.NewTestContext(t)
+	closeFn, rm, informers, c := scSetup(ctx, t)
+	defer closeFn()
+	cancel := runControllerAndInformers(rm, informers)
+	defer cancel()
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ns := framework.CreateNamespaceOrDie(c, test.namespace, t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
+
+			// Label map is the map of pod labels used in newSTS()
+			labelMap := labelMap()
+			sts := newSTS("sts", ns.Name, test.replicas)
+			sts.Spec.Ordinals = test.ordinals
+			stss := createSTSs(t, c, []*appsv1.StatefulSet{sts})
+			sts = stss[0]
+			waitSTSStable(t, c, sts)
+
+			podClient := c.CoreV1().Pods(ns.Name)
+			pods := getPods(t, podClient, labelMap)
+			if len(pods.Items) != test.replicas {
+				t.Errorf("len(pods) = %v, want %v", len(pods.Items), test.replicas)
+			}
+
+			var podNames []string
+			for _, pod := range pods.Items {
+				podNames = append(podNames, pod.Name)
+			}
+			ignoreOrder := cmpopts.SortSlices(func(a, b string) bool {
+				return a < b
+			})
+
+			// Validate all the expected pods were created.
+			if diff := cmp.Diff(test.expectedPodNames, podNames, ignoreOrder); diff != "" {
+				t.Errorf("Unexpected pod names: (-want +got): %v", diff)
+			}
+
+			// Scale down to 1 pod and verify it matches the first pod.
+			scaleSTS(t, c, sts, 1)
+			waitSTSStable(t, c, sts)
+
+			pods = getPods(t, podClient, labelMap)
+			if len(pods.Items) != 1 {
+				t.Errorf("len(pods) = %v, want %v", len(pods.Items), 1)
+			}
+			if pods.Items[0].Name != test.expectedPodNames[0] {
+				t.Errorf("Unexpected singleton pod name: got = %v, want %v", pods.Items[0].Name, test.expectedPodNames[0])
+			}
+		})
 	}
 }

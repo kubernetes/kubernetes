@@ -17,24 +17,26 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
-//TODO : Consolidate this code with the code for emptyDir.
-//This will require some smart.
+// TODO : Consolidate this code with the code for emptyDir.
+// This will require some smart.
 var _ = SIGDescribe("HostPath", func() {
 	f := framework.NewDefaultFramework("hostpath")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// TODO permission denied cleanup failures
@@ -47,7 +49,7 @@ var _ = SIGDescribe("HostPath", func() {
 	   Create a Pod with host volume mounted. The volume mounted MUST be a directory with permissions mode -rwxrwxrwx and that is has the sticky bit (mode flag t) set.
 	   This test is marked LinuxOnly since Windows does not support setting the sticky bit (mode flag t).
 	*/
-	ginkgo.It("should give a volume the correct mode [LinuxOnly] [NodeConformance]", func() {
+	ginkgo.It("should give a volume the correct mode [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
@@ -58,13 +60,13 @@ var _ = SIGDescribe("HostPath", func() {
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
-		f.TestContainerOutputRegexp("hostPath mode", pod, 0, []string{
+		e2epodoutput.TestContainerOutputRegexp(ctx, f, "hostPath mode", pod, 0, []string{
 			"mode of file \"/test-volume\": dg?trwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
 		})
 	})
 
 	// This test requires mounting a folder into a container with write privileges.
-	ginkgo.It("should support r/w [NodeConformance]", func() {
+	ginkgo.It("should support r/w [NodeConformance]", func(ctx context.Context) {
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
 		source := &v1.HostPathVolumeSource{
@@ -87,12 +89,12 @@ var _ = SIGDescribe("HostPath", func() {
 		}
 		//Read the content of the file with the second container to
 		//verify volumes  being shared properly among containers within the pod.
-		f.TestContainerOutput("hostPath r/w", pod, 1, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "hostPath r/w", pod, 1, []string{
 			"content of file \"/test-volume/test-file\": mount-tester new file",
 		})
 	})
 
-	ginkgo.It("should support subPath [NodeConformance]", func() {
+	ginkgo.It("should support subPath [NodeConformance]", func(ctx context.Context) {
 		subPath := "sub-path"
 		fileName := "test-file"
 		retryDuration := 180
@@ -124,14 +126,14 @@ var _ = SIGDescribe("HostPath", func() {
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
 
-		f.TestContainerOutput("hostPath subPath", pod, 1, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "hostPath subPath", pod, 1, []string{
 			"content of file \"" + filePathInReader + "\": mount-tester new file",
 		})
 	})
 })
 
-//These constants are borrowed from the other test.
-//const volumeName = "test-volume"
+// These constants are borrowed from the other test.
+// const volumeName = "test-volume"
 const containerName1 = "test-container-1"
 const containerName2 = "test-container-2"
 
@@ -146,7 +148,7 @@ func mount(source *v1.HostPathVolumeSource) []v1.Volume {
 	}
 }
 
-//TODO: To merge this with the emptyDir tests, we can make source a lambda.
+// TODO: To merge this with the emptyDir tests, we can make source a lambda.
 func testPodWithHostVol(path string, source *v1.HostPathVolumeSource, privileged bool) *v1.Pod {
 	podName := "pod-host-path-test"
 

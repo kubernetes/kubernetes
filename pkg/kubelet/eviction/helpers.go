@@ -25,10 +25,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	volumeutils "k8s.io/kubernetes/pkg/volume/util"
@@ -43,7 +46,7 @@ const (
 	// nodeConditionMessageFmt is the message for evictions due to resource pressure.
 	nodeConditionMessageFmt = "The node had condition: %v. "
 	// containerMessageFmt provides additional information for containers exceeding requests
-	containerMessageFmt = "Container %s was using %s, which exceeds its request of %s. "
+	containerMessageFmt = "Container %s was using %s, request is %s, has larger consumption of %v. "
 	// containerEphemeralStorageMessageFmt provides additional information for containers which have exceeded their ES limit
 	containerEphemeralStorageMessageFmt = "Container %s exceeded its local ephemeral storage limit %q. "
 	// podEphemeralStorageMessageFmt provides additional information for pods which have exceeded their ES limit
@@ -60,6 +63,8 @@ const (
 	OffendingContainersUsageKey = "offending_containers_usage"
 	// StarvedResourceKey is the key for the starved resource in eviction event annotations
 	StarvedResourceKey = "starved_resource"
+	// thresholdMetMessageFmt is the message for evictions due to resource pressure.
+	thresholdMetMessageFmt = "Threshold quantity: %v, available: %v. "
 )
 
 var (
@@ -430,10 +435,9 @@ func cachedStatsFunc(podStats []statsapi.PodStats) statsFunc {
 
 // Cmp compares p1 and p2 and returns:
 //
-//   -1 if p1 <  p2
-//    0 if p1 == p2
-//   +1 if p1 >  p2
-//
+//	-1 if p1 <  p2
+//	 0 if p1 == p2
+//	+1 if p1 >  p2
 type cmpFunc func(p1, p2 *v1.Pod) int
 
 // multiSorter implements the Sort interface, sorting changes within.
@@ -772,9 +776,9 @@ func debugLogObservations(logPrefix string, observations signalObservations) {
 	}
 	for k, v := range observations {
 		if !v.time.IsZero() {
-			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", v.available, "capacity", v.capacity, "time", v.time)
+			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity, "time", v.time)
 		} else {
-			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", v.available, "capacity", v.capacity)
+			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity)
 		}
 	}
 }
@@ -789,7 +793,7 @@ func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionap
 		observed, found := observations[threshold.Signal]
 		if found {
 			quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
-			klogV.InfoS("Eviction manager: threshold observed resource", "log", logPrefix, "signal", threshold.Signal, "quantity", quantity, "resource", observed.available)
+			klogV.InfoS("Eviction manager: threshold observed resource", "log", logPrefix, "signal", threshold.Signal, "resourceName", signalToResource[threshold.Signal], "quantity", quantity, "available", observed.available)
 		} else {
 			klogV.InfoS("Eviction manager: threshold had no observation", "log", logPrefix, "signal", threshold.Signal)
 		}
@@ -1000,9 +1004,13 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 }
 
 // evictionMessage constructs a useful message about why an eviction occurred, and annotations to provide metadata about the eviction
-func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats statsFunc) (message string, annotations map[string]string) {
+func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats statsFunc, thresholds []evictionapi.Threshold, observations signalObservations) (message string, annotations map[string]string) {
 	annotations = make(map[string]string)
 	message = fmt.Sprintf(nodeLowMessageFmt, resourceToReclaim)
+	quantity, available := getThresholdMetInfo(resourceToReclaim, thresholds, observations)
+	if quantity != nil && available != nil {
+		message += fmt.Sprintf(thresholdMetMessageFmt, quantity, available)
+	}
 	containers := []string{}
 	containerUsage := []string{}
 	podStats, ok := stats(pod)
@@ -1013,6 +1021,12 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 		for _, container := range pod.Spec.Containers {
 			if container.Name == containerStats.Name {
 				requests := container.Resources.Requests[resourceToReclaim]
+				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
+					(resourceToReclaim == v1.ResourceMemory || resourceToReclaim == v1.ResourceCPU) {
+					if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+						requests = cs.AllocatedResources[resourceToReclaim]
+					}
+				}
 				var usage *resource.Quantity
 				switch resourceToReclaim {
 				case v1.ResourceEphemeralStorage:
@@ -1025,7 +1039,7 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 					}
 				}
 				if usage != nil && usage.Cmp(requests) > 0 {
-					message += fmt.Sprintf(containerMessageFmt, container.Name, usage.String(), requests.String())
+					message += fmt.Sprintf(containerMessageFmt, container.Name, usage.String(), requests.String(), resourceToReclaim)
 					containers = append(containers, container.Name)
 					containerUsage = append(containerUsage, usage.String())
 				}
@@ -1036,4 +1050,19 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	annotations[OffendingContainersUsageKey] = strings.Join(containerUsage, ",")
 	annotations[StarvedResourceKey] = string(resourceToReclaim)
 	return
+}
+
+// getThresholdMetInfo get the threshold quantity and available for the resource resourceToReclaim
+func getThresholdMetInfo(resourceToReclaim v1.ResourceName, thresholds []evictionapi.Threshold, observations signalObservations) (quantity *resource.Quantity, available *resource.Quantity) {
+	for i := range thresholds {
+		threshold := thresholds[i]
+		if signalToResource[threshold.Signal] == resourceToReclaim {
+			observed, found := observations[threshold.Signal]
+			if found {
+				quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
+				return quantity, observed.available
+			}
+		}
+	}
+	return nil, nil
 }

@@ -96,7 +96,7 @@ type CustomResourceDefinitionSpec struct {
 	// Defaults to true in v1beta for backwards compatibility.
 	// Deprecated: will be required to be false in v1. Preservation of unknown fields can be specified
 	// in the validation schema using the `x-kubernetes-preserve-unknown-fields: true` extension.
-	// See https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#pruning-versus-preserving-unknown-fields for details.
+	// See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#field-pruning for details.
 	// +optional
 	PreserveUnknownFields *bool `json:"preserveUnknownFields,omitempty" protobuf:"varint,10,opt,name=preserveUnknownFields"`
 }

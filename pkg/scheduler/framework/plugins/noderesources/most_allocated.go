@@ -17,6 +17,7 @@ limitations under the License.
 package noderesources
 
 import (
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -25,13 +26,16 @@ import (
 // based on the maximum of the average of the fraction of requested to capacity.
 //
 // Details:
-// (cpu(MaxNodeScore * sum(requested) / capacity) + memory(MaxNodeScore * sum(requested) / capacity)) / weightSum
-func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocable resourceToValueMap) int64 {
-	return func(requested, allocable resourceToValueMap) int64 {
+// (cpu(MaxNodeScore * requested * cpuWeight / capacity) + memory(MaxNodeScore * requested * memoryWeight / capacity) + ...) / weightSum
+func mostResourceScorer(resources []config.ResourceSpec) func(requested, allocable []int64) int64 {
+	return func(requested, allocable []int64) int64 {
 		var nodeScore, weightSum int64
-		for resource := range requested {
-			weight := resToWeightMap[resource]
-			resourceScore := mostRequestedScore(requested[resource], allocable[resource])
+		for i := range requested {
+			if allocable[i] == 0 {
+				continue
+			}
+			weight := resources[i].Weight
+			resourceScore := mostRequestedScore(requested[i], allocable[i])
 			nodeScore += resourceScore * weight
 			weightSum += weight
 		}

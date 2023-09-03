@@ -86,10 +86,10 @@ message ContainerResourceMetricStatus {
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
-  // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+  // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   optional string kind = 1;
 
-  // Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
+  // Name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
   optional string name = 2;
 
   // API version of the referent

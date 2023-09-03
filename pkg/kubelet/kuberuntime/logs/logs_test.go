@@ -17,18 +17,23 @@ limitations under the License.
 package logs
 
 import (
+	"bufio"
 	"bytes"
 	"context"
-	"io/ioutil"
-	apitesting "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/utils/pointer"
+	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
+	v1 "k8s.io/api/core/v1"
+	apitesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/utils/pointer"
+
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -72,11 +77,11 @@ func TestLogOptions(t *testing.T) {
 }
 
 func TestReadLogs(t *testing.T) {
-	file, err := ioutil.TempFile("", "TestFollowLogs")
+	file, err := os.CreateTemp("", "TestFollowLogs")
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
-	defer os.Remove(file.Name())
+	defer utiltesting.CloseAndRemove(t, file)
 	file.WriteString(`{"log":"line1\n","stream":"stdout","time":"2020-09-27T11:18:01.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line2\n","stream":"stdout","time":"2020-09-27T11:18:02.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line3\n","stream":"stdout","time":"2020-09-27T11:18:03.00000000Z"}` + "\n")
@@ -94,42 +99,42 @@ func TestReadLogs(t *testing.T) {
 		{
 			name: "using TailLines 2 should output last 2 lines",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64Ptr(2),
+				TailLines: pointer.Int64(2),
 			},
 			expected: "line2\nline3\n",
 		},
 		{
 			name: "using TailLines 4 should output all lines when the log has less than 4 lines",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64Ptr(4),
+				TailLines: pointer.Int64(4),
 			},
 			expected: "line1\nline2\nline3\n",
 		},
 		{
 			name: "using TailLines 0 should output nothing",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64Ptr(0),
+				TailLines: pointer.Int64(0),
 			},
 			expected: "",
 		},
 		{
 			name: "using LimitBytes 9 should output first 9 bytes",
 			podLogOptions: v1.PodLogOptions{
-				LimitBytes: pointer.Int64Ptr(9),
+				LimitBytes: pointer.Int64(9),
 			},
 			expected: "line1\nlin",
 		},
 		{
 			name: "using LimitBytes 100 should output all bytes when the log has less than 100 bytes",
 			podLogOptions: v1.PodLogOptions{
-				LimitBytes: pointer.Int64Ptr(100),
+				LimitBytes: pointer.Int64(100),
 			},
 			expected: "line1\nline2\nline3\n",
 		},
 		{
 			name: "using LimitBytes 0 should output nothing",
 			podLogOptions: v1.PodLogOptions{
-				LimitBytes: pointer.Int64Ptr(0),
+				LimitBytes: pointer.Int64(0),
 			},
 			expected: "",
 		},
@@ -158,7 +163,7 @@ func TestReadLogs(t *testing.T) {
 			name: "using follow combined with TailLines 2 should output the last 2 lines",
 			podLogOptions: v1.PodLogOptions{
 				Follow:    true,
-				TailLines: pointer.Int64Ptr(2),
+				TailLines: pointer.Int64(2),
 			},
 			expected: "line2\nline3\n",
 		},
@@ -320,7 +325,7 @@ func TestWriteLogs(t *testing.T) {
 		stdoutBuf := bytes.NewBuffer(nil)
 		stderrBuf := bytes.NewBuffer(nil)
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{since: test.since, timestamp: test.timestamp, bytes: -1})
-		err := w.write(msg)
+		err := w.write(msg, true)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
 		assert.Equal(t, test.expectStderr, stderrBuf.String())
@@ -384,17 +389,68 @@ func TestWriteLogsWithBytesLimit(t *testing.T) {
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{timestamp: test.timestamp, bytes: int64(test.bytes)})
 		for i := 0; i < test.stdoutLines; i++ {
 			msg.stream = runtimeapi.Stdout
-			if err := w.write(msg); err != nil {
+			if err := w.write(msg, true); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
 		for i := 0; i < test.stderrLines; i++ {
 			msg.stream = runtimeapi.Stderr
-			if err := w.write(msg); err != nil {
+			if err := w.write(msg, true); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
 		assert.Equal(t, test.expectStderr, stderrBuf.String())
 	}
+}
+
+func TestReadLogsLimitsWithTimestamps(t *testing.T) {
+	logLineFmt := "2022-10-29T16:10:22.592603036-05:00 stdout P %v\n"
+	logLineNewLine := "2022-10-29T16:10:22.592603036-05:00 stdout F \n"
+
+	tmpfile, err := os.CreateTemp("", "log.*.txt")
+	assert.NoError(t, err)
+
+	count := 10000
+
+	for i := 0; i < count; i++ {
+		tmpfile.WriteString(fmt.Sprintf(logLineFmt, i))
+	}
+	tmpfile.WriteString(logLineNewLine)
+
+	for i := 0; i < count; i++ {
+		tmpfile.WriteString(fmt.Sprintf(logLineFmt, i))
+	}
+	tmpfile.WriteString(logLineNewLine)
+
+	// two lines are in the buffer
+
+	defer os.Remove(tmpfile.Name()) // clean up
+
+	assert.NoError(t, err)
+	tmpfile.Close()
+
+	var buf bytes.Buffer
+	w := io.MultiWriter(&buf)
+
+	err = ReadLogs(context.Background(), tmpfile.Name(), "", &LogOptions{tail: -1, bytes: -1, timestamp: true}, nil, w, w)
+	assert.NoError(t, err)
+
+	lineCount := 0
+	scanner := bufio.NewScanner(bytes.NewReader(buf.Bytes()))
+	for scanner.Scan() {
+		lineCount++
+
+		// Split the line
+		ts, logline, _ := bytes.Cut(scanner.Bytes(), []byte(" "))
+
+		// Verification
+		//   1. The timestamp should exist
+		//   2. The last item in the log should be 9999
+		_, err = time.Parse(time.RFC3339, string(ts))
+		assert.NoError(t, err, "timestamp not found")
+		assert.Equal(t, true, bytes.HasSuffix(logline, []byte("9999")), "is the complete log found")
+	}
+
+	assert.Equal(t, 2, lineCount, "should have two lines")
 }

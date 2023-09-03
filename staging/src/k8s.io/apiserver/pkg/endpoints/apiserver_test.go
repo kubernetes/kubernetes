@@ -37,9 +37,10 @@ import (
 	"testing"
 	"time"
 
-	restful "github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
+	"github.com/google/go-cmp/cmp"
 
-	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -55,7 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -72,10 +73,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 type alwaysMutatingDeny struct{}
@@ -234,6 +232,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		Creater:         scheme,
 		Convertor:       scheme,
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
@@ -254,7 +253,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = grouplessGroupVersion
 		group.OptionsExternalVersion = &grouplessGroupVersion
 		group.Serializer = codecs
-		if _, err := (&group).InstallREST(container); err != nil {
+		if _, _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -266,7 +265,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = testGroupVersion
 		group.OptionsExternalVersion = &testGroupVersion
 		group.Serializer = codecs
-		if _, err := (&group).InstallREST(container); err != nil {
+		if _, _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -278,7 +277,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = newGroupVersion
 		group.OptionsExternalVersion = &newGroupVersion
 		group.Serializer = codecs
-		if _, err := (&group).InstallREST(container); err != nil {
+		if _, _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -290,6 +289,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	handler := genericapifilters.WithAudit(mux, auditSink, fakeRuleEvaluator, longRunningCheck)
 	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeRuleEvaluator, longRunningCheck, codecs, 60*time.Second)
 	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
+	handler = genericapifilters.WithAuditInit(handler)
 
 	return &defaultAPIServer{handler, container}
 }
@@ -371,6 +371,10 @@ func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtim
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
 }
 
+func (storate *SimpleRESTStorage) GetSingularName() string {
+	return "simple"
+}
+
 func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
@@ -405,8 +409,8 @@ func (s *SimpleStream) Close() error {
 	return nil
 }
 
-func (obj *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
-func (obj *SimpleStream) DeepCopyObject() runtime.Object {
+func (s *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (s *SimpleStream) DeepCopyObject() runtime.Object {
 	panic("SimpleStream does not support DeepCopy")
 }
 
@@ -574,6 +578,10 @@ func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string
 	return s.emptyConnectOptions, false, ""
 }
 
+func (s *ConnecterRESTStorage) GetSingularName() string {
+	return "simple"
+}
+
 type MetadataRESTStorage struct {
 	*SimpleRESTStorage
 	types []string
@@ -616,6 +624,10 @@ type GetWithOptionsRootRESTStorage struct {
 	*SimpleTypedStorage
 	optionsReceived runtime.Object
 	takesPath       string
+}
+
+func (r *GetWithOptionsRootRESTStorage) GetSingularName() string {
+	return "simple"
 }
 
 func (r *GetWithOptionsRootRESTStorage) NamespaceScoped() bool {
@@ -684,6 +696,10 @@ func (storage *SimpleTypedStorage) Get(ctx context.Context, id string, options *
 
 func (storage *SimpleTypedStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
+}
+
+func (storage *SimpleTypedStorage) GetSingularName() string {
+	return "simple"
 }
 
 func bodyOrDie(response *http.Response) string {
@@ -820,6 +836,10 @@ func (UnimplementedRESTStorage) New() runtime.Object {
 }
 
 func (UnimplementedRESTStorage) Destroy() {
+}
+
+func (UnimplementedRESTStorage) GetSingularName() string {
+	return ""
 }
 
 // TestUnimplementedRESTStorage ensures that if a rest.Storage does not implement a given
@@ -1814,7 +1834,7 @@ func TestGetTable(t *testing.T) {
 			}
 			if !reflect.DeepEqual(test.expected, &itemOut) {
 				t.Log(body)
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, &itemOut))
 			}
 		})
 	}
@@ -2043,13 +2063,7 @@ func TestWatchTable(t *testing.T) {
 				actual = append(actual, &event)
 			}
 			if !reflect.DeepEqual(test.expected, actual) {
-				for i := range test.expected {
-					if i >= len(actual) {
-						break
-					}
-					t.Logf("%s", diff.StringDiff(string(test.expected[i].Object.Raw), string(actual[i].Object.Raw)))
-				}
-				t.Fatalf("unexpected: %s", diff.ObjectReflectDiff(test.expected, actual))
+				t.Fatalf("unexpected: %s", cmp.Diff(test.expected, actual))
 			}
 		})
 	}
@@ -2067,7 +2081,7 @@ func watcher(mediaType string, r io.ReadCloser) streaming.Decoder {
 }
 
 func TestGetPartialObjectMetadata(t *testing.T) {
-	now := metav1.Time{metav1.Now().Rfc3339Copy().Local()}
+	now := metav1.Time{Time: metav1.Now().Rfc3339Copy().Local()}
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
@@ -2227,7 +2241,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(test.expected, itemOut) {
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, itemOut))
 			}
 			body = d
 		} else {
@@ -2811,7 +2825,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2839,7 +2853,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if res.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %s %#v", request.URL, res)
+		t.Errorf("unexpected response: %s %#v", request.URL, res)
 		s, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -2851,7 +2865,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2894,7 +2908,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -3223,7 +3237,7 @@ func TestCreateNotFound(t *testing.T) {
 	handler := handle(map[string]rest.Storage{
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
-			// See http://pr.k8s.io/486#discussion_r15037092.
+			// See https://pr.k8s.io/486#discussion_r15037092.
 			errors: map[string]error{"create": apierrors.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
 		},
 	})
@@ -3310,7 +3324,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container := restful.NewContainer()
-	if _, err := group.InstallREST(container); err == nil {
+	if _, _, err := group.InstallREST(container); err == nil {
 		t.Fatal("expected error")
 	}
 
@@ -3327,6 +3341,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Creater:         scheme,
 		Convertor:       scheme,
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
@@ -3342,7 +3357,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container = restful.NewContainer()
-	if _, err := group.InstallREST(container); err != nil {
+	if _, _, err := group.InstallREST(container); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3520,6 +3535,8 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Name = populateName
 	simple.Namespace = "default" // populated by create handler to match request URL
@@ -3600,6 +3617,8 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -3662,6 +3681,8 @@ func TestCreateYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -3714,6 +3735,8 @@ func TestCreateInNamespace(t *testing.T) {
 		t.Fatalf("unexpected error: %v\n%s", err, data)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "other" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -3820,7 +3843,7 @@ func (obj *UnregisteredAPIObject) DeepCopyObject() runtime.Object {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responsewriters.WriteObjectNegotiated(codecs, negotiation.DefaultEndpointRestrictions, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(codecs, negotiation.DefaultEndpointRestrictions, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"}, false)
 	}))
 	defer server.Close()
 	// Decode error response behavior is dictated by
@@ -4001,16 +4024,6 @@ func runRequest(t testing.TB, path, verb string, data []byte, contentType string
 	return response
 }
 
-// encodeOrFatal is used by TestDryRun to parse an object and stop right
-// away if it fails.
-func encodeOrFatal(t *testing.T, obj runtime.Object) []byte {
-	data, err := runtime.Encode(testCodec, obj)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	return data
-}
-
 type SimpleRESTStorageWithDeleteCollection struct {
 	SimpleRESTStorage
 }
@@ -4030,7 +4043,6 @@ var (
 
 // TestFieldValidation tests the create, update, and patch handlers for correctness when faced with field validation errors.
 func TestFieldValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
 	var (
 		strictDecodingErr          = `strict decoding error: duplicate field \"other\", unknown field \"unknown\"`
 		strictDecodingWarns        = []string{`duplicate field "other"`, `unknown field "unknown"`}
@@ -4169,7 +4181,6 @@ unknown: baz`)
 // BenchmarkFieldValidation benchmarks the create, update, and patch handlers for performance distinctions between
 // strict, warn, and ignore field validation handling.
 func BenchmarkFieldValidation(b *testing.B) {
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
 	var (
 		validJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo"}`)
 		validYAMLDataPost = []byte(`apiVersion: test.group/version
@@ -4272,57 +4283,6 @@ other: bar`)
 	}
 }
 
-func TestDryRunDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, false)()
-
-	tests := []struct {
-		path        string
-		verb        string
-		data        []byte
-		contentType string
-	}{
-		{path: "/namespaces/default/simples", verb: "POST", data: encodeOrFatal(t, &genericapitesting.Simple{Other: "bar"})},
-		{path: "/namespaces/default/simples/id", verb: "PUT", data: encodeOrFatal(t, &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "id"}, Other: "bar"})},
-		{path: "/namespaces/default/simples/id", verb: "PATCH", data: []byte(`{"labels":{"foo":"bar"}}`), contentType: "application/merge-patch+json; charset=UTF-8"},
-		{path: "/namespaces/default/simples/id", verb: "DELETE"},
-		{path: "/namespaces/default/simples", verb: "DELETE"},
-		{path: "/namespaces/default/simples/id/subsimple", verb: "DELETE"},
-	}
-
-	server := httptest.NewServer(handle(map[string]rest.Storage{
-		"simples": &SimpleRESTStorageWithDeleteCollection{
-			SimpleRESTStorage{
-				item: genericapitesting.Simple{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "id",
-						Namespace: "",
-						UID:       "uid",
-					},
-					Other: "bar",
-				},
-			},
-		},
-		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
-			item: genericapitesting.SimpleXGSubresource{
-				SubresourceInfo: "foo",
-			},
-			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
-		},
-	}))
-	defer server.Close()
-	for _, test := range tests {
-		baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-		response := runRequest(t, baseURL+test.path, test.verb, test.data, test.contentType)
-		if response.StatusCode == http.StatusBadRequest {
-			t.Fatalf("unexpected BadRequest: %#v", response)
-		}
-		response = runRequest(t, baseURL+test.path+"?dryRun", test.verb, test.data, test.contentType)
-		if response.StatusCode != http.StatusBadRequest {
-			t.Fatalf("unexpected non BadRequest: %#v", response)
-		}
-	}
-}
-
 type SimpleXGSubresourceRESTStorage struct {
 	item    genericapitesting.SimpleXGSubresource
 	itemGVK schema.GroupVersionKind
@@ -4349,6 +4309,10 @@ func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV sch
 	return storage.itemGVK
 }
 
+func (storage *SimpleXGSubresourceRESTStorage) GetSingularName() string {
+	return "simple"
+}
+
 func TestXGSubresource(t *testing.T) {
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
@@ -4371,6 +4335,7 @@ func TestXGSubresource(t *testing.T) {
 
 		Creater:         scheme,
 		Convertor:       scheme,
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
@@ -4388,7 +4353,7 @@ func TestXGSubresource(t *testing.T) {
 		Serializer:             codecs,
 	}
 
-	if _, err := (&group).InstallREST(container); err != nil {
+	if _, _, err := (&group).InstallREST(container); err != nil {
 		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 	}
 

@@ -28,6 +28,10 @@ import (
 	utilexec "k8s.io/utils/exec"
 )
 
+const (
+	blockDev = "blockdev"
+)
+
 // ResizeFs Provides support for resizing file systems
 type ResizeFs struct {
 	exec utilexec.Interface
@@ -41,7 +45,6 @@ func NewResizeFs(exec utilexec.Interface) *ResizeFs {
 // Resize perform resize of file system
 func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (bool, error) {
 	format, err := getDiskFormat(resizefs.exec, devicePath)
-
 	if err != nil {
 		formatErr := fmt.Errorf("ResizeFS.Resize - error checking format for device %s: %v", devicePath, err)
 		return false, formatErr
@@ -74,7 +77,6 @@ func (resizefs *ResizeFs) extResize(devicePath string) (bool, error) {
 
 	resizeError := fmt.Errorf("resize of device %s failed: %v. resize2fs output: %s", devicePath, err, string(output))
 	return false, resizeError
-
 }
 
 func (resizefs *ResizeFs) xfsResize(deviceMountPath string) (bool, error) {
@@ -104,6 +106,17 @@ func (resizefs *ResizeFs) btrfsResize(deviceMountPath string) (bool, error) {
 }
 
 func (resizefs *ResizeFs) NeedResize(devicePath string, deviceMountPath string) (bool, error) {
+	// Do nothing if device is mounted as readonly
+	readonly, err := resizefs.getDeviceRO(devicePath)
+	if err != nil {
+		return false, err
+	}
+
+	if readonly {
+		klog.V(3).Infof("ResizeFs.needResize - no resize possible since filesystem %s is readonly", devicePath)
+		return false, nil
+	}
+
 	deviceSize, err := resizefs.getDeviceSize(devicePath)
 	if err != nil {
 		return false, err
@@ -146,8 +159,9 @@ func (resizefs *ResizeFs) NeedResize(devicePath string, deviceMountPath string) 
 	}
 	return true, nil
 }
+
 func (resizefs *ResizeFs) getDeviceSize(devicePath string) (uint64, error) {
-	output, err := resizefs.exec.Command("blockdev", "--getsize64", devicePath).CombinedOutput()
+	output, err := resizefs.exec.Command(blockDev, "--getsize64", devicePath).CombinedOutput()
 	outStr := strings.TrimSpace(string(output))
 	if err != nil {
 		return 0, fmt.Errorf("failed to read size of device %s: %s: %s", devicePath, err, outStr)
@@ -157,6 +171,22 @@ func (resizefs *ResizeFs) getDeviceSize(devicePath string) (uint64, error) {
 		return 0, fmt.Errorf("failed to parse size of device %s %s: %s", devicePath, outStr, err)
 	}
 	return size, nil
+}
+
+func (resizefs *ResizeFs) getDeviceRO(devicePath string) (bool, error) {
+	output, err := resizefs.exec.Command(blockDev, "--getro", devicePath).CombinedOutput()
+	outStr := strings.TrimSpace(string(output))
+	if err != nil {
+		return false, fmt.Errorf("failed to get readonly bit from device %s: %s: %s", devicePath, err, outStr)
+	}
+	switch outStr {
+	case "0":
+		return false, nil
+	case "1":
+		return true, nil
+	default:
+		return false, fmt.Errorf("Failed readonly device check. Expected 1 or 0, got '%s'", outStr)
+	}
 }
 
 func (resizefs *ResizeFs) getExtSize(devicePath string) (uint64, uint64, error) {

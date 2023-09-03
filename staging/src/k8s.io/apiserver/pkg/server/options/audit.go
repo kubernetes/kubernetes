@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -139,16 +140,6 @@ type AuditWebhookOptions struct {
 
 	// API group version used for serializing audit events.
 	GroupVersionString string
-}
-
-// AuditDynamicOptions control the configuration of dynamic backends for audit events
-type AuditDynamicOptions struct {
-	// Enabled tells whether the dynamic audit capability is enabled.
-	Enabled bool
-
-	// Configuration for batching backend. This is currently only used as an override
-	// for integration tests
-	BatchConfig *pluginbuffered.BatchConfig
 }
 
 func NewAuditOptions() *AuditOptions {
@@ -525,6 +516,9 @@ func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 }
 
 func (o *AuditLogOptions) ensureLogFile() error {
+	if err := os.MkdirAll(filepath.Dir(o.Path), 0700); err != nil {
+		return err
+	}
 	mode := os.FileMode(0600)
 	f, err := os.OpenFile(o.Path, os.O_CREATE|os.O_APPEND|os.O_RDWR, mode)
 	if err != nil {

@@ -28,7 +28,6 @@ Historical context is available here:
 Semantic versioning is used in this repository. It contains several Go modules
 with different levels of stability:
 - `k8s.io/klog/v2` - stable API, `vX.Y.Z` tags
-- `k8s.io/hack/tools` - no stable API yet (may change eventually or get moved to separate repo), `hack/tools/v0.Y.Z` tags
 - `examples` - no stable API, no tags, no intention to ever stabilize
 
 Exempt from the API stability guarantee are items (packages, functions, etc.)

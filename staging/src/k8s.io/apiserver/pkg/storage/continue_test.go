@@ -19,6 +19,7 @@ package storage
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"testing"
 )
 
@@ -40,23 +41,65 @@ func Test_decodeContinue(t *testing.T) {
 		args        args
 		wantFromKey string
 		wantRv      int64
-		wantErr     bool
+		wantErr     error
 	}{
-		{name: "valid", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "key"), keyPrefix: "/test/"}, wantRv: 1, wantFromKey: "/test/key"},
-		{name: "root path", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "/"), keyPrefix: "/test/"}, wantRv: 1, wantFromKey: "/test/"},
-
-		{name: "empty version", args: args{continueValue: encodeContinueOrDie("", 1, "key"), keyPrefix: "/test/"}, wantErr: true},
-		{name: "invalid version", args: args{continueValue: encodeContinueOrDie("v1", 1, "key"), keyPrefix: "/test/"}, wantErr: true},
-
-		{name: "path traversal - parent", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "../key"), keyPrefix: "/test/"}, wantErr: true},
-		{name: "path traversal - local", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "./key"), keyPrefix: "/test/"}, wantErr: true},
-		{name: "path traversal - double parent", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "./../key"), keyPrefix: "/test/"}, wantErr: true},
-		{name: "path traversal - after parent", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "key/../.."), keyPrefix: "/test/"}, wantErr: true},
+		{
+			name:        "valid",
+			args:        args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "key"), keyPrefix: "/test/"},
+			wantRv:      1,
+			wantFromKey: "/test/key",
+		},
+		{
+			name:        "root path",
+			args:        args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "/"), keyPrefix: "/test/"},
+			wantRv:      1,
+			wantFromKey: "/test/",
+		},
+		{
+			name:    "empty version",
+			args:    args{continueValue: encodeContinueOrDie("", 1, "key"), keyPrefix: "/test/"},
+			wantErr: ErrUnrecognizedEncodedVersion,
+		},
+		{
+			name:    "invalid version",
+			args:    args{continueValue: encodeContinueOrDie("v1", 1, "key"), keyPrefix: "/test/"},
+			wantErr: ErrUnrecognizedEncodedVersion,
+		},
+		{
+			name:    "invalid RV",
+			args:    args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 0, "key"), keyPrefix: "/test/"},
+			wantErr: ErrInvalidStartRV,
+		},
+		{
+			name:    "no start Key",
+			args:    args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, ""), keyPrefix: "/test/"},
+			wantErr: ErrEmptyStartKey,
+		},
+		{
+			name:    "path traversal - parent",
+			args:    args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "../key"), keyPrefix: "/test/"},
+			wantErr: ErrGenericInvalidKey,
+		},
+		{
+			name:    "path traversal - local",
+			args:    args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "./key"), keyPrefix: "/test/"},
+			wantErr: ErrGenericInvalidKey,
+		},
+		{
+			name:    "path traversal - double parent",
+			args:    args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "./../key"), keyPrefix: "/test/"},
+			wantErr: ErrGenericInvalidKey,
+		},
+		{
+			name:    "path traversal - after parent",
+			args:    args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "key/../.."), keyPrefix: "/test/"},
+			wantErr: ErrGenericInvalidKey,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotFromKey, gotRv, err := DecodeContinue(tt.args.continueValue, tt.args.keyPrefix)
-			if (err != nil) != tt.wantErr {
+			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("decodeContinue() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}

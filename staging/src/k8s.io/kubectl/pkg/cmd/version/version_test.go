@@ -22,22 +22,26 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func TestNewCmdVersionClientVersion(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	o := NewOptions(streams)
-	if err := o.Complete(tf, &cobra.Command{}); err != nil {
+	if err := o.Complete(tf, &cobra.Command{}, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if err := o.Validate(nil); err != nil {
+	if err := o.Validate(); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if err := o.Validate([]string{"extraParameter0"}); !strings.Contains(err.Error(), "extra arguments") {
+	if err := o.Complete(tf, &cobra.Command{}, []string{"extraParameter0"}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if err := o.Validate(); !strings.Contains(err.Error(), "extra arguments") {
 		t.Errorf("Unexpected error: should fail to validate the args length greater than 0")
 	}
 	if err := o.Run(); err != nil {

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 
 	v1 "k8s.io/api/autoscaling/v1"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
@@ -39,12 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
+	"k8s.io/client-go/kubernetes/scheme"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/builder3"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -201,7 +201,7 @@ func BuildOpenAPIV3(crd *apiextensionsv1.CustomResourceDefinition, version strin
 		return nil, err
 	}
 
-	return builder3.BuildOpenAPISpec([]*restful.WebService{b.ws}, b.getOpenAPIConfig(false))
+	return builder3.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIConfig(false))
 }
 
 // BuildOpenAPIV2 builds OpenAPI v2 for the given crd in the given version
@@ -211,7 +211,7 @@ func BuildOpenAPIV2(crd *apiextensionsv1.CustomResourceDefinition, version strin
 		return nil, err
 	}
 
-	return openapibuilder.BuildOpenAPISpec([]*restful.WebService{b.ws}, b.getOpenAPIConfig(true))
+	return openapibuilder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIConfig(true))
 }
 
 // Implements CanonicalTypeNamer
@@ -248,12 +248,13 @@ type builder struct {
 }
 
 // subresource is a handy method to get subresource name. Valid inputs are:
-//     input                     output
-//     ""                        ""
-//     "/"                       ""
-//     "/{name}"                 ""
-//     "/{name}/scale"           "scale"
-//     "/{name}/scale/foo"       invalid input
+//
+//	input                     output
+//	""                        ""
+//	"/"                       ""
+//	"/{name}"                 ""
+//	"/{name}/scale"           "scale"
+//	"/{name}/scale/foo"       invalid input
 func subresource(path string) string {
 	parts := strings.Split(path, "/")
 	if len(parts) <= 2 {
@@ -303,9 +304,10 @@ func (b *builder) descriptionFor(path, operationVerb string) string {
 }
 
 // buildRoute returns a RouteBuilder for WebService to consume and builds path in swagger
-//     action can be one of: GET, PUT, PATCH, POST, DELETE;
-//     verb can be one of: list, read, replace, patch, create, delete, deletecollection;
-//     sample is the sample Go type for response type.
+//
+//	action can be one of: GET, PUT, PATCH, POST, DELETE;
+//	verb can be one of: list, read, replace, patch, create, delete, deletecollection;
+//	sample is the sample Go type for response type.
 func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb string, sample interface{}) *restful.RouteBuilder {
 	var namespaced string
 	if b.namespaced {
@@ -338,32 +340,25 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		supportedTypes := []string{
 			string(types.JSONPatchType),
 			string(types.MergePatchType),
+			string(types.ApplyPatchType),
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-			supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
-		}
-
 		route.Consumes(supportedTypes...)
 	} else {
 		route.Consumes(runtime.ContentTypeJSON, runtime.ContentTypeYAML)
 	}
 
-	var disabledParams []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation) {
-		disabledParams = []string{"fieldValidation"}
-	}
 	// Build option parameters
 	switch actionVerb {
 	case "get":
-		// TODO: CRD support for export is still under consideration
 		endpoints.AddObjectParams(b.ws, route, &metav1.GetOptions{})
 	case "list", "deletecollection":
 		endpoints.AddObjectParams(b.ws, route, &metav1.ListOptions{})
-	case "put", "patch":
-		// TODO: PatchOption added in feature branch but not in master yet
-		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{}, disabledParams...)
+	case "put":
+		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{})
+	case "patch":
+		endpoints.AddObjectParams(b.ws, route, &metav1.PatchOptions{})
 	case "post":
-		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{}, disabledParams...)
+		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{})
 	case "delete":
 		endpoints.AddObjectParams(b.ws, route, &metav1.DeleteOptions{})
 		route.Reads(&metav1.DeleteOptions{}).ParameterNamed("body").Required(false)
@@ -474,7 +469,7 @@ func withDescription(s spec.Schema, desc string) spec.Schema {
 }
 
 func generateBuildDefinitionsFunc() {
-	namer = openapi.NewDefinitionNamer(runtime.NewScheme())
+	namer = openapi.NewDefinitionNamer(scheme.Scheme)
 	definitionsV3 = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
 		defName, _ := namer.GetDefinitionName(name)
 		prefix := v3DefinitionPrefix
@@ -489,7 +484,8 @@ func generateBuildDefinitionsFunc() {
 }
 
 // addTypeMetaProperties adds Kubernetes-specific type meta properties to input schema:
-//     apiVersion and kind
+//
+//	apiVersion and kind
 func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 	s.SetProperty("apiVersion", getDefinition(typeMetaType, v2).SchemaProps.Properties["apiVersion"])
 	s.SetProperty("kind", getDefinition(typeMetaType, v2).SchemaProps.Properties["kind"])
@@ -499,7 +495,9 @@ func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 func (b *builder) buildListSchema(v2 bool) *spec.Schema {
 	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", b.group, b.version, b.kind))
 	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
-	s := new(spec.Schema).WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
+	s := new(spec.Schema).
+		Typed("object", "").
+		WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
 		WithRequired("items").
 		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(refForOpenAPIVersion(name, v2))).WithDescription(doc)).
 		SetProperty("metadata", *spec.RefSchema(refForOpenAPIVersion(listMetaSchemaRef, v2)).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))

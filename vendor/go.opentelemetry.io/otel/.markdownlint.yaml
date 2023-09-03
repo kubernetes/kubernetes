@@ -1,0 +1,29 @@
+# Default state for all rules
+default: true
+
+# ul-style
+MD004: false
+
+# hard-tabs
+MD010: false
+
+# line-length
+MD013: false
+
+# no-duplicate-header
+MD024:
+  siblings_only: true
+
+#single-title
+MD025: false
+
+# ol-prefix
+MD029:
+  style: ordered
+
+# no-inline-html
+MD033: false
+
+# fenced-code-language
+MD040: false
+

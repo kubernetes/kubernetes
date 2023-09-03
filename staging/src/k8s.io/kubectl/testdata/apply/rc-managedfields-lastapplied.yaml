@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"ReplicationController","metadata":{"annotations":{},"labels":{"name":"test-rc"},"name":"test-rc","namespace":"test"},"spec":{"replicas":1,"template":{"metadata":{"labels":{"name":"test-rc"}},"spec":{"containers":[{"image":"nginx","name":"test-rc","ports":[{"containerPort":80}]}]}}}}
+  creationTimestamp: "2022-10-06T20:46:22Z"
+  generation: 1
+  labels:
+    name: test-rc
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:fullyLabeledReplicas: {}
+        f:observedGeneration: {}
+        f:replicas: {}
+    manager: kube-controller-manager
+    operation: Update
+    subresource: status
+    time: "2022-10-06T20:46:22Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:labels:
+          .: {}
+          f:name: {}
+      f:spec:
+        f:replicas: {}
+        f:selector: {}
+        f:template:
+          .: {}
+          f:metadata:
+            .: {}
+            f:creationTimestamp: {}
+            f:labels:
+              .: {}
+              f:name: {}
+          f:spec:
+            .: {}
+            f:containers:
+              .: {}
+              k:{"name":"test-rc"}:
+                .: {}
+                f:image: {}
+                f:imagePullPolicy: {}
+                f:name: {}
+                f:ports:
+                  .: {}
+                  k:{"containerPort":80,"protocol":"TCP"}:
+                    .: {}
+                    f:containerPort: {}
+                    f:protocol: {}
+                f:resources: {}
+                f:terminationMessagePath: {}
+                f:terminationMessagePolicy: {}
+            f:dnsPolicy: {}
+            f:restartPolicy: {}
+            f:schedulerName: {}
+            f:securityContext: {}
+            f:terminationGracePeriodSeconds: {}
+    manager: kubectl-client-side-apply
+    operation: Update
+    time: "2022-10-06T20:46:22Z"
+  name: test-rc
+  namespace: test
+  resourceVersion: "290"
+  uid: ad68b34c-d6c5-4d09-b50d-ef49c109778d
+spec:
+  replicas: 1
+  selector:
+    name: test-rc
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        name: test-rc
+    spec:
+      containers:
+      - image: nginx
+        imagePullPolicy: Always
+        name: test-rc
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  fullyLabeledReplicas: 1
+  observedGeneration: 1
+  replicas: 1

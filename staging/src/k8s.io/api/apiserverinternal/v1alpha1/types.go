@@ -24,7 +24,7 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-//  Storage version of a specific resource.
+// Storage version of a specific resource.
 type StorageVersion struct {
 	metav1.TypeMeta `json:",inline"`
 	// The name is <group>.<resource>.
@@ -77,6 +77,11 @@ type ServerStorageVersion struct {
 	// The encodingVersion must be included in the decodableVersions.
 	// +listType=set
 	DecodableVersions []string `json:"decodableVersions,omitempty" protobuf:"bytes,3,opt,name=decodableVersions"`
+
+	// The API server can serve these versions.
+	// DecodableVersions must include all ServedVersions.
+	// +listType=set
+	ServedVersions []string `json:"servedVersions,omitempty" protobuf:"bytes,4,opt,name=servedVersions"`
 }
 
 type StorageVersionConditionType string

@@ -253,7 +253,7 @@ func TestWithRequestDeadlineWithClock(t *testing.T) {
 	}
 }
 
-func TestWithRequestDeadlineWithFailedRequestIsAudited(t *testing.T) {
+func TestWithRequestDeadlineWithInvalidTimeoutIsAudited(t *testing.T) {
 	var handlerInvoked bool
 	handler := http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 		handlerInvoked = true
@@ -386,10 +386,7 @@ func TestWithFailedRequestAudit(t *testing.T) {
 			withAudit := withFailedRequestAudit(errorHandler, test.statusErr, fakeSink, fakeRuleEvaluator)
 
 			w := httptest.NewRecorder()
-			testRequest, err := http.NewRequest(http.MethodGet, "/apis/v1/namespaces/default/pods", nil)
-			if err != nil {
-				t.Fatalf("failed to create new http testRequest - %v", err)
-			}
+			testRequest := newRequest(t, "/apis/v1/namespaces/default/pods")
 			info := request.RequestInfo{}
 			testRequest = testRequest.WithContext(request.WithRequestInfo(testRequest.Context(), &info))
 
@@ -446,8 +443,8 @@ func newRequest(t *testing.T, requestURL string) *http.Request {
 	if err != nil {
 		t.Fatalf("failed to create new http request - %v", err)
 	}
-
-	return req
+	ctx := audit.WithAuditContext(req.Context())
+	return req.WithContext(ctx)
 }
 
 func message(err error) string {

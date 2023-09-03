@@ -19,20 +19,20 @@ package config
 import internal "k8s.io/controller-manager/config"
 
 // DefaultLeaderMigrationConfiguration returns the default LeaderMigrationConfiguration
-//  that is valid for this release of Kubernetes.
+// that is valid for this release of Kubernetes.
 func DefaultLeaderMigrationConfiguration() *internal.LeaderMigrationConfiguration {
 	return &internal.LeaderMigrationConfiguration{
 		LeaderName:   "cloud-provider-extraction-migration",
 		ResourceLock: ResourceLockLeases,
 		ControllerLeaders: []internal.ControllerLeaderConfiguration{
 			{
-				Name:      "route",
+				Name:      "route-controller",
 				Component: "*",
 			}, {
-				Name:      "service",
+				Name:      "service-controller",
 				Component: "*",
 			}, {
-				Name:      "cloud-node-lifecycle",
+				Name:      "cloud-node-lifecycle-controller",
 				Component: "*",
 			},
 		},

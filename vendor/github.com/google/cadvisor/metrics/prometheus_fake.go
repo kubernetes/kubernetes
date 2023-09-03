@@ -153,6 +153,10 @@ func (p testSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo, erro
 						},
 					},
 				},
+				Distances: []uint64{
+					10,
+					12,
+				},
 			},
 			{
 				Id:     1,
@@ -259,6 +263,10 @@ func (p testSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo, erro
 						Type:  "Unified",
 						Level: 3,
 					},
+				},
+				Distances: []uint64{
+					12,
+					10,
 				},
 			},
 		},

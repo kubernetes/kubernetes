@@ -17,16 +17,18 @@ limitations under the License.
 package openapi
 
 import (
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"sigs.k8s.io/yaml"
 )
 
 // Resources interface describe a resources provider, that can give you
 // resource based on group-version-kind.
 type Resources interface {
 	LookupResource(gvk schema.GroupVersionKind) proto.Schema
+	GetConsumes(gvk schema.GroupVersionKind, operation string) []string
 }
 
 // groupVersionKindExtensionKey is the key used to lookup the
@@ -40,6 +42,7 @@ type document struct {
 	// Maps gvk to model name
 	resources map[schema.GroupVersionKind]string
 	models    proto.Models
+	doc       *openapi_v2.Document
 }
 
 var _ Resources = &document{}
@@ -68,6 +71,7 @@ func NewOpenAPIData(doc *openapi_v2.Document) (Resources, error) {
 	return &document{
 		resources: resources,
 		models:    models,
+		doc:       doc,
 	}, nil
 }
 
@@ -77,6 +81,44 @@ func (d *document) LookupResource(gvk schema.GroupVersionKind) proto.Schema {
 		return nil
 	}
 	return d.models.LookupModel(modelName)
+}
+
+func (d *document) GetConsumes(gvk schema.GroupVersionKind, operation string) []string {
+	for _, path := range d.doc.GetPaths().GetPath() {
+		for _, ex := range path.GetValue().GetPatch().GetVendorExtension() {
+			if ex.GetValue().GetYaml() == "" ||
+				ex.GetName() != "x-kubernetes-group-version-kind" {
+				continue
+			}
+
+			var value map[string]string
+			err := yaml.Unmarshal([]byte(ex.GetValue().GetYaml()), &value)
+			if err != nil {
+				continue
+			}
+
+			if value["group"] == gvk.Group && value["kind"] == gvk.Kind && value["version"] == gvk.Version {
+				switch operation {
+				case "GET":
+					return path.GetValue().GetGet().GetConsumes()
+				case "PATCH":
+					return path.GetValue().GetPatch().GetConsumes()
+				case "HEAD":
+					return path.GetValue().GetHead().GetConsumes()
+				case "PUT":
+					return path.GetValue().GetPut().GetConsumes()
+				case "POST":
+					return path.GetValue().GetPost().GetConsumes()
+				case "OPTIONS":
+					return path.GetValue().GetOptions().GetConsumes()
+				case "DELETE":
+					return path.GetValue().GetDelete().GetConsumes()
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // Get and parse GroupVersionKind from the extension. Returns empty if it doesn't have one.

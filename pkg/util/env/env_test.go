@@ -17,7 +17,6 @@ limitations under the License.
 package env
 
 import (
-	"os"
 	"strconv"
 	"testing"
 
@@ -30,7 +29,7 @@ func TestGetEnvAsStringOrFallback(t *testing.T) {
 	assert := assert.New(t)
 
 	key := "FLOCKER_SET_VAR"
-	os.Setenv(key, expected)
+	t.Setenv(key, expected)
 	assert.Equal(expected, GetEnvAsStringOrFallback(key, "~"+expected))
 
 	key = "FLOCKER_UNSET_VAR"
@@ -43,7 +42,7 @@ func TestGetEnvAsIntOrFallback(t *testing.T) {
 	assert := assert.New(t)
 
 	key := "FLOCKER_SET_VAR"
-	os.Setenv(key, strconv.Itoa(expected))
+	t.Setenv(key, strconv.Itoa(expected))
 	returnVal, _ := GetEnvAsIntOrFallback(key, 1)
 	assert.Equal(expected, returnVal)
 
@@ -52,7 +51,7 @@ func TestGetEnvAsIntOrFallback(t *testing.T) {
 	assert.Equal(expected, returnVal)
 
 	key = "FLOCKER_SET_VAR"
-	os.Setenv(key, "not-an-int")
+	t.Setenv(key, "not-an-int")
 	returnVal, err := GetEnvAsIntOrFallback(key, 1)
 	assert.Equal(expected, returnVal)
 	if err == nil {
@@ -66,7 +65,7 @@ func TestGetEnvAsFloat64OrFallback(t *testing.T) {
 	assert := assert.New(t)
 
 	key := "FLOCKER_SET_VAR"
-	os.Setenv(key, "1.0")
+	t.Setenv(key, "1.0")
 	returnVal, _ := GetEnvAsFloat64OrFallback(key, 2.0)
 	assert.Equal(expected, returnVal)
 
@@ -75,7 +74,7 @@ func TestGetEnvAsFloat64OrFallback(t *testing.T) {
 	assert.Equal(expected, returnVal)
 
 	key = "FLOCKER_SET_VAR"
-	os.Setenv(key, "not-a-float")
+	t.Setenv(key, "not-a-float")
 	returnVal, err := GetEnvAsFloat64OrFallback(key, 1.0)
 	assert.Equal(expected, returnVal)
 	assert.EqualError(err, "strconv.ParseFloat: parsing \"not-a-float\": invalid syntax")

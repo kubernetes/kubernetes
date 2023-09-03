@@ -21,7 +21,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
 // NUMANodeInfo is a map from NUMANode ID to a list of CPU IDs associated with
@@ -62,6 +62,34 @@ func (topo *CPUTopology) CPUsPerSocket() int {
 	return topo.NumCPUs / topo.NumSockets
 }
 
+// CPUCoreID returns the physical core ID which the given logical CPU
+// belongs to.
+func (topo *CPUTopology) CPUCoreID(cpu int) (int, error) {
+	info, ok := topo.CPUDetails[cpu]
+	if !ok {
+		return -1, fmt.Errorf("unknown CPU ID: %d", cpu)
+	}
+	return info.CoreID, nil
+}
+
+// CPUCoreID returns the socket ID which the given logical CPU belongs to.
+func (topo *CPUTopology) CPUSocketID(cpu int) (int, error) {
+	info, ok := topo.CPUDetails[cpu]
+	if !ok {
+		return -1, fmt.Errorf("unknown CPU ID: %d", cpu)
+	}
+	return info.SocketID, nil
+}
+
+// CPUCoreID returns the NUMA node ID which the given logical CPU belongs to.
+func (topo *CPUTopology) CPUNUMANodeID(cpu int) (int, error) {
+	info, ok := topo.CPUDetails[cpu]
+	if !ok {
+		return -1, fmt.Errorf("unknown CPU ID: %d", cpu)
+	}
+	return info.NUMANodeID, nil
+}
+
 // CPUInfo contains the NUMA, socket, and core IDs associated with a CPU.
 type CPUInfo struct {
 	NUMANodeID int
@@ -83,138 +111,138 @@ func (d CPUDetails) KeepOnly(cpus cpuset.CPUSet) CPUDetails {
 // NUMANodes returns all of the NUMANode IDs associated with the CPUs in this
 // CPUDetails.
 func (d CPUDetails) NUMANodes() cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var numaNodeIDs []int
 	for _, info := range d {
-		b.Add(info.NUMANodeID)
+		numaNodeIDs = append(numaNodeIDs, info.NUMANodeID)
 	}
-	return b.Result()
+	return cpuset.New(numaNodeIDs...)
 }
 
 // NUMANodesInSockets returns all of the logical NUMANode IDs associated with
 // the given socket IDs in this CPUDetails.
 func (d CPUDetails) NUMANodesInSockets(ids ...int) cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var numaNodeIDs []int
 	for _, id := range ids {
 		for _, info := range d {
 			if info.SocketID == id {
-				b.Add(info.NUMANodeID)
+				numaNodeIDs = append(numaNodeIDs, info.NUMANodeID)
 			}
 		}
 	}
-	return b.Result()
+	return cpuset.New(numaNodeIDs...)
 }
 
 // Sockets returns all of the socket IDs associated with the CPUs in this
 // CPUDetails.
 func (d CPUDetails) Sockets() cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var socketIDs []int
 	for _, info := range d {
-		b.Add(info.SocketID)
+		socketIDs = append(socketIDs, info.SocketID)
 	}
-	return b.Result()
+	return cpuset.New(socketIDs...)
 }
 
 // CPUsInSockets returns all of the logical CPU IDs associated with the given
 // socket IDs in this CPUDetails.
 func (d CPUDetails) CPUsInSockets(ids ...int) cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var cpuIDs []int
 	for _, id := range ids {
 		for cpu, info := range d {
 			if info.SocketID == id {
-				b.Add(cpu)
+				cpuIDs = append(cpuIDs, cpu)
 			}
 		}
 	}
-	return b.Result()
+	return cpuset.New(cpuIDs...)
 }
 
 // SocketsInNUMANodes returns all of the logical Socket IDs associated with the
 // given NUMANode IDs in this CPUDetails.
 func (d CPUDetails) SocketsInNUMANodes(ids ...int) cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var socketIDs []int
 	for _, id := range ids {
 		for _, info := range d {
 			if info.NUMANodeID == id {
-				b.Add(info.SocketID)
+				socketIDs = append(socketIDs, info.SocketID)
 			}
 		}
 	}
-	return b.Result()
+	return cpuset.New(socketIDs...)
 }
 
 // Cores returns all of the core IDs associated with the CPUs in this
 // CPUDetails.
 func (d CPUDetails) Cores() cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var coreIDs []int
 	for _, info := range d {
-		b.Add(info.CoreID)
+		coreIDs = append(coreIDs, info.CoreID)
 	}
-	return b.Result()
+	return cpuset.New(coreIDs...)
 }
 
 // CoresInNUMANodes returns all of the core IDs associated with the given
 // NUMANode IDs in this CPUDetails.
 func (d CPUDetails) CoresInNUMANodes(ids ...int) cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var coreIDs []int
 	for _, id := range ids {
 		for _, info := range d {
 			if info.NUMANodeID == id {
-				b.Add(info.CoreID)
+				coreIDs = append(coreIDs, info.CoreID)
 			}
 		}
 	}
-	return b.Result()
+	return cpuset.New(coreIDs...)
 }
 
 // CoresInSockets returns all of the core IDs associated with the given socket
 // IDs in this CPUDetails.
 func (d CPUDetails) CoresInSockets(ids ...int) cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var coreIDs []int
 	for _, id := range ids {
 		for _, info := range d {
 			if info.SocketID == id {
-				b.Add(info.CoreID)
+				coreIDs = append(coreIDs, info.CoreID)
 			}
 		}
 	}
-	return b.Result()
+	return cpuset.New(coreIDs...)
 }
 
 // CPUs returns all of the logical CPU IDs in this CPUDetails.
 func (d CPUDetails) CPUs() cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var cpuIDs []int
 	for cpuID := range d {
-		b.Add(cpuID)
+		cpuIDs = append(cpuIDs, cpuID)
 	}
-	return b.Result()
+	return cpuset.New(cpuIDs...)
 }
 
 // CPUsInNUMANodes returns all of the logical CPU IDs associated with the given
 // NUMANode IDs in this CPUDetails.
 func (d CPUDetails) CPUsInNUMANodes(ids ...int) cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var cpuIDs []int
 	for _, id := range ids {
 		for cpu, info := range d {
 			if info.NUMANodeID == id {
-				b.Add(cpu)
+				cpuIDs = append(cpuIDs, cpu)
 			}
 		}
 	}
-	return b.Result()
+	return cpuset.New(cpuIDs...)
 }
 
 // CPUsInCores returns all of the logical CPU IDs associated with the given
 // core IDs in this CPUDetails.
 func (d CPUDetails) CPUsInCores(ids ...int) cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	var cpuIDs []int
 	for _, id := range ids {
 		for cpu, info := range d {
 			if info.CoreID == id {
-				b.Add(cpu)
+				cpuIDs = append(cpuIDs, cpu)
 			}
 		}
 	}
-	return b.Result()
+	return cpuset.New(cpuIDs...)
 }
 
 // Discover returns CPUTopology based on cadvisor node info
@@ -261,7 +289,7 @@ func getUniqueCoreID(threads []int) (coreID int, err error) {
 		return 0, fmt.Errorf("no cpus provided")
 	}
 
-	if len(threads) != cpuset.NewCPUSet(threads...).Size() {
+	if len(threads) != cpuset.New(threads...).Size() {
 		return 0, fmt.Errorf("cpus provided are not unique")
 	}
 

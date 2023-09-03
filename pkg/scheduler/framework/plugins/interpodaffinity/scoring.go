@@ -22,8 +22,9 @@ import (
 	"math"
 	"sync/atomic"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -131,7 +132,7 @@ func (pl *InterPodAffinity) PreScore(
 ) *framework.Status {
 	if len(nodes) == 0 {
 		// No nodes to score.
-		return nil
+		return framework.NewStatus(framework.Skip)
 	}
 
 	if pl.sharedLister == nil {
@@ -141,12 +142,19 @@ func (pl *InterPodAffinity) PreScore(
 	affinity := pod.Spec.Affinity
 	hasPreferredAffinityConstraints := affinity != nil && affinity.PodAffinity != nil && len(affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0
 	hasPreferredAntiAffinityConstraints := affinity != nil && affinity.PodAntiAffinity != nil && len(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0
+	hasConstraints := hasPreferredAffinityConstraints || hasPreferredAntiAffinityConstraints
+
+	// Optionally ignore calculating preferences of existing pods' affinity rules
+	// if the incoming pod has no inter-pod affinities.
+	if pl.args.IgnorePreferredTermsOfExistingPods && !hasConstraints {
+		return framework.NewStatus(framework.Skip)
+	}
 
 	// Unless the pod being scheduled has preferred affinity terms, we only
 	// need to process nodes hosting pods with affinity.
 	var allNodes []*framework.NodeInfo
 	var err error
-	if hasPreferredAffinityConstraints || hasPreferredAntiAffinityConstraints {
+	if hasConstraints {
 		allNodes, err = pl.sharedLister.NodeInfos().List()
 		if err != nil {
 			return framework.AsStatus(fmt.Errorf("failed to get all nodes from shared lister: %w", err))
@@ -162,10 +170,9 @@ func (pl *InterPodAffinity) PreScore(
 		topologyScore: make(map[string]map[string]int64),
 	}
 
-	state.podInfo = framework.NewPodInfo(pod)
-	if state.podInfo.ParseError != nil {
+	if state.podInfo, err = framework.NewPodInfo(pod); err != nil {
 		// Ideally we never reach here, because errors will be caught by PreFilter
-		return framework.AsStatus(fmt.Errorf("failed to parse pod: %w", state.podInfo.ParseError))
+		return framework.AsStatus(fmt.Errorf("failed to parse pod: %w", err))
 	}
 
 	for i := range state.podInfo.PreferredAffinityTerms {
@@ -178,19 +185,18 @@ func (pl *InterPodAffinity) PreScore(
 			return framework.AsStatus(fmt.Errorf("updating PreferredAntiAffinityTerms: %w", err))
 		}
 	}
-	state.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
+	logger := klog.FromContext(pCtx)
+	state.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
 
 	topoScores := make([]scoreMap, len(allNodes))
 	index := int32(-1)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
-		if nodeInfo.Node() == nil {
-			return
-		}
+
 		// Unless the pod being scheduled has preferred affinity terms, we only
 		// need to process pods with affinity in the node.
 		podsToProcess := nodeInfo.PodsWithAffinity
-		if hasPreferredAffinityConstraints || hasPreferredAntiAffinityConstraints {
+		if hasConstraints {
 			// We need to process all the pods.
 			podsToProcess = nodeInfo.Pods
 		}
@@ -203,7 +209,11 @@ func (pl *InterPodAffinity) PreScore(
 			topoScores[atomic.AddInt32(&index, 1)] = topoScore
 		}
 	}
-	pl.parallelizer.Until(pCtx, len(allNodes), processNode)
+	pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name())
+
+	if index == -1 {
+		return framework.NewStatus(framework.Skip)
+	}
 
 	for i := 0; i <= int(index); i++ {
 		state.topologyScore.append(topoScores[i])
@@ -262,7 +272,7 @@ func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState *fram
 	}
 
 	var minCount int64 = math.MaxInt64
-	var maxCount int64 = -math.MaxInt64
+	var maxCount int64 = math.MinInt64
 	for i := range scores {
 		score := scores[i].Score
 		if score > maxCount {

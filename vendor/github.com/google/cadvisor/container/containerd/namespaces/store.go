@@ -37,8 +37,6 @@ import "context"
 // oriented. A namespace is really just a name and a set of labels. Objects
 // that belong to a namespace are returned when the namespace is assigned to a
 // given context.
-//
-//
 type Store interface {
 	Create(ctx context.Context, namespace string, labels map[string]string) error
 	Labels(ctx context.Context, namespace string) (map[string]string, error)

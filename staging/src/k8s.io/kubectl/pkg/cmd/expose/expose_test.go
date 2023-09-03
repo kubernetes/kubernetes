@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -68,7 +68,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector: map[string]string{"app": "go"},
@@ -99,7 +99,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -131,7 +131,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 					},
 					Selector: map[string]string{"run": "this"},
@@ -162,7 +162,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -194,7 +194,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector:        map[string]string{"func": "stream"},
@@ -227,7 +227,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector:  map[string]string{"func": "stream"},
@@ -259,7 +259,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector:  map[string]string{"func": "stream"},
@@ -317,7 +317,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -345,7 +345,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolTCP,
 							Port:       90,
-							TargetPort: intstr.FromInt(90),
+							TargetPort: intstr.FromInt32(90),
 						},
 					},
 					Selector: map[string]string{"svc": "frompod"},
@@ -369,12 +369,12 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Protocol:   corev1.ProtocolTCP,
 							Port:       443,
-							TargetPort: intstr.FromInt(443),
+							TargetPort: intstr.FromInt32(443),
 						},
 					},
 				},
@@ -388,13 +388,13 @@ func TestRunExposeService(t *testing.T) {
 							Name:       "port-1",
 							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Name:       "port-2",
 							Protocol:   corev1.ProtocolTCP,
 							Port:       443,
-							TargetPort: intstr.FromInt(443),
+							TargetPort: intstr.FromInt32(443),
 						},
 					},
 					Selector: map[string]string{"svc": "fromfoo"},
@@ -418,22 +418,22 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       8080,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       8081,
-							TargetPort: intstr.FromInt(8081),
+							TargetPort: intstr.FromInt32(8081),
 						},
 						{
 							Protocol:   corev1.ProtocolSCTP,
 							Port:       8082,
-							TargetPort: intstr.FromInt(8082),
+							TargetPort: intstr.FromInt32(8082),
 						},
 					},
 				},
@@ -447,25 +447,25 @@ func TestRunExposeService(t *testing.T) {
 							Name:       "port-1",
 							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Name:       "port-2",
 							Protocol:   corev1.ProtocolUDP,
 							Port:       8080,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 						{
 							Name:       "port-3",
 							Protocol:   corev1.ProtocolUDP,
 							Port:       8081,
-							TargetPort: intstr.FromInt(8081),
+							TargetPort: intstr.FromInt32(8081),
 						},
 						{
 							Name:       "port-4",
 							Protocol:   corev1.ProtocolSCTP,
 							Port:       8082,
-							TargetPort: intstr.FromInt(8082),
+							TargetPort: intstr.FromInt32(8082),
 						},
 					},
 					Selector: map[string]string{"svc": "fromfoo"},
@@ -496,7 +496,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolSCTP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector: map[string]string{"app": "go"},
@@ -527,7 +527,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolSCTP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -558,7 +558,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolSCTP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector:  map[string]string{"func": "stream"},
@@ -590,7 +590,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolSCTP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector:  map[string]string{"func": "stream"},
@@ -622,7 +622,7 @@ func TestRunExposeService(t *testing.T) {
 						{
 							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
-							TargetPort: intstr.FromInt(14),
+							TargetPort: intstr.FromInt32(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
@@ -658,9 +658,10 @@ func TestRunExposeService(t *testing.T) {
 				}),
 			}
 
-			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdExposeService(tf, ioStreams)
-			cmd.SetOutput(buf)
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
 			for flag, value := range test.flags {
 				cmd.Flags().Set(flag, value)
 			}
@@ -820,7 +821,7 @@ status:
 									{
 										Protocol:   corev1.ProtocolUDP,
 										Port:       14,
-										TargetPort: intstr.FromInt(14),
+										TargetPort: intstr.FromInt32(14),
 									},
 								},
 								Selector: map[string]string{"app": "go"},
@@ -833,7 +834,7 @@ status:
 				}),
 			}
 
-			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdExposeService(tf, ioStreams)
 			cmd.SetOut(buf)
 			cmd.Flags().Set("protocol", "UDP")
@@ -896,7 +897,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 				},
@@ -951,7 +952,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 				},
@@ -1086,7 +1087,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 				},
@@ -1112,7 +1113,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 					SessionAffinity: corev1.ServiceAffinityClientIP,
@@ -1140,7 +1141,7 @@ func TestGenerateService(t *testing.T) {
 
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 					ClusterIP: "10.10.10.10",
@@ -1168,7 +1169,7 @@ func TestGenerateService(t *testing.T) {
 
 							Port:       80,
 							Protocol:   "TCP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 					ClusterIP: corev1.ClusterIPNone,
@@ -1225,13 +1226,13 @@ func TestGenerateService(t *testing.T) {
 							Name:       "port-1",
 							Port:       80,
 							Protocol:   corev1.ProtocolUDP,
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 						{
 							Name:       "port-2",
 							Port:       443,
 							Protocol:   corev1.ProtocolUDP,
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 				},
@@ -1255,13 +1256,13 @@ func TestGenerateService(t *testing.T) {
 							Name:       "port-1",
 							Port:       80,
 							Protocol:   corev1.ProtocolTCP,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Name:       "port-2",
 							Port:       443,
 							Protocol:   corev1.ProtocolTCP,
-							TargetPort: intstr.FromInt(443),
+							TargetPort: intstr.FromInt32(443),
 						},
 					},
 				},
@@ -1285,13 +1286,13 @@ func TestGenerateService(t *testing.T) {
 							Name:       "port-1",
 							Port:       80,
 							Protocol:   corev1.ProtocolTCP,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Name:       "port-2",
 							Port:       8080,
 							Protocol:   corev1.ProtocolUDP,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -1315,19 +1316,19 @@ func TestGenerateService(t *testing.T) {
 							Name:       "port-1",
 							Port:       80,
 							Protocol:   corev1.ProtocolTCP,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Name:       "port-2",
 							Port:       8080,
 							Protocol:   corev1.ProtocolUDP,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 						{
 							Name:       "port-3",
 							Port:       8081,
 							Protocol:   corev1.ProtocolTCP,
-							TargetPort: intstr.FromInt(8081),
+							TargetPort: intstr.FromInt32(8081),
 						},
 					},
 				},
@@ -1389,7 +1390,7 @@ func TestGenerateService(t *testing.T) {
 
 							Port:       80,
 							Protocol:   "SCTP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 				},
@@ -1420,7 +1421,7 @@ func TestGenerateService(t *testing.T) {
 
 							Port:       80,
 							Protocol:   "SCTP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 				},
@@ -1446,7 +1447,7 @@ func TestGenerateService(t *testing.T) {
 
 							Port:       80,
 							Protocol:   "SCTP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 				},
@@ -1472,7 +1473,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "SCTP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 					SessionAffinity: corev1.ServiceAffinityClientIP,
@@ -1499,7 +1500,7 @@ func TestGenerateService(t *testing.T) {
 						{
 							Port:       80,
 							Protocol:   "SCTP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 					ClusterIP: "10.10.10.10",
@@ -1527,7 +1528,7 @@ func TestGenerateService(t *testing.T) {
 
 							Port:       80,
 							Protocol:   "SCTP",
-							TargetPort: intstr.FromInt(1234),
+							TargetPort: intstr.FromInt32(1234),
 						},
 					},
 					ClusterIP: corev1.ClusterIPNone,
@@ -1583,13 +1584,13 @@ func TestGenerateService(t *testing.T) {
 							Name:       "port-1",
 							Port:       80,
 							Protocol:   corev1.ProtocolSCTP,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Name:       "port-2",
 							Port:       443,
 							Protocol:   corev1.ProtocolSCTP,
-							TargetPort: intstr.FromInt(443),
+							TargetPort: intstr.FromInt32(443),
 						},
 					},
 				},
@@ -1613,13 +1614,13 @@ func TestGenerateService(t *testing.T) {
 							Name:       "port-1",
 							Port:       80,
 							Protocol:   corev1.ProtocolTCP,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Name:       "port-2",
 							Port:       8080,
 							Protocol:   corev1.ProtocolSCTP,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -1643,25 +1644,25 @@ func TestGenerateService(t *testing.T) {
 							Name:       "port-1",
 							Port:       80,
 							Protocol:   corev1.ProtocolTCP,
-							TargetPort: intstr.FromInt(80),
+							TargetPort: intstr.FromInt32(80),
 						},
 						{
 							Name:       "port-2",
 							Port:       8080,
 							Protocol:   corev1.ProtocolUDP,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 						{
 							Name:       "port-3",
 							Port:       8081,
 							Protocol:   corev1.ProtocolTCP,
-							TargetPort: intstr.FromInt(8081),
+							TargetPort: intstr.FromInt32(8081),
 						},
 						{
 							Name:       "port-4",
 							Port:       8082,
 							Protocol:   corev1.ProtocolSCTP,
-							TargetPort: intstr.FromInt(8082),
+							TargetPort: intstr.FromInt32(8082),
 						},
 					},
 				},
@@ -1683,6 +1684,40 @@ func TestGenerateService(t *testing.T) {
 						"baz": "blah",
 					},
 					Ports:     []corev1.ServicePort{},
+					ClusterIP: corev1.ClusterIPNone,
+				},
+			},
+		},
+		// Fixed #114402 kubectl expose fails for apps with same-port, different-protocol
+		"test #114402": {
+			selector:  "foo=bar,baz=blah",
+			name:      "test",
+			clusterIP: "None",
+			protocols: "53/TCP,53/UDP",
+			port:      "53",
+			expected: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []corev1.ServicePort{
+						{
+							Name:       "port-1-tcp",
+							Port:       53,
+							Protocol:   corev1.ProtocolTCP,
+							TargetPort: intstr.FromInt32(53),
+						},
+						{
+							Name:       "port-1-udp",
+							Port:       53,
+							Protocol:   corev1.ProtocolUDP,
+							TargetPort: intstr.FromInt32(53),
+						},
+					},
 					ClusterIP: corev1.ClusterIPNone,
 				},
 			},

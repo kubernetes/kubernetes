@@ -27,7 +27,7 @@ import (
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 )
 
-// All of the image tags are of the format k8s.gcr.io/sig-storage/hostpathplugin:v1.7.3.
+// All of the image tags are of the format registry.k8s.io/sig-storage/hostpathplugin:v1.7.3.
 var imageRE = regexp.MustCompile(`^(.*)/([^/:]*):(.*)$`)
 
 // appendCSIImageConfigs extracts image repo, name and version from

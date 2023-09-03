@@ -19,9 +19,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"regexp"
-	"strings"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -52,7 +50,9 @@ func (tc TraceContext) Inject(ctx context.Context, carrier TextMapCarrier) {
 		return
 	}
 
-	carrier.Set(tracestateHeader, sc.TraceState().String())
+	if ts := sc.TraceState().String(); ts != "" {
+		carrier.Set(tracestateHeader, ts)
+	}
 
 	// Clear all flags other than the trace-context supported sampling bit.
 	flags := sc.TraceFlags() & trace.FlagsSampled
@@ -139,7 +139,10 @@ func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 	// Clear all flags other than the trace-context supported sampling bit.
 	scc.TraceFlags = trace.TraceFlags(opts[0]) & trace.FlagsSampled
 
-	scc.TraceState = parseTraceState(carrier.Get(tracestateHeader))
+	// Ignore the error returned here. Failure to parse tracestate MUST NOT
+	// affect the parsing of traceparent according to the W3C tracecontext
+	// specification.
+	scc.TraceState, _ = trace.ParseTraceState(carrier.Get(tracestateHeader))
 	scc.Remote = true
 
 	sc := trace.NewSpanContext(scc)
@@ -153,26 +156,4 @@ func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 // Fields returns the keys who's values are set with Inject.
 func (tc TraceContext) Fields() []string {
 	return []string{traceparentHeader, tracestateHeader}
-}
-
-func parseTraceState(in string) trace.TraceState {
-	if in == "" {
-		return trace.TraceState{}
-	}
-
-	kvs := []attribute.KeyValue{}
-	for _, entry := range strings.Split(in, ",") {
-		parts := strings.SplitN(entry, "=", 2)
-		if len(parts) != 2 {
-			// Parse failure, abort!
-			return trace.TraceState{}
-		}
-		kvs = append(kvs, attribute.String(parts[0], parts[1]))
-	}
-
-	// Ignoring error here as "failure to parse tracestate MUST NOT
-	// affect the parsing of traceparent."
-	// https://www.w3.org/TR/trace-context/#tracestate-header
-	ts, _ := trace.TraceStateFromKeyValues(kvs...)
-	return ts
 }

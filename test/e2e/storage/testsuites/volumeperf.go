@@ -19,16 +19,16 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
@@ -93,14 +93,13 @@ func (t *volumePerformanceTestSuite) SkipUnsupportedTests(driver storageframewor
 
 func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config      *storageframework.PerTestConfig
-		testCleanup func()
-		cs          clientset.Interface
-		ns          *v1.Namespace
-		scName      string
-		pvcs        []*v1.PersistentVolumeClaim
-		options     *storageframework.PerformanceTestOptions
-		stopCh      chan struct{}
+		config  *storageframework.PerTestConfig
+		cs      clientset.Interface
+		ns      *v1.Namespace
+		scName  string
+		pvcs    []*v1.PersistentVolumeClaim
+		options *storageframework.PerformanceTestOptions
+		stopCh  chan struct{}
 	}
 	var (
 		dInfo *storageframework.DriverInfo
@@ -127,30 +126,37 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ClientBurst: 400,
 	}
 	f := framework.NewFramework("volume-lifecycle-performance", frameworkOptions, nil)
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	f.AddAfterEach("cleanup", func(f *framework.Framework, failed bool) {
-		ginkgo.By("Closing informer channel")
-		close(l.stopCh)
-		ginkgo.By("Deleting all PVCs")
-		for _, pvc := range l.pvcs {
-			err := e2epv.DeletePersistentVolumeClaim(l.cs, pvc.Name, pvc.Namespace)
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.AfterEach(func(ctx context.Context) {
+		if l != nil {
+			if l.stopCh != nil {
+				ginkgo.By("Closing informer channel")
+				close(l.stopCh)
+			}
+
+			ginkgo.By("Deleting all PVCs")
+			for _, pvc := range l.pvcs {
+				err := e2epv.DeletePersistentVolumeClaim(ctx, l.cs, pvc.Name, pvc.Namespace)
+				framework.ExpectNoError(err)
+				err = e2epv.WaitForPersistentVolumeDeleted(ctx, l.cs, pvc.Spec.VolumeName, 1*time.Second, 5*time.Minute)
+				framework.ExpectNoError(err)
+			}
+			ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
+			err := l.cs.StorageV1().StorageClasses().Delete(ctx, l.scName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-			err = e2epv.WaitForPersistentVolumeDeleted(l.cs, pvc.Spec.VolumeName, 1*time.Second, 5*time.Minute)
-			framework.ExpectNoError(err)
+		} else {
+			ginkgo.By("Local l setup is nil")
 		}
-		ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
-		err := l.cs.StorageV1().StorageClasses().Delete(context.TODO(), l.scName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
-		l.testCleanup()
 	})
 
-	ginkgo.It("should provision volumes at scale within performance constraints [Slow] [Serial]", func() {
+	ginkgo.It("should provision volumes at scale within performance constraints [Slow] [Serial]", func(ctx context.Context) {
 		l = &local{
 			cs:      f.ClientSet,
 			ns:      f.Namespace,
 			options: dInfo.PerformanceTestOptions,
 		}
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(ctx, f)
 
 		// Stats for volume provisioning operation
 		// TODO: Add stats for attach, resize and snapshot
@@ -159,21 +165,21 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 			perObjectInterval: make(map[string]*interval),
 			operationMetrics:  &storageframework.Metrics{},
 		}
-		sc := driver.(storageframework.DynamicPVTestDriver).GetDynamicProvisionStorageClass(l.config, pattern.FsType)
+		sc := driver.(storageframework.DynamicPVTestDriver).GetDynamicProvisionStorageClass(ctx, l.config, pattern.FsType)
 		ginkgo.By(fmt.Sprintf("Creating Storage Class %v", sc))
 		// TODO: Add support for WaitForFirstConsumer volume binding mode
 		if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
 			e2eskipper.Skipf("WaitForFirstConsumer binding mode currently not supported for performance tests")
 		}
 		ginkgo.By(fmt.Sprintf("Creating Storage Class %s", sc.Name))
-		sc, err := l.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
+		sc, err := l.cs.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		l.scName = sc.Name
 
 		// Create a controller to watch on PVCs
 		// When all PVCs provisioned by this test are in the Bound state, the controller
 		// sends a signal to the channel
-		controller := newPVCWatch(f, l.options.ProvisioningOptions.Count, provisioningStats)
+		controller := newPVCWatch(ctx, f, l.options.ProvisioningOptions.Count, provisioningStats)
 		l.stopCh = make(chan struct{})
 		go controller.Run(l.stopCh)
 		waitForProvisionCh = make(chan []*v1.PersistentVolumeClaim)
@@ -184,7 +190,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 				ClaimSize:        l.options.ProvisioningOptions.VolumeSize,
 				StorageClassName: &sc.Name,
 			}, l.ns.Name)
-			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
+			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(ctx, pvc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			// Store create time for each PVC
 			provisioningStats.mutex.Lock()
@@ -206,7 +212,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ginkgo.By("Calculating performance metrics for provisioning operations")
 		createPerformanceStats(provisioningStats, l.options.ProvisioningOptions.Count, l.pvcs)
 
-		ginkgo.By(fmt.Sprintf("Validating performance metrics for provisioning operations against baseline %v", spew.Sdump(l.options.ProvisioningOptions.ExpectedMetrics)))
+		ginkgo.By(fmt.Sprintf("Validating performance metrics for provisioning operations against baseline %v", dump.Pretty(l.options.ProvisioningOptions.ExpectedMetrics)))
 		errList := validatePerformanceStats(provisioningStats.operationMetrics, l.options.ProvisioningOptions.ExpectedMetrics)
 		framework.ExpectNoError(errors.NewAggregate(errList), "while validating performance metrics")
 	})
@@ -219,7 +225,9 @@ func createPerformanceStats(stats *performanceStats, provisionCount int, pvcs []
 	var min, max, sum time.Duration
 	for _, pvc := range pvcs {
 		pvcMetric, ok := stats.perObjectInterval[pvc.Name]
-		framework.ExpectEqual(ok, true)
+		if !ok {
+			framework.Failf("PVC %s not found in perObjectInterval", pvc.Name)
+		}
 
 		elapsedTime := pvcMetric.elapsed
 		sum += elapsedTime
@@ -239,7 +247,7 @@ func createPerformanceStats(stats *performanceStats, provisionCount int, pvcs []
 // validatePerformanceStats validates if test performance metrics meet the baseline target
 func validatePerformanceStats(operationMetrics *storageframework.Metrics, baselineMetrics *storageframework.Metrics) []error {
 	var errList []error
-	framework.Logf("Metrics to evaluate: %+v", spew.Sdump(operationMetrics))
+	framework.Logf("Metrics to evaluate: %+v", dump.Pretty(operationMetrics))
 
 	if operationMetrics.AvgLatency > baselineMetrics.AvgLatency {
 		err := fmt.Errorf("expected latency to be less than %v but calculated latency %v", baselineMetrics.AvgLatency, operationMetrics.AvgLatency)
@@ -255,7 +263,7 @@ func validatePerformanceStats(operationMetrics *storageframework.Metrics, baseli
 // newPVCWatch creates an informer to check whether all PVCs are Bound
 // When all PVCs are bound, the controller sends a signal to
 // waitForProvisionCh to unblock the test
-func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *performanceStats) cache.Controller {
+func newPVCWatch(ctx context.Context, f *framework.Framework, provisionCount int, pvcMetrics *performanceStats) cache.Controller {
 	defer ginkgo.GinkgoRecover()
 	count := 0
 	countLock := &sync.Mutex{}
@@ -271,7 +279,9 @@ func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *perform
 		// Check if PVC entered the bound state
 		if oldPVC.Status.Phase != v1.ClaimBound && newPVC.Status.Phase == v1.ClaimBound {
 			newPVCInterval, ok := pvcMetrics.perObjectInterval[newPVC.Name]
-			framework.ExpectEqual(ok, true, "PVC %s should exist in interval map already", newPVC.Name)
+			if !ok {
+				framework.Failf("PVC %s should exist in interval map already", newPVC.Name)
+			}
 			count++
 			newPVCInterval.enterDesiredState = now
 			newPVCInterval.elapsed = now.Sub(newPVCInterval.create)
@@ -287,11 +297,11 @@ func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *perform
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				obj, err := f.ClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{})
+				obj, err := f.ClientSet.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{})
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return f.ClientSet.CoreV1().PersistentVolumeClaims(ns).Watch(context.TODO(), metav1.ListOptions{})
+				return f.ClientSet.CoreV1().PersistentVolumeClaims(ns).Watch(ctx, metav1.ListOptions{})
 			},
 		},
 		&v1.PersistentVolumeClaim{},
@@ -299,9 +309,13 @@ func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *perform
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				oldPVC, ok := oldObj.(*v1.PersistentVolumeClaim)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Expected a PVC, got instead an old object of type %T", oldObj)
+				}
 				newPVC, ok := newObj.(*v1.PersistentVolumeClaim)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Expected a PVC, got instead a new object of type %T", newObj)
+				}
 
 				checkPVCBound(oldPVC, newPVC)
 			},

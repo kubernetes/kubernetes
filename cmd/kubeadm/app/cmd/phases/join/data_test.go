@@ -37,11 +37,11 @@ func (j *testJoinData) Cfg() *kubeadmapi.JoinConfiguration              { return
 func (j *testJoinData) TLSBootstrapCfg() (*clientcmdapi.Config, error)  { return nil, nil }
 func (j *testJoinData) InitCfg() (*kubeadmapi.InitConfiguration, error) { return nil, nil }
 func (j *testJoinData) Client() (clientset.Interface, error)            { return nil, nil }
-func (j *testJoinData) IgnorePreflightErrors() sets.String              { return nil }
+func (j *testJoinData) IgnorePreflightErrors() sets.Set[string]         { return nil }
 func (j *testJoinData) OutputWriter() io.Writer                         { return nil }
 func (j *testJoinData) PatchesDir() string                              { return "" }
-func (t *testJoinData) DryRun() bool                                    { return false }
-func (t *testJoinData) KubeConfigDir() string                           { return "" }
-func (t *testJoinData) KubeletDir() string                              { return "" }
-func (t *testJoinData) ManifestDir() string                             { return "" }
-func (t *testJoinData) CertificateWriteDir() string                     { return "" }
+func (j *testJoinData) DryRun() bool                                    { return false }
+func (j *testJoinData) KubeConfigDir() string                           { return "" }
+func (j *testJoinData) KubeletDir() string                              { return "" }
+func (j *testJoinData) ManifestDir() string                             { return "" }
+func (j *testJoinData) CertificateWriteDir() string                     { return "" }

@@ -17,7 +17,7 @@ limitations under the License.
 /*
 This soak tests places a specified number of pods on each node and then
 repeatedly sends queries to a service running on these pods via
-a serivce
+a service
 */
 
 package main
@@ -155,7 +155,7 @@ func main() {
 				Ports: []v1.ServicePort{{
 					Protocol:   "TCP",
 					Port:       9376,
-					TargetPort: intstr.FromInt(9376),
+					TargetPort: intstr.FromInt32(9376),
 				}},
 				Selector: map[string]string{
 					"name": "serve-hostname",

@@ -27,7 +27,8 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:Windows] DNS", func() {
@@ -37,12 +38,12 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 	})
 
 	f := framework.NewDefaultFramework("dns")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	ginkgo.It("should support configurable pod DNS servers", func() {
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	ginkgo.It("should support configurable pod DNS servers", func(ctx context.Context) {
 
 		ginkgo.By("Getting the IP address of the internal Kubernetes service")
 
-		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(context.TODO(), "kube-dns", metav1.GetOptions{})
+		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(ctx, "kube-dns", metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Preparing a test DNS service with injected DNS names...")
@@ -60,24 +61,25 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		testPod.Spec.NodeSelector = map[string]string{
 			"kubernetes.io/os": "windows",
 		}
-		testPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testPod, metav1.CreateOptions{})
+		testPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("confirming that the pod has a windows label")
-		framework.ExpectEqual(testPod.Spec.NodeSelector["kubernetes.io/os"], "windows")
+		gomega.Expect(testPod.Spec.NodeSelector).To(gomega.HaveKeyWithValue("kubernetes.io/os", "windows"), "pod.spec.nodeSelector")
+
 		framework.Logf("Created pod %v", testPod)
 		defer func() {
 			framework.Logf("Deleting pod %s...", testPod.Name)
-			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
+			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, testPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("Failed to delete pod %s: %v", testPod.Name, err)
 			}
 		}()
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, testPod.Name, f.Namespace.Name), "failed to wait for pod %s to be running", testPod.Name)
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testPod.Name, f.Namespace.Name), "failed to wait for pod %s to be running", testPod.Name)
 
 		// This isn't the best 'test' but it is a great diagnostic, see later test for the 'real' test.
 		ginkgo.By("Calling ipconfig to get debugging info for this pod's DNS and confirm that a dns server 1.1.1.1 can be injected, along with ")
 		cmd := []string{"ipconfig", "/all"}
-		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testPod.Name,
@@ -102,7 +104,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		// TODO @jayunit100 add ResolveHost to agn images
 
 		cmd = []string{"curl.exe", "-k", "https://kubernetezzzzzzzz:443"}
-		stdout, _, err = f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err = e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testPod.Name,
@@ -117,7 +119,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 
 		ginkgo.By("Verifying that injected dns records for 'kubernetes' resolve to the valid ip address")
 		cmd = []string{"curl.exe", "-k", "https://kubernetes:443"}
-		stdout, _, err = f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err = e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testPod.Name,
@@ -127,7 +129,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		})
 		framework.Logf("Result of curling the kubernetes service... (Failure ok, only testing for the sake of DNS resolution) %v ... error = %v", stdout, err)
 
-		// curl returns an error if the host isnt resolved, otherwise, it will return a passing result.
+		// curl returns an error if the host isn't resolved, otherwise, it will return a passing result.
 		if err != nil {
 			framework.ExpectNoError(err)
 		}

@@ -19,7 +19,6 @@ package testing
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -39,6 +38,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
+	openapiclient "k8s.io/client-go/openapi"
+	"k8s.io/client-go/openapi/openapitest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/restmapper"
@@ -50,8 +51,6 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 	"k8s.io/kubectl/pkg/validation"
-
-	openapi_v2 "github.com/google/gnostic/openapiv2"
 )
 
 // InternalType is the schema for internal type
@@ -364,19 +363,45 @@ func AddToScheme(scheme *runtime.Scheme) (meta.RESTMapper, runtime.Codec) {
 	return mapper, codec
 }
 
-type fakeCachedDiscoveryClient struct {
+type FakeCachedDiscoveryClient struct {
 	discovery.DiscoveryInterface
+	Groups             []*metav1.APIGroup
+	Resources          []*metav1.APIResourceList
+	PreferredResources []*metav1.APIResourceList
+	Invalidations      int
 }
 
-func (d *fakeCachedDiscoveryClient) Fresh() bool {
+func NewFakeCachedDiscoveryClient() *FakeCachedDiscoveryClient {
+	return &FakeCachedDiscoveryClient{
+		Groups:             []*metav1.APIGroup{},
+		Resources:          []*metav1.APIResourceList{},
+		PreferredResources: []*metav1.APIResourceList{},
+		Invalidations:      0,
+	}
+}
+
+func (d *FakeCachedDiscoveryClient) Fresh() bool {
 	return true
 }
 
-func (d *fakeCachedDiscoveryClient) Invalidate() {
+func (d *FakeCachedDiscoveryClient) Invalidate() {
+	d.Invalidations++
 }
 
-func (d *fakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-	return []*metav1.APIGroup{}, []*metav1.APIResourceList{}, nil
+func (d *FakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return d.Groups, d.Resources, nil
+}
+
+func (d *FakeCachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
+	groupList := &metav1.APIGroupList{Groups: []metav1.APIGroup{}}
+	for _, g := range d.Groups {
+		groupList.Groups = append(groupList.Groups, *g)
+	}
+	return groupList, nil
+}
+
+func (d *FakeCachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return d.PreferredResources, nil
 }
 
 // TestFactory extends cmdutil.Factory
@@ -395,14 +420,14 @@ type TestFactory struct {
 
 	UnstructuredClientForMappingFunc resource.FakeClientFunc
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
-	FakeOpenAPIGetter                discovery.OpenAPISchemaInterface
+	OpenAPIV3ClientFunc              func() (openapiclient.Client, error)
 }
 
 // NewTestFactory returns an initialized TestFactory instance
 func NewTestFactory() *TestFactory {
 	// specify an optionalClientConfig to explicitly use in testing
 	// to avoid polluting an existing user config.
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "cmdtests_temp")
+	tmpFile, err := os.CreateTemp(os.TempDir(), "cmdtests_temp")
 	if err != nil {
 		panic(fmt.Sprintf("unable to create a fake client config: %v", err))
 	}
@@ -447,12 +472,18 @@ func (f *TestFactory) WithClientConfig(clientConfig clientcmd.ClientConfig) *Tes
 	return f
 }
 
+func (f *TestFactory) WithDiscoveryClient(discoveryClient discovery.CachedDiscoveryInterface) *TestFactory {
+	f.kubeConfigFlags.WithDiscoveryClient(discoveryClient)
+	return f
+}
+
 // Cleanup cleans up TestFactory temp config file
 func (f *TestFactory) Cleanup() {
 	if f.tempConfigFile == nil {
 		return
 	}
 
+	f.tempConfigFile.Close()
 	os.Remove(f.tempConfigFile.Name())
 }
 
@@ -494,7 +525,7 @@ func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 }
 
 // Validator returns a validation schema
-func (f *TestFactory) Validator(validateDirective string, verifier *resource.QueryParamVerifier) (validation.Schema, error) {
+func (f *TestFactory) Validator(validateDirective string) (validation.Schema, error) {
 	return validation.NullSchema{}, nil
 }
 
@@ -506,21 +537,11 @@ func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 	return openapitesting.EmptyResources{}, nil
 }
 
-type EmptyOpenAPI struct{}
-
-func (EmptyOpenAPI) OpenAPISchema() (*openapi_v2.Document, error) {
-	return &openapi_v2.Document{}, nil
-}
-
-func (f *TestFactory) OpenAPIGetter() discovery.OpenAPISchemaInterface {
-	if f.FakeOpenAPIGetter != nil {
-		return f.FakeOpenAPIGetter
+func (f *TestFactory) OpenAPIV3Client() (openapiclient.Client, error) {
+	if f.OpenAPIV3ClientFunc != nil {
+		return f.OpenAPIV3ClientFunc()
 	}
-	client, err := f.ToDiscoveryClient()
-	if err != nil {
-		return EmptyOpenAPI{}
-	}
-	return client
+	return openapitest.NewFakeClient(), nil
 }
 
 // NewBuilder returns an initialized resource.Builder instance
@@ -552,8 +573,9 @@ func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AuthorizationV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AuthenticationV1alpha1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AutoscalingV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AutoscalingV2beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AutoscalingV2().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.BatchV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.CertificatesV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.CertificatesV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
@@ -618,7 +640,7 @@ func testRESTMapper() meta.RESTMapper {
 		},
 	}
 
-	fakeDs := &fakeCachedDiscoveryClient{}
+	fakeDs := NewFakeCachedDiscoveryClient()
 	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
 	return expander
 }
@@ -714,15 +736,15 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				Name: "autoscaling",
 				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1"},
-					{Version: "v2beta1"},
+					{Version: "v2"},
 				},
-				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v2beta1"},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v2"},
 			},
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
 				},
-				"v2beta1": {
+				"v2": {
 					{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
 				},
 			},
@@ -775,6 +797,7 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "bars", Namespaced: true, Kind: "Bar"},
+					{Name: "applysets", Namespaced: false, Kind: "ApplySet"},
 				},
 			},
 		},

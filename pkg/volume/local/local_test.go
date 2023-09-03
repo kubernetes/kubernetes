@@ -136,30 +136,40 @@ func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
 }
 
 func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (string, volume.DeviceMountableVolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
+	var (
+		source string
+		err    error
+	)
+
+	if isBlockDevice && runtime.GOOS == "windows" {
+		// On Windows, block devices are referenced by the disk number, which is validated by the mounter,
+		source = "0"
+	} else {
+		source, err = utiltesting.MkTmpdir("localVolumeTest")
+		if err != nil {
+			t.Fatalf("can't make a temp dir: %v", err)
+		}
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
 	var pathToFSType map[string]hostutil.FileType
 	if isBlockDevice {
 		pathToFSType = map[string]hostutil.FileType{
-			tmpDir: hostutil.FileTypeBlockDev,
+			source: hostutil.FileTypeBlockDev,
 		}
 	}
 
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHostWithMounterFSType(t, tmpDir, nil, nil, pathToFSType))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHostWithMounterFSType(t, source, nil, nil, pathToFSType))
 
 	plug, err := plugMgr.FindDeviceMountablePluginByName(localVolumePluginName)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		os.RemoveAll(source)
 		t.Fatalf("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != localVolumePluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	return tmpDir, plug
+	return source, plug
 }
 
 func getTestVolume(readOnly bool, path string, isBlock bool, mountOptions []string) *volume.Spec {
@@ -370,7 +380,7 @@ func TestMountUnmount(t *testing.T) {
 	}
 
 	if runtime.GOOS != "windows" {
-		// skip this check in windows since the "bind mount" logic is implemented differently in mount_wiondows.go
+		// skip this check in windows since the "bind mount" logic is implemented differently in mount_windows.go
 		if _, err := os.Stat(path); err != nil {
 			if os.IsNotExist(err) {
 				t.Errorf("SetUp() failed, volume path not created: %s", path)
@@ -543,34 +553,34 @@ func TestConstructVolumeSpec(t *testing.T) {
 			}
 			mounter.(*mount.FakeMounter).MountPoints = fakeMountPoints
 			volPath := filepath.Join(tmpDir, testMountPath)
-			spec, err := plug.ConstructVolumeSpec(testPVName, volPath)
+			rec, err := plug.ConstructVolumeSpec(testPVName, volPath)
 			if err != nil {
 				t.Errorf("ConstructVolumeSpec() failed: %v", err)
 			}
-			if spec == nil {
+			if rec.Spec == nil {
 				t.Fatalf("ConstructVolumeSpec() returned nil")
 			}
 
-			volName := spec.Name()
+			volName := rec.Spec.Name()
 			if volName != testPVName {
 				t.Errorf("Expected volume name %q, got %q", testPVName, volName)
 			}
 
-			if spec.Volume != nil {
+			if rec.Spec.Volume != nil {
 				t.Errorf("Volume object returned, expected nil")
 			}
 
-			pv := spec.PersistentVolume
+			pv := rec.Spec.PersistentVolume
 			if pv == nil {
 				t.Fatalf("PersistentVolume object nil")
 			}
 
-			if spec.PersistentVolume.Spec.VolumeMode == nil {
+			if rec.Spec.PersistentVolume.Spec.VolumeMode == nil {
 				t.Fatalf("Volume mode has not been set.")
 			}
 
-			if *spec.PersistentVolume.Spec.VolumeMode != v1.PersistentVolumeFilesystem {
-				t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
+			if *rec.Spec.PersistentVolume.Spec.VolumeMode != v1.PersistentVolumeFilesystem {
+				t.Errorf("Unexpected volume mode %q", *rec.Spec.PersistentVolume.Spec.VolumeMode)
 			}
 
 			ls := pv.Spec.PersistentVolumeSource.Local

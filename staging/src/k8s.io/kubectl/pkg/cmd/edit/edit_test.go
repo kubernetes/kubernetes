@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -28,14 +27,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 
 	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -98,20 +97,20 @@ func TestEdit(t *testing.T) {
 
 		body := []byte{}
 		if req.Body != nil {
-			body, err = ioutil.ReadAll(req.Body)
+			body, err = io.ReadAll(req.Body)
 			if err != nil {
 				t.Fatalf("%s, step %d: %v", name, i, err)
 			}
 		}
 
 		inputFile := filepath.Join("testdata", "testcase-"+name, step.Input)
-		expectedInput, err := ioutil.ReadFile(inputFile)
+		expectedInput, err := os.ReadFile(inputFile)
 		if err != nil {
 			t.Fatalf("%s, step %d: %v", name, i, err)
 		}
 
 		outputFile := filepath.Join("testdata", "testcase-"+name, step.Output)
-		resultingOutput, err := ioutil.ReadFile(outputFile)
+		resultingOutput, err := os.ReadFile(outputFile)
 		if err != nil {
 			t.Fatalf("%s, step %d: %v", name, i, err)
 		}
@@ -123,13 +122,13 @@ func TestEdit(t *testing.T) {
 			if !bytes.Equal(body, expectedInput) {
 				if updateInputFixtures {
 					// Convenience to allow recapturing the input and persisting it here
-					ioutil.WriteFile(inputFile, body, os.FileMode(0644))
+					os.WriteFile(inputFile, body, os.FileMode(0644))
 				} else {
-					t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, diff.StringDiff(string(body), string(expectedInput)))
+					t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, cmp.Diff(string(body), string(expectedInput)))
 					t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
 				}
 			}
-			return &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(resultingOutput))}, nil
 		}
 		if step.StepType != "request" {
 			t.Fatalf("%s, step %d: expected request step, got %s %s", name, i, req.Method, req.URL.Path)
@@ -146,13 +145,13 @@ func TestEdit(t *testing.T) {
 		if !bytes.Equal(body, expectedInput) {
 			if updateInputFixtures {
 				// Convenience to allow recapturing the input and persisting it here
-				ioutil.WriteFile(inputFile, body, os.FileMode(0644))
+				os.WriteFile(inputFile, body, os.FileMode(0644))
 			} else {
-				t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, diff.StringDiff(string(body), string(expectedInput)))
+				t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, cmp.Diff(string(body), string(expectedInput)))
 				t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
 			}
 		}
-		return &http.Response{StatusCode: step.ResponseStatusCode, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
+		return &http.Response{StatusCode: step.ResponseStatusCode, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(resultingOutput))}, nil
 
 	}
 
@@ -171,8 +170,8 @@ func TestEdit(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	os.Setenv("KUBE_EDITOR", "testdata/test_editor.sh")
-	os.Setenv("KUBE_EDITOR_CALLBACK", server.URL+"/callback")
+	t.Setenv("KUBE_EDITOR", "testdata/test_editor.sh")
+	t.Setenv("KUBE_EDITOR_CALLBACK", server.URL+"/callback")
 
 	testcases := sets.NewString()
 	filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {
@@ -202,7 +201,7 @@ func TestEdit(t *testing.T) {
 			name = testcaseName
 			testcase = EditTestCase{}
 			testcaseDir := filepath.Join("testdata", "testcase-"+name)
-			testcaseData, err := ioutil.ReadFile(filepath.Join(testcaseDir, "test.yaml"))
+			testcaseData, err := os.ReadFile(filepath.Join(testcaseDir, "test.yaml"))
 			if err != nil {
 				t.Fatalf("%s: %v", name, err)
 			}
@@ -228,7 +227,7 @@ func TestEdit(t *testing.T) {
 			}
 			tf.WithNamespace(testcase.Namespace)
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 
 			var cmd *cobra.Command
 			switch testcase.Mode {

@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // OperationProps describes an operation
@@ -38,6 +40,23 @@ type OperationProps struct {
 	Security     []map[string][]string  `json:"security,omitempty"`
 	Parameters   []Parameter            `json:"parameters,omitempty"`
 	Responses    *Responses             `json:"responses,omitempty"`
+}
+
+// Marshaling structure only, always edit along with corresponding
+// struct (or compilation will fail).
+type operationPropsOmitZero struct {
+	Description  string                 `json:"description,omitempty"`
+	Consumes     []string               `json:"consumes,omitempty"`
+	Produces     []string               `json:"produces,omitempty"`
+	Schemes      []string               `json:"schemes,omitempty"`
+	Tags         []string               `json:"tags,omitempty"`
+	Summary      string                 `json:"summary,omitempty"`
+	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitzero"`
+	ID           string                 `json:"operationId,omitempty"`
+	Deprecated   bool                   `json:"deprecated,omitempty,omitzero"`
+	Security     []map[string][]string  `json:"security,omitempty"`
+	Parameters   []Parameter            `json:"parameters,omitempty"`
+	Responses    *Responses             `json:"responses,omitzero"`
 }
 
 // MarshalJSON takes care of serializing operation properties to JSON
@@ -75,14 +94,35 @@ type Operation struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (o *Operation) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshaling {
+		return jsonv2.Unmarshal(data, o)
+	}
+
 	if err := json.Unmarshal(data, &o.OperationProps); err != nil {
 		return err
 	}
 	return json.Unmarshal(data, &o.VendorExtensible)
 }
 
+func (o *Operation) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	type OperationPropsNoMethods OperationProps // strip MarshalJSON method
+	var x struct {
+		Extensions
+		OperationPropsNoMethods
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	o.Extensions = internal.SanitizeExtensions(x.Extensions)
+	o.OperationProps = OperationProps(x.OperationPropsNoMethods)
+	return nil
+}
+
 // MarshalJSON converts this items object to JSON
 func (o Operation) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshaling {
+		return internal.DeterministicMarshal(o)
+	}
 	b1, err := json.Marshal(o.OperationProps)
 	if err != nil {
 		return nil, err
@@ -93,4 +133,14 @@ func (o Operation) MarshalJSON() ([]byte, error) {
 	}
 	concated := swag.ConcatJSON(b1, b2)
 	return concated, nil
+}
+
+func (o Operation) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Extensions
+		OperationProps operationPropsOmitZero `json:",inline"`
+	}
+	x.Extensions = internal.SanitizeExtensions(o.Extensions)
+	x.OperationProps = operationPropsOmitZero(o.OperationProps)
+	return opts.MarshalNext(enc, x)
 }

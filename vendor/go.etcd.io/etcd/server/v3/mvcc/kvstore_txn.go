@@ -16,6 +16,7 @@ package mvcc
 
 import (
 	"context"
+	"fmt"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/pkg/v3/traceutil"
@@ -78,7 +79,7 @@ type storeTxnWrite struct {
 func (s *store) Write(trace *traceutil.Trace) TxnWrite {
 	s.mu.RLock()
 	tx := s.b.BatchTx()
-	tx.Lock()
+	tx.LockInsideApply()
 	tw := &storeTxnWrite{
 		storeTxnRead: storeTxnRead{s, tx, 0, 0, trace},
 		tx:           tx,
@@ -156,7 +157,7 @@ func (tr *storeTxnRead) rangeKeys(ctx context.Context, key, end []byte, curRev i
 	for i, revpair := range revpairs[:len(kvs)] {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, fmt.Errorf("rangeKeys: context cancelled: %w", ctx.Err())
 		default:
 		}
 		revToBytes(revpair, revBytes)
@@ -166,6 +167,13 @@ func (tr *storeTxnRead) rangeKeys(ctx context.Context, key, end []byte, curRev i
 				"range failed to find revision pair",
 				zap.Int64("revision-main", revpair.main),
 				zap.Int64("revision-sub", revpair.sub),
+				zap.Int64("revision-current", curRev),
+				zap.Int64("range-option-rev", ro.Rev),
+				zap.Int64("range-option-limit", ro.Limit),
+				zap.Binary("key", key),
+				zap.Binary("end", end),
+				zap.Int("len-revpairs", len(revpairs)),
+				zap.Int("len-values", len(vs)),
 			)
 		}
 		if err := kvs[i].Unmarshal(vs[0]); err != nil {

@@ -17,13 +17,15 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+
 	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -629,7 +632,7 @@ func TestAddAllocatableThresholds(t *testing.T) {
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			if !thresholdsEqual(testCase.expected, addAllocatableThresholds(testCase.thresholds)) {
-				t.Errorf("Err not as expected, test: %v, Unexpected data: %s", testName, diff.ObjectDiff(testCase.expected, addAllocatableThresholds(testCase.thresholds)))
+				t.Errorf("Err not as expected, test: %v, Unexpected data: %s", testName, cmp.Diff(testCase.expected, addAllocatableThresholds(testCase.thresholds)))
 			}
 		})
 	}
@@ -699,7 +702,6 @@ func TestOrderedByExceedsRequestMemory(t *testing.T) {
 }
 
 func TestOrderedByExceedsRequestDisk(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	below := newPod("below-requests", -1, []v1.Container{
 		newContainer("below-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")}, newResourceList("", "", "")),
 	}, nil)
@@ -748,7 +750,6 @@ func TestOrderedByPriority(t *testing.T) {
 }
 
 func TestOrderedbyDisk(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
 		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -813,75 +814,7 @@ func TestOrderedbyDisk(t *testing.T) {
 	}
 }
 
-// Tests that we correctly ignore disk requests when the local storage feature gate is disabled.
-func TestOrderedbyDiskDisableLocalStorage(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, false)()
-	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
-		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
-	}, []v1.Volume{
-		newVolume("local-volume", v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
-		}),
-	})
-	pod2 := newPod("best-effort-low", defaultPriority, []v1.Container{
-		newContainer("best-effort-low", newResourceList("", "", ""), newResourceList("", "", "")),
-	}, []v1.Volume{
-		newVolume("local-volume", v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
-		}),
-	})
-	pod3 := newPod("burstable-high", defaultPriority, []v1.Container{
-		newContainer("burstable-high", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi")),
-	}, []v1.Volume{
-		newVolume("local-volume", v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
-		}),
-	})
-	pod4 := newPod("burstable-low", defaultPriority, []v1.Container{
-		newContainer("burstable-low", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi")),
-	}, []v1.Volume{
-		newVolume("local-volume", v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
-		}),
-	})
-	pod5 := newPod("guaranteed-high", defaultPriority, []v1.Container{
-		newContainer("guaranteed-high", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi")),
-	}, []v1.Volume{
-		newVolume("local-volume", v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
-		}),
-	})
-	pod6 := newPod("guaranteed-low", defaultPriority, []v1.Container{
-		newContainer("guaranteed-low", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi")),
-	}, []v1.Volume{
-		newVolume("local-volume", v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
-		}),
-	})
-	stats := map[*v1.Pod]statsapi.PodStats{
-		pod1: newPodDiskStats(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("150Mi")), // 300Mi
-		pod2: newPodDiskStats(pod2, resource.MustParse("25Mi"), resource.MustParse("25Mi"), resource.MustParse("50Mi")),   // 100Mi
-		pod3: newPodDiskStats(pod3, resource.MustParse("150Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 350Mi
-		pod4: newPodDiskStats(pod4, resource.MustParse("25Mi"), resource.MustParse("35Mi"), resource.MustParse("50Mi")),   // 110Mi
-		pod5: newPodDiskStats(pod5, resource.MustParse("225Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 375Mi
-		pod6: newPodDiskStats(pod6, resource.MustParse("25Mi"), resource.MustParse("45Mi"), resource.MustParse("50Mi")),   // 120Mi
-	}
-	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
-		result, found := stats[pod]
-		return result, found
-	}
-	pods := []*v1.Pod{pod1, pod3, pod2, pod4, pod5, pod6}
-	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)).Sort(pods)
-	expected := []*v1.Pod{pod5, pod3, pod1, pod6, pod4, pod2}
-	for i := range expected {
-		if pods[i] != expected[i] {
-			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
-		}
-	}
-}
-
 func TestOrderedbyInodes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	low := newPod("low", defaultPriority, []v1.Container{
 		newContainer("low", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -924,7 +857,6 @@ func TestOrderedbyInodes(t *testing.T) {
 
 // TestOrderedByPriorityDisk ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityDisk(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -1252,11 +1184,11 @@ type fakeSummaryProvider struct {
 	result *statsapi.Summary
 }
 
-func (f *fakeSummaryProvider) Get(updateStats bool) (*statsapi.Summary, error) {
+func (f *fakeSummaryProvider) Get(ctx context.Context, updateStats bool) (*statsapi.Summary, error) {
 	return f.result, nil
 }
 
-func (f *fakeSummaryProvider) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
+func (f *fakeSummaryProvider) GetCPUAndMemoryStats(ctx context.Context) (*statsapi.Summary, error) {
 	return f.result, nil
 }
 
@@ -2191,4 +2123,54 @@ func (s1 thresholdList) Equal(s2 thresholdList) bool {
 		}
 	}
 	return true
+}
+
+func TestEvictonMessageWithResourceResize(t *testing.T) {
+	testpod := newPod("testpod", 1, []v1.Container{
+		newContainer("testcontainer", newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+	}, nil)
+	testpod.Status = v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name:               "testcontainer",
+				AllocatedResources: newResourceList("", "100Mi", ""),
+			},
+		},
+	}
+	testpodMemory := resource.MustParse("150Mi")
+	testpodStats := newPodMemoryStats(testpod, testpodMemory)
+	testpodMemoryBytes := uint64(testpodMemory.Value())
+	testpodStats.Containers = []statsapi.ContainerStats{
+		{
+			Name: "testcontainer",
+			Memory: &statsapi.MemoryStats{
+				WorkingSetBytes: &testpodMemoryBytes,
+			},
+		},
+	}
+	stats := map[*v1.Pod]statsapi.PodStats{
+		testpod: testpodStats,
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	threshold := []evictionapi.Threshold{}
+	observations := signalObservations{}
+
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("InPlacePodVerticalScaling enabled=%v", enabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)()
+			msg, _ := evictionMessage(v1.ResourceMemory, testpod, statsFn, threshold, observations)
+			if enabled {
+				if !strings.Contains(msg, "testcontainer was using 150Mi, request is 100Mi") {
+					t.Errorf("Expected 'exceeds memory' eviction message was not found.")
+				}
+			} else {
+				if strings.Contains(msg, "which exceeds its request") {
+					t.Errorf("Found 'exceeds memory' eviction message which was not expected.")
+				}
+			}
+		})
+	}
 }

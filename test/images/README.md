@@ -94,8 +94,8 @@ the regular image building process. This helper image can be found in at `e2etea
 It can be used by anyone, but if you need to build your own, you can read more about it [here](windows/README.md).
 
 For Windows, in order to spawn process-isolated containers, the container OS version should closely match
-the host OS version. For this reason, we build test images for different Windows OS Versions: 1809 (Windows Server 2019),
-20H2, ltsc2022. In order to add support for a new Windows OS version, a new entry for that OS version will have
+the host OS version. For this reason, we build test images for different Windows OS Versions: 1809 (Windows Server 2019)
+and ltsc2022 (Windows Server 2022). In order to add support for a new Windows OS version, a new entry for that OS version will have
 to be first added to the `windows-servercore-cache` and `busybox` images, followed by the rest of the images.
 These images are then used by the rest of the E2E test images as a cache / base image.
 
@@ -130,7 +130,7 @@ To build AND push an image, the following command can be used:
 make all-push WHAT=agnhost
 ```
 
-By default, the images will be tagged and pushed under the `k8s.gcr.io/e2e-test-images`
+By default, the images will be tagged and pushed under the `registry.k8s.io/e2e-test-images`
 registry. That can changed by running this command instead:
 
 ```bash
@@ -141,7 +141,7 @@ REGISTRY=foo_registry make all-push WHAT=agnhost
 require the `agnhost` image to be published in an authenticated repo as well:
 
 ```bash
-REGISTRY=k8s.gcr.io/e2e-test-images make all-push WHAT=agnhost
+REGISTRY=registry.k8s.io/e2e-test-images make all-push WHAT=agnhost
 REGISTRY=gcr.io/k8s-authenticated-test make all-push WHAT=agnhost
 ```
 
@@ -151,7 +151,7 @@ Conformance tests.
 
 ## Testing images
 
-Once the image has been built and pushed to an accesible registry, you can run the tests using that image
+Once the image has been built and pushed to an accessible registry, you can run the tests using that image
 by having the environment variable `KUBE_TEST_REPO_LIST` set before running the tests that are using the
 image:
 
@@ -191,8 +191,8 @@ https://testgrid.k8s.io/sig-testing-images#post-kubernetes-push-e2e-agnhost-test
 will be triggered. The postsubmit job will push the images to the `gcr.io/k8s-staging-e2e-test-images` registry. You can use the image
 from the staging registry to do more testing if required. All the postsubmit jobs and their logs for all the images can be seen in
 [testgrid](https://testgrid.k8s.io/sig-testing-images) which is helpful for troubleshooting.  Note that these images are not the same as used by the e2e jobs and still need to be promoted to the final registry.
-1. The next step is to promote the image to the `k8s.gcr.io/e2e-test-images` registry by adding a line in
-[kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/main/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml).  See this [pull request](https://github.com/kubernetes/k8s.io/pull/1804) for an example You will need the image manifest list's digest, which can be obtained by using [manifest-tool](https://github.com/estesp/manifest-tool):
+1. The next step is to promote the image to the `registry.k8s.io/e2e-test-images` registry by adding a line in
+[kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/main/registry.k8s.io/images/k8s-staging-e2e-test-images/images.yaml).  See this [pull request](https://github.com/kubernetes/k8s.io/pull/1804) for an example You will need the image manifest list's digest, which can be obtained by using [manifest-tool](https://github.com/estesp/manifest-tool):
 
     ```bash
     manifest-tool inspect --raw gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION} | jq '.[0].Digest'
@@ -210,7 +210,7 @@ sudo chmod o+x /etc/docker
 ```
 
 A few images have been mirrored from dockerhub into the `gcr.io/k8s-staging-e2e-test-images` registry
-(`busybox`, `glusterdynamic-provisioner`, `httpd`, `httpd-new`, `nginx`, `nginx-new`, `perl`), and they
+(`busybox`,`httpd`, `httpd-new`, `nginx`, `nginx-new`, `perl`), and they
 only have a noop Dockerfile. However, due to an [issue](https://github.com/kubernetes/test-infra/issues/20884),
 the same SHA cannot be pushed twice. A small change to them is required in order to generate a new SHA,
 which can then be pushed and promoted.

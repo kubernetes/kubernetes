@@ -2,10 +2,12 @@
 
 approvers:
   - bowei
+  - sig-network-approvers
 reviewers:
   - smarterclayton
   - ingvagabund
   - k82cn
+  - sig-network-reviewers
 labels:
   - sig/network
 emeritus_approvers:

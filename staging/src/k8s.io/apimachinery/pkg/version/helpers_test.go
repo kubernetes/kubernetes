@@ -45,8 +45,77 @@ func TestCompareKubeAwareVersionStrings(t *testing.T) {
 			if e {
 				t.Errorf("expected %s to be greater than %s", tc.v1, tc.v2)
 			} else {
-				t.Errorf("expected %s to be less than than %s", tc.v1, tc.v2)
+				t.Errorf("expected %s to be less than %s", tc.v1, tc.v2)
 			}
 		}
+	}
+}
+
+func Test_parseKubeVersion(t *testing.T) {
+	tests := []struct {
+		name             string
+		v                string
+		wantMajorVersion int
+		wantVType        versionType
+		wantMinorVersion int
+		wantOk           bool
+	}{
+		{
+			name:             "invaild version for ga",
+			v:                "v1.1",
+			wantMajorVersion: 0,
+			wantVType:        0,
+			wantMinorVersion: 0,
+			wantOk:           false,
+		},
+		{
+			name:             "invaild version for alpha",
+			v:                "v1alpha1.1",
+			wantMajorVersion: 0,
+			wantVType:        0,
+			wantMinorVersion: 0,
+			wantOk:           false,
+		},
+		{
+			name:             "alpha version",
+			v:                "v1alpha1",
+			wantMajorVersion: 1,
+			wantVType:        0,
+			wantMinorVersion: 1,
+			wantOk:           true,
+		},
+		{
+			name:             "beta version",
+			v:                "v2beta10",
+			wantMajorVersion: 2,
+			wantVType:        1,
+			wantMinorVersion: 10,
+			wantOk:           true,
+		},
+		{
+			name:             "ga version",
+			v:                "v3",
+			wantMajorVersion: 3,
+			wantVType:        2,
+			wantMinorVersion: 0,
+			wantOk:           true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotMajorVersion, gotVType, gotMinorVersion, gotOk := parseKubeVersion(tt.v)
+			if gotMajorVersion != tt.wantMajorVersion {
+				t.Errorf("parseKubeVersion() gotMajorVersion = %v, want %v", gotMajorVersion, tt.wantMajorVersion)
+			}
+			if gotVType != tt.wantVType {
+				t.Errorf("parseKubeVersion() gotVType = %v, want %v", gotVType, tt.wantVType)
+			}
+			if gotMinorVersion != tt.wantMinorVersion {
+				t.Errorf("parseKubeVersion() gotMinorVersion = %v, want %v", gotMinorVersion, tt.wantMinorVersion)
+			}
+			if gotOk != tt.wantOk {
+				t.Errorf("parseKubeVersion() gotOk = %v, want %v", gotOk, tt.wantOk)
+			}
+		})
 	}
 }

@@ -18,8 +18,8 @@ package testing
 
 import (
 	"encoding/json"
+	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -27,14 +27,13 @@ import (
 	"strings"
 	"sync"
 
-	openapi_v3 "github.com/google/gnostic/openapiv3"
 	"k8s.io/kube-openapi/pkg/handler3"
 	"k8s.io/kube-openapi/pkg/spec3"
 )
 
 type FakeOpenAPIServer struct {
 	HttpServer      *httptest.Server
-	ServedDocuments map[string]*openapi_v3.Document
+	ServedDocuments map[string]*spec3.OpenAPI
 	RequestCounters map[string]int
 }
 
@@ -42,26 +41,23 @@ type FakeOpenAPIServer struct {
 // API server.
 //
 // specsPath - Give a path to some test data organized so that each GroupVersion
-// 	has its own OpenAPI V3 JSON file.
-// 		i.e. apps/v1beta1 is stored in <specsPath>/apps/v1beta1.json
+// has its own OpenAPI V3 JSON file.
+//
+//	i.e. apps/v1beta1 is stored in <specsPath>/apps/v1beta1.json
 func NewFakeOpenAPIV3Server(specsPath string) (*FakeOpenAPIServer, error) {
 	mux := &testMux{
 		counts: map[string]int{},
 	}
 	server := httptest.NewServer(mux)
 
-	openAPIVersionedService, err := handler3.NewOpenAPIService(nil)
-	if err != nil {
-		return nil, err
-	}
-
-	err = openAPIVersionedService.RegisterOpenAPIV3VersionedService("/openapi/v3", mux)
+	openAPIVersionedService := handler3.NewOpenAPIService()
+	err := openAPIVersionedService.RegisterOpenAPIV3VersionedService("/openapi/v3", mux)
 	if err != nil {
 		return nil, err
 	}
 
 	grouped := make(map[string][]byte)
-	var testV3Specs = make(map[string]*openapi_v3.Document)
+	var testV3Specs = make(map[string]*spec3.OpenAPI)
 
 	addSpec := func(path string) {
 		file, err := os.Open(path)
@@ -70,7 +66,7 @@ func NewFakeOpenAPIV3Server(specsPath string) (*FakeOpenAPIServer, error) {
 		}
 
 		defer file.Close()
-		vals, err := ioutil.ReadAll(file)
+		vals, err := io.ReadAll(file)
 		if err != nil {
 			panic(err)
 		}
@@ -96,11 +92,8 @@ func NewFakeOpenAPIV3Server(specsPath string) (*FakeOpenAPIServer, error) {
 		if err != nil {
 			return nil, err
 		}
-		gnosticSpec, err := openapi_v3.ParseDocument(jsonSpec)
-		if err != nil {
-			return nil, err
-		}
-		testV3Specs[gv] = gnosticSpec
+
+		testV3Specs[gv] = spec
 		openAPIVersionedService.UpdateGroupVersion(gv, spec)
 	}
 

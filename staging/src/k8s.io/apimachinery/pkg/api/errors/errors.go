@@ -87,21 +87,21 @@ func (e *StatusError) DebugError() (string, []interface{}) {
 
 // HasStatusCause returns true if the provided error has a details cause
 // with the provided type name.
+// It supports wrapped errors and returns false when the error is nil.
 func HasStatusCause(err error, name metav1.CauseType) bool {
 	_, ok := StatusCause(err, name)
 	return ok
 }
 
 // StatusCause returns the named cause from the provided error if it exists and
-// the error is of the type APIStatus. Otherwise it returns false.
+// the error unwraps to the type APIStatus. Otherwise it returns false.
 func StatusCause(err error, name metav1.CauseType) (metav1.StatusCause, bool) {
-	apierr, ok := err.(APIStatus)
-	if !ok || apierr == nil || apierr.Status().Details == nil {
-		return metav1.StatusCause{}, false
-	}
-	for _, cause := range apierr.Status().Details.Causes {
-		if cause.Type == name {
-			return cause, true
+	status, ok := err.(APIStatus)
+	if (ok || errors.As(err, &status)) && status.Status().Details != nil {
+		for _, cause := range status.Status().Details.Causes {
+			if cause.Type == name {
+				return cause, true
+			}
 		}
 	}
 	return metav1.StatusCause{}, false
@@ -757,7 +757,8 @@ func IsRequestEntityTooLargeError(err error) bool {
 // and may be the result of another HTTP actor.
 // It supports wrapped errors and returns false when the error is nil.
 func IsUnexpectedServerError(err error) bool {
-	if status := APIStatus(nil); errors.As(err, &status) && status.Status().Details != nil {
+	status, ok := err.(APIStatus)
+	if (ok || errors.As(err, &status)) && status.Status().Details != nil {
 		for _, cause := range status.Status().Details.Causes {
 			if cause.Type == metav1.CauseTypeUnexpectedServerResponse {
 				return true
@@ -770,8 +771,8 @@ func IsUnexpectedServerError(err error) bool {
 // IsUnexpectedObjectError determines if err is due to an unexpected object from the master.
 // It supports wrapped errors and returns false when the error is nil.
 func IsUnexpectedObjectError(err error) bool {
-	uoe := &UnexpectedObjectError{}
-	return err != nil && errors.As(err, &uoe)
+	uoe, ok := err.(*UnexpectedObjectError)
+	return err != nil && (ok || errors.As(err, &uoe))
 }
 
 // SuggestsClientDelay returns true if this error suggests a client delay as well as the
@@ -780,7 +781,8 @@ func IsUnexpectedObjectError(err error) bool {
 // request delay without retry.
 // It supports wrapped errors and returns false when the error is nil.
 func SuggestsClientDelay(err error) (int, bool) {
-	if t := APIStatus(nil); errors.As(err, &t) && t.Status().Details != nil {
+	t, ok := err.(APIStatus)
+	if (ok || errors.As(err, &t)) && t.Status().Details != nil {
 		switch t.Status().Reason {
 		// this StatusReason explicitly requests the caller to delay the action
 		case metav1.StatusReasonServerTimeout:
@@ -798,14 +800,14 @@ func SuggestsClientDelay(err error) (int, bool) {
 // It supports wrapped errors and returns StatusReasonUnknown when
 // the error is nil or doesn't have a status.
 func ReasonForError(err error) metav1.StatusReason {
-	if status := APIStatus(nil); errors.As(err, &status) {
+	if status, ok := err.(APIStatus); ok || errors.As(err, &status) {
 		return status.Status().Reason
 	}
 	return metav1.StatusReasonUnknown
 }
 
 func reasonAndCodeForError(err error) (metav1.StatusReason, int32) {
-	if status := APIStatus(nil); errors.As(err, &status) {
+	if status, ok := err.(APIStatus); ok || errors.As(err, &status) {
 		return status.Status().Reason, status.Status().Code
 	}
 	return metav1.StatusReasonUnknown, 0

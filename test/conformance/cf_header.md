@@ -19,7 +19,7 @@ Example:
   Testname: Kubelet, log output, default
   Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 */
-framework.ConformanceIt("should print the output to logs [NodeConformance]", func() {
+framework.ConformanceIt("should print the output to logs [NodeConformance]", func(ctx context.Context) {
 ```
 
 would generate the following documentation for the test. Note that the "TestName" from the Documentation above will

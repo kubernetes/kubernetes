@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	netutils "k8s.io/utils/net"
 )
@@ -57,6 +58,7 @@ func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
 	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{})
 	gce.nodeInformerSynced = func() bool { return true }
 	gce.client = fake.NewSimpleClientset()
+	gce.eventRecorder = &record.FakeRecorder{}
 
 	mockGCE := gce.c.(*cloud.MockGCE)
 	mockGCE.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
@@ -78,6 +80,7 @@ func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
 	mockGCE.MockRegionBackendServices.UpdateHook = mock.UpdateRegionBackendServiceHook
 	mockGCE.MockHealthChecks.UpdateHook = mock.UpdateHealthCheckHook
 	mockGCE.MockFirewalls.UpdateHook = mock.UpdateFirewallHook
+	mockGCE.MockFirewalls.PatchHook = mock.UpdateFirewallHook
 
 	keyGA := meta.GlobalKey("key-ga")
 	mockGCE.MockZones.Objects[*keyGA] = &cloud.MockZonesObj{
@@ -372,7 +375,7 @@ func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key
 	return err
 }
 
-//hasFinalizer returns if the given service has the specified key in its list of finalizers.
+// hasFinalizer returns if the given service has the specified key in its list of finalizers.
 func hasFinalizer(service *v1.Service, key string) bool {
 	for _, finalizer := range service.ObjectMeta.Finalizers {
 		if finalizer == key {

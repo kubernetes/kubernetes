@@ -60,3 +60,33 @@ func TestGetDefinitionName(t *testing.T) {
 	assertEqual(t, "com.test.another.Type", n)
 	assertEqual(t, e2, spec.Extensions(nil))
 }
+
+func TestToValidOperationID(t *testing.T) {
+	scenarios := []struct {
+		s                     string
+		capitalizeFirstLetter bool
+		expectedResult        string
+	}{
+		{
+			s:                     "test_operation",
+			capitalizeFirstLetter: true,
+			expectedResult:        "Test_operation",
+		},
+		{
+			s:                     "test operation& test",
+			capitalizeFirstLetter: true,
+			expectedResult:        "TestOperationTest",
+		},
+		{
+			s:                     "test78operation",
+			capitalizeFirstLetter: false,
+			expectedResult:        "test78operation",
+		},
+	}
+	for _, tt := range scenarios {
+		result := ToValidOperationID(tt.s, tt.capitalizeFirstLetter)
+		if result != tt.expectedResult {
+			t.Errorf("expected result: %s, got: %s", tt.expectedResult, result)
+		}
+	}
+}

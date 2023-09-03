@@ -118,7 +118,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 
 func hasTypeMetaField(t *types.Type) bool {
 	for _, member := range t.Members {
-		if typeMeta.Name == member.Type.Name {
+		if typeMeta.Name == member.Type.Name && member.Embedded {
 			return true
 		}
 	}
@@ -157,7 +157,6 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 				EmbeddedIn: embed,
 			}
 			if memberParams.Member.Embedded {
-
 				g.generateWithFuncs(member.Type, typeParams, sw, &memberParams)
 				if !jsonTags.inline {
 					// non-inlined embeds are nillable and need a "ensure exists" utility function
@@ -165,12 +164,13 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 				}
 				continue
 			}
+
 			// For slices where the items are generated apply configuration types, accept varargs of
 			// pointers of the type as "with" function arguments so the "with" function can be used like so:
 			// WithFoos(Foo().WithName("x"), Foo().WithName("y"))
 			if t := deref(member.Type); t.Kind == types.Slice && g.refGraph.isApplyConfig(t.Elem) {
 				memberParams.ArgType = &types.Type{Kind: types.Pointer, Elem: memberType.Elem}
-				g.generateMemberWithForSlice(sw, memberParams)
+				g.generateMemberWithForSlice(sw, member, memberParams)
 				continue
 			}
 			// Note: There are no maps where the values are generated apply configurations (because
@@ -182,7 +182,7 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 			switch memberParams.Member.Type.Kind {
 			case types.Slice:
 				memberParams.ArgType = memberType.Elem
-				g.generateMemberWithForSlice(sw, memberParams)
+				g.generateMemberWithForSlice(sw, member, memberParams)
 			case types.Map:
 				g.generateMemberWithForMap(sw, memberParams)
 			default:
@@ -252,20 +252,39 @@ func (g *applyConfigurationGenerator) generateMemberWith(sw *generator.SnippetWr
 	sw.Do("}\n", memberParams)
 }
 
-func (g *applyConfigurationGenerator) generateMemberWithForSlice(sw *generator.SnippetWriter, memberParams memberParams) {
+func (g *applyConfigurationGenerator) generateMemberWithForSlice(sw *generator.SnippetWriter, member types.Member, memberParams memberParams) {
+	memberIsPointerToSlice := member.Type.Kind == types.Pointer
+	if memberIsPointerToSlice {
+		sw.Do(ensureNonEmbedSliceExists, memberParams)
+	}
+
 	sw.Do("// With$.Member.Name$ adds the given value to the $.Member.Name$ field in the declarative configuration\n", memberParams)
 	sw.Do("// and returns the receiver, so that objects can be build by chaining \"With\" function invocations.\n", memberParams)
 	sw.Do("// If called multiple times, values provided by each call will be appended to the $.Member.Name$ field.\n", memberParams)
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(values ...$.ArgType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
 	g.ensureEnbedExistsIfApplicable(sw, memberParams)
+
+	if memberIsPointerToSlice {
+		sw.Do("b.ensure$.MemberType.Elem|public$Exists()\n", memberParams)
+	}
+
 	sw.Do("  for i := range values {\n", memberParams)
 	if memberParams.ArgType.Kind == types.Pointer {
 		sw.Do("if values[i] == nil {\n", memberParams)
 		sw.Do("  panic(\"nil value passed to With$.Member.Name$\")\n", memberParams)
 		sw.Do("}\n", memberParams)
-		sw.Do("b.$.Member.Name$ = append(b.$.Member.Name$, *values[i])\n", memberParams)
+
+		if memberIsPointerToSlice {
+			sw.Do("*b.$.Member.Name$ = append(*b.$.Member.Name$, *values[i])\n", memberParams)
+		} else {
+			sw.Do("b.$.Member.Name$ = append(b.$.Member.Name$, *values[i])\n", memberParams)
+		}
 	} else {
-		sw.Do("b.$.Member.Name$ = append(b.$.Member.Name$, values[i])\n", memberParams)
+		if memberIsPointerToSlice {
+			sw.Do("*b.$.Member.Name$ = append(*b.$.Member.Name$, values[i])\n", memberParams)
+		} else {
+			sw.Do("b.$.Member.Name$ = append(b.$.Member.Name$, values[i])\n", memberParams)
+		}
 	}
 	sw.Do("  }\n", memberParams)
 	sw.Do("  return b\n", memberParams)
@@ -301,6 +320,14 @@ var ensureEmbedExists = `
 func (b *$.ApplyConfig.ApplyConfiguration|public$) ensure$.MemberType.Elem|public$Exists() {
   if b.$.MemberType.Elem|public$ == nil {
     b.$.MemberType.Elem|public$ = &$.MemberType.Elem|raw${}
+  }
+}
+`
+
+var ensureNonEmbedSliceExists = `
+func (b *$.ApplyConfig.ApplyConfiguration|public$) ensure$.MemberType.Elem|public$Exists() {
+  if b.$.Member.Name$ == nil {
+    b.$.Member.Name$ = &[]$.MemberType.Elem|raw${}
   }
 }
 `

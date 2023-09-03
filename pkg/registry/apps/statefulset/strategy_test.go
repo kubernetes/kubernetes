@@ -85,8 +85,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 		Status: apps.StatefulSetStatus{Replicas: 4},
 	}
 	Strategy.PrepareForUpdate(ctx, validPs, ps)
-	t.Run("when minReadySeconds feature gate is enabled", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, true)()
+	t.Run("StatefulSet minReadySeconds field validations on creation and updation", func(t *testing.T) {
 		// Test creation
 		ps := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -137,53 +136,6 @@ func TestStatefulSetStrategy(t *testing.T) {
 			t.Errorf("expected minReadySeconds to not be changed %v", errs)
 		}
 	})
-	t.Run("when minReadySeconds feature gate is disabled, the minReadySeconds should not be updated",
-		func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, false)()
-			// Test creation
-			ps := &apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validSelector},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					MinReadySeconds:     int32(-1),
-				},
-			}
-			Strategy.PrepareForCreate(ctx, ps)
-			errs := Strategy.Validate(ctx, ps)
-			if len(errs) != 0 {
-				t.Errorf("StatefulSet creation should not have any issues but found %v", errs)
-			}
-			if ps.Spec.MinReadySeconds != 0 {
-				t.Errorf("if the StatefulSet is created with invalid value we expect it to be defaulted to 0 "+
-					"but got %v", ps.Spec.MinReadySeconds)
-			}
-
-			// Test Updation
-			validPs := &apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            ps.Spec.Selector,
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					MinReadySeconds:     newMinReadySeconds,
-				},
-				Status: apps.StatefulSetStatus{Replicas: 4},
-			}
-			Strategy.PrepareForUpdate(ctx, validPs, ps)
-			errs = Strategy.ValidateUpdate(ctx, validPs, ps)
-			if len(errs) == 0 {
-				t.Errorf("updating only spec.Replicas is allowed on a statefulset: %v", errs)
-			}
-			expectedUpdateErrorString := "spec: Forbidden: updates to statefulset spec for fields other than" +
-				" 'replicas', 'template', 'updateStrategy' and 'persistentVolumeClaimRetentionPolicy' are forbidden"
-			if errs[0].Error() != expectedUpdateErrorString {
-				t.Errorf("expected error string %v", errs[0].Error())
-			}
-		})
 
 	validPs = &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
@@ -356,7 +308,7 @@ func generateStatefulSetWithMinReadySeconds(minReadySeconds int32) *apps.Statefu
 func makeStatefulSetWithMaxUnavailable(maxUnavailable *int) *apps.StatefulSet {
 	rollingUpdate := apps.RollingUpdateStatefulSetStrategy{}
 	if maxUnavailable != nil {
-		maxUnavailableIntStr := intstr.FromInt(*maxUnavailable)
+		maxUnavailableIntStr := intstr.FromInt32(int32(*maxUnavailable))
 		rollingUpdate = apps.RollingUpdateStatefulSetStrategy{
 			MaxUnavailable: &maxUnavailableIntStr,
 		}
@@ -376,78 +328,71 @@ func getMaxUnavailable(maxUnavailable int) *int {
 	return &maxUnavailable
 }
 
+func createOrdinalsWithStart(start int) *apps.StatefulSetOrdinals {
+	return &apps.StatefulSetOrdinals{
+		Start: int32(start),
+	}
+}
+
+func makeStatefulSetWithStatefulSetOrdinals(ordinals *apps.StatefulSetOrdinals) *apps.StatefulSet {
+	validSelector := map[string]string{"a": "b"}
+	validPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validSelector,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			},
+		},
+	}
+	return &apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "ss", Namespace: metav1.NamespaceDefault},
+		Spec: apps.StatefulSetSpec{
+			Ordinals:            ordinals,
+			Selector:            &metav1.LabelSelector{MatchLabels: validSelector},
+			Template:            validPodTemplate.Template,
+			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+		},
+	}
+}
+
 // TestDropStatefulSetDisabledFields tests if the drop functionality is working fine or not
 func TestDropStatefulSetDisabledFields(t *testing.T) {
 	testCases := []struct {
-		name                  string
-		enableMinReadySeconds bool
-		enableMaxUnavailable  bool
-		ss                    *apps.StatefulSet
-		oldSS                 *apps.StatefulSet
-		expectedSS            *apps.StatefulSet
+		name                          string
+		enableMaxUnavailable          bool
+		enableStatefulSetStartOrdinal bool
+		ss                            *apps.StatefulSet
+		oldSS                         *apps.StatefulSet
+		expectedSS                    *apps.StatefulSet
 	}{
 		{
-			name:                  "no minReadySeconds, no update",
-			enableMinReadySeconds: false,
-			ss:                    &apps.StatefulSet{},
-			oldSS:                 nil,
-			expectedSS:            &apps.StatefulSet{},
+			name:       "set minReadySeconds, no update",
+			ss:         generateStatefulSetWithMinReadySeconds(10),
+			oldSS:      generateStatefulSetWithMinReadySeconds(20),
+			expectedSS: generateStatefulSetWithMinReadySeconds(10),
 		},
 		{
-			name:                  "no minReadySeconds, irrespective of the current value, set to default value of 0",
-			enableMinReadySeconds: false,
-			ss:                    generateStatefulSetWithMinReadySeconds(2000),
-			oldSS:                 nil,
-			expectedSS:            &apps.StatefulSet{Spec: apps.StatefulSetSpec{MinReadySeconds: int32(0)}},
+			name:       "set minReadySeconds, oldSS field set to nil",
+			ss:         generateStatefulSetWithMinReadySeconds(10),
+			oldSS:      nil,
+			expectedSS: generateStatefulSetWithMinReadySeconds(10),
 		},
 		{
-			name:                  "no minReadySeconds, oldSS field set to 100, no update",
-			enableMinReadySeconds: false,
-			ss:                    generateStatefulSetWithMinReadySeconds(2000),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(100),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(2000),
+			name:       "set minReadySeconds, oldSS field is set to 0",
+			ss:         generateStatefulSetWithMinReadySeconds(10),
+			oldSS:      generateStatefulSetWithMinReadySeconds(0),
+			expectedSS: generateStatefulSetWithMinReadySeconds(10),
 		},
 		{
-			name:                  "no minReadySeconds, oldSS field set to -1(invalid value), update to zero",
-			enableMinReadySeconds: false,
-			ss:                    generateStatefulSetWithMinReadySeconds(2000),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(-1),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(0),
-		},
-		{
-			name:                  "no minReadySeconds, oldSS field set to 0, no update",
-			enableMinReadySeconds: false,
-			ss:                    generateStatefulSetWithMinReadySeconds(2000),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(0),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(2000),
-		},
-		{
-			name:                  "set minReadySeconds, no update",
-			enableMinReadySeconds: true,
-			ss:                    generateStatefulSetWithMinReadySeconds(10),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(20),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:                  "set minReadySeconds, oldSS field set to nil",
-			enableMinReadySeconds: true,
-			ss:                    generateStatefulSetWithMinReadySeconds(10),
-			oldSS:                 nil,
-			expectedSS:            generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:                  "set minReadySeconds, oldSS field is set to 0",
-			enableMinReadySeconds: true,
-			ss:                    generateStatefulSetWithMinReadySeconds(10),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(0),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:                 "MaxUnavailable not enabled, field not used",
-			enableMaxUnavailable: false,
-			ss:                   makeStatefulSetWithMaxUnavailable(nil),
-			oldSS:                nil,
-			expectedSS:           makeStatefulSetWithMaxUnavailable(nil),
+			name:       "MaxUnavailable not enabled, field not used",
+			ss:         makeStatefulSetWithMaxUnavailable(nil),
+			oldSS:      nil,
+			expectedSS: makeStatefulSetWithMaxUnavailable(nil),
 		},
 		{
 			name:                 "MaxUnavailable not enabled, field used in new, not in old",
@@ -476,12 +421,39 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 			ss:                   makeStatefulSetWithMaxUnavailable(getMaxUnavailable(1)),
 			oldSS:                makeStatefulSetWithMaxUnavailable(getMaxUnavailable(3)),
 			expectedSS:           makeStatefulSetWithMaxUnavailable(getMaxUnavailable(1)),
+		}, {
+			name:                          "StatefulSetStartOrdinal disabled, ordinals in use in new only",
+			enableStatefulSetStartOrdinal: false,
+			ss:                            makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+			oldSS:                         nil,
+			expectedSS:                    makeStatefulSetWithStatefulSetOrdinals(nil),
+		},
+		{
+			name:                          "StatefulSetStartOrdinal disabled, ordinals in use in both old and new",
+			enableStatefulSetStartOrdinal: false,
+			ss:                            makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+			oldSS:                         makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(1)),
+			expectedSS:                    makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+		},
+		{
+			name:                          "StatefulSetStartOrdinal enabled, ordinals in use in new only",
+			enableStatefulSetStartOrdinal: true,
+			ss:                            makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+			oldSS:                         nil,
+			expectedSS:                    makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+		},
+		{
+			name:                          "StatefulSetStartOrdinal enabled, ordinals in use in both old and new",
+			enableStatefulSetStartOrdinal: true,
+			ss:                            makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+			oldSS:                         makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(1)),
+			expectedSS:                    makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, tc.enableMaxUnavailable)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, tc.enableMinReadySeconds)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, tc.enableStatefulSetStartOrdinal)()
 			old := tc.oldSS.DeepCopy()
 
 			dropStatefulSetDisabledFields(tc.ss, tc.oldSS)
@@ -495,5 +467,68 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 				t.Fatalf("%v: unexpected statefulSet spec: %v, want %v, got %v", tc.name, diff, tc.expectedSS, tc.ss)
 			}
 		})
+	}
+}
+
+func TestStatefulSetStartOrdinalEnablement(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+	ss := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
+	expectedSS := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
+	ss.Spec.Replicas = 1
+
+	ctx := genericapirequest.NewDefaultContext()
+	Strategy.PrepareForCreate(ctx, ss)
+
+	if diff := cmp.Diff(expectedSS.Spec.Ordinals, ss.Spec.Ordinals); diff != "" {
+		t.Fatalf("Strategy.PrepareForCreate(%v) unexpected .spec.ordinals change: (-want, +got):\n%v", ss, diff)
+	}
+
+	errs := Strategy.Validate(ctx, ss)
+	if len(errs) != 0 {
+		t.Errorf("Strategy.Validate(%v) returned error: %v", ss, errs)
+	}
+
+	if ss.Generation != 1 {
+		t.Errorf("Generation = %v, want = 1 for StatefulSet: %v", ss.Generation, ss)
+	}
+
+	// Validate that the ordinals field is retained when StatefulSetStartOridnal is disabled.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, false)()
+	ssWhenDisabled := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
+	ssWhenDisabled.Spec.Replicas = 2
+
+	Strategy.PrepareForUpdate(ctx, ssWhenDisabled, ss)
+
+	if diff := cmp.Diff(expectedSS.Spec.Ordinals, ssWhenDisabled.Spec.Ordinals); diff != "" {
+		t.Fatalf("Strategy.PrepareForUpdate(%v) unexpected .spec.ordinals change: (-want, +got):\n%v", ssWhenDisabled, diff)
+	}
+
+	errs = Strategy.Validate(ctx, ssWhenDisabled)
+	if len(errs) != 0 {
+		t.Errorf("Strategy.Validate(%v) returned error: %v", ssWhenDisabled, errs)
+	}
+
+	if ssWhenDisabled.Generation != 2 {
+		t.Errorf("Generation = %v, want = 2 for StatefulSet: %v", ssWhenDisabled.Generation, ssWhenDisabled)
+	}
+
+	// Validate that the ordinal field is after re-enablement.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, false)()
+	ssWhenEnabled := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
+	ssWhenEnabled.Spec.Replicas = 3
+
+	Strategy.PrepareForUpdate(ctx, ssWhenEnabled, ssWhenDisabled)
+
+	if diff := cmp.Diff(expectedSS.Spec.Ordinals, ssWhenEnabled.Spec.Ordinals); diff != "" {
+		t.Fatalf("Strategy.PrepareForUpdate(%v) unexpected .spec.ordinals change: (-want, +got):\n%v", ssWhenEnabled, diff)
+	}
+
+	errs = Strategy.Validate(ctx, ssWhenEnabled)
+	if len(errs) != 0 {
+		t.Errorf("Strategy.Validate(%v) returned error: %v", ssWhenEnabled, errs)
+	}
+
+	if ssWhenEnabled.Generation != 3 {
+		t.Errorf("Generation = %v, want = 3 for StatefulSet: %v", ssWhenEnabled.Generation, ssWhenEnabled)
 	}
 }

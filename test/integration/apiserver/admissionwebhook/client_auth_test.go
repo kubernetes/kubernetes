@@ -31,10 +31,11 @@ import (
 	"testing"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -88,7 +89,7 @@ func testWebhookClientAuth(t *testing.T, enableAggregatorRouting bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(kubeConfigFile.Name())
+	defer utiltesting.CloseAndRemove(t, kubeConfigFile)
 
 	if err := os.WriteFile(kubeConfigFile.Name(), []byte(`
 apiVersion: v1
@@ -114,7 +115,7 @@ users:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(admissionConfigFile.Name())
+	defer utiltesting.CloseAndRemove(t, admissionConfigFile)
 
 	if err := os.WriteFile(admissionConfigFile.Name(), []byte(`
 apiVersion: apiserver.k8s.io/v1alpha1
@@ -160,7 +161,7 @@ plugins:
 
 	upCh := recorder.Reset()
 	ns := "load-balance"
-	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +294,7 @@ var clientAuthMarkerFixture = &corev1.Pod{
 		Name:      "marker",
 	},
 	Spec: corev1.PodSpec{
-		Containers: []v1.Container{{
+		Containers: []corev1.Container{{
 			Name:  "fake-name",
 			Image: "fakeimage",
 		}},

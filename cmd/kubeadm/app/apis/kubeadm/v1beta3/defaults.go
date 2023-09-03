@@ -42,7 +42,8 @@ const (
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
-	DefaultImageRepository = "k8s.gcr.io"
+	// (previously this defaulted to k8s.gcr.io)
+	DefaultImageRepository = "registry.k8s.io"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
 	// DefaultClusterName defines the default cluster name
@@ -59,12 +60,6 @@ const (
 
 	// DefaultImagePullPolicy is the default image pull policy in kubeadm
 	DefaultImagePullPolicy = corev1.PullIfNotPresent
-)
-
-var (
-	// DefaultAuditPolicyLogMaxAge is defined as a var so its address can be taken
-	// It is the number of days to store audit logs
-	DefaultAuditPolicyLogMaxAge = int32(2)
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -186,23 +181,7 @@ func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 	}
 
 	for i := range obj.BootstrapTokens {
-		SetDefaults_BootstrapToken(&obj.BootstrapTokens[i])
-	}
-}
-
-// SetDefaults_BootstrapToken sets the defaults for an individual Bootstrap Token
-func SetDefaults_BootstrapToken(bt *bootstraptokenv1.BootstrapToken) {
-	if bt.TTL == nil {
-		bt.TTL = &metav1.Duration{
-			Duration: constants.DefaultTokenDuration,
-		}
-	}
-	if len(bt.Usages) == 0 {
-		bt.Usages = constants.DefaultTokenUsages
-	}
-
-	if len(bt.Groups) == 0 {
-		bt.Groups = constants.DefaultTokenGroups
+		bootstraptokenv1.SetDefaults_BootstrapToken(&obj.BootstrapTokens[i])
 	}
 }
 

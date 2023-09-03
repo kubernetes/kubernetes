@@ -68,12 +68,16 @@ func (i *Config) SetVersion(version string) {
 	i.version = version
 }
 
-func initReg() RegistryList {
+func Init(repoList string) {
+	registry, imageConfigs, originalImageConfigs = readRepoList(repoList)
+}
+
+func readRepoList(repoList string) (RegistryList, map[ImageID]Config, map[ImageID]Config) {
 	registry := initRegistry
 
-	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
-		return registry
+		imageConfigs, originalImageConfigs := initImageConfigs(registry)
+		return registry, imageConfigs, originalImageConfigs
 	}
 
 	var fileContent []byte
@@ -94,9 +98,13 @@ func initReg() RegistryList {
 
 	err = yaml.Unmarshal(fileContent, &registry)
 	if err != nil {
-		panic(fmt.Errorf("Error unmarshalling '%v' YAML file: %v", repoList, err))
+		panic(fmt.Errorf("error unmarshalling '%v' YAML file: %v", repoList, err))
 	}
-	return registry
+
+	imageConfigs, originalImageConfigs := initImageConfigs(registry)
+
+	return registry, imageConfigs, originalImageConfigs
+
 }
 
 // Essentially curl url | writer
@@ -123,22 +131,19 @@ func readFromURL(url string, writer io.Writer) error {
 var (
 	initRegistry = RegistryList{
 		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
-		PromoterE2eRegistry:      "k8s.gcr.io/e2e-test-images",
-		BuildImageRegistry:       "k8s.gcr.io/build-image",
+		PromoterE2eRegistry:      "registry.k8s.io/e2e-test-images",
+		BuildImageRegistry:       "registry.k8s.io/build-image",
 		InvalidRegistry:          "invalid.registry.k8s.io/invalid",
-		GcEtcdRegistry:           "k8s.gcr.io",
-		GcRegistry:               "k8s.gcr.io",
-		SigStorageRegistry:       "k8s.gcr.io/sig-storage",
+		GcEtcdRegistry:           "registry.k8s.io",
+		GcRegistry:               "registry.k8s.io",
+		SigStorageRegistry:       "registry.k8s.io/sig-storage",
 		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
 		MicrosoftRegistry:        "mcr.microsoft.com",
 		DockerLibraryRegistry:    "docker.io/library",
-		CloudProviderGcpRegistry: "k8s.gcr.io/cloud-provider-gcp",
+		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
 	}
 
-	registry = initReg()
-
-	// Preconfigured image configs
-	imageConfigs, originalImageConfigs = initImageConfigs(registry)
+	registry, imageConfigs, originalImageConfigs = readRepoList(os.Getenv("KUBE_TEST_REPO_LIST"))
 )
 
 type ImageID int
@@ -164,14 +169,10 @@ const (
 	CudaVectorAdd
 	// CudaVectorAdd2 image
 	CudaVectorAdd2
-	// DebianIptables Image
-	DebianIptables
-	// EchoServer image
-	EchoServer
+	// DistrolessIptables Image
+	DistrolessIptables
 	// Etcd image
 	Etcd
-	// GlusterDynamicProvisioner image
-	GlusterDynamicProvisioner
 	// Httpd image
 	Httpd
 	// HttpdNew image
@@ -223,8 +224,6 @@ const (
 	VolumeNFSServer
 	// VolumeISCSIServer image
 	VolumeISCSIServer
-	// VolumeGlusterServer image
-	VolumeGlusterServer
 	// VolumeRBDServer image
 	VolumeRBDServer
 	// WindowsServer image
@@ -233,47 +232,44 @@ const (
 
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
-	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.36"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.45"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
-	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.17.5"}
+	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.17.7"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
-	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-2"}
+	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.36.1-1"}
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
-	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
-	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "bullseye-v1.3.0"}
-	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.4"}
-	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.3-0"}
-	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.3"}
-	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-2"}
-	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-2"}
+	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.3"}
+	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.3.1"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.9-0"}
+	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-4"}
+	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-4"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.3"}
-	configs[JessieDnsutils] = Config{list.PromoterE2eRegistry, "jessie-dnsutils", "1.5"}
-	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.5"}
-	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.5"}
+	configs[JessieDnsutils] = Config{list.PromoterE2eRegistry, "jessie-dnsutils", "1.7"}
+	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.7"}
+	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.7"}
 	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v3.0.1"}
-	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.14-2"}
-	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.15-2"}
+	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.14-4"}
+	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.15-4"}
 	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.2"}
 	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.2"}
-	configs[NodePerfTfWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/tf-wide-deep", "1.2"}
+	configs[NodePerfTfWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/tf-wide-deep", "1.3"}
 	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
-	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.2"}
+	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.4"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{list.GcRegistry, "pause", "3.7"}
+	configs[Pause] = Config{list.GcRegistry, "pause", "3.9"}
 	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
 	configs[PrometheusDummyExporter] = Config{list.GcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{list.GcRegistry, "prometheus-to-sd", "v0.5.0"}
-	configs[Redis] = Config{list.PromoterE2eRegistry, "redis", "5.0.5-1"}
+	configs[Redis] = Config{list.PromoterE2eRegistry, "redis", "5.0.5-3"}
 	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.2"}
-	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.10"}
+	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.13"}
 	configs[SdDummyExporter] = Config{list.GcRegistry, "sd-dummy-exporter", "v0.2.0"}
 	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.3"}
-	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.3"}
-	configs[VolumeGlusterServer] = Config{list.PromoterE2eRegistry, "volume/gluster", "1.3"}
-	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.4"}
+	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.6"}
+	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.6"}
 	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
 
 	// This adds more config entries. Those have no pre-defined ImageID number,

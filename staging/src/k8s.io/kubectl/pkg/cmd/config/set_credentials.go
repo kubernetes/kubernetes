@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,7 +96,7 @@ var (
 		# Enable the Google Compute Platform auth provider for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --auth-provider=gcp
 
-		# Enable the OpenID Connect auth provider for the "cluster-admin" entry with additional args
+		# Enable the OpenID Connect auth provider for the "cluster-admin" entry with additional arguments
 		kubectl config set-credentials cluster-admin --auth-provider=oidc --auth-provider-arg=client-id=foo --auth-provider-arg=client-secret=bar
 
 		# Remove the "client-secret" config value for the OpenID Connect auth provider for the "cluster-admin" entry
@@ -106,7 +105,7 @@ var (
 		# Enable new exec auth plugin for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --exec-command=/path/to/the/executable --exec-api-version=client.authentication.k8s.io/v1beta1
 
-		# Define new exec auth plugin args for the "cluster-admin" entry
+		# Define new exec auth plugin arguments for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --exec-arg=arg1 --exec-arg=arg2
 
 		# Create or update exec auth plugin environment variables for the "cluster-admin" entry
@@ -221,7 +220,7 @@ func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if o.clientCertificate.Provided() {
 		certPath := o.clientCertificate.Value()
 		if o.embedCertData.Value() {
-			modifiedAuthInfo.ClientCertificateData, _ = ioutil.ReadFile(certPath)
+			modifiedAuthInfo.ClientCertificateData, _ = os.ReadFile(certPath)
 			modifiedAuthInfo.ClientCertificate = ""
 		} else {
 			certPath, _ = filepath.Abs(certPath)
@@ -234,7 +233,7 @@ func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if o.clientKey.Provided() {
 		keyPath := o.clientKey.Value()
 		if o.embedCertData.Value() {
-			modifiedAuthInfo.ClientKeyData, _ = ioutil.ReadFile(keyPath)
+			modifiedAuthInfo.ClientKeyData, _ = os.ReadFile(keyPath)
 			modifiedAuthInfo.ClientKey = ""
 		} else {
 			keyPath, _ = filepath.Abs(keyPath)

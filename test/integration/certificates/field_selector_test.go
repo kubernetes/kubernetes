@@ -27,20 +27,19 @@ import (
 
 	certv1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	certclientset "k8s.io/client-go/kubernetes/typed/certificates/v1"
-	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // Verifies that the 'spec.signerName' field can be correctly used as a field selector on LIST requests
 func TestCSRSignerNameFieldSelector(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
 	csrClient := client.CertificatesV1().CertificateSigningRequests()
 	csr1 := createTestingCSR(t, csrClient, "csr-1", "example.com/signer-name-1", "")
 	csr2 := createTestingCSR(t, csrClient, "csr-2", "example.com/signer-name-2", "")

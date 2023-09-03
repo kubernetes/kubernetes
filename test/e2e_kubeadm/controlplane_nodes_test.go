@@ -24,17 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 const (
 	controlPlaneLabel = "node-role.kubernetes.io/control-plane"
-	// TODO: remove the legacy label in 1.25:
-	// https://github.com/kubernetes/kubeadm/issues/2200
-	controlPlaneLabelLegacy = "node-role.kubernetes.io/master"
 )
 
 // Define container for all the test specification aimed at verifying
@@ -43,7 +41,7 @@ var _ = Describe("control-plane node", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("control-plane node")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
@@ -51,27 +49,24 @@ var _ = Describe("control-plane node", func() {
 
 	// Important! please note that this test can't be run on single-node clusters
 	// in case you can skip this test with SKIP=multi-node
-	ginkgo.It("should be labelled and tainted [multi-node]", func() {
+	ginkgo.It("should be labelled and tainted [multi-node]", func(ctx context.Context) {
 		// get all control-plane nodes (and this implicitly checks that node are properly labeled)
-		controlPlanes := getControlPlaneNodes(f.ClientSet)
+		controlPlanes := getControlPlaneNodes(ctx, f.ClientSet)
 
 		// checks if there is at least one control-plane node
 		gomega.Expect(controlPlanes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist. if you are running test on a single-node cluster, you can skip this test with SKIP=multi-node", controlPlaneLabel)
 
 		// checks that the control-plane nodes have the expected taints
-		// TODO: remove the legacy taint check in 1.25:
-		// https://github.com/kubernetes/kubeadm/issues/2200
 		for _, cp := range controlPlanes.Items {
-			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabel, Effect: corev1.TaintEffectNoSchedule})
-			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabelLegacy, Effect: corev1.TaintEffectNoSchedule})
+			e2enode.ExpectNodeHasTaint(ctx, f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabel, Effect: corev1.TaintEffectNoSchedule})
 		}
 	})
 })
 
-func getControlPlaneNodes(c clientset.Interface) *corev1.NodeList {
+func getControlPlaneNodes(ctx context.Context, c clientset.Interface) *corev1.NodeList {
 	selector := labels.Set{controlPlaneLabel: ""}.AsSelector()
 	cpNodes, err := c.CoreV1().Nodes().
-		List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+		List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "error reading control-plane nodes")
 	return cpNodes
 }

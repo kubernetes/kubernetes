@@ -32,7 +32,9 @@ RUN wget https://github.com/tensorflow/models/archive/v1.9.0.tar.gz \
 && tar xzf v1.9.0.tar.gz \
 && rm -f v1.9.0.tar.gz
 
+RUN python /models-1.9.0/official/wide_deep/data_download.py
+
 WORKDIR $HOME/models-1.9.0/official/wide_deep
 ENV PYTHONPATH=$PYTHONPATH:$HOME/models-1.9.0
 
-ENTRYPOINT python ./data_download.py && python ./wide_deep.py
+ENTRYPOINT python ./wide_deep.py

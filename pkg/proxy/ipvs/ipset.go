@@ -19,7 +19,7 @@ package ipvs
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
+	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 
 	"fmt"
 	"strings"
@@ -49,8 +49,8 @@ const (
 	kubeLoadBalancerLocalSetComment = "Kubernetes service load balancer ip + port with externalTrafficPolicy=local"
 	kubeLoadBalancerLocalSet        = "KUBE-LOAD-BALANCER-LOCAL"
 
-	kubeLoadbalancerFWSetComment = "Kubernetes service load balancer ip + port for load balancer with sourceRange"
-	kubeLoadbalancerFWSet        = "KUBE-LOAD-BALANCER-FW"
+	kubeLoadBalancerFWSetComment = "Kubernetes service load balancer ip + port for load balancer with sourceRange"
+	kubeLoadBalancerFWSet        = "KUBE-LOAD-BALANCER-FW"
 
 	kubeLoadBalancerSourceIPSetComment = "Kubernetes service load balancer ip + port + source IP for packet filter purpose"
 	kubeLoadBalancerSourceIPSet        = "KUBE-LOAD-BALANCER-SOURCE-IP"
@@ -78,6 +78,9 @@ const (
 
 	kubeHealthCheckNodePortSetComment = "Kubernetes health check node port"
 	kubeHealthCheckNodePortSet        = "KUBE-HEALTH-CHECK-NODE-PORT"
+
+	kubeIPVSSetComment = "Addresses on the ipvs interface"
+	kubeIPVSSet        = "KUBE-IPVS-IPS"
 )
 
 // IPSetVersioner can query the current ipset version.
@@ -90,7 +93,7 @@ type IPSetVersioner interface {
 type IPSet struct {
 	utilipset.IPSet
 	// activeEntries is the current active entries of the ipset.
-	activeEntries sets.String
+	activeEntries sets.Set[string]
 	// handle is the util ipset interface handle.
 	handle utilipset.Interface
 }
@@ -122,7 +125,7 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 			HashFamily: hashFamily,
 			Comment:    comment,
 		},
-		activeEntries: sets.NewString(),
+		activeEntries: sets.New[string](),
 		handle:        handle,
 	}
 	return set
@@ -133,7 +136,7 @@ func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
 }
 
 func (set *IPSet) isEmpty() bool {
-	return len(set.activeEntries.UnsortedList()) == 0
+	return set.activeEntries.Len() == 0
 }
 
 func (set *IPSet) getComment() string {
@@ -141,7 +144,7 @@ func (set *IPSet) getComment() string {
 }
 
 func (set *IPSet) resetEntries() {
-	set.activeEntries = sets.NewString()
+	set.activeEntries = sets.New[string]()
 }
 
 func (set *IPSet) syncIPSetEntries() {
@@ -152,14 +155,14 @@ func (set *IPSet) syncIPSetEntries() {
 	}
 
 	// currentIPSetEntries represents Endpoints watched from API Server.
-	currentIPSetEntries := sets.NewString()
+	currentIPSetEntries := sets.New[string]()
 	for _, appliedEntry := range appliedEntries {
 		currentIPSetEntries.Insert(appliedEntry)
 	}
 
 	if !set.activeEntries.Equal(currentIPSetEntries) {
 		// Clean legacy entries
-		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
+		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).UnsortedList() {
 			if err := set.handle.DelEntry(entry, set.Name); err != nil {
 				if !utilipset.IsNotFoundError(err) {
 					klog.ErrorS(err, "Failed to delete ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name)
@@ -169,7 +172,7 @@ func (set *IPSet) syncIPSetEntries() {
 			}
 		}
 		// Create active entries
-		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
+		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).UnsortedList() {
 			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
 				klog.ErrorS(err, "Failed to add ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name)
 			} else {

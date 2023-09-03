@@ -17,11 +17,12 @@ limitations under the License.
 package clientcmd
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+
+	utiltesting "k8s.io/client-go/util/testing"
 
 	"github.com/imdario/mergo"
 
@@ -139,6 +140,22 @@ func createCAValidTestConfig() *clientcmdapi.Config {
 	return config
 }
 
+func TestDisableCompression(t *testing.T) {
+	config := createValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			DisableCompression: true,
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	matchBoolArg(true, actualCfg.DisableCompression, t)
+}
+
 func TestInsecureOverridesCA(t *testing.T) {
 	config := createCAValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
@@ -158,11 +175,11 @@ func TestInsecureOverridesCA(t *testing.T) {
 }
 
 func TestCAOverridesCAData(t *testing.T) {
-	file, err := ioutil.TempFile("", "my.ca")
+	file, err := os.CreateTemp("", "my.ca")
 	if err != nil {
 		t.Fatalf("could not create tempfile: %v", err)
 	}
-	defer os.Remove(file.Name())
+	defer utiltesting.CloseAndRemove(t, file)
 
 	config := createCAValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
@@ -293,12 +310,11 @@ func TestModifyContext(t *testing.T) {
 		"clean":   true,
 	}
 
-	tempPath, err := ioutil.TempFile("", "testclientcmd-")
+	tempPath, err := os.CreateTemp("", "testclientcmd-")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(tempPath.Name())
-
+	defer utiltesting.CloseAndRemove(t, tempPath)
 	pathOptions := NewDefaultPathOptions()
 	config := createValidTestConfig()
 
@@ -478,13 +494,13 @@ func TestBasicAuthData(t *testing.T) {
 
 func TestBasicTokenFile(t *testing.T) {
 	token := "exampletoken"
-	f, err := ioutil.TempFile("", "tokenfile")
+	f, err := os.CreateTemp("", "tokenfile")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), []byte(token), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, f)
+	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
@@ -514,13 +530,13 @@ func TestBasicTokenFile(t *testing.T) {
 
 func TestPrecedenceTokenFile(t *testing.T) {
 	token := "exampletoken"
-	f, err := ioutil.TempFile("", "tokenfile")
+	f, err := os.CreateTemp("", "tokenfile")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), []byte(token), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, f)
+	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
@@ -904,12 +920,12 @@ users:
       command: foo-command
       provideClusterInfo: true
 `
-	tmpfile, err := ioutil.TempFile("", "kubeconfig")
+	tmpfile, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Error(err)
 	}
-	defer os.Remove(tmpfile.Name())
-	if err := ioutil.WriteFile(tmpfile.Name(), []byte(content), 0666); err != nil {
+	defer utiltesting.CloseAndRemove(t, tmpfile)
+	if err := os.WriteFile(tmpfile.Name(), []byte(content), 0666); err != nil {
 		t.Error(err)
 	}
 	config, err := BuildConfigFromFlags("", tmpfile.Name())

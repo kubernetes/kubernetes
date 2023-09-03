@@ -58,6 +58,13 @@ func configureAndRunWithEnv(env Getenver) error {
 	// Print the output to stdout and a logfile which will be returned
 	// as part of the results tarball.
 	logFilePath := filepath.Join(resultsDir, logFileName)
+	// ensure the resultsDir actually exists
+	if _, err := os.Stat(resultsDir); os.IsNotExist(err) {
+		log.Printf("The resultsDir %v does not exist, will create it", resultsDir)
+		if mkdirErr := os.Mkdir(resultsDir, 0755); mkdirErr != nil {
+			return fmt.Errorf("failed to create log directory %v: %w", resultsDir, mkdirErr)
+		}
+	}
 	logFile, err := os.Create(logFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to create log file %v: %w", logFilePath, err)

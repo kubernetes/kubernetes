@@ -14,7 +14,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "k8s.gcr.io/cluster-autoscaler:v1.0.0",
+                "image": "registry.k8s.io/cluster-autoscaler:v1.0.0",
                 "command": [
                     "./run.sh",
                     "--kubernetes=https://{{master_ip}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/cluster_autoscaler.kubeconfig",

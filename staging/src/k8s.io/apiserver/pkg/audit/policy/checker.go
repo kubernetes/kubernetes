@@ -61,25 +61,21 @@ type policyRuleEvaluator struct {
 	audit.Policy
 }
 
-func (p *policyRuleEvaluator) EvaluatePolicyRule(attrs authorizer.Attributes) auditinternal.RequestAuditConfigWithLevel {
+func (p *policyRuleEvaluator) EvaluatePolicyRule(attrs authorizer.Attributes) auditinternal.RequestAuditConfig {
 	for _, rule := range p.Rules {
 		if ruleMatches(&rule, attrs) {
-			return auditinternal.RequestAuditConfigWithLevel{
-				Level: rule.Level,
-				RequestAuditConfig: auditinternal.RequestAuditConfig{
-					OmitStages:        rule.OmitStages,
-					OmitManagedFields: isOmitManagedFields(&rule, p.OmitManagedFields),
-				},
+			return auditinternal.RequestAuditConfig{
+				Level:             rule.Level,
+				OmitStages:        rule.OmitStages,
+				OmitManagedFields: isOmitManagedFields(&rule, p.OmitManagedFields),
 			}
 		}
 	}
 
-	return auditinternal.RequestAuditConfigWithLevel{
-		Level: DefaultAuditLevel,
-		RequestAuditConfig: auditinternal.RequestAuditConfig{
-			OmitStages:        p.OmitStages,
-			OmitManagedFields: p.OmitManagedFields,
-		},
+	return auditinternal.RequestAuditConfig{
+		Level:             DefaultAuditLevel,
+		OmitStages:        p.OmitStages,
+		OmitManagedFields: p.OmitManagedFields,
 	}
 }
 
@@ -235,11 +231,9 @@ type fakePolicyRuleEvaluator struct {
 	stage []audit.Stage
 }
 
-func (f *fakePolicyRuleEvaluator) EvaluatePolicyRule(_ authorizer.Attributes) auditinternal.RequestAuditConfigWithLevel {
-	return auditinternal.RequestAuditConfigWithLevel{
-		Level: f.level,
-		RequestAuditConfig: auditinternal.RequestAuditConfig{
-			OmitStages: f.stage,
-		},
+func (f *fakePolicyRuleEvaluator) EvaluatePolicyRule(_ authorizer.Attributes) auditinternal.RequestAuditConfig {
+	return auditinternal.RequestAuditConfig{
+		Level:      f.level,
+		OmitStages: f.stage,
 	}
 }

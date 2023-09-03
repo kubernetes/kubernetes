@@ -39,7 +39,7 @@ func TestIngressBackendConversion(t *testing.T) {
 			external: v1beta1.IngressSpec{
 				Backend: &v1beta1.IngressBackend{
 					ServiceName: "test-backend",
-					ServicePort: intstr.FromInt(8080),
+					ServicePort: intstr.FromInt32(8080),
 				},
 			},
 			internal: networking.IngressSpec{

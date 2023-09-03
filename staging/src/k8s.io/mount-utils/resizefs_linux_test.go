@@ -20,14 +20,15 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
+	"testing"
+
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
-	"testing"
 )
 
 func TestGetFileSystemSize(t *testing.T) {
-	cmdOutputSuccessXfs :=
-		`
+	cmdOutputSuccessXfs := `
 	statfs.f_bsize = 4096
 	statfs.f_blocks = 1832448
 	statfs.f_bavail = 1822366
@@ -48,8 +49,7 @@ func TestGetFileSystemSize(t *testing.T) {
 	counts.freeino = 61
 	counts.allocino = 64
 `
-	cmdOutputNoDataXfs :=
-		`
+	cmdOutputNoDataXfs := `
 	statfs.f_bsize = 4096
 	statfs.f_blocks = 1832448
 	statfs.f_bavail = 1822366
@@ -68,8 +68,7 @@ func TestGetFileSystemSize(t *testing.T) {
 	counts.freeino = 61
 	counts.allocino = 64
 `
-	cmdOutputSuccessExt4 :=
-		`
+	cmdOutputSuccessExt4 := `
 Filesystem volume name:   cloudimg-rootfs
 Last mounted on:          /
 Filesystem UUID:          testUUID
@@ -119,8 +118,7 @@ Journal start:            1
 Journal checksum type:    crc32c
 Journal checksum:         0xb7df3c6e
 `
-	cmdOutputNoDataExt4 :=
-		`Filesystem volume name:   cloudimg-rootfs
+	cmdOutputNoDataExt4 := `Filesystem volume name:   cloudimg-rootfs
 Last mounted on:          /
 Filesystem UUID:          testUUID
 Filesystem magic number:  0xEF53
@@ -167,8 +165,7 @@ Journal start:            1
 Journal checksum type:    crc32c
 Journal checksum:         0xb7df3c6e
 `
-	cmdOutputSuccessBtrfs :=
-		`superblock: bytenr=65536, device=/dev/loop0
+	cmdOutputSuccessBtrfs := `superblock: bytenr=65536, device=/dev/loop0
 ---------------------------------------------------------
 csum_type               0 (crc32c)
 csum_size               4
@@ -179,7 +176,7 @@ flags                   0x1
 magic                   _BHRfS_M [match]
 fsid                    3f53c8f7-3c57-4185-bf1d-b305b42cce97
 metadata_uuid           3f53c8f7-3c57-4185-bf1d-b305b42cce97
-label                   
+label
 generation              7
 root                    30441472
 sys_array_size          129
@@ -277,8 +274,7 @@ backup_roots[4]:
                 backup_num_devices:     1
 
 `
-	cmdOutputNoDataBtrfs :=
-		`superblock: bytenr=65536, device=/dev/loop0
+	cmdOutputNoDataBtrfs := `superblock: bytenr=65536, device=/dev/loop0
 ---------------------------------------------------------
 csum_type               0 (crc32c)
 csum_size               4
@@ -289,7 +285,7 @@ flags                   0x1
 magic                   _BHRfS_M [match]
 fsid                    3f53c8f7-3c57-4185-bf1d-b305b42cce97
 metadata_uuid           3f53c8f7-3c57-4185-bf1d-b305b42cce97
-label                   
+label
 generation              7
 root                    30441472
 sys_array_size          129
@@ -457,14 +453,14 @@ backup_roots[4]:
 					func() ([]byte, []byte, error) { return []byte(test.cmdOutput), nil, nil },
 				},
 			}
-			fexec := fakeexec.FakeExec{
+			fexec := &fakeexec.FakeExec{
 				CommandScript: []fakeexec.FakeCommandAction{
 					func(cmd string, args ...string) exec.Cmd {
 						return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
 					},
 				},
 			}
-			resizefs := ResizeFs{exec: &fexec}
+			resizefs := ResizeFs{exec: fexec}
 
 			var blockSize uint64
 			var fsSize uint64
@@ -496,16 +492,53 @@ func TestNeedResize(t *testing.T) {
 		name            string
 		devicePath      string
 		deviceMountPath string
+		readonly        string
 		deviceSize      string
+		extSize         string
 		cmdOutputFsType string
 		expectError     bool
 		expectResult    bool
 	}{
 		{
+			name:            "True",
+			devicePath:      "/dev/test1",
+			deviceMountPath: "/mnt/test1",
+			readonly:        "0",
+			deviceSize:      "2048",
+			cmdOutputFsType: "TYPE=ext3",
+			extSize:         "20",
+			expectError:     false,
+			expectResult:    true,
+		},
+		{
+			name:            "False - needed by size but fs is readonly",
+			devicePath:      "/dev/test1",
+			deviceMountPath: "/mnt/test1",
+			readonly:        "1",
+			deviceSize:      "2048",
+			cmdOutputFsType: "TYPE=ext3",
+			extSize:         "20",
+			expectError:     false,
+			expectResult:    false,
+		},
+		{
+			name:            "False - Not needed by size",
+			devicePath:      "/dev/test1",
+			deviceMountPath: "/mnt/test1",
+			readonly:        "0",
+			deviceSize:      "20",
+			cmdOutputFsType: "TYPE=ext3",
+			extSize:         "2048",
+			expectError:     false,
+			expectResult:    false,
+		},
+		{
 			name:            "False - Unsupported fs type",
 			devicePath:      "/dev/test1",
 			deviceMountPath: "/mnt/test1",
+			readonly:        "0",
 			deviceSize:      "2048",
+			extSize:         "1",
 			cmdOutputFsType: "TYPE=ntfs",
 			expectError:     true,
 			expectResult:    false,
@@ -516,24 +549,30 @@ func TestNeedResize(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fcmd := fakeexec.FakeCmd{
 				CombinedOutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) { return []byte(test.readonly), nil, nil },
 					func() ([]byte, []byte, error) { return []byte(test.deviceSize), nil, nil },
 					func() ([]byte, []byte, error) { return []byte(test.cmdOutputFsType), nil, nil },
+					func() ([]byte, []byte, error) {
+						return []byte(fmt.Sprintf("block size: %s\nblock count: 1", test.extSize)), nil, nil
+					},
 				},
 			}
-			fexec := fakeexec.FakeExec{
+			fexec := &fakeexec.FakeExec{
 				CommandScript: []fakeexec.FakeCommandAction{
 					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 				},
 			}
-			resizefs := ResizeFs{exec: &fexec}
+			resizefs := ResizeFs{exec: fexec}
 
 			needResize, err := resizefs.NeedResize(test.devicePath, test.deviceMountPath)
-			if needResize != test.expectResult {
-				t.Fatalf("Expect result is %v but got %v", test.expectResult, needResize)
-			}
 			if !test.expectError && err != nil {
 				t.Fatalf("Expect no error but got %v", err)
+			}
+			if needResize != test.expectResult {
+				t.Fatalf("Expect result is %v but got %v", test.expectResult, needResize)
 			}
 		})
 	}

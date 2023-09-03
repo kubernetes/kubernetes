@@ -16,6 +16,11 @@ resources:
           name: testprovider
           endpoint: unix:///tmp/testprovider.sock
           cachesize: 10
+          timeout: 10s
+      - kms:
+          apiVersion: v2
+          name: testproviderv2
+          endpoint: unix:///tmp/testprovider.sock
       - aescbc:
           keys:
             - name: key1

@@ -118,7 +118,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				default:
 					isValue := true
 					switch field.Type.Kind() {
-					case reflect.Interface, reflect.Map, reflect.Slice, reflect.Ptr:
+					case reflect.Interface, reflect.Map, reflect.Slice, reflect.Pointer:
 						isValue = false
 					}
 					if isValue || c.Intn(10) == 0 {
@@ -180,6 +180,12 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(obj *int64, c fuzz.Continue) {
 			// JSON only supports 53 bits because everything is a float
 			*obj = int64(c.Uint64()) & ((int64(1) << 53) - 1)
+		},
+		func(obj *apiextensions.ValidationRule, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			if obj.Reason != nil && *(obj.Reason) == "" {
+				obj.Reason = nil
+			}
 		},
 	}
 }

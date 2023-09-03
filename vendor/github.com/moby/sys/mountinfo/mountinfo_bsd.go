@@ -1,53 +1,37 @@
-//go:build (freebsd && cgo) || (openbsd && cgo) || (darwin && cgo)
-// +build freebsd,cgo openbsd,cgo darwin,cgo
+//go:build freebsd || openbsd || darwin
+// +build freebsd openbsd darwin
 
 package mountinfo
 
-/*
-#include <sys/param.h>
-#include <sys/ucred.h>
-#include <sys/mount.h>
-*/
-import "C"
-
-import (
-	"fmt"
-	"reflect"
-	"unsafe"
-)
+import "golang.org/x/sys/unix"
 
 // parseMountTable returns information about mounted filesystems
 func parseMountTable(filter FilterFunc) ([]*Info, error) {
-	var rawEntries *C.struct_statfs
-
-	count := int(C.getmntinfo(&rawEntries, C.MNT_WAIT))
-	if count == 0 {
-		return nil, fmt.Errorf("failed to call getmntinfo")
+	count, err := unix.Getfsstat(nil, unix.MNT_WAIT)
+	if err != nil {
+		return nil, err
 	}
 
-	var entries []C.struct_statfs
-	header := (*reflect.SliceHeader)(unsafe.Pointer(&entries))
-	header.Cap = count
-	header.Len = count
-	header.Data = uintptr(unsafe.Pointer(rawEntries))
+	entries := make([]unix.Statfs_t, count)
+	_, err = unix.Getfsstat(entries, unix.MNT_WAIT)
+	if err != nil {
+		return nil, err
+	}
 
 	var out []*Info
 	for _, entry := range entries {
-		var mountinfo Info
 		var skip, stop bool
-		mountinfo.Mountpoint = C.GoString(&entry.f_mntonname[0])
-		mountinfo.FSType = C.GoString(&entry.f_fstypename[0])
-		mountinfo.Source = C.GoString(&entry.f_mntfromname[0])
+		mountinfo := getMountinfo(&entry)
 
 		if filter != nil {
 			// filter out entries we're not interested in
-			skip, stop = filter(&mountinfo)
+			skip, stop = filter(mountinfo)
 			if skip {
 				continue
 			}
 		}
 
-		out = append(out, &mountinfo)
+		out = append(out, mountinfo)
 		if stop {
 			break
 		}

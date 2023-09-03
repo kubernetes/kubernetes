@@ -24,11 +24,13 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
+// LoopControl controls the behavior of the cpu accumulator loop logic
 type LoopControl int
 
+// Possible loop control outcomes
 const (
 	Continue LoopControl = iota
 	Break
@@ -126,7 +128,7 @@ func (n *numaFirst) takeFullSecondLevel() {
 // If NUMA nodes are higher in the memory hierarchy than sockets, then just
 // sort the NUMA nodes directly, and return them.
 func (n *numaFirst) sortAvailableNUMANodes() []int {
-	numas := n.acc.details.NUMANodes().ToSliceNoSort()
+	numas := n.acc.details.NUMANodes().UnsortedList()
 	n.acc.sort(numas, n.acc.details.CPUsInNUMANodes)
 	return numas
 }
@@ -137,7 +139,7 @@ func (n *numaFirst) sortAvailableNUMANodes() []int {
 func (n *numaFirst) sortAvailableSockets() []int {
 	var result []int
 	for _, numa := range n.sortAvailableNUMANodes() {
-		sockets := n.acc.details.SocketsInNUMANodes(numa).ToSliceNoSort()
+		sockets := n.acc.details.SocketsInNUMANodes(numa).UnsortedList()
 		n.acc.sort(sockets, n.acc.details.CPUsInSockets)
 		result = append(result, sockets...)
 	}
@@ -149,7 +151,7 @@ func (n *numaFirst) sortAvailableSockets() []int {
 func (n *numaFirst) sortAvailableCores() []int {
 	var result []int
 	for _, socket := range n.acc.sortAvailableSockets() {
-		cores := n.acc.details.CoresInSockets(socket).ToSliceNoSort()
+		cores := n.acc.details.CoresInSockets(socket).UnsortedList()
 		n.acc.sort(cores, n.acc.details.CPUsInCores)
 		result = append(result, cores...)
 	}
@@ -174,7 +176,7 @@ func (s *socketsFirst) takeFullSecondLevel() {
 func (s *socketsFirst) sortAvailableNUMANodes() []int {
 	var result []int
 	for _, socket := range s.sortAvailableSockets() {
-		numas := s.acc.details.NUMANodesInSockets(socket).ToSliceNoSort()
+		numas := s.acc.details.NUMANodesInSockets(socket).UnsortedList()
 		s.acc.sort(numas, s.acc.details.CPUsInNUMANodes)
 		result = append(result, numas...)
 	}
@@ -184,7 +186,7 @@ func (s *socketsFirst) sortAvailableNUMANodes() []int {
 // If sockets are higher in the memory hierarchy than NUMA nodes, then just
 // sort the sockets directly, and return them.
 func (s *socketsFirst) sortAvailableSockets() []int {
-	sockets := s.acc.details.Sockets().ToSliceNoSort()
+	sockets := s.acc.details.Sockets().UnsortedList()
 	s.acc.sort(sockets, s.acc.details.CPUsInSockets)
 	return sockets
 }
@@ -194,7 +196,7 @@ func (s *socketsFirst) sortAvailableSockets() []int {
 func (s *socketsFirst) sortAvailableCores() []int {
 	var result []int
 	for _, numa := range s.acc.sortAvailableNUMANodes() {
-		cores := s.acc.details.CoresInNUMANodes(numa).ToSliceNoSort()
+		cores := s.acc.details.CoresInNUMANodes(numa).UnsortedList()
 		s.acc.sort(cores, s.acc.details.CPUsInCores)
 		result = append(result, cores...)
 	}
@@ -214,7 +216,7 @@ func newCPUAccumulator(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, 
 		topo:          topo,
 		details:       topo.CPUDetails.KeepOnly(availableCPUs),
 		numCPUsNeeded: numCPUs,
-		result:        cpuset.NewCPUSet(),
+		result:        cpuset.New(),
 	}
 
 	if topo.NumSockets >= topo.NumNUMANodes {
@@ -321,7 +323,7 @@ func (a *cpuAccumulator) sortAvailableCores() []int {
 func (a *cpuAccumulator) sortAvailableCPUs() []int {
 	var result []int
 	for _, core := range a.sortAvailableCores() {
-		cpus := a.details.CPUsInCores(core).ToSliceNoSort()
+		cpus := a.details.CPUsInCores(core).UnsortedList()
 		sort.Ints(cpus)
 		result = append(result, cpus...)
 	}
@@ -370,7 +372,7 @@ func (a *cpuAccumulator) takeFullCores() {
 func (a *cpuAccumulator) takeRemainingCPUs() {
 	for _, cpu := range a.sortAvailableCPUs() {
 		klog.V(4).InfoS("takeRemainingCPUs: claiming CPU", "cpu", cpu)
-		a.take(cpuset.NewCPUSet(cpu))
+		a.take(cpuset.New(cpu))
 		if a.isSatisfied() {
 			return
 		}
@@ -451,7 +453,7 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 		return acc.result, nil
 	}
 	if acc.isFailed() {
-		return cpuset.NewCPUSet(), fmt.Errorf("not enough cpus available to satisfy request")
+		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request")
 	}
 
 	// Algorithm: topology-aware best-fit
@@ -483,7 +485,7 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 		return acc.result, nil
 	}
 
-	return cpuset.NewCPUSet(), fmt.Errorf("failed to allocate cpus")
+	return cpuset.New(), fmt.Errorf("failed to allocate cpus")
 }
 
 // takeByTopologyNUMADistributed returns a CPUSet of size 'numCPUs'.
@@ -501,35 +503,35 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 // At a high-level this algorithm can be summarized as:
 //
 // For each NUMA single node:
-//      * If all requested CPUs can be allocated from this NUMA node;
-//    --> Do the allocation by running takeByTopologyNUMAPacked() over the
-//        available CPUs in that NUMA node and return
+//   - If all requested CPUs can be allocated from this NUMA node;
+//     --> Do the allocation by running takeByTopologyNUMAPacked() over the
+//     available CPUs in that NUMA node and return
 //
 // Otherwise, for each pair of NUMA nodes:
-//      * If the set of requested CPUs (modulo 2) can be evenly split across
-//        the 2 NUMA nodes; AND
-//      * Any remaining CPUs (after the modulo operation) can be striped across
-//        some subset of the NUMA nodes;
-//    --> Do the allocation by running takeByTopologyNUMAPacked() over the
-//        available CPUs in both NUMA nodes and return
+//   - If the set of requested CPUs (modulo 2) can be evenly split across
+//     the 2 NUMA nodes; AND
+//   - Any remaining CPUs (after the modulo operation) can be striped across
+//     some subset of the NUMA nodes;
+//     --> Do the allocation by running takeByTopologyNUMAPacked() over the
+//     available CPUs in both NUMA nodes and return
 //
 // Otherwise, for each 3-tuple of NUMA nodes:
-//      * If the set of requested CPUs (modulo 3) can be evenly distributed
-//        across the 3 NUMA nodes; AND
-//      * Any remaining CPUs (after the modulo operation) can be striped across
-//        some subset of the NUMA nodes;
-//    --> Do the allocation by running takeByTopologyNUMAPacked() over the
-//        available CPUs in all three NUMA nodes and return
+//   - If the set of requested CPUs (modulo 3) can be evenly distributed
+//     across the 3 NUMA nodes; AND
+//   - Any remaining CPUs (after the modulo operation) can be striped across
+//     some subset of the NUMA nodes;
+//     --> Do the allocation by running takeByTopologyNUMAPacked() over the
+//     available CPUs in all three NUMA nodes and return
 //
 // ...
 //
 // Otherwise, for the set of all NUMA nodes:
-//      * If the set of requested CPUs (modulo NUM_NUMA_NODES) can be evenly
-//        distributed across all NUMA nodes; AND
-//      * Any remaining CPUs (after the modulo operation) can be striped across
-//        some subset of the NUMA nodes;
-//    --> Do the allocation by running takeByTopologyNUMAPacked() over the
-//        available CPUs in all NUMA nodes and return
+//   - If the set of requested CPUs (modulo NUM_NUMA_NODES) can be evenly
+//     distributed across all NUMA nodes; AND
+//   - Any remaining CPUs (after the modulo operation) can be striped across
+//     some subset of the NUMA nodes;
+//     --> Do the allocation by running takeByTopologyNUMAPacked() over the
+//     available CPUs in all NUMA nodes and return
 //
 // If none of the above conditions can be met, then resort back to a
 // best-effort fit of packing CPUs into NUMA nodes by calling
@@ -563,7 +565,7 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 		return acc.result, nil
 	}
 	if acc.isFailed() {
-		return cpuset.NewCPUSet(), fmt.Errorf("not enough cpus available to satisfy request")
+		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request")
 	}
 
 	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.
@@ -761,13 +763,13 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 		// If we haven't allocated all of our CPUs at this point, then something
 		// went wrong in our accounting and we should error out.
 		if acc.numCPUsNeeded > 0 {
-			return cpuset.NewCPUSet(), fmt.Errorf("accounting error, not enough CPUs allocated, remaining: %v", acc.numCPUsNeeded)
+			return cpuset.New(), fmt.Errorf("accounting error, not enough CPUs allocated, remaining: %v", acc.numCPUsNeeded)
 		}
 
 		// Likewise, if we have allocated too many CPUs at this point, then something
 		// went wrong in our accounting and we should error out.
 		if acc.numCPUsNeeded < 0 {
-			return cpuset.NewCPUSet(), fmt.Errorf("accounting error, too many CPUs allocated, remaining: %v", acc.numCPUsNeeded)
+			return cpuset.New(), fmt.Errorf("accounting error, too many CPUs allocated, remaining: %v", acc.numCPUsNeeded)
 		}
 
 		// Otherwise, return the result

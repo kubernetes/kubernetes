@@ -259,7 +259,7 @@ func (f CodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
 // invoke CodecForVersions. Callers that need only to read data should use UniversalDecoder().
 //
 // TODO: make this call exist only in pkg/api, and initialize it with the set of default versions.
-//   All other callers will be forced to request a Codec directly.
+// All other callers will be forced to request a Codec directly.
 func (f CodecFactory) LegacyCodec(version ...schema.GroupVersion) runtime.Codec {
 	return versioning.NewDefaultingCodecForScheme(f.scheme, f.legacySerializer, f.universal, schema.GroupVersions(version), runtime.InternalGroupVersioner)
 }

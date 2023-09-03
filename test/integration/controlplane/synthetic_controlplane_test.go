@@ -37,22 +37,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/group"
-	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
-	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
-	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
 	clientset "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/controlplane"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
-	netutils "k8s.io/utils/net"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -61,23 +55,24 @@ const (
 	BobToken   string = "xyz987" // username: bob.  Present in token file.
 )
 
-type allowAliceAuthorizer struct{}
-
-func (allowAliceAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	if a.GetUser() != nil && a.GetUser().GetName() == "alice" {
-		return authorizer.DecisionAllow, "", nil
-	}
-	return authorizer.DecisionNoOpinion, "I can't allow that.  Go ask alice.", nil
-}
-
 func testPrefix(t *testing.T, prefix string) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	resp, err := http.Get(s.URL + prefix)
+	transport, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest("GET", server.ClientConfig.Host+prefix, nil)
+	if err != nil {
+		t.Fatalf("couldn't create a request: %v", err)
+	}
+
+	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("unexpected error getting %s prefix: %v", prefix, err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
@@ -96,10 +91,10 @@ func TestAppsPrefix(t *testing.T) {
 }
 
 func TestKubernetesService(t *testing.T) {
-	config := framework.NewControlPlaneConfig()
-	_, _, closeFn := framework.RunAnAPIServer(config)
-	defer closeFn()
-	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--advertise-address=10.1.1.1"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	coreClient := clientset.NewForConfigOrDie(server.ClientConfig)
 	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
 		if _, err := coreClient.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
 			return false, nil
@@ -114,18 +109,28 @@ func TestKubernetesService(t *testing.T) {
 }
 
 func TestEmptyList(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	u := s.URL + "/api/v1/namespaces/default/pods"
-	resp, err := http.Get(u)
+	transport, err := restclient.TransportFor(server.ClientConfig)
 	if err != nil {
-		t.Fatalf("unexpected error getting %s: %v", u, err)
+		t.Fatal(err)
 	}
+
+	u := server.ClientConfig.Host + "/api/v1/namespaces/default/pods"
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		t.Fatalf("couldn't create a request: %v", err)
+	}
+
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("unexpected error getting response: %v", err)
+	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
-	defer resp.Body.Close()
 	data, _ := io.ReadAll(resp.Body)
 	decodedData := map[string]interface{}{}
 	if err := json.Unmarshal(data, &decodedData); err != nil {
@@ -141,80 +146,86 @@ func TestEmptyList(t *testing.T) {
 	}
 }
 
-func initStatusForbiddenControlPlaneConfig() *controlplane.Config {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(
-		authauthenticator.RequestFunc(func(req *http.Request) (*authauthenticator.Response, bool, error) {
-			return &authauthenticator.Response{
-				User: &user.DefaultInfo{
-					Name:   "unprivileged",
-					Groups: []string{user.AllAuthenticated},
-				},
-			}, true, nil
-		}))
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
-	return controlPlaneConfig
+func initStatusForbiddenControlPlaneConfig(options *options.ServerRunOptions) {
+	options.Authorization.Modes = []string{"AlwaysDeny"}
 }
 
-func initUnauthorizedControlPlaneConfig() *controlplane.Config {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	tokenAuthenticator := tokentest.New()
-	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
-	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	return controlPlaneConfig
+func initUnauthorizedControlPlaneConfig(options *options.ServerRunOptions) {
+	options.Authentication.Anonymous.Allow = false
 }
 
 func TestStatus(t *testing.T) {
 	testCases := []struct {
-		name               string
-		controlPlaneConfig *controlplane.Config
-		statusCode         int
-		reqPath            string
-		reason             string
-		message            string
+		name          string
+		modifyOptions func(*options.ServerRunOptions)
+		statusCode    int
+		reqPath       string
+		reason        string
+		message       string
 	}{
 		{
-			name:               "404",
-			controlPlaneConfig: nil,
-			statusCode:         http.StatusNotFound,
-			reqPath:            "/apis/batch/v1/namespaces/default/jobs/foo",
-			reason:             "NotFound",
-			message:            `jobs.batch "foo" not found`,
+			name:       "404",
+			statusCode: http.StatusNotFound,
+			reqPath:    "/apis/batch/v1/namespaces/default/jobs/foo",
+			reason:     "NotFound",
+			message:    `jobs.batch "foo" not found`,
 		},
 		{
-			name:               "403",
-			controlPlaneConfig: initStatusForbiddenControlPlaneConfig(),
-			statusCode:         http.StatusForbidden,
-			reqPath:            "/apis",
-			reason:             "Forbidden",
-			message:            `forbidden: User "unprivileged" cannot get path "/apis": Everything is forbidden.`,
+			name:          "403",
+			modifyOptions: initStatusForbiddenControlPlaneConfig,
+			statusCode:    http.StatusForbidden,
+			reqPath:       "/apis",
+			reason:        "Forbidden",
+			message:       `forbidden: User "system:anonymous" cannot get path "/apis": Everything is forbidden.`,
 		},
 		{
-			name:               "401",
-			controlPlaneConfig: initUnauthorizedControlPlaneConfig(),
-			statusCode:         http.StatusUnauthorized,
-			reqPath:            "/apis",
-			reason:             "Unauthorized",
-			message:            `Unauthorized`,
+			name:          "401",
+			modifyOptions: initUnauthorizedControlPlaneConfig,
+			statusCode:    http.StatusUnauthorized,
+			reqPath:       "/apis",
+			reason:        "Unauthorized",
+			message:       `Unauthorized`,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, s, closeFn := framework.RunAnAPIServer(tc.controlPlaneConfig)
-			defer closeFn()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
-			u := s.URL + tc.reqPath
-			resp, err := http.Get(u)
-			if err != nil {
-				t.Fatalf("unexpected error getting %s: %v", u, err)
+			_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(options *options.ServerRunOptions) {
+					if tc.modifyOptions != nil {
+						tc.modifyOptions(options)
+					}
+				},
+			})
+			defer tearDownFn()
+
+			// When modifying authenticator and authorizer, don't use
+			// bearer token than will be always authorized.
+			if tc.modifyOptions != nil {
+				kubeConfig.BearerToken = ""
 			}
+			transport, err := restclient.TransportFor(kubeConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			req, err := http.NewRequest("GET", kubeConfig.Host+tc.reqPath, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			resp, err := transport.RoundTrip(req)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			defer resp.Body.Close()
+
 			if resp.StatusCode != tc.statusCode {
 				t.Fatalf("got status %v instead of %s", resp.StatusCode, tc.name)
 			}
-			defer resp.Body.Close()
 			data, _ := io.ReadAll(resp.Body)
 			decodedData := map[string]interface{}{}
 			if err := json.Unmarshal(data, &decodedData); err != nil {
@@ -311,29 +322,36 @@ func constructBody(val string, size int, field string, t *testing.T) *appsv1.Dep
 }
 
 func TestObjectSizeResponses(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--storage-media-type=application/json"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	server.ClientConfig.ContentType = runtime.ContentTypeJSON
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
 
-	const DeploymentMegabyteSize = 100000
-	const DeploymentTwoMegabyteSize = 175000
-	const DeploymentThreeMegabyteSize = 250000
+	// Computing ManagedFields is extremely inefficient for large object, e.g.
+	// it may take 10s+ to just compute it if we have ~100k very small labels or
+	// annotations.  This in turn may lead to timing out requests,
+	// which have hardcoded timeout of 34 seconds.
+	// As a result, we're using slightly larger individual labels/annotations
+	// to reduce the number of those.
+	const DeploymentMegabyteSize = 25000
+	const DeploymentTwoMegabyteSize = 30000
+	const DeploymentThreeMegabyteSize = 45000
 
 	expectedMsgFor1MB := `etcdserver: request is too large`
 	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = trying to send message larger than max`
 	expectedMsgFor3MB := `Request entity too large: limit is 3145728`
 	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 bytes`
 
-	deployment1 := constructBody("a", DeploymentMegabyteSize, "labels", t)      // >1 MB file
-	deployment2 := constructBody("a", DeploymentTwoMegabyteSize, "labels", t)   // >2 MB file
-	deployment3 := constructBody("a", DeploymentThreeMegabyteSize, "labels", t) // >3 MB file
+	deployment1 := constructBody("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", DeploymentMegabyteSize, "labels", t)      // >1.5 MB file
+	deployment2 := constructBody("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", DeploymentTwoMegabyteSize, "labels", t)   // >2 MB file
+	deployment3 := constructBody("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", DeploymentThreeMegabyteSize, "labels", t) // >3 MB file
 
-	deployment4 := constructBody("a", DeploymentMegabyteSize, "annotations", t)
+	deployment4 := constructBody("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", DeploymentMegabyteSize, "annotations", t)
 
-	deployment5 := constructBody("sample/sample", DeploymentMegabyteSize, "finalizers", t)      // >1 MB file
-	deployment6 := constructBody("sample/sample", DeploymentTwoMegabyteSize, "finalizers", t)   // >2 MB file
-	deployment7 := constructBody("sample/sample", DeploymentThreeMegabyteSize, "finalizers", t) // >3 MB file
+	deployment5 := constructBody("sample0123456789/sample0123456789", 2*DeploymentMegabyteSize, "finalizers", t)      // >1.5 MB file
+	deployment6 := constructBody("sample0123456789/sample0123456789", 2*DeploymentTwoMegabyteSize, "finalizers", t)   // >2 MB file
+	deployment7 := constructBody("sample0123456789/sample0123456789", 2*DeploymentThreeMegabyteSize, "finalizers", t) // >3 MB file
 
 	requests := []struct {
 		size             string
@@ -352,6 +370,9 @@ func TestObjectSizeResponses(t *testing.T) {
 	for _, r := range requests {
 		t.Run(r.size, func(t *testing.T) {
 			_, err := client.AppsV1().Deployments(metav1.NamespaceDefault).Create(context.TODO(), r.deploymentObject, metav1.CreateOptions{})
+			if err == nil {
+				t.Errorf("got: <nil>;want: %s", r.expectedMessage)
+			}
 			if err != nil {
 				if !strings.Contains(err.Error(), r.expectedMessage) {
 					t.Errorf("got: %s;want: %s", err.Error(), r.expectedMessage)
@@ -362,17 +383,27 @@ func TestObjectSizeResponses(t *testing.T) {
 }
 
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	resp, err := http.Get(s.URL + "/api/v1/namespaces?watch=1")
+	transport, err := restclient.TransportFor(server.ClientConfig)
 	if err != nil {
-		t.Fatalf("unexpected error getting experimental prefix: %v", err)
+		t.Fatal(err)
 	}
+
+	req, err := http.NewRequest("GET", server.ClientConfig.Host+"/api/v1/namespaces?watch=1", nil)
+	if err != nil {
+		t.Fatalf("couldn't create a request: %v", err)
+	}
+
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("unexpected error getting response: %v", err)
+	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
-	resp.Body.Close()
 }
 
 var hpaV1 = `
@@ -420,7 +451,7 @@ var deploymentApps = `
       "spec": {
         "containers": [{
           "name": "nginx",
-          "image": "k8s.gcr.io/nginx:1.7.9"
+          "image": "registry.k8s.io/nginx:1.7.9"
         }]
       }
     }
@@ -443,9 +474,13 @@ func appsPath(resource, namespace, name string) string {
 }
 
 func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
-	transport := http.DefaultTransport
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	transport, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	requests := []struct {
 		verb                string
@@ -460,7 +495,7 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 
 	for _, r := range requests {
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, server.ClientConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
@@ -488,9 +523,13 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 }
 
 func TestAppsGroupBackwardCompatibility(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
-	transport := http.DefaultTransport
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	transport, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	requests := []struct {
 		verb                string
@@ -508,7 +547,7 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 
 	for _, r := range requests {
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, server.ClientConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
@@ -536,17 +575,26 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 }
 
 func TestAccept(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	resp, err := http.Get(s.URL + "/api/")
+	transport, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := http.NewRequest("GET", server.ClientConfig.Host+"/api/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("unexpected error getting api: %v", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
-
 	body, _ := io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/json" {
 		t.Errorf("unexpected content: %s", body)
@@ -555,15 +603,16 @@ func TestAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req, err := http.NewRequest("GET", s.URL+"/api/", nil)
+	req, err = http.NewRequest("GET", server.ClientConfig.Host+"/api/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.Header.Set("Accept", "application/yaml")
-	resp, err = http.DefaultClient.Do(req)
+	resp, err = transport.RoundTrip(req)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	body, _ = io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/yaml" {
 		t.Errorf("unexpected content: %s", body)
@@ -573,15 +622,16 @@ func TestAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req, err = http.NewRequest("GET", s.URL+"/api/", nil)
+	req, err = http.NewRequest("GET", server.ClientConfig.Host+"/api/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.Header.Set("Accept", "application/json, application/yaml")
-	resp, err = http.DefaultClient.Do(req)
+	resp, err = transport.RoundTrip(req)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	body, _ = io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/json" {
 		t.Errorf("unexpected content: %s", body)
@@ -591,15 +641,16 @@ func TestAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req, err = http.NewRequest("GET", s.URL+"/api/", nil)
+	req, err = http.NewRequest("GET", server.ClientConfig.Host+"/api/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.Header.Set("Accept", "application") // not a valid media type
-	resp, err = http.DefaultClient.Do(req)
+	resp, err = transport.RoundTrip(req)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNotAcceptable {
 		t.Errorf("unexpected error from the server")
 	}
@@ -614,10 +665,10 @@ func countEndpoints(eps *corev1.Endpoints) int {
 }
 
 func TestAPIServerService(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--advertise-address=10.1.1.1"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 		svcList, err := client.CoreV1().Services(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{})
@@ -646,78 +697,6 @@ func TestAPIServerService(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestServiceAlloc(t *testing.T) {
-	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := netutils.ParseCIDRSloppy("192.168.0.0/29")
-	if err != nil {
-		t.Fatalf("bad cidr: %v", err)
-	}
-	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAnAPIServer(cfg)
-	defer closeFn()
-
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
-
-	svc := func(i int) *corev1.Service {
-		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("svc-%v", i),
-			},
-			Spec: corev1.ServiceSpec{
-				Type: corev1.ServiceTypeClusterIP,
-				Ports: []corev1.ServicePort{
-					{Port: 80},
-				},
-			},
-		}
-	}
-
-	// Wait until the default "kubernetes" service is created.
-	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return false, err
-		}
-		return !apierrors.IsNotFound(err), nil
-	}); err != nil {
-		t.Fatalf("creating kubernetes service timed out")
-	}
-
-	// make 5 more services to take up all IPs
-	for i := 0; i < 5; i++ {
-		if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
-			t.Error(err)
-		}
-	}
-
-	// Make another service. It will fail because we're out of cluster IPs
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8), metav1.CreateOptions{}); err != nil {
-		if !strings.Contains(err.Error(), "range is full") {
-			t.Errorf("unexpected error text: %v", err)
-		}
-	} else {
-		svcs, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			t.Fatalf("unexpected success, and error getting the services: %v", err)
-		}
-		allIPs := []string{}
-		for _, s := range svcs.Items {
-			allIPs = append(allIPs, s.Spec.ClusterIP)
-		}
-		t.Fatalf("unexpected creation success. The following IPs exist: %#v. It should only be possible to allocate 2 IP addresses in this cluster.\n\n%#v", allIPs, svcs)
-	}
-
-	// Delete the first service.
-	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.TODO(), svc(1).ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
-		t.Fatalf("got unexpected error: %v", err)
-	}
-
-	// This time creating the second service should work.
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8), metav1.CreateOptions{}); err != nil {
-		t.Fatalf("got unexpected error: %v", err)
 	}
 }
 

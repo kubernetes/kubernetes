@@ -13,21 +13,21 @@
 //
 // The primary features of cmp are:
 //
-// • When the default behavior of equality does not suit the needs of the test,
-// custom equality functions can override the equality operation.
-// For example, an equality function may report floats as equal so long as they
-// are within some tolerance of each other.
+//   - When the default behavior of equality does not suit the test's needs,
+//     custom equality functions can override the equality operation.
+//     For example, an equality function may report floats as equal so long as
+//     they are within some tolerance of each other.
 //
-// • Types that have an Equal method may use that method to determine equality.
-// This allows package authors to determine the equality operation for the types
-// that they define.
+//   - Types with an Equal method may use that method to determine equality.
+//     This allows package authors to determine the equality operation
+//     for the types that they define.
 //
-// • If no custom equality functions are used and no Equal method is defined,
-// equality is determined by recursively comparing the primitive kinds on both
-// values, much like reflect.DeepEqual. Unlike reflect.DeepEqual, unexported
-// fields are not compared by default; they result in panics unless suppressed
-// by using an Ignore option (see cmpopts.IgnoreUnexported) or explicitly
-// compared using the Exporter option.
+//   - If no custom equality functions are used and no Equal method is defined,
+//     equality is determined by recursively comparing the primitive kinds on
+//     both values, much like reflect.DeepEqual. Unlike reflect.DeepEqual,
+//     unexported fields are not compared by default; they result in panics
+//     unless suppressed by using an Ignore option (see cmpopts.IgnoreUnexported)
+//     or explicitly compared using the Exporter option.
 package cmp
 
 import (
@@ -36,33 +36,34 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp/internal/diff"
-	"github.com/google/go-cmp/cmp/internal/flags"
 	"github.com/google/go-cmp/cmp/internal/function"
 	"github.com/google/go-cmp/cmp/internal/value"
 )
 
+// TODO(≥go1.18): Use any instead of interface{}.
+
 // Equal reports whether x and y are equal by recursively applying the
 // following rules in the given order to x and y and all of their sub-values:
 //
-// • Let S be the set of all Ignore, Transformer, and Comparer options that
-// remain after applying all path filters, value filters, and type filters.
-// If at least one Ignore exists in S, then the comparison is ignored.
-// If the number of Transformer and Comparer options in S is greater than one,
-// then Equal panics because it is ambiguous which option to use.
-// If S contains a single Transformer, then use that to transform the current
-// values and recursively call Equal on the output values.
-// If S contains a single Comparer, then use that to compare the current values.
-// Otherwise, evaluation proceeds to the next rule.
+//   - Let S be the set of all Ignore, Transformer, and Comparer options that
+//     remain after applying all path filters, value filters, and type filters.
+//     If at least one Ignore exists in S, then the comparison is ignored.
+//     If the number of Transformer and Comparer options in S is non-zero,
+//     then Equal panics because it is ambiguous which option to use.
+//     If S contains a single Transformer, then use that to transform
+//     the current values and recursively call Equal on the output values.
+//     If S contains a single Comparer, then use that to compare the current values.
+//     Otherwise, evaluation proceeds to the next rule.
 //
-// • If the values have an Equal method of the form "(T) Equal(T) bool" or
-// "(T) Equal(I) bool" where T is assignable to I, then use the result of
-// x.Equal(y) even if x or y is nil. Otherwise, no such method exists and
-// evaluation proceeds to the next rule.
+//   - If the values have an Equal method of the form "(T) Equal(T) bool" or
+//     "(T) Equal(I) bool" where T is assignable to I, then use the result of
+//     x.Equal(y) even if x or y is nil. Otherwise, no such method exists and
+//     evaluation proceeds to the next rule.
 //
-// • Lastly, try to compare x and y based on their basic kinds.
-// Simple kinds like booleans, integers, floats, complex numbers, strings, and
-// channels are compared using the equivalent of the == operator in Go.
-// Functions are only equal if they are both nil, otherwise they are unequal.
+//   - Lastly, try to compare x and y based on their basic kinds.
+//     Simple kinds like booleans, integers, floats, complex numbers, strings,
+//     and channels are compared using the equivalent of the == operator in Go.
+//     Functions are only equal if they are both nil, otherwise they are unequal.
 //
 // Structs are equal if recursively calling Equal on all fields report equal.
 // If a struct contains unexported fields, Equal panics unless an Ignore option
@@ -143,7 +144,7 @@ func rootStep(x, y interface{}) PathStep {
 	// so that they have the same parent type.
 	var t reflect.Type
 	if !vx.IsValid() || !vy.IsValid() || vx.Type() != vy.Type() {
-		t = reflect.TypeOf((*interface{})(nil)).Elem()
+		t = anyType
 		if vx.IsValid() {
 			vvx := reflect.New(t).Elem()
 			vvx.Set(vx)
@@ -319,7 +320,6 @@ func (s *state) tryMethod(t reflect.Type, vx, vy reflect.Value) bool {
 }
 
 func (s *state) callTRFunc(f, v reflect.Value, step Transform) reflect.Value {
-	v = sanitizeValue(v, f.Type().In(0))
 	if !s.dynChecker.Next() {
 		return f.Call([]reflect.Value{v})[0]
 	}
@@ -343,8 +343,6 @@ func (s *state) callTRFunc(f, v reflect.Value, step Transform) reflect.Value {
 }
 
 func (s *state) callTTBFunc(f, x, y reflect.Value) bool {
-	x = sanitizeValue(x, f.Type().In(0))
-	y = sanitizeValue(y, f.Type().In(1))
 	if !s.dynChecker.Next() {
 		return f.Call([]reflect.Value{x, y})[0].Bool()
 	}
@@ -370,19 +368,6 @@ func detectRaces(c chan<- reflect.Value, f reflect.Value, vs ...reflect.Value) {
 		c <- ret
 	}()
 	ret = f.Call(vs)[0]
-}
-
-// sanitizeValue converts nil interfaces of type T to those of type R,
-// assuming that T is assignable to R.
-// Otherwise, it returns the input value as is.
-func sanitizeValue(v reflect.Value, t reflect.Type) reflect.Value {
-	// TODO(≥go1.10): Workaround for reflect bug (https://golang.org/issue/22143).
-	if !flags.AtLeastGo110 {
-		if v.Kind() == reflect.Interface && v.IsNil() && v.Type() != t {
-			return reflect.New(t).Elem()
-		}
-	}
-	return v
 }
 
 func (s *state) compareStruct(t reflect.Type, vx, vy reflect.Value) {
@@ -654,7 +639,9 @@ type dynChecker struct{ curr, next int }
 // Next increments the state and reports whether a check should be performed.
 //
 // Checks occur every Nth function call, where N is a triangular number:
+//
 //	0 1 3 6 10 15 21 28 36 45 55 66 78 91 105 120 136 153 171 190 ...
+//
 // See https://en.wikipedia.org/wiki/Triangular_number
 //
 // This sequence ensures that the cost of checks drops significantly as

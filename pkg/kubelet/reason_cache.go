@@ -29,10 +29,11 @@ import (
 // in a string, keyed by <pod_UID>_<container_name>. The goal is to
 // propagate this reason to the container status. This endeavor is
 // "best-effort" for two reasons:
-//   1. The cache is not persisted.
-//   2. We use an LRU cache to avoid extra garbage collection work. This
-//      means that some entries may be recycled before a pod has been
-//      deleted.
+//  1. The cache is not persisted.
+//  2. We use an LRU cache to avoid extra garbage collection work. This
+//     means that some entries may be recycled before a pod has been
+//     deleted.
+//
 // TODO(random-liu): Use more reliable cache which could collect garbage of failed pod.
 // TODO(random-liu): Move reason cache to somewhere better.
 type ReasonCache struct {

@@ -21,24 +21,15 @@ package azure
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
 )
-
-type fakeClient struct {
-	results []containerregistry.Registry
-}
-
-func (f *fakeClient) List(ctx context.Context) ([]containerregistry.Registry, error) {
-	return f.results, nil
-}
 
 func Test(t *testing.T) {
 	configStr := `
@@ -48,37 +39,33 @@ func Test(t *testing.T) {
     }`
 	result := []containerregistry.Registry{
 		{
-			Name: to.StringPtr("foo"),
+			Name: pointer.String("foo"),
 			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.io"),
+				LoginServer: pointer.String("*.azurecr.io"),
 			},
 		},
 		{
-			Name: to.StringPtr("bar"),
+			Name: pointer.String("bar"),
 			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.cn"),
+				LoginServer: pointer.String("*.azurecr.cn"),
 			},
 		},
 		{
-			Name: to.StringPtr("baz"),
+			Name: pointer.String("baz"),
 			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.de"),
+				LoginServer: pointer.String("*.azurecr.de"),
 			},
 		},
 		{
-			Name: to.StringPtr("bus"),
+			Name: pointer.String("bus"),
 			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.us"),
+				LoginServer: pointer.String("*.azurecr.us"),
 			},
 		},
-	}
-	fakeClient := &fakeClient{
-		results: result,
 	}
 
 	provider := &acrProvider{
-		registryClient: fakeClient,
-		cache:          cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
+		cache: cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
 	}
 	provider.loadConfig(bytes.NewBufferString(configStr))
 
@@ -133,8 +120,7 @@ func TestProvide(t *testing.T) {
 
 	for i, test := range testCases {
 		provider := &acrProvider{
-			registryClient: &fakeClient{},
-			cache:          cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
+			cache: cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
 		}
 		provider.loadConfig(bytes.NewBufferString(test.configStr))
 
@@ -149,21 +135,8 @@ func TestParseACRLoginServerFromImage(t *testing.T) {
         "aadClientId": "foo",
         "aadClientSecret": "bar"
     }`
-	result := []containerregistry.Registry{
-		{
-			Name: to.StringPtr("foo"),
-			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.io"),
-			},
-		},
-	}
-	fakeClient := &fakeClient{
-		results: result,
-	}
 
-	provider := &acrProvider{
-		registryClient: fakeClient,
-	}
+	provider := &acrProvider{}
 	provider.loadConfig(bytes.NewBufferString(configStr))
 	provider.environment = &azure.Environment{
 		ContainerRegistryDNSSuffix: ".azurecr.my.cloud",

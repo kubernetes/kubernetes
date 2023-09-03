@@ -20,9 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	openapiclient "k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/validation"
@@ -61,9 +61,10 @@ type Factory interface {
 	UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	// Returns a schema that can validate objects stored on disk.
-	Validator(validationDirective string, verifier *resource.QueryParamVerifier) (validation.Schema, error)
+	Validator(validationDirective string) (validation.Schema, error)
 	// OpenAPISchema returns the parsed openapi schema definition
 	OpenAPISchema() (openapi.Resources, error)
-	// OpenAPIGetter returns a getter for the openapi schema document
-	OpenAPIGetter() discovery.OpenAPISchemaInterface
+	// OpenAPIV3Schema returns a client for fetching parsed schemas for
+	// any group version
+	OpenAPIV3Client() (openapiclient.Client, error)
 }

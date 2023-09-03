@@ -62,7 +62,7 @@ type GenericWebhook struct {
 // Otherwise it returns false for an immediate fail.
 func DefaultShouldRetry(err error) bool {
 	// these errors indicate a transient error that should be retried.
-	if utilnet.IsConnectionReset(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
+	if utilnet.IsConnectionReset(err) || utilnet.IsHTTP2ConnectionLost(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
 		return true
 	}
 	// if the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
@@ -121,7 +121,7 @@ func WithExponentialBackoff(ctx context.Context, retryBackoff wait.Backoff, webh
 	// having a webhook error allows us to track the last actual webhook error for requests that
 	// are later cancelled or time out.
 	var webhookErr error
-	err := wait.ExponentialBackoffWithContext(ctx, retryBackoff, func() (bool, error) {
+	err := wait.ExponentialBackoffWithContext(ctx, retryBackoff, func(_ context.Context) (bool, error) {
 		webhookErr = webhookFn()
 		if shouldRetry(webhookErr) {
 			return false, nil

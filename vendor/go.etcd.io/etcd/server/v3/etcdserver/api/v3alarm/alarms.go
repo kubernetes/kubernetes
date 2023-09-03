@@ -65,7 +65,7 @@ func (a *AlarmStore) Activate(id types.ID, at pb.AlarmType) *pb.AlarmMember {
 	}
 
 	b := a.bg.Backend()
-	b.BatchTx().Lock()
+	b.BatchTx().LockInsideApply()
 	b.BatchTx().UnsafePut(buckets.Alarm, v, nil)
 	b.BatchTx().Unlock()
 
@@ -94,7 +94,7 @@ func (a *AlarmStore) Deactivate(id types.ID, at pb.AlarmType) *pb.AlarmMember {
 	}
 
 	b := a.bg.Backend()
-	b.BatchTx().Lock()
+	b.BatchTx().LockInsideApply()
 	b.BatchTx().UnsafeDelete(buckets.Alarm, v)
 	b.BatchTx().Unlock()
 
@@ -122,7 +122,7 @@ func (a *AlarmStore) restore() error {
 	b := a.bg.Backend()
 	tx := b.BatchTx()
 
-	tx.Lock()
+	tx.LockOutsideApply()
 	tx.UnsafeCreateBucket(buckets.Alarm)
 	err := tx.UnsafeForEach(buckets.Alarm, func(k, v []byte) error {
 		var m pb.AlarmMember

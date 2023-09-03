@@ -41,13 +41,13 @@ type PathStep interface {
 	// The type of each valid value is guaranteed to be identical to Type.
 	//
 	// In some cases, one or both may be invalid or have restrictions:
-	//	• For StructField, both are not interface-able if the current field
-	//	is unexported and the struct type is not explicitly permitted by
-	//	an Exporter to traverse unexported fields.
-	//	• For SliceIndex, one may be invalid if an element is missing from
-	//	either the x or y slice.
-	//	• For MapIndex, one may be invalid if an entry is missing from
-	//	either the x or y map.
+	//   - For StructField, both are not interface-able if the current field
+	//     is unexported and the struct type is not explicitly permitted by
+	//     an Exporter to traverse unexported fields.
+	//   - For SliceIndex, one may be invalid if an element is missing from
+	//     either the x or y slice.
+	//   - For MapIndex, one may be invalid if an entry is missing from
+	//     either the x or y map.
 	//
 	// The provided values must not be mutated.
 	Values() (vx, vy reflect.Value)
@@ -94,6 +94,7 @@ func (pa Path) Index(i int) PathStep {
 // The simplified path only contains struct field accesses.
 //
 // For example:
+//
 //	MyMap.MySlices.MyField
 func (pa Path) String() string {
 	var ss []string
@@ -108,6 +109,7 @@ func (pa Path) String() string {
 // GoString returns the path to a specific node using Go syntax.
 //
 // For example:
+//
 //	(*root.MyMap["key"].(*mypkg.MyStruct).MySlices)[2][3].MyField
 func (pa Path) GoString() string {
 	var ssPre, ssPost []string
@@ -159,7 +161,7 @@ func (ps pathStep) String() string {
 	if ps.typ == nil {
 		return "<nil>"
 	}
-	s := ps.typ.String()
+	s := value.TypeString(ps.typ, false)
 	if s == "" || strings.ContainsAny(s, "{}\n") {
 		return "root" // Type too simple or complex to print
 	}
@@ -178,7 +180,7 @@ type structField struct {
 	unexported bool
 	mayForce   bool                // Forcibly allow visibility
 	paddr      bool                // Was parent addressable?
-	pvx, pvy   reflect.Value       // Parent values (always addressible)
+	pvx, pvy   reflect.Value       // Parent values (always addressable)
 	field      reflect.StructField // Field information
 }
 
@@ -282,7 +284,7 @@ type typeAssertion struct {
 
 func (ta TypeAssertion) Type() reflect.Type             { return ta.typ }
 func (ta TypeAssertion) Values() (vx, vy reflect.Value) { return ta.vx, ta.vy }
-func (ta TypeAssertion) String() string                 { return fmt.Sprintf(".(%v)", ta.typ) }
+func (ta TypeAssertion) String() string                 { return fmt.Sprintf(".(%v)", value.TypeString(ta.typ, false)) }
 
 // Transform is a transformation from the parent type to the current type.
 type Transform struct{ *transform }
@@ -315,7 +317,7 @@ func (tf Transform) Option() Option { return tf.trans }
 // pops the address from the stack. Thus, when traversing into a pointer from
 // reflect.Ptr, reflect.Slice element, or reflect.Map, we can detect cycles
 // by checking whether the pointer has already been visited. The cycle detection
-// uses a seperate stack for the x and y values.
+// uses a separate stack for the x and y values.
 //
 // If a cycle is detected we need to determine whether the two pointers
 // should be considered equal. The definition of equality chosen by Equal

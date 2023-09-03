@@ -121,6 +121,11 @@ func MustParseSemantic(str string) *Version {
 	return v
 }
 
+// MajorMinor returns a version with the provided major and minor version.
+func MajorMinor(major, minor uint) *Version {
+	return &Version{components: []uint{major, minor}}
+}
+
 // Major returns the major release number
 func (v *Version) Major() uint {
 	return v.components[0]

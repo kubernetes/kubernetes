@@ -144,6 +144,24 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
+			name:       "should sign without key encipherment if signerName is kubernetes.io/kube-apiserver-client",
+			signerName: "kubernetes.io/kube-apiserver-client",
+			commonName: "hello-world",
+			org:        []string{"some-org"},
+			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature},
+			approved:   true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
+					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) == 0 {
+					t.Errorf("expected certificate to be issued but it was not")
+				}
+			},
+		},
+		{
 			name:       "should refuse to sign if signerName is kubernetes.io/kube-apiserver-client and contains an unexpected usage",
 			signerName: "kubernetes.io/kube-apiserver-client",
 			commonName: "hello-world",
@@ -183,6 +201,24 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
+			name:       "should sign without usage key encipherment if signerName is kubernetes.io/kube-apiserver-client-kubelet",
+			signerName: "kubernetes.io/kube-apiserver-client-kubelet",
+			commonName: "system:node:hello-world",
+			org:        []string{"system:nodes"},
+			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature},
+			approved:   true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
+					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) == 0 {
+					t.Errorf("expected certificate to be issued but it was not")
+				}
+			},
+		},
+		{
 			name:       "should sign if signerName is kubernetes.io/legacy-unknown",
 			signerName: "kubernetes.io/legacy-unknown",
 			approved:   true,
@@ -203,6 +239,25 @@ func TestHandle(t *testing.T) {
 			commonName: "system:node:testnode",
 			org:        []string{"system:nodes"},
 			usages:     []capi.KeyUsage{capi.UsageServerAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+			dnsNames:   []string{"example.com"},
+			approved:   true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
+					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) == 0 {
+					t.Errorf("expected certificate to be issued but it was not")
+				}
+			},
+		},
+		{
+			name:       "should sign without usage key encipherment if signerName is kubernetes.io/kubelet-serving",
+			signerName: "kubernetes.io/kubelet-serving",
+			commonName: "system:node:testnode",
+			org:        []string{"system:nodes"},
+			usages:     []capi.KeyUsage{capi.UsageServerAuth, capi.UsageDigitalSignature},
 			dnsNames:   []string{"example.com"},
 			approved:   true,
 			verify: func(t *testing.T, as []testclient.Action) {

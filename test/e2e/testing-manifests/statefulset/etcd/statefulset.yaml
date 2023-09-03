@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: etcd
-        image: k8s.gcr.io/etcd:3.2.24
+        image: registry.k8s.io/etcd:3.2.24
         imagePullPolicy: Always
         ports:
         - containerPort: 2380

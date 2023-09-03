@@ -26,7 +26,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-echo "NOTE: $0 has been replaced by 'make update'"
+echo "NOTE: ${BASH_SOURCE[0]} has been replaced by 'make update'"
 echo
 echo "The equivalent of this invocation is: "
 echo "    make update"

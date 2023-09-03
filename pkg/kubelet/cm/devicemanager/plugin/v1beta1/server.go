@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
+// Server interface provides methods for Device plugin registration server.
 type Server interface {
 	cache.PluginHandler
 	Start() error
@@ -54,6 +55,7 @@ type server struct {
 	clients    map[string]Client
 }
 
+// NewServer returns an initialized device plugin registration server.
 func NewServer(socketPath string, rh RegistrationHandler, ch ClientHandler) (Server, error) {
 	if socketPath == "" || !filepath.IsAbs(socketPath) {
 		return nil, fmt.Errorf(errBadSocket+" %s", socketPath)

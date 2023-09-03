@@ -51,6 +51,7 @@ type fakeConnection struct {
 	closeChan   chan bool
 	dataStream  *fakeStream
 	errorStream *fakeStream
+	streamCount int
 }
 
 func newFakeConnection() *fakeConnection {
@@ -64,8 +65,10 @@ func newFakeConnection() *fakeConnection {
 func (c *fakeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
 	switch headers.Get(v1.StreamType) {
 	case v1.StreamTypeData:
+		c.streamCount++
 		return c.dataStream, nil
 	case v1.StreamTypeError:
+		c.streamCount++
 		return c.errorStream, nil
 	default:
 		return nil, fmt.Errorf("fakeStream creation not supported for stream type %s", headers.Get(v1.StreamType))
@@ -84,7 +87,10 @@ func (c *fakeConnection) CloseChan() <-chan bool {
 	return c.closeChan
 }
 
-func (c *fakeConnection) RemoveStreams(_ ...httpstream.Stream) {
+func (c *fakeConnection) RemoveStreams(streams ...httpstream.Stream) {
+	for range streams {
+		c.streamCount--
+	}
 }
 
 func (c *fakeConnection) SetIdleTimeout(timeout time.Duration) {
@@ -504,7 +510,7 @@ func TestHandleConnection(t *testing.T) {
 
 	// Test handleConnection
 	pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
-
+	assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
 	assert.Equal(t, "test data from local", remoteDataReceived.String())
 	assert.Equal(t, "test data from remote", localConnection.receiveBuffer.String())
 	assert.Equal(t, "Handling connection for 1111\n", out.String())
@@ -538,6 +544,7 @@ func TestHandleConnectionSendsRemoteError(t *testing.T) {
 	// Test handleConnection, using go-routine because it needs to be able to write to unbuffered pf.errorChan
 	pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
 
+	assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
 	assert.Equal(t, "", remoteDataReceived.String())
 	assert.Equal(t, "", localConnection.receiveBuffer.String())
 	assert.Equal(t, "Handling connection for 1111\n", out.String())
@@ -559,4 +566,65 @@ func TestWaitForConnectionExitsOnStreamConnClosed(t *testing.T) {
 
 	port := ForwardedPort{}
 	pf.waitForConnection(&listener, port)
+}
+
+func TestForwardPortsReturnsErrorWhenConnectionIsLost(t *testing.T) {
+	dialer := &fakeDialer{
+		conn: newFakeConnection(),
+	}
+
+	stopChan := make(chan struct{})
+	readyChan := make(chan struct{})
+	errChan := make(chan error)
+
+	pf, err := New(dialer, []string{":5000"}, stopChan, readyChan, os.Stdout, os.Stderr)
+	if err != nil {
+		t.Fatalf("failed to create new PortForwarder: %s", err)
+	}
+
+	go func() {
+		errChan <- pf.ForwardPorts()
+	}()
+
+	<-pf.Ready
+
+	// Simulate lost pod connection by closing streamConn, which should result in pf.ForwardPorts() returning an error.
+	pf.streamConn.Close()
+
+	err = <-errChan
+	if err == nil {
+		t.Fatalf("unexpected non-error from pf.ForwardPorts()")
+	} else if err != ErrLostConnectionToPod {
+		t.Fatalf("unexpected error from pf.ForwardPorts(): %s", err)
+	}
+}
+
+func TestForwardPortsReturnsNilWhenStopChanIsClosed(t *testing.T) {
+	dialer := &fakeDialer{
+		conn: newFakeConnection(),
+	}
+
+	stopChan := make(chan struct{})
+	readyChan := make(chan struct{})
+	errChan := make(chan error)
+
+	pf, err := New(dialer, []string{":5000"}, stopChan, readyChan, os.Stdout, os.Stderr)
+	if err != nil {
+		t.Fatalf("failed to create new PortForwarder: %s", err)
+	}
+
+	go func() {
+		errChan <- pf.ForwardPorts()
+	}()
+
+	<-pf.Ready
+
+	// Closing (or sending to) stopChan indicates a stop request by the caller, which should result in pf.ForwardPorts()
+	// returning nil.
+	close(stopChan)
+
+	err = <-errChan
+	if err != nil {
+		t.Fatalf("unexpected error from pf.ForwardPorts(): %s", err)
+	}
 }

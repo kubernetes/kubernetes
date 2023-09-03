@@ -17,8 +17,8 @@ limitations under the License.
 package admission
 
 import (
-	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -47,14 +47,14 @@ type Config struct {
 }
 
 // New sets up the plugins and admission start hooks needed for admission
-func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselector.EgressSelector, serviceResolver webhook.ServiceResolver, tp *trace.TracerProvider) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
+func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselector.EgressSelector, serviceResolver webhook.ServiceResolver, tp trace.TracerProvider) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
 	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, egressSelector, c.LoopbackClientConfig, tp)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 
 	var cloudConfig []byte
 	if c.CloudConfigFile != "" {
 		var err error
-		cloudConfig, err = ioutil.ReadFile(c.CloudConfigFile)
+		cloudConfig, err = os.ReadFile(c.CloudConfigFile)
 		if err != nil {
 			klog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
 		}
@@ -63,7 +63,6 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 	if err != nil {
 		return nil, nil, err
 	}
-
 	discoveryClient := cacheddiscovery.NewMemCacheClient(clientset.Discovery())
 	discoveryRESTMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	kubePluginInitializer := NewPluginInitializer(

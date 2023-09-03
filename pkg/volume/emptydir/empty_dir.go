@@ -42,7 +42,7 @@ import (
 // and the group will be set to allow containers to use emptyDir volumes
 // from the group attribute.
 //
-// http://issue.k8s.io/2630
+// https://issue.k8s.io/2630
 const perm os.FileMode = 0777
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -101,6 +101,10 @@ func (plugin *emptyDirPlugin) SupportsMountOption() bool {
 
 func (plugin *emptyDirPlugin) SupportsBulkVolumeVerification() bool {
 	return false
+}
+
+func (plugin *emptyDirPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
 }
 
 func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
@@ -184,14 +188,16 @@ func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.
 	return ed, nil
 }
 
-func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (volume.ReconstructedVolume, error) {
 	emptyDirVolume := &v1.Volume{
 		Name: volName,
 		VolumeSource: v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(emptyDirVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(emptyDirVolume),
+	}, nil
 }
 
 // mountDetector abstracts how to find what kind of mount a path is backed by.
@@ -274,7 +280,7 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
-	volume.SetVolumeOwnership(ed, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(ed.plugin, nil))
+	volume.SetVolumeOwnership(ed, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(ed.plugin, nil))
 
 	// If setting up the quota fails, just log a message but don't actually error out.
 	// We'll use the old du mechanism in this case, at least until we support
@@ -296,11 +302,11 @@ func (ed *emptyDir) assignQuota(dir string, mounterSize *resource.Quantity) erro
 			klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
 		} else if hasQuotas {
 			klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterSize, dir)
-			err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterSize)
-			if err != nil {
+			if err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterSize); err != nil {
 				klog.V(3).Infof("Set quota on %s failed %s", dir, err.Error())
+				return err
 			}
-			return err
+			return nil
 		}
 	}
 	return nil
@@ -513,18 +519,16 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
-	// Remove any quota
-	err := fsquota.ClearQuota(ed.mounter, dir)
-	if err != nil {
-		klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)
+	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
+		// Remove any quota
+		err := fsquota.ClearQuota(ed.mounter, dir)
+		if err != nil {
+			klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)
+		}
 	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
-	err = os.RemoveAll(dir)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(dir)
 }
 
 func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {

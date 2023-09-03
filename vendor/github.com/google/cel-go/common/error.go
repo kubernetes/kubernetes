@@ -22,15 +22,24 @@ import (
 	"golang.org/x/text/width"
 )
 
-// Error type which references a location within source and a message.
+// NewError creates an error associated with an expression id with the given message at the given location.
+func NewError(id int64, message string, location Location) *Error {
+	return &Error{Message: message, Location: location, ExprID: id}
+}
+
+// Error type which references an expression id, a location within source, and a message.
 type Error struct {
 	Location Location
 	Message  string
+	ExprID   int64
 }
 
 const (
 	dot = "."
 	ind = "^"
+
+	// maxSnippetLength is the largest number of characters which can be rendered in an error message snippet.
+	maxSnippetLength = 16384
 )
 
 var (
@@ -45,7 +54,7 @@ func (e *Error) ToDisplayString(source Source) string {
 		e.Location.Line(),
 		e.Location.Column()+1, // add one to the 0-based column for display
 		e.Message)
-	if snippet, found := source.Snippet(e.Location.Line()); found {
+	if snippet, found := source.Snippet(e.Location.Line()); found && len(snippet) <= maxSnippetLength {
 		snippet := strings.Replace(snippet, "\t", " ", -1)
 		srcLine := "\n | " + snippet
 		var bytes = []byte(snippet)

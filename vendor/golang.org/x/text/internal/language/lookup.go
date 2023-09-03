@@ -50,7 +50,7 @@ func (id Language) Canonicalize() (Language, AliasType) {
 	return normLang(id)
 }
 
-// mapLang returns the mapped langID of id according to mapping m.
+// normLang returns the mapped langID of id according to mapping m.
 func normLang(id Language) (Language, AliasType) {
 	k := sort.Search(len(AliasMap), func(i int) bool {
 		return AliasMap[i].From >= uint16(id)
@@ -328,7 +328,7 @@ func (r Region) IsPrivateUse() bool {
 	return r.typ()&iso3166UserAssigned != 0
 }
 
-type Script uint8
+type Script uint16
 
 // getScriptID returns the script id for string s. It assumes that s
 // is of the format [A-Z][a-z]{3}.

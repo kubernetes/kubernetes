@@ -34,11 +34,12 @@ import (
 // https://kubernetes.io/docs/concepts/containers/runtime-class/
 type RuntimeClass struct {
 	metav1.TypeMeta `json:",inline"`
+
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Handler specifies the underlying runtime and configuration that the CRI
+	// handler specifies the underlying runtime and configuration that the CRI
 	// implementation will use to handle pods of this class. The possible values
 	// are specific to the node & CRI configuration.  It is assumed that all
 	// handlers are available on every node, and handlers of the same name are
@@ -50,13 +51,13 @@ type RuntimeClass struct {
 	// and is immutable.
 	Handler string `json:"handler" protobuf:"bytes,2,opt,name=handler"`
 
-	// Overhead represents the resource overhead associated with running a pod for a
+	// overhead represents the resource overhead associated with running a pod for a
 	// given RuntimeClass. For more details, see
 	//  https://kubernetes.io/docs/concepts/scheduling-eviction/pod-overhead/
 	// +optional
 	Overhead *Overhead `json:"overhead,omitempty" protobuf:"bytes,3,opt,name=overhead"`
 
-	// Scheduling holds the scheduling constraints to ensure that pods running
+	// scheduling holds the scheduling constraints to ensure that pods running
 	// with this RuntimeClass are scheduled to nodes that support it.
 	// If scheduling is nil, this RuntimeClass is assumed to be supported by all
 	// nodes.
@@ -66,7 +67,7 @@ type RuntimeClass struct {
 
 // Overhead structure represents the resource overhead associated with running a pod.
 type Overhead struct {
-	// PodFixed represents the fixed resource overhead associated with running a pod.
+	// podFixed represents the fixed resource overhead associated with running a pod.
 	// +optional
 	PodFixed corev1.ResourceList `json:"podFixed,omitempty" protobuf:"bytes,1,opt,name=podFixed,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName,castvalue=k8s.io/apimachinery/pkg/api/resource.Quantity"`
 }
@@ -96,11 +97,12 @@ type Scheduling struct {
 // RuntimeClassList is a list of RuntimeClass objects.
 type RuntimeClassList struct {
 	metav1.TypeMeta `json:",inline"`
+
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is a list of schema objects.
+	// items is a list of schema objects.
 	Items []RuntimeClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

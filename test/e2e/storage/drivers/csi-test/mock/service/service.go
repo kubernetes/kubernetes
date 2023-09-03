@@ -71,6 +71,9 @@ type DirIO interface {
 	Mkdir(path string) error
 	// RemoveAll removes the path and everything contained inside it. It's not an error if the path does not exist.
 	RemoveAll(path string) error
+	// Rename changes the name of a file or directory. The parent directory
+	// of newPath must exist.
+	Rename(oldPath, newPath string) error
 }
 
 type OSDirIO struct{}
@@ -95,6 +98,10 @@ func (o OSDirIO) Mkdir(path string) error {
 
 func (o OSDirIO) RemoveAll(path string) error {
 	return os.RemoveAll(path)
+}
+
+func (o OSDirIO) Rename(oldPath, newPath string) error {
+	return os.Rename(oldPath, newPath)
 }
 
 // Service is the CSI Mock service provider.

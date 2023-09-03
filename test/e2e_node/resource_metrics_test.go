@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -24,12 +25,13 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/prometheus/common/model"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
@@ -43,18 +45,18 @@ const (
 
 var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 	f := framework.NewDefaultFramework("resource-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /resource/metrics", func() {
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("Creating test pods to measure their resource usage")
 			numRestarts := int32(1)
 			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
-			f.PodClient().CreateBatch(pods)
+			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
 
 			ginkgo.By("restarting the containers to ensure container metrics are still being gathered after a container is restarted")
-			gomega.Eventually(func() error {
+			gomega.Eventually(ctx, func(ctx context.Context) error {
 				for _, pod := range pods {
-					err := verifyPodRestartCount(f, pod.Name, len(pod.Spec.Containers), numRestarts)
+					err := verifyPodRestartCount(ctx, f, pod.Name, len(pod.Spec.Containers), numRestarts)
 					if err != nil {
 						return err
 					}
@@ -65,14 +67,15 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 			ginkgo.By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
 			time.Sleep(15 * time.Second)
 		})
-		ginkgo.It("should report resource usage through the resource metrics api", func() {
+		ginkgo.It("should report resource usage through the resource metrics api", func(ctx context.Context) {
 			ginkgo.By("Fetching node so we can match against an appropriate memory limit")
-			node := getLocalNode(f)
+			node := getLocalNode(ctx, f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
 
-			matchResourceMetrics := gstruct.MatchAllKeys(gstruct.Keys{
-				"scrape_error": gstruct.Ignore(),
+			matchResourceMetrics := gomega.And(gstruct.MatchKeys(gstruct.IgnoreMissing, gstruct.Keys{
+				"scrape_error":          gstruct.Ignore(),
+				"resource_scrape_error": gstruct.Ignore(),
 				"node_cpu_usage_seconds_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": boundedSample(1, 1e6),
 				}),
@@ -104,32 +107,40 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
-			})
+
+				"pod_swap_usage_bytes": gstruct.MatchElements(podID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
+				}),
+			}),
+				haveKeys("scrape_error", "resource_scrape_error", "node_cpu_usage_seconds_total", "node_memory_working_set_bytes", "container_cpu_usage_seconds_total",
+					"container_memory_working_set_bytes", "container_start_time_seconds", "pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes"),
+			)
 			ginkgo.By("Giving pods a minute to start up and produce metrics")
-			gomega.Eventually(getResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(getResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
-		ginkgo.AfterEach(func() {
+		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("Deleting test pods")
 			var zero int64 = 0
-			f.PodClient().DeleteSync(pod0, metav1.DeleteOptions{GracePeriodSeconds: &zero}, 10*time.Minute)
-			f.PodClient().DeleteSync(pod1, metav1.DeleteOptions{GracePeriodSeconds: &zero}, 10*time.Minute)
-			if !ginkgo.CurrentGinkgoTestDescription().Failed {
+			e2epod.NewPodClient(f).DeleteSync(ctx, pod0, metav1.DeleteOptions{GracePeriodSeconds: &zero}, 10*time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, pod1, metav1.DeleteOptions{GracePeriodSeconds: &zero}, 10*time.Minute)
+			if !ginkgo.CurrentSpecReport().Failed() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+				e2ekubectl.LogFailedContainers(ctx, f.ClientSet, f.Namespace.Name, framework.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
-			recordSystemCgroupProcesses()
+			recordSystemCgroupProcesses(ctx)
 		})
 	})
 })
 
-func getResourceMetrics() (e2emetrics.KubeletMetrics, error) {
+func getResourceMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
 	ginkgo.By("getting stable resource metrics API")
-	return e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics/resource")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, nodeNameOrIP()+":10255", "/metrics/resource")
 }
 
 func nodeID(element interface{}) string {
@@ -159,5 +170,22 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 				gomega.BeTemporally(">=", time.Now().Add(-maxStatsAge)),
 				// Now() is the test start time, not the match time, so permit a few extra minutes.
 				gomega.BeTemporally("<", time.Now().Add(2*time.Minute))),
-		)}))
+		),
+		"Histogram": gstruct.Ignore(),
+	}))
+}
+
+func haveKeys(keys ...string) types.GomegaMatcher {
+	gomega.ExpectWithOffset(1, keys).ToNot(gomega.BeEmpty())
+	matcher := gomega.HaveKey(keys[0])
+
+	if len(keys) == 1 {
+		return matcher
+	}
+
+	for _, key := range keys[1:] {
+		matcher = gomega.And(matcher, gomega.HaveKey(key))
+	}
+
+	return matcher
 }

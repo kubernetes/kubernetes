@@ -20,10 +20,13 @@ import (
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
+// RegistrationHandler is an interface for handling device plugin registration
+// and plugin directory cleanup.
 type RegistrationHandler interface {
 	CleanupPluginDirectory(string) error
 }
 
+// ClientHandler is an interface for handling device plugin connections.
 type ClientHandler interface {
 	PluginConnected(string, DevicePlugin) error
 	PluginDisconnected(string)

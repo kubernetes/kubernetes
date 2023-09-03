@@ -18,7 +18,6 @@ package volumepathhandler
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -42,9 +41,9 @@ type BlockVolumePathHandler interface {
 	UnmapDevice(mapPath string, linkName string, bindMount bool) error
 	// RemovePath removes a file or directory on specified map path
 	RemoveMapPath(mapPath string) error
-	// IsSymlinkExist retruns true if specified symbolic link exists
+	// IsSymlinkExist returns true if specified symbolic link exists
 	IsSymlinkExist(mapPath string) (bool, error)
-	// IsDeviceBindMountExist retruns true if specified bind mount exists
+	// IsDeviceBindMountExist returns true if specified bind mount exists
 	IsDeviceBindMountExist(mapPath string) (bool, error)
 	// GetDeviceBindMountRefs searches bind mounts under global map path
 	GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error)
@@ -279,12 +278,12 @@ func (v VolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) 
 // GetDeviceBindMountRefs searches bind mounts under global map path
 func (v VolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error) {
 	var refs []string
-	files, err := ioutil.ReadDir(mapPath)
+	files, err := os.ReadDir(mapPath)
 	if err != nil {
 		return nil, err
 	}
 	for _, file := range files {
-		if file.Mode()&os.ModeDevice != os.ModeDevice {
+		if file.Type()&os.ModeDevice != os.ModeDevice {
 			continue
 		}
 		filename := file.Name()

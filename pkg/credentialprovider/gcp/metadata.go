@@ -18,8 +18,8 @@ package gcp
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -110,8 +110,9 @@ type DockerConfigURLKeyProvider struct {
 }
 
 // ContainerRegistryProvider is a DockerConfigProvider that provides a dockercfg with:
-//    Username: "_token"
-//    Password: "{access token from metadata}"
+//
+//	Username: "_token"
+//	Password: "{access token from metadata}"
 type ContainerRegistryProvider struct {
 	MetadataProvider
 }
@@ -133,7 +134,7 @@ func onGCEVM() bool {
 		}
 		name = fields[1]
 	} else {
-		data, err := ioutil.ReadFile(gceProductNameFile)
+		data, err := os.ReadFile(gceProductNameFile)
 		if err != nil {
 			klog.V(2).Infof("Error while reading product_name: %v", err)
 			return false

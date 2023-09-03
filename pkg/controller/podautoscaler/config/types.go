@@ -22,6 +22,9 @@ import (
 
 // HPAControllerConfiguration contains elements describing HPAController.
 type HPAControllerConfiguration struct {
+	// ConcurrentHorizontalPodAutoscalerSyncs is the number of HPA objects that are allowed to sync concurrently.
+	// Larger number = more responsive HPA processing, but more CPU (and network) load.
+	ConcurrentHorizontalPodAutoscalerSyncs int32
 	// horizontalPodAutoscalerSyncPeriod is the period for syncing the number of
 	// pods in horizontal pod autoscaler.
 	HorizontalPodAutoscalerSyncPeriod metav1.Duration

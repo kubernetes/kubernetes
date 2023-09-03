@@ -29,12 +29,12 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
@@ -43,6 +43,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient/mockvmssclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 // setTestVirtualMachines sets test virtual machine with powerstate.
@@ -58,14 +59,14 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string, isDataDisksFull 
 		}
 		status := []compute.InstanceViewStatus{
 			{
-				Code: to.StringPtr(powerState),
+				Code: pointer.String(powerState),
 			},
 			{
-				Code: to.StringPtr("ProvisioningState/succeeded"),
+				Code: pointer.String("ProvisioningState/succeeded"),
 			},
 		}
 		vm.VirtualMachineProperties = &compute.VirtualMachineProperties{
-			ProvisioningState: to.StringPtr(string(compute.ProvisioningStateSucceeded)),
+			ProvisioningState: pointer.String(string(compute.ProvisioningStateSucceeded)),
 			HardwareProfile: &compute.HardwareProfile{
 				VMSize: compute.VirtualMachineSizeTypesStandardA0,
 			},
@@ -78,13 +79,13 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string, isDataDisksFull 
 		}
 		if !isDataDisksFull {
 			vm.StorageProfile.DataDisks = &[]compute.DataDisk{{
-				Lun:  to.Int32Ptr(0),
-				Name: to.StringPtr("disk1"),
+				Lun:  pointer.Int32(0),
+				Name: pointer.String("disk1"),
 			}}
 		} else {
 			dataDisks := make([]compute.DataDisk, maxLUN)
 			for i := 0; i < maxLUN; i++ {
-				dataDisks[i] = compute.DataDisk{Lun: to.Int32Ptr(int32(i))}
+				dataDisks[i] = compute.DataDisk{Lun: pointer.Int32(int32(i))}
 			}
 			vm.StorageProfile.DataDisks = &dataDisks
 		}
@@ -348,7 +349,7 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 		cloud := GetTestCloud(ctrl)
 		expectedVMs := setTestVirtualMachines(cloud, test.vmList, false)
 		if test.provisioningState != "" {
-			expectedVMs[0].ProvisioningState = to.StringPtr(test.provisioningState)
+			expectedVMs[0].ProvisioningState = pointer.String(test.provisioningState)
 		}
 		mockVMsClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		for _, vm := range expectedVMs {
@@ -373,9 +374,9 @@ func TestNodeAddresses(t *testing.T) {
 				NetworkInterfaces: &[]compute.NetworkInterfaceReference{
 					{
 						NetworkInterfaceReferenceProperties: &compute.NetworkInterfaceReferenceProperties{
-							Primary: to.BoolPtr(true),
+							Primary: pointer.Bool(true),
 						},
-						ID: to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic"),
+						ID: pointer.String("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic"),
 					},
 				},
 			},
@@ -383,9 +384,9 @@ func TestNodeAddresses(t *testing.T) {
 	}
 
 	expectedPIP := network.PublicIPAddress{
-		ID: to.StringPtr("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/pip1"),
+		ID: pointer.String("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/pip1"),
 		PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
-			IPAddress: to.StringPtr("192.168.1.12"),
+			IPAddress: pointer.String("192.168.1.12"),
 		},
 	}
 
@@ -394,7 +395,7 @@ func TestNodeAddresses(t *testing.T) {
 			IPConfigurations: &[]network.InterfaceIPConfiguration{
 				{
 					InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
-						PrivateIPAddress: to.StringPtr("172.1.0.3"),
+						PrivateIPAddress: pointer.String("172.1.0.3"),
 						PublicIPAddress:  &expectedPIP,
 					},
 				},
@@ -487,7 +488,7 @@ func TestNodeAddresses(t *testing.T) {
 			metadataName:        "vm1",
 			vmType:              vmTypeStandard,
 			useInstanceMetadata: true,
-			expectedErrMsg:      fmt.Errorf("timed out waiting for the condition"),
+			expectedErrMsg:      wait.ErrWaitTimeout,
 		},
 		{
 			name:                "NodeAddresses should get IP addresses from Azure API if node's name isn't equal to metadataName",

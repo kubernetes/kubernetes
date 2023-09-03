@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/protobuf/ptypes"
 	"github.com/prometheus/common/model"
 
 	dto "github.com/prometheus/client_model/go"
@@ -47,20 +46,20 @@ import (
 // missing features and peculiarities to avoid complications when switching from
 // Prometheus to OpenMetrics or vice versa:
 //
-// - Counters are expected to have the `_total` suffix in their metric name. In
-//   the output, the suffix will be truncated from the `# TYPE` and `# HELP`
-//   line. A counter with a missing `_total` suffix is not an error. However,
-//   its type will be set to `unknown` in that case to avoid invalid OpenMetrics
-//   output.
+//   - Counters are expected to have the `_total` suffix in their metric name. In
+//     the output, the suffix will be truncated from the `# TYPE` and `# HELP`
+//     line. A counter with a missing `_total` suffix is not an error. However,
+//     its type will be set to `unknown` in that case to avoid invalid OpenMetrics
+//     output.
 //
-// - No support for the following (optional) features: `# UNIT` line, `_created`
-//   line, info type, stateset type, gaugehistogram type.
+//   - No support for the following (optional) features: `# UNIT` line, `_created`
+//     line, info type, stateset type, gaugehistogram type.
 //
-// - The size of exemplar labels is not checked (i.e. it's possible to create
-//   exemplars that are larger than allowed by the OpenMetrics specification).
+//   - The size of exemplar labels is not checked (i.e. it's possible to create
+//     exemplars that are larger than allowed by the OpenMetrics specification).
 //
-// - The value of Counters is not checked. (OpenMetrics doesn't allow counters
-//   with a `NaN` value.)
+//   - The value of Counters is not checked. (OpenMetrics doesn't allow counters
+//     with a `NaN` value.)
 func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int, err error) {
 	name := in.GetName()
 	if name == "" {
@@ -473,10 +472,11 @@ func writeExemplar(w enhancedWriter, e *dto.Exemplar) (int, error) {
 		if err != nil {
 			return written, err
 		}
-		ts, err := ptypes.Timestamp((*e).Timestamp)
+		err = (*e).Timestamp.CheckValid()
 		if err != nil {
 			return written, err
 		}
+		ts := (*e).Timestamp.AsTime()
 		// TODO(beorn7): Format this directly from components of ts to
 		// avoid overflow/underflow and precision issues of the float
 		// conversion.

@@ -27,7 +27,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/cadvisor/accelerators"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
@@ -155,9 +154,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 	selfContainer := "/"
 	var err error
 	// Avoid using GetOwnCgroupPath on cgroup v2 as it is not supported by libcontainer
-	if cgroups.IsCgroup2UnifiedMode() {
-		klog.Warningf("Cannot detect current cgroup on cgroup v2")
-	} else {
+	if !cgroups.IsCgroup2UnifiedMode() {
 		selfContainer, err = cgroups.GetOwnCgroup("cpu")
 		if err != nil {
 			return nil, err
@@ -201,7 +198,6 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 		containerWatchers:                     []watcher.ContainerWatcher{},
 		eventsChannel:                         eventsChannel,
 		collectorHTTPClient:                   collectorHTTPClient,
-		nvidiaManager:                         accelerators.NewNvidiaManager(includedMetricsSet),
 		rawContainerCgroupPathPrefixWhiteList: rawContainerCgroupPathPrefixWhiteList,
 		containerEnvMetadataWhiteList:         containerEnvMetadataWhiteList,
 	}
@@ -261,7 +257,6 @@ type manager struct {
 	containerWatchers        []watcher.ContainerWatcher
 	eventsChannel            chan watcher.ContainerEvent
 	collectorHTTPClient      *http.Client
-	nvidiaManager            stats.Manager
 	perfManager              stats.Manager
 	resctrlManager           resctrl.Manager
 	// List of raw container cgroup path prefix whitelist.
@@ -329,7 +324,6 @@ func (m *manager) Start() error {
 }
 
 func (m *manager) Stop() error {
-	defer m.nvidiaManager.Destroy()
 	defer m.destroyCollectors()
 	// Stop and wait on all quit channels.
 	for i, c := range m.quitChannels {
@@ -936,17 +930,6 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 		return err
 	}
 
-	if !cgroups.IsCgroup2UnifiedMode() {
-		devicesCgroupPath, err := handler.GetCgroupPath("devices")
-		if err != nil {
-			klog.Warningf("Error getting devices cgroup path: %v", err)
-		} else {
-			cont.nvidiaCollector, err = m.nvidiaManager.GetCollector(devicesCgroupPath)
-			if err != nil {
-				klog.V(4).Infof("GPU metrics may be unavailable/incomplete for container %s: %s", cont.info.Name, err)
-			}
-		}
-	}
 	if m.includedMetrics.Has(container.PerfMetrics) {
 		perfCgroupPath, err := handler.GetCgroupPath("perf_event")
 		if err != nil {

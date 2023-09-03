@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func TestNewEndpointSlice(t *testing.T) {
@@ -54,12 +53,12 @@ func TestNewEndpointSlice(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		tweakEndpoint func(ep *corev1.Endpoints)
+		tweakEndpoint func(ep *v1.Endpoints)
 		expectedSlice discovery.EndpointSlice
 	}{
 		{
 			name: "create slice from endpoints",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 			},
 			expectedSlice: discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -79,7 +78,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with annotations",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				annotations := map[string]string{"foo": "bar"}
 				ep.Annotations = annotations
 			},
@@ -101,7 +100,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with labels",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				labels := map[string]string{"foo": "bar"}
 				ep.Labels = labels
 			},
@@ -124,7 +123,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with labels and annotations",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				labels := map[string]string{"foo": "bar"}
 				ep.Labels = labels
 				annotations := map[string]string{"foo2": "bar2"}
@@ -149,12 +148,12 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with labels and annotations triggertime",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				labels := map[string]string{"foo": "bar"}
 				ep.Labels = labels
 				annotations := map[string]string{
-					"foo2":                                "bar2",
-					corev1.EndpointsLastChangeTriggerTime: "date",
+					"foo2":                            "bar2",
+					v1.EndpointsLastChangeTriggerTime: "date",
 				}
 				ep.Annotations = annotations
 			},
@@ -194,7 +193,7 @@ func TestAddressToEndpoint(t *testing.T) {
 	epAddress := v1.EndpointAddress{
 		IP:       "10.1.2.3",
 		Hostname: "foo",
-		NodeName: utilpointer.StringPtr("node-abc"),
+		NodeName: pointer.String("node-abc"),
 		TargetRef: &v1.ObjectReference{
 			APIVersion: "v1",
 			Kind:       "Pod",
@@ -205,9 +204,9 @@ func TestAddressToEndpoint(t *testing.T) {
 	ready := true
 	expectedEndpoint := discovery.Endpoint{
 		Addresses: []string{"10.1.2.3"},
-		Hostname:  utilpointer.StringPtr("foo"),
+		Hostname:  pointer.String("foo"),
 		Conditions: discovery.EndpointConditions{
-			Ready: utilpointer.BoolPtr(true),
+			Ready: pointer.BoolPtr(true),
 		},
 		TargetRef: &v1.ObjectReference{
 			APIVersion: "v1",
@@ -215,7 +214,7 @@ func TestAddressToEndpoint(t *testing.T) {
 			Namespace:  "default",
 			Name:       "foo",
 		},
-		NodeName: utilpointer.StringPtr("node-abc"),
+		NodeName: pointer.String("node-abc"),
 	}
 
 	ep := addressToEndpoint(epAddress, ready)

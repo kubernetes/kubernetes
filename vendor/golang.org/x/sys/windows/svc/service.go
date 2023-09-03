@@ -6,7 +6,6 @@
 // +build windows
 
 // Package svc provides everything required to build Windows service.
-//
 package svc
 
 import (
@@ -67,6 +66,15 @@ const (
 	AcceptPowerEvent            = Accepted(windows.SERVICE_ACCEPT_POWEREVENT)
 	AcceptSessionChange         = Accepted(windows.SERVICE_ACCEPT_SESSIONCHANGE)
 	AcceptPreShutdown           = Accepted(windows.SERVICE_ACCEPT_PRESHUTDOWN)
+)
+
+// ActivityStatus allows for services to be selected based on active and inactive categories of service state.
+type ActivityStatus uint32
+
+const (
+	Active      = ActivityStatus(windows.SERVICE_ACTIVE)
+	Inactive    = ActivityStatus(windows.SERVICE_INACTIVE)
+	AnyActivity = ActivityStatus(windows.SERVICE_STATE_ALL)
 )
 
 // Status combines State and Accepted commands to fully describe running service.

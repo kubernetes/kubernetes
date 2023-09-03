@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -143,6 +146,8 @@ func TestRunRenewCommands(t *testing.T) {
 		command         string
 		Certs           []*certsphase.KubeadmCert
 		KubeconfigFiles []string
+		Args            string
+		expectedError   bool
 	}{
 		{
 			command: "all",
@@ -221,6 +226,14 @@ func TestRunRenewCommands(t *testing.T) {
 				kubeadmconstants.ControllerManagerKubeConfigFileName,
 			},
 		},
+		{
+			command: "apiserver",
+			Certs: []*certsphase.KubeadmCert{
+				certsphase.KubeadmCertAPIServer(),
+			},
+			Args:          "args",
+			expectedError: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -244,25 +257,34 @@ func TestRunRenewCommands(t *testing.T) {
 
 			// exec renew
 			renewCmds := getRenewSubCommands(os.Stdout, tmpDir)
-			cmdtestutil.RunSubCommand(t, renewCmds, test.command, fmt.Sprintf("--cert-dir=%s", tmpDir))
-
-			// check the file is modified
-			for _, cert := range test.Certs {
-				file, err := os.Stat(filepath.Join(tmpDir, fmt.Sprintf("%s.crt", cert.BaseName)))
-				if err != nil {
-					t.Fatalf("couldn't get certificate %s: %v", cert.Name, err)
-				}
-				if ModTime[cert.Name] == file.ModTime() {
-					t.Errorf("certificate %s was not renewed as expected", cert.Name)
-				}
+			args := fmt.Sprintf("--cert-dir=%s", tmpDir)
+			if len(test.Args) > 0 {
+				args = test.Args + " " + args
 			}
-			for _, kubeConfig := range test.KubeconfigFiles {
-				file, err := os.Stat(filepath.Join(tmpDir, kubeConfig))
-				if err != nil {
-					t.Fatalf("couldn't get kubeconfig %s: %v", kubeConfig, err)
+			err := cmdtestutil.RunSubCommand(t, renewCmds, test.command, args)
+			// certs renew doesn't support positional Args
+			if (err != nil) != test.expectedError {
+				t.Errorf("failed to run renew commands, expected error: %t, actual error: %v", test.expectedError, err)
+			}
+			if !test.expectedError {
+				// check the file is modified
+				for _, cert := range test.Certs {
+					file, err := os.Stat(filepath.Join(tmpDir, fmt.Sprintf("%s.crt", cert.BaseName)))
+					if err != nil {
+						t.Fatalf("couldn't get certificate %s: %v", cert.Name, err)
+					}
+					if ModTime[cert.Name] == file.ModTime() {
+						t.Errorf("certificate %s was not renewed as expected", cert.Name)
+					}
 				}
-				if ModTime[kubeConfig] == file.ModTime() {
-					t.Errorf("kubeconfig %s was not renewed as expected", kubeConfig)
+				for _, kubeConfig := range test.KubeconfigFiles {
+					file, err := os.Stat(filepath.Join(tmpDir, kubeConfig))
+					if err != nil {
+						t.Fatalf("couldn't get kubeconfig %s: %v", kubeConfig, err)
+					}
+					if ModTime[kubeConfig] == file.ModTime() {
+						t.Errorf("kubeconfig %s was not renewed as expected", kubeConfig)
+					}
 				}
 			}
 		})
@@ -442,11 +464,11 @@ kubernetesVersion: %s`,
 			err := config.load()
 			if test.expectErr {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
 			}
-			for _, assertFunc := range test.assertions {
-				assertFunc(t, config)
+			if !test.expectErr && assert.NoError(t, err) {
+				for _, assertFunc := range test.assertions {
+					assertFunc(t, config)
+				}
 			}
 		})
 	}

@@ -74,243 +74,275 @@ func Wrap(w http.ResponseWriter, hooks Hooks) http.ResponseWriter {
 	// combination 1/32
 	case !i0 && !i1 && !i2 && !i3 && !i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
-		}{rw}
+		}{rw, rw}
 	// combination 2/32
 	case !i0 && !i1 && !i2 && !i3 && i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.Pusher
-		}{rw, rw}
+		}{rw, rw, rw}
 	// combination 3/32
 	case !i0 && !i1 && !i2 && i3 && !i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			io.ReaderFrom
-		}{rw, rw}
+		}{rw, rw, rw}
 	// combination 4/32
 	case !i0 && !i1 && !i2 && i3 && i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			io.ReaderFrom
 			http.Pusher
-		}{rw, rw, rw}
+		}{rw, rw, rw, rw}
 	// combination 5/32
 	case !i0 && !i1 && i2 && !i3 && !i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.Hijacker
-		}{rw, rw}
+		}{rw, rw, rw}
 	// combination 6/32
 	case !i0 && !i1 && i2 && !i3 && i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.Hijacker
 			http.Pusher
-		}{rw, rw, rw}
+		}{rw, rw, rw, rw}
 	// combination 7/32
 	case !i0 && !i1 && i2 && i3 && !i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.Hijacker
 			io.ReaderFrom
-		}{rw, rw, rw}
+		}{rw, rw, rw, rw}
 	// combination 8/32
 	case !i0 && !i1 && i2 && i3 && i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.Hijacker
 			io.ReaderFrom
 			http.Pusher
-		}{rw, rw, rw, rw}
+		}{rw, rw, rw, rw, rw}
 	// combination 9/32
 	case !i0 && i1 && !i2 && !i3 && !i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.CloseNotifier
-		}{rw, rw}
+		}{rw, rw, rw}
 	// combination 10/32
 	case !i0 && i1 && !i2 && !i3 && i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.CloseNotifier
 			http.Pusher
-		}{rw, rw, rw}
+		}{rw, rw, rw, rw}
 	// combination 11/32
 	case !i0 && i1 && !i2 && i3 && !i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.CloseNotifier
 			io.ReaderFrom
-		}{rw, rw, rw}
+		}{rw, rw, rw, rw}
 	// combination 12/32
 	case !i0 && i1 && !i2 && i3 && i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.CloseNotifier
 			io.ReaderFrom
 			http.Pusher
-		}{rw, rw, rw, rw}
+		}{rw, rw, rw, rw, rw}
 	// combination 13/32
 	case !i0 && i1 && i2 && !i3 && !i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.CloseNotifier
 			http.Hijacker
-		}{rw, rw, rw}
+		}{rw, rw, rw, rw}
 	// combination 14/32
 	case !i0 && i1 && i2 && !i3 && i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.CloseNotifier
 			http.Hijacker
 			http.Pusher
-		}{rw, rw, rw, rw}
+		}{rw, rw, rw, rw, rw}
 	// combination 15/32
 	case !i0 && i1 && i2 && i3 && !i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
 			http.CloseNotifier
 			http.Hijacker
 			io.ReaderFrom
-		}{rw, rw, rw, rw}
+		}{rw, rw, rw, rw, rw}
 	// combination 16/32
 	case !i0 && i1 && i2 && i3 && i4:
 		return struct {
+			Unwrapper
 			http.ResponseWriter
-			http.CloseNotifier
-			http.Hijacker
-			io.ReaderFrom
-			http.Pusher
-		}{rw, rw, rw, rw, rw}
-	// combination 17/32
-	case i0 && !i1 && !i2 && !i3 && !i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-		}{rw, rw}
-	// combination 18/32
-	case i0 && !i1 && !i2 && !i3 && i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Pusher
-		}{rw, rw, rw}
-	// combination 19/32
-	case i0 && !i1 && !i2 && i3 && !i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			io.ReaderFrom
-		}{rw, rw, rw}
-	// combination 20/32
-	case i0 && !i1 && !i2 && i3 && i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			io.ReaderFrom
-			http.Pusher
-		}{rw, rw, rw, rw}
-	// combination 21/32
-	case i0 && !i1 && i2 && !i3 && !i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Hijacker
-		}{rw, rw, rw}
-	// combination 22/32
-	case i0 && !i1 && i2 && !i3 && i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Hijacker
-			http.Pusher
-		}{rw, rw, rw, rw}
-	// combination 23/32
-	case i0 && !i1 && i2 && i3 && !i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Hijacker
-			io.ReaderFrom
-		}{rw, rw, rw, rw}
-	// combination 24/32
-	case i0 && !i1 && i2 && i3 && i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Hijacker
-			io.ReaderFrom
-			http.Pusher
-		}{rw, rw, rw, rw, rw}
-	// combination 25/32
-	case i0 && i1 && !i2 && !i3 && !i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.CloseNotifier
-		}{rw, rw, rw}
-	// combination 26/32
-	case i0 && i1 && !i2 && !i3 && i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.CloseNotifier
-			http.Pusher
-		}{rw, rw, rw, rw}
-	// combination 27/32
-	case i0 && i1 && !i2 && i3 && !i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.CloseNotifier
-			io.ReaderFrom
-		}{rw, rw, rw, rw}
-	// combination 28/32
-	case i0 && i1 && !i2 && i3 && i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.CloseNotifier
-			io.ReaderFrom
-			http.Pusher
-		}{rw, rw, rw, rw, rw}
-	// combination 29/32
-	case i0 && i1 && i2 && !i3 && !i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.CloseNotifier
-			http.Hijacker
-		}{rw, rw, rw, rw}
-	// combination 30/32
-	case i0 && i1 && i2 && !i3 && i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.CloseNotifier
-			http.Hijacker
-			http.Pusher
-		}{rw, rw, rw, rw, rw}
-	// combination 31/32
-	case i0 && i1 && i2 && i3 && !i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
-			http.CloseNotifier
-			http.Hijacker
-			io.ReaderFrom
-		}{rw, rw, rw, rw, rw}
-	// combination 32/32
-	case i0 && i1 && i2 && i3 && i4:
-		return struct {
-			http.ResponseWriter
-			http.Flusher
 			http.CloseNotifier
 			http.Hijacker
 			io.ReaderFrom
 			http.Pusher
 		}{rw, rw, rw, rw, rw, rw}
+	// combination 17/32
+	case i0 && !i1 && !i2 && !i3 && !i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+		}{rw, rw, rw}
+	// combination 18/32
+	case i0 && !i1 && !i2 && !i3 && i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.Pusher
+		}{rw, rw, rw, rw}
+	// combination 19/32
+	case i0 && !i1 && !i2 && i3 && !i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			io.ReaderFrom
+		}{rw, rw, rw, rw}
+	// combination 20/32
+	case i0 && !i1 && !i2 && i3 && i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			io.ReaderFrom
+			http.Pusher
+		}{rw, rw, rw, rw, rw}
+	// combination 21/32
+	case i0 && !i1 && i2 && !i3 && !i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.Hijacker
+		}{rw, rw, rw, rw}
+	// combination 22/32
+	case i0 && !i1 && i2 && !i3 && i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.Hijacker
+			http.Pusher
+		}{rw, rw, rw, rw, rw}
+	// combination 23/32
+	case i0 && !i1 && i2 && i3 && !i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.Hijacker
+			io.ReaderFrom
+		}{rw, rw, rw, rw, rw}
+	// combination 24/32
+	case i0 && !i1 && i2 && i3 && i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.Hijacker
+			io.ReaderFrom
+			http.Pusher
+		}{rw, rw, rw, rw, rw, rw}
+	// combination 25/32
+	case i0 && i1 && !i2 && !i3 && !i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.CloseNotifier
+		}{rw, rw, rw, rw}
+	// combination 26/32
+	case i0 && i1 && !i2 && !i3 && i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.CloseNotifier
+			http.Pusher
+		}{rw, rw, rw, rw, rw}
+	// combination 27/32
+	case i0 && i1 && !i2 && i3 && !i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.CloseNotifier
+			io.ReaderFrom
+		}{rw, rw, rw, rw, rw}
+	// combination 28/32
+	case i0 && i1 && !i2 && i3 && i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.CloseNotifier
+			io.ReaderFrom
+			http.Pusher
+		}{rw, rw, rw, rw, rw, rw}
+	// combination 29/32
+	case i0 && i1 && i2 && !i3 && !i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.CloseNotifier
+			http.Hijacker
+		}{rw, rw, rw, rw, rw}
+	// combination 30/32
+	case i0 && i1 && i2 && !i3 && i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.CloseNotifier
+			http.Hijacker
+			http.Pusher
+		}{rw, rw, rw, rw, rw, rw}
+	// combination 31/32
+	case i0 && i1 && i2 && i3 && !i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.CloseNotifier
+			http.Hijacker
+			io.ReaderFrom
+		}{rw, rw, rw, rw, rw, rw}
+	// combination 32/32
+	case i0 && i1 && i2 && i3 && i4:
+		return struct {
+			Unwrapper
+			http.ResponseWriter
+			http.Flusher
+			http.CloseNotifier
+			http.Hijacker
+			io.ReaderFrom
+			http.Pusher
+		}{rw, rw, rw, rw, rw, rw, rw}
 	}
 	panic("unreachable")
 }
@@ -318,6 +350,10 @@ func Wrap(w http.ResponseWriter, hooks Hooks) http.ResponseWriter {
 type rw struct {
 	w http.ResponseWriter
 	h Hooks
+}
+
+func (w *rw) Unwrap() http.ResponseWriter {
+	return w.w
 }
 
 func (w *rw) Header() http.Header {
@@ -382,4 +418,19 @@ func (w *rw) Push(target string, opts *http.PushOptions) error {
 		f = w.h.Push(f)
 	}
 	return f(target, opts)
+}
+
+type Unwrapper interface {
+	Unwrap() http.ResponseWriter
+}
+
+// Unwrap returns the underlying http.ResponseWriter from within zero or more
+// layers of httpsnoop wrappers.
+func Unwrap(w http.ResponseWriter) http.ResponseWriter {
+	if rw, ok := w.(Unwrapper); ok {
+		// recurse until rw.Unwrap() returns a non-Unwrapper
+		return Unwrap(rw.Unwrap())
+	} else {
+		return w
+	}
 }

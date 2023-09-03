@@ -51,7 +51,7 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	if len(cfg.Discovery.TLSBootstrapToken) != 0 {
 		klog.V(1).Info("[discovery] Using provided TLSBootstrapToken as authentication credentials for the join process")
 
-		clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
+		_, clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
 		return kubeconfigutil.CreateWithToken(
 			clusterinfo.Server,
 			kubeadmapiv1.DefaultClusterName,
@@ -76,9 +76,9 @@ func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	case cfg.Discovery.File != nil:
 		kubeConfigPath := cfg.Discovery.File.KubeConfigPath
 		if isHTTPSURL(kubeConfigPath) {
-			return https.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1.DefaultClusterName, cfg.Discovery.Timeout.Duration)
+			return https.RetrieveValidatedConfigInfo(kubeConfigPath, cfg.Discovery.Timeout.Duration)
 		}
-		return file.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1.DefaultClusterName, cfg.Discovery.Timeout.Duration)
+		return file.RetrieveValidatedConfigInfo(kubeConfigPath, cfg.Discovery.Timeout.Duration)
 	case cfg.Discovery.BootstrapToken != nil:
 		return token.RetrieveValidatedConfigInfo(&cfg.Discovery)
 	default:

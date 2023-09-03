@@ -17,11 +17,11 @@ limitations under the License.
 /*
 This stand-alone package is utilized for dynamically generating/maintaining a list of
 conformance tests. It utilizes a two step approach:
- - The test binary is built
- - The test binary is run in dry mode with a custom ginkgo reporter dumping out
- types.SpecSummary objects which contain full test names and file/code information.
- - The SpecSummary information is parsed to get file/line info on Conformance tests and
- then we use a simplified AST parser to grab the comments above the test.
+  - The test binary is built
+  - The test binary is run in dry mode with a custom ginkgo reporter dumping out
+    types.SpecSummary objects which contain full test names and file/code information.
+  - The SpecSummary information is parsed to get file/line info on Conformance tests and
+    then we use a simplified AST parser to grab the comments above the test.
 
 Due to the complicated nature of how tests can be declared/wrapped in various contexts,
 this approach is much simpler to maintain than a pure-AST parser and allows us to easily

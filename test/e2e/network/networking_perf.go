@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -33,6 +33,7 @@ import (
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -56,7 +57,7 @@ const (
 	serverServiceName = "iperf2-server"
 )
 
-func iperf2ServerDeployment(client clientset.Interface, namespace string, isIPV6 bool) (*appsv1.Deployment, error) {
+func iperf2ServerDeployment(ctx context.Context, client clientset.Interface, namespace string, isIPV6 bool) (*appsv1.Deployment, error) {
 	framework.Logf("deploying iperf2 server")
 	one := int64(1)
 	replicas := int32(1)
@@ -82,20 +83,20 @@ func iperf2ServerDeployment(client clientset.Interface, namespace string, isIPV6
 		},
 	}
 
-	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+	deployment, err := client.AppsV1().Deployments(namespace).Create(ctx, deploymentSpec, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
+		return nil, fmt.Errorf("deployment %q Create API error: %w", deploymentSpec.Name, err)
 	}
 	framework.Logf("Waiting for deployment %q to complete", deploymentSpec.Name)
 	err = e2edeployment.WaitForDeploymentComplete(client, deployment)
 	if err != nil {
-		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)
+		return nil, fmt.Errorf("deployment %q failed to complete: %w", deploymentSpec.Name, err)
 	}
 
 	return deployment, nil
 }
 
-func iperf2ServerService(client clientset.Interface, namespace string) (*v1.Service, error) {
+func iperf2ServerService(ctx context.Context, client clientset.Interface, namespace string) (*v1.Service, error) {
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serverServiceName},
 		Spec: v1.ServiceSpec{
@@ -107,41 +108,42 @@ func iperf2ServerService(client clientset.Interface, namespace string) (*v1.Serv
 			},
 		},
 	}
-	return client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
+	return client.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
 }
 
-func iperf2ClientDaemonSet(client clientset.Interface, namespace string) (*appsv1.DaemonSet, error) {
+func iperf2ClientDaemonSet(ctx context.Context, client clientset.Interface, namespace string) (*appsv1.DaemonSet, error) {
 	one := int64(1)
 	labels := map[string]string{labelKey: clientLabelValue}
 	spec := e2edaemonset.NewDaemonSet("iperf2-clients", imageutils.GetE2EImage(imageutils.Agnhost), labels, nil, nil, nil)
 	spec.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 
-	ds, err := client.AppsV1().DaemonSets(namespace).Create(context.TODO(), spec, metav1.CreateOptions{})
+	ds, err := client.AppsV1().DaemonSets(namespace).Create(ctx, spec, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("daemonset %s Create API error: %v", spec.Name, err)
+		return nil, fmt.Errorf("daemonset %s Create API error: %w", spec.Name, err)
 	}
 	return ds, nil
 }
 
 // Test summary:
-//   This test uses iperf2 to obtain bandwidth data between nodes in the cluster, providing a coarse measure
-//   of the health of the cluster network.  The test runs two sets of pods:
-//     1. an iperf2 server on a single node
-//     2. a daemonset of iperf2 clients
-//   The test then iterates through the clients, one by one, running iperf2 from each of them to transfer
-//   data to the server and back for ten seconds, after which the results are collected and parsed.
-//   Thus, if your cluster has 10 nodes, then 10 test runs are performed.
-//     Note: a more complete test could run this scenario with a daemonset of servers as well; however, this
-//     would require n^2 tests, n^2 time, and n^2 network resources which quickly become prohibitively large
-//     as the cluster size increases.
-//   Finally, after collecting all data, the results are analyzed and tabulated.
+//
+//	This test uses iperf2 to obtain bandwidth data between nodes in the cluster, providing a coarse measure
+//	of the health of the cluster network.  The test runs two sets of pods:
+//	  1. an iperf2 server on a single node
+//	  2. a daemonset of iperf2 clients
+//	The test then iterates through the clients, one by one, running iperf2 from each of them to transfer
+//	data to the server and back for ten seconds, after which the results are collected and parsed.
+//	Thus, if your cluster has 10 nodes, then 10 test runs are performed.
+//	  Note: a more complete test could run this scenario with a daemonset of servers as well; however, this
+//	  would require n^2 tests, n^2 time, and n^2 network resources which quickly become prohibitively large
+//	  as the cluster size increases.
+//	Finally, after collecting all data, the results are analyzed and tabulated.
 var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
 	// this test runs iperf2: one pod as a server, and a daemonset of clients
 	f := framework.NewDefaultFramework("network-perf")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	ginkgo.It(fmt.Sprintf("should run iperf2"), func() {
-		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	ginkgo.It("should run iperf2", func(ctx context.Context) {
+		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 
 		familyStr := ""
@@ -154,22 +156,22 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 		}
 
 		// Step 1: set up iperf2 server -- a single pod on any node
-		_, err = iperf2ServerDeployment(f.ClientSet, f.Namespace.Name, framework.TestContext.ClusterIsIPv6())
+		_, err = iperf2ServerDeployment(ctx, f.ClientSet, f.Namespace.Name, framework.TestContext.ClusterIsIPv6())
 		framework.ExpectNoError(err, "deploy iperf2 server deployment")
 
-		_, err = iperf2ServerService(f.ClientSet, f.Namespace.Name)
+		_, err = iperf2ServerService(ctx, f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err, "deploy iperf2 server service")
 
 		// Step 2: set up iperf2 client daemonset
 		//   initially, the clients don't do anything -- they simply pause until they're called
-		_, err = iperf2ClientDaemonSet(f.ClientSet, f.Namespace.Name)
+		_, err = iperf2ClientDaemonSet(ctx, f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err, "deploy iperf2 client daemonset")
 
 		// Make sure the server is ready to go
 		framework.Logf("waiting for iperf2 server endpoints")
 		err = wait.Poll(2*time.Second, largeClusterTimeout, func() (done bool, err error) {
 			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serverServiceName)}
-			esList, err := f.ClientSet.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), listOptions)
+			esList, err := f.ClientSet.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, listOptions)
 			framework.ExpectNoError(err, "Error fetching EndpointSlice for Service %s/%s", f.Namespace.Name, serverServiceName)
 
 			if len(esList.Items) == 0 {
@@ -188,7 +190,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 		framework.Logf("waiting for client pods to be running")
 		var clientPodList *v1.PodList
 		err = wait.Poll(2*time.Second, largeClusterTimeout, func() (done bool, err error) {
-			clientPodList, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), clientPodsListOptions)
+			clientPodList, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, clientPodsListOptions)
 			if err != nil {
 				return false, err
 			}
@@ -206,7 +208,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 		framework.Logf("all client pods are ready: %d pods", len(clientPodList.Items))
 
 		// Get a reference to the server pod for later
-		serverPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), serverPodsListOptions)
+		serverPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, serverPodsListOptions)
 		framework.ExpectNoError(err)
 		if len(serverPodList.Items) != 1 {
 			framework.Failf("expected 1 server pod, found %d", len(serverPodList.Items))
@@ -233,7 +235,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 			podName := pod.Name
 			nodeName := pod.Spec.NodeName
 
-			iperfVersion := f.ExecShellInPod(podName, "iperf -v || true")
+			iperfVersion := e2epod.ExecShellInPod(ctx, f, podName, "iperf -v || true")
 			framework.Logf("iperf version: %s", iperfVersion)
 
 			for try := 0; ; try++ {
@@ -246,7 +248,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 				 */
 				command := fmt.Sprintf(`iperf %s -e -p %d --reportstyle C -i 1 -c %s && sleep 5`, familyStr, iperf2Port, serverServiceName)
 				framework.Logf("attempting to run command '%s' in client pod %s (node %s)", command, podName, nodeName)
-				output := f.ExecShellInPod(podName, command)
+				output := e2epod.ExecShellInPod(ctx, f, podName, command)
 				framework.Logf("output from exec on client pod %s (node %s): \n%s\n", podName, nodeName, output)
 
 				results, err := ParseIPerf2EnhancedResultsFromCSV(output)

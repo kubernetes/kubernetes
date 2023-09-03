@@ -430,6 +430,12 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - ""
+    resources:
+    - pods/status
+    verbs:
+    - patch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -744,15 +750,6 @@ items:
     verbs:
     - list
   - apiGroups:
-    - ""
-    resourceNames:
-    - 'http:heapster:'
-    - 'https:heapster:'
-    resources:
-    - services/proxy
-    verbs:
-    - get
-  - apiGroups:
     - metrics.k8s.io
     resources:
     - pods
@@ -899,6 +896,7 @@ items:
     resources:
     - pods/status
     verbs:
+    - patch
     - update
   - apiGroups:
     - ""
@@ -908,6 +906,15 @@ items:
     - delete
     - list
   - apiGroups:
+    - networking.k8s.io
+    resources:
+    - clustercidrs
+    verbs:
+    - create
+    - get
+    - list
+    - update
+  - apiGroups:
     - ""
     - events.k8s.io
     resources:
@@ -916,6 +923,12 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    verbs:
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1046,6 +1059,12 @@ items:
     verbs:
     - get
     - list
+  - apiGroups:
+    - ""
+    resources:
+    - pods/status
+    verbs:
+    - patch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1443,6 +1462,13 @@ items:
     verbs:
     - create
     - patch
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims
+    verbs:
+    - delete
     - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole

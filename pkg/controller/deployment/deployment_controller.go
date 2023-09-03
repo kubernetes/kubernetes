@@ -26,10 +26,8 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -46,7 +44,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -67,9 +65,11 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("Deployment")
 // in the system with actual running replica sets and pods.
 type DeploymentController struct {
 	// rsControl is used for adopting/releasing replica sets.
-	rsControl     controller.RSControlInterface
-	client        clientset.Interface
-	eventRecorder record.EventRecorder
+	rsControl controller.RSControlInterface
+	client    clientset.Interface
+
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
 
 	// To allow injection of syncDeployment for testing.
 	syncHandler func(ctx context.Context, dKey string) error
@@ -98,20 +98,14 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
+func NewDeploymentController(ctx context.Context, dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
-
-	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, err
-		}
-	}
+	logger := klog.FromContext(ctx)
 	dc := &DeploymentController{
-		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		client:           client,
+		eventBroadcaster: eventBroadcaster,
+		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 	dc.rsControl = controller.RealRSControl{
 		KubeClient: client,
@@ -119,18 +113,32 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 	}
 
 	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    dc.addDeployment,
-		UpdateFunc: dc.updateDeployment,
+		AddFunc: func(obj interface{}) {
+			dc.addDeployment(logger, obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			dc.updateDeployment(logger, oldObj, newObj)
+		},
 		// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
-		DeleteFunc: dc.deleteDeployment,
+		DeleteFunc: func(obj interface{}) {
+			dc.deleteDeployment(logger, obj)
+		},
 	})
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    dc.addReplicaSet,
-		UpdateFunc: dc.updateReplicaSet,
-		DeleteFunc: dc.deleteReplicaSet,
+		AddFunc: func(obj interface{}) {
+			dc.addReplicaSet(logger, obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			dc.updateReplicaSet(logger, oldObj, newObj)
+		},
+		DeleteFunc: func(obj interface{}) {
+			dc.deleteReplicaSet(logger, obj)
+		},
 	})
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		DeleteFunc: dc.deletePod,
+		DeleteFunc: func(obj interface{}) {
+			dc.deletePod(logger, obj)
+		},
 	})
 
 	dc.syncHandler = dc.syncDeployment
@@ -148,10 +156,17 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 // Run begins watching and syncing.
 func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
+
+	// Start events processing pipeline.
+	dc.eventBroadcaster.StartStructuredLogging(0)
+	dc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.client.CoreV1().Events("")})
+	defer dc.eventBroadcaster.Shutdown()
+
 	defer dc.queue.ShutDown()
 
-	klog.InfoS("Starting controller", "controller", "deployment")
-	defer klog.InfoS("Shutting down controller", "controller", "deployment")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting controller", "controller", "deployment")
+	defer logger.Info("Shutting down controller", "controller", "deployment")
 
 	if !cache.WaitForNamedCacheSync("deployment", ctx.Done(), dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
@@ -164,20 +179,20 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (dc *DeploymentController) addDeployment(obj interface{}) {
+func (dc *DeploymentController) addDeployment(logger klog.Logger, obj interface{}) {
 	d := obj.(*apps.Deployment)
-	klog.V(4).InfoS("Adding deployment", "deployment", klog.KObj(d))
+	logger.V(4).Info("Adding deployment", "deployment", klog.KObj(d))
 	dc.enqueueDeployment(d)
 }
 
-func (dc *DeploymentController) updateDeployment(old, cur interface{}) {
+func (dc *DeploymentController) updateDeployment(logger klog.Logger, old, cur interface{}) {
 	oldD := old.(*apps.Deployment)
 	curD := cur.(*apps.Deployment)
-	klog.V(4).InfoS("Updating deployment", "deployment", klog.KObj(oldD))
+	logger.V(4).Info("Updating deployment", "deployment", klog.KObj(oldD))
 	dc.enqueueDeployment(curD)
 }
 
-func (dc *DeploymentController) deleteDeployment(obj interface{}) {
+func (dc *DeploymentController) deleteDeployment(logger klog.Logger, obj interface{}) {
 	d, ok := obj.(*apps.Deployment)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
@@ -191,39 +206,38 @@ func (dc *DeploymentController) deleteDeployment(obj interface{}) {
 			return
 		}
 	}
-	klog.V(4).InfoS("Deleting deployment", "deployment", klog.KObj(d))
+	logger.V(4).Info("Deleting deployment", "deployment", klog.KObj(d))
 	dc.enqueueDeployment(d)
 }
 
 // addReplicaSet enqueues the deployment that manages a ReplicaSet when the ReplicaSet is created.
-func (dc *DeploymentController) addReplicaSet(obj interface{}) {
+func (dc *DeploymentController) addReplicaSet(logger klog.Logger, obj interface{}) {
 	rs := obj.(*apps.ReplicaSet)
 
 	if rs.DeletionTimestamp != nil {
 		// On a restart of the controller manager, it's possible for an object to
 		// show up in a state that is already pending deletion.
-		dc.deleteReplicaSet(rs)
+		dc.deleteReplicaSet(logger, rs)
 		return
 	}
-
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := metav1.GetControllerOf(rs); controllerRef != nil {
 		d := dc.resolveControllerRef(rs.Namespace, controllerRef)
 		if d == nil {
 			return
 		}
-		klog.V(4).InfoS("ReplicaSet added", "replicaSet", klog.KObj(rs))
+		logger.V(4).Info("ReplicaSet added", "replicaSet", klog.KObj(rs))
 		dc.enqueueDeployment(d)
 		return
 	}
 
 	// Otherwise, it's an orphan. Get a list of all matching Deployments and sync
 	// them to see if anyone wants to adopt it.
-	ds := dc.getDeploymentsForReplicaSet(rs)
+	ds := dc.getDeploymentsForReplicaSet(logger, rs)
 	if len(ds) == 0 {
 		return
 	}
-	klog.V(4).InfoS("Orphan ReplicaSet added", "replicaSet", klog.KObj(rs))
+	logger.V(4).Info("Orphan ReplicaSet added", "replicaSet", klog.KObj(rs))
 	for _, d := range ds {
 		dc.enqueueDeployment(d)
 	}
@@ -231,7 +245,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 
 // getDeploymentsForReplicaSet returns a list of Deployments that potentially
 // match a ReplicaSet.
-func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *apps.ReplicaSet) []*apps.Deployment {
+func (dc *DeploymentController) getDeploymentsForReplicaSet(logger klog.Logger, rs *apps.ReplicaSet) []*apps.Deployment {
 	deployments, err := util.GetDeploymentsForReplicaSet(dc.dLister, rs)
 	if err != nil || len(deployments) == 0 {
 		return nil
@@ -243,7 +257,7 @@ func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *apps.ReplicaSet)
 	if len(deployments) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		klog.V(4).InfoS("user error! more than one deployment is selecting replica set",
+		logger.V(4).Info("user error! more than one deployment is selecting replica set",
 			"replicaSet", klog.KObj(rs), "labels", rs.Labels, "deployment", klog.KObj(deployments[0]))
 	}
 	return deployments
@@ -253,7 +267,7 @@ func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *apps.ReplicaSet)
 // is updated and wake them up. If the anything of the ReplicaSets have changed, we need to
 // awaken both the old and new deployments. old and cur must be *apps.ReplicaSet
 // types.
-func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
+func (dc *DeploymentController) updateReplicaSet(logger klog.Logger, old, cur interface{}) {
 	curRS := cur.(*apps.ReplicaSet)
 	oldRS := old.(*apps.ReplicaSet)
 	if curRS.ResourceVersion == oldRS.ResourceVersion {
@@ -271,14 +285,13 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 			dc.enqueueDeployment(d)
 		}
 	}
-
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
 		d := dc.resolveControllerRef(curRS.Namespace, curControllerRef)
 		if d == nil {
 			return
 		}
-		klog.V(4).InfoS("ReplicaSet updated", "replicaSet", klog.KObj(curRS))
+		logger.V(4).Info("ReplicaSet updated", "replicaSet", klog.KObj(curRS))
 		dc.enqueueDeployment(d)
 		return
 	}
@@ -287,11 +300,11 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 	// to see if anyone wants to adopt it now.
 	labelChanged := !reflect.DeepEqual(curRS.Labels, oldRS.Labels)
 	if labelChanged || controllerRefChanged {
-		ds := dc.getDeploymentsForReplicaSet(curRS)
+		ds := dc.getDeploymentsForReplicaSet(logger, curRS)
 		if len(ds) == 0 {
 			return
 		}
-		klog.V(4).InfoS("Orphan ReplicaSet updated", "replicaSet", klog.KObj(curRS))
+		logger.V(4).Info("Orphan ReplicaSet updated", "replicaSet", klog.KObj(curRS))
 		for _, d := range ds {
 			dc.enqueueDeployment(d)
 		}
@@ -301,7 +314,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 // deleteReplicaSet enqueues the deployment that manages a ReplicaSet when
 // the ReplicaSet is deleted. obj could be an *apps.ReplicaSet, or
 // a DeletionFinalStateUnknown marker item.
-func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
+func (dc *DeploymentController) deleteReplicaSet(logger klog.Logger, obj interface{}) {
 	rs, ok := obj.(*apps.ReplicaSet)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
@@ -330,12 +343,12 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 	if d == nil {
 		return
 	}
-	klog.V(4).InfoS("ReplicaSet deleted", "replicaSet", klog.KObj(rs))
+	logger.V(4).Info("ReplicaSet deleted", "replicaSet", klog.KObj(rs))
 	dc.enqueueDeployment(d)
 }
 
 // deletePod will enqueue a Recreate Deployment once all of its pods have stopped running.
-func (dc *DeploymentController) deletePod(obj interface{}) {
+func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
@@ -354,8 +367,12 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 			return
 		}
 	}
-	klog.V(4).InfoS("Pod deleted", "pod", klog.KObj(pod))
-	if d := dc.getDeploymentForPod(pod); d != nil && d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
+	d := dc.getDeploymentForPod(logger, pod)
+	if d == nil {
+		return
+	}
+	logger.V(4).Info("Pod deleted", "pod", klog.KObj(pod))
+	if d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
 		// Sync if this Deployment now has no more Pods.
 		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client.AppsV1()))
 		if err != nil {
@@ -407,7 +424,7 @@ func (dc *DeploymentController) enqueueAfter(deployment *apps.Deployment, after 
 }
 
 // getDeploymentForPod returns the deployment managing the given Pod.
-func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *apps.Deployment {
+func (dc *DeploymentController) getDeploymentForPod(logger klog.Logger, pod *v1.Pod) *apps.Deployment {
 	// Find the owning replica set
 	var rs *apps.ReplicaSet
 	var err error
@@ -422,7 +439,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *apps.Deploymen
 	}
 	rs, err = dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
 	if err != nil || rs.UID != controllerRef.UID {
-		klog.V(4).InfoS("Cannot get replicaset for pod", "ownerReference", controllerRef.Name, "pod", klog.KObj(pod), "err", err)
+		logger.V(4).Info("Cannot get replicaset for pod", "ownerReference", controllerRef.Name, "pod", klog.KObj(pod), "err", err)
 		return nil
 	}
 
@@ -470,30 +487,30 @@ func (dc *DeploymentController) processNextWorkItem(ctx context.Context) bool {
 	defer dc.queue.Done(key)
 
 	err := dc.syncHandler(ctx, key.(string))
-	dc.handleErr(err, key)
+	dc.handleErr(ctx, err, key)
 
 	return true
 }
 
-func (dc *DeploymentController) handleErr(err error, key interface{}) {
+func (dc *DeploymentController) handleErr(ctx context.Context, err error, key interface{}) {
+	logger := klog.FromContext(ctx)
 	if err == nil || errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 		dc.queue.Forget(key)
 		return
 	}
-
 	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
 	if keyErr != nil {
-		klog.ErrorS(err, "Failed to split meta namespace cache key", "cacheKey", key)
+		logger.Error(err, "Failed to split meta namespace cache key", "cacheKey", key)
 	}
 
 	if dc.queue.NumRequeues(key) < maxRetries {
-		klog.V(2).InfoS("Error syncing deployment", "deployment", klog.KRef(ns, name), "err", err)
+		logger.V(2).Info("Error syncing deployment", "deployment", klog.KRef(ns, name), "err", err)
 		dc.queue.AddRateLimited(key)
 		return
 	}
 
 	utilruntime.HandleError(err)
-	klog.V(2).InfoS("Dropping deployment out of the queue", "deployment", klog.KRef(ns, name), "err", err)
+	logger.V(2).Info("Dropping deployment out of the queue", "deployment", klog.KRef(ns, name), "err", err)
 	dc.queue.Forget(key)
 }
 
@@ -566,21 +583,22 @@ func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsLis
 // syncDeployment will sync the deployment with the given key.
 // This function is not meant to be invoked concurrently with the same key.
 func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) error {
+	logger := klog.FromContext(ctx)
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		klog.ErrorS(err, "Failed to split meta namespace cache key", "cacheKey", key)
+		logger.Error(err, "Failed to split meta namespace cache key", "cacheKey", key)
 		return err
 	}
 
 	startTime := time.Now()
-	klog.V(4).InfoS("Started syncing deployment", "deployment", klog.KRef(namespace, name), "startTime", startTime)
+	logger.V(4).Info("Started syncing deployment", "deployment", klog.KRef(namespace, name), "startTime", startTime)
 	defer func() {
-		klog.V(4).InfoS("Finished syncing deployment", "deployment", klog.KRef(namespace, name), "duration", time.Since(startTime))
+		logger.V(4).Info("Finished syncing deployment", "deployment", klog.KRef(namespace, name), "duration", time.Since(startTime))
 	}()
 
 	deployment, err := dc.dLister.Deployments(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		klog.V(2).InfoS("Deployment has been deleted", "deployment", klog.KRef(namespace, name))
+		logger.V(2).Info("Deployment has been deleted", "deployment", klog.KRef(namespace, name))
 		return nil
 	}
 	if err != nil {

@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -123,58 +122,6 @@ func ParseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
 		}
 	}
 	return taints, taintsToRemove, nil
-}
-
-// ReorganizeTaints returns the updated set of taints, taking into account old taints that were not updated,
-// old taints that were updated, old taints that were deleted, and new taints.
-func ReorganizeTaints(node *v1.Node, overwrite bool, taintsToAdd []v1.Taint, taintsToRemove []v1.Taint) (string, []v1.Taint, error) {
-	newTaints := append([]v1.Taint{}, taintsToAdd...)
-	oldTaints := node.Spec.Taints
-	// add taints that already existing but not updated to newTaints
-	added := addTaints(oldTaints, &newTaints)
-	allErrs, deleted := deleteTaints(taintsToRemove, &newTaints)
-	if (added && deleted) || overwrite {
-		return MODIFIED, newTaints, utilerrors.NewAggregate(allErrs)
-	} else if added {
-		return TAINTED, newTaints, utilerrors.NewAggregate(allErrs)
-	}
-	return UNTAINTED, newTaints, utilerrors.NewAggregate(allErrs)
-}
-
-// deleteTaints deletes the given taints from the node's taintlist.
-func deleteTaints(taintsToRemove []v1.Taint, newTaints *[]v1.Taint) ([]error, bool) {
-	allErrs := []error{}
-	var removed bool
-	for _, taintToRemove := range taintsToRemove {
-		removed = false // nolint:ineffassign
-		if len(taintToRemove.Effect) > 0 {
-			*newTaints, removed = DeleteTaint(*newTaints, &taintToRemove)
-		} else {
-			*newTaints, removed = DeleteTaintsByKey(*newTaints, taintToRemove.Key)
-		}
-		if !removed {
-			allErrs = append(allErrs, fmt.Errorf("taint %q not found", taintToRemove.ToString()))
-		}
-	}
-	return allErrs, removed
-}
-
-// addTaints adds the newTaints list to existing ones and updates the newTaints List.
-// TODO: This needs a rewrite to take only the new values instead of appended newTaints list to be consistent.
-func addTaints(oldTaints []v1.Taint, newTaints *[]v1.Taint) bool {
-	for _, oldTaint := range oldTaints {
-		existsInNew := false
-		for _, taint := range *newTaints {
-			if taint.MatchTaint(&oldTaint) {
-				existsInNew = true
-				break
-			}
-		}
-		if !existsInNew {
-			*newTaints = append(*newTaints, oldTaint)
-		}
-	}
-	return len(oldTaints) != len(*newTaints)
 }
 
 // CheckIfTaintsAlreadyExists checks if the node already has taints that we want to add and returns a string with taint keys.
@@ -285,16 +232,21 @@ func TaintKeyExists(taints []v1.Taint, taintKeyToMatch string) bool {
 	return false
 }
 
-func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
-	for _, taint := range t1 {
-		if !TaintExists(t2, &taint) {
+// TaintSetDiff finds the difference between two taint slices and
+// returns all new and removed elements of the new slice relative to the old slice.
+// for example:
+// input: taintsNew=[a b] taintsOld=[a c]
+// output: taintsToAdd=[b] taintsToRemove=[c]
+func TaintSetDiff(taintsNew, taintsOld []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
+	for _, taint := range taintsNew {
+		if !TaintExists(taintsOld, &taint) {
 			t := taint
 			taintsToAdd = append(taintsToAdd, &t)
 		}
 	}
 
-	for _, taint := range t2 {
-		if !TaintExists(t1, &taint) {
+	for _, taint := range taintsOld {
+		if !TaintExists(taintsNew, &taint) {
 			t := taint
 			taintsToRemove = append(taintsToRemove, &t)
 		}
@@ -303,6 +255,7 @@ func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []
 	return
 }
 
+// TaintSetFilter filters from the taint slice according to the passed fn function to get the filtered taint slice.
 func TaintSetFilter(taints []v1.Taint, fn func(*v1.Taint) bool) []v1.Taint {
 	res := []v1.Taint{}
 

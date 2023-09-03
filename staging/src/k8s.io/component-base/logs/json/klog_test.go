@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
+package json
 
 import (
 	"bytes"
@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap/zapcore"
 
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -152,10 +153,10 @@ func TestKlogIntegration(t *testing.T) {
 			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"some","v":0,"pod":{"name":"pod-1","namespace":"kube-system"}}`,
 		},
 		{
-			name: "KObjs",
+			name: "KObjSlice",
 			fun: func() {
 				klog.InfoS("several", "pods",
-					klog.KObjs([]interface{}{
+					klog.KObjSlice([]interface{}{
 						&kmeta{Name: "pod-1", Namespace: "kube-system"},
 						&kmeta{Name: "pod-2", Namespace: "kube-system"},
 					}))
@@ -239,7 +240,9 @@ func TestKlogIntegration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var buffer bytes.Buffer
 			writer := zapcore.AddSync(&buffer)
-			logger, _ := NewJSONLogger(100, writer, nil, nil)
+			// This level is high enough to enable all log messages from this test.
+			verbosityLevel := logsapi.VerbosityLevel(100)
+			logger, _ := NewJSONLogger(verbosityLevel, writer, nil, nil)
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
 

@@ -45,7 +45,7 @@ import (
 // and their field paths and types are exactly the same, then ExtractInto can be
 // called with the root resource as the object and the subresource as the
 // applyConfiguration. This works for "status", obviously, because status is
-// represented by the exact same object as the root resource. This this does NOT
+// represented by the exact same object as the root resource. This does NOT
 // work, for example, with the "scale" subresources of Deployment, ReplicaSet and
 // StatefulSet. While the spec.replicas, status.replicas fields are in the same
 // exact field path locations as they are in autoscaling.Scale, the selector

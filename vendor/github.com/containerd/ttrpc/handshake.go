@@ -45,6 +45,6 @@ func (fn handshakerFunc) Handshake(ctx context.Context, conn net.Conn) (net.Conn
 	return fn(ctx, conn)
 }
 
-func noopHandshake(ctx context.Context, conn net.Conn) (net.Conn, interface{}, error) {
+func noopHandshake(_ context.Context, conn net.Conn) (net.Conn, interface{}, error) {
 	return conn, nil, nil
 }

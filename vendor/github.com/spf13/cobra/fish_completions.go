@@ -1,3 +1,17 @@
+// Copyright 2013-2023 The Cobra Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cobra
 
 import (
@@ -11,8 +25,8 @@ import (
 func genFishComp(buf io.StringWriter, name string, includeDesc bool) {
 	// Variables should not contain a '-' or ':' character
 	nameForVar := name
-	nameForVar = strings.Replace(nameForVar, "-", "_", -1)
-	nameForVar = strings.Replace(nameForVar, ":", "_", -1)
+	nameForVar = strings.ReplaceAll(nameForVar, "-", "_")
+	nameForVar = strings.ReplaceAll(nameForVar, ":", "_")
 
 	compCmd := ShellCompRequestCmd
 	if !includeDesc {
@@ -38,7 +52,8 @@ function __%[1]s_perform_completion
     __%[1]s_debug "args: $args"
     __%[1]s_debug "last arg: $lastArg"
 
-    set -l requestComp "$args[1] %[3]s $args[2..-1] $lastArg"
+    # Disable ActiveHelp which is not supported for fish shell
+    set -l requestComp "%[10]s=0 $args[1] %[3]s $args[2..-1] $lastArg"
 
     __%[1]s_debug "Calling $requestComp"
     set -l results (eval $requestComp 2> /dev/null)
@@ -74,6 +89,60 @@ function __%[1]s_perform_completion
     printf "%%s\n" "$directiveLine"
 end
 
+# this function limits calls to __%[1]s_perform_completion, by caching the result behind $__%[1]s_perform_completion_once_result
+function __%[1]s_perform_completion_once
+    __%[1]s_debug "Starting __%[1]s_perform_completion_once"
+
+    if test -n "$__%[1]s_perform_completion_once_result"
+        __%[1]s_debug "Seems like a valid result already exists, skipping __%[1]s_perform_completion"
+        return 0
+    end
+
+    set --global __%[1]s_perform_completion_once_result (__%[1]s_perform_completion)
+    if test -z "$__%[1]s_perform_completion_once_result"
+        __%[1]s_debug "No completions, probably due to a failure"
+        return 1
+    end
+
+    __%[1]s_debug "Performed completions and set __%[1]s_perform_completion_once_result"
+    return 0
+end
+
+# this function is used to clear the $__%[1]s_perform_completion_once_result variable after completions are run
+function __%[1]s_clear_perform_completion_once_result
+    __%[1]s_debug ""
+    __%[1]s_debug "========= clearing previously set __%[1]s_perform_completion_once_result variable =========="
+    set --erase __%[1]s_perform_completion_once_result
+    __%[1]s_debug "Succesfully erased the variable __%[1]s_perform_completion_once_result"
+end
+
+function __%[1]s_requires_order_preservation
+    __%[1]s_debug ""
+    __%[1]s_debug "========= checking if order preservation is required =========="
+
+    __%[1]s_perform_completion_once
+    if test -z "$__%[1]s_perform_completion_once_result"
+        __%[1]s_debug "Error determining if order preservation is required"
+        return 1
+    end
+
+    set -l directive (string sub --start 2 $__%[1]s_perform_completion_once_result[-1])
+    __%[1]s_debug "Directive is: $directive"
+
+    set -l shellCompDirectiveKeepOrder %[9]d
+    set -l keeporder (math (math --scale 0 $directive / $shellCompDirectiveKeepOrder) %% 2)
+    __%[1]s_debug "Keeporder is: $keeporder"
+
+    if test $keeporder -ne 0
+        __%[1]s_debug "This does require order preservation"
+        return 0
+    end
+
+    __%[1]s_debug "This doesn't require order preservation"
+    return 1
+end
+
+
 # This function does two things:
 # - Obtain the completions and store them in the global __%[1]s_comp_results
 # - Return false if file completion should be performed
@@ -84,17 +153,17 @@ function __%[1]s_prepare_completions
     # Start fresh
     set --erase __%[1]s_comp_results
 
-    set -l results (__%[1]s_perform_completion)
-    __%[1]s_debug "Completion results: $results"
+    __%[1]s_perform_completion_once
+    __%[1]s_debug "Completion results: $__%[1]s_perform_completion_once_result"
 
-    if test -z "$results"
+    if test -z "$__%[1]s_perform_completion_once_result"
         __%[1]s_debug "No completion, probably due to a failure"
         # Might as well do file completion, in case it helps
         return 1
     end
 
-    set -l directive (string sub --start 2 $results[-1])
-    set --global __%[1]s_comp_results $results[1..-2]
+    set -l directive (string sub --start 2 $__%[1]s_perform_completion_once_result[-1])
+    set --global __%[1]s_comp_results $__%[1]s_perform_completion_once_result[1..-2]
 
     __%[1]s_debug "Completions are: $__%[1]s_comp_results"
     __%[1]s_debug "Directive is: $directive"
@@ -190,13 +259,17 @@ end
 # Remove any pre-existing completions for the program since we will be handling all of them.
 complete -c %[2]s -e
 
+# this will get called after the two calls below and clear the $__%[1]s_perform_completion_once_result global
+complete -c %[2]s -n '__%[1]s_clear_perform_completion_once_result'
 # The call to __%[1]s_prepare_completions will setup __%[1]s_comp_results
 # which provides the program's completion choices.
-complete -c %[2]s -n '__%[1]s_prepare_completions' -f -a '$__%[1]s_comp_results'
-
+# If this doesn't require order preservation, we don't use the -k flag
+complete -c %[2]s -n 'not __%[1]s_requires_order_preservation && __%[1]s_prepare_completions' -f -a '$__%[1]s_comp_results'
+# otherwise we use the -k flag
+complete -k -c %[2]s -n '__%[1]s_requires_order_preservation && __%[1]s_prepare_completions' -f -a '$__%[1]s_comp_results'
 `, nameForVar, name, compCmd,
 		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
-		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs))
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, ShellCompDirectiveKeepOrder, activeHelpEnvVar(name)))
 }
 
 // GenFishCompletion generates fish completion file and writes to the passed writer.
