@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/distribution/reference"
+	"github.com/distribution/reference"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
