@@ -19,6 +19,7 @@ package cronjob
 import (
 	"context"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/pointer"
+
+	"fmt"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
@@ -1237,7 +1241,8 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 					return tc.now
 				},
 			}
-			cjCopy, requeueAfter, updateStatus, err := jm.syncCronJob(context.TODO(), &cj, js)
+			cjCopy := cj.DeepCopy()
+			requeueAfter, updateStatus, err := jm.syncCronJob(context.TODO(), cjCopy, js)
 			if tc.expectErr && err == nil {
 				t.Errorf("%s: expected error got none with requeueAfter time: %#v", name, requeueAfter)
 			}
@@ -1666,6 +1671,123 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 			}
 			if !reflect.DeepEqual(actual, tt.expected) {
 				t.Errorf("\nExpected %#v,\nbut got %#v", tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestControllerV2CleanupFinishedJobs(t *testing.T) {
+	tests := []struct {
+		name                string
+		now                 time.Time
+		cronJob             *batchv1.CronJob
+		finishedJobs        []*batchv1.Job
+		jobCreateError      error
+		expectedDeletedJobs []string
+	}{
+		{
+			name: "jobs are still deleted when a cronjob can't create jobs due to jobs quota being reached (avoiding a deadlock)",
+			now:  *justAfterTheHour(),
+			cronJob: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"},
+				Spec: batchv1.CronJobSpec{
+					Schedule:                   onTheHour,
+					SuccessfulJobsHistoryLimit: pointer.Int32(1),
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"key": "value"}},
+					},
+				},
+				Status: batchv1.CronJobStatus{LastScheduleTime: &metav1.Time{Time: justAfterThePriorHour()}},
+			},
+			finishedJobs: []*batchv1.Job{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "foo-ns",
+						Name:            "finished-job-started-hour-ago",
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+					},
+					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeThePriorHour()}},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "foo-ns",
+						Name:            "finished-job-started-minute-ago",
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+					},
+					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeTheHour()}},
+				},
+			},
+			jobCreateError:      errors.NewInternalError(fmt.Errorf("quota for # of jobs reached")),
+			expectedDeletedJobs: []string{"finished-job-started-hour-ago"},
+		},
+		{
+			name: "jobs are not deleted if history limit not reached",
+			now:  justBeforeTheHour(),
+			cronJob: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"},
+				Spec: batchv1.CronJobSpec{
+					Schedule:                   onTheHour,
+					SuccessfulJobsHistoryLimit: pointer.Int32(2),
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"key": "value"}},
+					},
+				},
+				Status: batchv1.CronJobStatus{LastScheduleTime: &metav1.Time{Time: justAfterThePriorHour()}},
+			},
+			finishedJobs: []*batchv1.Job{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "foo-ns",
+						Name:            "finished-job-started-hour-ago",
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+					},
+					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeThePriorHour()}},
+				},
+			},
+			jobCreateError:      nil,
+			expectedDeletedJobs: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			for _, job := range tt.finishedJobs {
+				job.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete, Status: v1.ConditionTrue}}
+			}
+
+			client := fake.NewSimpleClientset()
+
+			informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+			_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(tt.cronJob)
+			for _, job := range tt.finishedJobs {
+				_ = informerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			}
+
+			jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			jobControl := &fakeJobControl{CreateErr: tt.jobCreateError}
+			jm.jobControl = jobControl
+			jm.now = func() time.Time {
+				return tt.now
+			}
+
+			jm.enqueueController(tt.cronJob)
+			jm.processNextWorkItem(ctx)
+
+			if len(tt.expectedDeletedJobs) != len(jobControl.DeleteJobName) {
+				t.Fatalf("expected '%v' jobs to be deleted, instead deleted '%s'", tt.expectedDeletedJobs, jobControl.DeleteJobName)
+			}
+			sort.Strings(jobControl.DeleteJobName)
+			sort.Strings(tt.expectedDeletedJobs)
+			for i, deletedJob := range jobControl.DeleteJobName {
+				if deletedJob != tt.expectedDeletedJobs[i] {
+					t.Fatalf("expected '%v' jobs to be deleted, instead deleted '%s'", tt.expectedDeletedJobs, jobControl.DeleteJobName)
+				}
 			}
 		})
 	}
