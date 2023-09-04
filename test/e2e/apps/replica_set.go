@@ -251,7 +251,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 		podQuota := quota.Status.Hard[v1.ResourcePods]
 		return (&podQuota).Cmp(quantity) == 0, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("resource quota %q never synced", name)
 	}
 	framework.ExpectNoError(err)
@@ -279,7 +279,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 		return cond != nil, nil
 
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("rs controller never added the failure condition for replica set %q: %#v", name, conditions)
 	}
 	framework.ExpectNoError(err)
@@ -308,7 +308,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
 		return cond == nil, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("rs controller never removed the failure condition for rs %q: %#v", name, conditions)
 	}
 	framework.ExpectNoError(err)
