@@ -178,7 +178,7 @@ var _ = SIGDescribe("Secrets", func() {
 			LabelSelector: "testsecret-constant=true",
 		})
 		framework.ExpectNoError(err, "failed to list secrets")
-		framework.ExpectNotEqual(len(secretsList.Items), 0, "no secrets found")
+		gomega.Expect(secretsList.Items).ToNot(gomega.BeEmpty(), "no secrets found")
 
 		foundCreatedSecret := false
 		var secretCreatedName string
