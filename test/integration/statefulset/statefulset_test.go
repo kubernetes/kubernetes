@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -168,7 +169,7 @@ func TestSpecReplicasChange(t *testing.T) {
 	}
 }
 
-func TestDeletingAndFailedPods(t *testing.T) {
+func TestDeletingAndTerminatingPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	closeFn, rm, informers, c := scSetup(ctx, t)
 	defer closeFn()
@@ -177,17 +178,19 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	cancel := runControllerAndInformers(rm, informers)
 	defer cancel()
 
+	podCount := 3
+
 	labelMap := labelMap()
-	sts := newSTS("sts", ns.Name, 2)
+	sts := newSTS("sts", ns.Name, podCount)
 	stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
 	sts = stss[0]
 	waitSTSStable(t, c, sts)
 
-	// Verify STS creates 2 pods
+	// Verify STS creates 3 pods
 	podClient := c.CoreV1().Pods(ns.Name)
 	pods := getPods(t, podClient, labelMap)
-	if len(pods.Items) != 2 {
-		t.Fatalf("len(pods) = %d, want 2", len(pods.Items))
+	if len(pods.Items) != podCount {
+		t.Fatalf("len(pods) = %d, want %d", len(pods.Items), podCount)
 	}
 
 	// Set first pod as deleting pod
@@ -206,23 +209,48 @@ func TestDeletingAndFailedPods(t *testing.T) {
 		pod.Status.Phase = v1.PodFailed
 	})
 
+	// Set third pod as succeeded pod
+	succeededPod := &pods.Items[2]
+	updatePodStatus(t, podClient, succeededPod.Name, func(pod *v1.Pod) {
+		pod.Status.Phase = v1.PodSucceeded
+	})
+
+	exists := func(pods []v1.Pod, uid types.UID) bool {
+		for _, pod := range pods {
+			if pod.UID == uid {
+				return true
+			}
+		}
+		return false
+	}
+
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		// Verify only 2 pods exist: deleting pod and new pod replacing failed pod
+		// Verify only 3 pods exist: deleting pod and new pod replacing failed pod
 		pods = getPods(t, podClient, labelMap)
-		if len(pods.Items) != 2 {
+		if len(pods.Items) != podCount {
 			return false, nil
 		}
+
 		// Verify deleting pod still exists
 		// Immediately return false with an error if it does not exist
-		if pods.Items[0].UID != deletingPod.UID && pods.Items[1].UID != deletingPod.UID {
+		if !exists(pods.Items, deletingPod.UID) {
 			return false, fmt.Errorf("expected deleting pod %s still exists, but it is not found", deletingPod.Name)
 		}
 		// Verify failed pod does not exist anymore
-		if pods.Items[0].UID == failedPod.UID || pods.Items[1].UID == failedPod.UID {
+		if exists(pods.Items, failedPod.UID) {
 			return false, nil
 		}
-		// Verify both pods have non-failed status
-		return pods.Items[0].Status.Phase != v1.PodFailed && pods.Items[1].Status.Phase != v1.PodFailed, nil
+		// Verify succeeded pod does not exist anymore
+		if exists(pods.Items, succeededPod.UID) {
+			return false, nil
+		}
+		// Verify all pods have non-terminated status
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
+				return false, nil
+			}
+		}
+		return true, nil
 	}); err != nil {
 		t.Fatalf("failed to verify failed pod %s has been replaced with a new non-failed pod, and deleting pod %s survives: %v", failedPod.Name, deletingPod.Name, err)
 	}
@@ -235,11 +263,11 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		// Verify only 2 pods exist: new non-deleting pod replacing deleting pod and the non-failed pod
 		pods = getPods(t, podClient, labelMap)
-		if len(pods.Items) != 2 {
+		if len(pods.Items) != podCount {
 			return false, nil
 		}
 		// Verify deleting pod does not exist anymore
-		return pods.Items[0].UID != deletingPod.UID && pods.Items[1].UID != deletingPod.UID, nil
+		return !exists(pods.Items, deletingPod.UID), nil
 	}); err != nil {
 		t.Fatalf("failed to verify deleting pod %s has been replaced with a new non-deleting pod: %v", deletingPod.Name, err)
 	}
