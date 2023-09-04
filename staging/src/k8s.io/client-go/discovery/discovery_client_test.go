@@ -2763,54 +2763,76 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 }
 
 func TestDiscoveryContentTypeVersion(t *testing.T) {
+	v2beta1 := schema.GroupVersionKind{Group: "apidiscovery.k8s.io", Version: "v2beta1", Kind: "APIGroupDiscoveryList"}
 	tests := []struct {
 		contentType string
-		isV2Beta1   bool
+		gvk         schema.GroupVersionKind
+		match       bool
+		expectErr   bool
 	}{
 		{
 			contentType: "application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList",
-			isV2Beta1:   true,
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
 		},
 		{
 			// content-type parameters are not in correct order, but comparison ignores order.
 			contentType: "application/json; v=v2beta1;as=APIGroupDiscoveryList;g=apidiscovery.k8s.io",
-			isV2Beta1:   true,
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
 		},
 		{
 			// content-type parameters are not in correct order, but comparison ignores order.
 			contentType: "application/json; as=APIGroupDiscoveryList;g=apidiscovery.k8s.io;v=v2beta1",
-			isV2Beta1:   true,
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
 		},
 		{
 			// Ignores extra parameter "charset=utf-8"
 			contentType: "application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList;charset=utf-8",
-			isV2Beta1:   true,
+			gvk:         v2beta1,
+			match:       true,
+			expectErr:   false,
 		},
 		{
 			contentType: "application/json",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
 		},
 		{
 			contentType: "application/json; charset=UTF-8",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
 		},
 		{
 			contentType: "text/json",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
 		},
 		{
 			contentType: "text/html",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   false,
 		},
 		{
 			contentType: "",
-			isV2Beta1:   false,
+			gvk:         v2beta1,
+			match:       false,
+			expectErr:   true,
 		},
 	}
 
 	for _, test := range tests {
-		isV2Beta1 := isV2Beta1ContentType(test.contentType)
-		assert.Equal(t, test.isV2Beta1, isV2Beta1)
+		match, err := ContentTypeIsGVK(test.contentType, test.gvk)
+		assert.Equal(t, test.expectErr, err != nil)
+		assert.Equal(t, test.match, match)
 	}
 }
 
