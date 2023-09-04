@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
@@ -1138,6 +1139,251 @@ metadata:
 	}
 }
 
+func TestCreateDNSService(t *testing.T) {
+	coreDNSServiceBytes, _ := kubeadmutil.ParseTemplate(CoreDNSService, struct{ DNSIP string }{
+		DNSIP: "10.233.0.3",
+	})
+	type args struct {
+		dnsService   *v1.Service
+		serviceBytes []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "dnsService and serviceBytes are nil",
+			args: args{
+				dnsService:   nil,
+				serviceBytes: nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid dns",
+			args: args{
+				dnsService:   nil,
+				serviceBytes: coreDNSServiceBytes,
+			},
+			wantErr: true,
+		},
+		{
+			name: "serviceBytes is not valid",
+			args: args{
+				dnsService: &v1.Service{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Service",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{Name: "coredns",
+						Labels: map[string]string{"k8s-app": "kube-dns",
+							"kubernetes.io/name": "coredns"},
+						Namespace: "kube-system",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Name:     "dns",
+								Port:     53,
+								Protocol: v1.ProtocolUDP,
+								TargetPort: intstr.IntOrString{
+									Type:   0,
+									IntVal: 53,
+								},
+							},
+							{
+								Name:     "dns-tcp",
+								Port:     53,
+								Protocol: v1.ProtocolTCP,
+								TargetPort: intstr.IntOrString{
+									Type:   0,
+									IntVal: 53,
+								},
+							},
+						},
+						Selector: map[string]string{
+							"k8s-app": "kube-dns",
+						},
+					},
+				},
+				serviceBytes: []byte{
+					'f', 'o', 'o',
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "dnsService is valid and serviceBytes is nil",
+			args: args{
+				dnsService: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{Name: "coredns",
+						Labels: map[string]string{"k8s-app": "kube-dns",
+							"kubernetes.io/name": "coredns"},
+						Namespace: "kube-system",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Name:     "dns",
+								Port:     53,
+								Protocol: v1.ProtocolUDP,
+								TargetPort: intstr.IntOrString{
+									Type:   0,
+									IntVal: 53,
+								},
+							},
+							{
+								Name:     "dns-tcp",
+								Port:     53,
+								Protocol: v1.ProtocolTCP,
+								TargetPort: intstr.IntOrString{
+									Type:   0,
+									IntVal: 53,
+								},
+							},
+						},
+						Selector: map[string]string{
+							"k8s-app": "kube-dns",
+						},
+					},
+				},
+				serviceBytes: nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "dnsService and serviceBytes are not nil and valid",
+			args: args{
+				dnsService: &v1.Service{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Service",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{Name: "coredns",
+						Labels: map[string]string{"k8s-app": "kube-dns",
+							"kubernetes.io/name": "coredns"},
+						Namespace: "kube-system",
+					},
+					Spec: v1.ServiceSpec{
+						ClusterIP: "10.233.0.3",
+						Ports: []v1.ServicePort{
+							{
+								Name:     "dns",
+								Port:     53,
+								Protocol: v1.ProtocolUDP,
+								TargetPort: intstr.IntOrString{
+									Type:   0,
+									IntVal: 53,
+								},
+							},
+						},
+						Selector: map[string]string{
+							"k8s-app": "kube-dns",
+						},
+					},
+				},
+				serviceBytes: coreDNSServiceBytes,
+			},
+			wantErr: false,
+		},
+		{
+			name: "the namespace of dnsService is not kube-system",
+			args: args{
+				dnsService: &v1.Service{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Service",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{Name: "coredns",
+						Labels: map[string]string{"k8s-app": "kube-dns",
+							"kubernetes.io/name": "coredns"},
+						Namespace: "kube-system-test",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Name:     "dns",
+								Port:     53,
+								Protocol: v1.ProtocolUDP,
+								TargetPort: intstr.IntOrString{
+									Type:   0,
+									IntVal: 53,
+								},
+							},
+							{
+								Name:     "dns-tcp",
+								Port:     53,
+								Protocol: v1.ProtocolTCP,
+								TargetPort: intstr.IntOrString{
+									Type:   0,
+									IntVal: 53,
+								},
+							},
+						},
+						Selector: map[string]string{
+							"k8s-app": "kube-dns",
+						},
+					},
+				},
+				serviceBytes: nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "the name of dnsService is not coredns",
+			args: args{
+				dnsService: &v1.Service{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Service",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{Name: "coredns-test",
+						Labels: map[string]string{"k8s-app": "kube-dns",
+							"kubernetes.io/name": "coredns"},
+						Namespace: "kube-system",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{
+							{
+								Name:     "dns",
+								Port:     53,
+								Protocol: v1.ProtocolUDP,
+								TargetPort: intstr.IntOrString{
+									Type:   0,
+									IntVal: 53,
+								},
+							},
+							{
+								Name:     "dns-tcp",
+								Port:     53,
+								Protocol: v1.ProtocolTCP,
+								TargetPort: intstr.IntOrString{
+									Type:   0,
+									IntVal: 53,
+								},
+							},
+						},
+						Selector: map[string]string{
+							"k8s-app": "kube-dns",
+						},
+					},
+				},
+				serviceBytes: nil,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newMockClientForTest(t, 1, 1)
+			if err := createDNSService(tt.args.dnsService, tt.args.serviceBytes, client); (err != nil) != tt.wantErr {
+				t.Errorf("createDNSService() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // replicas is replica of each DNS deployment
 // deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
 func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int) *clientsetfake.Clientset {
@@ -1163,6 +1409,37 @@ func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int) *cli
 		if err != nil {
 			t.Fatalf("error creating deployment: %v", err)
 		}
+	}
+	_, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(context.TODO(), &v1.Service{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Service",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{Name: "coredns",
+			Labels: map[string]string{"k8s-app": "kube-dns",
+				"kubernetes.io/name": "coredns"},
+			Namespace: "kube-system",
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIP: "10.233.0.3",
+			Ports: []v1.ServicePort{
+				{
+					Name:     "dns",
+					Port:     53,
+					Protocol: v1.ProtocolUDP,
+					TargetPort: intstr.IntOrString{
+						Type:   0,
+						IntVal: 53,
+					},
+				},
+			},
+			Selector: map[string]string{
+				"k8s-app": "kube-dns",
+			},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("error creating service: %v", err)
 	}
 	return client
 }
