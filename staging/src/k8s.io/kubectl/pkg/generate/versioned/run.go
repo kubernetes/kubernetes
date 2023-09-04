@@ -240,6 +240,7 @@ func (BasicPod) ParamNames() []generate.GeneratorParam {
 		{Name: "name", Required: true},
 		{Name: "image", Required: true},
 		{Name: "image-pull-policy", Required: false},
+		{Name: "image-pull-secret", Required: false},
 		{Name: "port", Required: false},
 		{Name: "hostport", Required: false},
 		{Name: "stdin", Required: false},
@@ -311,6 +312,13 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 		restartPolicy = v1.RestartPolicyAlways
 	}
 
+	var imagePullSecrets []v1.LocalObjectReference = nil
+	if secretName, ok := params["image-pull-secret"]; ok && len(secretName) > 0 {
+		imagePullSecrets = []v1.LocalObjectReference{
+			{Name: secretName},
+		}
+	}
+
 	privileged, err := generate.GetBool(params, "privileged", false)
 	if err != nil {
 		return nil, err
@@ -341,8 +349,9 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 					SecurityContext: securityContext,
 				},
 			},
-			DNSPolicy:     v1.DNSClusterFirst,
-			RestartPolicy: restartPolicy,
+			DNSPolicy:        v1.DNSClusterFirst,
+			RestartPolicy:    restartPolicy,
+			ImagePullSecrets: imagePullSecrets,
 		},
 	}
 	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
