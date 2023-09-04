@@ -297,6 +297,8 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	if kubeCfg.StaticPodPath != "" {
 		klog.InfoS("Adding static pod path", "path", kubeCfg.StaticPodPath)
 		config.NewSourceFile(kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.FileSource))
+	} else {
+		klog.InfoS("There is NO static pod path defined, which may interfere with kubeadm or other K8s bootstrapping functionality - check kubelet configuration file if you want to fix this")
 	}
 
 	// define url config source
@@ -2322,13 +2324,18 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 		kl.dnsConfigurer.CheckLimitsForResolvConf()
 	}
 
+	skippedPodSynchronization := false
 	for {
 		if err := kl.runtimeState.runtimeErrors(); err != nil {
-			klog.ErrorS(err, "Skipping pod synchronization")
+			skippedPodSynchronization = true
+			klog.ErrorS(err, "Skipping pod synchronization, runtime errors detected")
 			// exponential backoff
 			time.Sleep(duration)
 			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
 			continue
+		} else if skippedPodSynchronization {
+			skippedPodSynchronization = false
+			klog.InfoS("runtime errors have now been recovered, resuming normal pod synchronization")
 		}
 		// reset backoff if we have a success
 		duration = base
