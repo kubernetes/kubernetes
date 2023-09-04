@@ -97,9 +97,9 @@ func TestValidateTracingConfiguration(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := ValidateTracingConfiguration(tc.contents, nil, field.NewPath("tracing"))
-			if tc.expectError == false && len(errs) != 0 {
+			if !tc.expectError && len(errs) != 0 {
 				t.Errorf("Calling ValidateTracingConfiguration expected no error, got %v", errs)
-			} else if tc.expectError == true && len(errs) == 0 {
+			} else if tc.expectError && len(errs) == 0 {
 				t.Errorf("Calling ValidateTracingConfiguration expected error, got no error")
 			}
 		})

@@ -102,7 +102,7 @@ func TestUnschedulableNodes(t *testing.T) {
 					// Nodes that are unschedulable or that are not ready or
 					// have their disk full (Node.Spec.Conditions) are excluded
 					// based on NodeConditionPredicate, a separate check
-					return node != nil && node.(*v1.Node).Spec.Unschedulable == true
+					return node != nil && node.(*v1.Node).Spec.Unschedulable
 				})
 				if err != nil {
 					t.Fatalf("Failed to observe reflected update for setting unschedulable=true: %v", err)

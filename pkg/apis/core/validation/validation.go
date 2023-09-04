@@ -3365,7 +3365,7 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 
 	// Only make the following checks if hostUsers is false (otherwise, the container uses the
 	// same userns as the host, and so there isn't anything to check).
-	if spec.SecurityContext == nil || spec.SecurityContext.HostUsers == nil || *spec.SecurityContext.HostUsers == true {
+	if spec.SecurityContext == nil || spec.SecurityContext.HostUsers == nil || *spec.SecurityContext.HostUsers {
 		return allErrs
 	}
 

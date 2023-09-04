@@ -672,7 +672,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 		switch rName {
 		case v1.ResourceCPU:
 			podCpuResources := &cm.ResourceConfig{CPUPeriod: podResources.CPUPeriod}
-			if setLimitValue == true {
+			if setLimitValue {
 				podCpuResources.CPUQuota = podResources.CPUQuota
 			} else {
 				podCpuResources.CPUShares = podResources.CPUShares

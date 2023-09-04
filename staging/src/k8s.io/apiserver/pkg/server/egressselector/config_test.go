@@ -541,9 +541,9 @@ func TestValidateEgressSelectorConfiguration(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := ValidateEgressSelectorConfiguration(tc.contents)
-			if tc.expectError == false && len(errs) != 0 {
+			if !tc.expectError && len(errs) != 0 {
 				t.Errorf("Calling ValidateEgressSelectorConfiguration expected no error, got %v", errs)
-			} else if tc.expectError == true && len(errs) == 0 {
+			} else if tc.expectError && len(errs) == 0 {
 				t.Errorf("Calling ValidateEgressSelectorConfiguration expected error, got no error")
 			}
 		})

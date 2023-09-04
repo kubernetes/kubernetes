@@ -485,7 +485,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
-		if drainWatcher == true {
+		if drainWatcher {
 			t.Fatalf("didn't expect drainWatcher to be set to true")
 		}
 		count++

@@ -374,7 +374,7 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimea
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if pod.Spec.HostUsers == nil || *pod.Spec.HostUsers == true {
+	if pod.Spec.HostUsers == nil || *pod.Spec.HostUsers {
 		return &runtimeapi.UserNamespace{
 			Mode: runtimeapi.NamespaceMode_NODE,
 		}, nil
