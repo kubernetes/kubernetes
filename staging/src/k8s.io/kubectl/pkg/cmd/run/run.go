@@ -192,6 +192,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("The image for the container to run."))
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container.  If left empty, this value will not be specified by the client and defaulted by the server."))
+	cmd.Flags().String("image-pull-secret", "", i18n.T("The image pull secret for the container. It is needed when running an image from a private registry."))
 	cmd.Flags().Bool("rm", false, "If true, delete the pod after it exits.  Only valid when attaching to the container, e.g. with '--attach' or with '-i/--stdin'.")
 	cmd.Flags().StringArray("env", []string{}, "Environment variables to set in the container.")
 	cmd.Flags().StringVar(&opt.Port, "port", opt.Port, i18n.T("The port that this container exposes."))
