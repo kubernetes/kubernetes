@@ -436,6 +436,13 @@ func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, name
 			return false, nil
 		}
 
+		// Endpoints are single family but EndpointSlices can have dual stack addresses,
+		// so we verify the number of addresses that matches the same family on both.
+		addressType := discoveryv1.AddressTypeIPv4
+		if isIPv6Endpoint(endpoint) {
+			addressType = discoveryv1.AddressTypeIPv6
+		}
+
 		esList, err := c.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName)})
 		if err != nil {
 			Logf("Unexpected error trying to get EndpointSlices for %s : %v", serviceName, err)
@@ -447,8 +454,8 @@ func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, name
 			return false, nil
 		}
 
-		if countEndpointsSlicesNum(esList) != expectNum {
-			Logf("Unexpected number of Endpoints on Slices, got %d, expected %d", countEndpointsSlicesNum(esList), expectNum)
+		if countEndpointsSlicesNum(esList, addressType) != expectNum {
+			Logf("Unexpected number of Endpoints on Slices, got %d, expected %d", countEndpointsSlicesNum(esList, addressType), expectNum)
 			return false, nil
 		}
 		return true, nil
@@ -463,10 +470,28 @@ func countEndpointsNum(e *v1.Endpoints) int {
 	return num
 }
 
-func countEndpointsSlicesNum(epList *discoveryv1.EndpointSliceList) int {
+// isIPv6Endpoint returns true if the Endpoint uses IPv6 addresses
+func isIPv6Endpoint(e *v1.Endpoints) bool {
+	for _, sub := range e.Subsets {
+		for _, addr := range sub.Addresses {
+			if len(addr.IP) == 0 {
+				continue
+			}
+			// Endpoints are single family, so it is enough to check only one address
+			return netutils.IsIPv6String(addr.IP)
+		}
+	}
+	// default to IPv4 an Endpoint without IP addresses
+	return false
+}
+
+func countEndpointsSlicesNum(epList *discoveryv1.EndpointSliceList, addressType discoveryv1.AddressType) int {
 	// EndpointSlices can contain the same address on multiple Slices
 	addresses := sets.Set[string]{}
 	for _, epSlice := range epList.Items {
+		if epSlice.AddressType != addressType {
+			continue
+		}
 		for _, ep := range epSlice.Endpoints {
 			if len(ep.Addresses) > 0 {
 				addresses.Insert(ep.Addresses[0])
