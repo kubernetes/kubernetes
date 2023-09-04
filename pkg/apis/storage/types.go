@@ -688,6 +688,9 @@ type VolumeAttributesClass struct {
 	// +optional
 	metav1.ObjectMeta
 
+	// Name of the driver
+	DriverName string
+
 	// parameters holds the mutable attributes of volumes for the provisioner that should
 	// create and update volumes of this volume attributes class. And these parameters are
 	// immutable.

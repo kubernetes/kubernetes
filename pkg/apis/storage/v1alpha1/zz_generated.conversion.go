@@ -363,6 +363,7 @@ func Convert_storage_VolumeAttachmentStatus_To_v1alpha1_VolumeAttachmentStatus(i
 
 func autoConvert_v1alpha1_VolumeAttributesClass_To_storage_VolumeAttributesClass(in *v1alpha1.VolumeAttributesClass, out *storage.VolumeAttributesClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
+	out.DriverName = in.DriverName
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
 	return nil
 }
@@ -374,6 +375,7 @@ func Convert_v1alpha1_VolumeAttributesClass_To_storage_VolumeAttributesClass(in 
 
 func autoConvert_storage_VolumeAttributesClass_To_v1alpha1_VolumeAttributesClass(in *storage.VolumeAttributesClass, out *v1alpha1.VolumeAttributesClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
+	out.DriverName = in.DriverName
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
 	return nil
 }

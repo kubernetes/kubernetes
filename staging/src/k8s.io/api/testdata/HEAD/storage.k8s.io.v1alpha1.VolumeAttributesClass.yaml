@@ -1,4 +1,5 @@
 apiVersion: storage.k8s.io/v1alpha1
+driverName: driverNameValue
 kind: VolumeAttributesClass
 metadata:
   annotations:

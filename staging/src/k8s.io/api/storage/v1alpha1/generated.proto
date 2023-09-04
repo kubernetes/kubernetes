@@ -227,6 +227,9 @@ message VolumeAttributesClass {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
+  // Name of the driver
+  optional string driverName = 2;
+
   // parameters holds the mutable attributes of volumes for the provisioner that should
   // create and update volumes of this volume attributes class. And these parameters are
   // immutable.

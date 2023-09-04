@@ -582,6 +582,7 @@ func ValidateCSIStorageCapacityUpdate(capacity, oldCapacity *storage.CSIStorageC
 // ValidateVolumeAttributesClass validates a VolumeAttributesClass.
 func ValidateVolumeAttributesClass(volumeAttributesClass *storage.VolumeAttributesClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&volumeAttributesClass.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateProvisioner(volumeAttributesClass.DriverName, field.NewPath("driverName"))...)
 	allErrs = append(allErrs, validateParameters(volumeAttributesClass.Parameters, field.NewPath("parameters"))...)
 	return allErrs
 }
@@ -589,6 +590,9 @@ func ValidateVolumeAttributesClass(volumeAttributesClass *storage.VolumeAttribut
 // ValidateVolumeAttributesClassUpdate tests if an update to VolumeAttributesClass is valid.
 func ValidateVolumeAttributesClassUpdate(volumeAttributesClass, oldVolumeAttributesClass *storage.VolumeAttributesClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&volumeAttributesClass.ObjectMeta, &oldVolumeAttributesClass.ObjectMeta, field.NewPath("metadata"))
+	if volumeAttributesClass.DriverName != oldVolumeAttributesClass.DriverName {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("driverName"), "updates to driverName are forbidden."))
+	}
 	if !reflect.DeepEqual(oldVolumeAttributesClass.Parameters, volumeAttributesClass.Parameters) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
 	}

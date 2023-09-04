@@ -43695,6 +43695,14 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClass(ref common.Referenc
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
+					"driverName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the driver",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"parameters": {
 						SchemaProps: spec.SchemaProps{
 							Description: "parameters holds the mutable attributes of volumes for the provisioner that should create and update volumes of this volume attributes class. And these parameters are immutable.",
@@ -43712,6 +43720,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClass(ref common.Referenc
 						},
 					},
 				},
+				Required: []string{"driverName"},
 			},
 		},
 		Dependencies: []string{

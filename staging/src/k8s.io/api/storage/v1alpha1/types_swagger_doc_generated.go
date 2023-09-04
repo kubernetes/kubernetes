@@ -106,6 +106,7 @@ func (VolumeAttachmentStatus) SwaggerDoc() map[string]string {
 var map_VolumeAttributesClass = map[string]string{
 	"":           "VolumeAttributesClass represents a class of volume attributes. It holds the mutable attributes of volumes for the provisioner that should create and update volumes.\n\nVolumeAttributesClasses are non-namespaced; the name of the volume attributes class according to etcd is in ObjectMeta.Name.",
 	"metadata":   "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"driverName": "Name of the driver",
 	"parameters": "parameters holds the mutable attributes of volumes for the provisioner that should create and update volumes of this volume attributes class. And these parameters are immutable.",
 }
 

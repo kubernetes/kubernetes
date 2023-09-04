@@ -43,6 +43,7 @@
       }
     ]
   },
+  "driverName": "driverNameValue",
   "parameters": {
     "parametersKey": "parametersValue"
   }

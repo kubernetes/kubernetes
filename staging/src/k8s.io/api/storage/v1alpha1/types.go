@@ -270,6 +270,9 @@ type VolumeAttributesClass struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
+	// Name of the driver
+	DriverName string `json:"driverName" protobuf:"bytes,2,opt,name=driverName"`
+
 	// parameters holds the mutable attributes of volumes for the provisioner that should
 	// create and update volumes of this volume attributes class. And these parameters are
 	// immutable.
