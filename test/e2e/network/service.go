@@ -210,7 +210,7 @@ func checkAffinity(ctx context.Context, cs clientset.Interface, execPod *v1.Pod,
 		return false, nil
 	}); pollErr != nil {
 		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
-		if pollErr != wait.ErrWaitTimeout {
+		if !wait.Interrupted(pollErr) {
 			checkAffinityFailed(tracker, pollErr.Error())
 			return false
 		}
