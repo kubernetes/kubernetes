@@ -134,7 +134,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 		for vc, vsi := range nm.vsphereInstanceMap {
 
 			found := getVMFound()
-			if found == true {
+			if found {
 				break
 			}
 
@@ -175,7 +175,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 
 			for _, datacenterObj := range datacenterObjs {
 				found := getVMFound()
-				if found == true {
+				if found {
 					break
 				}
 

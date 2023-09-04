@@ -698,7 +698,7 @@ func TestRevertPorts(t *testing.T) {
 			}
 		}
 		for _, lp := range tc.existingPorts {
-			if existingPortsMap[lp].(*fakeClosable).closed == true {
+			if existingPortsMap[lp].(*fakeClosable).closed {
 				t.Errorf("Expect existing localport %v to be false in test case %v", lp, i)
 			}
 		}

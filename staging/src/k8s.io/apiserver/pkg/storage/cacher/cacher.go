@@ -1252,7 +1252,7 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 //
 // The returned function must be called under the watchCache lock.
 func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(ctx context.Context, parsedResourceVersion uint64, opts storage.ListOptions) (func() uint64, error) {
-	if opts.SendInitialEvents == nil || *opts.SendInitialEvents == false || !opts.Predicate.AllowWatchBookmarks {
+	if opts.SendInitialEvents == nil || !*opts.SendInitialEvents || !opts.Predicate.AllowWatchBookmarks {
 		return func() uint64 { return 0 }, nil
 	}
 	return c.getCommonResourceVersionLockedFunc(ctx, parsedResourceVersion, opts)
@@ -1267,7 +1267,7 @@ func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(ctx context.Context, 
 //
 // The returned function must be called under the watchCache lock.
 func (c *Cacher) getStartResourceVersionForWatchLockedFunc(ctx context.Context, parsedWatchResourceVersion uint64, opts storage.ListOptions) (func() uint64, error) {
-	if opts.SendInitialEvents == nil || *opts.SendInitialEvents == true {
+	if opts.SendInitialEvents == nil || *opts.SendInitialEvents {
 		return func() uint64 { return parsedWatchResourceVersion }, nil
 	}
 	return c.getCommonResourceVersionLockedFunc(ctx, parsedWatchResourceVersion, opts)
@@ -1298,7 +1298,7 @@ func (c *Cacher) getCommonResourceVersionLockedFunc(ctx context.Context, parsedW
 // Additionally, it instructs the caller whether it should ask for
 // all events from the cache (full state) or not.
 func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, requestedWatchRV uint64, opts storage.ListOptions) (bool, error) {
-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents == true {
+	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
 		err := c.watchCache.waitUntilFreshAndBlock(ctx, requestedWatchRV)
 		defer c.watchCache.RUnlock()
 		return err == nil, err
