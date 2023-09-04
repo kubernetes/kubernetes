@@ -998,7 +998,7 @@ func testSubpathReconstruction(ctx context.Context, f *framework.Framework, host
 			podNode = &nodeList.Items[i]
 		}
 	}
-	framework.ExpectNotEqual(podNode, nil, "pod node should exist in schedulable nodes")
+	gomega.Expect(podNode).ToNot(gomega.BeNil(), "pod node should exist in schedulable nodes")
 
 	storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, f.ClientSet, f, pod, forceDelete, true, nil, volumePath)
 
