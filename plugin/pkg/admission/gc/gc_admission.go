@@ -238,7 +238,7 @@ func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.O
 func blockingOwnerRefs(refs []metav1.OwnerReference) []metav1.OwnerReference {
 	var ret []metav1.OwnerReference
 	for _, ref := range refs {
-		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion == true {
+		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion {
 			ret = append(ret, ref)
 		}
 	}
