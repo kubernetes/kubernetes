@@ -814,13 +814,13 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			pcCopy := pcs[0].DeepCopy()
 			pcCopy.Value = pcCopy.Value * 10
 			err := patchPriorityClass(ctx, cs, pcs[0], pcCopy)
-			framework.ExpectError(err, "expect a patch error on an immutable field")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expect a patch error on an immutable field")
 			framework.Logf("%v", err)
 
 			pcCopy = pcs[1].DeepCopy()
 			pcCopy.Value = pcCopy.Value * 10
 			_, err = cs.SchedulingV1().PriorityClasses().Update(ctx, pcCopy, metav1.UpdateOptions{})
-			framework.ExpectError(err, "expect an update error on an immutable field")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expect an update error on an immutable field")
 			framework.Logf("%v", err)
 
 			// 2. Patch/Update on mutable fields will succeed.
