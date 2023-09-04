@@ -1415,7 +1415,7 @@ func TestFitError_Error(t *testing.T) {
 				// PostFilterMsg will be included.
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
-			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter. Error running PostFilter plugin FailedPostFilter.",
+			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter. Error running PostFilter plugin FailedPostFilter",
 		},
 		{
 			name:        "nodes failed one Filter plugin with an empty PostFilterMsg",
@@ -1442,7 +1442,7 @@ func TestFitError_Error(t *testing.T) {
 				},
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
-			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter.",
+			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
 		},
 		{
 			name:        "nodes failed two Filter plugins with an empty PostFilterMsg",
@@ -1469,7 +1469,7 @@ func TestFitError_Error(t *testing.T) {
 				},
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
-			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter.",
+			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
 		},
 		{
 			name:        "failed to Permit on node",

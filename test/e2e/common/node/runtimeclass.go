@@ -376,7 +376,7 @@ func createRuntimeClass(ctx context.Context, f *framework.Framework, name, handl
 
 func expectPodRejection(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-	framework.ExpectError(err, "should be forbidden")
+	gomega.Expect(err).To(gomega.HaveOccurred(), "should be forbidden")
 	if !apierrors.IsForbidden(err) {
 		framework.Failf("expected forbidden error, got %#v", err)
 	}

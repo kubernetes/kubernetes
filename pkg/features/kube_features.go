@@ -72,6 +72,7 @@ const (
 
 	// owner: @danwinship
 	// alpha: v1.27
+	// beta: v1.29
 	//
 	// Enables dual-stack --node-ip in kubelet with external cloud providers
 	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
@@ -228,12 +229,14 @@ const (
 
 	// owner: @andrewsykim
 	// alpha: v1.22
+	// beta: v1.29
 	//
 	// Disable any functionality in kube-apiserver, kube-controller-manager and kubelet related to the `--cloud-provider` component flag.
 	DisableCloudProviders featuregate.Feature = "DisableCloudProviders"
 
 	// owner: @andrewsykim
 	// alpha: v1.23
+	// beta: v1.29
 	//
 	// Disable in-tree functionality in kubelet to authenticate to cloud provider container registries for image pull credentials.
 	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
@@ -794,6 +797,7 @@ const (
 	// kep: http://kep.k8s.io/3682
 	// alpha: v1.27
 	// beta: v1.28
+	// stable: v1.29
 	//
 	// Subdivide the NodePort range for dynamic and static port allocation.
 	ServiceNodePortStaticSubrange featuregate.Feature = "ServiceNodePortStaticSubrange"
@@ -970,7 +974,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
-	CloudDualStackNodeIPs: {Default: false, PreRelease: featuregate.Alpha},
+	CloudDualStackNodeIPs: {Default: true, PreRelease: featuregate.Beta},
 
 	ClusterTrustBundle: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1010,9 +1014,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Deprecated},
 
-	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
+	DisableCloudProviders: {Default: true, PreRelease: featuregate.Beta},
 
-	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
+	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.Beta},
 
 	DevicePluginCDIDevices: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1158,7 +1162,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
 
-	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.Beta},
+	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
 
 	SidecarContainers: {Default: false, PreRelease: featuregate.Alpha},
 

@@ -14542,27 +14542,38 @@ func TestValidateServiceCreate(t *testing.T) {
 	}, {
 		name: "invalid publicIPs localhost",
 		tweakSvc: func(s *core.Service) {
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"127.0.0.1"}
 		},
 		numErrs: 1,
 	}, {
 		name: "invalid publicIPs unspecified",
 		tweakSvc: func(s *core.Service) {
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"0.0.0.0"}
 		},
 		numErrs: 1,
 	}, {
 		name: "invalid publicIPs loopback",
 		tweakSvc: func(s *core.Service) {
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"127.0.0.1"}
 		},
 		numErrs: 1,
 	}, {
 		name: "invalid publicIPs host",
 		tweakSvc: func(s *core.Service) {
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"myhost.mydomain"}
 		},
 		numErrs: 1,
+	}, {
+		name: "valid publicIPs",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+		},
+		numErrs: 0,
 	}, {
 		name: "dup port name",
 		tweakSvc: func(s *core.Service) {
@@ -15541,6 +15552,13 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 		},
 		numErrs: 2,
 	}, {
+		name: "cannot set externalTrafficPolicy field on ExternalName service",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeExternalName
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
+		},
+		numErrs: 1,
+	}, {
 		name: "externalTrafficPolicy is required on NodePort service",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeNodePort
@@ -15550,6 +15568,13 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 		name: "externalTrafficPolicy is required on LoadBalancer service",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
+		},
+		numErrs: 1,
+	}, {
+		name: "externalTrafficPolicy is required on ClusterIP service with externalIPs",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeClusterIP
+			s.Spec.ExternalIPs = []string{"1.2.3,4"}
 		},
 		numErrs: 1,
 	},

@@ -229,6 +229,7 @@ func (o *EventsOptions) Run() error {
 	if o.forName != "" {
 		listOptions.FieldSelector = fields.AndSelectors(
 			fields.OneTermEqualSelector("involvedObject.kind", o.forGVK.Kind),
+			fields.OneTermEqualSelector("involvedObject.apiVersion", o.forGVK.GroupVersion().String()),
 			fields.OneTermEqualSelector("involvedObject.name", o.forName)).String()
 	}
 	if o.Watch {

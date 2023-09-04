@@ -138,7 +138,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should fail to create ConfigMap with empty key", func(ctx context.Context) {
 		configMap, err := newConfigMapWithEmptyKey(ctx, f)
-		framework.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
 
 	ginkgo.It("should update ConfigMap successfully", func(ctx context.Context) {

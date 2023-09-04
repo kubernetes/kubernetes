@@ -133,8 +133,10 @@ func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesPr
 		},
 		Args: cobra.NoArgs,
 	}
-	cmd.Flags().StringSliceVar(&kinds, "component-configs", kinds,
-		fmt.Sprintf("A comma-separated list for component config API objects to print the default values for. Available values: %v. If this flag is not set, no component configs will be printed.", getSupportedComponentConfigKinds()))
+	if action == "init" {
+		cmd.Flags().StringSliceVar(&kinds, "component-configs", kinds,
+			fmt.Sprintf("A comma-separated list for component config API objects to print the default values for. Available values: %v. If this flag is not set, no component configs will be printed.", getSupportedComponentConfigKinds()))
+	}
 	return cmd
 }
 

@@ -132,14 +132,14 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		select {
 		case err := <-errCh:
 			return false, err
 		default:
 		}
 
-		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
+		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(ctx)
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {

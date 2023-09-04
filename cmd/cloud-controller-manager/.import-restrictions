@@ -7,6 +7,7 @@ rules:
       - k8s.io/kubernetes/pkg/api/legacyscheme
       - k8s.io/kubernetes/pkg/api/service
       - k8s.io/kubernetes/pkg/api/v1/pod
+      - k8s.io/kubernetes/pkg/api/v1/service
       - k8s.io/kubernetes/pkg/apis/apps
       - k8s.io/kubernetes/pkg/apis/autoscaling
       - k8s.io/kubernetes/pkg/apis/core

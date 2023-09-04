@@ -982,7 +982,7 @@ func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSo
 
 func pidConsumingPod(name string, numProcesses int) *v1.Pod {
 	// Each iteration forks once, but creates two processes
-	return podWithCommand(nil, v1.ResourceRequirements{}, numProcesses/2, name, "(while true; do sleep 5; done)&")
+	return podWithCommand(nil, v1.ResourceRequirements{}, numProcesses/2, name, "(while true; do /bin/sleep 5; done)&")
 }
 
 // podWithCommand returns a pod with the provided volumeSource and resourceRequirements.

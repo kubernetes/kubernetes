@@ -969,10 +969,11 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	nodes []*v1.Node,
 ) (status *framework.Status) {
 	startTime := time.Now()
+	skipPlugins := sets.New[string]()
 	defer func() {
+		state.SkipScorePlugins = skipPlugins
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreScore, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	skipPlugins := sets.New[string]()
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithName(logger, "PreScore")
 	// TODO(knelasevero): Remove duplicated keys from log entry calls
@@ -991,7 +992,6 @@ func (f *frameworkImpl) RunPreScorePlugins(
 			return framework.AsStatus(fmt.Errorf("running PreScore plugin %q: %w", pl.Name(), status.AsError()))
 		}
 	}
-	state.SkipScorePlugins = skipPlugins
 	return nil
 }
 

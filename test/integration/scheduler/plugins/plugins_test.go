@@ -475,7 +475,7 @@ func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 		bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}
 	}
 	if bp.bindStatus.IsSuccess() {
-		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(context.TODO(), &v1.Binding{
+		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(ctx, &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID, Annotations: map[string]string{bindPluginAnnotation: bp.Name()}},
 			Target: v1.ObjectReference{
 				Kind: "Node",
@@ -1559,20 +1559,24 @@ func TestBindPlugin(t *testing.T) {
 
 	tests := []struct {
 		name                   string
+		enabledBindPlugins     []configv1.Plugin
 		bindPluginStatuses     []*framework.Status
 		expectBoundByScheduler bool   // true means this test case expecting scheduler would bind pods
 		expectBoundByPlugin    bool   // true means this test case expecting a plugin would bind pods
+		expectBindFailed       bool   // true means this test case expecting a plugin binding pods with error
 		expectBindPluginName   string // expecting plugin name to bind pods
 		expectInvokeEvents     []pluginInvokeEvent
 	}{
 		{
 			name:                   "bind plugins skipped to bind the pod and scheduler bond the pod",
+			enabledBindPlugins:     []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			bindPluginStatuses:     []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
 			expectBoundByScheduler: true,
 			expectInvokeEvents:     []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}, {pluginName: postBindPluginName, val: 1}},
 		},
 		{
 			name:                 "bindplugin2 succeeded to bind the pod",
+			enabledBindPlugins:   []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Success, "")},
 			expectBoundByPlugin:  true,
 			expectBindPluginName: bindPlugin2Name,
@@ -1580,6 +1584,7 @@ func TestBindPlugin(t *testing.T) {
 		},
 		{
 			name:                 "bindplugin1 succeeded to bind the pod",
+			enabledBindPlugins:   []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Success, ""), framework.NewStatus(framework.Success, "")},
 			expectBoundByPlugin:  true,
 			expectBindPluginName: bindPlugin1Name,
@@ -1587,8 +1592,16 @@ func TestBindPlugin(t *testing.T) {
 		},
 		{
 			name:               "bind plugin fails to bind the pod",
+			enabledBindPlugins: []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
+			expectBindFailed:   true,
 			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Error, "failed to bind"), framework.NewStatus(framework.Success, "")},
 			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: reservePluginName, val: 1}},
+		},
+		{
+			name:               "all bind plugins will be skipped(this should not happen for most of the cases)",
+			enabledBindPlugins: []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}},
+			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
+			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}},
 		},
 	}
 
@@ -1624,7 +1637,7 @@ func TestBindPlugin(t *testing.T) {
 						},
 						Bind: configv1.PluginSet{
 							// Put DefaultBinder last.
-							Enabled:  []configv1.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
+							Enabled:  test.enabledBindPlugins,
 							Disabled: []configv1.Plugin{{Name: defaultbinder.Name}},
 						},
 						PostBind: configv1.PluginSet{
@@ -1696,7 +1709,7 @@ func TestBindPlugin(t *testing.T) {
 				if reservePlugin.numUnreserveCalled != 0 {
 					t.Errorf("Expected unreserve to not be called, was called %d times.", reservePlugin.numUnreserveCalled)
 				}
-			} else {
+			} else if test.expectBindFailed {
 				// bind plugin fails to bind the pod
 				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
 					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
@@ -1706,7 +1719,11 @@ func TestBindPlugin(t *testing.T) {
 				if p.numPostBindCalled > 0 {
 					t.Errorf("Didn't expect the postbind plugin to be called %d times.", p.numPostBindCalled)
 				}
+			} else if postBindPlugin.numPostBindCalled > 0 {
+				// all bind plugins are skipped
+				t.Errorf("Didn't expect the postbind plugin to be called %d times.", postBindPlugin.numPostBindCalled)
 			}
+
 			for j := range test.expectInvokeEvents {
 				expectEvent := test.expectInvokeEvents[j]
 				select {

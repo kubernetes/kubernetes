@@ -312,7 +312,7 @@ func TestNamespaceScopedWatch(t *testing.T) {
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher)
+	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
 }
 
 func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {

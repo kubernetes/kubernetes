@@ -18,11 +18,13 @@ package etcd3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -46,6 +48,9 @@ const (
 	incomingBufSize = 100
 	outgoingBufSize = 100
 )
+
+// defaultWatcherMaxLimit is used to facilitate construction tests
+var defaultWatcherMaxLimit int64 = maxLimit
 
 // fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error
 var fatalOnDecodeError = false
@@ -96,6 +101,9 @@ type watchChan struct {
 func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage.ListOptions) (watch.Interface, error) {
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
+	}
+	if opts.ProgressNotify && w.newFunc == nil {
+		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
 	}
 	wc := w.createWatchChan(ctx, key, rev, opts.Recursive, opts.ProgressNotify, opts.Predicate)
 	go wc.run()
@@ -207,17 +215,58 @@ func (wc *watchChan) RequestWatchProgress() error {
 func (wc *watchChan) sync() error {
 	opts := []clientv3.OpOption{}
 	if wc.recursive {
-		opts = append(opts, clientv3.WithPrefix())
+		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
+		rangeEnd := clientv3.GetPrefixRangeEnd(wc.key)
+		opts = append(opts, clientv3.WithRange(rangeEnd))
 	}
-	getResp, err := wc.watcher.client.Get(wc.ctx, wc.key, opts...)
-	if err != nil {
-		return err
+
+	var err error
+	var lastKey []byte
+	var withRev int64
+	var getResp *clientv3.GetResponse
+
+	metricsOp := "get"
+	if wc.recursive {
+		metricsOp = "list"
 	}
-	wc.initialRev = getResp.Header.Revision
-	for _, kv := range getResp.Kvs {
-		wc.sendEvent(parseKV(kv))
+
+	preparedKey := wc.key
+
+	for {
+		startTime := time.Now()
+		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
+		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource.String(), err, startTime)
+		if err != nil {
+			return interpretListError(err, true, preparedKey, wc.key)
+		}
+
+		if len(getResp.Kvs) == 0 && getResp.More {
+			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+		}
+
+		// send items from the response until no more results
+		for i, kv := range getResp.Kvs {
+			lastKey = kv.Key
+			wc.sendEvent(parseKV(kv))
+			// free kv early. Long lists can take O(seconds) to decode.
+			getResp.Kvs[i] = nil
+		}
+
+		if withRev == 0 {
+			wc.initialRev = getResp.Header.Revision
+		}
+
+		// no more results remain
+		if !getResp.More {
+			return nil
+		}
+
+		preparedKey = string(lastKey) + "\x00"
+		if withRev == 0 {
+			withRev = getResp.Header.Revision
+			opts = append(opts, clientv3.WithRev(withRev))
+		}
 	}
-	return nil
 }
 
 func logWatchChannelErr(err error) {
@@ -334,9 +383,6 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 	switch {
 	case e.isProgressNotify:
-		if wc.watcher.newFunc == nil {
-			return nil
-		}
 		object := wc.watcher.newFunc()
 		if err := wc.watcher.versioner.UpdateObject(object, uint64(e.rev)); err != nil {
 			klog.Errorf("failed to propagate object version: %v", err)

@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 // DriverDefinition needs to be filled in via a .yaml or .json
@@ -287,7 +288,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(ctx context.Context, 
 		var ok bool
 		items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
 		framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
-		framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
+		gomega.Expect(items).To(gomega.HaveLen(1), "exactly one item from %s", d.StorageClass.FromFile)
 		err = utils.PatchItems(f, f.Namespace, items...)
 		framework.ExpectNoError(err, "patch items")
 

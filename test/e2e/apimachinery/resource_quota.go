@@ -53,6 +53,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -128,7 +129,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Not allowing a LoadBalancer Service with NodePort to be created that exceeds remaining quota")
 		loadbalancer := newTestServiceForQuota("test-service-lb", v1.ServiceTypeLoadBalancer, true)
 		_, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, loadbalancer, metav1.CreateOptions{})
-		framework.ExpectError(err)
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		ginkgo.By("Ensuring resource quota status captures service creation")
 		usedResources = v1.ResourceList{}
@@ -276,7 +277,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		pod = newTestPodForQuota(f, "fail-pod", requests, v1.ResourceList{})
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-		framework.ExpectError(err)
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		ginkgo.By("Not allowing a pod to be created that exceeds remaining quota(validation on extended resources)")
 		requests = v1.ResourceList{}
@@ -288,7 +289,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
 		pod = newTestPodForQuota(f, "fail-pod-for-extended-resource", requests, limits)
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-		framework.ExpectError(err)
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		ginkgo.By("Ensuring a pod cannot update its resource requirements")
 		// a pod cannot dynamically update its resource requirements.
@@ -298,7 +299,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceEphemeralStorage] = resource.MustParse("10Gi")
 		podToUpdate.Spec.Containers[0].Resources.Requests = requests
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(ctx, podToUpdate, metav1.UpdateOptions{})
-		framework.ExpectError(err)
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		ginkgo.By("Ensuring attempts to update pod resource requirements did not change quota usage")
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
@@ -669,7 +670,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			},
 		}, resourceClient, testcrd.Crd)
 		// since we only give one quota, this creation should fail.
-		framework.ExpectError(err)
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		ginkgo.By("Deleting a custom resource")
 		err = deleteCustomResource(ctx, resourceClient, testcr.GetName())
@@ -1463,7 +1464,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		podName2 := "testpod-pclass2-2"
 		pod2 := newTestPodForQuotaWithPriority(f, podName2, v1.ResourceList{}, v1.ResourceList{}, "pclass2")
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
-		framework.ExpectError(err)
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		ginkgo.By("Deleting first pod")
 		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))

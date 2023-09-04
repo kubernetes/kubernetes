@@ -251,7 +251,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				// Check the pod is still not running
 				p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-				framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
+				gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodPending), "Pod phase isn't pending")
 			})
 		}
 
@@ -289,7 +289,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				// Check the pvc is still pending
 				pvc, err := l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Get(ctx, l.Pvc.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "Failed to re-read the pvc after event (or timeout)")
-				framework.ExpectEqual(pvc.Status.Phase, v1.ClaimPending, "PVC phase isn't pending")
+				gomega.Expect(pvc.Status.Phase).To(gomega.Equal(v1.ClaimPending), "PVC phase isn't pending")
 			})
 		}
 	default:
@@ -348,7 +348,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		// Check the pod is still not running
 		p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodPending), "Pod phase isn't pending")
 	})
 
 	ginkgo.It("should not mount / map unused volumes in a pod [LinuxOnly]", func(ctx context.Context) {

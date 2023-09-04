@@ -36,7 +36,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
-	flowcontrolapisv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
 	flowcontrolapisv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
@@ -58,12 +57,6 @@ const PostStartHookName = "priority-and-fairness-config-producer"
 // NewRESTStorage creates a new rest storage for flow-control api models.
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(flowcontrol.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
-
-	if storageMap, err := p.storage(apiResourceConfigSource, restOptionsGetter, flowcontrolapisv1alpha1.SchemeGroupVersion); err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	} else if len(storageMap) > 0 {
-		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1alpha1.SchemeGroupVersion.Version] = storageMap
-	}
 
 	if storageMap, err := p.storage(apiResourceConfigSource, restOptionsGetter, flowcontrolapisv1beta1.SchemeGroupVersion); err != nil {
 		return genericapiserver.APIGroupInfo{}, err

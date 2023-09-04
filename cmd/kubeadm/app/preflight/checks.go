@@ -653,7 +653,7 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 	}
 
 	if len(buf) > 1 {
-		return []error{errors.New("swap is enabled; production deployments should disable swap unless testing the NodeSwap feature gate of the kubelet")}, nil
+		return []error{errors.New("swap is supported for cgroup v2 only; the NodeSwap feature gate of the kubelet is beta but disabled by default")}, nil
 	}
 
 	return nil, nil

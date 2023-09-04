@@ -22,15 +22,15 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.8.0
 	github.com/containerd/cgroups v1.1.0
-	github.com/coredns/corefile-migration v1.0.20
+	github.com/coredns/corefile-migration v1.0.21
 	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.2
 	github.com/cyphar/filepath-securejoin v0.2.3
-	github.com/docker/distribution v2.8.2+incompatible
+	github.com/distribution/reference v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.9.0
-	github.com/evanphx/json-patch v5.6.0+incompatible
+	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-logr/logr v1.2.4
 	github.com/godbus/dbus/v5 v5.0.6
@@ -53,7 +53,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/onsi/ginkgo/v2 v2.9.4
 	github.com/onsi/gomega v1.27.6
-	github.com/opencontainers/runc v1.1.7
+	github.com/opencontainers/runc v1.1.9
 	github.com/opencontainers/selinux v1.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
@@ -89,7 +89,7 @@ require (
 	google.golang.org/api v0.114.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230525234030-28d5490b6b19
 	google.golang.org/grpc v1.54.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.31.0
 	gopkg.in/gcfg.v1 v1.2.3
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v2 v2.4.0

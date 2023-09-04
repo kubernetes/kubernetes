@@ -142,7 +142,7 @@ type invalidPlugins struct {
 var invalidPluginsByVersion = []invalidPlugins{
 	{
 		schemeGroupVersion: v1.SchemeGroupVersion.String(),
-		plugins:            []string{"SelectorSpread"},
+		plugins:            []string{},
 	},
 }
 

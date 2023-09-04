@@ -140,7 +140,7 @@ var _ = SIGDescribe("Secrets", func() {
 	*/
 	framework.ConformanceIt("should fail to create secret due to empty secret key", func(ctx context.Context) {
 		secret, err := createEmptyKeySecretForTest(ctx, f)
-		framework.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
+		gomega.Expect(err).To(gomega.HaveOccurred(), "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
 	})
 
 	/*
