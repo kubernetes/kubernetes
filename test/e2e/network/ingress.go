@@ -786,7 +786,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("deleting")
 
 		expectFinalizer := func(ing *networkingv1.Ingress, msg string) {
-			framework.ExpectNotEqual(ing.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing))
+			gomega.Expect(ing.DeletionTimestamp).ToNot(gomega.BeNil(), "expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing)
 			if len(ing.Finalizers) == 0 {
 				framework.Failf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing)
 			}
