@@ -22,8 +22,11 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -2321,4 +2324,105 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 		framework.ExpectNoError(results.Exits(restartableInit1))
 		framework.ExpectNoError(results.Starts(regular1))
 	})
+
+	ginkgo.When("a Pod with the restartable init container is termination requested", func() {
+		ginkgo.It("should receive the SIGTERM signal immediately and respect the graceful termination period", func(ctx context.Context) {
+			restartableInitGracefulTermination := "restartable-init-graceful-termination"
+			restartableInitNonGracefulTermination := "restartable-init-non-graceful-termination"
+			regular1 := "regular-1"
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "restartable-init-container-graceful-termination",
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					InitContainers: []v1.Container{
+						{
+							Name:  restartableInitGracefulTermination,
+							Image: busyboxImage,
+							Command: ExecCommand(restartableInitGracefulTermination, execCommand{
+								Delay:              300,
+								TerminationSeconds: 15,
+								ExitCode:           0,
+							}),
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+						{
+							Name:  restartableInitNonGracefulTermination,
+							Image: busyboxImage,
+							Command: ExecCommand(restartableInitGracefulTermination, execCommand{
+								Delay:              300,
+								TerminationSeconds: 100,
+								ExitCode:           0,
+							}),
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  regular1,
+							Image: busyboxImage,
+							Command: ExecCommand(regular1, execCommand{
+								Delay:              300,
+								TerminationSeconds: 15,
+								ExitCode:           0,
+							}),
+						},
+					},
+				},
+			}
+
+			preparePod(pod)
+
+			client := e2epod.NewPodClient(f)
+			pod = client.Create(context.TODO(), pod)
+
+			ginkgo.By("Waiting for the pod to run")
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err)
+
+			gracePeriodSeconds := int64(v1.DefaultTerminationGracePeriodSeconds)
+			// To account for the time it takes to delete the pod and prevent
+			// the flake, add an arbitrarily large buffer to the grace period.
+			bufferSeconds := int64(30)
+
+			ginkgo.By("Deleting the pod to terminate its containers")
+			err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("ensuring the pod is terminated within the grace period seconds + buffer seconds")
+			pod, err = waitForPodNotFoundInNamespaceAndReturnLast(ctx, f.ClientSet, pod.Name, pod.Namespace, time.Duration(gracePeriodSeconds+bufferSeconds)*time.Second)
+			framework.ExpectNoError(err)
+
+			results := parseOutput(pod)
+
+			ginkgo.By("Analyzing results")
+			framework.ExpectNoError(results.RunTogether(restartableInitGracefulTermination, restartableInitNonGracefulTermination))
+			framework.ExpectNoError(results.RunTogether(restartableInitGracefulTermination, regular1))
+			// TODO
+		})
+
+		ginkgo.It("should call its preStop hook before termination", func(ctx context.Context) {
+			// TODO
+		})
+	})
 })
+
+func waitForPodNotFoundInNamespaceAndReturnLast(ctx context.Context, c clientset.Interface, podName, ns string, timeout time.Duration) (*v1.Pod, error) {
+	var lastPod *v1.Pod
+	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*v1.Pod, error) {
+		pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		if err != nil {
+			lastPod = pod
+		}
+		return pod, err
+	})).WithTimeout(timeout).Should(gomega.BeNil())
+	if err != nil {
+		return nil, fmt.Errorf("expected pod to not be found: %w", err)
+	}
+	return lastPod, nil
+}
