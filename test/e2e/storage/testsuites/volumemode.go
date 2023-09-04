@@ -389,7 +389,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		// Reload the pod to get its node
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(pod.Spec.NodeName, "", "pod should be scheduled to a node")
+		gomega.Expect(pod.Spec.NodeName).ToNot(gomega.BeEmpty(), "pod should be scheduled to a node")
 		node, err := l.cs.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 

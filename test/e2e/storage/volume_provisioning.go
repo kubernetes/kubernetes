@@ -275,7 +275,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				}
 
 				if zone, ok := test.Parameters["zone"]; ok {
-					framework.ExpectNotEqual(len(zone), 0, "expect at least one zone")
+					gomega.Expect(zone).ToNot(gomega.BeEmpty(), "expect at least one zone")
 				}
 
 				ginkgo.By("Testing " + test.Name)
