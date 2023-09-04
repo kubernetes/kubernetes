@@ -154,7 +154,7 @@ func UpdatePVSize(ctx context.Context, pv *v1.PersistentVolume, size resource.Qu
 		}
 		return true, nil
 	})
-	if waitErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(waitErr) {
 		return nil, fmt.Errorf("timed out attempting to update PV size. last update error: %v", lastError)
 	}
 	if waitErr != nil {

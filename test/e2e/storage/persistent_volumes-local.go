@@ -909,7 +909,7 @@ func createLocalPVCsPVs(ctx context.Context, config *localTestConfig, volumes []
 			}
 			return false, nil
 		})
-		if waitErr == wait.ErrWaitTimeout {
+		if wait.Interrupted(waitErr) {
 			framework.Logf("PVCs were not bound within %v (that's good)", bindTimeout)
 			waitErr = nil
 		}

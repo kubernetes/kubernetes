@@ -1105,7 +1105,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
 			_, err := resourceClient.Get(ctx, dependentName, metav1.GetOptions{})
 			return false, err
-		}); err != nil && err != wait.ErrWaitTimeout {
+		}); err != nil && !wait.Interrupted(err) {
 			framework.Failf("failed to ensure the dependent is not deleted: %v", err)
 		}
 	})
