@@ -32,7 +32,7 @@ const (
 )
 
 // GetDefaultVolumeAttributesClass returns the default VolumeAttributesClass from the store, or nil.
-func GetDefaultVolumeAttributesClass(lister storagev1alpha1listers.VolumeAttributesClassLister) (*storagev1alpha1.VolumeAttributesClass, error) {
+func GetDefaultVolumeAttributesClass(lister storagev1alpha1listers.VolumeAttributesClassLister, driverName string) (*storagev1alpha1.VolumeAttributesClass, error) {
 	list, err := lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func GetDefaultVolumeAttributesClass(lister storagev1alpha1listers.VolumeAttribu
 
 	defaultClasses := []*storagev1alpha1.VolumeAttributesClass{}
 	for _, class := range list {
-		if IsDefaultVolumeAttributesClassAnnotation(class.ObjectMeta) {
+		if IsDefaultVolumeAttributesClassAnnotation(class.ObjectMeta) && class.DriverName == driverName {
 			defaultClasses = append(defaultClasses, class)
 			klog.V(4).Infof("GetDefaultVolumeAttributesClass added: %s", class.Name)
 		}

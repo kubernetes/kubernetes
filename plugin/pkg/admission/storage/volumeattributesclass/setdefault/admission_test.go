@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
@@ -36,8 +37,20 @@ import (
 func TestAdmission(t *testing.T) {
 	empty := ""
 	foo := "foo"
+	scName := "sc"
+	dirverName := "driverName"
 
-	defaultClass1 := &storagev1alpha1.VolumeAttributesClass{
+	sc := &storagev1.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: scName,
+		},
+		Provisioner: dirverName,
+	}
+
+	defaultVAC1 := &storagev1alpha1.VolumeAttributesClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "VolumeAttributesClass",
 		},
@@ -47,8 +60,9 @@ func TestAdmission(t *testing.T) {
 				storageutil.AlphaIsDefaultVolumeAttributesClassAnnotation: "true",
 			},
 		},
+		DriverName: dirverName,
 	}
-	defaultClass2 := &storagev1alpha1.VolumeAttributesClass{
+	defaultVAC2 := &storagev1alpha1.VolumeAttributesClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "VolumeAttributesClass",
 		},
@@ -58,9 +72,10 @@ func TestAdmission(t *testing.T) {
 				storageutil.AlphaIsDefaultVolumeAttributesClassAnnotation: "true",
 			},
 		},
+		DriverName: dirverName,
 	}
-	// Class that has explicit default = false
-	classWithFalseDefault := &storagev1alpha1.VolumeAttributesClass{
+	// VolumeAttributesClass that has explicit default = false
+	vacWithFalseDefault := &storagev1alpha1.VolumeAttributesClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "VolumeAttributesClass",
 		},
@@ -70,18 +85,20 @@ func TestAdmission(t *testing.T) {
 				storageutil.AlphaIsDefaultVolumeAttributesClassAnnotation: "false",
 			},
 		},
+		DriverName: dirverName,
 	}
-	// Class with missing default annotation (=non-default)
-	classWithNoDefault := &storagev1alpha1.VolumeAttributesClass{
+	// VolumeAttributesClass with missing default annotation (=non-default)
+	vacWithNoDefault := &storagev1alpha1.VolumeAttributesClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "VolumeAttributesClass",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nondefault2",
 		},
+		DriverName: dirverName,
 	}
-	// Class with empty default annotation (=non-default)
-	classWithEmptyDefault := &storagev1alpha1.VolumeAttributesClass{
+	// VolumeAttributesClass with empty default annotation (=non-default)
+	vacWithEmptyDefault := &storagev1alpha1.VolumeAttributesClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "VolumeAttributesClass",
 		},
@@ -91,8 +108,10 @@ func TestAdmission(t *testing.T) {
 				storageutil.AlphaIsDefaultVolumeAttributesClassAnnotation: "",
 			},
 		},
+		DriverName: dirverName,
 	}
-	classWithCreateTime1 := &storagev1alpha1.VolumeAttributesClass{
+	// VolumeAttributesClass with creation time 1
+	vacWithCreateTime1 := &storagev1alpha1.VolumeAttributesClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "VolumeAttributesClass",
 		},
@@ -103,8 +122,10 @@ func TestAdmission(t *testing.T) {
 				storageutil.AlphaIsDefaultVolumeAttributesClassAnnotation: "true",
 			},
 		},
+		DriverName: dirverName,
 	}
-	classWithCreateTime2 := &storagev1alpha1.VolumeAttributesClass{
+	// VolumeAttributesClass with creation time 2
+	vacWithCreateTime2 := &storagev1alpha1.VolumeAttributesClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "VolumeAttributesClass",
 		},
@@ -115,104 +136,119 @@ func TestAdmission(t *testing.T) {
 				storageutil.AlphaIsDefaultVolumeAttributesClassAnnotation: "true",
 			},
 		},
+		DriverName: dirverName,
 	}
 
-	claimWithClass := &api.PersistentVolumeClaim{
+	claimWithVAC := &api.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolumeClaim",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "claimWithClass",
+			Name:      "claimWithVAC",
 			Namespace: "ns",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
+			StorageClassName:          &scName,
 			VolumeAttributesClassName: &foo,
 		},
 	}
-	claimWithEmptyClass := &api.PersistentVolumeClaim{
+	claimWithEmptyVAC := &api.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolumeClaim",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "claimWithEmptyClass",
+			Name:      "claimWithEmptyVAC",
 			Namespace: "ns",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
+			StorageClassName:          &scName,
 			VolumeAttributesClassName: &empty,
 		},
 	}
-	claimWithNoClass := &api.PersistentVolumeClaim{
+	claimWithNoVAC := &api.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolumeClaim",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "claimWithNoClass",
+			Name:      "claimWithNoVAC",
 			Namespace: "ns",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			StorageClassName: &scName,
 		},
 	}
 
 	tests := []struct {
 		name              string
-		classes           []*storagev1alpha1.VolumeAttributesClass
+		scs               []*storagev1.StorageClass
+		vacs              []*storagev1alpha1.VolumeAttributesClass
 		claim             *api.PersistentVolumeClaim
 		expectError       bool
 		expectedClassName string
 	}{
 		{
 			"no default, no modification of PVCs",
-			[]*storagev1alpha1.VolumeAttributesClass{classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			claimWithNoClass,
+			[]*storagev1.StorageClass{sc},
+			[]*storagev1alpha1.VolumeAttributesClass{vacWithFalseDefault, vacWithNoDefault, vacWithEmptyDefault},
+			claimWithNoVAC,
 			false,
 			"",
 		},
 		{
-			"one default, modify PVC with class=nil",
-			[]*storagev1alpha1.VolumeAttributesClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			claimWithNoClass,
+			"one default, modify PVC with vac=nil",
+			[]*storagev1.StorageClass{sc},
+			[]*storagev1alpha1.VolumeAttributesClass{defaultVAC1, vacWithFalseDefault, vacWithNoDefault, vacWithEmptyDefault},
+			claimWithNoVAC,
 			false,
 			"default1",
 		},
 		{
-			"one default, no modification of PVC with class=''",
-			[]*storagev1alpha1.VolumeAttributesClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			claimWithEmptyClass,
+			"one default, no modification of PVC with vac=''",
+			[]*storagev1.StorageClass{sc},
+			[]*storagev1alpha1.VolumeAttributesClass{defaultVAC1, vacWithFalseDefault, vacWithNoDefault, vacWithEmptyDefault},
+			claimWithEmptyVAC,
 			false,
 			"",
 		},
 		{
-			"one default, no modification of PVC with class='foo'",
-			[]*storagev1alpha1.VolumeAttributesClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			claimWithClass,
+			"one default, no modification of PVC with vac='foo'",
+			[]*storagev1.StorageClass{sc},
+			[]*storagev1alpha1.VolumeAttributesClass{defaultVAC1, vacWithFalseDefault, vacWithNoDefault, vacWithEmptyDefault},
+			claimWithVAC,
 			false,
 			"foo",
 		},
 		{
-			"two defaults, no modification of PVC with class=''",
-			[]*storagev1alpha1.VolumeAttributesClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			claimWithEmptyClass,
+			"two defaults, no modification of PVC with vac=''",
+			[]*storagev1.StorageClass{sc},
+			[]*storagev1alpha1.VolumeAttributesClass{defaultVAC1, defaultVAC2, vacWithFalseDefault, vacWithNoDefault, vacWithEmptyDefault},
+			claimWithEmptyVAC,
 			false,
 			"",
 		},
 		{
-			"two defaults, no modification of PVC with class='foo'",
-			[]*storagev1alpha1.VolumeAttributesClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			claimWithClass,
+			"two defaults, no modification of PVC with vac='foo'",
+			[]*storagev1.StorageClass{sc},
+			[]*storagev1alpha1.VolumeAttributesClass{defaultVAC2, defaultVAC2, vacWithFalseDefault, vacWithNoDefault, vacWithEmptyDefault},
+			claimWithVAC,
 			false,
 			"foo",
 		},
 		{
 			"two defaults with same creation time, choose the one with smaller name",
-			[]*storagev1alpha1.VolumeAttributesClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			claimWithNoClass,
+			[]*storagev1.StorageClass{sc},
+			[]*storagev1alpha1.VolumeAttributesClass{defaultVAC1, defaultVAC2, vacWithFalseDefault, vacWithNoDefault, vacWithEmptyDefault},
+			claimWithNoVAC,
 			false,
-			defaultClass1.Name,
+			defaultVAC1.Name,
 		},
 		{
 			"two defaults, choose the one with newer creation time",
-			[]*storagev1alpha1.VolumeAttributesClass{classWithCreateTime1, classWithCreateTime2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
-			claimWithNoClass,
+			[]*storagev1.StorageClass{sc},
+			[]*storagev1alpha1.VolumeAttributesClass{vacWithCreateTime1, vacWithCreateTime2, vacWithFalseDefault, vacWithNoDefault, vacWithEmptyDefault},
+			claimWithNoVAC,
 			false,
-			classWithCreateTime1.Name,
+			vacWithCreateTime1.Name,
 		},
 	}
 
@@ -225,8 +261,11 @@ func TestAdmission(t *testing.T) {
 		ctrl := newPlugin()
 		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 		ctrl.SetExternalKubeInformerFactory(informerFactory)
-		for _, c := range test.classes {
+		for _, c := range test.vacs {
 			informerFactory.Storage().V1alpha1().VolumeAttributesClasses().Informer().GetStore().Add(c)
+		}
+		for _, c := range test.scs {
+			informerFactory.Storage().V1().StorageClasses().Informer().GetStore().Add(c)
 		}
 		attrs := admission.NewAttributesRecord(
 			claim, // new object

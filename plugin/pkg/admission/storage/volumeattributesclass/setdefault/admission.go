@@ -21,15 +21,15 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/volume/util"
-
-	"k8s.io/klog/v2"
-
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
+	storagev1listers "k8s.io/client-go/listers/storage/v1"
 	storagev1alpha1listers "k8s.io/client-go/listers/storage/v1alpha1"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -49,7 +49,8 @@ func Register(plugins *admission.Plugins) {
 type claimDefaulterPlugin struct {
 	*admission.Handler
 
-	lister storagev1alpha1listers.VolumeAttributesClassLister
+	lister   storagev1alpha1listers.VolumeAttributesClassLister
+	sclister storagev1listers.StorageClassLister
 }
 
 var _ admission.Interface = &claimDefaulterPlugin{}
@@ -66,13 +67,20 @@ func newPlugin() *claimDefaulterPlugin {
 func (a *claimDefaulterPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	informer := f.Storage().V1alpha1().VolumeAttributesClasses()
 	a.lister = informer.Lister()
-	a.SetReadyFunc(informer.Informer().HasSynced)
+	scinformer := f.Storage().V1().StorageClasses()
+	a.sclister = scinformer.Lister()
+	a.SetReadyFunc(func() bool {
+		return informer.Informer().HasSynced() && scinformer.Informer().HasSynced()
+	})
 }
 
 // ValidateInitialization ensures lister is set.
 func (a *claimDefaulterPlugin) ValidateInitialization() error {
 	if a.lister == nil {
 		return fmt.Errorf("missing lister")
+	}
+	if a.sclister == nil {
+		return fmt.Errorf("missing storage class lister")
 	}
 	return nil
 }
@@ -99,13 +107,26 @@ func (a *claimDefaulterPlugin) Admit(ctx context.Context, attr admission.Attribu
 	}
 
 	if pvc.Spec.VolumeAttributesClassName != nil {
-		// The user asked for a class.
+		// The user asked for a volume attributes class.
 		return nil
 	}
 
 	klog.V(4).Infof("no volume attributes class for claim %s (generate: %s)", pvc.Name, pvc.GenerateName)
 
-	def, err := util.GetDefaultVolumeAttributesClass(a.lister)
+	if pvc.Spec.StorageClassName == nil || *pvc.Spec.StorageClassName == "" {
+		return nil
+	}
+
+	sc, err := a.sclister.Get(*pvc.Spec.StorageClassName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// The storage class does not exist, do nothing about the PVC.
+			return nil
+		}
+		return admission.NewForbidden(attr, err)
+	}
+
+	def, err := util.GetDefaultVolumeAttributesClass(a.lister, sc.Provisioner)
 	if err != nil {
 		return admission.NewForbidden(attr, err)
 	}
