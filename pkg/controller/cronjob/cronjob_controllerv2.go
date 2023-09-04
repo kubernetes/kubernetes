@@ -232,6 +232,7 @@ func (jm *ControllerV2) resolveControllerRef(namespace string, controllerRef *me
 	if controllerRef.Kind != controllerKind.Kind {
 		return nil
 	}
+
 	cronJob, err := jm.cronJobLister.CronJobs(namespace).Get(controllerRef.Name)
 	if err != nil {
 		return nil
@@ -257,8 +258,8 @@ func (jm *ControllerV2) getJobsToBeReconciled(cronJob *batchv1.CronJob) ([]*batc
 	for _, job := range jobList {
 		// If it has a ControllerRef, that's all that matters.
 		controllerRef := metav1.GetControllerOf(job)
-		if controllerRef != nil && controllerRef.Name == cronJob.Name &&
-			(controllerRef.Kind == "" || controllerRef.Kind == controllerKind.Kind) {
+		// call resolveControllerRef to make sure the controllerRef is pointing to the right controller
+		if controllerRef != nil && jm.resolveControllerRef(job.Namespace, controllerRef) != nil {
 			// this job is needs to be reconciled
 			jobsToBeReconciled = append(jobsToBeReconciled, job)
 		}
