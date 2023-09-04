@@ -84,10 +84,36 @@ func TokenFromIDAndSecret(id, secret string) string {
 	return fmt.Sprintf("%s.%s", id, secret)
 }
 
-// IsValidBootstrapToken returns whether the given string is valid as a Bootstrap Token and
-// in other words satisfies the BootstrapTokenRegexp
+// IsValidBootstrapToken returns whether the given string is valid as a Bootstrap Token.
+// Avoid using BootstrapTokenRegexp.MatchString(token) and instead perform constant-time
+// comparisons on the secret.
 func IsValidBootstrapToken(token string) bool {
-	return BootstrapTokenRegexp.MatchString(token)
+	// Must be exactly two strings separated by "."
+	t := strings.Split(token, ".")
+	if len(t) != 2 {
+		return false
+	}
+
+	// Validate the ID: t[0]
+	// Using a Regexp for it is safe because the ID is public already
+	if !BootstrapTokenIDRegexp.MatchString(t[0]) {
+		return false
+	}
+
+	// Validate the secret with constant-time: t[1]
+	secret := t[1]
+	if len(secret) != api.BootstrapTokenSecretBytes { // Must be an exact size
+		return false
+	}
+	for i := range secret {
+		c := int(secret[i])
+		notDigit := (c < 48 || c > 57)   // Character is not in the 0-9 range
+		notLetter := (c < 97 || c > 122) // Character is not in the a-z range
+		if notDigit && notLetter {
+			return false
+		}
+	}
+	return true
 }
 
 // IsValidBootstrapTokenID returns whether the given string is valid as a Bootstrap Token ID and
