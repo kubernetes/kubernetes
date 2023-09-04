@@ -45,7 +45,7 @@ func TestReachableHTTPWithRetriableErrorCodes(ctx context.Context, host string, 
 	}
 
 	if err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, pollfn); err != nil {
-		if err == wait.ErrWaitTimeout {
+		if wait.Interrupted(err) {
 			framework.Failf("Could not reach HTTP service through %v:%v after %v", host, port, timeout)
 		} else {
 			framework.Failf("Failed to reach HTTP service through %v:%v: %v", host, port, err)

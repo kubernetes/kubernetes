@@ -27,10 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	testutils "k8s.io/kubernetes/test/utils"
-	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
@@ -170,7 +171,7 @@ var _ = SIGDescribe("NodeLease", func() {
 				return false, fmt.Errorf("node status heartbeat changed in %s (with no other status changes), was waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
 			})
 			// a timeout is acceptable, since it means we waited 5 minutes and didn't see any unwarranted node status updates
-			if err != nil && err != wait.ErrWaitTimeout {
+			if !wait.Interrupted(err) {
 				framework.ExpectNoError(err, "error waiting for infrequent nodestatus update")
 			}
 
