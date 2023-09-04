@@ -332,6 +332,7 @@ func setup(t *testing.T) (*testEnv, context.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	factory.Start(ctx.Done())
+	factory.WaitForCacheSync(ctx.Done())
 
 	env.mux = http.NewServeMux()
 	h := handler.NewOpenAPIService(&spec.Swagger{})
