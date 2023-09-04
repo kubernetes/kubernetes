@@ -1803,7 +1803,7 @@ func TestSyncPodStartMetrics(t *testing.T) {
 	pods := []*v1.Pod{podPending}
 	kl.podManager.SetPods(pods)
 
-	kl.SyncPod(context.Background(), kubetypes.SyncPodUpdate, podPending, nil, &kubecontainer.PodStatus{})
+	_, _ = kl.SyncPod(context.Background(), kubetypes.SyncPodUpdate, podPending, nil, &kubecontainer.PodStatus{})
 	metricsFamily, err := metrics.GetGather().Gather()
 	if err != nil {
 		t.Errorf("metrics gather error")
@@ -1821,13 +1821,13 @@ func TestSyncPodStartMetrics(t *testing.T) {
 			{Name: "1234", Image: "foo"},
 		},
 	})
-	podRunning.Status.ContainerStatuses = append(podRunning.Status.ContainerStatuses)
+
 	podRunning.Annotations[kubetypes.ConfigFirstSeenAnnotationKey] = kubetypes.NewTimestamp().GetString()
 	podRunning.Status.Phase = v1.PodRunning
 	pods = []*v1.Pod{podRunning}
 	kl.podManager.SetPods(pods)
 
-	kl.SyncPod(context.Background(), kubetypes.SyncPodUpdate, podRunning, nil, &kubecontainer.PodStatus{
+	_, _ = kl.SyncPod(context.Background(), kubetypes.SyncPodUpdate, podRunning, nil, &kubecontainer.PodStatus{
 		ID:        podRunning.UID,
 		Name:      podRunning.Name,
 		Namespace: podRunning.Namespace,
@@ -1844,7 +1844,6 @@ func TestSyncPodStartMetrics(t *testing.T) {
 	}
 	for _, mf := range metricsFamily {
 		if *mf.Name == "kubelet_pod_start_duration_seconds" {
-			t.Log(mf.Metric)
 			if *mf.Metric[0].Histogram.SampleCount == 0 {
 				t.Errorf("expected kubelet_pod_start_duration_seconds counter > 0")
 			}
