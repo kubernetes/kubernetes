@@ -489,16 +489,16 @@ func TestRequeueByBindFailure(t *testing.T) {
 	}
 
 	// first binding try should fail.
-	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodSchedulingError(cs, ns, "pod-1"))
+	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodSchedulingError(cs, ns, pod.Name))
 	if err != nil {
-		t.Fatalf("Expect pod-1 to be rejected by the bind plugin")
+		t.Fatalf("Expect pod-1 to be rejected by the bind plugin: %v", err)
 	}
 
 	// The pod should be enqueued to activeQ/backoffQ without any event.
 	// The pod should be scheduled in the second binding try.
-	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, "pod-1"))
+	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
 	if err != nil {
-		t.Fatalf("Expect pod-1 to be scheduled by the bind plugin in the second binding try")
+		t.Fatalf("Expect pod-1 to be scheduled by the bind plugin in the second binding try: %v", err)
 	}
 }
 
