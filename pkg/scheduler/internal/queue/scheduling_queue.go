@@ -165,9 +165,26 @@ type PriorityQueue struct {
 	// inFlightPods holds the UID of all pods which have been popped out for which Done
 	// hasn't been called yet - in other words, all pods that are currently being
 	// processed (being scheduled, in permit, or in the binding cycle).
-	inFlightPods map[types.UID]inFlightPod
-	// receivedEvents holds the events received by the scheduling queue.
-	receivedEvents *list.List
+	//
+	// The values in the map are the entry of each pod in the inFlightEvents list.
+	// The value of that entry is the *v1.Pod at the time that scheduling of that
+	// pod started, which can be useful for logging or debugging.
+	inFlightPods map[types.UID]*list.Element
+
+	// inFlightEvents holds the events received by the scheduling queue
+	// (entry value is clusterEvent) together with in-flight pods (entry
+	// value is *v1.Pod). Entries get added at the end while the mutex is
+	// locked, so they get serialized.
+	//
+	// The pod entries are added in Pop and used to track which events
+	// occurred after the pod scheduling attempt for that pod started.
+	// They get removed when the scheduling attempt is done, at which
+	// point all events that occurred in the meantime are processed.
+	//
+	// After removal of a pod, events at the start of the list are no
+	// longer needed because all of the other in-flight pods started
+	// later. Those events can be removed.
+	inFlightEvents *list.List
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
@@ -212,11 +229,6 @@ type QueueingHintFunction struct {
 	QueueingHintFn framework.QueueingHintFn
 }
 
-type inFlightPod struct {
-	// previousEvent is the latest observed event when the pod is popped.
-	previousEvent *list.Element
-}
-
 // clusterEvent has the event and involved objects.
 type clusterEvent struct {
 	event framework.ClusterEvent
@@ -224,11 +236,6 @@ type clusterEvent struct {
 	oldObj interface{}
 	// newObj is the object that involved this event.
 	newObj interface{}
-
-	// inFlightPodsNum is the counter of pods referring to this cluster event.
-	// It is initialized with the number of Pods being scheduled when the event is received,
-	// and is decremented when the scheduling for those Pods are Done().
-	inFlightPodsNum int
 }
 
 type priorityQueueOptions struct {
@@ -364,8 +371,8 @@ func NewPriorityQueue(
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
 		activeQ:                           heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
-		inFlightPods:                      make(map[types.UID]inFlightPod),
-		receivedEvents:                    list.New(),
+		inFlightPods:                      make(map[types.UID]*list.Element),
+		inFlightEvents:                    list.New(),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
 		metricsRecorder:                   options.metricsRecorder,
@@ -607,36 +614,48 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 // determineSchedulingHintForInFlightPod looks at the unschedulable plugins of the given Pod
 // and determines the scheduling hint for this Pod while checking the events that happened during in-flight.
 func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) framework.QueueingHint {
-	if len(pInfo.UnschedulablePlugins) == 0 {
-		// When there is no unschedulable plugin, we cannot have a guess which event makes this Pod schedulable.
-		// Here, we use the latest requestCycle so that this Pod won't be stuck in the unschedulable pod pool for a long time.
-		if p.receivedEvents.Len() != 0 {
+	logger.V(5).Info("Checking events for in-flight pod", "pod", klog.KObj(pInfo.Pod), "unschedulablePlugins", pInfo.UnschedulablePlugins, "inFlightEventsSize", p.inFlightEvents.Len(), "inFlightPodsSize", len(p.inFlightPods))
+
+	// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
+	// So, given pInfo should have been Pop()ed before,
+	// we can assume pInfo must be recorded in inFlightPods and thus inFlightEvents.
+	inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]
+	if !ok {
+		// This can happen while updating a pod. In that case pInfo.UnschedulablePlugins should
+		// be empty. If it is not, we may have a problem.
+		if len(pInfo.UnschedulablePlugins) != 0 {
+			logger.Error(nil, "In flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler.", "pod", klog.KObj(pInfo.Pod))
+			return framework.QueueAfterBackoff
+		}
+		if p.inFlightEvents.Len() > len(p.inFlightPods) {
 			return framework.QueueAfterBackoff
 		}
 		return framework.QueueSkip
 	}
 
-	inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]
-	if !ok {
-		// It shouldn't reach here unless there is a bug somewhere.
-		// But, set podSchedulingCycle to moveRequestCycle
-		// so that this Pod won't stuck in the unschedulable pod pool.
-		logger.Error(nil, "In flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler.", "pod", klog.KObj(pInfo.Pod))
-		return framework.QueueAfterBackoff
+	if len(pInfo.UnschedulablePlugins) == 0 {
+		// When there is no unschedulable plugin, we cannot have a guess which event makes this Pod schedulable.
+		// If there has been any concurrent event for the pod, it has to go to the backoff queue because the event
+		// may have been relevant.
+		for event := inFlightPod.Next(); event != nil; event = event.Next() {
+			_, ok := event.Value.(*clusterEvent)
+			if ok {
+				// There really was a concurrent event.
+				return framework.QueueAfterBackoff
+			}
+		}
+		return framework.QueueSkip
 	}
 
-	// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
-	// So, given pInfo should have been Pop()ed before,
-	// we can assume pInfo must be recorded in inFlightPods.
 	// check if there is an event that makes this Pod schedulable based on pInfo.UnschedulablePlugins.
-	event := p.receivedEvents.Front()
-	if inFlightPod.previousEvent != nil {
-		// only check events that happened after the Pod was popped.
-		event = inFlightPod.previousEvent.Next()
-	}
 	schedulingHint := framework.QueueSkip
-	for ; event != nil; event = event.Next() {
-		e := event.Value.(*clusterEvent)
+	for event := inFlightPod.Next(); event != nil; event = event.Next() {
+		e, ok := event.Value.(*clusterEvent)
+		if !ok {
+			// Must be another pod. Can be ignored.
+			continue
+		}
+		logger.V(5).Info("Checking event for in-flight pod", "pod", klog.KObj(pInfo.Pod), "event", e.event.Label)
 
 		hint := p.isPodWorthRequeuing(logger, pInfo, e.event, e.oldObj, e.newObj)
 		if hint == framework.QueueSkip {
@@ -816,11 +835,9 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	pInfo := obj.(*framework.QueuedPodInfo)
 	pInfo.Attempts++
 	p.schedulingCycle++
-	// In flight, no move request yet.
+	// In flight, no concurrent events yet.
 	if p.isSchedulingQueueHintEnabled {
-		p.inFlightPods[pInfo.Pod.UID] = inFlightPod{
-			previousEvent: p.receivedEvents.Back(),
-		}
+		p.inFlightPods[pInfo.Pod.UID] = p.inFlightEvents.PushBack(pInfo.Pod)
 	}
 
 	for plugin := range pInfo.UnschedulablePlugins {
@@ -842,7 +859,7 @@ func (p *PriorityQueue) Done(pod types.UID) {
 func (p *PriorityQueue) done(pod types.UID) {
 	if !p.isSchedulingQueueHintEnabled {
 		// do nothing if schedulingQueueHint is disabled.
-		// In that case, we don't have inFlightPods and receivedEvents.
+		// In that case, we don't have inFlightPods and inFlightEvents.
 		return
 	}
 	inFlightPod, ok := p.inFlightPods[pod]
@@ -852,35 +869,25 @@ func (p *PriorityQueue) done(pod types.UID) {
 	}
 	delete(p.inFlightPods, pod)
 
-	// remove events which is only referred from this Pod
-	// so that the receivedEvents map doesn't grow infinitely.
+	// Remove the pod from the list.
+	p.inFlightEvents.Remove(inFlightPod)
 
-	// Find the event that we should start.
-	// case1. If the previousEvent is nil, it means no receivedEvents when this Pod's scheduling started.
-	//        We start from the first event in the receivedEvents.
-	// case2. If the previousEvent is not nil, but the inFlightPodsNum is 0,
-	//        this previousEvent is removed from the list already.
-	//        We start from the first event in the receivedEvents.
-	event := p.receivedEvents.Front()
-	if inFlightPod.previousEvent != nil && inFlightPod.previousEvent.Value.(*clusterEvent).inFlightPodsNum != 0 {
-		// case3. If the previousEvent is not nil, and the inFlightPodsNum is not 0,
-		//        we can start from the next event of the previousEvent.
-		event = inFlightPod.previousEvent.Next()
-	}
-
-	for event != nil {
-		e := event.Value.(*clusterEvent)
-		// decrement inFlightPodsNum on events that happened after the Pod is popped.
-		e.inFlightPodsNum--
-		if e.inFlightPodsNum <= 0 {
-			// remove the event from the list if no Pod refers to it.
-			eventToDelete := event
-			// we need to take next event before removal.
-			event = event.Next()
-			p.receivedEvents.Remove(eventToDelete)
-			continue
+	// Remove events which are only referred to by this Pod
+	// so that the inFlightEvents list doesn't grow infinitely.
+	// If the pod was at the head of the list, then all
+	// events between it and the next pod are no longer needed
+	// and can be removed.
+	for {
+		e := p.inFlightEvents.Front()
+		if e == nil {
+			// Empty list.
+			break
 		}
-		event = event.Next()
+		if _, ok := e.Value.(*clusterEvent); !ok {
+			// A pod, must stop pruning.
+			break
+		}
+		p.inFlightEvents.Remove(e)
 	}
 }
 
@@ -1108,14 +1115,14 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 	// (no need to check the feature gate because there is always no p.inFlightPods when the feature is disabled.)
 	if len(p.inFlightPods) != 0 {
+		logger.V(5).Info("Event received while pods are in flight", "event", event.Label, "numPods", len(p.inFlightPods))
 		// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
 		// AddUnschedulableIfNotPresent we need to know whether events were
 		// observed while scheduling them.
-		p.receivedEvents.PushBack(&clusterEvent{
-			event:           event,
-			inFlightPodsNum: len(p.inFlightPods),
-			oldObj:          oldObj,
-			newObj:          newObj,
+		p.inFlightEvents.PushBack(&clusterEvent{
+			event:  event,
+			oldObj: oldObj,
+			newObj: newObj,
 		})
 	}
 
