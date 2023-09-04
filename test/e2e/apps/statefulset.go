@@ -1836,7 +1836,7 @@ func pollReadWithTimeout(ctx context.Context, statefulPod statefulPodTester, sta
 		return true, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		return fmt.Errorf("timed out when trying to read value for key %v from stateful pod %d", key, statefulPodNumber)
 	}
 	return err
@@ -2058,7 +2058,7 @@ func updateStatefulSetWithRetries(ctx context.Context, c clientset.Interface, na
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %v", name, updateErr)
 	}
 	return statefulSet, pollErr

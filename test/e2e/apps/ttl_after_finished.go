@@ -138,7 +138,7 @@ func updateJobWithRetries(ctx context.Context, c clientset.Interface, namespace,
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("couldn't apply the provided updated to job %q: %v", name, updateErr)
 	}
 	return job, pollErr

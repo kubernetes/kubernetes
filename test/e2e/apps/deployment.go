@@ -1554,7 +1554,7 @@ func watchRecreateDeployment(ctx context.Context, c clientset.Interface, d *apps
 	ctxUntil, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_, err := watchtools.Until(ctxUntil, d.ResourceVersion, w, condition)
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("deployment %q never completed: %#v", d.Name, status)
 	}
 	return err
@@ -1578,7 +1578,7 @@ func waitForDeploymentOldRSsNum(ctx context.Context, c clientset.Interface, ns, 
 		}
 		return len(oldRSs) == desiredRSNum, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("%d old replica sets were not cleaned up for deployment %q", len(oldRSs)-desiredRSNum, deploymentName)
 		testutil.LogReplicaSetsOfDeployment(d, oldRSs, nil, framework.Logf)
 	}
@@ -1595,7 +1595,7 @@ func waitForReplicaSetDesiredReplicas(ctx context.Context, rsClient appsclient.R
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(replicaSet.Spec.Replicas) && rs.Status.Replicas == *(rs.Spec.Replicas), nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never had desired number of replicas", replicaSet.Name)
 	}
 	return err
@@ -1611,7 +1611,7 @@ func waitForReplicaSetTargetSpecReplicas(ctx context.Context, c clientset.Interf
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration && *rs.Spec.Replicas == targetReplicaNum, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never had desired number of .spec.replicas", replicaSet.Name)
 	}
 	return err
