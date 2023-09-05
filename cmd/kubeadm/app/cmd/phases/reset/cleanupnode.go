@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -84,10 +85,13 @@ func runCleanupNode(c workflow.RunData) error {
 		// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
 		fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
 		// In case KubeletRunDirectory holds a symbolic link, evaluate it
-		kubeletRunDir, err := absoluteKubeletRunDirectory()
+		kubeletRunDir, retainDirs, err := absoluteKubeletRunDirectory()
 		if err == nil {
 			// Only clean absoluteKubeletRunDirectory if umountDirsCmd passed without error
-			dirsToClean = append(dirsToClean, kubeletRunDir)
+			err = cleanKubeletRunDir(kubeletRunDir, retainDirs)
+			if err != nil {
+				klog.Warningf("[reset] Failed to remove dir: %q [%v]\n", kubeletRunDir, err)
+			}
 		}
 	} else {
 		fmt.Printf("[reset] Would unmount mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
@@ -128,18 +132,44 @@ func runCleanupNode(c workflow.RunData) error {
 	return nil
 }
 
-func absoluteKubeletRunDirectory() (string, error) {
+// cleanKubeletRunDir goes over the kubelet run directory tree (specified by runDir) and cleans up everything
+func cleanKubeletRunDir(runDir string, retainDirs []string) error {
+	// If the kubelet run directory doesn't even exist there's nothing to do, Do not report the error
+	if _, err := os.Stat(runDir); os.IsNotExist(err) {
+		return nil
+	}
+
+	err := filepath.WalkDir(runDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		isRetainPath, isSkipPath := checkPath(path, retainDirs)
+		if isRetainPath {
+			return nil
+		}
+		if isSkipPath {
+			return filepath.SkipDir
+		}
+		if err = os.RemoveAll(path); err != nil {
+			return err
+		}
+		return nil
+	})
+	return err
+}
+
+func absoluteKubeletRunDirectory() (string, []string, error) {
 	absoluteKubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
 	if err != nil {
 		klog.Warningf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v\n", kubeadmconstants.KubeletRunDirectory, err)
-		return "", err
+		return "", []string{}, err
 	}
-	err = unmountKubeletDirectory(absoluteKubeletRunDirectory)
+	retainDirs, err := unmountKubeletDirectory(absoluteKubeletRunDirectory)
 	if err != nil {
-		klog.Warningf("[reset] Failed to unmount mounted directories in %s \n", kubeadmconstants.KubeletRunDirectory)
-		return "", err
+		klog.Warningf("[reset] Failed to unmount mounted directories in %s \n err: %s \n", kubeadmconstants.KubeletRunDirectory, err.Error())
+		return "", []string{}, err
 	}
-	return absoluteKubeletRunDirectory, nil
+	return absoluteKubeletRunDirectory, retainDirs, nil
 }
 
 func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
@@ -209,7 +239,19 @@ func CleanDir(filePath string) error {
 			return err
 		}
 	}
-	return nil
+	return err
+}
+
+func checkPath(path string, dirsToBeRetain []string) (bool, bool) {
+	for _, retainPath := range dirsToBeRetain {
+		if strings.HasPrefix(retainPath, path) {
+			if strings.EqualFold(retainPath, path) {
+				return false, true
+			}
+			return true, false
+		}
+	}
+	return false, false
 }
 
 func IsDirEmpty(dir string) (bool, error) {

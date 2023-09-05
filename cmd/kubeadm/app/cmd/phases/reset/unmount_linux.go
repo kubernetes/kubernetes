@@ -24,15 +24,14 @@ import (
 	"strings"
 	"syscall"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 )
 
 // unmountKubeletDirectory unmounts all paths that contain KubeletRunDirectory
-func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
+func unmountKubeletDirectory(absoluteKubeletRunDirectory string) ([]string, error) {
 	raw, err := os.ReadFile("/proc/mounts")
 	if err != nil {
-		return err
+		return []string{}, err
 	}
 
 	if !strings.HasSuffix(absoluteKubeletRunDirectory, "/") {
@@ -41,7 +40,7 @@ func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
 	}
 
 	mounts := strings.Split(string(raw), "\n")
-	errs := []error{}
+	retainDirs := []string{}
 	for _, mount := range mounts {
 		m := strings.Split(mount, " ")
 		if len(m) < 2 || !strings.HasPrefix(m[1], absoluteKubeletRunDirectory) {
@@ -49,9 +48,9 @@ func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
 		}
 		if err := syscall.Unmount(m[1], syscall.MNT_DETACH); err != nil {
 			klog.Warningf("[reset] Failed to unmount mounted directory in %s: %s", absoluteKubeletRunDirectory, m[1])
-			// aggregate error to terminate reset action to avoid recursive deleting contents within any active mount points.
-			errs = append(errs, err)
+			// Aggregate umount failed directories and skip to remove them when cleaning up the data of node.
+			retainDirs = append(retainDirs, m[1])
 		}
 	}
-	return utilerrors.NewAggregate(errs)
+	return retainDirs, nil
 }
