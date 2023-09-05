@@ -53,6 +53,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&EgressSelectorConfiguration{},
 	)
 	scheme.AddKnownTypes(ConfigSchemeGroupVersion,
+		&AuthenticationConfiguration{},
 		&TracingConfiguration{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
