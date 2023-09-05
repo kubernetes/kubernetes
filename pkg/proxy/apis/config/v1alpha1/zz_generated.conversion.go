@@ -215,6 +215,9 @@ func autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyCon
 	out.Min = (*int32)(unsafe.Pointer(in.Min))
 	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
 	out.TCPCloseWaitTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
+	out.TCPBeLiberal = (*bool)(unsafe.Pointer(in.TCPBeLiberal))
+	out.UDPTimeout = in.UDPTimeout
+	out.UDPStreamTimeout = in.UDPStreamTimeout
 	return nil
 }
 
@@ -228,6 +231,9 @@ func autoConvert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyCon
 	out.Min = (*int32)(unsafe.Pointer(in.Min))
 	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
 	out.TCPCloseWaitTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
+	out.TCPBeLiberal = (*bool)(unsafe.Pointer(in.TCPBeLiberal))
+	out.UDPTimeout = in.UDPTimeout
+	out.UDPStreamTimeout = in.UDPStreamTimeout
 	return nil
 }
 
