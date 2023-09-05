@@ -50,6 +50,7 @@ func validNewVolumeAttributesClass(name string) *storageapi.VolumeAttributesClas
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
+		DriverName: "fake",
 		Parameters: map[string]string{
 			"foo": "bar",
 		},

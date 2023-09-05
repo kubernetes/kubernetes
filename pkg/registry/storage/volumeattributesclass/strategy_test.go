@@ -37,6 +37,7 @@ func TestVolumeAttributesClassStrategy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-class",
 		},
+		DriverName: "fake",
 		Parameters: map[string]string{
 			"foo": "bar",
 		},
@@ -54,6 +55,7 @@ func TestVolumeAttributesClassStrategy(t *testing.T) {
 			Name:            "valid-class-2",
 			ResourceVersion: "4",
 		},
+		DriverName: "fake",
 		Parameters: map[string]string{
 			"foo": "bar",
 		},

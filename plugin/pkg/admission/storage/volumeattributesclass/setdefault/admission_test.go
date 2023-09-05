@@ -262,10 +262,16 @@ func TestAdmission(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 		ctrl.SetExternalKubeInformerFactory(informerFactory)
 		for _, c := range test.vacs {
-			informerFactory.Storage().V1alpha1().VolumeAttributesClasses().Informer().GetStore().Add(c)
+			err := informerFactory.Storage().V1alpha1().VolumeAttributesClasses().Informer().GetStore().Add(c)
+			if err != nil {
+				t.Errorf("Test %q: unexpected error adding VolumeAttributesClass %q: %v", test.name, c.Name, err)
+			}
 		}
 		for _, c := range test.scs {
-			informerFactory.Storage().V1().StorageClasses().Informer().GetStore().Add(c)
+			err := informerFactory.Storage().V1().StorageClasses().Informer().GetStore().Add(c)
+			if err != nil {
+				t.Errorf("Test %q: unexpected error adding StorageClass %q: %v", test.name, c.Name, err)
+			}
 		}
 		attrs := admission.NewAttributesRecord(
 			claim, // new object
