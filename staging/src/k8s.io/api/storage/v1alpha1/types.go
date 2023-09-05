@@ -254,7 +254,7 @@ type CSIStorageCapacityList struct {
 
 // +genclient
 // +genclient:nonNamespaced
-// +k8s:prerelease-lifecycle-gen:introduced=1.28
+// +k8s:prerelease-lifecycle-gen:introduced=1.29
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeAttributesClass represents a class of volume attributes. It holds the mutable
@@ -270,17 +270,17 @@ type VolumeAttributesClass struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Name of the driver
+	// Name of the csi driver
 	DriverName string `json:"driverName" protobuf:"bytes,2,opt,name=driverName"`
 
-	// parameters holds the mutable attributes of volumes for the provisioner that should
+	// parameters holds the mutable attributes of volumes for the csi driver that should
 	// create and update volumes of this volume attributes class. And these parameters are
 	// immutable.
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 }
 
-// +k8s:prerelease-lifecycle-gen:introduced=1.28
+// +k8s:prerelease-lifecycle-gen:introduced=1.29
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeAttributesClassList is a collection of VolumeAttributesClass objects.

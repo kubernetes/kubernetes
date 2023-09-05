@@ -4855,6 +4855,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 
 func TestPrintPersistentVolumeClaim(t *testing.T) {
 	volumeMode := api.PersistentVolumeFilesystem
+	myVacn := "my-vacn"
 	myScn := "my-scn"
 	tests := []struct {
 		pvc      api.PersistentVolumeClaim
@@ -4878,7 +4879,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "Bound", "my-volume", "4Gi", "ROX", "", "<unknown>", "Filesystem"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "Bound", "my-volume", "4Gi", "ROX", "", "<unset>", "<unknown>", "Filesystem"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -4897,7 +4898,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"test2", "Lost", "", "", "", "", "<unknown>", "Filesystem"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test2", "Lost", "", "", "", "", "<unset>", "<unknown>", "Filesystem"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -4917,7 +4918,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"test3", "Pending", "my-volume", "10Gi", "RWX", "", "<unknown>", "Filesystem"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test3", "Pending", "my-volume", "10Gi", "RWX", "", "<unset>", "<unknown>", "Filesystem"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -4938,7 +4939,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"test4", "Pending", "my-volume", "10Gi", "RWO", "my-scn", "<unknown>", "Filesystem"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test4", "Pending", "my-volume", "10Gi", "RWO", "my-scn", "<unset>", "<unknown>", "Filesystem"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -4958,7 +4959,28 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "Pending", "my-volume", "10Gi", "RWO", "my-scn", "<unknown>", "<unset>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "Pending", "my-volume", "10Gi", "RWO", "my-scn", "<unset>", "<unknown>", "<unset>"}}},
+		},
+		{
+			// Test name, num of containers, restarts, container ready status
+			pvc: api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test5",
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:                "my-volume",
+					StorageClassName:          &myScn,
+					VolumeAttributesClassName: &myVacn,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Phase:       api.ClaimPending,
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "Pending", "my-volume", "10Gi", "RWO", "my-scn", "my-vacn", "<unknown>", "<unset>"}}},
 		},
 	}
 
@@ -5357,8 +5379,9 @@ func TestPrintVolumeAttributesClass(t *testing.T) {
 					Name:              "vac1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
+				DriverName: "fake",
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"vac1", int64(0), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"vac1", "fake", int64(0), "0s"}}},
 		},
 		{
 			vac: storage.VolumeAttributesClass{
@@ -5366,12 +5389,13 @@ func TestPrintVolumeAttributesClass(t *testing.T) {
 					Name:              "vac2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
+				DriverName: "fake",
 				Parameters: map[string]string{
 					"iops":       "500",
 					"throughput": "50MiB/s",
 				},
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"vac2", int64(2), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"vac2", "fake", int64(2), "0s"}}},
 		},
 		{
 			vac: storage.VolumeAttributesClass{
@@ -5379,12 +5403,13 @@ func TestPrintVolumeAttributesClass(t *testing.T) {
 					Name:              "vac3",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
+				DriverName: "fake",
 				Parameters: map[string]string{
 					"iops":       "500",
 					"throughput": "50MiB/s",
 				},
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"vac3", int64(2), "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"vac3", "fake", int64(2), "5m"}}},
 		},
 	}
 

@@ -43697,7 +43697,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClass(ref common.Referenc
 					},
 					"driverName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the driver",
+							Description: "Name of the csi driver",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -43705,7 +43705,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClass(ref common.Referenc
 					},
 					"parameters": {
 						SchemaProps: spec.SchemaProps{
-							Description: "parameters holds the mutable attributes of volumes for the provisioner that should create and update volumes of this volume attributes class. And these parameters are immutable.",
+							Description: "parameters holds the mutable attributes of volumes for the csi driver that should create and update volumes of this volume attributes class. And these parameters are immutable.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,

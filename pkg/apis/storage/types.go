@@ -688,17 +688,16 @@ type VolumeAttributesClass struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Name of the driver
+	// Name of the csi driver
 	DriverName string
 
-	// parameters holds the mutable attributes of volumes for the provisioner that should
+	// parameters holds the mutable attributes of volumes for the csi driver that should
 	// create and update volumes of this volume attributes class. And these parameters are
 	// immutable.
 	// +optional
 	Parameters map[string]string
 }
 
-// +k8s:prerelease-lifecycle-gen:introduced=1.28
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeAttributesClassList is a collection of VolumeAttributesClass objects.
