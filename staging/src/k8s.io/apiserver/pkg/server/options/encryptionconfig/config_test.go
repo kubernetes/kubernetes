@@ -1839,6 +1839,8 @@ func TestComputeEncryptionConfigHash(t *testing.T) {
 }
 
 func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
+	defaultUseSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF)
+
 	origNowFunc := envelopekmsv2.NowFunc
 	now := origNowFunc() // freeze time
 	t.Cleanup(func() { envelopekmsv2.NowFunc = origNowFunc })
@@ -1888,7 +1890,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 		{
 			name:        "happy path, with previous state",
 			service:     &testKMSv2EnvelopeService{err: fmt.Errorf("broken")}, // not called
-			state:       validState(t, "2", now),
+			state:       validState(t, "2", now, false),
 			statusKeyID: "2",
 			wantState: envelopekmsv2.State{
 				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2"},
@@ -1901,7 +1903,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 		{
 			name:        "happy path, with previous state, useSeed=true",
 			service:     &testKMSv2EnvelopeService{keyID: "2"},
-			state:       validState(t, "2", now),
+			state:       validState(t, "2", now, false),
 			useSeed:     true,
 			statusKeyID: "2",
 			wantState: envelopekmsv2.State{
@@ -1917,9 +1919,72 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			wantErr: "",
 		},
 		{
+			name:        "happy path, with previous useSeed=true state",
+			service:     &testKMSv2EnvelopeService{keyID: "2"},
+			state:       validState(t, "2", now, true),
+			statusKeyID: "2",
+			wantState: envelopekmsv2.State{
+				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2"},
+				ExpirationTimestamp: now.Add(3 * time.Minute),
+			},
+			wantEncryptCalls: 1,
+			wantLogs: []string{
+				`"encrypting content using envelope service" uid="panda"`,
+				fmt.Sprintf(`"successfully rotated DEK" uid="panda" useSeed=false newKeyIDHash="sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35" oldKeyIDHash="sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35" expirationTimestamp="%s"`,
+					now.Add(3*time.Minute).Format(time.RFC3339)),
+			},
+			wantErr: "",
+		},
+		{
+			name:        "happy path, with previous useSeed=true state, useSeed=true",
+			service:     &testKMSv2EnvelopeService{keyID: "2"},
+			state:       validState(t, "2", now, true),
+			useSeed:     true,
+			statusKeyID: "2",
+			wantState: envelopekmsv2.State{
+				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2", EncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED},
+				ExpirationTimestamp: now.Add(3 * time.Minute),
+			},
+			wantEncryptCalls: 0,
+			wantLogs:         nil,
+			wantErr:          "",
+		},
+		{
+			name:        "happy path, with previous state, useSeed=default",
+			service:     &testKMSv2EnvelopeService{keyID: "2"},
+			state:       validState(t, "2", now, false),
+			useSeed:     defaultUseSeed,
+			statusKeyID: "2",
+			wantState: envelopekmsv2.State{
+				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2", EncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED},
+				ExpirationTimestamp: now.Add(3 * time.Minute),
+			},
+			wantEncryptCalls: 1,
+			wantLogs: []string{
+				`"encrypting content using envelope service" uid="panda"`,
+				fmt.Sprintf(`"successfully rotated DEK" uid="panda" useSeed=true newKeyIDHash="sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35" oldKeyIDHash="sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35" expirationTimestamp="%s"`,
+					now.Add(3*time.Minute).Format(time.RFC3339)),
+			},
+			wantErr: "",
+		},
+		{
+			name:        "happy path, with previous useSeed=true state, useSeed=default",
+			service:     &testKMSv2EnvelopeService{keyID: "2"},
+			state:       validState(t, "2", now, true),
+			useSeed:     defaultUseSeed,
+			statusKeyID: "2",
+			wantState: envelopekmsv2.State{
+				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2", EncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED},
+				ExpirationTimestamp: now.Add(3 * time.Minute),
+			},
+			wantEncryptCalls: 0,
+			wantLogs:         nil,
+			wantErr:          "",
+		},
+		{
 			name:        "previous state expired but key ID matches",
 			service:     &testKMSv2EnvelopeService{err: fmt.Errorf("broken")}, // not called
-			state:       validState(t, "3", now.Add(-time.Hour)),
+			state:       validState(t, "3", now.Add(-time.Hour), false),
 			statusKeyID: "3",
 			wantState: envelopekmsv2.State{
 				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "3"},
@@ -1932,7 +1997,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 		{
 			name:        "previous state expired but key ID does not match",
 			service:     &testKMSv2EnvelopeService{keyID: "4"},
-			state:       validState(t, "3", now.Add(-time.Hour)),
+			state:       validState(t, "3", now.Add(-time.Hour), false),
 			statusKeyID: "4",
 			wantState: envelopekmsv2.State{
 				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "4"},
@@ -1949,7 +2014,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 		{
 			name:        "service down but key ID does not match",
 			service:     &testKMSv2EnvelopeService{err: fmt.Errorf("broken")},
-			state:       validState(t, "4", now.Add(7*time.Minute)),
+			state:       validState(t, "4", now.Add(7*time.Minute), false),
 			statusKeyID: "5",
 			wantState: envelopekmsv2.State{
 				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "4"},
@@ -1981,7 +2046,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 		{
 			name:        "invalid service response, with previous state",
 			service:     &testKMSv2EnvelopeService{keyID: "3", encryptAnnotations: map[string][]byte{"panda": nil}},
-			state:       validState(t, "2", now),
+			state:       validState(t, "2", now, false),
 			statusKeyID: "3",
 			wantState: envelopekmsv2.State{
 				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2"},
@@ -2083,10 +2148,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 	}
 }
 
-func validState(t *testing.T, keyID string, exp time.Time) envelopekmsv2.State {
+func validState(t *testing.T, keyID string, exp time.Time, useSeed bool) envelopekmsv2.State {
 	t.Helper()
-
-	useSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF) // match the current default behavior
 
 	transformer, encObject, cacheKey, err := envelopekmsv2.GenerateTransformer(testContext(t), "", &testKMSv2EnvelopeService{keyID: keyID}, useSeed)
 	if err != nil {
