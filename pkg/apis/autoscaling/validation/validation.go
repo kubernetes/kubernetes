@@ -344,10 +344,6 @@ func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Pa
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
-	if src.Target.Value == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
-	}
-
 	return allErrs
 }
 
@@ -356,10 +352,6 @@ func validateExternalSource(src *autoscaling.ExternalMetricSource, fldPath *fiel
 
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-
-	if src.Target.Value == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value for metric or a per-pod target"))
-	}
 
 	if src.Target.Value != nil && src.Target.AverageValue != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("value"), "may not set both a target value for metric and a per-pod target"))
@@ -373,10 +365,6 @@ func validatePodsSource(src *autoscaling.PodsMetricSource, fldPath *field.Path) 
 
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-
-	if src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must specify a positive target averageValue"))
-	}
 
 	return allErrs
 }
@@ -442,11 +430,11 @@ func validateMetricTarget(mt autoscaling.MetricTarget, fldPath *field.Path) fiel
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), mt.Type, "must be either Utilization, Value, or AverageValue"))
 	}
 
-	if mt.Type == autoscaling.ValueMetricType && mt.Value == nil && mt.AverageValue != nil {
+	if mt.Type == autoscaling.ValueMetricType && mt.Value == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), mt.Value, "must be set for metric target type Value"))
 	}
 
-	if mt.Type == autoscaling.AverageValueMetricType && mt.AverageValue == nil && mt.Value != nil {
+	if mt.Type == autoscaling.AverageValueMetricType && mt.AverageValue == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("averageValue"), mt.AverageValue, "must be set for metric target type AverageValue"))
 	}
 
