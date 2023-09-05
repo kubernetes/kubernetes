@@ -19,6 +19,8 @@ package storage
 import (
 	"context"
 	"fmt"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"strings"
 	"time"
 
@@ -43,6 +45,11 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+)
+
+const (
+	// pvDeletionInTreeProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
+	pvDeletionInTreeProtectionFinalizer = "kubernetes.io/pv-controller"
 )
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
@@ -372,6 +379,73 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				framework.Logf("Removing second PVC, waiting for the recycler to finish before cleanup.")
 				framework.ExpectNoError(e2epv.DeletePVCandValidatePV(ctx, c, f.Timeouts, ns, pvc, pv, v1.VolumeAvailable))
 				pvc = nil
+			})
+		})
+
+		ginkgo.Context("[Feature:HonorPVReclaimPolicy] delete pv prior", func() {
+			ginkgo.AfterEach(func() {
+				framework.Logf("AfterEach: Cleaning up test resources.")
+				if errs := e2epv.PVPVCCleanup(context.TODO(), c, ns, pv, pvc); len(errs) > 0 {
+					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				}
+			})
+
+			// Waiting for the pvc and pv bound and then delete the pv before pvc
+			ginkgo.It("to exercise deletion of PV prior to deletion of PVC for a Bound PV-PVC pair", func() {
+
+				e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.HonorPVReclaimPolicy)
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				defer cancel()
+				testPVCObj := e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
+				testPVC, err := e2epv.CreatePVC(ctx, c, ns, testPVCObj)
+				framework.ExpectNoError(err)
+
+				pvcClaims := []*v1.PersistentVolumeClaim{testPVC}
+				var pvs []*v1.PersistentVolume
+
+				// 1. verify that the PV and PVC are bound
+				pvs, err = e2epv.WaitForPVClaimBoundPhase(ctx, c, pvcClaims, framework.ClaimProvisionTimeout)
+
+				framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
+				gomega.Expect(pvs).To(gomega.HaveLen(1))
+
+				// 2. wait for finalizer to be added to pv
+				ginkgo.By(fmt.Sprintf("Wait for finalizer %s to be added to pv %s", pvDeletionInTreeProtectionFinalizer, pv.Name))
+				err = e2epv.WaitForPVFinalizer(ctx, c, pv.Name, pvDeletionInTreeProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
+				framework.ExpectNoError(err)
+
+				// 3. delete pv
+				ginkgo.By("Delete pv")
+				err = e2epv.DeletePersistentVolume(ctx, c, pv.Name)
+				framework.ExpectNoError(err)
+
+				// 4. delete pvc
+				ginkgo.By("Delete pvc")
+				err = e2epv.DeletePersistentVolumeClaim(ctx, c, pvc.Name, ns)
+				framework.ExpectNoError(err)
+
+				// 5. waiting for pvc to be deleted
+				ginkgo.By("Wating for the pvc to be deleted")
+				framework.ExpectNoError(waitForPersistentVolumeClaimDeleted(ctx, c, ns, pv.Name, 2*time.Second, 60*time.Second),
+					"Failed to delete PVC", pvc.Name)
+
+				// 6. check the pv whether it's exists
+				ginkgo.By("check the pv whether it's exists")
+				exists, err := e2epv.CheckPVExists(ctx, c, pv.Name, 2*time.Second, 60*time.Second)
+				framework.ExpectNoError(err)
+				if !exists {
+					framework.ExpectNoError(fmt.Errorf("pv was deleted"))
+				}
+
+				// 7. remove the finalizer on pv
+				ginkgo.By("Remove the finalizer on pv")
+				err = e2epv.RemovePVFinalizer(ctx, c, pv.Name, pvDeletionInTreeProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
+				framework.ExpectNoError(err)
+
+				// 8. waiting for pv to be deleted
+				ginkgo.By("Wating for the pv to be deleted")
+				framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(ctx, c, pv.Name, 2*time.Second, 60*time.Second),
+					"Failed to delete PV ", pv.Name)
 			})
 		})
 	})

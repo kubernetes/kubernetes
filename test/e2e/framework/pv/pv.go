@@ -901,3 +901,105 @@ func GetDefaultFSType() string {
 	}
 	return "ext4"
 }
+
+// CheckPVExists to check pv whether it's exists or until timeout occurs, whichever comes first.
+// If return 'true', prove the pv that exists, otherwise it does not exist
+func CheckPVExists(ctx context.Context, c clientset.Interface, pvName string, poll, timeout time.Duration) (bool, error) {
+	framework.Logf("Waiting up to %v for checking PersistentVolume %s that whether it exists", timeout, pvName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		pv, err := c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+		if err == nil && !pv.DeletionTimestamp.IsZero() {
+			framework.Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
+			continue
+		}
+
+		if apierrors.IsNotFound(err) {
+			framework.Logf("PersistentVolume %s was removed", pvName)
+			return false, nil
+		}
+		framework.Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, poll, err)
+	}
+	return true, nil
+}
+
+// RemovePVFinalizer to remove finalizer from pv
+func RemovePVFinalizer(ctx context.Context, cs clientset.Interface, pvName, finalizer string, poll, timeout time.Duration) error {
+	var (
+		err    error
+		pv     *v1.PersistentVolume
+		exists bool
+	)
+	finalizers := make([]string, 0)
+	pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+	if err != nil {
+		framework.Logf("Failed to get PersistentVolume %s with err: %v.", pvName, err)
+		return err
+	}
+	for _, f := range pv.Finalizers {
+		if f == finalizer {
+			exists = true
+		} else {
+			finalizers = append(finalizers, f)
+		}
+	}
+
+	if exists {
+		pv.Finalizers = finalizers
+		if _, err = cs.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{}); err != nil {
+			if err != nil {
+				framework.Logf("failed to remove finalizer from PV %v", pvName)
+				return err
+			}
+		}
+	} else {
+		return nil
+	}
+	framework.Logf("Waiting up to %v for finalizer %s to be removed from PersistentVolume %s", timeout, pvName, finalizer)
+	if successful := utils.WaitUntil(poll, timeout, func() bool {
+		pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Failed to get PersistentVolume %s with err: %v. Will retry in %v", pvName, err, timeout)
+			return false
+		}
+		for _, f := range pv.Finalizers {
+			if f == finalizer {
+				return false
+			}
+		}
+		return true
+	}); successful {
+		return nil
+	}
+	if err == nil {
+		err = fmt.Errorf("finalizer %s not removed to pv %s", finalizer, pvName)
+	}
+	return err
+}
+
+// WaitForPVFinalizer waits for a finalizer to be added to a PV.
+func WaitForPVFinalizer(ctx context.Context, cs clientset.Interface, pvName, finalizer string, poll, timeout time.Duration) error {
+	var (
+		err error
+		pv  *v1.PersistentVolume
+	)
+	framework.Logf("Waiting up to %v for finalizer %s to be added to PersistentVolume %s", timeout, pvName, finalizer)
+	if successful := utils.WaitUntil(poll, timeout, func() bool {
+		pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Failed to get PersistentVolume %s with err: %v. Will retry in %v", pvName, err, timeout)
+			return false
+		}
+		for _, f := range pv.Finalizers {
+			if f == finalizer {
+				return true
+			}
+		}
+		return false
+	}); successful {
+		return nil
+	}
+	if err == nil {
+		err = fmt.Errorf("finalizer %s not added to pv %s", finalizer, pvName)
+	}
+	return err
+}
