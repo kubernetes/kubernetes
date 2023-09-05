@@ -33,6 +33,7 @@ import (
 	"unicode"
 
 	"github.com/fatih/camelcase"
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -1645,7 +1646,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 
 	pc := d.CoreV1().Pods(namespace)
 
-	pods, err := getPodsForPVC(pc, pvc.Name, describerSettings)
+	pods, err := getPodsForPVC(pc, pvc, describerSettings)
 	if err != nil {
 		return "", err
 	}
@@ -1655,7 +1656,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	return describePersistentVolumeClaim(pvc, events, pods)
 }
 
-func getPodsForPVC(c corev1client.PodInterface, pvcName string, settings DescriberSettings) ([]corev1.Pod, error) {
+func getPodsForPVC(c corev1client.PodInterface, pvc *corev1.PersistentVolumeClaim, settings DescriberSettings) ([]corev1.Pod, error) {
 	nsPods, err := getPodsInChunks(c, metav1.ListOptions{Limit: settings.ChunkSize})
 	if err != nil {
 		return []corev1.Pod{}, err
@@ -1665,9 +1666,29 @@ func getPodsForPVC(c corev1client.PodInterface, pvcName string, settings Describ
 
 	for _, pod := range nsPods.Items {
 		for _, volume := range pod.Spec.Volumes {
-			if volume.VolumeSource.PersistentVolumeClaim != nil && volume.VolumeSource.PersistentVolumeClaim.ClaimName == pvcName {
+			if volume.VolumeSource.PersistentVolumeClaim != nil && volume.VolumeSource.PersistentVolumeClaim.ClaimName == pvc.Name {
 				pods = append(pods, pod)
 			}
+		}
+	}
+
+	for _, ownerRef := range pvc.ObjectMeta.OwnerReferences {
+		if ownerRef.Kind != "Pod" {
+			continue
+		}
+
+		podIndex := slices.IndexFunc(nsPods.Items, func(pod corev1.Pod) bool {
+			return pod.UID == ownerRef.UID
+		})
+		if podIndex == -1 {
+			// Maybe the pod has been deleted
+			continue
+		}
+
+		if slices.IndexFunc(pods, func(pod corev1.Pod) bool {
+			return pod.UID == nsPods.Items[podIndex].UID
+		}) == -1 {
+			pods = append(pods, nsPods.Items[podIndex])
 		}
 	}
 
