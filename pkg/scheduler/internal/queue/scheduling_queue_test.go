@@ -191,12 +191,25 @@ func Test_InFlightPods(t *testing.T) {
 	pod := st.MakePod().Name("targetpod").UID("pod1").Obj()
 	pod2 := st.MakePod().Name("targetpod2").UID("pod2").Obj()
 	pod3 := st.MakePod().Name("targetpod3").UID("pod3").Obj()
+	var poppedPod, poppedPod2 *framework.QueuedPodInfo
 
 	type action struct {
 		// ONLY ONE of the following should be set.
 		eventHappens *framework.ClusterEvent
 		podPopped    *v1.Pod
 		podEnqueued  *framework.QueuedPodInfo
+		callback     func(t *testing.T, q *PriorityQueue)
+	}
+
+	popPod := func(t *testing.T, q *PriorityQueue, pod *v1.Pod) *framework.QueuedPodInfo {
+		p, err := q.Pop()
+		if err != nil {
+			t.Fatalf("Pop failed: %v", err)
+		}
+		if p.Pod.UID != pod.UID {
+			t.Errorf("Unexpected popped pod: %v", p)
+		}
+		return p
 	}
 
 	tests := []struct {
@@ -481,6 +494,54 @@ func Test_InFlightPods(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                         "pod is enqueued to activeQ because the failed plugin has a hint fn and it returns QueueImmediately for a concurrent event that was received while some other pod was in flight",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod, pod2},
+			actions: []action{
+				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod = popPod(t, q, pod) }},
+				{eventHappens: &NodeAdd},
+				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod2 = popPod(t, q, pod2) }},
+				{eventHappens: &AssignedPodAdd},
+				{callback: func(t *testing.T, q *PriorityQueue) {
+					logger, _ := ktesting.NewTestContext(t)
+					if err := q.AddUnschedulableIfNotPresent(logger, poppedPod, q.SchedulingCycle()); err != nil {
+						t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+					}
+				}},
+				{callback: func(t *testing.T, q *PriorityQueue) {
+					logger, _ := ktesting.NewTestContext(t)
+					poppedPod2.UnschedulablePlugins = sets.New("fooPlugin1", "fooPlugin2", "fooPlugin3")
+					if err := q.AddUnschedulableIfNotPresent(logger, poppedPod2, q.SchedulingCycle()); err != nil {
+						t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+					}
+				}},
+			},
+			wantActiveQPodNames: []string{pod2.Name},
+			wantInFlightPods:    nil,
+			wantInFlightEvents:  nil,
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					AssignedPodAdd: {
+						{
+							// it will be ignored because the hint fn returns QueueSkip that is weaker than queueHintReturnQueueImmediately from fooPlugin1.
+							PluginName:     "fooPlugin3",
+							QueueingHintFn: queueHintReturnQueueSkip,
+						},
+						{
+							// it will be ignored because the hint fn returns QueueAfterBackoff that is weaker than queueHintReturnQueueImmediately from fooPlugin1.
+							PluginName:     "fooPlugin2",
+							QueueingHintFn: queueHintReturnQueueAfterBackoff,
+						},
+						{
+							// The hint fn tells that this event makes a Pod scheudlable immediately.
+							PluginName:     "fooPlugin1",
+							QueueingHintFn: queueHintReturnQueueImmediately,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -502,18 +563,13 @@ func Test_InFlightPods(t *testing.T) {
 			for _, action := range test.actions {
 				switch {
 				case action.podPopped != nil:
-					p, err := q.Pop()
-					if err != nil {
-						t.Fatalf("Pop failed: %v", err)
-					}
-					if p.Pod.UID != action.podPopped.UID {
-						t.Errorf("Unexpected popped pod: %v", p)
-					}
-					continue
+					popPod(t, q, action.podPopped)
 				case action.eventHappens != nil:
 					q.MoveAllToActiveOrBackoffQueue(logger, *action.eventHappens, nil, nil, nil)
 				case action.podEnqueued != nil:
 					q.AddUnschedulableIfNotPresent(logger, action.podEnqueued, q.SchedulingCycle())
+				case action.callback != nil:
+					action.callback(t, q)
 				}
 			}
 
