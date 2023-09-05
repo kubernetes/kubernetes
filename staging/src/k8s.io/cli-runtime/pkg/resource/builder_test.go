@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/restmapper"
+
 	// TODO we need to remove this linkage and create our own scheme
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -1732,16 +1733,18 @@ func TestGetObjectResourceVersion(t *testing.T) {
 }
 
 func TestListObjectResourceVersion(t *testing.T) {
+	resourceVersionMatch := metav1.ResourceVersionMatchExact
 	targetRV := "13"
 	newPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "13"},
 	}
 	obj, err := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
-		"/namespaces/test/pods?resourceVersion=" + targetRV: runtime.EncodeOrDie(corev1Codec, newPod),
+		"/namespaces/test/pods?resourceVersion=" + targetRV + "&resourceVersionMatch=" + string(resourceVersionMatch): runtime.EncodeOrDie(corev1Codec, newPod),
 	})).
 		NamespaceParam("test").
 		ResourceTypeOrNameArgs(true, "pods").
 		ResourceVersion(targetRV).
+		ResourceVersionMatch(string(resourceVersionMatch)).
 		Flatten().
 		Do().Object()
 

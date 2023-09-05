@@ -85,9 +85,10 @@ type Builder struct {
 	limitChunks       int64
 	requestTransforms []RequestTransform
 
-	resources       []string
-	subresource     string
-	resourceVersion string
+	resources            []string
+	subresource          string
+	resourceVersion      string
+	resourceVersionMatch metav1.ResourceVersionMatch
 
 	namespace    string
 	allNamespace bool
@@ -579,6 +580,13 @@ func (b *Builder) ResourceVersion(resourceVersion string) *Builder {
 	return b
 }
 
+// ResourceVersionMatch adds to the builder the resourceVersionMatch parameter to be used as a request parameter
+// validation of the ResourceVersionMatch value is done on the server side
+func (b *Builder) ResourceVersionMatch(resourceVersionMatch string) *Builder {
+	b.resourceVersionMatch = metav1.ResourceVersionMatch(resourceVersionMatch)
+	return b
+}
+
 // SelectEverythingParam
 func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 	if selectAll && (b.labelSelector != nil || b.fieldSelector != nil) {
@@ -939,7 +947,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.limitChunks, b.resourceVersion))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.limitChunks, b.resourceVersion, b.resourceVersionMatch))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)

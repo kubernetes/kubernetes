@@ -62,11 +62,12 @@ type GetOptions struct {
 
 	resource.FilenameOptions
 
-	Raw             string
-	Watch           bool
-	WatchOnly       bool
-	ChunkSize       int64
-	ResourceVersion string
+	Raw                  string
+	Watch                bool
+	WatchOnly            bool
+	ChunkSize            int64
+	ResourceVersion      string
+	ResourceVersionMatch string
 
 	OutputWatchEvents bool
 
@@ -141,6 +142,7 @@ const (
 )
 
 var supportedSubresources = []string{"status", "scale"}
+var supportedResourceVersionMatch = []string{string(metav1.ResourceVersionMatchExact), string(metav1.ResourceVersionMatchNotOlderThan)}
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(parent string, streams genericiooptions.IOStreams) *GetOptions {
@@ -183,12 +185,13 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, "If present, get the exact resourceVersion of the specified resource")
 	addServerPrintColumnFlags(cmd, o)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, gets the subresource of the requested object.", supportedSubresources...)
+	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, "If present, get the exact resourceVersion of the specified resource")
+	cmdutil.AddResourceVersionMatchFlags(cmd, &o.ResourceVersionMatch, "If the resource-version flag is used, specifies the resourceVersionMatch method for getting the resource.", supportedResourceVersionMatch...)
 	return cmd
 }
 
@@ -286,6 +289,10 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		}
 	}
 
+	if o.ResourceVersion != "" && o.ResourceVersionMatch == "" {
+		o.ResourceVersionMatch = string(cmdutil.DefaultResourceVersionMatch)
+	}
+
 	return nil
 }
 
@@ -313,6 +320,12 @@ func (o *GetOptions) Validate() error {
 	}
 	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
 		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
+	}
+	if len(o.ResourceVersionMatch) > 0 && !slice.ContainsString(supportedResourceVersionMatch, o.ResourceVersionMatch, nil) {
+		return fmt.Errorf("invalid resourceVersionMatch value: %q. Must be one of %v", o.ResourceVersionMatch, supportedResourceVersionMatch)
+	}
+	if o.ResourceVersionMatch != "" && o.ResourceVersion == "" {
+		return fmt.Errorf("--resource-version must be set when using --resource-version-match")
 	}
 	return nil
 }
@@ -465,6 +478,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		FieldSelectorParam(o.FieldSelector).
 		Subresource(o.Subresource).
 		ResourceVersion(o.ResourceVersion).
+		ResourceVersionMatch(o.ResourceVersionMatch).
 		RequestChunksOf(chunkSize).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
