@@ -19,8 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"strings"
 	"time"
 
@@ -382,7 +380,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			})
 		})
 
-		ginkgo.Context("[Feature:HonorPVReclaimPolicy] delete pv prior", func() {
+		ginkgo.Context("HonorPVReclaimPolicy delete pv prior", func() {
 			ginkgo.AfterEach(func() {
 				framework.Logf("AfterEach: Cleaning up test resources.")
 				if errs := e2epv.PVPVCCleanup(context.TODO(), c, ns, pv, pvc); len(errs) > 0 {
@@ -393,7 +391,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Waiting for the pvc and pv bound and then delete the pv before pvc
 			ginkgo.It("to exercise deletion of PV prior to deletion of PVC for a Bound PV-PVC pair", func() {
 
-				e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.HonorPVReclaimPolicy)
+				//e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.HonorPVReclaimPolicy)
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 				defer cancel()
 				testPVCObj := e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
