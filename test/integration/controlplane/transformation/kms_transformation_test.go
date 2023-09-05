@@ -29,21 +29,27 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"golang.org/x/crypto/cryptobyte"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v1beta1"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kmsapi "k8s.io/kms/apis/v1beta1"
 	"k8s.io/kubernetes/test/integration"
@@ -308,6 +314,8 @@ resources:
        cachesize: 1000
        endpoint: unix:///@kms-provider.sock
 `
+
+	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
 	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 	var restarted bool
 	test, err := newTransformTest(t, encryptionConfig, true, "", storageConfig)
@@ -319,6 +327,26 @@ resources:
 			test.cleanUp()
 		}
 	}()
+	ctx := testContext(t)
+
+	// the global metrics registry persists across test runs - reset it here so we can make assertions
+	copyConfig := rest.CopyConfig(test.kubeAPIServer.ClientConfig)
+	copyConfig.GroupVersion = &schema.GroupVersion{}
+	copyConfig.NegotiatedSerializer = unstructuredscheme.NewUnstructuredNegotiatedSerializer()
+	rc, err := rest.RESTClientFor(copyConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rc.Delete().AbsPath("/metrics").Do(ctx).Error(); err != nil {
+		t.Fatal(err)
+	}
+
+	// assert that the metrics we collect during the test run match expectations
+	// NOTE: 2 successful automatic reload resulted from 2 config file updates
+	wantMetricStrings := []string{
+		`apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
+		`apiserver_encryption_config_controller_automatic_reload_success_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795"} 2`,
+	}
 
 	test.secret, err = test.createSecret(testSecret, testNamespace)
 	if err != nil {
@@ -378,7 +406,7 @@ resources:
 
 	// run storage migration
 	// get secrets
-	ctx := testContext(t)
+
 	secretsList, err := test.restClient.CoreV1().Secrets("").List(
 		ctx,
 		metav1.ListOptions{},
@@ -522,6 +550,34 @@ resources:
 	if _, err = test.restClient.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{}); err != nil {
 		t.Fatalf("failed to list configmaps, err: %v", err)
 	}
+
+	// recreate rest client with the new transformTest
+	copyConfig = rest.CopyConfig(test.kubeAPIServer.ClientConfig)
+	copyConfig.GroupVersion = &schema.GroupVersion{}
+	copyConfig.NegotiatedSerializer = unstructuredscheme.NewUnstructuredNegotiatedSerializer()
+	rc, err = rest.RESTClientFor(copyConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		body, err := rc.Get().AbsPath("/metrics").DoRaw(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var gotMetricStrings []string
+		trimFP := regexp.MustCompile(`(.*)(} \d+\.\d+.*)`)
+		for _, line := range strings.Split(string(body), "\n") {
+			if strings.HasPrefix(line, "apiserver_encryption_config_controller_") {
+				if strings.Contains(line, "_seconds") {
+					line = trimFP.ReplaceAllString(line, `$1`) + "} FP" // ignore floating point metric values
+				}
+				gotMetricStrings = append(gotMetricStrings, line)
+			}
+		}
+		if diff := cmp.Diff(wantMetricStrings, gotMetricStrings); diff != "" {
+			t.Errorf("unexpected metrics diff (-want +got): %s", diff)
+		}
+	}()
 }
 
 func TestEncryptAll(t *testing.T) {

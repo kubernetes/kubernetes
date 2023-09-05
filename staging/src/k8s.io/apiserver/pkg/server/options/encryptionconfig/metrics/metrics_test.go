@@ -24,11 +24,16 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 )
 
+const (
+	testAPIServerID     = "testAPIServerID"
+	testAPIServerIDHash = "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37"
+)
+
 func TestRecordEncryptionConfigAutomaticReloadFailure(t *testing.T) {
 	expectedValue := `
-	# HELP apiserver_encryption_config_controller_automatic_reload_failures_total [ALPHA] Total number of failed automatic reloads of encryption configuration.
+	# HELP apiserver_encryption_config_controller_automatic_reload_failures_total [ALPHA] Total number of failed automatic reloads of encryption configuration split by apiserver identity.
     # TYPE apiserver_encryption_config_controller_automatic_reload_failures_total counter
-    apiserver_encryption_config_controller_automatic_reload_failures_total 1
+    apiserver_encryption_config_controller_automatic_reload_failures_total {apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37"} 1
 	`
 	metrics := []string{
 		namespace + "_" + subsystem + "_automatic_reload_failures_total",
@@ -37,7 +42,7 @@ func TestRecordEncryptionConfigAutomaticReloadFailure(t *testing.T) {
 	encryptionConfigAutomaticReloadFailureTotal.Reset()
 	RegisterMetrics()
 
-	RecordEncryptionConfigAutomaticReloadFailure()
+	RecordEncryptionConfigAutomaticReloadFailure(testAPIServerID)
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
 		t.Fatal(err)
 	}
@@ -45,9 +50,9 @@ func TestRecordEncryptionConfigAutomaticReloadFailure(t *testing.T) {
 
 func TestRecordEncryptionConfigAutomaticReloadSuccess(t *testing.T) {
 	expectedValue := `
-	# HELP apiserver_encryption_config_controller_automatic_reload_success_total [ALPHA] Total number of successful automatic reloads of encryption configuration.
+	# HELP apiserver_encryption_config_controller_automatic_reload_success_total [ALPHA] Total number of successful automatic reloads of encryption configuration split by apiserver identity.
     # TYPE apiserver_encryption_config_controller_automatic_reload_success_total counter
-    apiserver_encryption_config_controller_automatic_reload_success_total 1
+    apiserver_encryption_config_controller_automatic_reload_success_total {apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37"} 1
 	`
 	metrics := []string{
 		namespace + "_" + subsystem + "_automatic_reload_success_total",
@@ -56,7 +61,7 @@ func TestRecordEncryptionConfigAutomaticReloadSuccess(t *testing.T) {
 	encryptionConfigAutomaticReloadSuccessTotal.Reset()
 	RegisterMetrics()
 
-	RecordEncryptionConfigAutomaticReloadSuccess()
+	RecordEncryptionConfigAutomaticReloadSuccess(testAPIServerID)
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
 		t.Fatal(err)
 	}
@@ -70,18 +75,18 @@ func TestEncryptionConfigAutomaticReloadLastTimestampSeconds(t *testing.T) {
 	}{
 		{
 			expectedValue: `
-                # HELP apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds [ALPHA] Timestamp of the last successful or failed automatic reload of encryption configuration.
+                # HELP apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds [ALPHA] Timestamp of the last successful or failed automatic reload of encryption configuration split by apiserver identity.
                 # TYPE apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds gauge
-                apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{status="failure"} 1.689101941e+09
+                apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",status="failure"} 1.689101941e+09
             `,
 			resultLabel: "failure",
 			timestamp:   1689101941,
 		},
 		{
 			expectedValue: `
-                # HELP apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds [ALPHA] Timestamp of the last successful or failed automatic reload of encryption configuration.
+                # HELP apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds [ALPHA] Timestamp of the last successful or failed automatic reload of encryption configuration split by apiserver identity.
                 # TYPE apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds gauge
-                apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{status="success"} 1.689101941e+09
+                apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",status="success"} 1.689101941e+09
             `,
 			resultLabel: "success",
 			timestamp:   1689101941,
@@ -95,7 +100,7 @@ func TestEncryptionConfigAutomaticReloadLastTimestampSeconds(t *testing.T) {
 
 	for _, tc := range testCases {
 		encryptionConfigAutomaticReloadLastTimestampSeconds.Reset()
-		encryptionConfigAutomaticReloadLastTimestampSeconds.WithLabelValues(tc.resultLabel).Set(float64(tc.timestamp))
+		encryptionConfigAutomaticReloadLastTimestampSeconds.WithLabelValues(tc.resultLabel, testAPIServerIDHash).Set(float64(tc.timestamp))
 
 		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.expectedValue), metrics...); err != nil {
 			t.Fatal(err)
