@@ -69,13 +69,20 @@ var _ = SIGDescribe("Kubectl rollout", func() {
 			}
 
 			origEnv := d.Spec.Template.Spec.Containers[0].Env
-			origLabels := d.Spec.Template.Labels
-			origAnnotations := d.Spec.Template.Annotations
-
 			for _, env := range origEnv {
 				if env.Name == "foo" && env.Value == "bar" {
 					framework.Failf("labeled deployment should not have an env named foo and valued bar at the beginning")
 				}
+			}
+
+			origLabels := d.Spec.Template.Labels
+			if len(origLabels) == 0 {
+				framework.Failf("original labels should not be empty in kubectl rollout test")
+			}
+
+			origAnnotations := d.Spec.Template.Annotations
+			if len(origAnnotations) == 0 {
+				framework.Failf("original annotations should not be empty in kubectl rollout test")
 			}
 
 			// do a small update
