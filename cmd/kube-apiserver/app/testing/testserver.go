@@ -18,9 +18,16 @@ package testing
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"math"
+	"math/big"
 	"net"
 	"os"
 	"path/filepath"
@@ -44,6 +51,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
@@ -51,7 +59,6 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/test/utils"
 )
 
@@ -211,24 +218,63 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		// give the kube api server an "identity" it can use to for request header auth
 		// so that aggregated api servers can understand who the calling user is
 		s.Authentication.RequestHeader.AllowedNames = []string{"ash", "misty", "brock"}
-		// make a client certificate for the api server - common name has to match one of our defined names above
-		tenThousandHoursLater := time.Now().Add(10_000 * time.Hour)
-		clientCrtOfAPIServer, signer, err := pkiutil.NewCertAndKey(proxySigningCert, proxySigningKey, &pkiutil.CertConfig{
-			Config: cert.Config{
-				CommonName: "misty",
-				Usages: []x509.ExtKeyUsage{
-					x509.ExtKeyUsageClientAuth,
-				},
-			},
-			NotAfter:           &tenThousandHoursLater,
-			PublicKeyAlgorithm: x509.ECDSA,
-		})
+
+		// create private key
+		signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
 			return result, err
 		}
-		if err := pkiutil.WriteCertAndKey(s.SecureServing.ServerCert.CertDirectory, "misty-crt", clientCrtOfAPIServer, signer); err != nil {
+
+		// make a client certificate for the api server - common name has to match one of our defined names above
+		serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
+		if err != nil {
 			return result, err
 		}
+		serial = new(big.Int).Add(serial, big.NewInt(1))
+		tenThousandHoursLater := time.Now().Add(10_000 * time.Hour)
+		certTmpl := x509.Certificate{
+			Subject: pkix.Name{
+				CommonName: "misty",
+			},
+			SerialNumber: serial,
+			NotBefore:    proxySigningCert.NotBefore,
+			NotAfter:     tenThousandHoursLater,
+			KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+			ExtKeyUsage: []x509.ExtKeyUsage{
+				x509.ExtKeyUsageClientAuth,
+			},
+			BasicConstraintsValid: true,
+		}
+		certDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, proxySigningCert, signer.Public(), proxySigningKey)
+		if err != nil {
+			return result, err
+		}
+		clientCrtOfAPIServer, err := x509.ParseCertificate(certDERBytes)
+		if err != nil {
+			return result, err
+		}
+
+		// write the cert to disk
+		certificatePath := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
+		certBlock := pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: clientCrtOfAPIServer.Raw,
+		}
+		certBytes := pem.EncodeToMemory(&certBlock)
+		if err := cert.WriteCert(certificatePath, certBytes); err != nil {
+			return result, err
+		}
+
+		// write the key to disk
+		privateKeyPath := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
+		encodedPrivateKey, err := keyutil.MarshalPrivateKeyToPEM(signer)
+		if err != nil {
+			return result, err
+		}
+		if err := keyutil.WriteKey(privateKeyPath, encodedPrivateKey); err != nil {
+			return result, err
+		}
+
 		s.ProxyClientKeyFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
 		s.ProxyClientCertFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
 
