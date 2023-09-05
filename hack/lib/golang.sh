@@ -330,6 +330,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kubectl
   kubectl-convert
   kubemark
+  mounter
 )
 
 # Fully-qualified package names that we want to instrument for coverage information.
