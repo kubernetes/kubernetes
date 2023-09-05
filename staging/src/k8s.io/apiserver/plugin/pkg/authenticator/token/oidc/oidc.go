@@ -257,8 +257,9 @@ func New(opts Options) (*Authenticator, error) {
 	}
 
 	var resolver *claimResolver
-	if opts.JWTAuthenticator.ClaimMappings.Groups.Claim != "" {
-		resolver = newClaimResolver(opts.JWTAuthenticator.ClaimMappings.Groups.Claim, client, verifierConfig)
+	groupsClaim := opts.JWTAuthenticator.ClaimMappings.Groups.Claim
+	if groupsClaim != "" {
+		resolver = newClaimResolver(groupsClaim, client, verifierConfig)
 	}
 
 	authenticator := &Authenticator{
@@ -521,11 +522,12 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 	}
 
 	var username string
-	if err := c.unmarshalClaim(a.jwtAuthenticator.ClaimMappings.Username.Claim, &username); err != nil {
-		return nil, false, fmt.Errorf("oidc: parse username claims %q: %v", a.jwtAuthenticator.ClaimMappings.Username.Claim, err)
+	usernameClaim := a.jwtAuthenticator.ClaimMappings.Username.Claim
+	if err := c.unmarshalClaim(usernameClaim, &username); err != nil {
+		return nil, false, fmt.Errorf("oidc: parse username claims %q: %v", usernameClaim, err)
 	}
 
-	if a.jwtAuthenticator.ClaimMappings.Username.Claim == "email" {
+	if usernameClaim == "email" {
 		// If the email_verified claim is present, ensure the email is valid.
 		// https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
 		if hasEmailVerified := c.hasClaim("email_verified"); hasEmailVerified {
@@ -541,28 +543,31 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 		}
 	}
 
-	if a.jwtAuthenticator.ClaimMappings.Username.Prefix != nil && *a.jwtAuthenticator.ClaimMappings.Username.Prefix != "" {
-		username = *a.jwtAuthenticator.ClaimMappings.Username.Prefix + username
+	userNamePrefix := a.jwtAuthenticator.ClaimMappings.Username.Prefix
+	if userNamePrefix != nil && *userNamePrefix != "" {
+		username = *userNamePrefix + username
 	}
 
 	info := &user.DefaultInfo{Name: username}
-	if a.jwtAuthenticator.ClaimMappings.Groups.Claim != "" {
-		if _, ok := c[a.jwtAuthenticator.ClaimMappings.Groups.Claim]; ok {
+	groupsClaim := a.jwtAuthenticator.ClaimMappings.Groups.Claim
+	if groupsClaim != "" {
+		if _, ok := c[groupsClaim]; ok {
 			// Some admins want to use string claims like "role" as the group value.
 			// Allow the group claim to be a single string instead of an array.
 			//
 			// See: https://github.com/kubernetes/kubernetes/issues/33290
 			var groups stringOrArray
-			if err := c.unmarshalClaim(a.jwtAuthenticator.ClaimMappings.Groups.Claim, &groups); err != nil {
-				return nil, false, fmt.Errorf("oidc: parse groups claim %q: %v", a.jwtAuthenticator.ClaimMappings.Groups.Claim, err)
+			if err := c.unmarshalClaim(groupsClaim, &groups); err != nil {
+				return nil, false, fmt.Errorf("oidc: parse groups claim %q: %v", groupsClaim, err)
 			}
 			info.Groups = []string(groups)
 		}
 	}
 
-	if a.jwtAuthenticator.ClaimMappings.Groups.Prefix != nil && *a.jwtAuthenticator.ClaimMappings.Groups.Prefix != "" {
+	groupsPrefix := a.jwtAuthenticator.ClaimMappings.Groups.Prefix
+	if groupsPrefix != nil && *groupsPrefix != "" {
 		for i, group := range info.Groups {
-			info.Groups[i] = *a.jwtAuthenticator.ClaimMappings.Groups.Prefix + group
+			info.Groups[i] = *groupsPrefix + group
 		}
 	}
 
