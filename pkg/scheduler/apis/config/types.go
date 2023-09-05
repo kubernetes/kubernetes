@@ -26,10 +26,6 @@ import (
 )
 
 const (
-	// SchedulerPolicyConfigMapKey defines the key of the element in the
-	// scheduler's policy ConfigMap that contains scheduler's policy config.
-	SchedulerPolicyConfigMapKey = "policy.cfg"
-
 	// DefaultKubeSchedulerPort is the default port for the scheduler status server.
 	// May be overridden by a flag at startup.
 	DefaultKubeSchedulerPort = 10259
