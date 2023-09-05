@@ -1743,7 +1743,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "foo-ns",
 						Name:            "finished-job-started-hour-ago",
-						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true), Kind: "CronJob"}},
 					},
 					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeThePriorHour()}},
 				},
@@ -1751,7 +1751,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "foo-ns",
 						Name:            "finished-job-started-minute-ago",
-						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true), Kind: "CronJob"}},
 					},
 					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeTheHour()}},
 				},
