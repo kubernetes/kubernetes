@@ -1038,7 +1038,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	HPAContainerMetrics: {Default: true, PreRelease: featuregate.Beta},
 
-	HonorPVReclaimPolicy: {Default: false, PreRelease: featuregate.Alpha},
+	HonorPVReclaimPolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	InTreePluginAWSUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
