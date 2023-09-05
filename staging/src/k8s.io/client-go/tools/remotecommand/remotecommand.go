@@ -18,17 +18,10 @@ package remotecommand
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/remotecommand"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/transport/spdy"
 )
 
 // StreamOptions holds information pertaining to the current streaming session:
@@ -62,121 +55,4 @@ type streamCreator interface {
 
 type streamProtocolHandler interface {
 	stream(conn streamCreator) error
-}
-
-// streamExecutor handles transporting standard shell streams over an httpstream connection.
-type streamExecutor struct {
-	upgrader  spdy.Upgrader
-	transport http.RoundTripper
-
-	method    string
-	url       *url.URL
-	protocols []string
-}
-
-// NewSPDYExecutor connects to the provided server and upgrades the connection to
-// multiplexed bidirectional streams.
-func NewSPDYExecutor(config *restclient.Config, method string, url *url.URL) (Executor, error) {
-	wrapper, upgradeRoundTripper, err := spdy.RoundTripperFor(config)
-	if err != nil {
-		return nil, err
-	}
-	return NewSPDYExecutorForTransports(wrapper, upgradeRoundTripper, method, url)
-}
-
-// NewSPDYExecutorForTransports connects to the provided server using the given transport,
-// upgrades the response using the given upgrader to multiplexed bidirectional streams.
-func NewSPDYExecutorForTransports(transport http.RoundTripper, upgrader spdy.Upgrader, method string, url *url.URL) (Executor, error) {
-	return NewSPDYExecutorForProtocols(
-		transport, upgrader, method, url,
-		remotecommand.StreamProtocolV4Name,
-		remotecommand.StreamProtocolV3Name,
-		remotecommand.StreamProtocolV2Name,
-		remotecommand.StreamProtocolV1Name,
-	)
-}
-
-// NewSPDYExecutorForProtocols connects to the provided server and upgrades the connection to
-// multiplexed bidirectional streams using only the provided protocols. Exposed for testing, most
-// callers should use NewSPDYExecutor or NewSPDYExecutorForTransports.
-func NewSPDYExecutorForProtocols(transport http.RoundTripper, upgrader spdy.Upgrader, method string, url *url.URL, protocols ...string) (Executor, error) {
-	return &streamExecutor{
-		upgrader:  upgrader,
-		transport: transport,
-		method:    method,
-		url:       url,
-		protocols: protocols,
-	}, nil
-}
-
-// Stream opens a protocol streamer to the server and streams until a client closes
-// the connection or the server disconnects.
-func (e *streamExecutor) Stream(options StreamOptions) error {
-	return e.StreamWithContext(context.Background(), options)
-}
-
-// newConnectionAndStream creates a new SPDY connection and a stream protocol handler upon it.
-func (e *streamExecutor) newConnectionAndStream(ctx context.Context, options StreamOptions) (httpstream.Connection, streamProtocolHandler, error) {
-	req, err := http.NewRequestWithContext(ctx, e.method, e.url.String(), nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error creating request: %v", err)
-	}
-
-	conn, protocol, err := spdy.Negotiate(
-		e.upgrader,
-		&http.Client{Transport: e.transport},
-		req,
-		e.protocols...,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var streamer streamProtocolHandler
-
-	switch protocol {
-	case remotecommand.StreamProtocolV4Name:
-		streamer = newStreamProtocolV4(options)
-	case remotecommand.StreamProtocolV3Name:
-		streamer = newStreamProtocolV3(options)
-	case remotecommand.StreamProtocolV2Name:
-		streamer = newStreamProtocolV2(options)
-	case "":
-		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
-		fallthrough
-	case remotecommand.StreamProtocolV1Name:
-		streamer = newStreamProtocolV1(options)
-	}
-
-	return conn, streamer, nil
-}
-
-// StreamWithContext opens a protocol streamer to the server and streams until a client closes
-// the connection or the server disconnects or the context is done.
-func (e *streamExecutor) StreamWithContext(ctx context.Context, options StreamOptions) error {
-	conn, streamer, err := e.newConnectionAndStream(ctx, options)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	panicChan := make(chan any, 1)
-	errorChan := make(chan error, 1)
-	go func() {
-		defer func() {
-			if p := recover(); p != nil {
-				panicChan <- p
-			}
-		}()
-		errorChan <- streamer.stream(conn)
-	}()
-
-	select {
-	case p := <-panicChan:
-		panic(p)
-	case err := <-errorChan:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
