@@ -1693,7 +1693,7 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 			defer cancel()
 			kubeClient := fake.NewSimpleClientset()
 			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-			sharedInformers.Batch().V1().CronJobs().Informer().GetIndexer().Add(tt.cronJob)
+			_ = sharedInformers.Batch().V1().CronJobs().Informer().GetIndexer().Add(tt.cronJob)
 			for _, job := range tt.jobs {
 				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
