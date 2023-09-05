@@ -50,10 +50,9 @@ import (
 )
 
 const (
-	ApplyAnnotationsFlag        = "save-config"
-	DefaultErrorExitCode        = 1
-	DefaultChunkSize            = 500
-	DefaultResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+	ApplyAnnotationsFlag = "save-config"
+	DefaultErrorExitCode = 1
+	DefaultChunkSize     = 500
 )
 
 type debugError interface {
@@ -534,10 +533,6 @@ func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, 
 	CheckErr(cmd.RegisterFlagCompletionFunc("subresource", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		return allowedSubresources, cobra.ShellCompDirectiveNoFileComp
 	}))
-}
-
-func AddResourceVersionMatchFlags(cmd *cobra.Command, resourceVersionMatch *string, usage string, allowedResourceVersionMatch ...string) {
-	cmd.Flags().StringVar(resourceVersionMatch, "resource-version-match", "", fmt.Sprintf("%s Must be one of %v. Defaults to %s.\nSee [https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list]", usage, allowedResourceVersionMatch, DefaultResourceVersionMatch))
 }
 
 type ValidateOptions struct {

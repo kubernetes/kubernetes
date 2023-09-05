@@ -1043,12 +1043,13 @@ func (b *Builder) visitByResource() *Result {
 		}
 
 		info := &Info{
-			Client:          client,
-			Mapping:         mapping,
-			Namespace:       selectorNamespace,
-			Name:            tuple.Name,
-			Subresource:     b.subresource,
-			ResourceVersion: b.resourceVersion,
+			Client:               client,
+			Mapping:              mapping,
+			Namespace:            selectorNamespace,
+			Name:                 tuple.Name,
+			Subresource:          b.subresource,
+			ResourceVersion:      b.resourceVersion,
+			ResourceVersionMatch: b.resourceVersionMatch,
 		}
 		items = append(items, info)
 	}
@@ -1109,12 +1110,13 @@ func (b *Builder) visitByName() *Result {
 	visitors := []Visitor{}
 	for _, name := range b.names {
 		info := &Info{
-			Client:          client,
-			Mapping:         mapping,
-			Namespace:       selectorNamespace,
-			Name:            name,
-			Subresource:     b.subresource,
-			ResourceVersion: b.resourceVersion,
+			Client:               client,
+			Mapping:              mapping,
+			Namespace:            selectorNamespace,
+			Name:                 name,
+			Subresource:          b.subresource,
+			ResourceVersion:      b.resourceVersion,
+			ResourceVersionMatch: b.resourceVersionMatch,
 		}
 		visitors = append(visitors, info)
 	}

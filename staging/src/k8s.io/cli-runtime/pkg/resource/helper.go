@@ -41,6 +41,8 @@ type Helper struct {
 	Subresource string
 	// The resource version to look for
 	ResourceVersion string
+	// The match method for the resource version
+	ResourceVersionMatch metav1.ResourceVersionMatch
 	// A RESTClient capable of mutating this resource.
 	RESTClient RESTClient
 	// True if the resource type is scoped to namespaces
@@ -105,11 +107,19 @@ func (m *Helper) WithResourceVersion(resourceVersion string) *Helper {
 	return m
 }
 
+// WithResourceVersionMatch sets the helper to request a resource version with a specific method
+// (<resource>/[ns/<namespace>/]<name>?ResourceVersionMatch=<resourceVersionMatch>)
+func (m *Helper) WithResourceVersionMatch(resourceVersionMatch metav1.ResourceVersionMatch) *Helper {
+	m.ResourceVersionMatch = resourceVersionMatch
+	return m
+}
+
 func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		ResourceVersion(m.ResourceVersion).
+		ResourceVersionMatch(m.ResourceVersionMatch).
 		Name(name).
 		SubResource(m.Subresource)
 	return req.Do(context.TODO()).Get()

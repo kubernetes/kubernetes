@@ -323,6 +323,13 @@ func (r *Request) ResourceVersion(resourceVersion string) *Request {
 	return r.setParam("resourceVersion", resourceVersion)
 }
 
+func (r *Request) ResourceVersionMatch(resourceVersionMatch metav1.ResourceVersionMatch) *Request {
+	if r.err != nil {
+		return r
+	}
+	return r.setParam("resourceVersion", string(resourceVersionMatch))
+}
+
 // AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
 // when a single segment is passed.
 func (r *Request) AbsPath(segments ...string) *Request {

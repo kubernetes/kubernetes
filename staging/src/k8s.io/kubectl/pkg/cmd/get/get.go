@@ -142,7 +142,6 @@ const (
 )
 
 var supportedSubresources = []string{"status", "scale"}
-var supportedResourceVersionMatch = []string{string(metav1.ResourceVersionMatchExact), string(metav1.ResourceVersionMatchNotOlderThan)}
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(parent string, streams genericiooptions.IOStreams) *GetOptions {
@@ -190,8 +189,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, gets the subresource of the requested object.", supportedSubresources...)
-	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, "If present, get the exact resourceVersion of the specified resource")
-	cmdutil.AddResourceVersionMatchFlags(cmd, &o.ResourceVersionMatch, "If the resource-version flag is used, specifies the resourceVersionMatch method for getting the resource.", supportedResourceVersionMatch...)
+	cmd.Flags().StringVar(&o.ResourceVersion, "exact-resource-version", o.ResourceVersion, "If present, get the exact resourceVersion of the specified resource")
 	return cmd
 }
 
@@ -289,8 +287,8 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		}
 	}
 
-	if o.ResourceVersion != "" && o.ResourceVersionMatch == "" {
-		o.ResourceVersionMatch = string(cmdutil.DefaultResourceVersionMatch)
+	if len(o.ResourceVersion) > 0 {
+		o.ResourceVersionMatch = string(metav1.ResourceVersionMatchExact)
 	}
 
 	return nil
@@ -320,12 +318,6 @@ func (o *GetOptions) Validate() error {
 	}
 	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
 		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
-	}
-	if len(o.ResourceVersionMatch) > 0 && !slice.ContainsString(supportedResourceVersionMatch, o.ResourceVersionMatch, nil) {
-		return fmt.Errorf("invalid resourceVersionMatch value: %q. Must be one of %v", o.ResourceVersionMatch, supportedResourceVersionMatch)
-	}
-	if o.ResourceVersionMatch != "" && o.ResourceVersion == "" {
-		return fmt.Errorf("--resource-version must be set when using --resource-version-match")
 	}
 	return nil
 }
