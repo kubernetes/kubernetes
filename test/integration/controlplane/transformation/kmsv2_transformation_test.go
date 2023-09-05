@@ -199,7 +199,7 @@ resources:
        name: kms-provider
        endpoint: unix:///@kms-provider.sock
 `
-
+	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
 	providerName := "kms-provider"
 	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
@@ -226,10 +226,10 @@ resources:
 	// assert that the metrics we collect during the test run match expectations
 	wantMetricStrings := []string{
 		`apiserver_envelope_encryption_dek_source_cache_size{provider_name="kms-provider"} 1`,
-		`apiserver_envelope_encryption_key_id_hash_last_timestamp_seconds{key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="kms-provider",transformation_type="from_storage"} FP`,
-		`apiserver_envelope_encryption_key_id_hash_last_timestamp_seconds{key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="kms-provider",transformation_type="to_storage"} FP`,
-		`apiserver_envelope_encryption_key_id_hash_total{key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="kms-provider",transformation_type="from_storage"} 2`,
-		`apiserver_envelope_encryption_key_id_hash_total{key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="kms-provider",transformation_type="to_storage"} 1`,
+		`apiserver_envelope_encryption_key_id_hash_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="kms-provider",transformation_type="from_storage"} FP`,
+		`apiserver_envelope_encryption_key_id_hash_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="kms-provider",transformation_type="to_storage"} FP`,
+		`apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="kms-provider",transformation_type="from_storage"} 2`,
+		`apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",key_id_hash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",provider_name="kms-provider",transformation_type="to_storage"} 1`,
 	}
 	defer func() {
 		body, err := rc.Get().AbsPath("/metrics").DoRaw(ctx)
