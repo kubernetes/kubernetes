@@ -65,6 +65,7 @@ type PatchOptions struct {
 	Patch       string
 	PatchFile   string
 	Subresource string
+	IgnoreNotFound bool
 
 	namespace                    string
 	enforceNamespace             bool
@@ -140,6 +141,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 	cmd.Flags().StringVarP(&o.Patch, "patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.Flags().StringVar(&o.PatchFile, "patch-file", "", "A file containing a patch to be applied to the resource.")
 	cmd.Flags().StringVar(&o.PatchType, "type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
+	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
@@ -313,6 +315,9 @@ func (o *PatchOptions) RunPatch() error {
 		return printer.PrintObj(targetObj, o.Out)
 	})
 	if err != nil {
+		if o.IgnoreNotFound && apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 	if count == 0 {
