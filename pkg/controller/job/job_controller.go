@@ -470,9 +470,9 @@ func (jm *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
 	}
 
 	// The job shouldn't be marked as finished until all pod finalizers are removed.
-	// This is a backup operation
+	// This is a backup operation in this case.
 	if IsJobFinished(curJob) {
-		jm.backupRemovePodFinalizers(curJob)
+		jm.cleanupPodFinalizers(curJob)
 	}
 
 	// check if need to add a new rsync for ActiveDeadlineSeconds
@@ -509,7 +509,7 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 			return
 		}
 	}
-	jm.backupRemovePodFinalizers(jobObj)
+	jm.cleanupPodFinalizers(jobObj)
 }
 
 // enqueueSyncJobImmediately tells the Job controller to invoke syncJob
@@ -1874,7 +1874,7 @@ func onlyReplaceFailedPods(job *batch.Job) bool {
 	return feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil
 }
 
-func (jm *Controller) backupRemovePodFinalizers(job *batch.Job) {
+func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
 	// Listing pods shouldn't really fail, as we are just querying the informer cache.
 	selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
