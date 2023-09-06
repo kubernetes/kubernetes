@@ -362,8 +362,11 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 
 	// Returns the updated list of etcd members
 	ret := []Member{}
-	for _, m := range resp.Members {
-		ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+	if resp != nil {
+		for _, m := range resp.Members {
+			ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+		}
+
 	}
 
 	return ret, nil
