@@ -32,6 +32,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/dynamic-resource-allocation/controller/metrics"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 )
@@ -124,6 +126,7 @@ func TestController(t *testing.T) {
 		schedulingCtx, expectedSchedulingCtx *resourcev1alpha2.PodSchedulingContext
 		claim, expectedClaim                 *resourcev1alpha2.ResourceClaim
 		expectedError                        string
+		expectedMetrics                      expectedMetrics
 	}{
 		"invalid-key": {
 			key:           "claim:x/y/z",
@@ -196,7 +199,8 @@ func TestController(t *testing.T) {
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
 				expectAllocate(map[string]allocate{claimName: {allocResult: &allocation, allocErr: nil}}),
-			expectedClaim: withAllocate(claim),
+			expectedClaim:   withAllocate(claim),
+			expectedMetrics: expectedMetrics{1, 0},
 		},
 		// not deleted, not allocated, finalizer -> allocate
 		"immediate-continue-allocation": {
@@ -206,7 +210,8 @@ func TestController(t *testing.T) {
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
 				expectAllocate(map[string]allocate{claimName: {allocResult: &allocation, allocErr: nil}}),
-			expectedClaim: withAllocate(claim),
+			expectedClaim:   withAllocate(claim),
+			expectedMetrics: expectedMetrics{1, 0},
 		},
 		// not deleted, not allocated, finalizer, fail allocation -> requeue
 		"immediate-fail-allocation": {
@@ -216,8 +221,9 @@ func TestController(t *testing.T) {
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
 				expectAllocate(map[string]allocate{claimName: {allocErr: errors.New("fake error")}}),
-			expectedClaim: withFinalizer(claim, ourFinalizer),
-			expectedError: "allocate: fake error",
+			expectedClaim:   withFinalizer(claim, ourFinalizer),
+			expectedError:   "allocate: fake error",
+			expectedMetrics: expectedMetrics{1, 1},
 		},
 		// not deleted, allocated -> do nothing
 		"immediate-allocated-nop": {
@@ -375,12 +381,14 @@ func TestController(t *testing.T) {
 				expectAllocate(map[string]allocate{claimName: {allocResult: &allocation, selectedNode: nodeName, allocErr: nil}}),
 			expectedSchedulingCtx: withUnsuitableNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx))),
 			expectedError:         errPeriodic.Error(),
+			expectedMetrics:       expectedMetrics{1, 0},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 
+			setupMetrics()
 			initialObjects := []runtime.Object{}
 			for _, class := range test.classes {
 				initialObjects = append(initialObjects, class)
@@ -456,7 +464,7 @@ func TestController(t *testing.T) {
 				expectedPodSchedulings = append(expectedPodSchedulings, *test.expectedSchedulingCtx)
 			}
 			assert.Equal(t, expectedPodSchedulings, podSchedulings.Items)
-
+			expectMetrics(t, test.expectedMetrics)
 			// TODO: add testing of events.
 			// Right now, client-go/tools/record/event.go:267 fails during unit testing with
 			// request namespace does not match object namespace, request: "" object: "default",
@@ -654,4 +662,36 @@ func fakeK8s(objs []runtime.Object) (kubernetes.Interface, informers.SharedInfor
 	client := fake.NewSimpleClientset(objs...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return client, informerFactory
+}
+
+type expectedMetrics struct {
+	numCreated  int
+	numFailures int
+}
+
+func setupMetrics() {
+	metrics.RegisterMetrics()
+	metrics.DynamicResourceCreateAttempts.Reset()
+	metrics.DynamicResourceCreateFailures.Reset()
+}
+
+func expectMetrics(t *testing.T, em expectedMetrics) {
+	t.Helper()
+
+	actualCreated, err := testutil.GetCounterMetricValue(metrics.DynamicResourceCreateAttempts)
+	handleErr(t, err, "resourceClaimCreate")
+	if actualCreated != float64(em.numCreated) {
+		t.Errorf("case %s: Expected resourceClaim to be created %d, got %v", t.Name(), em.numCreated, actualCreated)
+	}
+	actualConflicts, err := testutil.GetCounterMetricValue(metrics.DynamicResourceCreateFailures)
+	handleErr(t, err, "resourceClaimCreateFailures")
+	if actualConflicts != float64(em.numFailures) {
+		t.Errorf("case %s: Expected resourceClaim to have failures %d, got %v", t.Name(), em.numFailures, actualConflicts)
+	}
+}
+
+func handleErr(t *testing.T, err error, metricName string) {
+	if err != nil {
+		t.Errorf("Failed to get %s value, err: %v", metricName, err)
+	}
 }

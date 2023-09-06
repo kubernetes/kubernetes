@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/dynamic-resource-allocation/controller/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 )
@@ -613,9 +614,11 @@ func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAlloc
 	logger.V(5).Info("Allocating")
 	ctrl.driver.Allocate(ctx, claimsWithFinalizers, selectedNode)
 
+	metrics.DynamicResourceCreateAttempts.Add(float64(len(claimsWithFinalizers)))
 	// Update successfully allocated claims' status with allocation info.
 	for _, claimAllocation := range claimsWithFinalizers {
 		if claimAllocation.Error != nil {
+			metrics.DynamicResourceCreateFailures.Inc()
 			logger.Error(claimAllocation.Error, "allocating claim", "claim", claimAllocation.Claim.Name)
 			continue
 		}
