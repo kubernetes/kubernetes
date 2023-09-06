@@ -267,7 +267,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KMSv2: {Default: true, PreRelease: featuregate.Beta},
 
-	KMSv2KDF: {Default: false, PreRelease: featuregate.Beta}, // default and lock to true in 1.29, remove in 1.31
+	KMSv2KDF: {Default: true, PreRelease: featuregate.Beta}, // lock to true in 1.29 once KMSv2 is GA, remove in 1.31
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 

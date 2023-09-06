@@ -171,18 +171,20 @@ func (r envelopekmsv2) plainTextPayload(secretETCDPath string) ([]byte, error) {
 // 4. The cipherTextPayload (ex. Secret) should be encrypted via AES GCM transform / extended nonce GCM
 // 5. kmstypes.EncryptedObject structure should be serialized and deposited in ETCD
 func TestKMSv2Provider(t *testing.T) {
+	defaultUseSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF)
+
 	t.Run("regular gcm", func(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
-		testKMSv2Provider(t)
+		testKMSv2Provider(t, !defaultUseSeed)
 	})
 
 	t.Run("extended nonce gcm", func(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2KDF, true)()
-		testKMSv2Provider(t)
+		testKMSv2Provider(t, defaultUseSeed)
 	})
 }
 
-func testKMSv2Provider(t *testing.T) {
+func testKMSv2Provider(t *testing.T, useSeed bool) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
 
 	encryptionConfig := `
@@ -271,7 +273,7 @@ resources:
 		providerName:       providerName,
 		rawEnvelope:        rawEnvelope,
 		plainTextDEKSource: plainTextDEKSource,
-		useSeed:            utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF),
+		useSeed:            useSeed,
 	}
 
 	wantPrefix := envelopeData.prefix()
@@ -953,6 +955,7 @@ resources:
 		providerName:       providerName,
 		rawEnvelope:        rawEnvelope,
 		plainTextDEKSource: plainTextDEKSource,
+		useSeed:            true, // expect KMSv2KDF to be enabled by default for this test
 	}
 
 	wantPrefix := envelopeData.prefix()
