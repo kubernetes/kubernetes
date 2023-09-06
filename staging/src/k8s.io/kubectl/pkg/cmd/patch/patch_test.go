@@ -242,7 +242,7 @@ func TestPatchSubresource(t *testing.T) {
 	}
 }
 
-func TestPatchIgnoreNotFound(t *testing.T) {
+func TestPatchIgnoreNotFoundWithNonexistentResource(t *testing.T) {
 	ns := &corev1.NamespaceList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "1",
@@ -277,6 +277,8 @@ func TestPatchIgnoreNotFound(t *testing.T) {
 	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdPatch(tf, stream)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
@@ -284,6 +286,46 @@ func TestPatchIgnoreNotFound(t *testing.T) {
 	cmd.Run(cmd, []string{"services/nonexistentservice"})
 
 	if buf.String() != "" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestPatchIgnoreNotFoundWithExistingResource(t *testing.T) {
+	_, svc, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/services/frontend" && (m == "PATCH" || m == "GET"):
+				obj := svc.Items[0]
+
+				if m == "PATCH" {
+					obj.Spec.Type = "NodePort"
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &obj)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
+
+	cmd := NewCmdPatch(tf, stream)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("ignore-not-found", "true")
+	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{"services/frontend"})
+
+	// uses the name from the response
+	if buf.String() != "service/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
