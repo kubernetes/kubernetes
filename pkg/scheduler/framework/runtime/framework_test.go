@@ -1509,8 +1509,8 @@ func TestRunPreFilterPlugins(t *testing.T) {
 					inj:  injectedResult{PreFilterStatus: int(framework.Error)},
 				},
 			},
-			wantPreFilterResult: nil,
-			wantStatusCode:      framework.Error,
+			wantSkippedPlugins: sets.New("skip"),
+			wantStatusCode:     framework.Error,
 		},
 		{
 			name: "all PreFilter plugins returned skip",
