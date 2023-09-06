@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -707,6 +708,9 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if oldNode.Spec.ProviderID != newNode.Spec.ProviderID {
 		return true
 	}
+	if oldNode.UID != newNode.UID {
+		return true
+	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
 		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
 	}
@@ -768,10 +772,12 @@ func nodesSufficientlyEqual(oldNodes, newNodes []*v1.Node) bool {
 	// This holds the Node fields which trigger a sync when changed.
 	type protoNode struct {
 		providerID string
+		uid        types.UID
 	}
 	distill := func(n *v1.Node) protoNode {
 		return protoNode{
 			providerID: n.Spec.ProviderID,
+			uid:        n.UID,
 		}
 	}
 

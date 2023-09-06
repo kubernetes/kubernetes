@@ -910,6 +910,7 @@ func TestNodesNotEqual(t *testing.T) {
 	node3 := makeNode(tweakName("node3"))
 	node1WithProviderID := makeNode(tweakName("node1"), tweakProviderID("cumulus/1"))
 	node2WithProviderID := makeNode(tweakName("node2"), tweakProviderID("cumulus/2"))
+	node1WithUID := makeNode(tweakName("node1"), tweakUID("uid1"))
 
 	testCases := []struct {
 		desc                string
@@ -939,6 +940,15 @@ func TestNodesNotEqual(t *testing.T) {
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1WithProviderID, node3}},
 				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1WithProviderID, node3}},
+			},
+		},
+		{
+			desc:          "Change node UIDs",
+			lastSyncNodes: []*v1.Node{node1, node2},
+			newNodes:      []*v1.Node{node1WithUID, node2},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1WithUID, node2}},
+				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1WithUID, node2}},
 			},
 		},
 	}
@@ -1999,6 +2009,12 @@ func tweakProviderID(id string) nodeTweak {
 	}
 }
 
+func tweakUID(uid string) nodeTweak {
+	return func(n *v1.Node) {
+		n.UID = types.UID(uid)
+	}
+}
+
 func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 	testcases := []struct {
 		name                 string
@@ -2355,6 +2371,12 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 				oldNode:    makeNode(tweakProviderID("")),
 				newNode:    makeNode(tweakProviderID(""), tweakSetReady(true)),
 				shouldSync: false,
+				fgEnabled:  fgEnabled,
+			}, {
+				name:       "Node UID changed",
+				oldNode:    makeNode(tweakUID("uid-123")),
+				newNode:    makeNode(tweakUID("123-uid")),
+				shouldSync: true,
 				fgEnabled:  fgEnabled,
 			},
 		}...)
