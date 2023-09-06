@@ -244,32 +244,45 @@ const (
 // Error returns detailed information of why the pod failed to fit on each node.
 // A message format is "0/X nodes are available: <PreFilterMsg>. <FilterMsg>. <PostFilterMsg>."
 func (f *FitError) Error() string {
-	reasons := make(map[string]int)
-	for _, status := range f.Diagnosis.NodeToStatusMap {
-		for _, reason := range status.Reasons() {
-			reasons[reason]++
+	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+":", f.NumAllNodes)
+	preFilterMsg := f.Diagnosis.PreFilterMsg
+	if preFilterMsg != "" {
+		// PreFilter plugin returns unschedulable.
+		// Add the messages from PreFilter plugins to reasonMsg.
+		reasonMsg += fmt.Sprintf(SeparatorFormat, preFilterMsg)
+	}
+
+	if preFilterMsg == "" {
+		// the scheduling cycle went through PreFilter extension point successfully.
+		//
+		// When the prefilter plugin returns unschedulable,
+		// the scheduling framework inserts the same unschedulable status to all nodes in NodeToStatusMap.
+		// So, we shouldn't add the message from NodeToStatusMap when the PreFilter failed.
+		// Otherwise, we will have duplicated reasons in the error message.
+		reasons := make(map[string]int)
+		for _, status := range f.Diagnosis.NodeToStatusMap {
+			for _, reason := range status.Reasons() {
+				reasons[reason]++
+			}
+		}
+
+		sortReasonsHistogram := func() []string {
+			var reasonStrings []string
+			for k, v := range reasons {
+				reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
+			}
+			sort.Strings(reasonStrings)
+			return reasonStrings
+		}
+		sortedFilterMsg := sortReasonsHistogram()
+		if len(sortedFilterMsg) != 0 {
+			reasonMsg += fmt.Sprintf(SeparatorFormat, strings.Join(sortedFilterMsg, ", "))
 		}
 	}
 
-	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+":", f.NumAllNodes)
-	// Add the messages from PreFilter plugins to reasonMsg.
-	preFilterMsg := f.Diagnosis.PreFilterMsg
-	if preFilterMsg != "" {
-		reasonMsg += fmt.Sprintf(SeparatorFormat, preFilterMsg)
-	}
-	sortReasonsHistogram := func() []string {
-		var reasonStrings []string
-		for k, v := range reasons {
-			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
-		}
-		sort.Strings(reasonStrings)
-		return reasonStrings
-	}
-	sortedFilterMsg := sortReasonsHistogram()
-	if len(sortedFilterMsg) != 0 {
-		reasonMsg += fmt.Sprintf(SeparatorFormat, strings.Join(sortedFilterMsg, ", "))
-	}
 	// Add the messages from PostFilter plugins to reasonMsg.
+	// We can add this message regardless of whether the scheduling cycle fails at PreFilter or Filter
+	// since we may run PostFilter (if enabled) in both cases.
 	postFilterMsg := f.Diagnosis.PostFilterMsg
 	if postFilterMsg != "" {
 		reasonMsg += fmt.Sprintf(SeparatorFormat, postFilterMsg)
