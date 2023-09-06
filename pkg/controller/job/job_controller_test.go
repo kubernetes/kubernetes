@@ -5172,7 +5172,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	}
 }
 
-func TestBackupFinalizerRemoval(t *testing.T) {
+func TestFinalizerCleanup(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -5183,7 +5183,9 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
-	go manager.Run(context.TODO(), 0)
+	// Initialize the controller with 0 workers to make sure the
+	// pod finalizers are not removed by the "syncJob" function.
+	go manager.Run(ctx, 0)
 
 	// Start the Pod and Job informers.
 	sharedInformers.Start(ctx.Done())
@@ -5214,8 +5216,8 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 		t.Fatalf("Updating job status: %v", err)
 	}
 
-	// Since Pod was not correctly tracked, the the backup code
-	// should remove the finalizer. (backupRemovePodFinalizers)
+	// Verify the pod finalizer is removed for a finished Job,
+	// even if the jobs pods are not tracked by the main reconciliation loop.
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		p, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
@@ -5224,8 +5226,6 @@ func TestBackupFinalizerRemoval(t *testing.T) {
 		return !hasJobTrackingFinalizer(p), nil
 	}); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			t.Errorf("Timed out waiting for Pod to get the finalizer removed")
-		} else {
 			t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
 		}
 	}
