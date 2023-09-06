@@ -48,6 +48,7 @@ message ExemptPriorityLevelConfiguration {
   // at the expense of every other priority level.
   // This field has a default value of zero.
   // +optional
+  // +default=0
   optional int32 nominalConcurrencyShares = 1;
 
   // `lendablePercent` prescribes the fraction of the level's NominalCL that
@@ -59,6 +60,7 @@ message ExemptPriorityLevelConfiguration {
   // LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
   //
   // +optional
+  // +default=0
   optional int32 lendablePercent = 2;
 }
 
@@ -133,6 +135,7 @@ message FlowSchemaSpec {
   // MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000].
   // Note that if the precedence is not specified, it will be set to 1000 as default.
   // +optional
+  // XXXTODO: +default=1000
   optional int32 matchingPrecedence = 2;
 
   // `distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema.
@@ -208,6 +211,7 @@ message LimitedPriorityLevelConfiguration {
   // at the expense of every other priority level.
   // This field has a default value of 30.
   // +optional
+  // XXXTODO: +default=30
   optional int32 nominalConcurrencyShares = 1;
 
   // `limitResponse` indicates what to do with requests that can not be executed right now
@@ -222,6 +226,7 @@ message LimitedPriorityLevelConfiguration {
   // LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
   //
   // +optional
+  // +default=0
   optional int32 lendablePercent = 3;
 
   // `borrowingLimitPercent`, if present, configures a limit on how many

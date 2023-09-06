@@ -146,6 +146,7 @@ message DaemonSetSpec {
   // This is a pointer to distinguish between explicit zero and not specified.
   // Defaults to 10.
   // +optional
+  // +default=10
   optional int32 revisionHistoryLimit = 6;
 }
 
@@ -207,6 +208,7 @@ message DaemonSetStatus {
 message DaemonSetUpdateStrategy {
   // Type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
   // +optional
+  // +default=ref(RollingUpdateDaemonSetStrategyType)
   optional string type = 1;
 
   // Rolling update config params. Present only if type = "RollingUpdate".
@@ -270,6 +272,7 @@ message DeploymentSpec {
   // Number of desired pods. This is a pointer to distinguish between explicit
   // zero and not specified. Defaults to 1.
   // +optional
+  // +default=1
   optional int32 replicas = 1;
 
   // Label selector for pods. Existing ReplicaSets whose pods are
@@ -296,6 +299,7 @@ message DeploymentSpec {
   // This is a pointer to distinguish between explicit zero and not specified.
   // Defaults to 10.
   // +optional
+  // +default=10
   optional int32 revisionHistoryLimit = 6;
 
   // Indicates that the deployment is paused.
@@ -307,6 +311,7 @@ message DeploymentSpec {
   // process failed deployments and a condition with a ProgressDeadlineExceeded
   // reason will be surfaced in the deployment status. Note that progress will
   // not be estimated during the time a deployment is paused. Defaults to 600s.
+  // +default=600
   optional int32 progressDeadlineSeconds = 9;
 }
 
@@ -354,6 +359,7 @@ message DeploymentStatus {
 message DeploymentStrategy {
   // Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
   // +optional
+  // +default=ref(RollingUpdateDeploymentStrategyType)
   optional string type = 1;
 
   // Rolling update config params. Present only if DeploymentStrategyType =
@@ -428,6 +434,7 @@ message ReplicaSetSpec {
   // Defaults to 1.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
   // +optional
+  // +default=1
   optional int32 replicas = 1;
 
   // Minimum number of seconds for which a newly created pod should be ready
@@ -495,6 +502,7 @@ message RollingUpdateDaemonSet {
   // 70% of original number of DaemonSet pods are available at all times during
   // the update.
   // +optional
+  // +default=1
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 
   // The maximum number of nodes with an existing available DaemonSet pod that
@@ -516,6 +524,7 @@ message RollingUpdateDaemonSet {
   // so resource intensive daemonsets should take into account that they may
   // cause evictions during disruption.
   // +optional
+  // +default=0
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
@@ -664,6 +673,7 @@ message StatefulSetSpec {
   // If unspecified, defaults to 1.
   // TODO: Consider a rename of this field.
   // +optional
+  // +default=1
   optional int32 replicas = 1;
 
   // selector is a label query over pods that should match the replica count.
@@ -706,6 +716,7 @@ message StatefulSetSpec {
   // to match the desired scale without waiting, and on scale down will delete
   // all pods at once.
   // +optional
+  // +default=ref(OrderedReadyPodManagement)
   optional string podManagementPolicy = 6;
 
   // updateStrategy indicates the StatefulSetUpdateStrategy that will be
@@ -717,6 +728,7 @@ message StatefulSetSpec {
   // be maintained in the StatefulSet's revision history. The revision history
   // consists of all revisions not represented by a currently applied
   // StatefulSetSpec version. The default value is 10.
+  // +default=10
   optional int32 revisionHistoryLimit = 8;
 
   // Minimum number of seconds for which a newly created pod should be ready
@@ -731,7 +743,8 @@ message StatefulSetSpec {
   // policy allows the lifecycle to be altered, for example by deleting persistent
   // volume claims when their stateful set is deleted, or when their pod is scaled
   // down. This requires the StatefulSetAutoDeletePVC feature gate to be enabled,
-  // which is alpha.  +optional
+  // which is alpha.
+  // +optional
   optional StatefulSetPersistentVolumeClaimRetentionPolicy persistentVolumeClaimRetentionPolicy = 10;
 
   // ordinals controls the numbering of replica indices in a StatefulSet. The
@@ -796,6 +809,7 @@ message StatefulSetUpdateStrategy {
   // Type indicates the type of the StatefulSetUpdateStrategy.
   // Default is RollingUpdate.
   // +optional
+  // +default=ref(RollingUpdateStatefulSetStrategyType)
   optional string type = 1;
 
   // RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.

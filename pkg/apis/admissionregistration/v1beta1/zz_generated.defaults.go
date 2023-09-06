@@ -22,9 +22,12 @@ limitations under the License.
 package v1beta1
 
 import (
+	"encoding/json"
+
+	v1 "k8s.io/api/admissionregistration/v1"
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -67,7 +70,11 @@ func SetObjectDefaults_MutatingWebhookConfiguration(in *v1beta1.MutatingWebhookC
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
-			v1.SetDefaults_Rule(&b.Rule)
+			admissionregistrationv1.SetDefaults_Rule(&b.Rule)
+			if b.Rule.Scope == nil {
+				ptrVar1 := v1.ScopeType(v1.AllScopes)
+				b.Rule.Scope = &ptrVar1
+			}
 		}
 	}
 }
@@ -83,27 +90,75 @@ func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1beta1.ValidatingAdmission
 	SetDefaults_ValidatingAdmissionPolicySpec(&in.Spec)
 	if in.Spec.MatchConstraints != nil {
 		SetDefaults_MatchResources(in.Spec.MatchConstraints)
+		if in.Spec.MatchConstraints.NamespaceSelector == nil {
+			if err := json.Unmarshal([]byte(`{}`), &in.Spec.MatchConstraints.NamespaceSelector); err != nil {
+				panic(err)
+			}
+		}
+		if in.Spec.MatchConstraints.ObjectSelector == nil {
+			if err := json.Unmarshal([]byte(`{}`), &in.Spec.MatchConstraints.ObjectSelector); err != nil {
+				panic(err)
+			}
+		}
 		for i := range in.Spec.MatchConstraints.ResourceRules {
 			a := &in.Spec.MatchConstraints.ResourceRules[i]
-			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+			admissionregistrationv1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+			if a.RuleWithOperations.Rule.Scope == nil {
+				ptrVar1 := v1.ScopeType(v1.AllScopes)
+				a.RuleWithOperations.Rule.Scope = &ptrVar1
+			}
 		}
 		for i := range in.Spec.MatchConstraints.ExcludeResourceRules {
 			a := &in.Spec.MatchConstraints.ExcludeResourceRules[i]
-			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+			admissionregistrationv1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+			if a.RuleWithOperations.Rule.Scope == nil {
+				ptrVar1 := v1.ScopeType(v1.AllScopes)
+				a.RuleWithOperations.Rule.Scope = &ptrVar1
+			}
 		}
+		if in.Spec.MatchConstraints.MatchPolicy == nil {
+			ptrVar1 := v1beta1.MatchPolicyType(v1beta1.Equivalent)
+			in.Spec.MatchConstraints.MatchPolicy = &ptrVar1
+		}
+	}
+	if in.Spec.FailurePolicy == nil {
+		ptrVar1 := v1beta1.FailurePolicyType(v1beta1.Fail)
+		in.Spec.FailurePolicy = &ptrVar1
 	}
 }
 
 func SetObjectDefaults_ValidatingAdmissionPolicyBinding(in *v1beta1.ValidatingAdmissionPolicyBinding) {
 	if in.Spec.MatchResources != nil {
 		SetDefaults_MatchResources(in.Spec.MatchResources)
+		if in.Spec.MatchResources.NamespaceSelector == nil {
+			if err := json.Unmarshal([]byte(`{}`), &in.Spec.MatchResources.NamespaceSelector); err != nil {
+				panic(err)
+			}
+		}
+		if in.Spec.MatchResources.ObjectSelector == nil {
+			if err := json.Unmarshal([]byte(`{}`), &in.Spec.MatchResources.ObjectSelector); err != nil {
+				panic(err)
+			}
+		}
 		for i := range in.Spec.MatchResources.ResourceRules {
 			a := &in.Spec.MatchResources.ResourceRules[i]
-			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+			admissionregistrationv1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+			if a.RuleWithOperations.Rule.Scope == nil {
+				ptrVar1 := v1.ScopeType(v1.AllScopes)
+				a.RuleWithOperations.Rule.Scope = &ptrVar1
+			}
 		}
 		for i := range in.Spec.MatchResources.ExcludeResourceRules {
 			a := &in.Spec.MatchResources.ExcludeResourceRules[i]
-			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+			admissionregistrationv1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+			if a.RuleWithOperations.Rule.Scope == nil {
+				ptrVar1 := v1.ScopeType(v1.AllScopes)
+				a.RuleWithOperations.Rule.Scope = &ptrVar1
+			}
+		}
+		if in.Spec.MatchResources.MatchPolicy == nil {
+			ptrVar1 := v1beta1.MatchPolicyType(v1beta1.Equivalent)
+			in.Spec.MatchResources.MatchPolicy = &ptrVar1
 		}
 	}
 }
@@ -131,7 +186,11 @@ func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1beta1.ValidatingWebh
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
-			v1.SetDefaults_Rule(&b.Rule)
+			admissionregistrationv1.SetDefaults_Rule(&b.Rule)
+			if b.Rule.Scope == nil {
+				ptrVar1 := v1.ScopeType(v1.AllScopes)
+				b.Rule.Scope = &ptrVar1
+			}
 		}
 	}
 }

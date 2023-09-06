@@ -22,6 +22,8 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
+
 	v1 "k8s.io/api/admissionregistration/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,10 +53,44 @@ func SetObjectDefaults_MutatingWebhookConfiguration(in *v1.MutatingWebhookConfig
 		SetDefaults_MutatingWebhook(a)
 		if a.ClientConfig.Service != nil {
 			SetDefaults_ServiceReference(a.ClientConfig.Service)
+			if a.ClientConfig.Service.Port == nil {
+				var ptrVar1 int32 = 443
+				a.ClientConfig.Service.Port = &ptrVar1
+			}
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
 			SetDefaults_Rule(&b.Rule)
+			if b.Rule.Scope == nil {
+				ptrVar1 := v1.ScopeType(v1.AllScopes)
+				b.Rule.Scope = &ptrVar1
+			}
+		}
+		if a.FailurePolicy == nil {
+			ptrVar1 := v1.FailurePolicyType(v1.Fail)
+			a.FailurePolicy = &ptrVar1
+		}
+		if a.MatchPolicy == nil {
+			ptrVar1 := v1.MatchPolicyType(v1.Equivalent)
+			a.MatchPolicy = &ptrVar1
+		}
+		if a.NamespaceSelector == nil {
+			if err := json.Unmarshal([]byte(`{}`), &a.NamespaceSelector); err != nil {
+				panic(err)
+			}
+		}
+		if a.ObjectSelector == nil {
+			if err := json.Unmarshal([]byte(`{}`), &a.ObjectSelector); err != nil {
+				panic(err)
+			}
+		}
+		if a.TimeoutSeconds == nil {
+			var ptrVar1 int32 = 10
+			a.TimeoutSeconds = &ptrVar1
+		}
+		if a.ReinvocationPolicy == nil {
+			ptrVar1 := v1.ReinvocationPolicyType(v1.NeverReinvocationPolicy)
+			a.ReinvocationPolicy = &ptrVar1
 		}
 	}
 }
@@ -72,10 +108,40 @@ func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1.ValidatingWebhookCo
 		SetDefaults_ValidatingWebhook(a)
 		if a.ClientConfig.Service != nil {
 			SetDefaults_ServiceReference(a.ClientConfig.Service)
+			if a.ClientConfig.Service.Port == nil {
+				var ptrVar1 int32 = 443
+				a.ClientConfig.Service.Port = &ptrVar1
+			}
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
 			SetDefaults_Rule(&b.Rule)
+			if b.Rule.Scope == nil {
+				ptrVar1 := v1.ScopeType(v1.AllScopes)
+				b.Rule.Scope = &ptrVar1
+			}
+		}
+		if a.FailurePolicy == nil {
+			ptrVar1 := v1.FailurePolicyType(v1.Fail)
+			a.FailurePolicy = &ptrVar1
+		}
+		if a.MatchPolicy == nil {
+			ptrVar1 := v1.MatchPolicyType(v1.Equivalent)
+			a.MatchPolicy = &ptrVar1
+		}
+		if a.NamespaceSelector == nil {
+			if err := json.Unmarshal([]byte(`{}`), &a.NamespaceSelector); err != nil {
+				panic(err)
+			}
+		}
+		if a.ObjectSelector == nil {
+			if err := json.Unmarshal([]byte(`{}`), &a.ObjectSelector); err != nil {
+				panic(err)
+			}
+		}
+		if a.TimeoutSeconds == nil {
+			var ptrVar1 int32 = 10
+			a.TimeoutSeconds = &ptrVar1
 		}
 	}
 }

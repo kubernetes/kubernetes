@@ -81,6 +81,7 @@ message MutatingWebhook {
   // FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
   // allowed values are Ignore or Fail. Defaults to Fail.
   // +optional
+  // +default=ref(Fail)
   optional string failurePolicy = 4;
 
   // matchPolicy defines how the "rules" list is used to match incoming requests.
@@ -98,6 +99,7 @@ message MutatingWebhook {
   //
   // Defaults to "Equivalent"
   // +optional
+  // +default=ref(Equivalent)
   optional string matchPolicy = 9;
 
   // NamespaceSelector decides whether to run the webhook on an object based
@@ -144,6 +146,7 @@ message MutatingWebhook {
   //
   // Default to the empty LabelSelector, which matches everything.
   // +optional
+  // +default={}
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 5;
 
   // ObjectSelector decides whether to run the webhook based on if the
@@ -158,6 +161,7 @@ message MutatingWebhook {
   // users may skip the admission webhook by setting the labels.
   // Default to the empty LabelSelector, which matches everything.
   // +optional
+  // +default={}
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 11;
 
   // SideEffects states whether this webhook has side effects.
@@ -174,6 +178,7 @@ message MutatingWebhook {
   // The timeout value must be between 1 and 30 seconds.
   // Default to 10 seconds.
   // +optional
+  // +default=10
   optional int32 timeoutSeconds = 7;
 
   // AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
@@ -201,6 +206,7 @@ message MutatingWebhook {
   //
   // Defaults to "Never".
   // +optional
+  // +default=ref(NeverReinvocationPolicy)
   optional string reinvocationPolicy = 10;
 
   // MatchConditions is a list of conditions that must be met for a request to be sent to this
@@ -293,6 +299,7 @@ message Rule {
   // Default is "*".
   //
   // +optional
+  // +default=ref(AllScopes)
   optional string scope = 4;
 }
 
@@ -330,6 +337,7 @@ message ServiceReference {
   // Default to 443 for backward compatibility.
   // `port` should be a valid port number (1-65535, inclusive).
   // +optional
+  // +default=443
   optional int32 port = 4;
 }
 
@@ -357,6 +365,7 @@ message ValidatingWebhook {
   // FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
   // allowed values are Ignore or Fail. Defaults to Fail.
   // +optional
+  // +default=ref(Fail)
   optional string failurePolicy = 4;
 
   // matchPolicy defines how the "rules" list is used to match incoming requests.
@@ -374,6 +383,7 @@ message ValidatingWebhook {
   //
   // Defaults to "Equivalent"
   // +optional
+  // +default=ref(Equivalent)
   optional string matchPolicy = 9;
 
   // NamespaceSelector decides whether to run the webhook on an object based
@@ -420,6 +430,7 @@ message ValidatingWebhook {
   //
   // Default to the empty LabelSelector, which matches everything.
   // +optional
+  // +default={}
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 5;
 
   // ObjectSelector decides whether to run the webhook based on if the
@@ -434,6 +445,7 @@ message ValidatingWebhook {
   // users may skip the admission webhook by setting the labels.
   // Default to the empty LabelSelector, which matches everything.
   // +optional
+  // +default={}
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 10;
 
   // SideEffects states whether this webhook has side effects.
@@ -450,6 +462,7 @@ message ValidatingWebhook {
   // The timeout value must be between 1 and 30 seconds.
   // Default to 10 seconds.
   // +optional
+  // +default=10
   optional int32 timeoutSeconds = 7;
 
   // AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`

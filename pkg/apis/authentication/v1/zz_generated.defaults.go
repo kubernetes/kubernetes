@@ -36,4 +36,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_TokenRequest(in *v1.TokenRequest) {
 	SetDefaults_TokenRequestSpec(&in.Spec)
+	if in.Spec.ExpirationSeconds == nil {
+		var ptrVar1 int64 = 3600
+		in.Spec.ExpirationSeconds = &ptrVar1
+	}
 }

@@ -39,6 +39,10 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_HorizontalPodAutoscaler(in *v1.HorizontalPodAutoscaler) {
 	SetDefaults_HorizontalPodAutoscaler(in)
+	if in.Spec.MinReplicas == nil {
+		var ptrVar1 int32 = 1
+		in.Spec.MinReplicas = &ptrVar1
+	}
 }
 
 func SetObjectDefaults_HorizontalPodAutoscalerList(in *v1.HorizontalPodAutoscalerList) {

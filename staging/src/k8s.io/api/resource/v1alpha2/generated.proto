@@ -231,6 +231,7 @@ message ResourceClaimSpec {
   // Allocation can start immediately or when a Pod wants to use the
   // resource. "WaitForFirstConsumer" is the default.
   // +optional
+  // +default=ref(AllocationModeWaitForFirstConsumer)
   optional string allocationMode = 3;
 }
 

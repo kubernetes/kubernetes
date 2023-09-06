@@ -22,6 +22,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/discovery/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -39,6 +40,14 @@ func SetObjectDefaults_EndpointSlice(in *v1.EndpointSlice) {
 	for i := range in.Ports {
 		a := &in.Ports[i]
 		SetDefaults_EndpointPort(a)
+		if a.Name == nil {
+			var ptrVar1 string = ""
+			a.Name = &ptrVar1
+		}
+		if a.Protocol == nil {
+			ptrVar1 := corev1.Protocol(corev1.ProtocolTCP)
+			a.Protocol = &ptrVar1
+		}
 	}
 }
 

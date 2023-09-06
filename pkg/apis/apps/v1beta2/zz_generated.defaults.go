@@ -22,9 +22,12 @@ limitations under the License.
 package v1beta2
 
 import (
+	"encoding/json"
+
 	v1beta2 "k8s.io/api/apps/v1beta2"
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -44,68 +47,136 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 	SetDefaults_DaemonSet(in)
-	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
+	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
-		v1.SetDefaults_Volume(a)
+		corev1.SetDefaults_Volume(a)
 		if a.VolumeSource.HostPath != nil {
-			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			corev1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			if a.VolumeSource.HostPath.Type == nil {
+				ptrVar1 := v1.HostPathType(v1.HostPathUnset)
+				a.VolumeSource.HostPath.Type = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Secret != nil {
-			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			corev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			if a.VolumeSource.Secret.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.Secret.DefaultMode = &ptrVar1
+			}
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			corev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
-			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			corev1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.RBDPool == "" {
+				a.VolumeSource.RBD.RBDPool = "rbd"
+			}
+			if a.VolumeSource.RBD.RadosUser == "" {
+				a.VolumeSource.RBD.RadosUser = "admin"
+			}
+			if a.VolumeSource.RBD.Keyring == "" {
+				a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			corev1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					if b.FieldRef.APIVersion == "" {
+						b.FieldRef.APIVersion = "v1"
+					}
 				}
+			}
+			if a.VolumeSource.DownwardAPI.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.DownwardAPI.DefaultMode = &ptrVar1
 			}
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			corev1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			if a.VolumeSource.ConfigMap.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.ConfigMap.DefaultMode = &ptrVar1
+			}
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			corev1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			if a.VolumeSource.AzureDisk.CachingMode == nil {
+				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.FSType == nil {
+				var ptrVar1 string = "ext4"
+				a.VolumeSource.AzureDisk.FSType = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.ReadOnly == nil {
+				var ptrVar1 bool = false
+				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.Kind == nil {
+				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+				a.VolumeSource.AzureDisk.Kind = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Projected != nil {
-			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			corev1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							corev1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							if c.FieldRef.APIVersion == "" {
+								c.FieldRef.APIVersion = "v1"
+							}
 						}
 					}
 				}
 				if b.ServiceAccountToken != nil {
-					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					corev1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					if b.ServiceAccountToken.ExpirationSeconds == nil {
+						var ptrVar1 int64 = 3600
+						b.ServiceAccountToken.ExpirationSeconds = &ptrVar1
+					}
 				}
+			}
+			if a.VolumeSource.Projected.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.Projected.DefaultMode = &ptrVar1
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			if a.VolumeSource.ScaleIO.StorageMode == "" {
+				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if a.VolumeSource.ScaleIO.FSType == "" {
+				a.VolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
-				v1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				if a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode == nil {
+					ptrVar1 := v1.PersistentVolumeMode(v1.PersistentVolumeFilesystem)
+					a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode = &ptrVar1
+				}
 			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -116,16 +187,25 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -133,11 +213,29 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.LivenessProbe.TimeoutSeconds == 0 {
+				a.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.LivenessProbe.PeriodSeconds == 0 {
+				a.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.LivenessProbe.SuccessThreshold == 0 {
+				a.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.LivenessProbe.FailureThreshold == 0 {
+				a.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -145,11 +243,29 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.ReadinessProbe.TimeoutSeconds == 0 {
+				a.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.ReadinessProbe.PeriodSeconds == 0 {
+				a.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.ReadinessProbe.SuccessThreshold == 0 {
+				a.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.ReadinessProbe.FailureThreshold == 0 {
+				a.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
+			corev1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				if a.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -157,23 +273,53 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.StartupProbe.TimeoutSeconds == 0 {
+				a.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.StartupProbe.PeriodSeconds == 0 {
+				a.StartupProbe.PeriodSeconds = 10
+			}
+			if a.StartupProbe.SuccessThreshold == 0 {
+				a.StartupProbe.SuccessThreshold = 1
+			}
+			if a.StartupProbe.FailureThreshold == 0 {
+				a.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					if a.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					if a.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -184,16 +330,25 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -201,11 +356,29 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.LivenessProbe.TimeoutSeconds == 0 {
+				a.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.LivenessProbe.PeriodSeconds == 0 {
+				a.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.LivenessProbe.SuccessThreshold == 0 {
+				a.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.LivenessProbe.FailureThreshold == 0 {
+				a.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -213,11 +386,29 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.ReadinessProbe.TimeoutSeconds == 0 {
+				a.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.ReadinessProbe.PeriodSeconds == 0 {
+				a.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.ReadinessProbe.SuccessThreshold == 0 {
+				a.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.ReadinessProbe.FailureThreshold == 0 {
+				a.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
+			corev1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				if a.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -225,23 +416,53 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.StartupProbe.TimeoutSeconds == 0 {
+				a.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.StartupProbe.PeriodSeconds == 0 {
+				a.StartupProbe.PeriodSeconds = 10
+			}
+			if a.StartupProbe.SuccessThreshold == 0 {
+				a.StartupProbe.SuccessThreshold = 1
+			}
+			if a.StartupProbe.FailureThreshold == 0 {
+				a.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					if a.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					if a.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
-		v1.SetDefaults_EphemeralContainer(a)
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
 			if b.Protocol == "" {
@@ -252,16 +473,25 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 			b := &a.EphemeralContainerCommon.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
 		if a.EphemeralContainerCommon.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -269,11 +499,29 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.LivenessProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -281,11 +529,29 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -293,21 +559,73 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.StartupProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.StartupProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.StartupProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.StartupProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.StartupProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.StartupProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 		}
+		if a.EphemeralContainerCommon.TerminationMessagePath == "" {
+			a.EphemeralContainerCommon.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePolicy == "" {
+			a.EphemeralContainerCommon.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
-	v1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.RestartPolicy == "" {
+		in.Spec.Template.Spec.RestartPolicy = v1.RestartPolicy(v1.RestartPolicyAlways)
+	}
+	if in.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
+		ptrVar1 := int64(v1.DefaultTerminationGracePeriodSeconds)
+		in.Spec.Template.Spec.TerminationGracePeriodSeconds = &ptrVar1
+	}
+	if in.Spec.Template.Spec.DNSPolicy == "" {
+		in.Spec.Template.Spec.DNSPolicy = v1.DNSPolicy(v1.DNSClusterFirst)
+	}
+	if in.Spec.Template.Spec.SecurityContext == nil {
+		if err := json.Unmarshal([]byte(`{}`), &in.Spec.Template.Spec.SecurityContext); err != nil {
+			panic(err)
+		}
+	}
+	if in.Spec.Template.Spec.SchedulerName == "" {
+		in.Spec.Template.Spec.SchedulerName = string(v1.DefaultSchedulerName)
+	}
+	if in.Spec.Template.Spec.EnableServiceLinks == nil {
+		ptrVar1 := bool(v1.DefaultEnableServiceLinks)
+		in.Spec.Template.Spec.EnableServiceLinks = &ptrVar1
+	}
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
 func SetObjectDefaults_DaemonSetList(in *v1beta2.DaemonSetList) {
@@ -319,68 +637,136 @@ func SetObjectDefaults_DaemonSetList(in *v1beta2.DaemonSetList) {
 
 func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 	SetDefaults_Deployment(in)
-	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
+	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
-		v1.SetDefaults_Volume(a)
+		corev1.SetDefaults_Volume(a)
 		if a.VolumeSource.HostPath != nil {
-			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			corev1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			if a.VolumeSource.HostPath.Type == nil {
+				ptrVar1 := v1.HostPathType(v1.HostPathUnset)
+				a.VolumeSource.HostPath.Type = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Secret != nil {
-			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			corev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			if a.VolumeSource.Secret.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.Secret.DefaultMode = &ptrVar1
+			}
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			corev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
-			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			corev1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.RBDPool == "" {
+				a.VolumeSource.RBD.RBDPool = "rbd"
+			}
+			if a.VolumeSource.RBD.RadosUser == "" {
+				a.VolumeSource.RBD.RadosUser = "admin"
+			}
+			if a.VolumeSource.RBD.Keyring == "" {
+				a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			corev1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					if b.FieldRef.APIVersion == "" {
+						b.FieldRef.APIVersion = "v1"
+					}
 				}
+			}
+			if a.VolumeSource.DownwardAPI.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.DownwardAPI.DefaultMode = &ptrVar1
 			}
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			corev1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			if a.VolumeSource.ConfigMap.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.ConfigMap.DefaultMode = &ptrVar1
+			}
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			corev1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			if a.VolumeSource.AzureDisk.CachingMode == nil {
+				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.FSType == nil {
+				var ptrVar1 string = "ext4"
+				a.VolumeSource.AzureDisk.FSType = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.ReadOnly == nil {
+				var ptrVar1 bool = false
+				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.Kind == nil {
+				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+				a.VolumeSource.AzureDisk.Kind = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Projected != nil {
-			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			corev1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							corev1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							if c.FieldRef.APIVersion == "" {
+								c.FieldRef.APIVersion = "v1"
+							}
 						}
 					}
 				}
 				if b.ServiceAccountToken != nil {
-					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					corev1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					if b.ServiceAccountToken.ExpirationSeconds == nil {
+						var ptrVar1 int64 = 3600
+						b.ServiceAccountToken.ExpirationSeconds = &ptrVar1
+					}
 				}
+			}
+			if a.VolumeSource.Projected.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.Projected.DefaultMode = &ptrVar1
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			if a.VolumeSource.ScaleIO.StorageMode == "" {
+				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if a.VolumeSource.ScaleIO.FSType == "" {
+				a.VolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
-				v1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				if a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode == nil {
+					ptrVar1 := v1.PersistentVolumeMode(v1.PersistentVolumeFilesystem)
+					a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode = &ptrVar1
+				}
 			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -391,16 +777,25 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -408,11 +803,29 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.LivenessProbe.TimeoutSeconds == 0 {
+				a.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.LivenessProbe.PeriodSeconds == 0 {
+				a.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.LivenessProbe.SuccessThreshold == 0 {
+				a.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.LivenessProbe.FailureThreshold == 0 {
+				a.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -420,11 +833,29 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.ReadinessProbe.TimeoutSeconds == 0 {
+				a.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.ReadinessProbe.PeriodSeconds == 0 {
+				a.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.ReadinessProbe.SuccessThreshold == 0 {
+				a.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.ReadinessProbe.FailureThreshold == 0 {
+				a.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
+			corev1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				if a.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -432,23 +863,53 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.StartupProbe.TimeoutSeconds == 0 {
+				a.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.StartupProbe.PeriodSeconds == 0 {
+				a.StartupProbe.PeriodSeconds = 10
+			}
+			if a.StartupProbe.SuccessThreshold == 0 {
+				a.StartupProbe.SuccessThreshold = 1
+			}
+			if a.StartupProbe.FailureThreshold == 0 {
+				a.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					if a.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					if a.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -459,16 +920,25 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -476,11 +946,29 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.LivenessProbe.TimeoutSeconds == 0 {
+				a.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.LivenessProbe.PeriodSeconds == 0 {
+				a.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.LivenessProbe.SuccessThreshold == 0 {
+				a.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.LivenessProbe.FailureThreshold == 0 {
+				a.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -488,11 +976,29 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.ReadinessProbe.TimeoutSeconds == 0 {
+				a.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.ReadinessProbe.PeriodSeconds == 0 {
+				a.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.ReadinessProbe.SuccessThreshold == 0 {
+				a.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.ReadinessProbe.FailureThreshold == 0 {
+				a.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
+			corev1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				if a.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -500,23 +1006,53 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.StartupProbe.TimeoutSeconds == 0 {
+				a.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.StartupProbe.PeriodSeconds == 0 {
+				a.StartupProbe.PeriodSeconds = 10
+			}
+			if a.StartupProbe.SuccessThreshold == 0 {
+				a.StartupProbe.SuccessThreshold = 1
+			}
+			if a.StartupProbe.FailureThreshold == 0 {
+				a.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					if a.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					if a.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
-		v1.SetDefaults_EphemeralContainer(a)
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
 			if b.Protocol == "" {
@@ -527,16 +1063,25 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 			b := &a.EphemeralContainerCommon.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
 		if a.EphemeralContainerCommon.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -544,11 +1089,29 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.LivenessProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -556,11 +1119,29 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -568,21 +1149,73 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.StartupProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.StartupProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.StartupProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.StartupProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.StartupProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.StartupProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 		}
+		if a.EphemeralContainerCommon.TerminationMessagePath == "" {
+			a.EphemeralContainerCommon.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePolicy == "" {
+			a.EphemeralContainerCommon.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
-	v1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.RestartPolicy == "" {
+		in.Spec.Template.Spec.RestartPolicy = v1.RestartPolicy(v1.RestartPolicyAlways)
+	}
+	if in.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
+		ptrVar1 := int64(v1.DefaultTerminationGracePeriodSeconds)
+		in.Spec.Template.Spec.TerminationGracePeriodSeconds = &ptrVar1
+	}
+	if in.Spec.Template.Spec.DNSPolicy == "" {
+		in.Spec.Template.Spec.DNSPolicy = v1.DNSPolicy(v1.DNSClusterFirst)
+	}
+	if in.Spec.Template.Spec.SecurityContext == nil {
+		if err := json.Unmarshal([]byte(`{}`), &in.Spec.Template.Spec.SecurityContext); err != nil {
+			panic(err)
+		}
+	}
+	if in.Spec.Template.Spec.SchedulerName == "" {
+		in.Spec.Template.Spec.SchedulerName = string(v1.DefaultSchedulerName)
+	}
+	if in.Spec.Template.Spec.EnableServiceLinks == nil {
+		ptrVar1 := bool(v1.DefaultEnableServiceLinks)
+		in.Spec.Template.Spec.EnableServiceLinks = &ptrVar1
+	}
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
 func SetObjectDefaults_DeploymentList(in *v1beta2.DeploymentList) {
@@ -594,68 +1227,136 @@ func SetObjectDefaults_DeploymentList(in *v1beta2.DeploymentList) {
 
 func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 	SetDefaults_ReplicaSet(in)
-	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
+	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
-		v1.SetDefaults_Volume(a)
+		corev1.SetDefaults_Volume(a)
 		if a.VolumeSource.HostPath != nil {
-			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			corev1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			if a.VolumeSource.HostPath.Type == nil {
+				ptrVar1 := v1.HostPathType(v1.HostPathUnset)
+				a.VolumeSource.HostPath.Type = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Secret != nil {
-			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			corev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			if a.VolumeSource.Secret.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.Secret.DefaultMode = &ptrVar1
+			}
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			corev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
-			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			corev1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.RBDPool == "" {
+				a.VolumeSource.RBD.RBDPool = "rbd"
+			}
+			if a.VolumeSource.RBD.RadosUser == "" {
+				a.VolumeSource.RBD.RadosUser = "admin"
+			}
+			if a.VolumeSource.RBD.Keyring == "" {
+				a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			corev1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					if b.FieldRef.APIVersion == "" {
+						b.FieldRef.APIVersion = "v1"
+					}
 				}
+			}
+			if a.VolumeSource.DownwardAPI.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.DownwardAPI.DefaultMode = &ptrVar1
 			}
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			corev1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			if a.VolumeSource.ConfigMap.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.ConfigMap.DefaultMode = &ptrVar1
+			}
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			corev1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			if a.VolumeSource.AzureDisk.CachingMode == nil {
+				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.FSType == nil {
+				var ptrVar1 string = "ext4"
+				a.VolumeSource.AzureDisk.FSType = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.ReadOnly == nil {
+				var ptrVar1 bool = false
+				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.Kind == nil {
+				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+				a.VolumeSource.AzureDisk.Kind = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Projected != nil {
-			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			corev1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							corev1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							if c.FieldRef.APIVersion == "" {
+								c.FieldRef.APIVersion = "v1"
+							}
 						}
 					}
 				}
 				if b.ServiceAccountToken != nil {
-					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					corev1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					if b.ServiceAccountToken.ExpirationSeconds == nil {
+						var ptrVar1 int64 = 3600
+						b.ServiceAccountToken.ExpirationSeconds = &ptrVar1
+					}
 				}
+			}
+			if a.VolumeSource.Projected.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.Projected.DefaultMode = &ptrVar1
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			if a.VolumeSource.ScaleIO.StorageMode == "" {
+				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if a.VolumeSource.ScaleIO.FSType == "" {
+				a.VolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
-				v1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				if a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode == nil {
+					ptrVar1 := v1.PersistentVolumeMode(v1.PersistentVolumeFilesystem)
+					a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode = &ptrVar1
+				}
 			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -666,16 +1367,25 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -683,11 +1393,29 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.LivenessProbe.TimeoutSeconds == 0 {
+				a.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.LivenessProbe.PeriodSeconds == 0 {
+				a.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.LivenessProbe.SuccessThreshold == 0 {
+				a.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.LivenessProbe.FailureThreshold == 0 {
+				a.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -695,11 +1423,29 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.ReadinessProbe.TimeoutSeconds == 0 {
+				a.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.ReadinessProbe.PeriodSeconds == 0 {
+				a.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.ReadinessProbe.SuccessThreshold == 0 {
+				a.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.ReadinessProbe.FailureThreshold == 0 {
+				a.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
+			corev1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				if a.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -707,23 +1453,53 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.StartupProbe.TimeoutSeconds == 0 {
+				a.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.StartupProbe.PeriodSeconds == 0 {
+				a.StartupProbe.PeriodSeconds = 10
+			}
+			if a.StartupProbe.SuccessThreshold == 0 {
+				a.StartupProbe.SuccessThreshold = 1
+			}
+			if a.StartupProbe.FailureThreshold == 0 {
+				a.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					if a.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					if a.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -734,16 +1510,25 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -751,11 +1536,29 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.LivenessProbe.TimeoutSeconds == 0 {
+				a.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.LivenessProbe.PeriodSeconds == 0 {
+				a.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.LivenessProbe.SuccessThreshold == 0 {
+				a.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.LivenessProbe.FailureThreshold == 0 {
+				a.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -763,11 +1566,29 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.ReadinessProbe.TimeoutSeconds == 0 {
+				a.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.ReadinessProbe.PeriodSeconds == 0 {
+				a.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.ReadinessProbe.SuccessThreshold == 0 {
+				a.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.ReadinessProbe.FailureThreshold == 0 {
+				a.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
+			corev1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				if a.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -775,23 +1596,53 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.StartupProbe.TimeoutSeconds == 0 {
+				a.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.StartupProbe.PeriodSeconds == 0 {
+				a.StartupProbe.PeriodSeconds = 10
+			}
+			if a.StartupProbe.SuccessThreshold == 0 {
+				a.StartupProbe.SuccessThreshold = 1
+			}
+			if a.StartupProbe.FailureThreshold == 0 {
+				a.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					if a.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					if a.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
-		v1.SetDefaults_EphemeralContainer(a)
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
 			if b.Protocol == "" {
@@ -802,16 +1653,25 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 			b := &a.EphemeralContainerCommon.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
 		if a.EphemeralContainerCommon.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -819,11 +1679,29 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.LivenessProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -831,11 +1709,29 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -843,21 +1739,73 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.StartupProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.StartupProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.StartupProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.StartupProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.StartupProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.StartupProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 		}
+		if a.EphemeralContainerCommon.TerminationMessagePath == "" {
+			a.EphemeralContainerCommon.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePolicy == "" {
+			a.EphemeralContainerCommon.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
-	v1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.RestartPolicy == "" {
+		in.Spec.Template.Spec.RestartPolicy = v1.RestartPolicy(v1.RestartPolicyAlways)
+	}
+	if in.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
+		ptrVar1 := int64(v1.DefaultTerminationGracePeriodSeconds)
+		in.Spec.Template.Spec.TerminationGracePeriodSeconds = &ptrVar1
+	}
+	if in.Spec.Template.Spec.DNSPolicy == "" {
+		in.Spec.Template.Spec.DNSPolicy = v1.DNSPolicy(v1.DNSClusterFirst)
+	}
+	if in.Spec.Template.Spec.SecurityContext == nil {
+		if err := json.Unmarshal([]byte(`{}`), &in.Spec.Template.Spec.SecurityContext); err != nil {
+			panic(err)
+		}
+	}
+	if in.Spec.Template.Spec.SchedulerName == "" {
+		in.Spec.Template.Spec.SchedulerName = string(v1.DefaultSchedulerName)
+	}
+	if in.Spec.Template.Spec.EnableServiceLinks == nil {
+		ptrVar1 := bool(v1.DefaultEnableServiceLinks)
+		in.Spec.Template.Spec.EnableServiceLinks = &ptrVar1
+	}
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
 func SetObjectDefaults_ReplicaSetList(in *v1beta2.ReplicaSetList) {
@@ -869,68 +1817,136 @@ func SetObjectDefaults_ReplicaSetList(in *v1beta2.ReplicaSetList) {
 
 func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 	SetDefaults_StatefulSet(in)
-	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
+	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
-		v1.SetDefaults_Volume(a)
+		corev1.SetDefaults_Volume(a)
 		if a.VolumeSource.HostPath != nil {
-			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			corev1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			if a.VolumeSource.HostPath.Type == nil {
+				ptrVar1 := v1.HostPathType(v1.HostPathUnset)
+				a.VolumeSource.HostPath.Type = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Secret != nil {
-			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			corev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			if a.VolumeSource.Secret.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.Secret.DefaultMode = &ptrVar1
+			}
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			corev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
-			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			corev1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.RBDPool == "" {
+				a.VolumeSource.RBD.RBDPool = "rbd"
+			}
+			if a.VolumeSource.RBD.RadosUser == "" {
+				a.VolumeSource.RBD.RadosUser = "admin"
+			}
+			if a.VolumeSource.RBD.Keyring == "" {
+				a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			corev1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					if b.FieldRef.APIVersion == "" {
+						b.FieldRef.APIVersion = "v1"
+					}
 				}
+			}
+			if a.VolumeSource.DownwardAPI.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.DownwardAPI.DefaultMode = &ptrVar1
 			}
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			corev1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			if a.VolumeSource.ConfigMap.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.ConfigMap.DefaultMode = &ptrVar1
+			}
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			corev1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			if a.VolumeSource.AzureDisk.CachingMode == nil {
+				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.FSType == nil {
+				var ptrVar1 string = "ext4"
+				a.VolumeSource.AzureDisk.FSType = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.ReadOnly == nil {
+				var ptrVar1 bool = false
+				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.Kind == nil {
+				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+				a.VolumeSource.AzureDisk.Kind = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Projected != nil {
-			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			corev1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							corev1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							if c.FieldRef.APIVersion == "" {
+								c.FieldRef.APIVersion = "v1"
+							}
 						}
 					}
 				}
 				if b.ServiceAccountToken != nil {
-					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					corev1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					if b.ServiceAccountToken.ExpirationSeconds == nil {
+						var ptrVar1 int64 = 3600
+						b.ServiceAccountToken.ExpirationSeconds = &ptrVar1
+					}
 				}
+			}
+			if a.VolumeSource.Projected.DefaultMode == nil {
+				var ptrVar1 int32 = 420
+				a.VolumeSource.Projected.DefaultMode = &ptrVar1
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			if a.VolumeSource.ScaleIO.StorageMode == "" {
+				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if a.VolumeSource.ScaleIO.FSType == "" {
+				a.VolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
-				v1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
-				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+				if a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode == nil {
+					ptrVar1 := v1.PersistentVolumeMode(v1.PersistentVolumeFilesystem)
+					a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode = &ptrVar1
+				}
 			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -941,16 +1957,25 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -958,11 +1983,29 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.LivenessProbe.TimeoutSeconds == 0 {
+				a.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.LivenessProbe.PeriodSeconds == 0 {
+				a.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.LivenessProbe.SuccessThreshold == 0 {
+				a.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.LivenessProbe.FailureThreshold == 0 {
+				a.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -970,11 +2013,29 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.ReadinessProbe.TimeoutSeconds == 0 {
+				a.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.ReadinessProbe.PeriodSeconds == 0 {
+				a.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.ReadinessProbe.SuccessThreshold == 0 {
+				a.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.ReadinessProbe.FailureThreshold == 0 {
+				a.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
+			corev1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				if a.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -982,23 +2043,53 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.StartupProbe.TimeoutSeconds == 0 {
+				a.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.StartupProbe.PeriodSeconds == 0 {
+				a.StartupProbe.PeriodSeconds = 10
+			}
+			if a.StartupProbe.SuccessThreshold == 0 {
+				a.StartupProbe.SuccessThreshold = 1
+			}
+			if a.StartupProbe.FailureThreshold == 0 {
+				a.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					if a.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					if a.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
-		v1.SetDefaults_Container(a)
+		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			if b.Protocol == "" {
@@ -1009,16 +2100,25 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
+			corev1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -1026,11 +2126,29 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.LivenessProbe.TimeoutSeconds == 0 {
+				a.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.LivenessProbe.PeriodSeconds == 0 {
+				a.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.LivenessProbe.SuccessThreshold == 0 {
+				a.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.LivenessProbe.FailureThreshold == 0 {
+				a.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -1038,11 +2156,29 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.ReadinessProbe.TimeoutSeconds == 0 {
+				a.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.ReadinessProbe.PeriodSeconds == 0 {
+				a.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.ReadinessProbe.SuccessThreshold == 0 {
+				a.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.ReadinessProbe.FailureThreshold == 0 {
+				a.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
+			corev1.SetDefaults_Probe(a.StartupProbe)
 			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+				if a.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -1050,23 +2186,53 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.StartupProbe.TimeoutSeconds == 0 {
+				a.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.StartupProbe.PeriodSeconds == 0 {
+				a.StartupProbe.PeriodSeconds = 10
+			}
+			if a.StartupProbe.SuccessThreshold == 0 {
+				a.StartupProbe.SuccessThreshold = 1
+			}
+			if a.StartupProbe.FailureThreshold == 0 {
+				a.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					if a.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					if a.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
+		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
-		v1.SetDefaults_EphemeralContainer(a)
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
 			if b.Protocol == "" {
@@ -1077,16 +2243,25 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 			b := &a.EphemeralContainerCommon.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					if b.ValueFrom.FieldRef.APIVersion == "" {
+						b.ValueFrom.FieldRef.APIVersion = "v1"
+					}
 				}
 			}
 		}
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
 		if a.EphemeralContainerCommon.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -1094,11 +2269,29 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.LivenessProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.LivenessProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.LivenessProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
@@ -1106,11 +2299,29 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.ReadinessProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.ReadinessProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
+			corev1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path == "" {
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path = "/"
+				}
+				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme == "" {
+					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+				}
 			}
 			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
 				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
@@ -1118,29 +2329,88 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
+			if a.EphemeralContainerCommon.StartupProbe.TimeoutSeconds == 0 {
+				a.EphemeralContainerCommon.StartupProbe.TimeoutSeconds = 1
+			}
+			if a.EphemeralContainerCommon.StartupProbe.PeriodSeconds == 0 {
+				a.EphemeralContainerCommon.StartupProbe.PeriodSeconds = 10
+			}
+			if a.EphemeralContainerCommon.StartupProbe.SuccessThreshold == 0 {
+				a.EphemeralContainerCommon.StartupProbe.SuccessThreshold = 1
+			}
+			if a.EphemeralContainerCommon.StartupProbe.FailureThreshold == 0 {
+				a.EphemeralContainerCommon.StartupProbe.FailureThreshold = 3
+			}
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path == "" {
+						a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path = "/"
+					}
+					if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme == "" {
+						a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					corev1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path == "" {
+						a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path = "/"
+					}
+					if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme == "" {
+						a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme = v1.URIScheme(v1.URISchemeHTTP)
+					}
 				}
 			}
 		}
+		if a.EphemeralContainerCommon.TerminationMessagePath == "" {
+			a.EphemeralContainerCommon.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePolicy == "" {
+			a.EphemeralContainerCommon.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
-	v1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.RestartPolicy == "" {
+		in.Spec.Template.Spec.RestartPolicy = v1.RestartPolicy(v1.RestartPolicyAlways)
+	}
+	if in.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
+		ptrVar1 := int64(v1.DefaultTerminationGracePeriodSeconds)
+		in.Spec.Template.Spec.TerminationGracePeriodSeconds = &ptrVar1
+	}
+	if in.Spec.Template.Spec.DNSPolicy == "" {
+		in.Spec.Template.Spec.DNSPolicy = v1.DNSPolicy(v1.DNSClusterFirst)
+	}
+	if in.Spec.Template.Spec.SecurityContext == nil {
+		if err := json.Unmarshal([]byte(`{}`), &in.Spec.Template.Spec.SecurityContext); err != nil {
+			panic(err)
+		}
+	}
+	if in.Spec.Template.Spec.SchedulerName == "" {
+		in.Spec.Template.Spec.SchedulerName = string(v1.DefaultSchedulerName)
+	}
+	if in.Spec.Template.Spec.EnableServiceLinks == nil {
+		ptrVar1 := bool(v1.DefaultEnableServiceLinks)
+		in.Spec.Template.Spec.EnableServiceLinks = &ptrVar1
+	}
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
-		v1.SetDefaults_PersistentVolumeClaim(a)
-		v1.SetDefaults_PersistentVolumeClaimSpec(&a.Spec)
-		v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
-		v1.SetDefaults_ResourceList(&a.Status.Capacity)
-		v1.SetDefaults_ResourceList(&a.Status.AllocatedResources)
+		corev1.SetDefaults_PersistentVolumeClaim(a)
+		corev1.SetDefaults_PersistentVolumeClaimSpec(&a.Spec)
+		corev1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+		if a.Spec.VolumeMode == nil {
+			ptrVar1 := v1.PersistentVolumeMode(v1.PersistentVolumeFilesystem)
+			a.Spec.VolumeMode = &ptrVar1
+		}
+		if a.Status.Phase == "" {
+			a.Status.Phase = v1.PersistentVolumeClaimPhase(v1.ClaimPending)
+		}
+		corev1.SetDefaults_ResourceList(&a.Status.Capacity)
+		corev1.SetDefaults_ResourceList(&a.Status.AllocatedResources)
 	}
 }
 

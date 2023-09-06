@@ -22,6 +22,9 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
+
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/networking/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -39,6 +42,12 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_IngressClass(in *v1.IngressClass) {
 	SetDefaults_IngressClass(in)
+	if in.Spec.Parameters != nil {
+		if in.Spec.Parameters.Scope == nil {
+			ptrVar1 := string(v1.IngressClassParametersReferenceScopeCluster)
+			in.Spec.Parameters.Scope = &ptrVar1
+		}
+	}
 }
 
 func SetObjectDefaults_IngressClassList(in *v1.IngressClassList) {
@@ -55,6 +64,10 @@ func SetObjectDefaults_NetworkPolicy(in *v1.NetworkPolicy) {
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			SetDefaults_NetworkPolicyPort(b)
+			if b.Protocol == nil {
+				ptrVar1 := corev1.Protocol(corev1.ProtocolTCP)
+				b.Protocol = &ptrVar1
+			}
 		}
 	}
 	for i := range in.Spec.Egress {
@@ -62,6 +75,15 @@ func SetObjectDefaults_NetworkPolicy(in *v1.NetworkPolicy) {
 		for j := range a.Ports {
 			b := &a.Ports[j]
 			SetDefaults_NetworkPolicyPort(b)
+			if b.Protocol == nil {
+				ptrVar1 := corev1.Protocol(corev1.ProtocolTCP)
+				b.Protocol = &ptrVar1
+			}
+		}
+	}
+	if in.Spec.PolicyTypes == nil {
+		if err := json.Unmarshal([]byte(`v1.DefaultPolicyTypes()`), &in.Spec.PolicyTypes); err != nil {
+			panic(err)
 		}
 	}
 }

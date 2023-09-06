@@ -41,6 +41,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_ResourceClaim(in *v1alpha2.ResourceClaim) {
 	SetDefaults_ResourceClaimSpec(&in.Spec)
+	if in.Spec.AllocationMode == "" {
+		in.Spec.AllocationMode = v1alpha2.AllocationMode(v1alpha2.AllocationModeWaitForFirstConsumer)
+	}
 }
 
 func SetObjectDefaults_ResourceClaimList(in *v1alpha2.ResourceClaimList) {
@@ -52,6 +55,9 @@ func SetObjectDefaults_ResourceClaimList(in *v1alpha2.ResourceClaimList) {
 
 func SetObjectDefaults_ResourceClaimTemplate(in *v1alpha2.ResourceClaimTemplate) {
 	SetDefaults_ResourceClaimSpec(&in.Spec.Spec)
+	if in.Spec.Spec.AllocationMode == "" {
+		in.Spec.Spec.AllocationMode = v1alpha2.AllocationMode(v1alpha2.AllocationModeWaitForFirstConsumer)
+	}
 }
 
 func SetObjectDefaults_ResourceClaimTemplateList(in *v1alpha2.ResourceClaimTemplateList) {

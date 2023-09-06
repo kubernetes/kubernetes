@@ -77,6 +77,7 @@ message CSIDriverSpec {
   // This field is immutable.
   //
   // +optional
+  // +default=true
   optional bool attachRequired = 1;
 
   // podInfoOnMount indicates this CSI volume driver requires additional pod information (like podName, podUID, etc.)
@@ -106,6 +107,7 @@ message CSIDriverSpec {
   // This field is immutable.
   //
   // +optional
+  // +default=false
   optional bool podInfoOnMount = 2;
 
   // volumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
@@ -125,6 +127,7 @@ message CSIDriverSpec {
   //
   // +optional
   // +listType=set
+  // +default=["Persistent"]
   repeated string volumeLifecycleModes = 3;
 
   // storageCapacity indicates that the CSI volume driver wants pod scheduling to consider the storage
@@ -144,6 +147,7 @@ message CSIDriverSpec {
   //
   // +optional
   // +featureGate=CSIStorageCapacity
+  // +default=false
   optional bool storageCapacity = 4;
 
   // fsGroupPolicy defines if the underlying volume supports changing ownership and
@@ -158,6 +162,7 @@ message CSIDriverSpec {
   // if a fstype is defined and the volume's access mode contains ReadWriteOnce.
   //
   // +optional
+  // +default=ref(ReadWriteOnceWithFSTypeFSGroupPolicy)
   optional string fsGroupPolicy = 5;
 
   // tokenRequests indicates the CSI driver needs pods' service account
@@ -189,6 +194,7 @@ message CSIDriverSpec {
   // mount points will not be seen by a running container.
   //
   // +optional
+  // +default=false
   optional bool requiresRepublish = 7;
 
   // seLinuxMount specifies if the CSI driver supports "-o context"
@@ -211,6 +217,7 @@ message CSIDriverSpec {
   //
   // +featureGate=SELinuxMountReadWriteOncePod
   // +optional
+  // +default=false
   optional bool seLinuxMount = 8;
 }
 
@@ -405,6 +412,7 @@ message StorageClass {
   // reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
   // Defaults to Delete.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.PersistentVolumeReclaimDelete)
   optional string reclaimPolicy = 4;
 
   // mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -421,6 +429,7 @@ message StorageClass {
   // provisioned and bound.  When unset, VolumeBindingImmediate is used.
   // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
+  // +default=ref(VolumeBindingImmediate)
   optional string volumeBindingMode = 7;
 
   // allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.

@@ -2810,6 +2810,7 @@ func schema_pkg_apis_apiregistration_v1_ServiceReference(ref common.ReferenceCal
 					"port": {
 						SchemaProps: spec.SchemaProps{
 							Description: "If specified, the port on the service that hosting webhook. Default to 443 for backward compatibility. `port` should be a valid port number (1-65535, inclusive).",
+							Default:     443,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -3108,6 +3109,7 @@ func schema_pkg_apis_apiregistration_v1beta1_ServiceReference(ref common.Referen
 					"port": {
 						SchemaProps: spec.SchemaProps{
 							Description: "If specified, the port on the service that hosting webhook. Default to 443 for backward compatibility. `port` should be a valid port number (1-65535, inclusive).",
+							Default:     443,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

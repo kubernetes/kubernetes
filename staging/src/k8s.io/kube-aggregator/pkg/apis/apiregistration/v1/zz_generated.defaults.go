@@ -37,6 +37,10 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 func SetObjectDefaults_APIService(in *APIService) {
 	if in.Spec.Service != nil {
 		SetDefaults_ServiceReference(in.Spec.Service)
+		if in.Spec.Service.Port == nil {
+			var ptrVar1 int32 = 443
+			in.Spec.Service.Port = &ptrVar1
+		}
 	}
 }
 

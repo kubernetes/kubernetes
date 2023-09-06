@@ -22,6 +22,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/scheduling/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -37,6 +38,10 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_PriorityClass(in *v1.PriorityClass) {
 	SetDefaults_PriorityClass(in)
+	if in.PreemptionPolicy == nil {
+		ptrVar1 := corev1.PreemptionPolicy(corev1.PreemptLowerPriority)
+		in.PreemptionPolicy = &ptrVar1
+	}
 }
 
 func SetObjectDefaults_PriorityClassList(in *v1.PriorityClassList) {

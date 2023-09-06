@@ -22,9 +22,12 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
+
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/storage/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -42,6 +45,35 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_CSIDriver(in *v1.CSIDriver) {
 	SetDefaults_CSIDriver(in)
+	if in.Spec.AttachRequired == nil {
+		var ptrVar1 bool = true
+		in.Spec.AttachRequired = &ptrVar1
+	}
+	if in.Spec.PodInfoOnMount == nil {
+		var ptrVar1 bool = false
+		in.Spec.PodInfoOnMount = &ptrVar1
+	}
+	if in.Spec.VolumeLifecycleModes == nil {
+		if err := json.Unmarshal([]byte(`["Persistent"]`), &in.Spec.VolumeLifecycleModes); err != nil {
+			panic(err)
+		}
+	}
+	if in.Spec.StorageCapacity == nil {
+		var ptrVar1 bool = false
+		in.Spec.StorageCapacity = &ptrVar1
+	}
+	if in.Spec.FSGroupPolicy == nil {
+		ptrVar1 := v1.FSGroupPolicy(v1.ReadWriteOnceWithFSTypeFSGroupPolicy)
+		in.Spec.FSGroupPolicy = &ptrVar1
+	}
+	if in.Spec.RequiresRepublish == nil {
+		var ptrVar1 bool = false
+		in.Spec.RequiresRepublish = &ptrVar1
+	}
+	if in.Spec.SELinuxMount == nil {
+		var ptrVar1 bool = false
+		in.Spec.SELinuxMount = &ptrVar1
+	}
 }
 
 func SetObjectDefaults_CSIDriverList(in *v1.CSIDriverList) {
@@ -53,6 +85,14 @@ func SetObjectDefaults_CSIDriverList(in *v1.CSIDriverList) {
 
 func SetObjectDefaults_StorageClass(in *v1.StorageClass) {
 	SetDefaults_StorageClass(in)
+	if in.ReclaimPolicy == nil {
+		ptrVar1 := corev1.PersistentVolumeReclaimPolicy(corev1.PersistentVolumeReclaimDelete)
+		in.ReclaimPolicy = &ptrVar1
+	}
+	if in.VolumeBindingMode == nil {
+		ptrVar1 := v1.VolumeBindingMode(v1.VolumeBindingImmediate)
+		in.VolumeBindingMode = &ptrVar1
+	}
 }
 
 func SetObjectDefaults_StorageClassList(in *v1.StorageClassList) {
@@ -64,21 +104,62 @@ func SetObjectDefaults_StorageClassList(in *v1.StorageClassList) {
 
 func SetObjectDefaults_VolumeAttachment(in *v1.VolumeAttachment) {
 	if in.Spec.Source.InlineVolumeSpec != nil {
-		corev1.SetDefaults_ResourceList(&in.Spec.Source.InlineVolumeSpec.Capacity)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Source.InlineVolumeSpec.Capacity)
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath != nil {
-			corev1.SetDefaults_HostPathVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath)
+			apiscorev1.SetDefaults_HostPathVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath.Type == nil {
+				ptrVar1 := corev1.HostPathType(corev1.HostPathUnset)
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath.Type = &ptrVar1
+			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD != nil {
-			corev1.SetDefaults_RBDPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD)
+			apiscorev1.SetDefaults_RBDPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RBDPool == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RBDPool = "rbd"
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RadosUser == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RadosUser = "admin"
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.Keyring == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI != nil {
-			corev1.SetDefaults_ISCSIPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI)
+			apiscorev1.SetDefaults_ISCSIPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI.ISCSIInterface == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk != nil {
-			corev1.SetDefaults_AzureDiskVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk)
+			apiscorev1.SetDefaults_AzureDiskVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.CachingMode == nil {
+				ptrVar1 := corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite)
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.CachingMode = &ptrVar1
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.FSType == nil {
+				var ptrVar1 string = "ext4"
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.FSType = &ptrVar1
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.ReadOnly == nil {
+				var ptrVar1 bool = false
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.ReadOnly = &ptrVar1
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.Kind == nil {
+				ptrVar1 := corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk)
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.Kind = &ptrVar1
+			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO != nil {
-			corev1.SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO)
+			apiscorev1.SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.StorageMode == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.FSType == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.FSType = "xfs"
+			}
+		}
+		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeReclaimPolicy == "" {
+			in.Spec.Source.InlineVolumeSpec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimPolicy(corev1.PersistentVolumeReclaimRetain)
 		}
 	}
 }

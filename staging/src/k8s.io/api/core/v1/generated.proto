@@ -106,20 +106,24 @@ message AzureDiskVolumeSource {
 
   // cachingMode is the Host Caching mode: None, Read Only, Read Write.
   // +optional
+  // +default=ref(AzureDataDiskCachingReadWrite)
   optional string cachingMode = 3;
 
   // fsType is Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
+  // +default="ext4"
   optional string fsType = 4;
 
   // readOnly Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
+  // +default=false
   optional bool readOnly = 5;
 
   // kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+  // +default=ref(AzureSharedBlobDisk)
   optional string kind = 6;
 }
 
@@ -501,6 +505,7 @@ message ConfigMap {
   // The keys stored in Data must not overlap with the keys in
   // the BinaryData field, this is enforced during validation process.
   // +optional
+  // +default={}
   map<string, string> data = 2;
 
   // BinaryData contains the binary data.
@@ -630,6 +635,7 @@ message ConfigMapVolumeSource {
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
+  // +default=420
   optional int32 defaultMode = 3;
 
   // optional specify whether the ConfigMap or its keys must be defined
@@ -792,6 +798,7 @@ message Container {
   // Defaults to /dev/termination-log.
   // Cannot be updated.
   // +optional
+  // +default=ref(TerminationMessagePathDefault)
   optional string terminationMessagePath = 13;
 
   // Indicate how the termination message should be populated. File will use the contents of
@@ -802,6 +809,7 @@ message Container {
   // Defaults to File.
   // Cannot be updated.
   // +optional
+  // +default=ref(TerminationMessageReadFile)
   optional string terminationMessagePolicy = 20;
 
   // Image pull policy.
@@ -1087,6 +1095,7 @@ message DownwardAPIVolumeSource {
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
+  // +default=420
   optional int32 defaultMode = 2;
 }
 
@@ -1148,6 +1157,7 @@ message EndpointPort {
   // Must be UDP, TCP, or SCTP.
   // Default is TCP.
   // +optional
+  // +default=ref(ProtocolTCP)
   optional string protocol = 3;
 
   // The application protocol for this port.
@@ -1446,6 +1456,7 @@ message EphemeralContainerCommon {
   // Defaults to /dev/termination-log.
   // Cannot be updated.
   // +optional
+  // +default=ref(TerminationMessagePathDefault)
   optional string terminationMessagePath = 13;
 
   // Indicate how the termination message should be populated. File will use the contents of
@@ -1456,6 +1467,7 @@ message EphemeralContainerCommon {
   // Defaults to File.
   // Cannot be updated.
   // +optional
+  // +default=ref(TerminationMessageReadFile)
   optional string terminationMessagePolicy = 20;
 
   // Image pull policy.
@@ -1852,6 +1864,7 @@ message GlusterfsVolumeSource {
 message HTTPGetAction {
   // Path to access on the HTTP server.
   // +optional
+  // +default="/"
   optional string path = 1;
 
   // Name or number of the port to access on the container.
@@ -1867,6 +1880,7 @@ message HTTPGetAction {
   // Scheme to use for connecting to the host.
   // Defaults to HTTP.
   // +optional
+  // +default=ref(URISchemeHTTP)
   optional string scheme = 4;
 
   // Custom headers to set in the request. HTTP allows repeated headers.
@@ -1912,6 +1926,7 @@ message HostPathVolumeSource {
   // Defaults to ""
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
   // +optional
+  // +default=ref(HostPathUnset)
   optional string type = 2;
 }
 
@@ -1932,6 +1947,7 @@ message ISCSIPersistentVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -1988,6 +2004,7 @@ message ISCSIVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -2300,6 +2317,7 @@ message NamespaceStatus {
   // Phase is the current lifecycle phase of the namespace.
   // More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
   // +optional
+  // +default=ref(NamespaceActive)
   optional string phase = 1;
 
   // Represents the latest available observations of a namespace's current state.
@@ -2662,6 +2680,7 @@ message NodeSystemInfo {
 message ObjectFieldSelector {
   // Version of the schema the FieldPath is written in terms of, defaults to "v1".
   // +optional
+  // +default="v1"
   optional string apiVersion = 1;
 
   // Path of the field to select in the specified API version.
@@ -2839,6 +2858,7 @@ message PersistentVolumeClaimSpec {
   // volumeMode defines what type of volume is required by the claim.
   // Value of Filesystem is implied when not included in claim spec.
   // +optional
+  // +default=ref(PersistentVolumeFilesystem)
   optional string volumeMode = 6;
 
   // dataSource field can be used to specify either:
@@ -2883,6 +2903,7 @@ message PersistentVolumeClaimSpec {
 message PersistentVolumeClaimStatus {
   // phase represents the current phase of PersistentVolumeClaim.
   // +optional
+  // +default=ref(ClaimPending)
   optional string phase = 1;
 
   // accessModes contains the actual access modes the volume backing the PVC has.
@@ -3148,6 +3169,7 @@ message PersistentVolumeSpec {
   // Recycle must be supported by the volume plugin underlying this PersistentVolume.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming
   // +optional
+  // +default=ref(PersistentVolumeReclaimRetain)
   optional string persistentVolumeReclaimPolicy = 5;
 
   // storageClassName is the name of StorageClass to which this persistent volume belongs. Empty value
@@ -3164,6 +3186,7 @@ message PersistentVolumeSpec {
   // volumeMode defines if a volume is intended to be used with a formatted filesystem
   // or to remain in raw block state. Value of Filesystem is implied when not included in spec.
   // +optional
+  // XXX TODO: shared with other types :( +default=ref(PersistentVolumeFilesystem)
   optional string volumeMode = 8;
 
   // nodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -3177,6 +3200,7 @@ message PersistentVolumeStatus {
   // phase indicates if a volume is available, bound to a claim, or released by a claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase
   // +optional
+  // +default=ref(VolumePending)
   optional string phase = 1;
 
   // message is a human-readable message indicating details about why the volume is in this state.
@@ -3730,6 +3754,7 @@ message PodSpec {
   // Default to Always.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
   // +optional
+  // +default=ref(RestartPolicyAlways)
   optional string restartPolicy = 3;
 
   // Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
@@ -3741,6 +3766,7 @@ message PodSpec {
   // Set this value longer than the expected cleanup time for your process.
   // Defaults to 30 seconds.
   // +optional
+  // +default=ref(DefaultTerminationGracePeriodSeconds)
   optional int64 terminationGracePeriodSeconds = 4;
 
   // Optional duration in seconds the pod may be active on the node relative to
@@ -3756,6 +3782,7 @@ message PodSpec {
   // To have DNS options set along with hostNetwork, you have to specify DNS policy
   // explicitly to 'ClusterFirstWithHostNet'.
   // +optional
+  // +default=ref(DNSClusterFirst)
   optional string dnsPolicy = 6;
 
   // NodeSelector is a selector which must be true for the pod to fit on a node.
@@ -3817,6 +3844,7 @@ message PodSpec {
   // SecurityContext holds pod-level security attributes and common container settings.
   // Optional: Defaults to empty.  See type description for default values of each field.
   // +optional
+  // +default={}
   optional PodSecurityContext securityContext = 14;
 
   // ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
@@ -3844,6 +3872,7 @@ message PodSpec {
   // If specified, the pod will be dispatched by specified scheduler.
   // If not specified, the pod will be dispatched by default scheduler.
   // +optional
+  // +default=ref(DefaultSchedulerName)
   optional string schedulerName = 19;
 
   // If specified, the pod's tolerations.
@@ -3899,6 +3928,7 @@ message PodSpec {
   // environment variables, matching the syntax of Docker links.
   // Optional: Defaults to true.
   // +optional
+  // +default=ref(DefaultEnableServiceLinks)
   optional bool enableServiceLinks = 30;
 
   // PreemptionPolicy is the Policy for preempting pods with lower priority.
@@ -4281,21 +4311,25 @@ message Probe {
   // Defaults to 1 second. Minimum value is 1.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
   // +optional
+  // +default=1
   optional int32 timeoutSeconds = 3;
 
   // How often (in seconds) to perform the probe.
   // Default to 10 seconds. Minimum value is 1.
   // +optional
+  // +default=10
   optional int32 periodSeconds = 4;
 
   // Minimum consecutive successes for the probe to be considered successful after having failed.
   // Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
   // +optional
+  // +default=1
   optional int32 successThreshold = 5;
 
   // Minimum consecutive failures for the probe to be considered failed after having succeeded.
   // Defaults to 3. Minimum value is 1.
   // +optional
+  // +default=3
   optional int32 failureThreshold = 6;
 
   // Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
@@ -4345,6 +4379,7 @@ message ProjectedVolumeSource {
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
+  // +default=420
   optional int32 defaultMode = 2;
 }
 
@@ -4403,18 +4438,21 @@ message RBDPersistentVolumeSource {
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="rbd"
   optional string pool = 4;
 
   // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="admin"
   optional string user = 5;
 
   // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="/etc/ceph/keyring"
   optional string keyring = 6;
 
   // secretRef is name of the authentication secret for RBDUser. If provided
@@ -4454,18 +4492,21 @@ message RBDVolumeSource {
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="rbd"
   optional string pool = 4;
 
   // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="admin"
   optional string user = 5;
 
   // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="/etc/ceph/keyring"
   optional string keyring = 6;
 
   // secretRef is name of the authentication secret for RBDUser. If provided
@@ -4557,6 +4598,7 @@ message ReplicationControllerSpec {
   // This is a pointer to distinguish between explicit zero and unspecified.
   // Defaults to 1.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
+  // +default=1
   // +optional
   optional int32 replicas = 1;
 
@@ -4772,6 +4814,7 @@ message ScaleIOPersistentVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -4783,6 +4826,7 @@ message ScaleIOPersistentVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs"
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -4818,6 +4862,7 @@ message ScaleIOVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -4829,6 +4874,7 @@ message ScaleIOVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs".
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly Defaults to false (read/write). ReadOnly here will force
@@ -4918,6 +4964,7 @@ message Secret {
   // Used to facilitate programmatic handling of secret data.
   // More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
   // +optional
+  // +default=ref(SecretTypeOpaque)
   optional string type = 3;
 }
 
@@ -5027,6 +5074,7 @@ message SecretVolumeSource {
   // This might be in conflict with other options that affect the file
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
+  // +default=420
   optional int32 defaultMode = 3;
 
   // optional field specify whether the Secret or its keys must be defined
@@ -5216,6 +5264,7 @@ message ServiceAccountTokenProjection {
   // its time to live or if the token is older than 24 hours.Defaults to 1 hour
   // and must be at least 10 minutes.
   // +optional
+  // +default=3600
   optional int64 expirationSeconds = 2;
 
   // path is the path relative to the mount point of the file to project the
@@ -5389,6 +5438,7 @@ message ServiceSpec {
   // Several other fields do not apply to ExternalName services.
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
   // +optional
+  // +default=ref(ServiceTypeClusterIP)
   optional string type = 4;
 
   // externalIPs is a list of IP addresses for which nodes in the cluster
@@ -5405,6 +5455,7 @@ message ServiceSpec {
   // Defaults to None.
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
   // +optional
+  // +default=ref(ServiceAffinityNone)
   optional string sessionAffinity = 7;
 
   // Only applies to Service Type: LoadBalancer.
@@ -5536,6 +5587,7 @@ message ServiceSpec {
   // "Cluster", uses the standard behavior of routing to all endpoints evenly
   // (possibly modified by topology and other features).
   // +optional
+  // +default=ref(ServiceInternalTrafficPolicyCluster)
   optional string internalTrafficPolicy = 22;
 }
 

@@ -58,9 +58,21 @@ func SetObjectDefaults_PriorityLevelConfiguration(in *v1beta2.PriorityLevelConfi
 		if in.Spec.Limited.LimitResponse.Queuing != nil {
 			SetDefaults_QueuingConfiguration(in.Spec.Limited.LimitResponse.Queuing)
 		}
+		if in.Spec.Limited.LendablePercent == nil {
+			var ptrVar1 int32 = 0
+			in.Spec.Limited.LendablePercent = &ptrVar1
+		}
 	}
 	if in.Spec.Exempt != nil {
 		SetDefaults_ExemptPriorityLevelConfiguration(in.Spec.Exempt)
+		if in.Spec.Exempt.NominalConcurrencyShares == nil {
+			var ptrVar1 int32 = 0
+			in.Spec.Exempt.NominalConcurrencyShares = &ptrVar1
+		}
+		if in.Spec.Exempt.LendablePercent == nil {
+			var ptrVar1 int32 = 0
+			in.Spec.Exempt.LendablePercent = &ptrVar1
+		}
 	}
 }
 

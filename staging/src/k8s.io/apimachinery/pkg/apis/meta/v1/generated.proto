@@ -1187,6 +1187,7 @@ message WatchEvent {
   //  * If Type is Deleted: the state of the object immediately before deletion.
   //  * If Type is Error: *Status is recommended; other types may make sense
   //    depending on context.
+  // +default=null
   optional k8s.io.apimachinery.pkg.runtime.RawExtension object = 2;
 }
 

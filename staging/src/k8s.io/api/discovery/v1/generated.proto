@@ -124,11 +124,13 @@ message EndpointPort {
   // * must consist of lower case alphanumeric characters or '-'.
   // * must start and end with an alphanumeric character.
   // Default is empty string.
+  // +default=""
   optional string name = 1;
 
   // protocol represents the IP protocol for this port.
   // Must be UDP, TCP, or SCTP.
   // Default is TCP.
+  // +default=ref(k8s.io/api/core/v1.ProtocolTCP)
   optional string protocol = 2;
 
   // port represents the port number of the endpoint.

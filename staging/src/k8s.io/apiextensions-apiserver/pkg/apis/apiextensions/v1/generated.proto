@@ -110,6 +110,7 @@ message CustomResourceConversion {
   // - `"None"`: The converter only change the apiVersion and would not touch any other field in the custom resource.
   // - `"Webhook"`: API Server will call to an external webhook to do the conversion. Additional information
   //   is needed for this option. This requires spec.preserveUnknownFields to be false, and spec.conversion.webhook to be set.
+  // +default=ref(NoneConverter)
   optional string strategy = 1;
 
   // webhook describes how to call the conversion webhook. Required when `strategy` is set to `"Webhook"`.
@@ -225,6 +226,7 @@ message CustomResourceDefinitionSpec {
 
   // conversion defines conversion settings for the CRD.
   // +optional
+  // +default={}
   optional CustomResourceConversion conversion = 9;
 
   // preserveUnknownFields indicates that object fields which are not specified
@@ -600,6 +602,7 @@ message ServiceReference {
   // `port` should be a valid port number (1-65535, inclusive).
   // Defaults to 443 for backward compatibility.
   // +optional
+  // +default=443
   optional int32 port = 4;
 }
 

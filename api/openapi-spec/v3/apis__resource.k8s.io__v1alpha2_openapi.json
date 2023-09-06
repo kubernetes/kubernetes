@@ -423,6 +423,7 @@
         "description": "ResourceClaimSpec defines how a resource is to be allocated.",
         "properties": {
           "allocationMode": {
+            "default": "WaitForFirstConsumer",
             "description": "Allocation can start immediately or when a Pod wants to use the resource. \"WaitForFirstConsumer\" is the default.",
             "type": "string"
           },

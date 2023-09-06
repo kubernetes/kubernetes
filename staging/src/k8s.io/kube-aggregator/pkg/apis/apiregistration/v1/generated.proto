@@ -146,6 +146,7 @@ message ServiceReference {
   // Default to 443 for backward compatibility.
   // `port` should be a valid port number (1-65535, inclusive).
   // +optional
+  // +default=443
   optional int32 port = 3;
 }
 

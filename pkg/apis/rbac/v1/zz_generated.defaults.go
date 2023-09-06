@@ -43,6 +43,9 @@ func SetObjectDefaults_ClusterRoleBinding(in *v1.ClusterRoleBinding) {
 		a := &in.Subjects[i]
 		SetDefaults_Subject(a)
 	}
+	if in.RoleRef.APIGroup == "" {
+		in.RoleRef.APIGroup = string(v1.GroupName)
+	}
 }
 
 func SetObjectDefaults_ClusterRoleBindingList(in *v1.ClusterRoleBindingList) {
@@ -57,6 +60,9 @@ func SetObjectDefaults_RoleBinding(in *v1.RoleBinding) {
 	for i := range in.Subjects {
 		a := &in.Subjects[i]
 		SetDefaults_Subject(a)
+	}
+	if in.RoleRef.APIGroup == "" {
+		in.RoleRef.APIGroup = string(v1.GroupName)
 	}
 }
 

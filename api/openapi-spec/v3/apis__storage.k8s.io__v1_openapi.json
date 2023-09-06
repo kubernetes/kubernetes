@@ -32,6 +32,7 @@
         "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
         "properties": {
           "cachingMode": {
+            "default": "ReadWrite",
             "description": "cachingMode is the Host Caching mode: None, Read Only, Read Write.",
             "type": "string"
           },
@@ -46,14 +47,17 @@
             "type": "string"
           },
           "fsType": {
+            "default": "ext4",
             "description": "fsType is Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
             "type": "string"
           },
           "kind": {
+            "default": "Shared",
             "description": "kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared",
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
             "type": "boolean"
           }
@@ -390,6 +394,7 @@
             "type": "string"
           },
           "type": {
+            "default": "",
             "description": "type for HostPath Volume Defaults to \"\" More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
             "type": "string"
           }
@@ -424,6 +429,7 @@
             "type": "string"
           },
           "iscsiInterface": {
+            "default": "default",
             "description": "iscsiInterface is the interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
             "type": "string"
           },
@@ -793,6 +799,7 @@
             "description": "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume."
           },
           "persistentVolumeReclaimPolicy": {
+            "default": "Retain",
             "description": "persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim. Valid options are Retain (default for manually created PersistentVolumes), Delete (default for dynamically provisioned PersistentVolumes), and Recycle (deprecated). Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
             "type": "string"
           },
@@ -849,7 +856,7 @@
             "description": "storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://examples.k8s.io/volumes/storageos/README.md"
           },
           "volumeMode": {
-            "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec.",
+            "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. XXX TODO: shared with other types :( +default=ref(PersistentVolumeFilesystem)",
             "type": "string"
           },
           "vsphereVolume": {
@@ -952,6 +959,7 @@
             "type": "string"
           },
           "keyring": {
+            "default": "/etc/ceph/keyring",
             "description": "keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           },
@@ -964,6 +972,7 @@
             "type": "array"
           },
           "pool": {
+            "default": "rbd",
             "description": "pool is the rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           },
@@ -980,6 +989,7 @@
             "description": "secretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
           },
           "user": {
+            "default": "admin",
             "description": "user is the rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           }
@@ -994,6 +1004,7 @@
         "description": "ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume",
         "properties": {
           "fsType": {
+            "default": "xfs",
             "description": "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\"",
             "type": "string"
           },
@@ -1023,6 +1034,7 @@
             "type": "boolean"
           },
           "storageMode": {
+            "default": "ThinProvisioned",
             "description": "storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
             "type": "string"
           },
@@ -1265,26 +1277,32 @@
         "description": "CSIDriverSpec is the specification of a CSIDriver.",
         "properties": {
           "attachRequired": {
+            "default": true,
             "description": "attachRequired indicates this CSI volume driver requires an attach operation (because it implements the CSI ControllerPublishVolume() method), and that the Kubernetes attach detach controller should call the attach volume interface which checks the volumeattachment status and waits until the volume is attached before proceeding to mounting. The CSI external-attacher coordinates with CSI volume driver and updates the volumeattachment status when the attach operation is complete. If the CSIDriverRegistry feature gate is enabled and the value is specified to false, the attach operation will be skipped. Otherwise the attach operation will be called.\n\nThis field is immutable.",
             "type": "boolean"
           },
           "fsGroupPolicy": {
+            "default": "ReadWriteOnceWithFSType",
             "description": "fsGroupPolicy defines if the underlying volume supports changing ownership and permission of the volume before being mounted. Refer to the specific FSGroupPolicy values for additional details.\n\nThis field is immutable.\n\nDefaults to ReadWriteOnceWithFSType, which will examine each volume to determine if Kubernetes should modify ownership and permissions of the volume. With the default policy the defined fsGroup will only be applied if a fstype is defined and the volume's access mode contains ReadWriteOnce.",
             "type": "string"
           },
           "podInfoOnMount": {
+            "default": false,
             "description": "podInfoOnMount indicates this CSI volume driver requires additional pod information (like podName, podUID, etc.) during mount operations, if set to true. If set to false, pod information will not be passed on mount. Default is false.\n\nThe CSI driver specifies podInfoOnMount as part of driver deployment. If true, Kubelet will pass pod information as VolumeContext in the CSI NodePublishVolume() calls. The CSI driver is responsible for parsing and validating the information passed in as VolumeContext.\n\nThe following VolumeConext will be passed if podInfoOnMount is set to true. This list might grow, but the prefix will be used. \"csi.storage.k8s.io/pod.name\": pod.Name \"csi.storage.k8s.io/pod.namespace\": pod.Namespace \"csi.storage.k8s.io/pod.uid\": string(pod.UID) \"csi.storage.k8s.io/ephemeral\": \"true\" if the volume is an ephemeral inline volume\n                                defined by a CSIVolumeSource, otherwise \"false\"\n\n\"csi.storage.k8s.io/ephemeral\" is a new feature in Kubernetes 1.16. It is only required for drivers which support both the \"Persistent\" and \"Ephemeral\" VolumeLifecycleMode. Other drivers can leave pod info disabled and/or ignore this field. As Kubernetes 1.15 doesn't support this field, drivers can only support one mode when deployed on such a cluster and the deployment determines which mode that is, for example via a command line parameter of the driver.\n\nThis field is immutable.",
             "type": "boolean"
           },
           "requiresRepublish": {
+            "default": false,
             "description": "requiresRepublish indicates the CSI driver wants `NodePublishVolume` being periodically called to reflect any possible change in the mounted volume. This field defaults to false.\n\nNote: After a successful initial NodePublishVolume call, subsequent calls to NodePublishVolume should only update the contents of the volume. New mount points will not be seen by a running container.",
             "type": "boolean"
           },
           "seLinuxMount": {
+            "default": false,
             "description": "seLinuxMount specifies if the CSI driver supports \"-o context\" mount option.\n\nWhen \"true\", the CSI driver must ensure that all volumes provided by this CSI driver can be mounted separately with different `-o context` options. This is typical for storage backends that provide volumes as filesystems on block devices or as independent shared volumes. Kubernetes will call NodeStage / NodePublish with \"-o context=xyz\" mount option when mounting a ReadWriteOncePod volume used in Pod that has explicitly set SELinux context. In the future, it may be expanded to other volume AccessModes. In any case, Kubernetes will ensure that the volume is mounted only with a single SELinux context.\n\nWhen \"false\", Kubernetes won't pass any special SELinux mount options to the driver. This is typical for volumes that represent subdirectories of a bigger shared filesystem.\n\nDefault is \"false\".",
             "type": "boolean"
           },
           "storageCapacity": {
+            "default": false,
             "description": "storageCapacity indicates that the CSI volume driver wants pod scheduling to consider the storage capacity that the driver deployment will report by creating CSIStorageCapacity objects with capacity information, if set to true.\n\nThe check can be enabled immediately when deploying a driver. In that case, provisioning new volumes with late binding will pause until the driver deployment has published some suitable CSIStorageCapacity object.\n\nAlternatively, the driver can be deployed with the field unset or false and it can be flipped later when storage capacity information has been published.\n\nThis field was immutable in Kubernetes <= 1.22 and now is mutable.",
             "type": "boolean"
           },
@@ -1302,6 +1320,9 @@
             "x-kubernetes-list-type": "atomic"
           },
           "volumeLifecycleModes": {
+            "default": [
+              "Persistent"
+            ],
             "description": "volumeLifecycleModes defines what kind of volumes this CSI volume driver supports. The default if the list is empty is \"Persistent\", which is the usage defined by the CSI specification and implemented in Kubernetes via the usual PV/PVC mechanism.\n\nThe other mode is \"Ephemeral\". In this mode, volumes are defined inline inside the pod spec with CSIVolumeSource and their lifecycle is tied to the lifecycle of that pod. A driver has to be aware of this because it is only going to get a NodePublishVolume call for such a volume.\n\nFor more information about implementing this mode, see https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html A driver can support one or more of these modes and more modes may be added in the future.\n\nThis field is beta. This field is immutable.",
             "items": {
               "default": "",
@@ -1629,10 +1650,12 @@
             "type": "string"
           },
           "reclaimPolicy": {
+            "default": "Delete",
             "description": "reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class. Defaults to Delete.",
             "type": "string"
           },
           "volumeBindingMode": {
+            "default": "Immediate",
             "description": "volumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is only honored by servers that enable the VolumeScheduling feature.",
             "type": "string"
           }

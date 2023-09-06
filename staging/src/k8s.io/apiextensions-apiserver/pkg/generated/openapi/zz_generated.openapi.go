@@ -549,6 +549,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.Refe
 					"minReplicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the alpha feature gate HPAScaleToZero is enabled and at least one Object or External metric is configured.  Scaling is active as long as at least one metric value is available.",
+							Default:     1,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -1584,6 +1585,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref common.Re
 					"conversion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "conversion defines conversion settings for the CRD.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceConversion"),
 						},
 					},
@@ -2318,6 +2320,7 @@ func schema_pkg_apis_apiextensions_v1_ServiceReference(ref common.ReferenceCallb
 					"port": {
 						SchemaProps: spec.SchemaProps{
 							Description: "port is an optional service port at which the webhook will be contacted. `port` should be a valid port number (1-65535, inclusive). Defaults to 443 for backward compatibility.",
+							Default:     443,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

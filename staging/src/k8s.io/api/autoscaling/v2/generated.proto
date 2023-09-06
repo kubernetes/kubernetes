@@ -131,6 +131,7 @@ message HPAScalingRules {
   // selectPolicy is used to specify which policy should be used.
   // If not set, the default value Max is used.
   // +optional
+  // +default=ref(MaxChangePolicySelect)
   optional string selectPolicy = 1;
 
   // policies is a list of potential scaling polices which can be used during scaling.
@@ -224,6 +225,7 @@ message HorizontalPodAutoscalerSpec {
   // metric is configured.  Scaling is active as long as at least one metric value is
   // available.
   // +optional
+  // +default=1
   optional int32 minReplicas = 2;
 
   // maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
@@ -240,6 +242,8 @@ message HorizontalPodAutoscalerSpec {
   // If not set, the default metric will be set to 80% average CPU utilization.
   // +listType=atomic
   // +optional
+  // !TODO: not this?
+  // +default=[{"type": "Resource", "resource": {"name": "cpu", "target": {"type": "Utilization", "averageUtilization": 80}}}]
   repeated MetricSpec metrics = 4;
 
   // behavior configures the scaling behavior of the target

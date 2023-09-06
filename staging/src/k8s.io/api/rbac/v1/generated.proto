@@ -169,6 +169,8 @@ message RoleList {
 // +structType=atomic
 message RoleRef {
   // APIGroup is the group for the resource being referenced
+  // +optional
+  // +default=ref(GroupName)
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced

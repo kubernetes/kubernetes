@@ -157,6 +157,7 @@ message MatchResources {
   //
   // Default to the empty LabelSelector, which matches everything.
   // +optional
+  // +default={}
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 1;
 
   // ObjectSelector decides whether to run the validation based on if the
@@ -171,6 +172,7 @@ message MatchResources {
   // users may skip the admission webhook by setting the labels.
   // Default to the empty LabelSelector, which matches everything.
   // +optional
+  // +default={}
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 2;
 
   // ResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy matches.
@@ -200,6 +202,7 @@ message MatchResources {
   //
   // Defaults to "Equivalent"
   // +optional
+  // +default=ref(Equivalent)
   optional string matchPolicy = 7;
 }
 
@@ -681,6 +684,7 @@ message ValidatingAdmissionPolicySpec {
   //
   // Allowed values are Ignore or Fail. Defaults to Fail.
   // +optional
+  // +default=ref(Fail)
   optional string failurePolicy = 4;
 
   // auditAnnotations contains CEL expressions which are used to produce audit

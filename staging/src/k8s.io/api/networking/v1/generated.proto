@@ -168,6 +168,7 @@ message IngressClassParametersReference {
   // scope represents if this refers to a cluster or namespace scoped resource.
   // This may be set to "Cluster" (default) or "Namespace".
   // +optional
+  // +default=ref(IngressClassParametersReferenceScopeCluster)
   optional string scope = 4;
 
   // namespace is the namespace of the resource being referenced. This field is
@@ -470,6 +471,7 @@ message NetworkPolicyPort {
   // protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
   // If not specified, this field defaults to TCP.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.ProtocolTCP)
   optional string protocol = 1;
 
   // port represents the port on the given protocol. This can either be a numerical or named
@@ -528,6 +530,7 @@ message NetworkPolicySpec {
   // an egress section and would otherwise default to just [ "Ingress" ]).
   // This field is beta-level in 1.8
   // +optional
+  // +default=ref(DefaultPolicyTypes())
   repeated string policyTypes = 4;
 }
 

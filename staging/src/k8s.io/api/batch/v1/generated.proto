@@ -87,11 +87,13 @@ message CronJobSpec {
   // - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
   // - "Replace": cancels currently running job and replaces it with a new one
   // +optional
+  // +default=ref(AllowConcurrent)
   optional string concurrencyPolicy = 3;
 
   // This flag tells the controller to suspend subsequent executions, it does
   // not apply to already started executions.  Defaults to false.
   // +optional
+  // +default=false
   optional bool suspend = 4;
 
   // Specifies the job that will be created when executing a CronJob.
@@ -100,11 +102,13 @@ message CronJobSpec {
   // The number of successful finished jobs to retain. Value must be non-negative integer.
   // Defaults to 3.
   // +optional
+  // +default=3
   optional int32 successfulJobsHistoryLimit = 6;
 
   // The number of failed finished jobs to retain. Value must be non-negative integer.
   // Defaults to 1.
   // +optional
+  // +default=1
   optional int32 failedJobsHistoryLimit = 7;
 }
 

@@ -22,6 +22,8 @@ limitations under the License.
 package v2
 
 import (
+	"encoding/json"
+
 	v2 "k8s.io/api/autoscaling/v2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -39,6 +41,29 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_HorizontalPodAutoscaler(in *v2.HorizontalPodAutoscaler) {
 	SetDefaults_HorizontalPodAutoscaler(in)
+	if in.Spec.MinReplicas == nil {
+		var ptrVar1 int32 = 1
+		in.Spec.MinReplicas = &ptrVar1
+	}
+	if in.Spec.Metrics == nil {
+		if err := json.Unmarshal([]byte(`[{"type": "Resource", "resource": {"name": "cpu", "target": {"type": "Utilization", "averageUtilization": 80}}}]`), &in.Spec.Metrics); err != nil {
+			panic(err)
+		}
+	}
+	if in.Spec.Behavior != nil {
+		if in.Spec.Behavior.ScaleUp != nil {
+			if in.Spec.Behavior.ScaleUp.SelectPolicy == nil {
+				ptrVar1 := v2.ScalingPolicySelect(v2.MaxChangePolicySelect)
+				in.Spec.Behavior.ScaleUp.SelectPolicy = &ptrVar1
+			}
+		}
+		if in.Spec.Behavior.ScaleDown != nil {
+			if in.Spec.Behavior.ScaleDown.SelectPolicy == nil {
+				ptrVar1 := v2.ScalingPolicySelect(v2.MaxChangePolicySelect)
+				in.Spec.Behavior.ScaleDown.SelectPolicy = &ptrVar1
+			}
+		}
+	}
 }
 
 func SetObjectDefaults_HorizontalPodAutoscalerList(in *v2.HorizontalPodAutoscalerList) {
