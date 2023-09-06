@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -160,7 +162,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 			framework.Logf("Located ControllerRevision: %q", rev.Name)
 			initialRevision, err = csAppsV1.ControllerRevisions(ns).Get(ctx, rev.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to lookup ControllerRevision: %v", err)
-			framework.ExpectNotEqual(initialRevision, nil, "failed to lookup ControllerRevision: %v", initialRevision)
+			gomega.Expect(initialRevision).NotTo(gomega.BeNil(), "failed to lookup ControllerRevision: %v", initialRevision)
 		}
 
 		ginkgo.By(fmt.Sprintf("Patching ControllerRevision %q", initialRevision.Name))
