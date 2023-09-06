@@ -20,7 +20,6 @@ issues:
 linters:
   disable-all: true # not disabled in golangci-strict.yaml
   enable: # please keep this alphabetized and in sync with golangci-strict.yaml
-    - ginkgolinter
     - gocritic
     - govet
     - ineffassign
