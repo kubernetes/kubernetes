@@ -616,12 +616,13 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 // If a non-success status is returned, then the scheduling cycle is aborted.
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
 	startTime := time.Now()
+	skipPlugins := sets.New[string]()
 	defer func() {
+		state.SkipFilterPlugins = skipPlugins
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	var result *framework.PreFilterResult
 	var pluginsWithNodes []string
-	skipPlugins := sets.New[string]()
 	for _, pl := range f.preFilterPlugins {
 		r, s := f.runPreFilterPlugin(ctx, pl, state, pod)
 		if s.IsSkip() {
@@ -647,7 +648,6 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			return nil, framework.NewStatus(framework.Unschedulable, msg)
 		}
 	}
-	state.SkipFilterPlugins = skipPlugins
 	return result, nil
 }
 

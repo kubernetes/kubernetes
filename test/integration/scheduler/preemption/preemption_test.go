@@ -99,9 +99,16 @@ func waitForNominatedNodeName(cs clientset.Interface, pod *v1.Pod) error {
 
 const tokenFilterName = "token-filter"
 
+// tokenFilter is a fake plugin that implements PreFilter and Filter.
+// `Token` simulates the allowed pods number a cluster can host.
+// If `EnablePreFilter` is set to false or `Token` is positive, PreFilter passes; otherwise returns Unschedulable
+// For each Filter() call, `Token` is decreased by one. When `Token` is positive, Filter passes; otherwise return
+// Unschedulable or UnschedulableAndUnresolvable (when `Unresolvable` is set to true)
+// AddPod()/RemovePod() adds/removes one token to the cluster to simulate the dryrun preemption
 type tokenFilter struct {
-	Tokens       int
-	Unresolvable bool
+	Tokens          int
+	Unresolvable    bool
+	EnablePreFilter bool
 }
 
 // Name returns name of the plugin.
@@ -123,7 +130,10 @@ func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, 
 }
 
 func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	return nil, nil
+	if !fp.EnablePreFilter || fp.Tokens > 0 {
+		return nil, nil
+	}
+	return nil, framework.NewStatus(framework.Unschedulable)
 }
 
 func (fp *tokenFilter) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
@@ -195,6 +205,7 @@ func TestPreemption(t *testing.T) {
 		existingPods                  []*v1.Pod
 		pod                           *v1.Pod
 		initTokens                    int
+		enablePreFilter               bool
 		unresolvable                  bool
 		preemptedPodIndexes           map[int]struct{}
 		enablePodDisruptionConditions bool
@@ -253,6 +264,36 @@ func TestPreemption(t *testing.T) {
 		{
 			name:       "basic pod preemption with filter",
 			initTokens: 1,
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "victim-pod",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{0: {}},
+		},
+		// This is identical with previous subtest except for setting enablePreFilter to true.
+		// With this fake plugin returning Unschedulable in PreFilter, it's able to exercise the path
+		// that in-tree plugins return Skip in PreFilter and their AddPod/RemovePod functions are also
+		// skipped properly upon preemption.
+		{
+			name:            "basic pod preemption with preFilter",
+			initTokens:      1,
+			enablePreFilter: true,
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:      "victim-pod",
@@ -446,6 +487,7 @@ func TestPreemption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			filter.Tokens = test.initTokens
+			filter.EnablePreFilter = test.enablePreFilter
 			filter.Unresolvable = test.unresolvable
 			pods := make([]*v1.Pod, len(test.existingPods))
 			// Create and run existingPods.
