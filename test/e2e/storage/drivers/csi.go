@@ -247,6 +247,7 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
+		Features:                 map[string][]string{},
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HonorPVReclaimPolicy) {
