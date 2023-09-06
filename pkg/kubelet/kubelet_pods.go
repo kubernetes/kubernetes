@@ -1662,6 +1662,10 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		s.Resize = kl.determinePodResizeStatus(pod, s)
 	}
+
+	// ensure the probe managers have up to date status for containers
+	kl.probeManager.UpdatePodStatus(pod, s)
+	
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(pod, allStatus, podIsTerminal)
@@ -1711,9 +1715,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			s.Phase = pod.Status.Phase
 		}
 	}
-
-	// ensure the probe managers have up to date status for containers
-	kl.probeManager.UpdatePodStatus(pod, s)
 
 	// preserve all conditions not owned by the kubelet
 	s.Conditions = make([]v1.PodCondition, 0, len(pod.Status.Conditions)+1)
