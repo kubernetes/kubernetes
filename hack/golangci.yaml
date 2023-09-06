@@ -89,6 +89,14 @@ issues:
         - gosimple
       text: "S1033: unnecessary guard around call to delete"
 
+    # Didn't make it into https://github.com/kubernetes/kubernetes/issues/117288.
+    # Discussion on Slack concluded that "it's hard to have a universal policy for all
+    # functions marked deprecated" and thus this can only be a hint which must
+    # be considered on a case-by-case basis.
+    - linters:
+        - staticcheck
+      text: "SA1019: .*is deprecated"
+
     # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507030071
     - linters:
         - stylecheck
