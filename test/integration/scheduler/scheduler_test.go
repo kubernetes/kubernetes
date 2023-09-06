@@ -26,15 +26,23 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -610,4 +618,170 @@ func TestNodeEvents(t *testing.T) {
 		t.Errorf("Pod %s didn't schedule: %v", pod2.Name, err)
 	}
 
+}
+
+// TestPodSchedulingContextSSA checks that the dynamicresources plugin falls
+// back to SSA successfully when the normal Update call encountered
+// a conflict.
+//
+// This is an integration test because:
+//   - Unit testing does not cover RBAC rules.
+//   - Triggering this particular race is harder in E2E testing
+//     and harder to verify (needs apiserver metrics and there's
+//     no standard API for those).
+func TestPodSchedulingContextSSA(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)()
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "podschedulingcontext-ssa")
+	logger := klog.FromContext(testCtx.Ctx)
+	// NOTE: This test cannot run in parallel, because it is creating and deleting
+	// non-namespaced objects (Nodes).
+	defer testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+
+	// Set up enough objects that the scheduler will start trying to
+	// schedule the pod and create the PodSchedulingContext.
+	nodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "30m",
+		v1.ResourceMemory: "30",
+	}
+	for _, name := range []string{"node-a", "node-b"} {
+		if _, err := testutils.CreateNode(testCtx.ClientSet, st.MakeNode().Name(name).Capacity(nodeRes).Obj()); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+	}
+
+	defer testCtx.ClientSet.ResourceV1alpha2().ResourceClasses().DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+	class := &resourcev1alpha2.ResourceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "my-class",
+		},
+		DriverName: "does-not-matter",
+	}
+	if _, err := testCtx.ClientSet.ResourceV1alpha2().ResourceClasses().Create(testCtx.Ctx, class, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create class: %v", err)
+	}
+
+	claim := &resourcev1alpha2.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-claim",
+			Namespace: testCtx.NS.Name,
+		},
+		Spec: resourcev1alpha2.ResourceClaimSpec{
+			ResourceClassName: class.Name,
+		},
+	}
+	if _, err := testCtx.ClientSet.ResourceV1alpha2().ResourceClaims(claim.Namespace).Create(testCtx.Ctx, claim, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create claim: %v", err)
+	}
+
+	podConf := testutils.PausePodConfig{
+		Name:      "testpod",
+		Namespace: testCtx.NS.Name,
+	}
+	pod := testutils.InitPausePod(&podConf)
+	podClaimName := "myclaim"
+	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: podClaimName}}
+	pod.Spec.ResourceClaims = []v1.PodResourceClaim{{Name: podClaimName, Source: v1.ClaimSource{ResourceClaimName: &claim.Name}}}
+	if _, err := testCtx.ClientSet.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	// Check that the PodSchedulingContext exists.
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Microsecond, 10*time.Second, true,
+		func(context.Context) (bool, error) {
+			_, err := testCtx.ClientSet.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			if err == nil {
+				return true, nil
+			}
+			return false, err
+		}); err != nil {
+		t.Fatalf("Failed while waiting for PodSchedulingContext: %v", err)
+	}
+
+	// Now that it exists, start modifying the PodSchedulingContext such
+	// that the scheduler is forced to update it. This is done by marking
+	// the node that the scheduler has chosen as unsuitable. Because we have
+	// two nodes, it'll switch to the other one, and so forth.
+	//
+	// Because we keep modifying it in parallel, the scheduler will
+	// eventually fall back to SSA.
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		counter := 0
+		for {
+			select {
+			case <-testCtx.Ctx.Done():
+				return
+			case <-ticker.C:
+				// Provide occasional feedback that this is running.
+				logger.Info("PodSchedulingContext status update", "counter", counter)
+			default:
+			}
+
+			// This intentionally doesn't patch: we want to use the
+			// PATCH method as indicator that the scheduler used
+			// SSA.
+			schedulingCtx, err := testCtx.ClientSet.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				continue
+			}
+			counter++
+
+			// Listing the selected node as unsuitable forces an
+			// immediate reaction. If it's empty, we clear
+			unsuitableNodes := []string{fmt.Sprintf("node-%d", counter)}
+			if schedulingCtx.Spec.SelectedNode != "" {
+				unsuitableNodes = append(unsuitableNodes, schedulingCtx.Spec.SelectedNode)
+			}
+			schedulingCtx.Status.ResourceClaims = []resourcev1alpha2.ResourceClaimSchedulingStatus{{
+				Name:            podClaimName,
+				UnsuitableNodes: unsuitableNodes,
+			}}
+			_, err = testCtx.ClientSet.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).UpdateStatus(testCtx.Ctx, schedulingCtx, metav1.UpdateOptions{})
+			if err != nil && !apierrors.IsConflict(err) && testCtx.Ctx.Err() == nil {
+				t.Errorf("Unexpected PodSchedulingContext status update error: %v", err)
+			}
+		}
+	}()
+
+	// We know that the scheduler has used SSA by looking at apiserver
+	// metrics. On a local machine, the entire test (including startup)
+	// took around 5 seconds, so a timeout of 1 minute should be enough.
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Microsecond, time.Minute, true,
+		func(context.Context) (bool, error) {
+			// The HTTP PATCH gets mapped to APPLY based on the content type.
+			count, err := getVectorCount("apiserver_request_total", map[string]string{"resource": "podschedulingcontexts", "verb": "APPLY"})
+			if err != nil {
+				return false, err
+			}
+			return count > 0, nil
+		}); err != nil {
+		t.Fatalf("Failed while waiting for PodSchedulingContext PATCH: %v", err)
+	}
+}
+
+func getVectorCount(name string, labelFilter map[string]string) (int, error) {
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		return 0, err
+	}
+
+	counterSum := 0
+	for _, mf := range metrics {
+		if mf.GetName() != name {
+			continue // Ignore other metrics.
+		}
+		for _, metric := range mf.GetMetric() {
+			if !testutil.LabelsMatch(metric, labelFilter) {
+				continue
+			}
+			counterSum += int(metric.GetCounter().GetValue())
+		}
+	}
+	return counterSum, nil
 }
