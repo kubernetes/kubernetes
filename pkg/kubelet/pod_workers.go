@@ -981,26 +981,31 @@ func calculateEffectiveGracePeriod(status *podSyncStatus, pod *v1.Pod, options *
 	// enforce the restriction that a grace period can only decrease and track whatever our value is,
 	// then ensure a calculated value is passed down to lower levels
 	gracePeriod := status.gracePeriod
-	// this value is bedrock truth - the apiserver owns telling us this value calculated by apiserver
-	if override := pod.DeletionGracePeriodSeconds; override != nil {
-		if gracePeriod == 0 || *override < gracePeriod {
+
+	// defaults the grace period value to the pod's specified termination grace period seconds if present
+	// the kubelet provided no requested value (graceful termination?)
+	if override := pod.Spec.TerminationGracePeriodSeconds; override != nil {
+		if *override < gracePeriod {
 			gracePeriod = *override
 		}
 	}
+
+	// When grace period is specified by adding --grace-period or --force option, this value is stored in pod.DeletionGracePeriodSeconds
+	// this value is top priority - the apiserver owns telling us this value calculated by apiserver
+	if override := pod.DeletionGracePeriodSeconds; override != nil {
+		gracePeriod = *override
+	}
+
 	// we allow other parts of the kubelet (namely eviction) to request this pod be terminated faster
 	if options != nil {
 		if override := options.PodTerminationGracePeriodSecondsOverride; override != nil {
-			if gracePeriod == 0 || *override < gracePeriod {
+			if *override < gracePeriod {
 				gracePeriod = *override
 			}
 		}
 	}
-	// make a best effort to default this value to the pod's desired intent, in the event
-	// the kubelet provided no requested value (graceful termination?)
-	if gracePeriod == 0 && pod.Spec.TerminationGracePeriodSeconds != nil {
-		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
-	}
-	// no matter what, we always supply a grace period of 1
+
+	// no matter what, we never supply a grace period value less than 1
 	if gracePeriod < 1 {
 		gracePeriod = 1
 	}
