@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,7 +36,7 @@ func GetPluginCommandGroup(kubectl *cobra.Command) templates.CommandGroup {
 	// Find root level
 	return templates.CommandGroup{
 		Message:  i18n.T("Subcommands provided by plugins:"),
-		Commands: registerPluginCommands(kubectl, 1, false),
+		Commands: registerPluginCommands(kubectl, false),
 	}
 }
 
@@ -56,7 +55,7 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 		if len(args) == 1 {
 			// We are completing a subcommand at the first level so
 			// we should include all plugins names.
-			registerPluginCommands(kubectl, math.MaxInt, true)
+			registerPluginCommands(kubectl, true)
 			return
 		}
 
@@ -84,14 +83,14 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 			kubectl.ResetFlags()
 			cobra.CompDebugln("Cleared global flags for plugin completion", true)
 
-			registerPluginCommands(kubectl, math.MaxInt, true)
+			registerPluginCommands(kubectl, true)
 		}
 	}
 }
 
 // registerPluginCommand allows adding Cobra command to the command tree or extracting them for usage in
 // e.g. the help function or for registering the completion function
-func registerPluginCommands(kubectl *cobra.Command, depth int, register bool) (cmds []*cobra.Command) {
+func registerPluginCommands(kubectl *cobra.Command, list bool) (cmds []*cobra.Command) {
 	userDefinedCommands := []*cobra.Command{}
 
 	streams := genericclioptions.IOStreams{
@@ -110,20 +109,18 @@ func registerPluginCommands(kubectl *cobra.Command, depth int, register bool) (c
 
 		// Plugins are named "kubectl-<name>" or with more - such as
 		// "kubectl-<name>-<subcmd1>..."
-		// Respect the search depth to find the plugin name
 		rawPluginArgs := strings.Split(plugin, "-")[1:]
-		actualDepth := len(rawPluginArgs)
-		if depth < actualDepth {
-			actualDepth = depth
+		pluginArgs := rawPluginArgs[0:1]
+		if list {
+			pluginArgs = append(pluginArgs, rawPluginArgs[1:]...)
 		}
-		pluginArgs := rawPluginArgs[0:actualDepth]
 
 		// Iterate through all segments, for kubectl-my_plugin-sub_cmd, we will end up with
 		// two iterations: one for my_plugin and one for sub_cmd.
 		for _, arg := range pluginArgs {
 			// Underscores (_) in plugin's filename are replaced with dashes(-)
 			// e.g. foo_bar -> foo-bar
-			args = append(args, strings.Replace(arg, "_", "-", -1))
+			args = append(args, strings.ReplaceAll(arg, "_", "-"))
 		}
 
 		// In order to avoid that the same plugin command is added more than once,
@@ -139,7 +136,7 @@ func registerPluginCommands(kubectl *cobra.Command, depth int, register bool) (c
 				// Add a description that will be shown with completion choices.
 				// Make each one different by including the plugin name to avoid
 				// all plugins being grouped in a single line during completion for zsh.
-				Short:              fmt.Sprintf("The command %s is a plugin installed by the user", remainingArg),
+				Short:              fmt.Sprintf(i18n.T("The command %s is a plugin installed by the user"), remainingArg),
 				DisableFlagParsing: true,
 				// Allow plugins to provide their own completion choices
 				ValidArgsFunction: pluginCompletion,
@@ -149,11 +146,8 @@ func registerPluginCommands(kubectl *cobra.Command, depth int, register bool) (c
 			// Add the plugin command to the list of user defined commands
 			userDefinedCommands = append(userDefinedCommands, cmd)
 
-			// Add the plugin command to the command tree, when requested
-			if register {
-				parentCmd.AddCommand(cmd)
-				parentCmd = cmd
-			}
+			parentCmd.AddCommand(cmd)
+			parentCmd = cmd
 		}
 	}
 
@@ -191,7 +185,7 @@ func registerPluginCommands(kubectl *cobra.Command, depth int, register bool) (c
 // executable must have executable permissions set on it and must be on $PATH.
 func pluginCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// Recreate the plugin name from the commandPath
-	pluginName := strings.Replace(strings.Replace(cmd.CommandPath(), "-", "_", -1), " ", "-", -1)
+	pluginName := strings.ReplaceAll(strings.ReplaceAll(cmd.CommandPath(), "-", "_"), " ", "-")
 
 	path, found := lookupCompletionExec(pluginName)
 	if !found {
