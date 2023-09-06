@@ -849,6 +849,63 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 	}
 }
 
+// findNextInitContainerToRun returns the status of the last failed container, the
+// index of next init container to start, or done if there are no further init containers.
+// Status is only returned if an init container is failed, in which case next will
+// point to the current container.
+func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
+	if len(pod.Spec.InitContainers) == 0 {
+		return nil, nil, true
+	}
+
+	// If any of the main containers have status and are Running, then all init containers must
+	// have been executed at some point in the past.  However, they could have been removed
+	// from the container runtime now, and if we proceed, it would appear as if they
+	// never ran and will re-execute improperly.
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status != nil && status.State == kubecontainer.ContainerStateRunning {
+			return nil, nil, true
+		}
+	}
+
+	// If there are failed containers, return the status of the last failed one.
+	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+		container := &pod.Spec.InitContainers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status != nil && isInitContainerFailed(status) {
+			return status, container, false
+		}
+	}
+
+	// There are no failed containers now.
+	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+		container := &pod.Spec.InitContainers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status == nil {
+			continue
+		}
+
+		// container is still running, return not done.
+		if status.State == kubecontainer.ContainerStateRunning {
+			return nil, nil, false
+		}
+
+		if status.State == kubecontainer.ContainerStateExited {
+			// all init containers successful
+			if i == (len(pod.Spec.InitContainers) - 1) {
+				return nil, nil, true
+			}
+
+			// all containers up to i successful, go to i+1
+			return nil, &pod.Spec.InitContainers[i+1], false
+		}
+	}
+
+	return nil, &pod.Spec.InitContainers[0], false
+}
+
 // hasAnyRegularContainerCreated returns true if any regular container has been
 // created, which indicates all init containers have been initialized.
 func hasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
@@ -878,6 +935,10 @@ func hasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStat
 // - Start the first init container that has not been started.
 // - Restart all restartable init containers that have started but are not running.
 // - Kill the restartable init containers that are not alive or started.
+//
+// Note that this is a function for the SidecarContainers feature.
+// Please sync with the findNextInitContainerToRun function if any changes are
+// made, as either this or that function will be called.
 func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus, changes *podActions) bool {
 	if len(pod.Spec.InitContainers) == 0 {
 		return true

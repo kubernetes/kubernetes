@@ -22,8 +22,10 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -728,6 +730,146 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PreStopPrefix, regular1)))
 		framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, regular1)))
 		framework.ExpectNoError(results.Exits(regular1))
+	})
+})
+
+var _ = SIGDescribe("[Serial] Containers Lifecycle ", func() {
+	f := framework.NewDefaultFramework("containers-lifecycle-test-serial")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+
+	ginkgo.It("should restart the containers in right order after the node reboot", func(ctx context.Context) {
+		init1 := "init-1"
+		init2 := "init-2"
+		init3 := "init-3"
+		regular1 := "regular-1"
+
+		podLabels := map[string]string{
+			"test":      "containers-lifecycle-test-serial",
+			"namespace": f.Namespace.Name,
+		}
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "initialized-pod",
+				Labels: podLabels,
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				InitContainers: []v1.Container{
+					{
+						Name:  init1,
+						Image: busyboxImage,
+						Command: ExecCommand(init1, execCommand{
+							Delay:    5,
+							ExitCode: 0,
+						}),
+					},
+					{
+						Name:  init2,
+						Image: busyboxImage,
+						Command: ExecCommand(init2, execCommand{
+							Delay:    5,
+							ExitCode: 0,
+						}),
+					},
+					{
+						Name:  init3,
+						Image: busyboxImage,
+						Command: ExecCommand(init3, execCommand{
+							Delay:    5,
+							ExitCode: 0,
+						}),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: busyboxImage,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:    30,
+							ExitCode: 0,
+						}),
+					},
+				},
+			},
+		}
+		preparePod(pod)
+
+		client := e2epod.NewPodClient(f)
+		pod = client.Create(ctx, pod)
+		ginkgo.By("Waiting for the pod to be initialized and run")
+		err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Getting the current pod sandbox ID")
+		rs, _, err := getCRIClient()
+		framework.ExpectNoError(err)
+
+		sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
+			LabelSelector: podLabels,
+		})
+		framework.ExpectNoError(err)
+		gomega.Expect(sandboxes).To(gomega.HaveLen(1))
+		podSandboxID := sandboxes[0].Id
+
+		ginkgo.By("Stopping the kubelet")
+		restartKubelet := stopKubelet()
+		gomega.Eventually(ctx, func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+
+		ginkgo.By("Stopping the pod sandbox to simulate the node reboot")
+		err = rs.StopPodSandbox(ctx, podSandboxID)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Restarting the kubelet")
+		restartKubelet()
+		gomega.Eventually(ctx, func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+
+		ginkgo.By("Waiting for the pod to be re-initialized and run")
+		err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "re-initialized", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
+			if pod.Status.ContainerStatuses[0].RestartCount < 2 {
+				return false, nil
+			}
+			if pod.Status.Phase != v1.PodRunning {
+				return false, nil
+			}
+			return true, nil
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Parsing results")
+		pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		results := parseOutput(pod)
+
+		ginkgo.By("Analyzing results")
+		init1Started, err := results.FindIndex(init1, "Started", 0)
+		framework.ExpectNoError(err)
+		init2Started, err := results.FindIndex(init2, "Started", 0)
+		framework.ExpectNoError(err)
+		init3Started, err := results.FindIndex(init3, "Started", 0)
+		framework.ExpectNoError(err)
+		regular1Started, err := results.FindIndex(regular1, "Started", 0)
+		framework.ExpectNoError(err)
+
+		init1Restarted, err := results.FindIndex(init1, "Started", init1Started+1)
+		framework.ExpectNoError(err)
+		init2Restarted, err := results.FindIndex(init2, "Started", init2Started+1)
+		framework.ExpectNoError(err)
+		init3Restarted, err := results.FindIndex(init3, "Started", init3Started+1)
+		framework.ExpectNoError(err)
+		regular1Restarted, err := results.FindIndex(regular1, "Started", regular1Started+1)
+		framework.ExpectNoError(err)
+
+		framework.ExpectNoError(init1Started.IsBefore(init2Started))
+		framework.ExpectNoError(init2Started.IsBefore(init3Started))
+		framework.ExpectNoError(init3Started.IsBefore(regular1Started))
+
+		framework.ExpectNoError(init1Restarted.IsBefore(init2Restarted))
+		framework.ExpectNoError(init2Restarted.IsBefore(init3Restarted))
+		framework.ExpectNoError(init3Restarted.IsBefore(regular1Restarted))
 	})
 })
 
