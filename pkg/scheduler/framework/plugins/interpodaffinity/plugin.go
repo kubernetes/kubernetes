@@ -17,6 +17,7 @@ limitations under the License.
 package interpodaffinity
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -69,7 +70,7 @@ func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEventWithHint 
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}

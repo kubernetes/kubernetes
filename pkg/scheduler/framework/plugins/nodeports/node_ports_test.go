@@ -17,7 +17,6 @@ limitations under the License.
 package nodeports
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -143,9 +143,13 @@ func TestNodePorts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p, _ := New(nil, nil)
+			_, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
 			cycleState := framework.NewCycleState()
-			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("preFilter status does not match (-want,+got): %s", diff)
 			}
@@ -155,7 +159,7 @@ func TestNodePorts(t *testing.T) {
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("prefilter failed with status: %v", preFilterStatus)
 			}
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
+			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 			if diff := cmp.Diff(test.wantFilterStatus, gotStatus); diff != "" {
 				t.Errorf("filter status does not match (-want, +got): %s", diff)
 			}
@@ -164,13 +168,17 @@ func TestNodePorts(t *testing.T) {
 }
 
 func TestPreFilterDisabled(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	pod := &v1.Pod{}
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p, _ := New(nil, nil)
+	p, err := New(ctx, nil, nil)
+	if err != nil {
+		t.Fatalf("creating plugin: %v", err)
+	}
 	cycleState := framework.NewCycleState()
-	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
+	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)

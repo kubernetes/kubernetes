@@ -17,7 +17,6 @@ limitations under the License.
 package schedulinggates
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPreEnqueue(t *testing.T) {
@@ -63,12 +63,13 @@ func TestPreEnqueue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p, err := New(nil, nil, feature.Features{EnablePodSchedulingReadiness: tt.enablePodSchedulingReadiness})
+			_, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, nil, nil, feature.Features{EnablePodSchedulingReadiness: tt.enablePodSchedulingReadiness})
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}
 
-			got := p.(framework.PreEnqueuePlugin).PreEnqueue(context.Background(), tt.pod)
+			got := p.(framework.PreEnqueuePlugin).PreEnqueue(ctx, tt.pod)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("unexpected status (-want, +got):\n%s", diff)
 			}

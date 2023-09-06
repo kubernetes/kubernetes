@@ -280,8 +280,8 @@ func (p *fakePlugin) Bind(context.Context, *framework.CycleState, *v1.Pod, strin
 	return nil
 }
 
-func newFakePlugin(name string) func(object runtime.Object, handle framework.Handle) (framework.Plugin, error) {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newFakePlugin(name string) func(ctx context.Context, object runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &fakePlugin{name: name}, nil
 	}
 }

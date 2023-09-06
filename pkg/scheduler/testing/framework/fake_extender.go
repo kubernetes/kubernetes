@@ -112,7 +112,7 @@ type node2PrioritizerPlugin struct{}
 
 // NewNode2PrioritizerPlugin returns a factory function to build node2PrioritizerPlugin.
 func NewNode2PrioritizerPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &node2PrioritizerPlugin{}, nil
 	}
 }

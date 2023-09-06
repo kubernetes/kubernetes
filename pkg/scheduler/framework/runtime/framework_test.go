@@ -76,7 +76,7 @@ var cmpOpts = []cmp.Option{
 	}),
 }
 
-func newScoreWithNormalizePlugin1(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+func newScoreWithNormalizePlugin1(_ context.Context, injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
 	var inj injectedResult
 	if err := DecodeInto(injArgs, &inj); err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func newScoreWithNormalizePlugin1(injArgs runtime.Object, f framework.Handle) (f
 	return &TestScoreWithNormalizePlugin{scoreWithNormalizePlugin1, inj}, nil
 }
 
-func newScoreWithNormalizePlugin2(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+func newScoreWithNormalizePlugin2(_ context.Context, injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
 	var inj injectedResult
 	if err := DecodeInto(injArgs, &inj); err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func newScoreWithNormalizePlugin2(injArgs runtime.Object, f framework.Handle) (f
 	return &TestScoreWithNormalizePlugin{scoreWithNormalizePlugin2, inj}, nil
 }
 
-func newScorePlugin1(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+func newScorePlugin1(_ context.Context, injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
 	var inj injectedResult
 	if err := DecodeInto(injArgs, &inj); err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func newScorePlugin1(injArgs runtime.Object, f framework.Handle) (framework.Plug
 	return &TestScorePlugin{scorePlugin1, inj}, nil
 }
 
-func newPluginNotImplementingScore(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newPluginNotImplementingScore(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &PluginNotImplementingScore{}, nil
 }
 
@@ -154,7 +154,7 @@ func (pl *PluginNotImplementingScore) Name() string {
 	return pluginNotImplementingScore
 }
 
-func newTestPlugin(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+func newTestPlugin(_ context.Context, injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
 	return &TestPlugin{name: testPlugin}, nil
 }
 
@@ -296,7 +296,7 @@ func (dp *TestDuplicatePlugin) PreFilterExtensions() framework.PreFilterExtensio
 
 var _ framework.PreFilterPlugin = &TestDuplicatePlugin{}
 
-func newDuplicatePlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newDuplicatePlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &TestDuplicatePlugin{}, nil
 }
 
@@ -326,7 +326,7 @@ func (pl *TestPreEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fram
 
 var _ framework.QueueSortPlugin = &TestQueueSortPlugin{}
 
-func newQueueSortPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newQueueSortPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &TestQueueSortPlugin{}, nil
 }
 
@@ -343,7 +343,7 @@ func (pl *TestQueueSortPlugin) Less(_, _ *framework.QueuedPodInfo) bool {
 
 var _ framework.BindPlugin = &TestBindPlugin{}
 
-func newBindPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newBindPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &TestBindPlugin{}, nil
 }
 
@@ -881,7 +881,7 @@ func TestPreEnqueuePlugins(t *testing.T) {
 				// register all plugins
 				tmpPl := pl
 				if err := registry.Register(pl.Name(),
-					func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+					func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 						return tmpPl, nil
 					}); err != nil {
 					t.Fatalf("fail to register preEnqueue plugin (%s)", pl.Name())
@@ -1004,9 +1004,11 @@ func TestRunPreScorePlugins(t *testing.T) {
 			for i, p := range tt.plugins {
 				p := p
 				enabled[i].Name = p.name
-				r.Register(p.name, func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return p, nil
-				})
+				}); err != nil {
+					t.Fatalf("fail to register PreScorePlugins plugin (%s)", p.Name())
+				}
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1425,11 +1427,11 @@ func TestPreFilterPlugins(t *testing.T) {
 	preFilter2 := &TestPreFilterWithExtensionsPlugin{}
 	r := make(Registry)
 	r.Register(preFilterPluginName,
-		func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+		func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return preFilter1, nil
 		})
 	r.Register(preFilterWithExtensionsPluginName,
-		func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+		func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return preFilter2, nil
 		})
 	plugins := &config.Plugins{PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithExtensionsPluginName}, {Name: preFilterPluginName}}}}
@@ -1563,9 +1565,11 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			for i, p := range tt.plugins {
 				p := p
 				enabled[i].Name = p.name
-				r.Register(p.name, func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return p, nil
-				})
+				}); err != nil {
+					t.Fatalf("fail to register PreFilter plugin (%s)", p.Name())
+				}
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1651,9 +1655,11 @@ func TestRunPreFilterExtensionRemovePod(t *testing.T) {
 			for i, p := range tt.plugins {
 				p := p
 				enabled[i].Name = p.name
-				r.Register(p.name, func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return p, nil
-				})
+				}); err != nil {
+					t.Fatalf("fail to register PreFilterExtension plugin (%s)", p.Name())
+				}
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1733,9 +1739,11 @@ func TestRunPreFilterExtensionAddPod(t *testing.T) {
 			for i, p := range tt.plugins {
 				p := p
 				enabled[i].Name = p.name
-				r.Register(p.name, func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				if err := r.Register(p.name, func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return p, nil
-				})
+				}); err != nil {
+					t.Fatalf("fail to register PreFilterExtension plugin (%s)", p.Name())
+				}
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1934,7 +1942,7 @@ func TestFilterPlugins(t *testing.T) {
 				// register all plugins
 				tmpPl := pl
 				if err := registry.Register(pl.name,
-					func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+					func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 						return tmpPl, nil
 					}); err != nil {
 					t.Fatalf("fail to register filter plugin (%s)", pl.name)
@@ -2058,7 +2066,7 @@ func TestPostFilterPlugins(t *testing.T) {
 				// register all plugins
 				tmpPl := pl
 				if err := registry.Register(pl.name,
-					func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+					func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 						return tmpPl, nil
 					}); err != nil {
 					t.Fatalf("fail to register postFilter plugin (%s)", pl.name)
@@ -2190,7 +2198,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 
 			if tt.preFilterPlugin != nil {
 				if err := registry.Register(tt.preFilterPlugin.name,
-					func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+					func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 						return tt.preFilterPlugin, nil
 					}); err != nil {
 					t.Fatalf("fail to register preFilter plugin (%s)", tt.preFilterPlugin.name)
@@ -2202,7 +2210,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			}
 			if tt.filterPlugin != nil {
 				if err := registry.Register(tt.filterPlugin.name,
-					func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+					func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 						return tt.filterPlugin, nil
 					}); err != nil {
 					t.Fatalf("fail to register filter plugin (%s)", tt.filterPlugin.name)
@@ -2366,7 +2374,7 @@ func TestPreBindPlugins(t *testing.T) {
 
 			for _, pl := range tt.plugins {
 				tmpPl := pl
-				if err := registry.Register(pl.name, func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+				if err := registry.Register(pl.name, func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 					return tmpPl, nil
 				}); err != nil {
 					t.Fatalf("Unable to register pre bind plugins: %s", pl.name)
@@ -2524,7 +2532,7 @@ func TestReservePlugins(t *testing.T) {
 
 			for _, pl := range tt.plugins {
 				tmpPl := pl
-				if err := registry.Register(pl.name, func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+				if err := registry.Register(pl.name, func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 					return tmpPl, nil
 				}); err != nil {
 					t.Fatalf("Unable to register pre bind plugins: %s", pl.name)
@@ -2650,7 +2658,7 @@ func TestPermitPlugins(t *testing.T) {
 
 			for _, pl := range tt.plugins {
 				tmpPl := pl
-				if err := registry.Register(pl.name, func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+				if err := registry.Register(pl.name, func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 					return tmpPl, nil
 				}); err != nil {
 					t.Fatalf("Unable to register Permit plugin: %s", pl.name)
@@ -2817,7 +2825,7 @@ func TestRecordingMetrics(t *testing.T) {
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
 			r.Register(testPlugin,
-				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return plugin, nil
 				})
 			pluginSet := config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
@@ -2941,7 +2949,7 @@ func TestRunBindPlugins(t *testing.T) {
 				name := fmt.Sprintf("bind-%d", i)
 				plugin := &TestPlugin{name: name, inj: injectedResult{BindStatus: int(inj)}}
 				r.Register(name,
-					func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 						return plugin, nil
 					})
 				pluginSet.Enabled = append(pluginSet.Enabled, config.Plugin{Name: name})
@@ -3000,7 +3008,7 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
 			err := r.Register(testPlugin,
-				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return plugin, nil
 				})
 			if err != nil {
@@ -3059,7 +3067,7 @@ func TestWaitOnPermit(t *testing.T) {
 			testPermitPlugin := &TestPermitPlugin{}
 			r := make(Registry)
 			r.Register(permitPlugin,
-				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return testPermitPlugin, nil
 				})
 			plugins := &config.Plugins{

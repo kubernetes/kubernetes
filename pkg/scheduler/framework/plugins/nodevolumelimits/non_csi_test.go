@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -181,16 +182,17 @@ func TestEphemeralLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			fts := feature.Features{}
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, filterName)
-			p := newNonCSILimits(filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts).(framework.FilterPlugin)
-			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
+			p := newNonCSILimits(ctx, filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts).(framework.FilterPlugin)
+			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(ctx, nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter status does not match (-want, +got): %s", diff)
 			}
 
 			if gotPreFilterStatus.Code() != framework.Skip {
-				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
+				gotStatus := p.Filter(ctx, nil, test.newPod, node)
 				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
 				}
@@ -412,8 +414,9 @@ func TestAzureDiskLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
+			p := newNonCSILimits(ctx, test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter status does not match (-want, +got): %s", diff)
@@ -693,15 +696,16 @@ func TestEBSLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
-			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
+			p := newNonCSILimits(ctx, test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
+			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(ctx, nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter status does not match (-want, +got): %s", diff)
 			}
 
 			if gotPreFilterStatus.Code() != framework.Skip {
-				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
+				gotStatus := p.Filter(ctx, nil, test.newPod, node)
 				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
 				}
@@ -923,8 +927,9 @@ func TestGCEPDLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
+			p := newNonCSILimits(ctx, test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter status does not match (-want, +got): %s", diff)
@@ -965,8 +970,9 @@ func TestGetMaxVols(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			t.Setenv(KubeMaxPDVols, test.rawMaxVols)
-			result := getMaxVolLimitFromEnv()
+			result := getMaxVolLimitFromEnv(logger)
 			if result != test.expected {
 				t.Errorf("expected %v got %v", test.expected, result)
 			}
