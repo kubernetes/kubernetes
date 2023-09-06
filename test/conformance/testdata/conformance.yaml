@@ -3346,4 +3346,10 @@
     was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
-
+- testname: Kubelet resource metrics
+  codename: '[sig-instrumentation] Metrics should grab all metrics from kubelet''s
+    /metrics/resource endpoint [Conformance]'
+  description: Should attempt to grab all resource metrics from kubelet metrics/resource
+    endpoint.
+  release: v1.28
+  file: test/e2e/instrumentation/metrics.go 
