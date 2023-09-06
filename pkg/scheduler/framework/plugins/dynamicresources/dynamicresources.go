@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/kubernetes"
 	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -187,6 +188,41 @@ func (p *podSchedulingState) publish(ctx context.Context, pod *v1.Pod, clientset
 			logger.V(5).Info("Updating PodSchedulingContext", "podSchedulingCtx", klog.KObj(schedulingCtx))
 		}
 		_, err = clientset.ResourceV1alpha2().PodSchedulingContexts(schedulingCtx.Namespace).Update(ctx, schedulingCtx, metav1.UpdateOptions{})
+		if apierrors.IsConflict(err) {
+			// We don't use SSA by default for performance reasons
+			// (https://github.com/kubernetes/kubernetes/issues/113700#issuecomment-1698563918)
+			// because most of the time an Update doesn't encounter
+			// a conflict and is faster.
+			//
+			// We could return an error here and rely on
+			// backoff+retry, but scheduling attempts are expensive
+			// and the backoff delay would cause a (small)
+			// slowdown. Therefore we fall back to SSA here if needed.
+			//
+			// Using SSA instead of Get+Update has the advantage that
+			// there is no delay for the Get. SSA is safe because only
+			// the scheduler updates these fields.
+			spec := resourcev1alpha2apply.PodSchedulingContextSpec()
+			spec.SelectedNode = p.selectedNode
+			if p.potentialNodes != nil {
+				spec.PotentialNodes = *p.potentialNodes
+			} else {
+				// Unchanged. Has to be set because the object that we send
+				// must represent the "fully specified intent". Not sending
+				// the list would clear it.
+				spec.PotentialNodes = p.schedulingCtx.Spec.PotentialNodes
+			}
+			schedulingCtxApply := resourcev1alpha2apply.PodSchedulingContext(pod.Name, pod.Namespace).WithSpec(spec)
+
+			if loggerV := logger.V(6); loggerV.Enabled() {
+				// At a high enough log level, dump the entire object.
+				loggerV.Info("Patching PodSchedulingContext", "podSchedulingCtx", klog.KObj(pod), "podSchedulingCtxApply", klog.Format(schedulingCtxApply))
+			} else {
+				logger.V(5).Info("Patching PodSchedulingContext", "podSchedulingCtx", klog.KObj(pod))
+			}
+			_, err = clientset.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Apply(ctx, schedulingCtxApply, metav1.ApplyOptions{FieldManager: "kube-scheduler", Force: true})
+		}
+
 	} else {
 		// Create it.
 		schedulingCtx := &resourcev1alpha2.PodSchedulingContext{
