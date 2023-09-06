@@ -45,7 +45,7 @@ func (pl *FalseFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, 
 }
 
 // NewFalseFilterPlugin initializes a FalseFilterPlugin and returns it.
-func NewFalseFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewFalseFilterPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &FalseFilterPlugin{}, nil
 }
 
@@ -63,7 +63,7 @@ func (pl *TrueFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, p
 }
 
 // NewTrueFilterPlugin initializes a TrueFilterPlugin and returns it.
-func NewTrueFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewTrueFilterPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &TrueFilterPlugin{}, nil
 }
 
@@ -102,7 +102,7 @@ func (pl *FakeFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, p
 
 // NewFakeFilterPlugin initializes a fakeFilterPlugin and returns it.
 func NewFakeFilterPlugin(failedNodeReturnCodeMap map[string]framework.Code) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakeFilterPlugin{
 			FailedNodeReturnCodeMap: failedNodeReturnCodeMap,
 		}, nil
@@ -131,7 +131,7 @@ func (pl *MatchFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, 
 }
 
 // NewMatchFilterPlugin initializes a MatchFilterPlugin and returns it.
-func NewMatchFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewMatchFilterPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &MatchFilterPlugin{}, nil
 }
 
@@ -159,7 +159,7 @@ func (pl *FakePreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensio
 
 // NewFakePreFilterPlugin initializes a fakePreFilterPlugin and returns it.
 func NewFakePreFilterPlugin(name string, result *framework.PreFilterResult, status *framework.Status) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakePreFilterPlugin{
 			Result: result,
 			Status: status,
@@ -189,7 +189,7 @@ func (pl *FakeReservePlugin) Unreserve(_ context.Context, _ *framework.CycleStat
 
 // NewFakeReservePlugin initializes a fakeReservePlugin and returns it.
 func NewFakeReservePlugin(status *framework.Status) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakeReservePlugin{
 			Status: status,
 		}, nil
@@ -213,7 +213,7 @@ func (pl *FakePreBindPlugin) PreBind(_ context.Context, _ *framework.CycleState,
 
 // NewFakePreBindPlugin initializes a fakePreBindPlugin and returns it.
 func NewFakePreBindPlugin(status *framework.Status) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakePreBindPlugin{
 			Status: status,
 		}, nil
@@ -238,7 +238,7 @@ func (pl *FakePermitPlugin) Permit(_ context.Context, _ *framework.CycleState, _
 
 // NewFakePermitPlugin initializes a fakePermitPlugin and returns it.
 func NewFakePermitPlugin(status *framework.Status, timeout time.Duration) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakePermitPlugin{
 			Status:  status,
 			Timeout: timeout,
@@ -271,7 +271,7 @@ func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state *frame
 }
 
 func NewFakePreScoreAndScorePlugin(name string, score int64, preScoreStatus, scoreStatus *framework.Status) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakePreScoreAndScorePlugin{
 			name:           name,
 			score:          score,

@@ -95,7 +95,7 @@ func TestPreScoreSkip(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed creating framework runtime: %v", err)
 			}
-			pl, err := New(&tt.config, f, feature.Features{})
+			pl, err := New(ctx, &tt.config, f, feature.Features{})
 			if err != nil {
 				t.Fatalf("Failed creating plugin: %v", err)
 			}
@@ -103,7 +103,7 @@ func TestPreScoreSkip(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-			if s := p.PreScore(context.Background(), cs, tt.pod, tt.nodes); !s.IsSkip() {
+			if s := p.PreScore(ctx, cs, tt.pod, tt.nodes); !s.IsSkip() {
 				t.Fatalf("Expected skip but got %v", s.AsError())
 			}
 		})
@@ -582,7 +582,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed creating framework runtime: %v", err)
 			}
-			pl, err := New(&tt.config, f, feature.Features{EnableNodeInclusionPolicyInPodTopologySpread: tt.enableNodeInclusionPolicy})
+			pl, err := New(ctx, &tt.config, f, feature.Features{EnableNodeInclusionPolicyInPodTopologySpread: tt.enableNodeInclusionPolicy})
 			if err != nil {
 				t.Fatalf("Failed creating plugin: %v", err)
 			}
@@ -1336,7 +1336,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
@@ -1346,7 +1347,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			p.enableMatchLabelKeysInPodTopologySpread = tt.enableMatchLabelKeys
 
-			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes)
+			status := p.PreScore(ctx, state, tt.pod, tt.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}

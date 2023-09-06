@@ -780,7 +780,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 		t.Fatal(err)
 	}
 
-	pl, err := New(nil, fh, feature.Features{EnableDynamicResourceAllocation: true})
+	pl, err := New(ctx, nil, fh, feature.Features{EnableDynamicResourceAllocation: true})
 	if err != nil {
 		t.Fatal(err)
 	}
