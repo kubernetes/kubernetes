@@ -263,28 +263,34 @@ const (
 	schedulingCtxKeyPrefix = "schedulingCtx:"
 )
 
-func (ctrl *controller) add(logger *klog.Logger, obj interface{}) {
-	if logger != nil {
-		logger.Info("new object", "content", prettyPrint(obj))
+func (ctrl *controller) add(loggerV6 *klog.Logger, obj interface{}) {
+	var logger klog.Logger
+	if loggerV6 != nil {
+		logger = loggerV6.WithValues("object", prettyPrint(obj))
+	} else {
+		logger = ctrl.logger.V(5)
 	}
-	ctrl.addNewOrUpdated("Adding new work item", obj)
+	ctrl.addNewOrUpdated(logger, "Adding new work item", obj)
 }
 
-func (ctrl *controller) update(logger *klog.Logger, oldObj, newObj interface{}) {
-	if logger != nil {
+func (ctrl *controller) update(loggerV6 *klog.Logger, oldObj, newObj interface{}) {
+	var logger klog.Logger
+	if loggerV6 != nil {
 		diff := cmp.Diff(oldObj, newObj)
-		logger.Info("updated object", "content", prettyPrint(newObj), "diff", diff)
+		logger = loggerV6.WithValues("object", prettyPrint(newObj), "diff", diff)
+	} else {
+		logger = ctrl.logger.V(5)
 	}
-	ctrl.addNewOrUpdated("Adding updated work item", newObj)
+	ctrl.addNewOrUpdated(logger, "Adding updated work item", newObj)
 }
 
-func (ctrl *controller) addNewOrUpdated(msg string, obj interface{}) {
+func (ctrl *controller) addNewOrUpdated(loggerV klog.Logger, msg string, obj interface{}) {
 	objKey, err := getKey(obj)
 	if err != nil {
-		ctrl.logger.Error(err, "Failed to get key", "obj", obj)
+		loggerV.Error(err, "Failed to get key", "obj", obj)
 		return
 	}
-	ctrl.logger.V(5).Info(msg, "key", objKey)
+	loggerV.Info(msg, "key", objKey)
 	ctrl.queue.Add(objKey)
 }
 
@@ -774,16 +780,20 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 
 			ctrl.allocateClaims(ctx, claims, selectedNode, selectedUser)
 
-			allErrorsStr := "allocation of one or more pod claims failed."
-			allocationFailed := false
+			var allErrors []error
 			for _, delayed := range claims {
 				if delayed.Error != nil {
-					allErrorsStr = fmt.Sprintf("%s Claim %s: %s.", allErrorsStr, delayed.Claim.Name, delayed.Error)
-					allocationFailed = true
+					if strings.Contains(delayed.Error.Error(), delayed.Claim.Name) {
+						// Avoid adding redundant information.
+						allErrors = append(allErrors, delayed.Error)
+					} else {
+						// Include claim name, it's not in the underlying error.
+						allErrors = append(allErrors, fmt.Errorf("claim %s: %v", delayed.Claim.Name, delayed.Error))
+					}
 				}
 			}
-			if allocationFailed {
-				return fmt.Errorf(allErrorsStr)
+			if len(allErrors) > 0 {
+				return errors.Join(allErrors...)
 			}
 		}
 	}

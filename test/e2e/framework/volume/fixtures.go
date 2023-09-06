@@ -706,5 +706,5 @@ func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exi
 				shExec, exitCode, err, stdout, stderr)
 		}
 	}
-	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", shExec, exitCode)
+	gomega.Expect(err).To(gomega.HaveOccurred(), "%q should fail with exit code %d, but exit without error", shExec, exitCode)
 }

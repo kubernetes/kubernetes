@@ -1067,7 +1067,7 @@ var _ = SIGDescribe("Pods", func() {
 		if postDeletePod != nil {
 			postDeletePodJSON, _ = json.Marshal(postDeletePod)
 		}
-		framework.ExpectError(err, "pod %v found in namespace %v, but it should be deleted: %s", testPodName, testNamespaceName, string(postDeletePodJSON))
+		gomega.Expect(err).To(gomega.HaveOccurred(), "pod %v found in namespace %v, but it should be deleted: %s", testPodName, testNamespaceName, string(postDeletePodJSON))
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("expected IsNotFound error, got %#v", err)
 		}
