@@ -55,8 +55,11 @@ configSyncPeriod: 15s
 conntrack:
   maxPerCore: 2
   min: 1
+  tcpBeLiberal: true
   tcpCloseWaitTimeout: 10s
   tcpEstablishedTimeout: 20s
+  udpStreamTimeout: 40s
+  udpTimeout: 30s
 healthzBindAddress: "%s"
 hostnameOverride: "foo"
 iptables:
@@ -199,6 +202,9 @@ nodePortAddresses:
 				Min:                   pointer.Int32(1),
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
+				TCPBeLiberal:          pointer.Bool(true),
+				UDPTimeout:            &metav1.Duration{Duration: 30 * time.Second},
+				UDPStreamTimeout:      &metav1.Duration{Duration: 40 * time.Second},
 			},
 			FeatureGates:       map[string]bool{},
 			HealthzBindAddress: tc.healthzBindAddress,
@@ -473,6 +479,7 @@ kind: KubeProxyConfiguration
 		t.Run(name, func(t *testing.T) {
 			options := NewOptions()
 			fs := new(pflag.FlagSet)
+			fmt.Println(options.config.Conntrack)
 			options.AddFlags(fs)
 			flags := tc.flags
 			if len(tc.config) > 0 {
