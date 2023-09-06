@@ -137,6 +137,21 @@ func (in *KubeProxyConntrackConfiguration) DeepCopyInto(out *KubeProxyConntrackC
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	if in.TCPBeLiberal != nil {
+		in, out := &in.TCPBeLiberal, &out.TCPBeLiberal
+		*out = new(bool)
+		**out = **in
+	}
+	if in.UDPTimeout != nil {
+		in, out := &in.UDPTimeout, &out.UDPTimeout
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.UDPStreamTimeout != nil {
+		in, out := &in.UDPStreamTimeout, &out.UDPStreamTimeout
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 
