@@ -32,6 +32,12 @@ kube::golang::verify_go_version
 export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
+# Disable warnings about the logcheck plugin using the old API
+# (https://github.com/golangci/golangci-lint/issues/4001).
+# Can be removed once logcheck gets updated to a newer release
+# which uses the new plugin API
+export GOLANGCI_LINT_HIDE_WARNING_ABOUT_PLUGIN_API_DEPRECATION=1
+
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
 
