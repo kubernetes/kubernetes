@@ -1366,6 +1366,13 @@
     The event is deleted and MUST NOT show up when listing all events.
   release: v1.25
   file: test/e2e/instrumentation/core_events.go
+- testname: Kubelet resource metrics
+  codename: '[sig-instrumentation] Metrics should grab all metrics from kubelet /metrics/resource
+    endpoint [Conformance]'
+  description: Should attempt to grab all resource metrics from kubelet metrics/resource
+    endpoint.
+  release: v1.29
+  file: test/e2e/instrumentation/metrics.go
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
@@ -3346,10 +3353,4 @@
     was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
-- testname: Kubelet resource metrics
-  codename: '[sig-instrumentation] Metrics should grab all metrics from kubelet''s
-    /metrics/resource endpoint [Conformance]'
-  description: Should attempt to grab all resource metrics from kubelet metrics/resource
-    endpoint.
-  release: v1.28
-  file: test/e2e/instrumentation/metrics.go 
+
