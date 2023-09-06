@@ -119,6 +119,7 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
+	disableForceDetachTimer bool,
 	timerConfig TimerConfig) (AttachDetachController, error) {
 
 	adc := &attachDetachController{
@@ -167,6 +168,7 @@ func NewAttachDetachController(
 	// Default these to values in options
 	adc.reconciler = reconciler.NewReconciler(
 		timerConfig.ReconcilerLoopPeriod,
+		disableForceDetachTimer,
 		timerConfig.ReconcilerMaxWaitForUnmountDuration,
 		reconcilerSyncDuration,
 		disableReconciliationSync,

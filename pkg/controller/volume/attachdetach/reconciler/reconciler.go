@@ -66,6 +66,7 @@ type Reconciler interface {
 // cleared.
 func NewReconciler(
 	loopPeriod time.Duration,
+	disableForceDetachTimer bool,
 	maxWaitForUnmountDuration time.Duration,
 	syncDuration time.Duration,
 	disableReconciliationSync bool,
@@ -77,6 +78,7 @@ func NewReconciler(
 	recorder record.EventRecorder) Reconciler {
 	return &reconciler{
 		loopPeriod:                loopPeriod,
+		disableForceDetachTimer:   disableForceDetachTimer,
 		maxWaitForUnmountDuration: maxWaitForUnmountDuration,
 		syncDuration:              syncDuration,
 		disableReconciliationSync: disableReconciliationSync,
@@ -92,6 +94,7 @@ func NewReconciler(
 
 type reconciler struct {
 	loopPeriod                time.Duration
+	disableForceDetachTimer   bool
 	maxWaitForUnmountDuration time.Duration
 	syncDuration              time.Duration
 	desiredStateOfWorld       cache.DesiredStateOfWorld
@@ -208,7 +211,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 				continue
 			}
 			// Check whether timeout has reached the maximum waiting time
-			timeout := elapsedTime > rc.maxWaitForUnmountDuration
+			timeout := !rc.disableForceDetachTimer && elapsedTime > rc.maxWaitForUnmountDuration
 
 			isHealthy, err := rc.nodeIsHealthy(attachedVolume.NodeName)
 			if err != nil {

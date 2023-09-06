@@ -51994,6 +51994,14 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachController
 							Format:      "",
 						},
 					},
+					"DisableForceDetachTimer": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisableForceDetachTimer allows to disable the force detach when the detach timeout is reached (6 min). Is false by default that maches the current behavior.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"ReconcilerSyncLoopPeriod": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop wait between successive executions. Is set to 5 sec by default.",
@@ -52002,7 +52010,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachController
 						},
 					},
 				},
-				Required: []string{"DisableAttachDetachReconcilerSync", "ReconcilerSyncLoopPeriod"},
+				Required: []string{"DisableAttachDetachReconcilerSync", "DisableForceDetachTimer", "ReconcilerSyncLoopPeriod"},
 			},
 		},
 		Dependencies: []string{

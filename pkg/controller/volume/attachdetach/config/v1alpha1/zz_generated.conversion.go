@@ -61,12 +61,14 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1alpha1_AttachDetachControllerConfiguration_To_config_AttachDetachControllerConfiguration(in *v1alpha1.AttachDetachControllerConfiguration, out *config.AttachDetachControllerConfiguration, s conversion.Scope) error {
 	out.DisableAttachDetachReconcilerSync = in.DisableAttachDetachReconcilerSync
+	out.DisableForceDetachTimer = in.DisableForceDetachTimer
 	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
 	return nil
 }
 
 func autoConvert_config_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(in *config.AttachDetachControllerConfiguration, out *v1alpha1.AttachDetachControllerConfiguration, s conversion.Scope) error {
 	out.DisableAttachDetachReconcilerSync = in.DisableAttachDetachReconcilerSync
+	out.DisableForceDetachTimer = in.DisableForceDetachTimer
 	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
 	return nil
 }

@@ -176,6 +176,9 @@ type AttachDetachControllerConfiguration struct {
 	// the actual state of the world by triggering attach detach operations.
 	// This flag enables or disables reconcile.  Is false by default, and thus enabled.
 	DisableAttachDetachReconcilerSync bool
+	// DisableForceDetachTimer allows to disable the force detach when the detach timeout
+	// is reached (6 min). Is false by default that maches the current behavior.
+	DisableForceDetachTimer bool
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
 	// wait between successive executions. Is set to 5 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration

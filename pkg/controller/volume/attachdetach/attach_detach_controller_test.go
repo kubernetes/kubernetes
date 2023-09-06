@@ -64,6 +64,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		nil, /* prober */
 		false,
 		5*time.Second,
+		false,
 		DefaultTimerConfig,
 	)
 
@@ -193,6 +194,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		prober,
 		false,
 		1*time.Second,
+		false,
 		DefaultTimerConfig,
 	)
 
@@ -458,6 +460,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		nil, /* prober */
 		false,
 		1*time.Second,
+		false,
 		DefaultTimerConfig,
 	)
 	if err != nil {

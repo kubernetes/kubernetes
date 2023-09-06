@@ -303,6 +303,7 @@ func startAttachDetachController(ctx context.Context, controllerContext Controll
 			GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 			controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
+			controllerContext.ComponentConfig.AttachDetachController.DisableForceDetachTimer,
 			attachdetach.DefaultTimerConfig,
 		)
 	if attachDetachControllerErr != nil {

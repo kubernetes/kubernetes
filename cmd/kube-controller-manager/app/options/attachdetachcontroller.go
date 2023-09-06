@@ -18,8 +18,9 @@ package options
 
 import (
 	"fmt"
-	"github.com/spf13/pflag"
 	"time"
+
+	"github.com/spf13/pflag"
 
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 )
@@ -36,6 +37,7 @@ func (o *AttachDetachControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.BoolVar(&o.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile-sync", false, "Disable volume attach detach reconciler sync. Disabling this may cause volumes to be mismatched with pods. Use wisely.")
+	fs.BoolVar(&o.DisableForceDetachTimer, "disable-force-detach-timer", false, "Disable force detach when the detach timeout is reached (6 min). If true, the volume won't be forcefully detached when the detach timeout is reached util the non-graceful feature is manually triggered on the target node.")
 	fs.DurationVar(&o.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", o.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
 }
 
@@ -46,6 +48,7 @@ func (o *AttachDetachControllerOptions) ApplyTo(cfg *attachdetachconfig.AttachDe
 	}
 
 	cfg.DisableAttachDetachReconcilerSync = o.DisableAttachDetachReconcilerSync
+	cfg.DisableForceDetachTimer = o.DisableForceDetachTimer
 	cfg.ReconcilerSyncLoopPeriod = o.ReconcilerSyncLoopPeriod
 
 	return nil
