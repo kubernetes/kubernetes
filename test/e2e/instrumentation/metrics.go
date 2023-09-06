@@ -56,7 +56,7 @@ var _ = common.SIGDescribe("Metrics", func() {
 	   Testname: Kubelet resource metrics
 	   Description: Should attempt to grab all resource metrics from kubelet metrics/resource endpoint.
 	*/
-	ginkgo.It("should grab all metrics from kubelet /metrics/resource endpoint", func(ctx context.Context) {
+	framework.ConformanceIt("should grab all metrics from kubelet /metrics/resource endpoint", func(ctx context.Context) {
 		ginkgo.By("Connecting to kubelet's /metrics/resource endpoint")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
