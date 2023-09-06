@@ -558,7 +558,7 @@ function install-auth-provider-gcp {
   download-or-bust "${auth_provider_gcp_hash}" "${auth_provider_storage_full_path}"
 
   mv "${KUBE_HOME}/${filename}" "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}"
-  chmod a+x "${KUBE_BIN}/${filename}"
+  chmod a+x "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}/${filename}"
 
   cat >> "${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}" << EOF
 kind: CredentialProviderConfig
