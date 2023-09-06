@@ -110,9 +110,9 @@ func registerPluginCommands(kubectl *cobra.Command, list bool) (cmds []*cobra.Co
 		// Plugins are named "kubectl-<name>" or with more - such as
 		// "kubectl-<name>-<subcmd1>..."
 		rawPluginArgs := strings.Split(plugin, "-")[1:]
-		pluginArgs := rawPluginArgs[0:1]
+		pluginArgs := rawPluginArgs[:1]
 		if list {
-			pluginArgs = append(pluginArgs, rawPluginArgs[1:]...)
+			pluginArgs = rawPluginArgs
 		}
 
 		// Iterate through all segments, for kubectl-my_plugin-sub_cmd, we will end up with
@@ -146,8 +146,10 @@ func registerPluginCommands(kubectl *cobra.Command, list bool) (cmds []*cobra.Co
 			// Add the plugin command to the list of user defined commands
 			userDefinedCommands = append(userDefinedCommands, cmd)
 
-			parentCmd.AddCommand(cmd)
-			parentCmd = cmd
+			if list {
+				parentCmd.AddCommand(cmd)
+				parentCmd = cmd
+			}
 		}
 	}
 
