@@ -280,10 +280,10 @@ func TestPatchIgnoreNotFoundWithNonexistentResource(t *testing.T) {
 	cmd := NewCmdPatch(tf, stream)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	_ := cmd.Flags().Set("namespace", "test")
-	_ := cmd.Flags().Set("ignore-not-found", "true")
-	_ := cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
-	_ := cmd.Flags().Set("output", "name")
+	_ = cmd.Flags().Set("namespace", "test")
+	_ = cmd.Flags().Set("ignore-not-found", "true")
+	_ = cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
+	_ = cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"services/nonexistentservice"})
 
 	if buf.String() != "" {
@@ -320,10 +320,10 @@ func TestPatchIgnoreNotFoundWithExistingResource(t *testing.T) {
 	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdPatch(tf, stream)
-	_ := cmd.Flags().Set("namespace", "test")
-	_ := cmd.Flags().Set("ignore-not-found", "true")
-	_ := cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
-	_ := cmd.Flags().Set("output", "name")
+	_ = cmd.Flags().Set("namespace", "test")
+	_ = cmd.Flags().Set("ignore-not-found", "true")
+	_ = cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
+	_ = cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"services/frontend"})
 
 	// uses the name from the response
