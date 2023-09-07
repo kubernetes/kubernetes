@@ -115,6 +115,7 @@ func TestCelCostStability(t *testing.T) {
 				"self.val1.substring(4, 10).trim() == 'takes'":     6,
 				"self.val1.upperAscii() == 'ROOK TAKES 👑'":         6,
 				"self.val1.lowerAscii() == 'rook takes 👑'":         6,
+				"self.val1.lowerAscii() == self.val1.lowerAscii()": 10,
 			},
 		},
 		{name: "escaped strings",

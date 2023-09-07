@@ -1631,17 +1631,19 @@ func TestCostEstimation(t *testing.T) {
 			name: "extended library replace",
 			schemaGenerator: func(max *int64) *schema.Structural {
 				strType := withMaxLength(primitiveType("string", ""), max)
+				beforeLen := int64(2)
+				afterLen := int64(4)
 				objType := objectType(map[string]schema.Structural{
 					"str":    strType,
-					"before": strType,
-					"after":  strType,
+					"before": withMaxLength(primitiveType("string", ""), &beforeLen),
+					"after":  withMaxLength(primitiveType("string", ""), &afterLen),
 				})
 				objType = withRule(objType, "self.str.replace(self.before, self.after) == 'does not matter'")
 				return &objType
 			},
-			expectedCalcCost: 629154,
-			setMaxElements:   10,
-			expectedSetCost:  16,
+			expectedCalcCost: 629154, // cost is based on the result size of the replace() call
+			setMaxElements:   4,
+			expectedSetCost:  12,
 		},
 		{
 			name: "extended library split",
