@@ -60,11 +60,11 @@ type PatchOptions struct {
 	ToPrinter   func(string) (printers.ResourcePrinter, error)
 	Recorder    genericclioptions.Recorder
 
-	Local       bool
-	PatchType   string
-	Patch       string
-	PatchFile   string
-	Subresource string
+	Local          bool
+	PatchType      string
+	Patch          string
+	PatchFile      string
+	Subresource    string
 	IgnoreNotFound bool
 
 	namespace                    string
