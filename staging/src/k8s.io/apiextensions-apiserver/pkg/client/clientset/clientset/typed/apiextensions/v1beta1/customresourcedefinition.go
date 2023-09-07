@@ -20,9 +20,12 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1beta1"
 	scheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,6 +50,8 @@ type CustomResourceDefinitionInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CustomResourceDefinitionList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CustomResourceDefinition, err error)
+	Apply(ctx context.Context, customResourceDefinition *apiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CustomResourceDefinition, err error)
+	ApplyStatus(ctx context.Context, customResourceDefinition *apiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CustomResourceDefinition, err error)
 	CustomResourceDefinitionExpansion
 }
 
@@ -177,6 +182,60 @@ func (c *customResourceDefinitions) Patch(ctx context.Context, name string, pt t
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied customResourceDefinition.
+func (c *customResourceDefinitions) Apply(ctx context.Context, customResourceDefinition *apiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CustomResourceDefinition, err error) {
+	if customResourceDefinition == nil {
+		return nil, fmt.Errorf("customResourceDefinition provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(customResourceDefinition)
+	if err != nil {
+		return nil, err
+	}
+	name := customResourceDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("customResourceDefinition.Name must be provided to Apply")
+	}
+	result = &v1beta1.CustomResourceDefinition{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("customresourcedefinitions").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *customResourceDefinitions) ApplyStatus(ctx context.Context, customResourceDefinition *apiextensionsv1beta1.CustomResourceDefinitionApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CustomResourceDefinition, err error) {
+	if customResourceDefinition == nil {
+		return nil, fmt.Errorf("customResourceDefinition provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(customResourceDefinition)
+	if err != nil {
+		return nil, err
+	}
+
+	name := customResourceDefinition.Name
+	if name == nil {
+		return nil, fmt.Errorf("customResourceDefinition.Name must be provided to Apply")
+	}
+
+	result = &v1beta1.CustomResourceDefinition{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("customresourcedefinitions").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

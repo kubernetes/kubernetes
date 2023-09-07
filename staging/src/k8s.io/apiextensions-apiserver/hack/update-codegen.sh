@@ -23,7 +23,7 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
 
 CLIENTSET_NAME_VERSIONED=clientset \
 CLIENTSET_PKG_NAME=clientset \
-"${CODEGEN_PKG}/generate-groups.sh" "deepcopy,client,lister,informer" \
+"${CODEGEN_PKG}/generate-groups.sh" "deepcopy,applyconfiguration,client,lister,informer" \
   k8s.io/apiextensions-apiserver/pkg/client \
   k8s.io/apiextensions-apiserver/pkg/apis \
   "apiextensions:v1beta1,v1" \
