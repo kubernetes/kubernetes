@@ -1356,6 +1356,14 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		podsWithAffinity = append(podsWithAffinity, pod)
 	}
 
+	// Add a couple of pods with anti-affinity, on the first and seconds nodes.
+	var podsWithRequiredAntiAffinity []*v1.Pod
+	for i := 0; i < 4; i++ {
+		pod := st.MakePod().Name(fmt.Sprintf("p-anti-affinity-%v", i)).Namespace("test-ns").UID(fmt.Sprintf("puid-anti-affinity-%v", i)).
+			PodAntiAffinityExists("foo", "bar", st.PodAntiAffinityWithRequiredReq).Node(fmt.Sprintf("test-node%v", i%2)).Obj()
+		podsWithRequiredAntiAffinity = append(podsWithRequiredAntiAffinity, pod)
+	}
+
 	// Add a few of pods with PVC
 	var podsWithPVC []*v1.Pod
 	for i := 0; i < 8; i++ {
@@ -1395,6 +1403,20 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	addPodWithAffinity := func(i int) operation {
 		return func(t *testing.T) {
 			if err := cache.AddPod(logger, podsWithAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	addPodWithRequiredAntiAffinity := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.AddPod(logger, podsWithRequiredAntiAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	removePodWithRequiredAntiAffinity := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.RemovePod(logger, podsWithRequiredAntiAffinity[i]); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1444,11 +1466,12 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                         string
-		operations                   []operation
-		expected                     []*v1.Node
-		expectedHavePodsWithAffinity int
-		expectedUsedPVCSet           sets.Set[string]
+		name                                     string
+		operations                               []operation
+		expected                                 []*v1.Node
+		expectedHavePodsWithAffinity             int
+		expectedHavePodsWithRequiredAntiAffinity int
+		expectedUsedPVCSet                       sets.Set[string]
 	}{
 		{
 			name:               "Empty cache",
@@ -1654,6 +1677,27 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			expected:           []*v1.Node{nodes[0], nodes[1]},
 			expectedUsedPVCSet: sets.New("test-ns/test-pvc1", "test-ns/test-pvc2"),
 		},
+		{
+			name: "Add multi pods with required anti-affinity",
+			operations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
+				addPodWithRequiredAntiAffinity(0), updateSnapshot(), addPodWithRequiredAntiAffinity(1), updateSnapshot(),
+			},
+			expected:                                 []*v1.Node{nodes[1], nodes[0]},
+			expectedHavePodsWithAffinity:             2,
+			expectedHavePodsWithRequiredAntiAffinity: 2,
+		},
+		{
+			name: "Add and Remove multi pods with required anti-affinity",
+			operations: []operation{
+				addNode(0), addNode(1), updateSnapshot(),
+				addPodWithRequiredAntiAffinity(0), updateSnapshot(), addPodWithRequiredAntiAffinity(2), updateSnapshot(),
+				removePodWithRequiredAntiAffinity(2), updateSnapshot(),
+			},
+			expected:                                 []*v1.Node{nodes[0], nodes[1]},
+			expectedHavePodsWithAffinity:             1,
+			expectedHavePodsWithRequiredAntiAffinity: 1,
+		},
 	}
 
 	for _, test := range tests {
@@ -1687,6 +1731,10 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			// Check number of nodes with pods with affinity
 			if len(snapshot.havePodsWithAffinityNodeInfoList) != test.expectedHavePodsWithAffinity {
 				t.Errorf("unexpected number of HavePodsWithAffinity nodes. Expected: %v, got: %v", test.expectedHavePodsWithAffinity, len(snapshot.havePodsWithAffinityNodeInfoList))
+			}
+			// Check number of nodes with pods with anti-affinity
+			if len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList) != test.expectedHavePodsWithRequiredAntiAffinity {
+				t.Errorf("unexpected number of HavePodsWithRequiredAntiAffinity nodes. Expected: %v, got: %v", test.expectedHavePodsWithRequiredAntiAffinity, len(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList))
 			}
 
 			// Compare content of the used PVC set

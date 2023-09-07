@@ -240,8 +240,12 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 			if (len(existing.PodsWithAffinity) > 0) != (len(clone.PodsWithAffinity) > 0) {
 				updateNodesHavePodsWithAffinity = true
 			}
-			if (len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
-				updateNodesHavePodsWithRequiredAntiAffinity = true
+			// We track nodes that have pods with anti-affinity, here we check if this node changed
+			// its status when we add or remove the pods with anti-affinity
+			if !updateNodesHavePodsWithRequiredAntiAffinity {
+				if len(existing.PodsWithRequiredAntiAffinity) != len(clone.PodsWithRequiredAntiAffinity) {
+					updateNodesHavePodsWithRequiredAntiAffinity = true
+				}
 			}
 			if !updateUsedPVCSet {
 				if len(existing.PVCRefCounts) != len(clone.PVCRefCounts) {
