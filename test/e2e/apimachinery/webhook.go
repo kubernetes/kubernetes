@@ -945,7 +945,7 @@ func newValidatingWebhookWithMatchConditions(
 					Rule: admissionregistrationv1.Rule{
 						APIGroups:   []string{""},
 						APIVersions: []string{"v1"},
-						Resources:   []string{"*"},
+						Resources:   []string{"configmaps"},
 					},
 				}},
 				ClientConfig: admissionregistrationv1.WebhookClientConfig{
