@@ -154,8 +154,10 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 		return slicesToCreate, slicesToUpdate, events
 	}
 
-	hintsEnabled := t.hintsPopulatedByService.Has(si.ServiceKey)
-	t.SetHints(si.ServiceKey, si.AddressType, allocatedHintsByZone)
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	hintsEnabled := t.hasPopulatedHintsLocked(si.ServiceKey)
+	t.setHintsLocked(si.ServiceKey, si.AddressType, allocatedHintsByZone)
 
 	// if hints were not enabled before, we publish an event to indicate we enabled them.
 	if !hintsEnabled {
@@ -175,6 +177,10 @@ func (t *TopologyCache) SetHints(serviceKey string, addrType discovery.AddressTy
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	t.setHintsLocked(serviceKey, addrType, allocatedHintsByZone)
+}
+
+func (t *TopologyCache) setHintsLocked(serviceKey string, addrType discovery.AddressType, allocatedHintsByZone EndpointZoneInfo) {
 	_, ok := t.endpointsByService[serviceKey]
 	if !ok {
 		t.endpointsByService[serviceKey] = map[discovery.AddressType]EndpointZoneInfo{}
@@ -263,6 +269,13 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 
 // HasPopulatedHints checks whether there are populated hints for a given service in the cache.
 func (t *TopologyCache) HasPopulatedHints(serviceKey string) bool {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return t.hasPopulatedHintsLocked(serviceKey)
+}
+
+func (t *TopologyCache) hasPopulatedHintsLocked(serviceKey string) bool {
 	return t.hintsPopulatedByService.Has(serviceKey)
 }
 
