@@ -23,12 +23,12 @@ import (
 
 	jsonpath "github.com/exponent-io/jsonpath"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestPatchObject(t *testing.T) {
@@ -243,6 +243,8 @@ func TestPatchSubresource(t *testing.T) {
 }
 
 func TestPatchIgnoreNotFoundWithNonexistentResource(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
 	ns := &corev1.NamespaceList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "1",
@@ -291,6 +293,8 @@ func TestPatchIgnoreNotFoundWithNonexistentResource(t *testing.T) {
 }
 
 func TestPatchIgnoreNotFoundWithExistingResource(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	
 	_, svc, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
