@@ -21,6 +21,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -488,7 +489,7 @@ func TestNodeAddresses(t *testing.T) {
 			metadataName:        "vm1",
 			vmType:              vmTypeStandard,
 			useInstanceMetadata: true,
-			expectedErrMsg:      wait.ErrWaitTimeout,
+			expectedErrMsg:      wait.ErrorInterrupted(errors.New("timed out waiting for the condition")),
 		},
 		{
 			name:                "NodeAddresses should get IP addresses from Azure API if node's name isn't equal to metadataName",

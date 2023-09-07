@@ -867,7 +867,7 @@ func TestWithExponentialBackoffParametersNotSet(t *testing.T) {
 
 	err := WithExponentialBackoff(context.TODO(), wait.Backoff{}, webhookFunc, alwaysRetry)
 
-	errExpected := fmt.Errorf("webhook call failed: %s", wait.ErrWaitTimeout)
+	errExpected := fmt.Errorf("webhook call failed: %w", wait.Interrupted(err))
 	if errExpected.Error() != err.Error() {
 		t.Errorf("expected error: %v, but got: %v", errExpected, err)
 	}

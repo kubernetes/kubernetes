@@ -207,7 +207,7 @@ func WaitForScaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.
 		waitForReplicas.Interval,
 		waitForReplicas.Timeout,
 		scaleHasDesiredReplicas(sClient, gr, resourceName, namespace, int32(newSize)))
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		return fmt.Errorf("timed out waiting for %q to be synced", resourceName)
 	}
 	return err

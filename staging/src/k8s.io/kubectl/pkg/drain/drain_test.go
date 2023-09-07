@@ -50,7 +50,7 @@ func TestDeletePods(t *testing.T) {
 		ctxTimeoutEarly   bool
 		expectPendingPods bool
 		expectError       bool
-		expectedError     *error
+		IsInterruptedErr  bool
 		getPodFn          func(namespace, name string) (*corev1.Pod, error)
 	}{
 		{
@@ -59,7 +59,7 @@ func TestDeletePods(t *testing.T) {
 			timeout:           10 * time.Second,
 			expectPendingPods: false,
 			expectError:       false,
-			expectedError:     nil,
+			IsInterruptedErr:  false,
 			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
 				oldPodMap, _ := createPods(false)
 				newPodMap, _ := createPods(true)
@@ -84,7 +84,7 @@ func TestDeletePods(t *testing.T) {
 			timeout:           3 * time.Second,
 			expectPendingPods: true,
 			expectError:       true,
-			expectedError:     &wait.ErrWaitTimeout,
+			IsInterruptedErr:  true,
 			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
 				oldPodMap, _ := createPods(false)
 				if oldPod, found := oldPodMap[name]; found {
@@ -100,7 +100,7 @@ func TestDeletePods(t *testing.T) {
 			ctxTimeoutEarly:   true,
 			expectPendingPods: true,
 			expectError:       true,
-			expectedError:     &wait.ErrWaitTimeout,
+			IsInterruptedErr:  true,
 			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
 				oldPodMap, _ := createPods(false)
 				if oldPod, found := oldPodMap[name]; found {
@@ -115,7 +115,7 @@ func TestDeletePods(t *testing.T) {
 			timeout:           3 * time.Second,
 			expectPendingPods: false,
 			expectError:       false,
-			expectedError:     nil,
+			IsInterruptedErr:  false,
 			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
 				oldPodMap, _ := createPods(false)
 				if oldPod, found := oldPodMap[name]; found {
@@ -132,7 +132,7 @@ func TestDeletePods(t *testing.T) {
 			timeout:           5 * time.Second,
 			expectPendingPods: true,
 			expectError:       true,
-			expectedError:     nil,
+			IsInterruptedErr:  false,
 			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
 				return nil, errors.New("This is a random error for testing")
 			},
@@ -168,12 +168,12 @@ func TestDeletePods(t *testing.T) {
 			if test.expectError {
 				if err == nil {
 					t.Fatalf("%s: unexpected non-error", test.description)
-				} else if test.expectedError != nil {
+				} else if test.IsInterruptedErr {
 					if test.ctxTimeoutEarly {
 						if elapsed >= test.timeout {
 							t.Fatalf("%s: the supplied context did not effectively cancel the waitForDelete", test.description)
 						}
-					} else if *test.expectedError != err {
+					} else if !wait.Interrupted(err) {
 						t.Fatalf("%s: the error does not match expected error", test.description)
 					}
 				}

@@ -189,7 +189,7 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 
 		// return if we've timed out
 		if err := ctx.Err(); err != nil {
-			return nil, wait.ErrWaitTimeout
+			return nil, wait.ErrorInterrupted(nil)
 		}
 
 		// see if the v1beta1 API is available
@@ -213,7 +213,7 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 
 		// return if we've timed out
 		if err := ctx.Err(); err != nil {
-			return nil, wait.ErrWaitTimeout
+			return nil, wait.ErrorInterrupted(nil)
 		}
 
 		// wait and try again
@@ -293,8 +293,8 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 			return false, nil
 		},
 	)
-	if err == wait.ErrWaitTimeout {
-		return nil, wait.ErrWaitTimeout
+	if wait.Interrupted(err) {
+		return nil, wait.ErrorInterrupted(nil)
 	}
 	if err != nil {
 		return nil, formatError("cannot watch on the certificate signing request: %v", err)

@@ -21,6 +21,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -227,7 +228,7 @@ func TestCreateRoute(t *testing.T) {
 			name:           "CreateRoute should report error if error occurs when invoke GetIPByNodeName",
 			routeTableName: "rt7",
 			getIPError:     fmt.Errorf("getIP error"),
-			expectedErrMsg: wait.ErrWaitTimeout,
+			expectedErrMsg: wait.ErrorInterrupted(errors.New("timed out waiting for the condition")),
 		},
 		{
 			name:               "CreateRoute should add route to cloud.RouteCIDRs if node is unmanaged",

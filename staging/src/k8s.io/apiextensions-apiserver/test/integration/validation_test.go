@@ -1540,7 +1540,7 @@ properties:
 					}
 					return true, nil
 				})
-				if err != wait.ErrWaitTimeout {
+				if !wait.Interrupted(err) {
 					t.Fatalf("expected no NonStructuralSchema condition, but got one: %v", cond)
 				}
 				return

@@ -380,7 +380,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 
 	endTime := time.Now().Add(o.Timeout)
 	timeout := time.Until(endTime)
-	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
+	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrorInterrupted(nil), info)
 	if o.Timeout == 0 {
 		// If timeout is zero check if the object exists once only
 		if gottenObj == nil {
@@ -430,7 +430,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 		return err
 	})
 	if err != nil {
-		if err == wait.ErrWaitTimeout {
+		if wait.Interrupted(err) {
 			return gottenObj, false, errWaitTimeoutWithName
 		}
 		return gottenObj, false, err
@@ -472,7 +472,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 
 	endTime := time.Now().Add(o.Timeout)
 	timeout := time.Until(endTime)
-	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
+	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrorInterrupted(nil), info)
 	if o.Timeout == 0 {
 		// If timeout is zero we will fetch the object(s) once only and check
 		gottenObj, initObjGetErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(context.Background(), info.Name, metav1.GetOptions{})
@@ -537,7 +537,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 		return err
 	})
 	if err != nil {
-		if err == wait.ErrWaitTimeout {
+		if wait.Interrupted(err) {
 			return result, false, errWaitTimeoutWithName
 		}
 		return result, false, err

@@ -91,7 +91,7 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName, crt azcache.Azu
 		klog.V(2).Infof("GetVirtualMachineWithRetry(%s): backoff success", name)
 		return true, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = retryErr
 	}
 	return machine, err

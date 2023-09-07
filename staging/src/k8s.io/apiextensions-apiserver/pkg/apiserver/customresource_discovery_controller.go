@@ -310,7 +310,7 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}, synchedCh chan<- struc
 			}
 		}
 		return true, nil
-	}, stopCh); err == wait.ErrWaitTimeout {
+	}, stopCh); wait.Interrupted(err) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for discovery endpoint to initialize"))
 		return
 	} else if err != nil {
