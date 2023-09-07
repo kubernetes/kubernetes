@@ -259,7 +259,6 @@ func TestPatchIgnoreNotFoundWithNonexistentResource(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -276,8 +275,8 @@ func TestPatchIgnoreNotFoundWithNonexistentResource(t *testing.T) {
 			}
 		}),
 	}
-	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
 
+	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdPatch(tf, stream)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -294,7 +293,6 @@ func TestPatchIgnoreNotFoundWithNonexistentResource(t *testing.T) {
 
 func TestPatchIgnoreNotFoundWithExistingResource(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
-	
 	_, svc, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
