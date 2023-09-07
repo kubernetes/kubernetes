@@ -155,9 +155,7 @@ func (c *AggregationController) UpdateAPIService(handler http.Handler, apiServic
 
 // RemoveAPIService removes API Service from OpenAPI Aggregation Controller.
 func (c *AggregationController) RemoveAPIService(apiServiceName string) {
-	if err := c.openAPIAggregationManager.RemoveAPIService(apiServiceName); err != nil {
-		utilruntime.HandleError(fmt.Errorf("removing %q from AggregationController failed with: %v", apiServiceName, err))
-	}
+	c.openAPIAggregationManager.RemoveAPIService(apiServiceName)
 	// This will only remove it if it was failing before. If it was successful, processNextWorkItem will figure it out
 	// and will not add it again to the queue.
 	c.queue.Forget(apiServiceName)
