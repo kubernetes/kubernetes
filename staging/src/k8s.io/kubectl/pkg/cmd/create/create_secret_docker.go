@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	pkgprinters "k8s.io/cli-runtime/pkg/printers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -88,6 +89,9 @@ type CreateSecretDockerRegistryOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	PrintObj   func(obj runtime.Object) error
 
+	// Print warning message if specified flag has any potentially negative implications
+	PrintWarn func(warning string)
+
 	// Name of secret (required)
 	Name string
 	// FileSources to derive the secret from (optional)
@@ -137,6 +141,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericioopti
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Warn())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -199,6 +204,18 @@ func (o *CreateSecretDockerRegistryOptions) Complete(f cmdutil.Factory, cmd *cob
 		return printer.PrintObj(obj, o.Out)
 	}
 
+	o.PrintWarn = func(warning string) {
+
+		opts := pkgprinters.WarningPrinterOptions{
+			Color: false,
+		}
+
+		warnPrinter := pkgprinters.NewWarningPrinter(o.IOStreams.ErrOut, opts)
+
+		warnPrinter.Print(warning)
+
+	}
+
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
 	if err != nil {
 		return err
@@ -214,6 +231,18 @@ func (o *CreateSecretDockerRegistryOptions) Validate() error {
 	}
 	if len(o.FileSources) == 0 && (len(o.Username) == 0 || len(o.Password) == 0 || len(o.Server) == 0) {
 		return fmt.Errorf("either --from-file or the combination of --docker-username, --docker-password and --docker-server is required")
+	}
+	return nil
+}
+
+// Warn checks if CreateSecretDockerRegistryOptions has docker password from cli flag and warns the user if true
+// it will be better to leave it to user which to choose so for now it enforces nil return
+func (o *CreateSecretDockerRegistryOptions) Warn() error {
+	if len(o.Password) != 0 {
+		warning := "*** Using --docker-password via CLI, which might not be secure enough in some cases ***"
+		o.PrintWarn(warning)
+		warning = "*** Flag --from-file is also available ***"
+		o.PrintWarn(warning)
 	}
 	return nil
 }
