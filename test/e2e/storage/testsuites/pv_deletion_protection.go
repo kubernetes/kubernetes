@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,13 +19,14 @@ package testsuites
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/onsi/gomega"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
@@ -191,8 +192,13 @@ func (t VolumeDeletionTest) TestVolumeDeletion(ctx context.Context) *v1.Persiste
 func (t VolumeDeletionTest) checkVolumeDeletion(ctx context.Context, client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storagev1.StorageClass) *v1.PersistentVolume {
 	err := e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, t.Timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
+
+	// Retrieve the PVC
+	pvcBound, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
 	// Get the bound PV
-	pv, err := client.CoreV1().PersistentVolumes().Get(ctx, claim.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := client.CoreV1().PersistentVolumes().Get(ctx, pvcBound.Spec.VolumeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Wait for finalizer %s to be added to pv %s", pvDeletionInTreeProtectionFinalizer, pv.Name))
