@@ -120,7 +120,7 @@ service RuntimeService {
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
 
     // GetContainerEvents gets container events from the CRI runtime
-    rpc  GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
+    rpc GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
 
     // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
     // This list should be static at startup: either the client and server restart together when
