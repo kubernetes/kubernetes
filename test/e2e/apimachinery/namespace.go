@@ -357,7 +357,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		})
 		framework.ExpectNoError(err, "failed to update namespace status %s", ns)
 		gomega.Expect(statusUpdated.Status.Conditions).To(gomega.HaveLen(len(statusUpdated.Status.Conditions)), "updated object should have the applied condition, got %#v", statusUpdated.Status.Conditions)
-		gomega.Expect(statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1].Type).To(gomega.Equal("StatusUpdate"), "updated object should have the approved condition, got %#v", statusUpdated.Status.Conditions)
+		gomega.Expect(statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1].Type).To(gomega.Equal(v1.NamespaceConditionType("StatusUpdate")), "updated object should have the approved condition, got %#v", statusUpdated.Status.Conditions)
 		gomega.Expect(statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1].Message).To(gomega.Equal("Updated by an e2e test"), "The Message returned was %v", statusUpdated.Status.Conditions[0].Message)
 		framework.Logf("Status.Condition: %#v", statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1])
 	})
