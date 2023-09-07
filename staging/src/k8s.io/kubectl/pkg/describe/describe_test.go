@@ -2005,7 +2005,7 @@ func TestGetPodsForPVC(t *testing.T) {
 		{
 			name: "pvc-unused",
 			pvc: &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pvc-name"},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					VolumeName:       "volume1",
 					StorageClassName: &goldClassName,
