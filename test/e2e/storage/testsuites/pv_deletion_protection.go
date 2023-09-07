@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"time"
 
@@ -209,7 +208,8 @@ func (t VolumeDeletionTest) checkVolumeDeletion(ctx context.Context, client clie
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Wating for the pvc to be deleted")
-	framework.ExpectNoError(storage.WaitForPersistentVolumeClaimDeleted(ctx, client, claim.Namespace, claim.Name, 2*time.Second, 60*time.Second),
+
+	framework.ExpectNoError(e2epv.WaitForPersistentVolumeClaimDeleted(ctx, client, claim.Namespace, claim.Name, 2*time.Second, 60*time.Second),
 		"Failed to delete PVC", claim.Name)
 
 	ginkgo.By("Remove the finalizer on pv")

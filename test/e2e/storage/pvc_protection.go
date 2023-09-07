@@ -44,8 +44,8 @@ const (
 	claimDeletingTimeout = 3 * time.Minute
 )
 
-// WaitForPersistentVolumeClaimDeleted waits for a PersistentVolumeClaim to be removed from the system until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeClaimDeleted(ctx context.Context, c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
+// waitForPersistentVolumeClaimDeleted waits for a PersistentVolumeClaim to be removed from the system until timeout occurs, whichever comes first.
+func waitForPersistentVolumeClaimDeleted(ctx context.Context, c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for PersistentVolumeClaim %s to be removed", timeout, pvcName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
 		_, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, pvcName, metav1.GetOptions{})
@@ -122,7 +122,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		ginkgo.By("Deleting the PVC")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Error deleting PVC")
-		WaitForPersistentVolumeClaimDeleted(ctx, client, pvc.Namespace, pvc.Name, framework.Poll, claimDeletingTimeout)
+		waitForPersistentVolumeClaimDeleted(ctx, client, pvc.Namespace, pvc.Name, framework.Poll, claimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 
@@ -141,7 +141,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
 
 		ginkgo.By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
-		WaitForPersistentVolumeClaimDeleted(ctx, client, pvc.Namespace, pvc.Name, framework.Poll, claimDeletingTimeout)
+		waitForPersistentVolumeClaimDeleted(ctx, client, pvc.Namespace, pvc.Name, framework.Poll, claimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 
@@ -173,7 +173,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
 
 		ginkgo.By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
-		WaitForPersistentVolumeClaimDeleted(ctx, client, pvc.Namespace, pvc.Name, framework.Poll, claimDeletingTimeout)
+		waitForPersistentVolumeClaimDeleted(ctx, client, pvc.Namespace, pvc.Name, framework.Poll, claimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 })
