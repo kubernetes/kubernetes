@@ -331,7 +331,7 @@ func TestPlugin(t *testing.T) {
 			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
 			want: want{
 				prefilter: result{
-					status: framework.AsStatus(fmt.Errorf(`look up resource class: resourceclass.resource.k8s.io "%s" not found`, className)),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("resource class %s does not exist", className)),
 				},
 				postfilter: result{
 					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
