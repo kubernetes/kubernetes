@@ -23,6 +23,7 @@ import (
 	"io"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -441,6 +442,8 @@ func newCallTreeForType(existingDefaulters, newDefaulters defaulterFuncMap) *cal
 	}
 }
 
+// resolveType follows pointers and aliases of `t` until reaching the first
+// non-pointer type in `t's` herarchy
 func resolveTypeAndDepth(t *types.Type) (*types.Type, int) {
 	var prev *types.Type
 	depth := 0
@@ -454,6 +457,42 @@ func resolveTypeAndDepth(t *types.Type) (*types.Type, int) {
 		}
 	}
 	return t, depth
+}
+
+// getPointerElementPath follows pointers and aliases to returns all
+// pointer elements in the path from the given type, to its base value type.
+//
+// Example:
+//
+//	type MyString string
+//	type MyStringPointer *MyString
+//	type MyStringPointerPointer *MyStringPointer
+//	type MyStringAlias MyStringPointer
+//	type MyStringAliasPointer *MyStringAlias
+//	type MyStringAliasDoublePointer **MyStringAlias
+//
+//	t		  				   | defaultPointerElementPath(t)
+//	---------------------------|----------------------------------------
+//	MyString                   | []
+//	MyStringPointer            | [MyString]
+//	MyStringPointerPointer     | [MyStringPointer, MyString]
+//	MyStringAlias              | [MyStringPointer, MyString]
+//	MyStringAliasPointer       | [MyStringAlias, MyStringPointer, MyString]
+//	MyStringAliasDoublePointer | [*MyStringAlias, MyStringAlias, MyStringPointer, MyString]
+func getPointerElementPath(t *types.Type) []*types.Type {
+	var path []*types.Type
+	for t != nil {
+		switch t.Kind {
+		case types.Alias:
+			t = t.Underlying
+		case types.Pointer:
+			t = t.Elem
+			path = append(path, t)
+		default:
+			t = nil
+		}
+	}
+	return path
 }
 
 // getNestedDefault returns the first default value when resolving alias types
@@ -497,29 +536,57 @@ func mustEnforceDefault(t *types.Type, depth int, omitEmpty bool) (interface{}, 
 	}
 }
 
-func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLines []string) *callNode {
+var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
+var refREIdentIndex = refRE.SubexpIndex("reference")
+
+// ParseSymbolReference looks for strings that match one of the following:
+//   - ref(Ident)
+//   - ref(pkgpath.Ident)
+//     If the input string matches either of these, it will return the (optional)
+//     pkgpath, the Ident, and true.  Otherwise it will return empty strings and
+//     false.
+func ParseSymbolReference(s, sourcePackage string) (types.Name, bool) {
+	matches := refRE.FindStringSubmatch(s)
+	if len(matches) < refREIdentIndex || matches[refREIdentIndex] == "" {
+		return types.Name{}, false
+	}
+
+	contents := matches[refREIdentIndex]
+	name := types.ParseFullyQualifiedName(contents)
+	if len(name.Package) == 0 {
+		name.Package = sourcePackage
+	}
+	return name, true
+}
+
+func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLines []string, commentPackage string) *callNode {
 	defaultMap := extractDefaultTag(commentLines)
 	var defaultString string
 	if len(defaultMap) == 1 {
 		defaultString = defaultMap[0]
+	} else if len(defaultMap) > 1 {
+		klog.Fatalf("Found more than one default tag for %v", t.Kind)
 	}
 
-	t, depth := resolveTypeAndDepth(t)
+	baseT, depth := resolveTypeAndDepth(t)
 	if depth > 0 && defaultString == "" {
 		defaultString = getNestedDefault(t)
 	}
-	if len(defaultMap) > 1 {
-		klog.Fatalf("Found more than one default tag for %v", t.Kind)
-	} else if len(defaultMap) == 0 {
+
+	if len(defaultString) == 0 {
 		return node
 	}
+	var symbolReference types.Name
 	var defaultValue interface{}
-	if err := json.Unmarshal([]byte(defaultString), &defaultValue); err != nil {
+	if id, ok := ParseSymbolReference(defaultString, commentPackage); ok {
+		symbolReference = id
+		defaultString = ""
+	} else if err := json.Unmarshal([]byte(defaultString), &defaultValue); err != nil {
 		klog.Fatalf("Failed to unmarshal default: %v", err)
 	}
 
 	omitEmpty := strings.Contains(reflect.StructTag(tags).Get("json"), "omitempty")
-	if enforced, err := mustEnforceDefault(t, depth, omitEmpty); err != nil {
+	if enforced, err := mustEnforceDefault(baseT, depth, omitEmpty); err != nil {
 		klog.Fatal(err)
 	} else if enforced != nil {
 		if defaultValue != nil {
@@ -540,10 +607,11 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 		node.markerOnly = true
 	}
 
-	node.defaultIsPrimitive = t.IsPrimitive()
-	node.defaultType = t.String()
-	node.defaultValue = defaultString
-	node.defaultDepth = depth
+	node.defaultIsPrimitive = baseT.IsPrimitive()
+	node.defaultType = baseT
+	node.defaultTopLevelType = t
+	node.defaultValue.InlineConstant = defaultString
+	node.defaultValue.SymbolReference = symbolReference
 	return node
 }
 
@@ -619,7 +687,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 				child.elem = true
 			}
 			parent.children = append(parent.children, *child)
-		} else if member := populateDefaultValue(nil, t.Elem, "", t.Elem.CommentLines); member != nil {
+		} else if member := populateDefaultValue(nil, t.Elem, "", t.Elem.CommentLines, t.Elem.Name.Package); member != nil {
 			member.index = true
 			parent.children = append(parent.children, *member)
 		}
@@ -627,7 +695,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		if child := c.build(t.Elem, false); child != nil {
 			child.key = true
 			parent.children = append(parent.children, *child)
-		} else if member := populateDefaultValue(nil, t.Elem, "", t.Elem.CommentLines); member != nil {
+		} else if member := populateDefaultValue(nil, t.Elem, "", t.Elem.CommentLines, t.Elem.Name.Package); member != nil {
 			member.key = true
 			parent.children = append(parent.children, *member)
 		}
@@ -644,9 +712,9 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 			}
 			if child := c.build(field.Type, false); child != nil {
 				child.field = name
-				populateDefaultValue(child, field.Type, field.Tags, field.CommentLines)
+				populateDefaultValue(child, field.Type, field.Tags, field.CommentLines, field.Type.Name.Package)
 				parent.children = append(parent.children, *child)
-			} else if member := populateDefaultValue(nil, field.Type, field.Tags, field.CommentLines); member != nil {
+			} else if member := populateDefaultValue(nil, field.Type, field.Tags, field.CommentLines, t.Name.Package); member != nil {
 				member.field = name
 				parent.children = append(parent.children, *member)
 			}
@@ -690,7 +758,7 @@ func NewGenDefaulter(sanitizedName, typesPackage, outputPackage string, existing
 		peerPackages:       peerPkgs,
 		newDefaulters:      newDefaulters,
 		existingDefaulters: existingDefaulters,
-		imports:            generator.NewImportTracker(),
+		imports:            generator.NewImportTrackerForPackage(outputPackage),
 		typesForInit:       make([]*types.Type, 0),
 	}
 }
@@ -766,6 +834,15 @@ func (g *genDefaulter) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	}
 	i := 0
 	callTree.VisitInOrder(func(ancestors []*callNode, current *callNode) {
+		if ref := &current.defaultValue.SymbolReference; len(ref.Name) > 0 {
+			// Ensure package for symbol is imported in output generation
+			g.imports.AddSymbol(*ref)
+
+			// Rewrite the fully qualified name using the local package name
+			// from the imports
+			ref.Package = g.imports.LocalNameOf(ref.Package)
+		}
+
 		if len(current.call) == 0 {
 			return
 		}
@@ -795,26 +872,26 @@ func (g *genDefaulter) generateDefaulter(inType *types.Type, callTree *callNode,
 // how in Go code an access would be performed. For example, if a defaulting function exists on a container
 // lifecycle hook, to invoke that defaulter correctly would require this Go code:
 //
-//     for i := range pod.Spec.Containers {
-//       o := &pod.Spec.Containers[i]
-//       if o.LifecycleHook != nil {
-//         SetDefaults_LifecycleHook(o.LifecycleHook)
-//       }
-//     }
+//	for i := range pod.Spec.Containers {
+//	  o := &pod.Spec.Containers[i]
+//	  if o.LifecycleHook != nil {
+//	    SetDefaults_LifecycleHook(o.LifecycleHook)
+//	  }
+//	}
 //
 // That would be represented by a call tree like:
 //
-//   callNode
-//     field: "Spec"
-//     children:
-//     - field: "Containers"
-//       children:
-//       - index: true
-//         children:
-//         - field: "LifecycleHook"
-//           elem: true
-//           call:
-//           - SetDefaults_LifecycleHook
+//	callNode
+//	  field: "Spec"
+//	  children:
+//	  - field: "Containers"
+//	    children:
+//	    - index: true
+//	      children:
+//	      - field: "LifecycleHook"
+//	        elem: true
+//	        call:
+//	        - SetDefaults_LifecycleHook
 //
 // which we can traverse to build that Go struct (you must call the field Spec, then Containers, then range over
 // that field, then check whether the LifecycleHook field is nil, before calling SetDefaults_LifecycleHook on
@@ -836,7 +913,7 @@ type callNode struct {
 
 	// defaultValue is the defaultValue of a callNode struct
 	// Only primitive types and pointer types are eligible to have a default value
-	defaultValue string
+	defaultValue defaultValue
 
 	// defaultIsPrimitive is used to determine how to assign the default value.
 	// Primitive types will be directly assigned while complex types will use JSON unmarshalling
@@ -845,21 +922,41 @@ type callNode struct {
 	// markerOnly is true if the callNode exists solely to fill in a default value
 	markerOnly bool
 
-	// defaultDepth is used to determine pointer level of the default value
-	// For example 1 corresponds to setting a default value and taking its pointer while
-	// 2 corresponds to setting a default value and taking its pointer's pointer
-	// 0 implies that no pointers are used
-	// This is used in situations where a field is a pointer to a primitive value rather than a primitive value itself.
+	// defaultType is the transitive underlying/element type of the node.
+	// The provided default value literal or reference is expected to be
+	// convertible to this type.
 	//
-	//     type A {
-	//       +default="foo"
-	//       Field *string
-	//     }
-	defaultDepth int
-
-	// defaultType is the type of the default value.
+	// e.g:
+	//	node type = *string 			-> 	defaultType = string
+	//	node type = StringPointerAlias 	-> 	defaultType = string
 	// Only populated if defaultIsPrimitive is true
-	defaultType string
+	defaultType *types.Type
+
+	// defaultTopLevelType is the final type the value should resolve to
+	// This is in constrast with default type, which resolves aliases and pointers.
+	defaultTopLevelType *types.Type
+}
+
+type defaultValue struct {
+	// The value was written directly in the marker comment and
+	// has been parsed as JSON
+	InlineConstant string
+	// The name of the symbol relative to the parsed package path
+	// i.e. k8s.io/pkg.apis.v1.Foo if from another package or simply `Foo`
+	// if within the same package.
+	SymbolReference types.Name
+}
+
+func (d defaultValue) IsEmpty() bool {
+	resolved := d.Resolved()
+	return resolved == ""
+}
+
+func (d defaultValue) Resolved() string {
+	if len(d.InlineConstant) > 0 {
+		return d.InlineConstant
+	}
+	return d.SymbolReference.String()
 }
 
 // CallNodeVisitorFunc is a function for visiting a call tree. ancestors is the list of all parents
@@ -929,15 +1026,14 @@ func getTypeZeroValue(t string) (interface{}, error) {
 }
 
 func (n *callNode) writeDefaulter(varName string, index string, isVarPointer bool, sw *generator.SnippetWriter) {
-	if n.defaultValue == "" {
+	if n.defaultValue.IsEmpty() {
 		return
 	}
 	args := generator.Args{
-		"defaultValue": n.defaultValue,
+		"defaultValue": n.defaultValue.Resolved(),
 		"varName":      varName,
 		"index":        index,
-		"varDepth":     n.defaultDepth,
-		"varType":      n.defaultType,
+		"varTopType":   n.defaultTopLevelType,
 	}
 
 	variablePlaceholder := ""
@@ -961,25 +1057,72 @@ func (n *callNode) writeDefaulter(varName string, index string, isVarPointer boo
 	if n.defaultIsPrimitive {
 		// If the default value is a primitive when the assigned type is a pointer
 		// keep using the address-of operator on the primitive value until the types match
-		if n.defaultDepth > 0 {
-			sw.Do(fmt.Sprintf("if %s == nil {\n", variablePlaceholder), args)
-			sw.Do("var ptrVar$.varDepth$ $.varType$ = $.defaultValue$\n", args)
-			// We iterate until a depth of 1 instead of 0 because the following line
-			// `if $.varName$ == &ptrVar1` accounts for 1 level already
-			for i := n.defaultDepth; i > 1; i-- {
-				sw.Do("ptrVar$.ptri$ := &ptrVar$.i$\n", generator.Args{"i": fmt.Sprintf("%d", i), "ptri": fmt.Sprintf("%d", (i - 1))})
+		if pointerPath := getPointerElementPath(n.defaultTopLevelType); len(pointerPath) > 0 {
+			// If the destination is a pointer, the last element in
+			// defaultDepth is the element type of the bottommost pointer:
+			// the base type of our default value.
+			destElemType := pointerPath[len(pointerPath)-1]
+			pointerArgs := args.WithArgs(generator.Args{
+				"varDepth":     len(pointerPath),
+				"baseElemType": destElemType,
+			})
+
+			sw.Do(fmt.Sprintf("if %s == nil {\n", variablePlaceholder), pointerArgs)
+			if len(n.defaultValue.InlineConstant) > 0 {
+				// If default value is a literal then it can be assigned via var stmt
+				sw.Do("var ptrVar$.varDepth$ $.baseElemType|raw$ = $.defaultValue$\n", pointerArgs)
+			} else {
+				// If default value is not a literal then it may need to be casted
+				// to the base type of the destination pointer
+				sw.Do("ptrVar$.varDepth$ := $.baseElemType|raw$($.defaultValue$)\n", pointerArgs)
 			}
-			sw.Do(fmt.Sprintf("%s = &ptrVar1", variablePlaceholder), args)
+
+			for i := len(pointerPath); i >= 1; i-- {
+				dest := fmt.Sprintf("ptrVar%d", i-1)
+				assignment := ":="
+				if i == 1 {
+					// Last assignment is into the storage destination
+					dest = variablePlaceholder
+					assignment = "="
+				}
+
+				sourceType := "*" + destElemType.String()
+				if i == len(pointerPath) {
+					// Initial value is not a pointer
+					sourceType = destElemType.String()
+				}
+				destElemType = pointerPath[i-1]
+
+				// Cannot include `dest` into args since its value may be
+				// `variablePlaceholder` which is a template, not a value
+				elementArgs := pointerArgs.WithArgs(generator.Args{
+					"assignment":   assignment,
+					"source":       fmt.Sprintf("ptrVar%d", i),
+					"destElemType": destElemType,
+				})
+
+				// Skip cast if type is exact match
+				if destElemType.String() == sourceType {
+					sw.Do(fmt.Sprintf("%v $.assignment$ &$.source$\n", dest), elementArgs)
+				} else {
+					sw.Do(fmt.Sprintf("%v $.assignment$ (*$.destElemType|raw$)(&$.source$)\n", dest), elementArgs)
+				}
+			}
 		} else {
 			// For primitive types, nil checks cannot be used and the zero value must be determined
-			defaultZero, err := getTypeZeroValue(n.defaultType)
+			defaultZero, err := getTypeZeroValue(n.defaultType.String())
 			if err != nil {
 				klog.Error(err)
 			}
 			args["defaultZero"] = defaultZero
 
 			sw.Do(fmt.Sprintf("if %s == $.defaultZero$ {\n", variablePlaceholder), args)
-			sw.Do(fmt.Sprintf("%s = $.defaultValue$", variablePlaceholder), args)
+
+			if len(n.defaultValue.InlineConstant) > 0 {
+				sw.Do(fmt.Sprintf("%s = $.defaultValue$", variablePlaceholder), args)
+			} else {
+				sw.Do(fmt.Sprintf("%s = $.varTopType|raw$($.defaultValue$)", variablePlaceholder), args)
+			}
 		}
 	} else {
 		sw.Do(fmt.Sprintf("if %s == nil {\n", variablePlaceholder), args)
@@ -1046,7 +1189,7 @@ func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode,
 		}
 		sw.Do("}\n", nil)
 	case n.key:
-		if n.defaultValue != "" {
+		if !n.defaultValue.IsEmpty() {
 			// Map keys are typed and cannot share the same index variable as arrays and other maps
 			index = index + "_" + ancestors[len(ancestors)-1].field
 			vars["index"] = index
