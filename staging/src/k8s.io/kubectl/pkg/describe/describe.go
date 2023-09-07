@@ -33,7 +33,6 @@ import (
 	"unicode"
 
 	"github.com/fatih/camelcase"
-	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -1672,24 +1671,32 @@ func getPodsForPVC(c corev1client.PodInterface, pvc *corev1.PersistentVolumeClai
 		}
 	}
 
+ownersLoop:
 	for _, ownerRef := range pvc.ObjectMeta.OwnerReferences {
 		if ownerRef.Kind != "Pod" {
 			continue
 		}
 
-		podIndex := slices.IndexFunc(nsPods.Items, func(pod corev1.Pod) bool {
-			return pod.UID == ownerRef.UID
-		})
+		podIndex := -1
+		for i, pod := range nsPods.Items {
+			if pod.UID == ownerRef.UID {
+				podIndex = i
+				break
+			}
+		}
 		if podIndex == -1 {
 			// Maybe the pod has been deleted
 			continue
 		}
 
-		if slices.IndexFunc(pods, func(pod corev1.Pod) bool {
-			return pod.UID == nsPods.Items[podIndex].UID
-		}) == -1 {
-			pods = append(pods, nsPods.Items[podIndex])
+		for _, pod := range pods {
+			if pod.UID == nsPods.Items[podIndex].UID {
+				// This owner pod is already recorded, look for pods between other owners
+				continue ownersLoop
+			}
 		}
+
+		pods = append(pods, nsPods.Items[podIndex])
 	}
 
 	return pods, nil
