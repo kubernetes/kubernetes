@@ -2072,18 +2072,6 @@ func TestGetPodsForPVC(t *testing.T) {
 			requiredObjects: []runtime.Object{
 				&corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod-name", UID: "pod-uid"},
-					Spec: corev1.PodSpec{
-						Volumes: []corev1.Volume{
-							{
-								Name: "volume",
-								VolumeSource: corev1.VolumeSource{
-									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-										ClaimName: "pvc-name",
-									},
-								},
-							},
-						},
-					},
 				},
 			},
 			expectedPods: []string{"pod-name"},
