@@ -18,6 +18,7 @@ package featuregate
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"sort"
 	"strconv"
@@ -253,8 +254,10 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 // String returns a string containing all enabled feature gates, formatted as "key1=value1,key2=value2,...".
 func (f *featureGate) String() string {
 	pairs := []string{}
-	for k, v := range f.enabled.Load().(map[Feature]bool) {
-		pairs = append(pairs, fmt.Sprintf("%s=%t", k, v))
+	if f.enabled != nil {
+		for k, v := range f.enabled.Load().(map[Feature]bool) {
+			pairs = append(pairs, fmt.Sprintf("%s=%t", k, v))
+		}
 	}
 	sort.Strings(pairs)
 	return strings.Join(pairs, ",")
@@ -319,6 +322,17 @@ func (f *featureGate) Enabled(key Feature) bool {
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
+	f.addFlag(fs)
+}
+
+// AddGoFlag is a variant of AddFlags for a standard FlagSet.
+func (f *featureGate) AddGoFlag(fs *flag.FlagSet) {
+	f.addFlag(goFlagSet{FlagSet: fs})
+}
+
+// addFlag can be used with both flag.FlagSet and pflag.FlagSet. The internal
+// interface definition avoids duplicating this code.
+func (f *featureGate) addFlag(fs flagSet) {
 	f.lock.Lock()
 	// TODO(mtaufen): Shouldn't we just close it on the first Set/SetFromMap instead?
 	// Not all components expose a feature gates flag using this AddFlag method, and
