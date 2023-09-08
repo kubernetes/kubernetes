@@ -18,6 +18,7 @@ package featuregate
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"reflect"
 	"sort"
@@ -67,6 +68,21 @@ var (
 		allBetaGate:  setUnsetBetaGates,
 	}
 )
+
+// flagSet is the interface implemented by pflag.FlagSet, with
+// just those methods defined which are needed by addFlags.
+type flagSet interface {
+	Var(value pflag.Value, name string, usage string)
+}
+
+// goFlagSet implements flagSet for a stdlib flag.FlagSet.
+type goFlagSet struct {
+	*flag.FlagSet
+}
+
+func (fs goFlagSet) Var(value pflag.Value, name string, usage string) {
+	fs.FlagSet.Var(value, name, usage)
+}
 
 type FeatureSpec struct {
 	// Default is the default enablement state for the feature
@@ -128,6 +144,10 @@ type MutableFeatureGate interface {
 
 	// AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 	AddFlag(fs *pflag.FlagSet)
+
+	// AddGoFlag is a variant of AddFlags for a standard FlagSet.
+	AddGoFlag(fs *flag.FlagSet)
+
 	// Close sets closed to true, and prevents subsequent calls to Add
 	Close()
 	// Set parses and stores flag gates for known features
@@ -623,6 +643,17 @@ func (f *featureGate) Close() {
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
+	f.addFlag(fs)
+}
+
+// AddGoFlag is a variant of AddFlags for a standard FlagSet.
+func (f *featureGate) AddGoFlag(fs *flag.FlagSet) {
+	f.addFlag(goFlagSet{FlagSet: fs})
+}
+
+// addFlag can be used with both flag.FlagSet and pflag.FlagSet. The internal
+// interface definition avoids duplicating this code.
+func (f *featureGate) addFlag(fs flagSet) {
 	// TODO(mtaufen): Shouldn't we just close it on the first Set/SetFromMap instead?
 	// Not all components expose a feature gates flag using this AddFlag method, and
 	// in the future, all components will completely stop exposing a feature gates flag,
