@@ -5225,9 +5225,7 @@ func TestFinalizerCleanup(t *testing.T) {
 		}
 		return !hasJobTrackingFinalizer(p), nil
 	}); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
-		}
+		t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
 	}
 
 }
