@@ -39,8 +39,8 @@ import (
 )
 
 const (
-	// pvDeletionInTreeProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
-	pvDeletionInTreeProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
+	// pvDeletionProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
+	pvDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
 )
 
 type VolumeDeletionTest struct {
@@ -202,30 +202,30 @@ func (t VolumeDeletionTest) checkVolumeDeletion(ctx context.Context, client clie
 	pv, err := client.CoreV1().PersistentVolumes().Get(ctx, pvcBound.Spec.VolumeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.By(fmt.Sprintf("Wait for finalizer %s to be added to pv %s", pvDeletionInTreeProtectionFinalizer, pv.Name))
-	err = e2epv.WaitForPVFinalizer(ctx, client, pv.Name, pvDeletionInTreeProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
+	ginkgo.By(fmt.Sprintf("Wait for finalizer %s to be added to pv %s", pvDeletionProtectionFinalizer, pv.Name))
+	pv, err = e2epv.WaitForPVFinalizer(ctx, client, pv.Name, pvDeletionProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
 	framework.ExpectNoError(err)
+	framework.Logf("finalizer %q found on pv %q", pvDeletionProtectionFinalizer, pv.Name)
+	framework.Logf("Persistent Volume: %+v", pv)
 
 	ginkgo.By("Delete pv")
 	err = e2epv.DeletePersistentVolume(ctx, client, pv.Name)
 	framework.ExpectNoError(err)
+	framework.Logf("pv %q deleted", pvDeletionProtectionFinalizer, pv.Name)
 
 	ginkgo.By("Delete pvc")
 	err = e2epv.DeletePersistentVolumeClaim(ctx, client, claim.Name, claim.Namespace)
 	framework.ExpectNoError(err)
+	framework.Logf("pvc %q/%q deleted", claim.Name, claim.Namespace)
 
 	ginkgo.By("Wating for the pvc to be deleted")
-
 	framework.ExpectNoError(e2epv.WaitForPersistentVolumeClaimDeleted(ctx, client, claim.Namespace, claim.Name, 2*time.Second, 60*time.Second),
 		"Failed to delete PVC", claim.Name)
-
-	ginkgo.By("Remove the finalizer on pv")
-	err = e2epv.RemovePVFinalizer(ctx, client, pv.Name, pvDeletionInTreeProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
-	framework.ExpectNoError(err)
 
 	ginkgo.By("Wating for the pv to be deleted")
 	framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(ctx, client, pv.Name, 2*time.Second, 60*time.Second),
 		"Failed to delete PV ", pv.Name)
+	framework.Logf("pv %q removed from the API server", pv.Name)
 
 	return pv
 }

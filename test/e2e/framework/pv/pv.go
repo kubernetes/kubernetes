@@ -977,7 +977,7 @@ func RemovePVFinalizer(ctx context.Context, cs clientset.Interface, pvName, fina
 }
 
 // WaitForPVFinalizer waits for a finalizer to be added to a PV.
-func WaitForPVFinalizer(ctx context.Context, cs clientset.Interface, pvName, finalizer string, poll, timeout time.Duration) error {
+func WaitForPVFinalizer(ctx context.Context, cs clientset.Interface, pvName, finalizer string, poll, timeout time.Duration) (*v1.PersistentVolume, error) {
 	var (
 		err error
 		pv  *v1.PersistentVolume
@@ -996,12 +996,12 @@ func WaitForPVFinalizer(ctx context.Context, cs clientset.Interface, pvName, fin
 		}
 		return false
 	}); successful {
-		return nil
+		return pv, nil
 	}
 	if err == nil {
 		err = fmt.Errorf("finalizer %s not added to pv %s", finalizer, pvName)
 	}
-	return err
+	return nil, err
 }
 
 // WaitForPersistentVolumeClaimDeleted waits for a PersistentVolumeClaim to be removed from the system until timeout occurs, whichever comes first.
