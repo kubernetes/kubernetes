@@ -336,14 +336,15 @@ func parseOutput(ctx context.Context, f *framework.Framework, pod *v1.Pod) conta
 	sc := bufio.NewScanner(&buf)
 	var res containerOutputList
 	for sc.Scan() {
-		fields := strings.Fields(sc.Text())
+		log := sc.Text()
+		fields := strings.Fields(log)
 		if len(fields) < 4 {
-			framework.ExpectNoError(fmt.Errorf("%v should have at least length 3", fields))
+			framework.ExpectNoError(fmt.Errorf("%v should have at least length 4", fields))
 		}
 		timestamp, err := strconv.ParseInt(fields[0], 10, 64)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "Failed to parse the log: %q", log)
 		timeSinceBoot, err := strconv.ParseFloat(fields[1], 64)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "Failed to parse the log: %q", log)
 		res = append(res, containerOutput{
 			timestamp:     time.Unix(timestamp, 0),
 			timeSinceBoot: timeSinceBoot,
