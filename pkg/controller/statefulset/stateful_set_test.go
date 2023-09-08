@@ -32,18 +32,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var parentKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
@@ -684,8 +681,6 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 }
 
 func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
-
 	testFn := func(t *testing.T, scaledownPolicy, deletionPolicy apps.PersistentVolumeClaimRetentionPolicyType) {
 		set := newStatefulSet(4)
 		*set.Spec.Replicas = 2
@@ -819,8 +814,6 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 }
 
 func TestStaleOwnerRefOnScaleup(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
-
 	for _, policy := range []*apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		{
 			WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,

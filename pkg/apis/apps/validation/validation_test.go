@@ -261,8 +261,6 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 
-	const enableStatefulSetAutoDeletePVC = "[enable StatefulSetAutoDeletePVC]"
-
 	type testCase struct {
 		name string
 		set  apps.StatefulSet
@@ -292,7 +290,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			tweakRollingUpdatePartition(2),
 		),
 	}, {
-		name: "PVC policy " + enableStatefulSetAutoDeletePVC,
+		name: "PVC policy",
 		set: mkStatefulSet(&validPodTemplate,
 			tweakPVCPolicy(mkPVCPolicy(
 				tweakPVCDeletedPolicy(apps.DeletePersistentVolumeClaimRetentionPolicyType),
@@ -463,7 +461,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), ""),
 		},
 	}, {
-		name: "empty PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC,
+		name: "empty PersistentVolumeClaimRetentionPolicy",
 		set: mkStatefulSet(&validPodTemplate,
 			tweakPVCPolicy(mkPVCPolicy()),
 		),
@@ -472,7 +470,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
 		},
 	}, {
-		name: "invalid PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC,
+		name: "invalid PersistentVolumeClaimRetentionPolicy",
 		set: mkStatefulSet(&validPodTemplate,
 			tweakPVCPolicy(mkPVCPolicy(
 				tweakPVCDeletedPolicy("invalid-retention-policy"),
@@ -536,10 +534,6 @@ func TestValidateStatefulSet(t *testing.T) {
 		}
 
 		t.Run(testTitle, func(t *testing.T) {
-			if strings.Contains(name, enableStatefulSetAutoDeletePVC) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
-			}
-
 			errs := ValidateStatefulSet(&testCase.set, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))
 			wantErrs := testCase.errs
 			if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {

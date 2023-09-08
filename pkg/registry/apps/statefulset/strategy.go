@@ -118,11 +118,6 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 //	    newSvc.Spec.MyFeature = nil
 //	}
 func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.StatefulSet) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
-		}
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) && !maxUnavailableInUse(oldSS) {
 		if newSS.Spec.UpdateStrategy.RollingUpdate != nil {
 			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil

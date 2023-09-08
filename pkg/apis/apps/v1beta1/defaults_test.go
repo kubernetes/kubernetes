@@ -221,14 +221,13 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                        string
-		original                    *appsv1beta1.StatefulSet
-		expected                    *appsv1beta1.StatefulSet
-		enableMaxUnavailablePolicy  bool
-		enableStatefulSetAutoDelete bool
+		name                       string
+		original                   *appsv1beta1.StatefulSet
+		expected                   *appsv1beta1.StatefulSet
+		enableMaxUnavailablePolicy bool
 	}{
 		{
-			name: "labels and default update strategy",
+			name: "labels, default update strategy and default pvc retention policy",
 			original: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -245,6 +244,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						RollingUpdate: nil,
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -273,6 +276,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						RollingUpdate: nil,
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -299,6 +306,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						RollingUpdate: nil,
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -323,6 +334,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						RollingUpdate: nil,
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -357,6 +372,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -391,6 +410,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -416,6 +439,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						RollingUpdate: nil,
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					Selector: &metav1.LabelSelector{
 						MatchLabels:      map[string]string{"foo": "bar"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -450,31 +477,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
-					Selector: &metav1.LabelSelector{
-						MatchLabels:      map[string]string{"foo": "bar"},
-						MatchExpressions: []metav1.LabelSelectorRequirement{},
-					},
-				},
-			},
-			enableMaxUnavailablePolicy: true,
-		},
-		{
-			name: "StatefulSetAutoDeletePVC enabled",
-			original: &appsv1beta1.StatefulSet{
-				Spec: appsv1beta1.StatefulSetSpec{
-					Template: defaultTemplate,
-				},
-			},
-			expected: &appsv1beta1.StatefulSet{
-				Spec: appsv1beta1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					Template:            defaultTemplate,
-					PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
-					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
-						Type:          appsv1beta1.OnDeleteStatefulSetStrategyType,
-						RollingUpdate: nil,
-					},
-					RevisionHistoryLimit: ptr.To[int32](10),
 					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
 						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -485,7 +487,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					},
 				},
 			},
-			enableStatefulSetAutoDelete: true,
+			enableMaxUnavailablePolicy: true,
 		},
 	}
 
@@ -493,7 +495,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enableStatefulSetAutoDelete)()
 			obj2 := roundTrip(t, runtime.Object(test.original))
 			got, ok := obj2.(*appsv1beta1.StatefulSet)
 			if !ok {

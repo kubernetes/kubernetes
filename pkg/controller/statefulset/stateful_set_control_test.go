@@ -95,18 +95,6 @@ func setMinReadySeconds(set *apps.StatefulSet, minReadySeconds int32) *apps.Stat
 }
 
 func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(*testing.T, *apps.StatefulSetPersistentVolumeClaimRetentionPolicy)) {
-	subtestName := "StatefulSetAutoDeletePVCDisabled"
-	if testName != "" {
-		subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
-	}
-	t.Run(subtestName, func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)()
-		testFn(t, &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-			WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
-			WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
-		})
-	})
-
 	for _, policy := range []*apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		{
 			WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -127,12 +115,11 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 		// tests the case when no policy is set.
 		nil,
 	} {
-		subtestName := pvcDeletePolicyString(policy) + "/StatefulSetAutoDeletePVCEnabled"
+		subtestName := pvcDeletePolicyString(policy)
 		if testName != "" {
 			subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
 		}
 		t.Run(subtestName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
 			testFn(t, policy)
 		})
 	}
@@ -2828,7 +2815,7 @@ func checkClaimInvarients(set *apps.StatefulSet, pod *v1.Pod, claim *v1.Persiste
 		WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 		WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
 	}
-	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil && utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil {
 		policy = *set.Spec.PersistentVolumeClaimRetentionPolicy
 	}
 	claimShouldBeRetained := policy.WhenScaled == apps.RetainPersistentVolumeClaimRetentionPolicyType

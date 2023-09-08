@@ -253,8 +253,8 @@ type StatefulSetSpec struct {
 	// volume claims are created as needed and retained until manually deleted. This
 	// policy allows the lifecycle to be altered, for example by deleting persistent
 	// volume claims when their stateful set is deleted, or when their pod is scaled
-	// down. This requires the StatefulSetAutoDeletePVC feature gate to be enabled,
-	// which is alpha.  +optional
+	// down.
+	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" protobuf:"bytes,10,opt,name=persistentVolumeClaimRetentionPolicy"`
 
 	// ordinals controls the numbering of replica indices in a StatefulSet. The

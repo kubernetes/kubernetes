@@ -448,7 +448,6 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
 			_, ctx := ktesting.NewTestContext(t)
 			closeFn, rm, informers, c := scSetup(ctx, t)
 			defer closeFn()

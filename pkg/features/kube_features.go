@@ -829,6 +829,7 @@ const (
 	// owner: @mattcary
 	// alpha: v1.22
 	// beta: v1.27
+	// stable: v1.29
 	//
 	// Enables policies controlling deletion of PVCs created by a StatefulSet.
 	StatefulSetAutoDeletePVC featuregate.Feature = "StatefulSetAutoDeletePVC"
@@ -1170,7 +1171,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StableLoadBalancerNodeSet: {Default: true, PreRelease: featuregate.Beta},
 
-	StatefulSetAutoDeletePVC: {Default: true, PreRelease: featuregate.Beta},
+	StatefulSetAutoDeletePVC: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
 
 	StatefulSetStartOrdinal: {Default: true, PreRelease: featuregate.Beta},
 

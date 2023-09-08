@@ -229,8 +229,7 @@ type StatefulSetSpec struct {
 	MinReadySeconds int32
 
 	// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
-	// the StatefulSet VolumeClaimTemplates. This requires the
-	// StatefulSetAutoDeletePVC feature gate to be enabled, which is beta and default on from 1.27.
+	// the StatefulSet VolumeClaimTemplates.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy
 
