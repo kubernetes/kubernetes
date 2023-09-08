@@ -200,8 +200,11 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		o.config.Conntrack.TCPCloseWaitTimeout.Duration,
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
 	fs.Var(&o.conntrackTCPBeLiberal, "conntrack-tcp-be-liberal", "Enable liberal mode for tracking TCP packets by setting nf_conntrack_tcp_be_liberal to 1")
-	fs.DurationVar(&o.config.Conntrack.UDPTimeout.Duration, "conntrack-udp-timeout", o.config.Conntrack.UDPTimeout.Duration, "Idle timeout for UNREPLIED UDP connections (0 to leave as-is)")
-	fs.DurationVar(&o.config.Conntrack.UDPStreamTimeout.Duration, "conntrack-udp-timeout-stream", o.config.Conntrack.UDPStreamTimeout.Duration, "Idle timeout for ASSURED UDP connections (0 to leave as-is)")
+
+	udpTimeout := cliflag.NewMetaDuration(o.config.Conntrack.UDPTimeout)
+	fs.Var(&udpTimeout, "conntrack-udp-timeout", "Idle timeout for UNREPLIED UDP connections")
+	udpStreamTimeout := cliflag.NewMetaDuration(o.config.Conntrack.UDPStreamTimeout)
+	fs.Var(&udpStreamTimeout, "conntrack-udp-timeout-stream", "Idle timeout for ASSURED UDP connections")
 
 	fs.DurationVar(&o.config.ConfigSyncPeriod.Duration, "config-sync-period", o.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
 

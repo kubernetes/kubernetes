@@ -96,11 +96,11 @@ type KubeProxyConntrackConfiguration struct {
 	// udpTimeout is how long an idle UDP conntrack entry in
 	// UNREPLIED state will remain in the conntrack table
 	// (e.g. '30s'). Must be greater than 0 to set.
-	UDPTimeout metav1.Duration
+	UDPTimeout *metav1.Duration
 	// udpStreamTimeout is how long an idle UDP conntrack entry in
 	// ASSURED state will remain in the conntrack table
 	// (e.g. '300s'). Must be greater than 0 to set.
-	UDPStreamTimeout metav1.Duration
+	UDPStreamTimeout *metav1.Duration
 }
 
 // KubeProxyWinkernelConfiguration contains Windows/HNS settings for

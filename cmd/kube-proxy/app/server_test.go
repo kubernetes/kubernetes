@@ -469,11 +469,40 @@ kind: KubeProxyConfiguration
 				return c
 			}(),
 		},
+		"udptimeout-config": {
+			config: header + "\nconntrack:\n  udpTimeout: 1s",
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Conntrack.UDPTimeout = &metav1.Duration{Duration: 1 * time.Second}
+				return c
+			}(),
+		},
+		"flag udptimeout": {
+			flags: []string{"--conntrack-udp-timeout=5s"},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Conntrack.UDPTimeout = &metav1.Duration{Duration: 5 * time.Second}
+				return c
+			}(),
+		},
+		"both udp timeout": {
+			config: header + "\nconntrack:\n  udpTimeout: 1s",
+			flags:  []string{"--conntrack-udp-timeout=5s"},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Conntrack.UDPTimeout = &metav1.Duration{Duration: 5 * time.Second}
+				return c
+			}(),
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			options := NewOptions()
 			fs := new(pflag.FlagSet)
+			t.Logf("Config before flags %+v", options.config.Conntrack.UDPTimeout)
+
 			options.AddFlags(fs)
+
+			t.Logf("Config after flags %+v", options.config.Conntrack.UDPTimeout)
 			flags := tc.flags
 			if len(tc.config) > 0 {
 				tmp := t.TempDir()
@@ -481,8 +510,16 @@ kind: KubeProxyConfiguration
 				require.NoError(t, ioutil.WriteFile(configFile, []byte(tc.config), 0666))
 				flags = append(flags, "--config", configFile)
 			}
+			t.Logf("Config after reading config file %+v", options.config.Conntrack.UDPTimeout)
+
 			require.NoError(t, fs.Parse(flags))
+
+			t.Logf("Config after parsing flags %+v", options.config.Conntrack.UDPTimeout)
+
 			require.NoError(t, options.Complete(fs))
+
+			t.Logf("Config after complete %+v", options.config.Conntrack.UDPTimeout)
+
 			assert.Equal(t, tc.expected, options.config)
 		})
 	}

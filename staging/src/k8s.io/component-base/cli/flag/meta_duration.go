@@ -62,5 +62,5 @@ func (m *MetaDuration) Set(val string) error {
 
 // Type implements github.com/spf13/pflag.Value
 func (m *MetaDuration) Type() string {
-	return "metav1.Duration"
+	return "duration"
 }

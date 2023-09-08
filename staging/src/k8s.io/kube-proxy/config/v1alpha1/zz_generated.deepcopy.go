@@ -120,8 +120,16 @@ func (in *KubeProxyConntrackConfiguration) DeepCopyInto(out *KubeProxyConntrackC
 		*out = new(bool)
 		**out = **in
 	}
-	out.UDPTimeout = in.UDPTimeout
-	out.UDPStreamTimeout = in.UDPStreamTimeout
+	if in.UDPTimeout != nil {
+		in, out := &in.UDPTimeout, &out.UDPTimeout
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.UDPStreamTimeout != nil {
+		in, out := &in.UDPStreamTimeout, &out.UDPStreamTimeout
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 
