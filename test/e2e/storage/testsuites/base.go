@@ -61,7 +61,7 @@ var BaseSuites = []func() storageframework.TestSuite{
 	InitVolumeModeTestSuite,
 	InitSubPathTestSuite,
 	InitProvisioningTestSuite,
-	InitPvDeleteionProtectionTestSuite,
+	InitPvDeletionProtectionTestSuite,
 	InitMultiVolumeTestSuite,
 	InitVolumeExpandTestSuite,
 	InitDisruptiveTestSuite,

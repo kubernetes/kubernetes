@@ -875,13 +875,7 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, co
 	if fsType != "" {
 		parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
-	var delayedBinding storagev1.VolumeBindingMode
-	if g.driverInfo.FeatureTag != "[Feature:HonorPVReclaimPolicy]" {
-		delayedBinding = storagev1.VolumeBindingWaitForFirstConsumer
-	} else {
-		framework.Logf("Using immediate volume binding mode for %q", g.driverInfo.Name)
-	}
-
+	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 

@@ -395,6 +395,13 @@ var (
 		VolType:     DynamicPV,
 		BindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
 	}
+
+	VolumeDeletion = TestPattern{
+		Name:       "Volume Deletion",
+		VolType:    DynamicPV,
+		FeatureTag: "[Feature:HonorPVReclaimPolicy]",
+		VolMode:    v1.PersistentVolumeBlock,
+	}
 )
 
 // NewVolTypeMap creates a map with the given TestVolTypes enabled

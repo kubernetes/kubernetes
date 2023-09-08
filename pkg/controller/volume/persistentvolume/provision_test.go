@@ -602,14 +602,20 @@ func TestProvisionMultiSync(t *testing.T) {
 	tests := []controllerTest{
 		{
 			// Provision a volume with binding
-			name:            "12-1 - successful provision",
-			initialVolumes:  novolumes,
-			expectedVolumes: newVolumeArray("pvc-uid12-1", "1Gi", "uid12-1", "claim12-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned),
-			initialClaims:   newClaimArray("claim12-1", "uid12-1", "1Gi", "", v1.ClaimPending, &classGold),
-			expectedClaims:  newClaimArray("claim12-1", "uid12-1", "1Gi", "pvc-uid12-1", v1.ClaimBound, &classGold, volume.AnnBoundByController, volume.AnnBindCompleted, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
-			expectedEvents:  noevents,
-			errors:          noerrors,
-			test:            wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			name:           "12-1 - successful provision",
+			initialVolumes: novolumes,
+			expectedVolumes: func() []*v1.PersistentVolume {
+				if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+					return volumesWithFinalizers(newVolumeArray("pvc-uid12-1", "1Gi", "uid12-1", "claim12-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned), []string{volume.PVDeletionInTreeProtectionFinalizer})
+				} else {
+					return newVolumeArray("pvc-uid12-1", "1Gi", "uid12-1", "claim12-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned)
+				}
+			}(),
+			initialClaims:  newClaimArray("claim12-1", "uid12-1", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims: newClaimArray("claim12-1", "uid12-1", "1Gi", "pvc-uid12-1", v1.ClaimBound, &classGold, volume.AnnBoundByController, volume.AnnBindCompleted, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents: noevents,
+			errors:         noerrors,
+			test:           wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// provision a volume (external provisioner) and binding + normal event with external provisioner

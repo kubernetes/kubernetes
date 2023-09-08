@@ -75,15 +75,13 @@ func InitTestSuite(patterns []storageframework.TestPattern) storageframework.Tes
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
-			FeatureTag: "[Feature:HonorPVReclaimPolicy]",
 		},
 	}
 }
 
-func InitPvDeleteionProtectionTestSuite() storageframework.TestSuite {
+func InitPvDeletionProtectionTestSuite() storageframework.TestSuite {
 	patterns := []storageframework.TestPattern{
-		storageframework.DefaultFsDynamicPV,
-		storageframework.BlockVolModeDynamicPV,
+		storageframework.VolumeDeletion,
 	}
 	return InitTestSuite(patterns)
 }
@@ -139,6 +137,9 @@ func (p *pvDeleteionProtectionTestSuite) DefineTests(driver storageframework.Tes
 		if l.sc == nil {
 			e2eskipper.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 		}
+		// explicitly set the volume binding mode to immediate.
+		immediateBinding := storagev1.VolumeBindingImmediate
+		l.sc.VolumeBindingMode = &immediateBinding
 		framework.Logf("GetDynamicProvisionStorageClass %q", l.sc)
 		l.pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        claimSize,
@@ -166,7 +167,7 @@ func (p *pvDeleteionProtectionTestSuite) DefineTests(driver storageframework.Tes
 		}
 	}
 
-	ginkgo.It("honor pv reclaim policy delete pv prior", func(ctx context.Context) {
+	ginkgo.It("HonorPVReclaimPolicy delete pv prior", func(ctx context.Context) {
 		init(ctx)
 		SetupStorageClass(ctx, l.testCase.Client, l.testCase.Class)
 		l.testCase.TestVolumeDeletion(ctx)
