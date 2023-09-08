@@ -40,7 +40,7 @@ import (
 
 const (
 	// pvDeletionInTreeProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
-	pvDeletionInTreeProtectionFinalizer = "kubernetes.io/pv-controller"
+	pvDeletionInTreeProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
 )
 
 type VolumeDeletionTest struct {
@@ -89,6 +89,7 @@ func (p *pvDeleteionProtectionTestSuite) SkipUnsupportedTests(driver storagefram
 		e2eskipper.Skipf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
 	}
 	dInfo := driver.GetDriverInfo()
+
 	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageframework.CapBlock] {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
 	}
