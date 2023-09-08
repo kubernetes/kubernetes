@@ -163,6 +163,10 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 		"Metric": gstruct.Ignore(),
 		"Value":  gomega.And(gomega.BeNumerically(">=", lower), gomega.BeNumerically("<=", upper)),
 		"Timestamp": gomega.WithTransform(func(t model.Time) time.Time {
+			if t.Unix() <= 0 {
+				return time.Now()
+			}
+
 			// model.Time is in Milliseconds since epoch
 			return time.Unix(0, int64(t)*int64(time.Millisecond))
 		},
