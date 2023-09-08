@@ -17,6 +17,8 @@ limitations under the License.
 package featuregate
 
 import (
+	"bytes"
+	"flag"
 	"fmt"
 	"strings"
 	"testing"
@@ -207,16 +209,49 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		t.Run(test.arg, func(t *testing.T) {
+		t.Run(fmt.Sprintf("AddFlag/%s", test.arg), func(t *testing.T) {
 			fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
 			f := NewFeatureGate()
-			f.Add(map[Feature]FeatureSpec{
+			err := f.Add(map[Feature]FeatureSpec{
 				testAlphaGate: {Default: false, PreRelease: Alpha},
 				testBetaGate:  {Default: false, PreRelease: Beta},
 			})
+			if err != nil {
+				t.Errorf("%d: f.Add() Expected nil, Got %v", i, err)
+			}
 			f.AddFlag(fs)
 
-			err := fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})
+			err = fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})
+			if test.parseError != "" {
+				if !strings.Contains(err.Error(), test.parseError) {
+					t.Errorf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)
+				}
+			} else if err != nil {
+				t.Errorf("%d: Parse() Expected nil, Got %v", i, err)
+			}
+			for k, v := range test.expect {
+				if actual := f.enabled.Load().(map[Feature]bool)[k]; actual != v {
+					t.Errorf("%d: expected %s=%v, Got %v", i, k, v, actual)
+				}
+			}
+		})
+	}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("AddGoFlag/%s", test.arg), func(t *testing.T) {
+			var output bytes.Buffer
+			fs := flag.NewFlagSet("testfeaturegateflag", flag.ContinueOnError)
+			fs.SetOutput(&output)
+			f := NewFeatureGate()
+			err := f.Add(map[Feature]FeatureSpec{
+				testAlphaGate: {Default: false, PreRelease: Alpha},
+				testBetaGate:  {Default: false, PreRelease: Beta},
+			})
+			if err != nil {
+				t.Errorf("%d: f.Add() Expected nil, Got %v", i, err)
+			}
+			f.AddGoFlag(fs)
+
+			err = fs.Parse([]string{fmt.Sprintf("-%s", flagName), test.arg})
 			if test.parseError != "" {
 				if !strings.Contains(err.Error(), test.parseError) {
 					t.Errorf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)
