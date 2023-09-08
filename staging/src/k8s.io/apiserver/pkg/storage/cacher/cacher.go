@@ -529,17 +529,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, errors.NewServiceUnavailable(err.Error())
 	}
 
-	// determine the namespace and name scope of the watch, first from the request, secondarily from the field selector
-	scope := namespacedName{}
-	if requestNamespace, ok := request.NamespaceFrom(ctx); ok && len(requestNamespace) > 0 {
-		scope.namespace = requestNamespace
-	} else if selectorNamespace, ok := pred.Field.RequiresExactMatch("metadata.namespace"); ok {
-		scope.namespace = selectorNamespace
-	}
-	if requestInfo, ok := request.RequestInfoFrom(ctx); ok && requestInfo != nil && len(requestInfo.Name) > 0 {
+	var scope namespacedName
+	if requestInfo, ok := request.RequestInfoFrom(ctx); ok {
+		scope.namespace = requestInfo.Namespace
 		scope.name = requestInfo.Name
-	} else if selectorName, ok := pred.Field.RequiresExactMatch("metadata.name"); ok {
-		scope.name = selectorName
 	}
 
 	triggerValue, triggerSupported := "", false
