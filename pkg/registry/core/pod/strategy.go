@@ -664,6 +664,43 @@ func PortForwardLocation(
 	return loc, nodeInfo.Transport, nil
 }
 
+// CheckpointLocation returns the checkpoint URL for a container.
+func CheckpointLocation(
+	ctx context.Context,
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	name string,
+	opts *api.PodCheckpointOptions,
+) (*url.URL, http.RoundTripper, error) {
+	pod, err := getPod(ctx, getter, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Try to figure out a container
+	// If a container was provided, it must be valid
+	container, err := validateContainer(opts.Container, pod)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodeName := types.NodeName(pod.Spec.NodeName)
+	if len(nodeName) == 0 {
+		// If pod has not been assigned a host, return an empty location
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
+	}
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
+	if err != nil {
+		return nil, nil, err
+	}
+	loc := &url.URL{
+		Scheme: nodeInfo.Scheme,
+		Host:   net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
+		Path:   fmt.Sprintf("/checkpoint/%s/%s/%s", pod.Namespace, pod.Name, container),
+	}
+	return loc, nodeInfo.Transport, nil
+}
+
 // validateContainer validate container is valid for pod, return valid container
 func validateContainer(container string, pod *api.Pod) (string, error) {
 	if len(container) == 0 {

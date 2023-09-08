@@ -19137,6 +19137,13 @@
       "type": "string",
       "uniqueItems": true
     },
+    "container-8Aue7E3J": {
+      "description": "Container which to checkpoint Defaults to the only container if there is only one container in the pod.",
+      "in": "query",
+      "name": "container",
+      "type": "string",
+      "uniqueItems": true
+    },
     "container-_Q-EJ3nR": {
       "description": "The container in which to execute the command. Defaults to only container if there is only one container in the pod.",
       "in": "query",
@@ -23452,6 +23459,57 @@
         "x-kubernetes-group-version-kind": {
           "group": "",
           "kind": "Binding",
+          "version": "v1"
+        }
+      }
+    },
+    "/api/v1/namespaces/{namespace}/pods/{name}/checkpoint": {
+      "parameters": [
+        {
+          "$ref": "#/parameters/container-8Aue7E3J"
+        },
+        {
+          "description": "name of the PodCheckpointOptions",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/namespace-vgWSWtn3"
+        }
+      ],
+      "post": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "connect POST requests to checkpoint of Pod",
+        "operationId": "connectCoreV1PostNamespacedPodCheckpoint",
+        "produces": [
+          "*/*"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "connect",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "PodCheckpointOptions",
           "version": "v1"
         }
       }

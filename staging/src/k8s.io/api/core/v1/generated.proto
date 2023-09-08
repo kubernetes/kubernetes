@@ -3587,6 +3587,14 @@ message PodAttachOptions {
   optional string container = 5;
 }
 
+// PodCheckpointOptions is the query options to checkpoint a container
+message PodCheckpointOptions {
+  // Container which to checkpoint
+  // Defaults to the only container if there is only one container in the pod.
+  // +optional
+  optional string container = 1;
+}
+
 // PodCondition contains details for the current condition of this pod.
 message PodCondition {
   // Type is the type of the condition.

@@ -255,3 +255,47 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }
+
+// CheckpointREST implements the checkpoint subresource for a Pod
+type CheckpointREST struct {
+	Store       *genericregistry.Store
+	KubeletConn client.ConnectionInfoGetter
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&CheckpointREST{})
+
+// New returns an empty podPortForwardOptions object
+func (r *CheckpointREST) New() runtime.Object {
+	return &api.PodCheckpointOptions{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *CheckpointREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
+// NewConnectOptions returns the versioned object that represents the
+// portforward parameters
+func (r *CheckpointREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return &api.PodCheckpointOptions{}, false, ""
+}
+
+// ConnectMethods returns the methods supported by checkpoint
+func (r *CheckpointREST) ConnectMethods() []string {
+	return []string{"POST"}
+}
+
+// Connect returns a handler for the pod portforward proxy
+func (r *CheckpointREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	checkpointOpts, ok := opts.(*api.PodCheckpointOptions)
+	if !ok {
+		return nil, fmt.Errorf("invalid options object: %#v", opts)
+	}
+	location, transport, err := pod.CheckpointLocation(ctx, r.Store, r.KubeletConn, name, checkpointOpts)
+	if err != nil {
+		return nil, err
+	}
+	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder), nil
+}

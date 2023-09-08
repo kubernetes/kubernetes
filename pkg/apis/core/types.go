@@ -5396,6 +5396,16 @@ type PodPortForwardOptions struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// PodCheckpointOptions is the query options to checkpoint a container
+type PodCheckpointOptions struct {
+	metav1.TypeMeta
+
+	// Container which to checkpoint
+	Container string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PodProxyOptions is the query options to a Pod's proxy call
 type PodProxyOptions struct {
 	metav1.TypeMeta

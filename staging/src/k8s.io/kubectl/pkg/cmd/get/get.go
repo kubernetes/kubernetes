@@ -455,7 +455,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		chunkSize = 0
 	}
 
-	r := f.NewBuilder().
+	t := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
@@ -467,8 +467,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		ContinueOnError().
 		Latest().
 		Flatten().
-		TransformRequests(o.transformRequests).
-		Do()
+		TransformRequests(o.transformRequests)
+
+	r := t.Do()
 
 	if o.IgnoreNotFound {
 		r.IgnoreErrors(apierrors.IsNotFound)

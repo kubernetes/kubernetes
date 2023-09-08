@@ -241,6 +241,9 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 			storage[resource+"/eviction"] = podStorage.Eviction
 		}
 		storage[resource+"/ephemeralcontainers"] = podStorage.EphemeralContainers
+		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
+			storage[resource+"/checkpoint"] = podStorage.Checkpoint
+		}
 	}
 	if resource := "bindings"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		storage[resource] = podStorage.LegacyBinding
