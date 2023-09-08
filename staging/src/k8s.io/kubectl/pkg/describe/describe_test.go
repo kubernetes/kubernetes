@@ -2080,7 +2080,8 @@ func TestGetPodsForPVC(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			objects := append(test.requiredObjects, test.pvc)
+			objects := test.requiredObjects[:]
+			objects = append(objects, test.pvc)
 			fake := fake.NewSimpleClientset(objects...)
 
 			pods, err := getPodsForPVC(fake.CoreV1().Pods(test.pvc.ObjectMeta.Namespace), test.pvc, DescriberSettings{})
