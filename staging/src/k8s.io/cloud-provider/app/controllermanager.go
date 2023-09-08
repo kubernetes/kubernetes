@@ -150,11 +150,13 @@ the cloud specific control loops shipped with Kubernetes.`,
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
 		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
 		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
+		cliflag.PrintSections(cmd.OutOrStderr(), additionalFlags, cols)
 		return nil
 	})
 	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
 		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
+		cliflag.PrintSections(cmd.OutOrStdout(), additionalFlags, cols)
 	})
 
 	return cmd
