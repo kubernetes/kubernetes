@@ -875,7 +875,12 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, co
 	if fsType != "" {
 		parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
-	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
+	var delayedBinding storagev1.VolumeBindingMode
+	if g.driverInfo.FeatureTag != "[Feature:HonorPVReclaimPolicy]" {
+		delayedBinding = storagev1.VolumeBindingWaitForFirstConsumer
+	} else {
+		framework.Logf("Using immediate volume binding mode for %q", g.driverInfo.Name)
+	}
 
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
@@ -927,8 +932,21 @@ func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework
 		"test/e2e/testing-manifests/storage-csi/gce-pd/node_ds.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	}
+	o := utils.PatchCSIOptions{
+		ProvisionerContainerName: "csi-provisioner",
+		Features:                 map[string][]string{},
+	}
 
-	err := utils.CreateFromManifests(ctx, f, driverNamespace, nil, manifests...)
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HonorPVReclaimPolicy) {
+		o.Features["csi-provisioner"] = []string{"HonorPVReclaimPolicy=true"}
+	}
+
+	err := utils.CreateFromManifests(ctx, f, driverNamespace, func(item interface{}) error {
+		if err := utils.PatchCSIDeployment(f, o, item); err != nil {
+			return err
+		}
+		return nil
+	}, manifests...)
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}

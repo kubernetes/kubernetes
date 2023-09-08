@@ -39,22 +39,26 @@ import (
 )
 
 const (
-	// pvDeletionProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
-	pvDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
+	// pvCSIDeletionProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
+	pvCSIDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
+
+	// pvInTreeDeletionProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
+	pvInTreeDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
 )
 
 type VolumeDeletionTest struct {
-	Client         clientset.Interface
-	Timeouts       *framework.TimeoutContext
-	Claim          *v1.PersistentVolumeClaim
-	Class          *storagev1.StorageClass
-	Name           string
-	CloudProviders []string
-	Provisioner    string
-	Parameters     map[string]string
-	DelayBinding   bool
-	ClaimSize      string
-	ExpectedSize   string
+	Client            clientset.Interface
+	Timeouts          *framework.TimeoutContext
+	Claim             *v1.PersistentVolumeClaim
+	Class             *storagev1.StorageClass
+	Name              string
+	CloudProviders    []string
+	Provisioner       string
+	Parameters        map[string]string
+	DelayBinding      bool
+	ClaimSize         string
+	ExpectedSize      string
+	ExpectedFinalizer string
 }
 
 type pvDeleteionProtectionTestSuite struct {
@@ -71,6 +75,7 @@ func InitTestSuite(patterns []storageframework.TestPattern) storageframework.Tes
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
+			FeatureTag: "[Feature:HonorPVReclaimPolicy]",
 		},
 	}
 }
@@ -134,6 +139,7 @@ func (p *pvDeleteionProtectionTestSuite) DefineTests(driver storageframework.Tes
 		if l.sc == nil {
 			e2eskipper.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 		}
+		framework.Logf("GetDynamicProvisionStorageClass %q", l.sc)
 		l.pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        claimSize,
 			StorageClassName: &(l.sc.Name),
@@ -149,9 +155,18 @@ func (p *pvDeleteionProtectionTestSuite) DefineTests(driver storageframework.Tes
 			ClaimSize:    claimSize,
 			ExpectedSize: claimSize,
 		}
+
+		// Different finalizers are expected for in-tree and csi volumes
+		if len(dDriver.GetDriverInfo().InTreePluginName) != 0 {
+			// In Tree
+			l.testCase.ExpectedFinalizer = pvInTreeDeletionProtectionFinalizer
+		} else {
+			// CSI
+			l.testCase.ExpectedFinalizer = pvCSIDeletionProtectionFinalizer
+		}
 	}
 
-	ginkgo.It("HonorPVReclaimPolicy delete pv prior", func(ctx context.Context) {
+	ginkgo.It("honor pv reclaim policy delete pv prior", func(ctx context.Context) {
 		init(ctx)
 		SetupStorageClass(ctx, l.testCase.Client, l.testCase.Class)
 		l.testCase.TestVolumeDeletion(ctx)
@@ -169,6 +184,7 @@ func (t VolumeDeletionTest) TestVolumeDeletion(ctx context.Context) *v1.Persiste
 	gomega.Expect(class).NotTo(gomega.BeNil(), "VolumeDeletionTest.Class is required")
 	class, err = client.StorageV1().StorageClasses().Get(ctx, class.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "VolumeDeletionTest.Class "+class.Name+" couldn't be fetched from the cluster")
+	framework.Logf("class retrieved %q", class.Name)
 
 	ginkgo.By(fmt.Sprintf("creating claim=%+v", claim))
 	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
@@ -202,16 +218,16 @@ func (t VolumeDeletionTest) checkVolumeDeletion(ctx context.Context, client clie
 	pv, err := client.CoreV1().PersistentVolumes().Get(ctx, pvcBound.Spec.VolumeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.By(fmt.Sprintf("Wait for finalizer %s to be added to pv %s", pvDeletionProtectionFinalizer, pv.Name))
-	pv, err = e2epv.WaitForPVFinalizer(ctx, client, pv.Name, pvDeletionProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
+	ginkgo.By(fmt.Sprintf("Wait for finalizer %s to be added to pv %s", pvCSIDeletionProtectionFinalizer, pv.Name))
+	pv, err = e2epv.WaitForPVFinalizer(ctx, client, pv.Name, t.ExpectedFinalizer, 1*time.Millisecond, 1*time.Minute)
 	framework.ExpectNoError(err)
-	framework.Logf("finalizer %q found on pv %q", pvDeletionProtectionFinalizer, pv.Name)
+	framework.Logf("finalizer %q found on pv %q", t.ExpectedFinalizer, pv.Name)
 	framework.Logf("Persistent Volume: %+v", pv)
 
 	ginkgo.By("Delete pv")
 	err = e2epv.DeletePersistentVolume(ctx, client, pv.Name)
 	framework.ExpectNoError(err)
-	framework.Logf("pv %q deleted", pvDeletionProtectionFinalizer, pv.Name)
+	framework.Logf("pv %q deleted", pv.Name)
 
 	ginkgo.By("Delete pvc")
 	err = e2epv.DeletePersistentVolumeClaim(ctx, client, claim.Name, claim.Namespace)
