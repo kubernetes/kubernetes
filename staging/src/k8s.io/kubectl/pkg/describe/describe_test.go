@@ -2080,7 +2080,8 @@ func TestGetPodsForPVC(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			objects := test.requiredObjects[:]
+			var objects []runtime.Object
+			objects = append(objects, test.requiredObjects...)
 			objects = append(objects, test.pvc)
 			fake := fake.NewSimpleClientset(objects...)
 
