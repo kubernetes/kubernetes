@@ -97,8 +97,12 @@ type NetworkPolicySpec struct {
 	// an egress section and would otherwise default to just [ "Ingress" ]).
 	// This field is beta-level in 1.8
 	// +optional
+	// +default=ref(DefaultPolicyTypes())
 	PolicyTypes []PolicyType `json:"policyTypes,omitempty" protobuf:"bytes,4,rep,name=policyTypes,casttype=PolicyType"`
 }
+
+// TODO: Figure out better way of slice defaults without sharing references
+func DefaultPolicyTypes() []PolicyType { return []PolicyType{PolicyTypeIngress} }
 
 // NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods
 // matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and from.
@@ -146,6 +150,7 @@ type NetworkPolicyPort struct {
 	// protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
 	// If not specified, this field defaults to TCP.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.ProtocolTCP)
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
 
 	// port represents the port on the given protocol. This can either be a numerical or named
@@ -597,6 +602,7 @@ type IngressClassParametersReference struct {
 	// scope represents if this refers to a cluster or namespace scoped resource.
 	// This may be set to "Cluster" (default) or "Namespace".
 	// +optional
+	// +default=ref(IngressClassParametersReferenceScopeCluster)
 	Scope *string `json:"scope" protobuf:"bytes,4,opt,name=scope"`
 
 	// namespace is the namespace of the resource being referenced. This field is

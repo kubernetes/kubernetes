@@ -58,6 +58,7 @@ type HorizontalPodAutoscalerSpec struct {
 	// metric is configured.  Scaling is active as long as at least one metric value is
 	// available.
 	// +optional
+	// +default=1
 	MinReplicas *int32 `json:"minReplicas,omitempty" protobuf:"varint,2,opt,name=minReplicas"`
 
 	// maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
@@ -74,6 +75,8 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default metric will be set to 80% average CPU utilization.
 	// +listType=atomic
 	// +optional
+	//!TODO: not this?
+	// +default=[{"type": "Resource", "resource": {"name": "cpu", "target": {"type": "Utilization", "averageUtilization": 80}}}]
 	Metrics []MetricSpec `json:"metrics,omitempty" protobuf:"bytes,4,rep,name=metrics"`
 
 	// behavior configures the scaling behavior of the target
@@ -192,6 +195,7 @@ type HPAScalingRules struct {
 	// selectPolicy is used to specify which policy should be used.
 	// If not set, the default value Max is used.
 	// +optional
+	// +default=ref(MaxChangePolicySelect)
 	SelectPolicy *ScalingPolicySelect `json:"selectPolicy,omitempty" protobuf:"bytes,1,opt,name=selectPolicy"`
 
 	// policies is a list of potential scaling polices which can be used during scaling.

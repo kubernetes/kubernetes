@@ -635,11 +635,13 @@ type CronJobSpec struct {
 	// - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
 	// - "Replace": cancels currently running job and replaces it with a new one
 	// +optional
+	// +default=ref(AllowConcurrent)
 	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty" protobuf:"bytes,3,opt,name=concurrencyPolicy,casttype=ConcurrencyPolicy"`
 
 	// This flag tells the controller to suspend subsequent executions, it does
 	// not apply to already started executions.  Defaults to false.
 	// +optional
+	// +default=false
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
 	// Specifies the job that will be created when executing a CronJob.
@@ -648,11 +650,13 @@ type CronJobSpec struct {
 	// The number of successful finished jobs to retain. Value must be non-negative integer.
 	// Defaults to 3.
 	// +optional
+	// +default=3
 	SuccessfulJobsHistoryLimit *int32 `json:"successfulJobsHistoryLimit,omitempty" protobuf:"varint,6,opt,name=successfulJobsHistoryLimit"`
 
 	// The number of failed finished jobs to retain. Value must be non-negative integer.
 	// Defaults to 1.
 	// +optional
+	// +default=1
 	FailedJobsHistoryLimit *int32 `json:"failedJobsHistoryLimit,omitempty" protobuf:"varint,7,opt,name=failedJobsHistoryLimit"`
 }
 

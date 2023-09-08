@@ -63,6 +63,7 @@ type Rule struct {
 	// Default is "*".
 	//
 	// +optional
+	// +default=ref(AllScopes)
 	Scope *ScopeType `json:"scope,omitempty" protobuf:"bytes,4,rep,name=scope"`
 }
 
@@ -204,6 +205,7 @@ type ValidatingWebhook struct {
 	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
 	// allowed values are Ignore or Fail. Defaults to Fail.
 	// +optional
+	// +default=ref(Fail)
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
 
 	// matchPolicy defines how the "rules" list is used to match incoming requests.
@@ -221,6 +223,7 @@ type ValidatingWebhook struct {
 	//
 	// Defaults to "Equivalent"
 	// +optional
+	// +default=ref(Equivalent)
 	MatchPolicy *MatchPolicyType `json:"matchPolicy,omitempty" protobuf:"bytes,9,opt,name=matchPolicy,casttype=MatchPolicyType"`
 
 	// NamespaceSelector decides whether to run the webhook on an object based
@@ -267,6 +270,7 @@ type ValidatingWebhook struct {
 	//
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
+	// +default={}
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
 
 	// ObjectSelector decides whether to run the webhook based on if the
@@ -281,6 +285,7 @@ type ValidatingWebhook struct {
 	// users may skip the admission webhook by setting the labels.
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
+	// +default={}
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,10,opt,name=objectSelector"`
 
 	// SideEffects states whether this webhook has side effects.
@@ -297,6 +302,7 @@ type ValidatingWebhook struct {
 	// The timeout value must be between 1 and 30 seconds.
 	// Default to 10 seconds.
 	// +optional
+	// +default=10
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
 
 	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
@@ -355,6 +361,7 @@ type MutatingWebhook struct {
 	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
 	// allowed values are Ignore or Fail. Defaults to Fail.
 	// +optional
+	// +default=ref(Fail)
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
 
 	// matchPolicy defines how the "rules" list is used to match incoming requests.
@@ -372,6 +379,7 @@ type MutatingWebhook struct {
 	//
 	// Defaults to "Equivalent"
 	// +optional
+	// +default=ref(Equivalent)
 	MatchPolicy *MatchPolicyType `json:"matchPolicy,omitempty" protobuf:"bytes,9,opt,name=matchPolicy,casttype=MatchPolicyType"`
 
 	// NamespaceSelector decides whether to run the webhook on an object based
@@ -418,6 +426,7 @@ type MutatingWebhook struct {
 	//
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
+	// +default={}
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
 
 	// ObjectSelector decides whether to run the webhook based on if the
@@ -432,6 +441,7 @@ type MutatingWebhook struct {
 	// users may skip the admission webhook by setting the labels.
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
+	// +default={}
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,11,opt,name=objectSelector"`
 
 	// SideEffects states whether this webhook has side effects.
@@ -448,6 +458,7 @@ type MutatingWebhook struct {
 	// The timeout value must be between 1 and 30 seconds.
 	// Default to 10 seconds.
 	// +optional
+	// +default=10
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
 
 	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
@@ -475,6 +486,7 @@ type MutatingWebhook struct {
 	//
 	// Defaults to "Never".
 	// +optional
+	// +default=ref(NeverReinvocationPolicy)
 	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,10,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
 
 	// MatchConditions is a list of conditions that must be met for a request to be sent to this
@@ -605,6 +617,7 @@ type ServiceReference struct {
 	// Default to 443 for backward compatibility.
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
+	// +default=443
 	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
 }
 

@@ -67,6 +67,7 @@ type ResourceClaimSpec struct {
 	// Allocation can start immediately or when a Pod wants to use the
 	// resource. "WaitForFirstConsumer" is the default.
 	// +optional
+	// +default=ref(AllocationModeWaitForFirstConsumer)
 	AllocationMode AllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,3,opt,name=allocationMode"`
 }
 

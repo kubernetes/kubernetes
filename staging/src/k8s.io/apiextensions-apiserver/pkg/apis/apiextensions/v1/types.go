@@ -60,6 +60,7 @@ type CustomResourceDefinitionSpec struct {
 
 	// conversion defines conversion settings for the CRD.
 	// +optional
+	// +default={}
 	Conversion *CustomResourceConversion `json:"conversion,omitempty" protobuf:"bytes,9,opt,name=conversion"`
 
 	// preserveUnknownFields indicates that object fields which are not specified
@@ -77,6 +78,7 @@ type CustomResourceConversion struct {
 	// - `"None"`: The converter only change the apiVersion and would not touch any other field in the custom resource.
 	// - `"Webhook"`: API Server will call to an external webhook to do the conversion. Additional information
 	//   is needed for this option. This requires spec.preserveUnknownFields to be false, and spec.conversion.webhook to be set.
+	// +default=ref(NoneConverter)
 	Strategy ConversionStrategyType `json:"strategy" protobuf:"bytes,1,name=strategy"`
 
 	// webhook describes how to call the conversion webhook. Required when `strategy` is set to `"Webhook"`.
@@ -161,6 +163,7 @@ type ServiceReference struct {
 	// `port` should be a valid port number (1-65535, inclusive).
 	// Defaults to 443 for backward compatibility.
 	// +optional
+	// +default=443
 	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
 }
 

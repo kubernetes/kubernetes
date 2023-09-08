@@ -182,6 +182,7 @@ type ValidatingAdmissionPolicySpec struct {
 	//
 	// Allowed values are Ignore or Fail. Defaults to Fail.
 	// +optional
+	// +default=ref(Fail)
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
 
 	// auditAnnotations contains CEL expressions which are used to produce audit
@@ -524,6 +525,7 @@ type ParamRef struct {
 	// Allowed values are `Allow` or `Deny`
 	// Default to `Deny`
 	// +optional
+	// +default=ref(DenyAction)
 	ParameterNotFoundAction *ParameterNotFoundActionType `json:"parameterNotFoundAction,omitempty" protobuf:"bytes,4,rep,name=parameterNotFoundAction"`
 }
 
@@ -576,6 +578,7 @@ type MatchResources struct {
 	//
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
+	// +default={}
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,1,opt,name=namespaceSelector"`
 	// ObjectSelector decides whether to run the validation based on if the
 	// object has matching labels. objectSelector is evaluated against both
@@ -589,6 +592,7 @@ type MatchResources struct {
 	// users may skip the admission webhook by setting the labels.
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
+	// +default={}
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,2,opt,name=objectSelector"`
 	// ResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy matches.
 	// The policy cares about an operation if it matches _any_ Rule.
@@ -615,6 +619,7 @@ type MatchResources struct {
 	//
 	// Defaults to "Equivalent"
 	// +optional
+	// +default=ref(Equivalent)
 	MatchPolicy *MatchPolicyType `json:"matchPolicy,omitempty" protobuf:"bytes,7,opt,name=matchPolicy,casttype=MatchPolicyType"`
 }
 

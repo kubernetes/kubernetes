@@ -345,6 +345,7 @@ type PersistentVolumeSpec struct {
 	// Recycle must be supported by the volume plugin underlying this PersistentVolume.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming
 	// +optional
+	// +default=ref(PersistentVolumeReclaimRetain)
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
 	// storageClassName is the name of StorageClass to which this persistent volume belongs. Empty value
 	// means that this volume does not belong to any StorageClass.
@@ -358,6 +359,7 @@ type PersistentVolumeSpec struct {
 	// volumeMode defines if a volume is intended to be used with a formatted filesystem
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
 	// +optional
+	//XXX TODO: shared with other types :( +default=ref(PersistentVolumeFilesystem)
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// nodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 	// This field influences the scheduling of pods that use this volume.
@@ -403,6 +405,7 @@ type PersistentVolumeStatus struct {
 	// phase indicates if a volume is available, bound to a claim, or released by a claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase
 	// +optional
+	// +default=ref(VolumePending)
 	Phase PersistentVolumePhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=PersistentVolumePhase"`
 	// message is a human-readable message indicating details about why the volume is in this state.
 	// +optional
@@ -497,6 +500,7 @@ type PersistentVolumeClaimSpec struct {
 	// volumeMode defines what type of volume is required by the claim.
 	// Value of Filesystem is implied when not included in claim spec.
 	// +optional
+	// +default=ref(PersistentVolumeFilesystem)
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// dataSource field can be used to specify either:
 	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
@@ -611,6 +615,7 @@ type PersistentVolumeClaimCondition struct {
 type PersistentVolumeClaimStatus struct {
 	// phase represents the current phase of PersistentVolumeClaim.
 	// +optional
+	// +default=ref(ClaimPending)
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=PersistentVolumeClaimPhase"`
 	// accessModes contains the actual access modes the volume backing the PVC has.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
@@ -778,6 +783,7 @@ type HostPathVolumeSource struct {
 	// Defaults to ""
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
 	// +optional
+	// +default=ref(HostPathUnset)
 	Type *HostPathType `json:"type,omitempty" protobuf:"bytes,2,opt,name=type"`
 }
 
@@ -862,16 +868,19 @@ type RBDVolumeSource struct {
 	// Default is rbd.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
+	// +default="rbd"
 	RBDPool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
 	// user is the rados user name.
 	// Default is admin.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
+	// +default="admin"
 	RadosUser string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
 	// keyring is the path to key ring for RBDUser.
 	// Default is /etc/ceph/keyring.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
+	// +default="/etc/ceph/keyring"
 	Keyring string `json:"keyring,omitempty" protobuf:"bytes,6,opt,name=keyring"`
 	// secretRef is name of the authentication secret for RBDUser. If provided
 	// overrides keyring.
@@ -906,16 +915,19 @@ type RBDPersistentVolumeSource struct {
 	// Default is rbd.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
+	// +default="rbd"
 	RBDPool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
 	// user is the rados user name.
 	// Default is admin.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
+	// +default="admin"
 	RadosUser string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
 	// keyring is the path to key ring for RBDUser.
 	// Default is /etc/ceph/keyring.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
+	// +default="/etc/ceph/keyring"
 	Keyring string `json:"keyring,omitempty" protobuf:"bytes,6,opt,name=keyring"`
 	// secretRef is name of the authentication secret for RBDUser. If provided
 	// overrides keyring.
@@ -1276,6 +1288,7 @@ type SecretVolumeSource struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +default=420
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"bytes,3,opt,name=defaultMode"`
 	// optional field specify whether the Secret or its keys must be defined
 	// +optional
@@ -1340,6 +1353,7 @@ type ISCSIVolumeSource struct {
 	// iscsiInterface is the interface Name that uses an iSCSI transport.
 	// Defaults to 'default' (tcp).
 	// +optional
+	// +default="default"
 	ISCSIInterface string `json:"iscsiInterface,omitempty" protobuf:"bytes,4,opt,name=iscsiInterface"`
 	// fsType is the filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
@@ -1386,6 +1400,7 @@ type ISCSIPersistentVolumeSource struct {
 	// iscsiInterface is the interface Name that uses an iSCSI transport.
 	// Defaults to 'default' (tcp).
 	// +optional
+	// +default="default"
 	ISCSIInterface string `json:"iscsiInterface,omitempty" protobuf:"bytes,4,opt,name=iscsiInterface"`
 	// fsType is the filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
@@ -1523,17 +1538,21 @@ type AzureDiskVolumeSource struct {
 	DataDiskURI string `json:"diskURI" protobuf:"bytes,2,opt,name=diskURI"`
 	// cachingMode is the Host Caching mode: None, Read Only, Read Write.
 	// +optional
+	// +default=ref(AzureDataDiskCachingReadWrite)
 	CachingMode *AzureDataDiskCachingMode `json:"cachingMode,omitempty" protobuf:"bytes,3,opt,name=cachingMode,casttype=AzureDataDiskCachingMode"`
 	// fsType is Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
+	// +default="ext4"
 	FSType *string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
 	// readOnly Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
+	// +default=false
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
 	// kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+	// +default=ref(AzureSharedBlobDisk)
 	Kind *AzureDataDiskKind `json:"kind,omitempty" protobuf:"bytes,6,opt,name=kind,casttype=AzureDataDiskKind"`
 }
 
@@ -1572,6 +1591,7 @@ type ScaleIOVolumeSource struct {
 	// storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
 	// Default is ThinProvisioned.
 	// +optional
+	// +default="ThinProvisioned"
 	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
 	// volumeName is the name of a volume already created in the ScaleIO system
 	// that is associated with this volume source.
@@ -1581,6 +1601,7 @@ type ScaleIOVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs".
 	// Default is "xfs".
 	// +optional
+	// +default="xfs"
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
 	// readOnly Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -1609,6 +1630,7 @@ type ScaleIOPersistentVolumeSource struct {
 	// storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
 	// Default is ThinProvisioned.
 	// +optional
+	// +default="ThinProvisioned"
 	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
 	// volumeName is the name of a volume already created in the ScaleIO system
 	// that is associated with this volume source.
@@ -1618,6 +1640,7 @@ type ScaleIOPersistentVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs".
 	// Default is "xfs"
 	// +optional
+	// +default="xfs"
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
 	// readOnly defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -1706,6 +1729,7 @@ type ConfigMapVolumeSource struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +default=420
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 	// optional specify whether the ConfigMap or its keys must be defined
 	// +optional
@@ -1757,6 +1781,7 @@ type ServiceAccountTokenProjection struct {
 	// its time to live or if the token is older than 24 hours.Defaults to 1 hour
 	// and must be at least 10 minutes.
 	// +optional
+	// +default=3600
 	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty" protobuf:"varint,2,opt,name=expirationSeconds"`
 	// path is the path relative to the mount point of the file to project the
 	// token into.
@@ -1775,6 +1800,7 @@ type ProjectedVolumeSource struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +default=420
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 }
 
@@ -2114,6 +2140,7 @@ type EnvVarSource struct {
 type ObjectFieldSelector struct {
 	// Version of the schema the FieldPath is written in terms of, defaults to "v1".
 	// +optional
+	// +default="v1"
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
 	// Path of the field to select in the specified API version.
 	FieldPath string `json:"fieldPath" protobuf:"bytes,2,opt,name=fieldPath"`
@@ -2208,6 +2235,7 @@ type HTTPHeader struct {
 type HTTPGetAction struct {
 	// Path to access on the HTTP server.
 	// +optional
+	// +default="/"
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 	// Name or number of the port to access on the container.
 	// Number must be in the range 1 to 65535.
@@ -2220,6 +2248,7 @@ type HTTPGetAction struct {
 	// Scheme to use for connecting to the host.
 	// Defaults to HTTP.
 	// +optional
+	// +default=ref(URISchemeHTTP)
 	Scheme URIScheme `json:"scheme,omitempty" protobuf:"bytes,4,opt,name=scheme,casttype=URIScheme"`
 	// Custom headers to set in the request. HTTP allows repeated headers.
 	// +optional
@@ -2285,18 +2314,22 @@ type Probe struct {
 	// Defaults to 1 second. Minimum value is 1.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
+	// +default=1
 	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,3,opt,name=timeoutSeconds"`
 	// How often (in seconds) to perform the probe.
 	// Default to 10 seconds. Minimum value is 1.
 	// +optional
+	// +default=10
 	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
 	// +optional
+	// +default=1
 	SuccessThreshold int32 `json:"successThreshold,omitempty" protobuf:"varint,5,opt,name=successThreshold"`
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// Defaults to 3. Minimum value is 1.
 	// +optional
+	// +default=3
 	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
 	// Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
 	// The grace period is the duration in seconds after the processes running in the pod are sent
@@ -2589,6 +2622,7 @@ type Container struct {
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	// +optional
+	// +default=ref(TerminationMessagePathDefault)
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" protobuf:"bytes,13,opt,name=terminationMessagePath"`
 	// Indicate how the termination message should be populated. File will use the contents of
 	// terminationMessagePath to populate the container status message on both success and failure.
@@ -2598,6 +2632,7 @@ type Container struct {
 	// Defaults to File.
 	// Cannot be updated.
 	// +optional
+	// +default=ref(TerminationMessageReadFile)
 	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,20,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
 	// Image pull policy.
 	// One of Always, Never, IfNotPresent.
@@ -3350,6 +3385,7 @@ type PodSpec struct {
 	// Default to Always.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
 	// +optional
+	// +default=ref(RestartPolicyAlways)
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,3,opt,name=restartPolicy,casttype=RestartPolicy"`
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
 	// Value must be non-negative integer. The value zero indicates stop immediately via
@@ -3360,6 +3396,7 @@ type PodSpec struct {
 	// Set this value longer than the expected cleanup time for your process.
 	// Defaults to 30 seconds.
 	// +optional
+	// +default=ref(DefaultTerminationGracePeriodSeconds)
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,4,opt,name=terminationGracePeriodSeconds"`
 	// Optional duration in seconds the pod may be active on the node relative to
 	// StartTime before the system will actively try to mark it failed and kill associated containers.
@@ -3373,6 +3410,7 @@ type PodSpec struct {
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy
 	// explicitly to 'ClusterFirstWithHostNet'.
 	// +optional
+	// +default=ref(DNSClusterFirst)
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
@@ -3426,6 +3464,7 @@ type PodSpec struct {
 	// SecurityContext holds pod-level security attributes and common container settings.
 	// Optional: Defaults to empty.  See type description for default values of each field.
 	// +optional
+	// +default={}
 	SecurityContext *PodSecurityContext `json:"securityContext,omitempty" protobuf:"bytes,14,opt,name=securityContext"`
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use.
@@ -3448,6 +3487,7 @@ type PodSpec struct {
 	// If specified, the pod will be dispatched by specified scheduler.
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
+	// +default=ref(DefaultSchedulerName)
 	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,19,opt,name=schedulerName"`
 	// If specified, the pod's tolerations.
 	// +optional
@@ -3495,6 +3535,7 @@ type PodSpec struct {
 	// environment variables, matching the syntax of Docker links.
 	// Optional: Defaults to true.
 	// +optional
+	// +default=ref(DefaultEnableServiceLinks)
 	EnableServiceLinks *bool `json:"enableServiceLinks,omitempty" protobuf:"varint,30,opt,name=enableServiceLinks"`
 	// PreemptionPolicy is the Policy for preempting pods with lower priority.
 	// One of Never, PreemptLowerPriority.
@@ -4136,6 +4177,7 @@ type EphemeralContainerCommon struct {
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	// +optional
+	// +default=ref(TerminationMessagePathDefault)
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" protobuf:"bytes,13,opt,name=terminationMessagePath"`
 	// Indicate how the termination message should be populated. File will use the contents of
 	// terminationMessagePath to populate the container status message on both success and failure.
@@ -4145,6 +4187,7 @@ type EphemeralContainerCommon struct {
 	// Defaults to File.
 	// Cannot be updated.
 	// +optional
+	// +default=ref(TerminationMessageReadFile)
 	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,20,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
 	// Image pull policy.
 	// One of Always, Never, IfNotPresent.
@@ -4437,6 +4480,7 @@ type ReplicationControllerSpec struct {
 	// This is a pointer to distinguish between explicit zero and unspecified.
 	// Defaults to 1.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
+	// +default=1
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
@@ -4854,6 +4898,7 @@ type ServiceSpec struct {
 	// Several other fields do not apply to ExternalName services.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
 	// +optional
+	// +default=ref(ServiceTypeClusterIP)
 	Type ServiceType `json:"type,omitempty" protobuf:"bytes,4,opt,name=type,casttype=ServiceType"`
 
 	// externalIPs is a list of IP addresses for which nodes in the cluster
@@ -4870,6 +4915,7 @@ type ServiceSpec struct {
 	// Defaults to None.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +optional
+	// +default=ref(ServiceAffinityNone)
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty" protobuf:"bytes,7,opt,name=sessionAffinity,casttype=ServiceAffinity"`
 
 	// Only applies to Service Type: LoadBalancer.
@@ -5007,6 +5053,7 @@ type ServiceSpec struct {
 	// "Cluster", uses the standard behavior of routing to all endpoints evenly
 	// (possibly modified by topology and other features).
 	// +optional
+	// +default=ref(ServiceInternalTrafficPolicyCluster)
 	InternalTrafficPolicy *ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty" protobuf:"bytes,22,opt,name=internalTrafficPolicy"`
 }
 
@@ -5268,6 +5315,7 @@ type EndpointPort struct {
 	// Must be UDP, TCP, or SCTP.
 	// Default is TCP.
 	// +optional
+	// +default=ref(ProtocolTCP)
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,3,opt,name=protocol,casttype=Protocol"`
 
 	// The application protocol for this port.
@@ -5783,6 +5831,7 @@ type NamespaceStatus struct {
 	// Phase is the current lifecycle phase of the namespace.
 	// More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
 	// +optional
+	// +default=ref(NamespaceActive)
 	Phase NamespacePhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=NamespacePhase"`
 
 	// Represents the latest available observations of a namespace's current state.
@@ -6575,6 +6624,7 @@ type Secret struct {
 	// Used to facilitate programmatic handling of secret data.
 	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	// +optional
+	// +default=ref(SecretTypeOpaque)
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
 
@@ -6704,6 +6754,7 @@ type ConfigMap struct {
 	// The keys stored in Data must not overlap with the keys in
 	// the BinaryData field, this is enforced during validation process.
 	// +optional
+	// +default={}
 	Data map[string]string `json:"data,omitempty" protobuf:"bytes,2,rep,name=data"`
 
 	// BinaryData contains the binary data.
@@ -6807,6 +6858,7 @@ type DownwardAPIVolumeSource struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +default=420
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 }
 

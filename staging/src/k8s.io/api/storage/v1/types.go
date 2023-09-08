@@ -50,6 +50,7 @@ type StorageClass struct {
 	// reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
 	// Defaults to Delete.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.PersistentVolumeReclaimDelete)
 	ReclaimPolicy *v1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty" protobuf:"bytes,4,opt,name=reclaimPolicy,casttype=k8s.io/api/core/v1.PersistentVolumeReclaimPolicy"`
 
 	// mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -66,6 +67,7 @@ type StorageClass struct {
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
 	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
+	// +default=ref(VolumeBindingImmediate)
 	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
 
 	// allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
@@ -280,6 +282,7 @@ type CSIDriverSpec struct {
 	// This field is immutable.
 	//
 	// +optional
+	// +default=true
 	AttachRequired *bool `json:"attachRequired,omitempty" protobuf:"varint,1,opt,name=attachRequired"`
 
 	// podInfoOnMount indicates this CSI volume driver requires additional pod information (like podName, podUID, etc.)
@@ -309,6 +312,7 @@ type CSIDriverSpec struct {
 	// This field is immutable.
 	//
 	// +optional
+	// +default=false
 	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
 
 	// volumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
@@ -328,6 +332,7 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	// +listType=set
+	// +default=["Persistent"]
 	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
 
 	// storageCapacity indicates that the CSI volume driver wants pod scheduling to consider the storage
@@ -347,6 +352,7 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	// +featureGate=CSIStorageCapacity
+	// +default=false
 	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
 
 	// fsGroupPolicy defines if the underlying volume supports changing ownership and
@@ -361,6 +367,7 @@ type CSIDriverSpec struct {
 	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.
 	//
 	// +optional
+	// +default=ref(ReadWriteOnceWithFSTypeFSGroupPolicy)
 	FSGroupPolicy *FSGroupPolicy `json:"fsGroupPolicy,omitempty" protobuf:"bytes,5,opt,name=fsGroupPolicy"`
 
 	// tokenRequests indicates the CSI driver needs pods' service account
@@ -392,6 +399,7 @@ type CSIDriverSpec struct {
 	// mount points will not be seen by a running container.
 	//
 	// +optional
+	// +default=false
 	RequiresRepublish *bool `json:"requiresRepublish,omitempty" protobuf:"varint,7,opt,name=requiresRepublish"`
 
 	// seLinuxMount specifies if the CSI driver supports "-o context"
@@ -414,6 +422,7 @@ type CSIDriverSpec struct {
 	//
 	// +featureGate=SELinuxMountReadWriteOncePod
 	// +optional
+	// +default=false
 	SELinuxMount *bool `json:"seLinuxMount,omitempty" protobuf:"varint,8,opt,name=seLinuxMount"`
 }
 

@@ -55,6 +55,7 @@ type PriorityClass struct {
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.PreemptLowerPriority)
 	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,5,opt,name=preemptionPolicy"`
 }
 

@@ -174,11 +174,13 @@ type EndpointPort struct {
 	// * must consist of lower case alphanumeric characters or '-'.
 	// * must start and end with an alphanumeric character.
 	// Default is empty string.
+	// +default=""
 	Name *string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
 
 	// protocol represents the IP protocol for this port.
 	// Must be UDP, TCP, or SCTP.
 	// Default is TCP.
+	// +default=ref(k8s.io/api/core/v1.ProtocolTCP)
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,2,name=protocol"`
 
 	// port represents the port number of the endpoint.

@@ -45,6 +45,7 @@ type ServiceReference struct {
 	// Default to 443 for backward compatibility.
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
+	// +default=443
 	Port *int32 `json:"port,omitempty" protobuf:"varint,3,opt,name=port"`
 }
 

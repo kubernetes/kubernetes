@@ -92,6 +92,8 @@ type Subject struct {
 // +structType=atomic
 type RoleRef struct {
 	// APIGroup is the group for the resource being referenced
+	// +optional
+	// +default=ref(GroupName)
 	APIGroup string `json:"apiGroup" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`

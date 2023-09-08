@@ -152,6 +152,7 @@ type FlowSchemaSpec struct {
 	// MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000].
 	// Note that if the precedence is not specified, it will be set to 1000 as default.
 	// +optional
+	// XXXTODO: +default=1000
 	MatchingPrecedence int32 `json:"matchingPrecedence" protobuf:"varint,2,opt,name=matchingPrecedence"`
 	// `distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema.
 	// `nil` specifies that the distinguisher is disabled and thus will always be the empty string.
@@ -478,6 +479,7 @@ type LimitedPriorityLevelConfiguration struct {
 	// at the expense of every other priority level.
 	// This field has a default value of 30.
 	// +optional
+	// XXXTODO: +default=30
 	NominalConcurrencyShares int32 `json:"nominalConcurrencyShares" protobuf:"varint,1,opt,name=nominalConcurrencyShares"`
 
 	// `limitResponse` indicates what to do with requests that can not be executed right now
@@ -492,6 +494,7 @@ type LimitedPriorityLevelConfiguration struct {
 	// LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
 	//
 	// +optional
+	// +default=0
 	LendablePercent *int32 `json:"lendablePercent,omitempty" protobuf:"varint,3,opt,name=lendablePercent"`
 
 	// `borrowingLimitPercent`, if present, configures a limit on how many
@@ -533,6 +536,7 @@ type ExemptPriorityLevelConfiguration struct {
 	// at the expense of every other priority level.
 	// This field has a default value of zero.
 	// +optional
+	// +default=0
 	NominalConcurrencyShares *int32 `json:"nominalConcurrencyShares,omitempty" protobuf:"varint,1,opt,name=nominalConcurrencyShares"`
 	// `lendablePercent` prescribes the fraction of the level's NominalCL that
 	// can be borrowed by other priority levels.  This value of this
@@ -543,6 +547,7 @@ type ExemptPriorityLevelConfiguration struct {
 	// LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
 	//
 	// +optional
+	// +default=0
 	LendablePercent *int32 `json:"lendablePercent,omitempty" protobuf:"varint,2,opt,name=lendablePercent"`
 	// The `BorrowingCL` of an Exempt priority level is implicitly `ServerCL`.
 	// In other words, an exempt priority level

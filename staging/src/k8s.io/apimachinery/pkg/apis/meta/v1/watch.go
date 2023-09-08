@@ -36,6 +36,7 @@ type WatchEvent struct {
 	//  * If Type is Deleted: the state of the object immediately before deletion.
 	//  * If Type is Error: *Status is recommended; other types may make sense
 	//    depending on context.
+	// +default=null
 	Object runtime.RawExtension `json:"object" protobuf:"bytes,2,opt,name=object"`
 }
 
