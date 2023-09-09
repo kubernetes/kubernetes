@@ -52,6 +52,10 @@ func (m *MetaDuration) Set(val string) error {
 	if m == nil {
 		return fmt.Errorf("no target (nil pointer to metav1.Duration")
 	}
+
+	if val == "" {
+		return nil
+	}
 	duration, err := time.ParseDuration(val)
 	if err != nil {
 		return err
