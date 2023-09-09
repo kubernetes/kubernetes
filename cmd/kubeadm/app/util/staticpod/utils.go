@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -367,8 +369,11 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
 	hash1 := hasher.Sum(nil)[0:]
 	DeepHashObject(hasher, pod2)
 	hash2 := hasher.Sum(nil)[0:]
-
-	return bytes.Equal(hash1, hash2), nil
+	if bytes.Equal(hash1, hash2) {
+		return true, nil
+	}
+	klog.V(4).Infof("Pod manifest files diff:\n%s\n", cmp.Diff(pod1, pod2))
+	return false, nil
 }
 
 // getProbeAddress returns a valid probe address.
