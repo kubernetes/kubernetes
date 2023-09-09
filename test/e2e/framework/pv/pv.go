@@ -994,8 +994,10 @@ func WaitForPVFinalizer(ctx context.Context, cs clientset.Interface, pvName, fin
 				return true
 			}
 		}
+		framework.Logf("PV Output: %+v", pv)
 		return false
 	}); successful {
+		framework.Logf("PV Output: %+v", pv)
 		return pv, nil
 	}
 	if err == nil {

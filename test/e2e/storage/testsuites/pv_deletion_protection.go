@@ -159,7 +159,7 @@ func (p *pvDeleteionProtectionTestSuite) DefineTests(driver storageframework.Tes
 		}
 
 		// Different finalizers are expected for in-tree and csi volumes
-		if len(dDriver.GetDriverInfo().InTreePluginName) != 0 {
+		if len(dDriver.GetDriverInfo().InTreePluginName) != 0 && dInfo.Name != "nfs" {
 			// In Tree
 			l.testCase.ExpectedFinalizer = pvInTreeDeletionProtectionFinalizer
 		} else {
@@ -220,7 +220,7 @@ func (t VolumeDeletionTest) checkVolumeDeletion(ctx context.Context, client clie
 	pv, err := client.CoreV1().PersistentVolumes().Get(ctx, pvcBound.Spec.VolumeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.By(fmt.Sprintf("Wait for finalizer %s to be added to pv %s", pvCSIDeletionProtectionFinalizer, pv.Name))
+	ginkgo.By(fmt.Sprintf("Wait for finalizer %s to be added to pv %s", t.ExpectedFinalizer, pv.Name))
 	pv, err = e2epv.WaitForPVFinalizer(ctx, client, pv.Name, t.ExpectedFinalizer, 1*time.Millisecond, 1*time.Minute)
 	framework.ExpectNoError(err)
 	framework.Logf("finalizer %q found on pv %q", t.ExpectedFinalizer, pv.Name)
