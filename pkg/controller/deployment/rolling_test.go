@@ -30,12 +30,12 @@ import (
 
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 	tests := []struct {
-		deploymentReplicas  int
+		deploymentReplicas  int32
 		maxSurge            intstr.IntOrString
-		oldReplicas         int
-		newReplicas         int
+		oldReplicas         int32
+		newReplicas         int32
 		scaleExpected       bool
-		expectedNewReplicas int
+		expectedNewReplicas int32
 	}{
 		{
 			// Should not scale up.
@@ -115,7 +115,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 			continue
 		}
 		updated := fake.Actions()[0].(core.UpdateAction).GetObject().(*apps.ReplicaSet)
-		if e, a := test.expectedNewReplicas, int(*(updated.Spec.Replicas)); e != a {
+		if e, a := test.expectedNewReplicas, *(updated.Spec.Replicas); e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
 	}
@@ -123,14 +123,14 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 
 func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 	tests := []struct {
-		deploymentReplicas  int
+		deploymentReplicas  int32
 		maxUnavailable      intstr.IntOrString
-		oldReplicas         int
-		newReplicas         int
+		oldReplicas         int32
+		newReplicas         int32
 		readyPodsFromOldRS  int
 		readyPodsFromNewRS  int
 		scaleExpected       bool
-		expectedOldReplicas int
+		expectedOldReplicas int32
 	}{
 		{
 			deploymentReplicas:  10,
@@ -220,7 +220,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 
 func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 	tests := []struct {
-		oldReplicas          int
+		oldReplicas          int32
 		readyPods            int
 		unHealthyPods        int
 		maxCleanupCount      int
@@ -285,12 +285,12 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 
 func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing.T) {
 	tests := []struct {
-		deploymentReplicas  int
+		deploymentReplicas  int32
 		maxUnavailable      intstr.IntOrString
 		readyPods           int
-		oldReplicas         int
+		oldReplicas         int32
 		scaleExpected       bool
-		expectedOldReplicas int
+		expectedOldReplicas int32
 	}{
 		{
 			deploymentReplicas:  10,
@@ -379,7 +379,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			continue
 		}
 		updated := updateAction.GetObject().(*apps.ReplicaSet)
-		if e, a := test.expectedOldReplicas, int(*(updated.Spec.Replicas)); e != a {
+		if e, a := test.expectedOldReplicas, *(updated.Spec.Replicas); e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
 	}
