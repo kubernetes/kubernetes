@@ -29,10 +29,11 @@ func TestSetStatusCondition(t *testing.T) {
 	oneHourAfter := time.Now().Add(1 * time.Hour)
 
 	tests := []struct {
-		name       string
-		conditions []metav1.Condition
-		toAdd      metav1.Condition
-		expected   []metav1.Condition
+		name          string
+		conditions    []metav1.Condition
+		toAdd         metav1.Condition
+		expectChanged bool
+		expected      []metav1.Condition
 	}{
 		{
 			name: "should-add",
@@ -40,7 +41,8 @@ func TestSetStatusCondition(t *testing.T) {
 				{Type: "first"},
 				{Type: "third"},
 			},
-			toAdd: metav1.Condition{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}, Reason: "reason", Message: "message"},
+			toAdd:         metav1.Condition{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}, Reason: "reason", Message: "message"},
+			expectChanged: true,
 			expected: []metav1.Condition{
 				{Type: "first"},
 				{Type: "third"},
@@ -54,7 +56,8 @@ func TestSetStatusCondition(t *testing.T) {
 				{Type: "second", Status: metav1.ConditionFalse},
 				{Type: "third"},
 			},
-			toAdd: metav1.Condition{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}, Reason: "reason", Message: "message"},
+			toAdd:         metav1.Condition{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}, Reason: "reason", Message: "message"},
+			expectChanged: true,
 			expected: []metav1.Condition{
 				{Type: "first"},
 				{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}, Reason: "reason", Message: "message"},
@@ -68,18 +71,36 @@ func TestSetStatusCondition(t *testing.T) {
 				{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}},
 				{Type: "third"},
 			},
-			toAdd: metav1.Condition{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourAfter}, Reason: "reason", Message: "message", ObservedGeneration: 3},
+			toAdd:         metav1.Condition{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourAfter}, Reason: "reason", Message: "message", ObservedGeneration: 3},
+			expectChanged: true,
 			expected: []metav1.Condition{
 				{Type: "first"},
 				{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}, Reason: "reason", Message: "message", ObservedGeneration: 3},
 				{Type: "third"},
 			},
 		},
+		{
+			name: "nothing changes",
+			conditions: []metav1.Condition{{
+				Type:               "type",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Time{Time: oneHourBefore},
+			}},
+			toAdd: metav1.Condition{Type: "type", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}},
+			expected: []metav1.Condition{{
+				Type:               "type",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Time{Time: oneHourBefore},
+			}},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			SetStatusCondition(&test.conditions, test.toAdd)
+			changed := SetStatusCondition(&test.conditions, test.toAdd)
+			if test.expectChanged != changed {
+				t.Errorf("expectChanged=%t != changed=%t", test.expectChanged, changed)
+			}
 			if !reflect.DeepEqual(test.conditions, test.expected) {
 				t.Error(test.conditions)
 			}
@@ -92,6 +113,7 @@ func TestRemoveStatusCondition(t *testing.T) {
 		name          string
 		conditions    []metav1.Condition
 		conditionType string
+		expectRemoval bool
 		expected      []metav1.Condition
 	}{
 		{
@@ -102,6 +124,7 @@ func TestRemoveStatusCondition(t *testing.T) {
 				{Type: "third"},
 			},
 			conditionType: "second",
+			expectRemoval: true,
 			expected: []metav1.Condition{
 				{Type: "first"},
 				{Type: "third"},
@@ -131,7 +154,10 @@ func TestRemoveStatusCondition(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			RemoveStatusCondition(&test.conditions, test.conditionType)
+			removed := RemoveStatusCondition(&test.conditions, test.conditionType)
+			if test.expectRemoval != removed {
+				t.Errorf("expectRemoval=%t != removal=%t", test.expectRemoval, removed)
+			}
 			if !reflect.DeepEqual(test.conditions, test.expected) {
 				t.Error(test.conditions)
 			}
