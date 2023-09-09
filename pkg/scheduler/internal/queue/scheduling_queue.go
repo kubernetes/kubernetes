@@ -1112,7 +1112,7 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 	p.moveRequestCycle = p.schedulingCycle
 
-	if len(p.inFlightPods) != 0 && p.isSchedulingQueueHintEnabled {
+	if p.isSchedulingQueueHintEnabled && len(p.inFlightPods) != 0 {
 		logger.V(5).Info("Event received while pods are in flight", "event", event.Label, "numPods", len(p.inFlightPods))
 		// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
 		// AddUnschedulableIfNotPresent we need to know whether events were
