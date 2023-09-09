@@ -39,11 +39,11 @@ import (
 )
 
 const (
-	// pvCSIDeletionProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
+	// pvCSIDeletionProtectionFinalizer is the finalizer added to protect PV deletion for csi volumes.
 	pvCSIDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
 
 	// pvInTreeDeletionProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
-	pvInTreeDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
+	pvInTreeDeletionProtectionFinalizer = "kubernetes.io/pv-controller"
 )
 
 type VolumeDeletionTest struct {
