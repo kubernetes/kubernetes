@@ -81,7 +81,8 @@ func InitTestSuite(patterns []storageframework.TestPattern) storageframework.Tes
 
 func InitPvDeletionProtectionTestSuite() storageframework.TestSuite {
 	patterns := []storageframework.TestPattern{
-		storageframework.VolumeDeletion,
+		storageframework.DefaultFsDynamicPV,
+		storageframework.BlockVolModeDynamicPV,
 	}
 	return InitTestSuite(patterns)
 }
