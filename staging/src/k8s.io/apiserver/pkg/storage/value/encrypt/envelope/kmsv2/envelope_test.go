@@ -49,10 +49,12 @@ import (
 )
 
 const (
-	testText        = "abcdefghijklmnopqrstuvwxyz"
-	testContextText = "0123456789"
-	testKeyHash     = "sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-	testKeyVersion  = "1"
+	testText            = "abcdefghijklmnopqrstuvwxyz"
+	testContextText     = "0123456789"
+	testKeyHash         = "sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+	testKeyVersion      = "1"
+	testAPIServerID     = "testAPIServerID"
+	testAPIServerIDHash = "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37"
 )
 
 // testEnvelopeService is a mock Envelope service which can be used to simulate remote Envelope services
@@ -178,7 +180,7 @@ func TestEnvelopeCaching(t *testing.T) {
 			}
 
 			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
-				func() (State, error) { return state, nil },
+				func() (State, error) { return state, nil }, testAPIServerID,
 				tt.cacheTTL, fakeClock)
 
 			dataCtx := value.DefaultContext(testContextText)
@@ -319,7 +321,7 @@ func TestEnvelopeTransformerStaleness(t *testing.T) {
 			var stateErr error
 
 			transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
-				func() (State, error) { return state, stateErr },
+				func() (State, error) { return state, stateErr }, testAPIServerID,
 			)
 
 			dataCtx := value.DefaultContext(testContextText)
@@ -376,7 +378,7 @@ func TestEnvelopeTransformerStateFunc(t *testing.T) {
 	stateErr := fmt.Errorf("some state error")
 
 	transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
-		func() (State, error) { return state, stateErr },
+		func() (State, error) { return state, stateErr }, testAPIServerID,
 	)
 
 	dataCtx := value.DefaultContext(testContextText)
@@ -513,6 +515,7 @@ func TestTransformToStorageError(t *testing.T) {
 			envelopeService.SetAnnotations(tt.annotations)
 			transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
 				testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool()),
+				testAPIServerID,
 			)
 			dataCtx := value.DefaultContext(testContextText)
 
@@ -838,6 +841,7 @@ func TestEnvelopeMetrics(t *testing.T) {
 	envelopeService := newTestEnvelopeService()
 	transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
 		testStateFunc(testContext(t), envelopeService, clock.RealClock{}, randomBool()),
+		testAPIServerID,
 	)
 
 	dataCtx := value.DefaultContext(testContextText)
@@ -859,11 +863,11 @@ func TestEnvelopeMetrics(t *testing.T) {
 				"apiserver_envelope_encryption_key_id_hash_total",
 			},
 			want: fmt.Sprintf(`
-				# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+				# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type, provider, and apiserver identity.
 				# TYPE apiserver_envelope_encryption_key_id_hash_total counter
-				apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-				apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
-				`, testKeyHash, testProviderName, metrics.FromStorageLabel, testKeyHash, testProviderName, metrics.ToStorageLabel),
+				apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+				apiserver_envelope_encryption_key_id_hash_total{apiserver_id_hash="%s",key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+				`, testAPIServerIDHash, testKeyHash, testProviderName, metrics.FromStorageLabel, testAPIServerIDHash, testKeyHash, testProviderName, metrics.ToStorageLabel),
 		},
 	}
 
@@ -931,10 +935,10 @@ func TestEnvelopeMetricsCache(t *testing.T) {
 	transformer1 := NewEnvelopeTransformer(envelopeService, provider1, func() (State, error) {
 		// return different states to ensure we get expected number of cache keys after restart on decryption
 		return testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool())()
-	})
-	transformer2 := NewEnvelopeTransformer(envelopeService, provider2, func() (State, error) { return state, nil })
+	}, testAPIServerID)
+	transformer2 := NewEnvelopeTransformer(envelopeService, provider2, func() (State, error) { return state, nil }, testAPIServerID)
 	// used for restart
-	transformer3 := NewEnvelopeTransformer(envelopeService, provider1, func() (State, error) { return state, nil })
+	transformer3 := NewEnvelopeTransformer(envelopeService, provider1, func() (State, error) { return state, nil }, testAPIServerID)
 	var transformedDatas [][]byte
 	for j := 0; j < numOfStates; j++ {
 		transformedData, err := transformer1.TransformToStorage(ctx, []byte(testText), dataCtx)
@@ -1029,8 +1033,7 @@ func TestEnvelopeLogging(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
-				testStateFunc(tc.ctx, envelopeService, clock.RealClock{}, randomBool()),
-				1*time.Second, fakeClock)
+				testStateFunc(tc.ctx, envelopeService, clock.RealClock{}, randomBool()), testAPIServerID, 1*time.Second, fakeClock)
 
 			dataCtx := value.DefaultContext([]byte(testContextText))
 			originalText := []byte(testText)
@@ -1082,7 +1085,7 @@ func TestCacheNotCorrupted(t *testing.T) {
 	}
 
 	transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
-		func() (State, error) { return state, nil },
+		func() (State, error) { return state, nil }, testAPIServerID,
 		1*time.Second, fakeClock)
 
 	dataCtx := value.DefaultContext(testContextText)
@@ -1108,7 +1111,7 @@ func TestCacheNotCorrupted(t *testing.T) {
 	}
 
 	transformer = newEnvelopeTransformerWithClock(envelopeService, testProviderName,
-		func() (State, error) { return state, nil },
+		func() (State, error) { return state, nil }, testAPIServerID,
 		1*time.Second, fakeClock)
 
 	transformedData2, err := transformer.TransformToStorage(ctx, originalText, dataCtx)

@@ -294,7 +294,7 @@ func (s *EtcdOptions) maybeApplyResourceTransformers(c *server.Config) (err erro
 		}
 	}()
 
-	encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(ctxTransformers, s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload)
+	encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(ctxTransformers, s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload, c.APIServerID)
 	if err != nil {
 		return err
 	}
@@ -318,6 +318,7 @@ func (s *EtcdOptions) maybeApplyResourceTransformers(c *server.Config) (err erro
 					s.EncryptionProviderConfigFilepath,
 					dynamicTransformers,
 					encryptionConfiguration.EncryptionFileContentHash,
+					c.APIServerID,
 				)
 
 				go dynamicEncryptionConfigController.Run(ctxServer)
