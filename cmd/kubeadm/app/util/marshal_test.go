@@ -84,7 +84,7 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 
 	t.Logf("\n%s", bytes)
 
-	obj2, err := UnmarshalFromYaml(bytes, corev1.SchemeGroupVersion)
+	obj2, err := UnmarshalFromYaml(bytes)
 	if err != nil {
 		t.Fatalf("unexpected error marshalling: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 	}
 	t.Logf("\n%s", bytes)
 
-	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1.SchemeGroupVersion, codecs)
+	obj, err := UnmarshalFromYamlForCodecs(bytes, codecs)
 	if err != nil {
 		t.Fatalf("unexpected error unmarshalling InitConfiguration: %v", err)
 	}

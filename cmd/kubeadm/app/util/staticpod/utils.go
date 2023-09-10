@@ -190,7 +190,7 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 		return pod, err
 	}
 
-	obj, err := kubeadmutil.UnmarshalFromYaml(patchTarget.Data, v1.SchemeGroupVersion)
+	obj, err := kubeadmutil.UnmarshalFromYaml(patchTarget.Data)
 	if err != nil {
 		return pod, errors.Wrap(err, "failed to unmarshal patched manifest from YAML")
 	}
@@ -233,7 +233,7 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 		return &v1.Pod{}, errors.Wrapf(err, "failed to read manifest for %q", manifestPath)
 	}
 
-	obj, err := kubeadmutil.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
+	obj, err := kubeadmutil.UnmarshalFromYaml(buf)
 	if err != nil {
 		return &v1.Pod{}, errors.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
 	}
