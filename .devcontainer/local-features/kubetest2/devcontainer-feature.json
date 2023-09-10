@@ -1,0 +1,8 @@
+{
+    "id": "kubetest2",
+    "name": "Kubetest2",
+    "description": "Kubetest2 a framework for deploying Kubernetes clusters and running end to end tests",
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/go"
+    ]
+}
