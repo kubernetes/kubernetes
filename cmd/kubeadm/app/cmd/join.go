@@ -251,7 +251,7 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.JoinConfigurati
 	)
 	flagSet.StringVar(
 		&cfg.ControlPlane.CertificateKey, options.CertificateKey, cfg.ControlPlane.CertificateKey,
-		"Use this key to decrypt the certificate secrets uploaded by init.",
+		"Use this key to decrypt the certificate secrets uploaded by init. The certificate key is a hex encoded string that is an AES key of size 32 bytes.",
 	)
 	// add control plane endpoint flags to the specified flagset
 	flagSet.StringVar(
