@@ -372,7 +372,7 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
 	if bytes.Equal(hash1, hash2) {
 		return true, nil
 	}
-	klog.V(4).Infof("Pod manifest files diff:\n%s\n", cmp.Diff(pod1, pod2))
+	klog.V(4).Infof("Pod manifest files diff:\n%s\n", cmp.Diff(pod2, pod1))
 	return false, nil
 }
 

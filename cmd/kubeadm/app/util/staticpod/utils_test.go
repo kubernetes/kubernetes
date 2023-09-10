@@ -652,6 +652,22 @@ spec:
   - image: gcr.io/google_containers/etcd-amd64:3.1.11
 status: {}
 `
+	invalidWithDefaultFields = `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    tier: control-plane
+    component: etcd
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - image: gcr.io/google_containers/etcd-amd64:3.1.11
+  restartPolicy: "Always"
+status: {}
+`
+
 	validPod2 = `
 apiVersion: v1
 kind: Pod
@@ -746,6 +762,12 @@ func TestManifestFilesAreEqual(t *testing.T) {
 		{
 			description:    "manifests are not equal",
 			podYamls:       []string{validPod, validPod2},
+			expectedResult: false,
+			expectErr:      false,
+		},
+		{
+			description:    "manifests are not equal for adding new defaults",
+			podYamls:       []string{validPod, invalidWithDefaultFields},
 			expectedResult: false,
 			expectErr:      false,
 		},
