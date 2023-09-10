@@ -393,7 +393,19 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			}
 		})
 
-		ginkgo.It("should run through the lifecycle of a PV and a PVC", func(ctx context.Context) {
+		/*
+			Release: v1.29
+			Testname: PersistentVolumes(Claims), lifecycle
+			Description: Creating PV and PVC MUST succeed. Listing PVs with a labelSelector
+			MUST succeed. Listing PVCs in a namespace MUST succeed. Patching a PV MUST succeed
+			with its new label found. Patching a PVC MUST succeed with its new label found.
+			Reading a PV and PVC MUST succeed with required UID retrieved. Deleting a PVC
+			and PV MUST succeed and it MUST be confirmed. Replacement PV and PVC MUST be created.
+			Updating a PV MUST succeed with its new label found. Updating a PVC MUST succeed
+			with its new label found. Deleting the PVC and PV via deleteCollection MUST succeed
+			and it MUST be confirmed.
+		*/
+		framework.ConformanceIt("should run through the lifecycle of a PV and a PVC", func(ctx context.Context) {
 
 			pvClient := c.CoreV1().PersistentVolumes()
 			pvcClient := c.CoreV1().PersistentVolumeClaims(ns)
