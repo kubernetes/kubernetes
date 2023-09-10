@@ -261,6 +261,9 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 		t.Errorf("Error executing ReadStaticPodFromDisk: %v", err)
 		return
 	}
+	if pod.Spec.DNSPolicy != "" {
+		t.Errorf("DNSPolicy should be empty but: %v", pod.Spec.DNSPolicy)
+	}
 
 	if _, ok := pod.ObjectMeta.Annotations["patched"]; !ok {
 		t.Errorf("Patches were not applied to %s", kubeadmconstants.Etcd)

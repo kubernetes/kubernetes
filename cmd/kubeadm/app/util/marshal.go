@@ -55,22 +55,13 @@ func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs s
 }
 
 // UnmarshalFromYaml unmarshals yaml into an object.
-func UnmarshalFromYaml(buffer []byte, gv schema.GroupVersion) (runtime.Object, error) {
-	return UnmarshalFromYamlForCodecs(buffer, gv, clientsetscheme.Codecs)
+func UnmarshalFromYaml(buffer []byte) (runtime.Object, error) {
+	return UnmarshalFromYamlForCodecs(buffer, clientsetscheme.Codecs)
 }
 
-// UnmarshalFromYamlForCodecs unmarshals yaml into an object using the specified codec
-// TODO: Is specifying the gv really needed here?
-// TODO: Can we support json out of the box easily here?
-func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs serializer.CodecFactory) (runtime.Object, error) {
-	const mediaType = runtime.ContentTypeYAML
-	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return nil, errors.Errorf("unsupported media type %q", mediaType)
-	}
-
-	decoder := codecs.DecoderToVersion(info.Serializer, gv)
-	obj, err := runtime.Decode(decoder, buffer)
+// UnmarshalFromYamlForCodecs unmarshals yaml into an object using the universal deserializer
+func UnmarshalFromYamlForCodecs(buffer []byte, codecs serializer.CodecFactory) (runtime.Object, error) {
+	obj, _, err := codecs.UniversalDeserializer().Decode(buffer, nil, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to decode %s into runtime.Object", buffer)
 	}
