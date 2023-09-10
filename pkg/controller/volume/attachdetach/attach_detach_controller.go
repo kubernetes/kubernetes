@@ -24,6 +24,7 @@ import (
 	"net"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
@@ -914,4 +915,8 @@ func (adc *attachDetachController) GetSubpather() subpath.Interface {
 
 func (adc *attachDetachController) GetCSIDriverLister() storagelistersv1.CSIDriverLister {
 	return adc.csiDriverLister
+}
+
+func (adc *attachDetachController) GetTracerProvider() trace.TracerProvider {
+	return trace.NewNoopTracerProvider()
 }

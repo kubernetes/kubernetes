@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
@@ -47,7 +48,7 @@ func TestGetMetrics(t *testing.T) {
 		metricsGetter := &metricsCsi{volumeID: tc.volumeID, targetPath: tc.targetPath}
 		metricsGetter.csiClient = &csiDriverClient{
 			driverName: "com.google.gcepd",
-			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClientWithVolumeStats(true /* VolumeStatsCapable */)
 				fakeCloser := fake.NewCloser(t)
 				nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())
@@ -116,7 +117,7 @@ func TestGetMetricsDriverNotSupportStats(t *testing.T) {
 		metricsGetter := &metricsCsi{volumeID: tc.volumeID, targetPath: tc.targetPath}
 		metricsGetter.csiClient = &csiDriverClient{
 			driverName: "com.simple.SimpleDriver",
-			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager, tp trace.TracerProvider) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClientWithVolumeStats(false /* VolumeStatsCapable */)
 				fakeCloser := fake.NewCloser(t)
 				nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())

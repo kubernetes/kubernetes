@@ -21,6 +21,7 @@ import (
 	"net"
 	"runtime"
 
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
@@ -59,7 +60,8 @@ func NewInitializedVolumePluginMgr(
 	tokenManager *token.Manager,
 	clusterTrustBundleManager clustertrustbundle.Manager,
 	plugins []volume.VolumePlugin,
-	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
+	prober volume.DynamicPluginProber,
+	tp trace.TracerProvider) (*volume.VolumePluginMgr, error) {
 
 	// Initialize csiDriverLister before calling InitPlugins
 	var informerFactory informers.SharedInformerFactory
@@ -88,6 +90,7 @@ func NewInitializedVolumePluginMgr(
 		csiDriverLister:           csiDriverLister,
 		csiDriversSynced:          csiDriversSynced,
 		exec:                      utilexec.New(),
+		tp:                        tp,
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
@@ -118,6 +121,11 @@ type kubeletVolumeHost struct {
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriversSynced          cache.InformerSynced
 	exec                      utilexec.Interface
+	tp                        trace.TracerProvider
+}
+
+func (kvh *kubeletVolumeHost) GetTracerProvider() trace.TracerProvider {
+	return kvh.tp
 }
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {

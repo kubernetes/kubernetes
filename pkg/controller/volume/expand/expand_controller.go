@@ -22,6 +22,7 @@ import (
 	"net"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
@@ -474,4 +475,8 @@ func (expc *expandController) GetEventRecorder() record.EventRecorder {
 func (expc *expandController) GetSubpather() subpath.Interface {
 	// not needed for expand controller
 	return nil
+}
+
+func (expc *expandController) GetTracerProvider() trace.TracerProvider {
+	return trace.NewNoopTracerProvider()
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -105,7 +106,7 @@ func TestRunOnce(t *testing.T) {
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kb.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kb, fakeSecretManager, fakeConfigMapManager, nil, clusterTrustBundleManager, []volume.VolumePlugin{plug}, nil /* prober */)
+		NewInitializedVolumePluginMgr(kb, fakeSecretManager, fakeConfigMapManager, nil, clusterTrustBundleManager, []volume.VolumePlugin{plug}, nil /* prober */, oteltrace.NewNoopTracerProvider())
 	if err != nil {
 		t.Fatalf("failed to initialize VolumePluginMgr: %v", err)
 	}

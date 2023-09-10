@@ -26,6 +26,8 @@ import (
 	"sync"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -33,6 +35,7 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	tracing "k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -111,6 +114,7 @@ type csiDriverClient struct {
 	addr                csiAddr
 	metricsManager      *MetricsManager
 	nodeV1ClientCreator nodeV1ClientCreator
+	tp                  trace.TracerProvider
 }
 
 type csiResizeOptions struct {
@@ -126,7 +130,7 @@ type csiResizeOptions struct {
 
 var _ csiClient = &csiDriverClient{}
 
-type nodeV1ClientCreator func(addr csiAddr, metricsManager *MetricsManager) (
+type nodeV1ClientCreator func(addr csiAddr, metricsManager *MetricsManager, tp trace.TracerProvider) (
 	nodeClient csipbv1.NodeClient,
 	closer io.Closer,
 	err error,
@@ -139,9 +143,9 @@ type nodeV1AccessModeMapper func(am api.PersistentVolumeAccessMode) csipbv1.Volu
 // the gRPC connection when the NodeClient is not used anymore.
 // This is the default implementation for the nodeV1ClientCreator, used in
 // newCsiDriverClient.
-func newV1NodeClient(addr csiAddr, metricsManager *MetricsManager) (nodeClient csipbv1.NodeClient, closer io.Closer, err error) {
+func newV1NodeClient(addr csiAddr, metricsManager *MetricsManager, tp trace.TracerProvider) (nodeClient csipbv1.NodeClient, closer io.Closer, err error) {
 	var conn *grpc.ClientConn
-	conn, err = newGrpcConn(addr, metricsManager)
+	conn, err = newGrpcConn(addr, metricsManager, tp)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -150,7 +154,7 @@ func newV1NodeClient(addr csiAddr, metricsManager *MetricsManager) (nodeClient c
 	return nodeClient, conn, nil
 }
 
-func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
+func newCsiDriverClient(driverName csiDriverName, tp trace.TracerProvider) (*csiDriverClient, error) {
 	if driverName == "" {
 		return nil, fmt.Errorf("driver name is empty")
 	}
@@ -163,6 +167,7 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 	nodeV1ClientCreator := newV1NodeClient
 	return &csiDriverClient{
 		driverName:          driverName,
+		tp:                  tp,
 		addr:                csiAddr(existingDriver.endpoint),
 		nodeV1ClientCreator: nodeV1ClientCreator,
 		metricsManager:      NewCSIMetricsManager(string(driverName)),
@@ -190,7 +195,7 @@ func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
 	accessibleTopology map[string]string,
 	err error) {
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager, c.tp)
 	if err != nil {
 		return "", 0, nil, err
 	}
@@ -239,7 +244,7 @@ func (c *csiDriverClient) NodePublishVolume(
 		return err
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager, c.tp)
 	if err != nil {
 		return err
 	}
@@ -307,7 +312,7 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 		return opts.newSize, err
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager, c.tp)
 	if err != nil {
 		return opts.newSize, err
 	}
@@ -368,7 +373,7 @@ func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string,
 		return errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager, c.tp)
 	if err != nil {
 		return err
 	}
@@ -410,7 +415,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 		return err
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager, c.tp)
 	if err != nil {
 		return err
 	}
@@ -465,7 +470,7 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 		return errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager, c.tp)
 	if err != nil {
 		return err
 	}
@@ -529,12 +534,12 @@ func asSingleNodeMultiWriterCapableCSIAccessModeV1(am api.PersistentVolumeAccess
 	return csipbv1.VolumeCapability_AccessMode_UNKNOWN
 }
 
-func newGrpcConn(addr csiAddr, metricsManager *MetricsManager) (*grpc.ClientConn, error) {
+func newGrpcConn(addr csiAddr, metricsManager *MetricsManager, tp trace.TracerProvider) (*grpc.ClientConn, error) {
 	network := "unix"
 	klog.V(4).InfoS(log("creating new gRPC connection"), "protocol", network, "endpoint", addr)
 
-	return grpc.Dial(
-		string(addr),
+	var dialOpts []grpc.DialOption
+	dialOpts = append(dialOpts,
 		grpc.WithAuthority("localhost"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
@@ -542,6 +547,20 @@ func newGrpcConn(addr csiAddr, metricsManager *MetricsManager) (*grpc.ClientConn
 		}),
 		grpc.WithChainUnaryInterceptor(metricsManager.RecordMetricsInterceptor),
 	)
+
+	tracingOpts := []otelgrpc.Option{
+		otelgrpc.WithPropagators(tracing.Propagators()),
+		otelgrpc.WithTracerProvider(tp),
+	}
+	// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
+	// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+		dialOpts = append(dialOpts,
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
+			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+	}
+
+	return grpc.Dial(string(addr), dialOpts...)
 }
 
 // CSI client getter with cache.
@@ -554,6 +573,7 @@ type csiClientGetter struct {
 	sync.RWMutex
 	csiClient  csiClient
 	driverName csiDriverName
+	tp         trace.TracerProvider
 }
 
 func (c *csiClientGetter) Get() (csiClient, error) {
@@ -569,7 +589,7 @@ func (c *csiClientGetter) Get() (csiClient, error) {
 	if c.csiClient != nil {
 		return c.csiClient, nil
 	}
-	csi, err := newCsiDriverClient(c.driverName)
+	csi, err := newCsiDriverClient(c.driverName, c.tp)
 	if err != nil {
 		return nil, err
 	}
@@ -597,7 +617,7 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		return nil, errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager, c.tp)
 	if err != nil {
 		return nil, err
 	}
@@ -690,7 +710,7 @@ func (c *csiDriverClient) nodeGetCapabilities(ctx context.Context) ([]*csipbv1.N
 		return []*csipbv1.NodeServiceCapability{}, errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager, c.tp)
 	if err != nil {
 		return []*csipbv1.NodeServiceCapability{}, err
 	}
