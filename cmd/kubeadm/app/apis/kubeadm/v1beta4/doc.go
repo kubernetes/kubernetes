@@ -23,10 +23,7 @@ limitations under the License.
 // This version improves on the v1beta3 format by fixing some minor issues and adding a few new fields.
 //
 // A list of changes since v1beta3:
-//
 //   - TODO https://github.com/kubernetes/kubeadm/issues/2890
-//   - Support custom environment variables in control plane components under `ClusterConfiguration`.
-//     Use `APIServer.ExtraEnvs`, `ControllerManager.ExtraEnvs`, `Scheduler.ExtraEnvs`, `Etcd.Local.ExtraEnvs`.
 //   - The ResetConfiguration API type is now supported in v1beta4. Users are able to reset a node by passing a --config file to "kubeadm reset".
 //   - `dry-run` mode in is now configurable in InitConfiguration and JoinConfiguration config files.
 //   - Replace the existing string/string extra argument maps with structured extra arguments that support duplicates.
@@ -47,7 +44,7 @@ limitations under the License.
 // configuration options defined in the kubeadm config file are also available as command line flags, but only
 // the most common/simple use case are supported with this approach.
 //
-// A kubeadm config file could contain multiple configuration types separated using three dashes ("---").
+// A kubeadm config file could contain multiple configuration types separated using three dashes (“---”).
 //
 // kubeadm supports the following configuration types:
 //

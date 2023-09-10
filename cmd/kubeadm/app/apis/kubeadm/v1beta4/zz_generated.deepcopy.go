@@ -159,13 +159,6 @@ func (in *ControlPlaneComponent) DeepCopyInto(out *ControlPlaneComponent) {
 		*out = make([]HostPathMount, len(*in))
 		copy(*out, *in)
 	}
-	if in.ExtraEnvs != nil {
-		in, out := &in.ExtraEnvs, &out.ExtraEnvs
-		*out = make([]corev1.EnvVar, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	return
 }
 
@@ -433,13 +426,6 @@ func (in *LocalEtcd) DeepCopyInto(out *LocalEtcd) {
 		in, out := &in.ExtraArgs, &out.ExtraArgs
 		*out = make([]Arg, len(*in))
 		copy(*out, *in)
-	}
-	if in.ExtraEnvs != nil {
-		in, out := &in.ExtraEnvs, &out.ExtraEnvs
-		*out = make([]corev1.EnvVar, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
 	}
 	if in.ServerCertSANs != nil {
 		in, out := &in.ServerCertSANs, &out.ServerCertSANs

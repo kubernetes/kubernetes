@@ -422,7 +422,6 @@ func Convert_kubeadm_ClusterConfiguration_To_v1beta4_ClusterConfiguration(in *ku
 func autoConvert_v1beta4_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *ControlPlaneComponent, out *kubeadm.ControlPlaneComponent, s conversion.Scope) error {
 	out.ExtraArgs = *(*[]kubeadm.Arg)(unsafe.Pointer(&in.ExtraArgs))
 	out.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
-	out.ExtraEnvs = *(*[]corev1.EnvVar)(unsafe.Pointer(&in.ExtraEnvs))
 	return nil
 }
 
@@ -434,7 +433,6 @@ func Convert_v1beta4_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *
 func autoConvert_kubeadm_ControlPlaneComponent_To_v1beta4_ControlPlaneComponent(in *kubeadm.ControlPlaneComponent, out *ControlPlaneComponent, s conversion.Scope) error {
 	out.ExtraArgs = *(*[]Arg)(unsafe.Pointer(&in.ExtraArgs))
 	out.ExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
-	out.ExtraEnvs = *(*[]corev1.EnvVar)(unsafe.Pointer(&in.ExtraEnvs))
 	return nil
 }
 
@@ -714,7 +712,6 @@ func autoConvert_v1beta4_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kube
 	}
 	out.DataDir = in.DataDir
 	out.ExtraArgs = *(*[]kubeadm.Arg)(unsafe.Pointer(&in.ExtraArgs))
-	out.ExtraEnvs = *(*[]corev1.EnvVar)(unsafe.Pointer(&in.ExtraEnvs))
 	out.ServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ServerCertSANs))
 	out.PeerCertSANs = *(*[]string)(unsafe.Pointer(&in.PeerCertSANs))
 	return nil
@@ -731,7 +728,6 @@ func autoConvert_kubeadm_LocalEtcd_To_v1beta4_LocalEtcd(in *kubeadm.LocalEtcd, o
 	}
 	out.DataDir = in.DataDir
 	out.ExtraArgs = *(*[]Arg)(unsafe.Pointer(&in.ExtraArgs))
-	out.ExtraEnvs = *(*[]corev1.EnvVar)(unsafe.Pointer(&in.ExtraEnvs))
 	out.ServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ServerCertSANs))
 	out.PeerCertSANs = *(*[]string)(unsafe.Pointer(&in.PeerCertSANs))
 	return nil

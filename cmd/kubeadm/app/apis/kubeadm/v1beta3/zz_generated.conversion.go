@@ -386,7 +386,6 @@ func autoConvert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(
 func autoConvert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in *kubeadm.ControlPlaneComponent, out *ControlPlaneComponent, s conversion.Scope) error {
 	// WARNING: in.ExtraArgs requires manual conversion: inconvertible types ([]k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm.Arg vs map[string]string)
 	out.ExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
-	// WARNING: in.ExtraEnvs requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -681,7 +680,6 @@ func autoConvert_kubeadm_LocalEtcd_To_v1beta3_LocalEtcd(in *kubeadm.LocalEtcd, o
 	}
 	out.DataDir = in.DataDir
 	// WARNING: in.ExtraArgs requires manual conversion: inconvertible types ([]k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm.Arg vs map[string]string)
-	// WARNING: in.ExtraEnvs requires manual conversion: does not exist in peer-type
 	out.ServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ServerCertSANs))
 	out.PeerCertSANs = *(*[]string)(unsafe.Pointer(&in.PeerCertSANs))
 	return nil

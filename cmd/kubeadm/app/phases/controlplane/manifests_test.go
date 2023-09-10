@@ -30,7 +30,6 @@ import (
 
 	"github.com/lithammer/dedent"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -52,18 +51,14 @@ func TestGetStaticPodSpecs(t *testing.T) {
 	// Creates a Cluster Configuration
 	cfg := &kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: "v1.9.0",
-		Scheduler: kubeadmapi.ControlPlaneComponent{ExtraEnvs: []v1.EnvVar{
-			{Name: "Foo", Value: "Bar"},
-		}},
 	}
 
 	// Executes GetStaticPodSpecs
-	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, []v1.EnvVar{})
+	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{})
 
 	var tests = []struct {
 		name          string
 		staticPodName string
-		env           []v1.EnvVar
 	}{
 		{
 			name:          "KubeAPIServer",
@@ -76,7 +71,6 @@ func TestGetStaticPodSpecs(t *testing.T) {
 		{
 			name:          "KubeScheduler",
 			staticPodName: kubeadmconstants.KubeScheduler,
-			env:           []v1.EnvVar{{Name: "Foo", Value: "Bar"}},
 		},
 	}
 
@@ -84,15 +78,12 @@ func TestGetStaticPodSpecs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// assert the spec for the staticPodName exists
 			if spec, ok := specs[tc.staticPodName]; ok {
+
 				// Assert each specs refers to the right pod
 				if spec.Spec.Containers[0].Name != tc.staticPodName {
 					t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expects %s", tc.staticPodName, spec.Spec.Containers[0].Name, tc.staticPodName)
 				}
-				if tc.env != nil {
-					if !reflect.DeepEqual(spec.Spec.Containers[0].Env, tc.env) {
-						t.Errorf("expected env: %v, got: %v", tc.env, spec.Spec.Containers[0].Env)
-					}
-				}
+
 			} else {
 				t.Errorf("getStaticPodSpecs didn't create spec for %s ", tc.staticPodName)
 			}
