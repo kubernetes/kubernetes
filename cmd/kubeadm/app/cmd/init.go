@@ -188,7 +188,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.InitConfigurati
 	)
 	flagSet.StringVar(
 		&cfg.CertificateKey, options.CertificateKey, "",
-		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
+		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret. The certificate key is a hex encoded string that is an AES key of size 32 bytes.",
 	)
 	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 }
