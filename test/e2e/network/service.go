@@ -3624,7 +3624,17 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.Logf("Collection of services has been deleted")
 	})
 
-	ginkgo.It("should serve endpoints on same port and different protocols", func(ctx context.Context) {
+	/*
+		Release: v1.29
+		Testname: Service, should serve endpoints on same port and different protocols.
+		Description: Create one service with two ports, same port number and different protocol TCP and UDP.
+		It MUST be able to forward traffic to both ports.
+		Update the Service to expose only the TCP port, it MUST succeed to connect to the TCP port and fail
+		to connect to the UDP port.
+		Update the Service to expose only the UDP port, it MUST succeed to connect to the UDP port and fail
+		to connect to the TCP port.
+	*/
+	framework.ConformanceIt("should serve endpoints on same port and different protocols", func(ctx context.Context) {
 		serviceName := "multiprotocol-test"
 		testLabels := map[string]string{"app": "multiport"}
 		ns := f.Namespace.Name
