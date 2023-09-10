@@ -61,49 +61,54 @@ type VolumeDeletionTest struct {
 	ExpectedFinalizer string
 }
 
-type pvDeleteionProtectionTestSuite struct {
+type pvDeletionProtectionTestSuite struct {
 	tsInfo storageframework.TestSuiteInfo
 }
 
-// InitTestSuite returns pvDeleteionProtectionTestSuite that implements TestSuite interface
+// InitTestSuite returns pvDeletionProtectionTestSuite that implements TestSuite interface
 // using custom test patterns
 func InitTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
-	return &pvDeleteionProtectionTestSuite{
+	return &pvDeletionProtectionTestSuite{
 		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "volume deletion",
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
+			FeatureTag: "[Feature:HonorPVReclaimPolicy]",
 		},
 	}
 }
 
 func InitPvDeletionProtectionTestSuite() storageframework.TestSuite {
 	patterns := []storageframework.TestPattern{
-		storageframework.DefaultFsDynamicPV,
-		storageframework.BlockVolModeDynamicPV,
+		storageframework.VolumeDelete,
 	}
 	return InitTestSuite(patterns)
 }
 
-func (p *pvDeleteionProtectionTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (p *pvDeletionProtectionTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	// Check preconditions.
+	if pattern.FeatureTag != "[Feature:HonorPVReclaimPolicy]" {
+		e2eskipper.Skipf("Suite %q, limiting only to HonorPVReclaimPolicy feature test, current: %q", p.tsInfo.Name, pattern.FeatureTag)
+	}
 	if pattern.VolType != storageframework.DynamicPV {
 		e2eskipper.Skipf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
 	}
 	dInfo := driver.GetDriverInfo()
-
+	if dInfo.Name == "nfs" {
+		e2eskipper.Skipf("Driver %s is not a in-tree volume", dInfo.Name)
+	}
 	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageframework.CapBlock] {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
 	}
 }
 
-func (p *pvDeleteionProtectionTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
+func (p *pvDeletionProtectionTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *pvDeleteionProtectionTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (p *pvDeletionProtectionTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
 		config *storageframework.PerTestConfig
 
@@ -168,7 +173,7 @@ func (p *pvDeleteionProtectionTestSuite) DefineTests(driver storageframework.Tes
 		}
 	}
 
-	ginkgo.It("HonorPVReclaimPolicy delete pv prior", func(ctx context.Context) {
+	ginkgo.It("delete pv prior", func(ctx context.Context) {
 		init(ctx)
 		SetupStorageClass(ctx, l.testCase.Client, l.testCase.Class)
 		l.testCase.TestVolumeDeletion(ctx)
@@ -236,11 +241,11 @@ func (t VolumeDeletionTest) checkVolumeDeletion(ctx context.Context, client clie
 	framework.ExpectNoError(err)
 	framework.Logf("pvc %q/%q deleted", claim.Name, claim.Namespace)
 
-	ginkgo.By("Wating for the pvc to be deleted")
+	ginkgo.By("Waiting for the pvc to be deleted")
 	framework.ExpectNoError(e2epv.WaitForPersistentVolumeClaimDeleted(ctx, client, claim.Namespace, claim.Name, 2*time.Second, 60*time.Second),
 		"Failed to delete PVC", claim.Name)
 
-	ginkgo.By("Wating for the pv to be deleted")
+	ginkgo.By("Waiting for the pv to be deleted")
 	framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(ctx, client, pv.Name, 2*time.Second, 60*time.Second),
 		"Failed to delete PV ", pv.Name)
 	framework.Logf("pv %q removed from the API server", pv.Name)
