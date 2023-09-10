@@ -16,14 +16,17 @@
 
 set -eux
 
-echo "Cloning kubernetes/kubectl" && mkdir -p /go/src/sigs.k8s.io && cd /go/src/sigs.k8s.io && git clone --depth=1 https://github.com/kubernetes/kubectl
-echo "Cloning golang/term" && cd /go/src && git clone --depth=1 https://github.com/golang/term.git
+cd "$(dirname "$0")"
+
+# TODO: Figure out how to nicely include these
+# echo "Cloning kubernetes/kubectl" && mkdir -p /go/src/sigs.k8s.io && cd /go/src/sigs.k8s.io && git clone --depth=1 https://github.com/kubernetes/kubectl
+# echo "Cloning golang/term" && cd /go/src && git clone --depth=1 https://github.com/golang/term.git
 
 # Install pyyaml as required by verify.publishing-bot
 python3 -m pip install --user --upgrade --no-cache-dir pyyaml
 
 # Copies over welcome message
-# cp .devcontainer/welcome-message.txt /usr/local/etc/vscode-dev-containers/first-run-notice.txt
+cp .devcontainer/welcome-message.txt /usr/local/etc/vscode-dev-containers/first-run-notice.txt
 
 git remote add upstream https://github.com/kubernetes/kubernetes.git
 # Never push to upstream master
