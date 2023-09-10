@@ -21,7 +21,6 @@
     "features": {
         // Install go latest. Was v1.19
         "ghcr.io/devcontainers/features/go:1": {
-            "version": "latest",
             "username": "root"
         },
         // Install kubectl, but skip minikube and helm
