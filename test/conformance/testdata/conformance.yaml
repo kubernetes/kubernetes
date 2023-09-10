@@ -2967,6 +2967,19 @@
     able to start with Secret and ConfigMap volumes mounted into the container.
   release: v1.13
   file: test/e2e/storage/empty_dir_wrapper.go
+- testname: PersistentVolumes(Claims), lifecycle
+  codename: '[sig-storage] PersistentVolumes CSI Conformance should run through the
+    lifecycle of a PV and a PVC [Conformance]'
+  description: Creating PV and PVC MUST succeed. Listing PVs with a labelSelector
+    MUST succeed. Listing PVCs in a namespace MUST succeed. Patching a PV MUST succeed
+    with its new label found. Patching a PVC MUST succeed with its new label found.
+    Reading a PV and PVC MUST succeed with required UID retrieved. Deleting a PVC
+    and PV MUST succeed and it MUST be confirmed. Replacement PV and PVC MUST be created.
+    Updating a PV MUST succeed with its new label found. Updating a PVC MUST succeed
+    with its new label found. Deleting the PVC and PV via deleteCollection MUST succeed
+    and it MUST be confirmed.
+  release: v1.29
+  file: test/e2e/storage/persistent_volumes.go
 - testname: Projected Volume, multiple projections
   codename: '[sig-storage] Projected combined should project all components that make
     up the projection API [Projection][NodeConformance] [Conformance]'
