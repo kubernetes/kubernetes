@@ -25,8 +25,6 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/utils/exec"
@@ -390,82 +388,4 @@ func (m fakePluginFactory) NewFlexVolumePlugin(_, driverName string, _ exec.Inte
 	}
 	// Dummy Flexvolume plugin. Prober never interacts with the plugin.
 	return &flexVolumePlugin{driverName: driverName}, nil
-}
-
-// testFlexVolumePlugin implements the volume.VolumePlugin interface for testing purposes
-type testFlexVolumePlugin struct {
-	driverName string
-}
-
-var _ volume.VolumePlugin = &testFlexVolumePlugin{}
-
-func (p *testFlexVolumePlugin) Init() error {
-	return nil
-}
-
-func (p *testFlexVolumePlugin) Name() string {
-	return p.driverName
-}
-
-func (p *testFlexVolumePlugin) GetPluginName() string {
-	return p.driverName
-}
-
-func (p *testFlexVolumePlugin) CanSupport(spec *volume.Spec) bool {
-	return true
-}
-
-func (p *testFlexVolumePlugin) ConstructVolumeSpec(volOptions volume.VolumeOptions, pod *v1.Pod, volumeName string) (*volume.Spec, error) {
-	// Implement the ConstructVolumeSpec method here (for simplicity, we can return a dummy volume spec).
-	return &volume.Spec{
-		Volume: &v1.Volume{
-			Name: volumeName,
-		},
-	}, nil
-}
-
-func (p *testFlexVolumePlugin) NewBuilder(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	return &testVolumeBuilder{}, nil
-}
-
-func (p *testFlexVolumePlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &testVolumeCleaner{}, nil
-}
-
-func TestTLSGRPCProbe(t *testing.T) {
-	// Arrange
-	fs := utilfs.NewTempFs()
-	watcher := newFakeWatcher()
-
-	// Create a test driver with UseTLS set to true
-	testDriverName := "test-driver-tls"
-	testDriverPath := filepath.Join(pluginDir, testDriverName)
-	installDriver(testDriverName, fs)
-	watcher.TriggerEvent(fsnotify.Create, testDriverPath)
-	watcher.TriggerEvent(fsnotify.Create, filepath.Join(testDriverPath, testDriverName))
-
-	// Create the prober with TLS options enabled
-	prober := &flexVolumeProber{
-		pluginDir:  pluginDir,
-		watcher:    watcher,
-		fs:         fs,
-		factory:    fakePluginFactory{},
-		UseTLS:     true,                   // Enable TLS
-		CACertFile: "/path/to/ca-cert.pem", // Path to the CA certificate file
-	}
-
-	// Initialize the gRPC client options
-	prober.initGRPCClient()
-
-	// Act
-	events, err := prober.Probe()
-
-	// Assert
-	assert.Equal(t, 1, len(events))
-	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
-	assert.Equal(t, testDriverName, events[0].PluginName)
-	assert.NoError(t, err)
-
-	// Close the gRPC client connection when it is no longer needed
-	prober.closeGRPCConnection()
 }

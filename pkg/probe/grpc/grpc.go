@@ -22,6 +22,7 @@ import (
 	"net"
 	"time"
 
+	"crypto/tls"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/probe"
+	"google.golang.org/grpc/credentials"
 )
 
 // Prober is an interface that defines the Probe function for doing GRPC readiness/liveness/startup checks.
@@ -39,24 +41,27 @@ type Prober interface {
 }
 
 type grpcProber struct {
+	tlsConfig *tls.Config // Add a TLS configuration field
 }
 
 // New Prober for execute grpc probe
-func New() Prober {
-	return grpcProber{}
+func New(tlsConfig *tls.Config) Prober {
+	return &grpcProber{
+		tlsConfig: tlsConfig,
+	}
 }
 
 // Probe executes a grpc call to check the liveness/readiness/startup of container.
 // Returns the Result status, command output, and errors if any.
 // Any failure is considered as a probe failure to mimic grpc_health_probe tool behavior.
 // err is always nil
-func (p grpcProber) Probe(host, service string, port int, timeout time.Duration) (probe.Result, string, error) {
+func (p *grpcProber) Probe(host, service string, port int, timeout time.Duration) (probe.Result, string, error) {
 	v := version.Get()
 
 	opts := []grpc.DialOption{
 		grpc.WithUserAgent(fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor)),
 		grpc.WithBlock(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()), //credentials are currently not supported
+		grpc.WithTransportCredentials(credentials.NewTLS(p.tlsConfig)), // Use TLS credentials
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return probe.ProbeDialer().DialContext(ctx, "tcp", addr)
 		}),

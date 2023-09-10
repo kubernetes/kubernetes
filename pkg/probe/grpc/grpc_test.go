@@ -32,6 +32,7 @@ import (
 	grpchealth "google.golang.org/grpc/health/grpc_health_v1"
 
 	"k8s.io/kubernetes/pkg/probe"
+	"crypto/tls"
 )
 
 func TestNew(t *testing.T) {
@@ -168,6 +169,23 @@ func TestGrpcProber_Probe(t *testing.T) {
 	})
 	t.Run("Should: not return error because check was success, when listen port is 0", func(t *testing.T) {
 		s := New()
+		lis, _ := net.Listen("tcp", ":0")
+		port := lis.Addr().(*net.TCPAddr).Port
+
+		grpcServer := grpc.NewServer()
+		defer grpcServer.Stop()
+		grpchealth.RegisterHealthServer(grpcServer, &successServerMock{})
+		go func() {
+			_ = grpcServer.Serve(lis)
+		}()
+		// take some time to wait server boot
+		time.Sleep(2 * time.Second)
+		p, _, err := s.Probe("0.0.0.0", "", port, time.Second*2)
+		assert.Equal(t, probe.Success, p)
+		assert.Equal(t, nil, err)
+	})
+	t.Run("Should: not return error because check was success with TLS", func(t *testing.T) {
+		s := New(&tls.Config{InsecureSkipVerify: true}) // Provide a TLS configuration with InsecureSkipVerify set to true
 		lis, _ := net.Listen("tcp", ":0")
 		port := lis.Addr().(*net.TCPAddr).Port
 

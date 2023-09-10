@@ -17,17 +17,13 @@ limitations under the License.
 package flexvolume
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -45,14 +41,6 @@ type flexVolumeProber struct {
 	fs             utilfs.Filesystem
 	probeAllNeeded bool
 	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the corresponding operation
-	// Add gRPC client field
-	grpcClient     *grpc.ClientConn
-	grpcClientOpts []grpc.DialOption
-
-	// Add TLS option for gRPC probes
-	UseTLS         bool   // Set to true to use TLS for gRPC probes
-	CACertFile     string // Path to the CA certificate file for gRPC TLS
-	grpcServerAddr string // Address of the gRPC server to connect to
 }
 
 // GetDynamicPluginProber creates dynamic plugin prober
@@ -78,42 +66,6 @@ func (prober *flexVolumeProber) Init() error {
 	}
 
 	return nil
-}
-
-// Initialize gRPC client options
-func (prober *flexVolumeProber) initGRPCClient() {
-	// Add TLS options if UseTLS is true
-	if prober.UseTLS {
-		creds, err := credentials.NewClientTLSFromFile(prober.CACertFile, "")
-		if err != nil {
-			klog.Warningf("Error loading CA certificate: %v", err)
-			return
-		}
-		prober.grpcClientOpts = append(prober.grpcClientOpts, grpc.WithTransportCredentials(creds))
-	} else {
-		prober.grpcClientOpts = append(prober.grpcClientOpts, grpc.WithInsecure())
-	}
-}
-
-// Create a gRPC client connection
-func (prober *flexVolumeProber) createGRPCClient() error {
-	// Set up a context with timeout for gRPC dial
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var err error
-	prober.grpcClient, err = grpc.DialContext(ctx, prober.grpcServerAddr, prober.grpcClientOpts...)
-	if err != nil {
-		return fmt.Errorf("error creating gRPC client connection: %v", err)
-	}
-	return nil
-}
-
-// Close the gRPC client connection
-func (prober *flexVolumeProber) closeGRPCClient() {
-	if prober.grpcClient != nil {
-		_ = prober.grpcClient.Close()
-	}
 }
 
 // If probeAllNeeded is true, probe all pluginDir
@@ -184,14 +136,6 @@ func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.Pr
 				driverDirName, pluginErr)
 			return probeEvent, pluginErr
 		}
-		if prober.UseTLS {
-			prober.initGRPCClient()
-			err := prober.createGRPCClient()
-			if err != nil {
-				klog.Warningf("Error creating gRPC client connection: %v", err)
-				// Return an error or handle it according to your needs
-			}
-		}
 		probeEvent.Plugin = plugin
 		probeEvent.PluginName = plugin.GetPluginName()
 	} else if op == volume.ProbeRemove {
@@ -202,11 +146,6 @@ func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.Pr
 		return probeEvent, fmt.Errorf("Unknown Operation on directory: %s. ", driverDirName)
 	}
 	return probeEvent, nil
-}
-
-// When the prober is no longer needed, close the gRPC client connection
-func (prober *flexVolumeProber) closeGRPCConnection() {
-	prober.closeGRPCClient()
 }
 
 func (prober *flexVolumeProber) handleWatchEvent(event fsnotify.Event) error {
