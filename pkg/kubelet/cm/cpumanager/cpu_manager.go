@@ -380,23 +380,27 @@ func (m *manager) removeStaleState() {
 	assignments := m.state.GetCPUAssignments()
 	for podUID := range assignments {
 		for containerName := range assignments[podUID] {
-			if _, ok := activeContainers[podUID][containerName]; !ok {
-				klog.V(2).InfoS("RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
-				err := m.policyRemoveContainerByRef(podUID, containerName)
-				if err != nil {
-					klog.ErrorS(err, "RemoveStaleState: failed to remove container", "podUID", podUID, "containerName", containerName)
-				}
+			if _, ok := activeContainers[podUID][containerName]; ok {
+				klog.V(4).InfoS("RemoveStaleState: container still active", "podUID", podUID, "containerName", containerName)
+				continue
 			}
-		}
-	}
-
-	m.containerMap.Visit(func(podUID, containerName, containerID string) {
-		if _, ok := activeContainers[podUID][containerName]; !ok {
 			klog.V(2).InfoS("RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
 			err := m.policyRemoveContainerByRef(podUID, containerName)
 			if err != nil {
 				klog.ErrorS(err, "RemoveStaleState: failed to remove container", "podUID", podUID, "containerName", containerName)
 			}
+		}
+	}
+
+	m.containerMap.Visit(func(podUID, containerName, containerID string) {
+		if _, ok := activeContainers[podUID][containerName]; ok {
+			klog.V(4).InfoS("RemoveStaleState: containerMap: container still active", "podUID", podUID, "containerName", containerName)
+			return
+		}
+		klog.V(2).InfoS("RemoveStaleState: containerMap: removing container", "podUID", podUID, "containerName", containerName)
+		err := m.policyRemoveContainerByRef(podUID, containerName)
+		if err != nil {
+			klog.ErrorS(err, "RemoveStaleState: containerMap: failed to remove container", "podUID", podUID, "containerName", containerName)
 		}
 	})
 }
