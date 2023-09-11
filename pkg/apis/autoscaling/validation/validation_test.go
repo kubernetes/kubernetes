@@ -1075,7 +1075,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 							Name: "somemetric",
 						},
 						Target: autoscaling.MetricTarget{
-							Type: autoscaling.ValueMetricType,
+							Type:  autoscaling.ValueMetricType,
 							Value: resource.NewMilliQuantity(100, resource.DecimalSI),
 						},
 					},
