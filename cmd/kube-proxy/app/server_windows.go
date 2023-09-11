@@ -30,6 +30,7 @@ import (
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
@@ -48,6 +49,12 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 // platform-specific setup.
 func (s *ProxyServer) platformSetup() error {
 	winkernel.RegisterMetrics()
+	// Preserve backward-compatibility with the old secondary IP behavior
+	if s.PrimaryIPFamily == v1.IPv4Protocol {
+		s.NodeIPs[v1.IPv6Protocol] = net.IPv6zero
+	} else {
+		s.NodeIPs[v1.IPv4Protocol] = net.IPv4zero
+	}
 	return nil
 }
 
