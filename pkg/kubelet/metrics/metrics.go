@@ -36,6 +36,7 @@ const (
 	PodWorkerDurationKey               = "pod_worker_duration_seconds"
 	PodStartDurationKey                = "pod_start_duration_seconds"
 	PodStartSLIDurationKey             = "pod_start_sli_duration_seconds"
+	ContainerPostStartHookDurationKey  = "container_poststart_hook_duration_seconds"
 	CgroupManagerOperationsKey         = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
@@ -736,6 +737,17 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// ContainerPostStartHookDuration is the duration of container's PostStart hook.
+	ContainerPostStartHookDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ContainerPostStartHookDurationKey,
+			Help:           "Duration in seconds to execute a container's PostStart hook.",
+			Buckets:        []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600},
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -800,6 +812,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumes)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumesErrors)
+		legacyregistry.MustRegister(ContainerPostStartHookDuration)
 
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
