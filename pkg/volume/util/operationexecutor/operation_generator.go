@@ -503,9 +503,13 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		migrated := getMigratedStatusBySpec(volumeToDetach.VolumeSpec)
 
 		if err != nil {
-			// On failure, add volume back to ReportAsAttached list
-			actualStateOfWorld.AddVolumeToReportAsAttached(
-				volumeToDetach.VolumeName, volumeToDetach.NodeName)
+			// On failure, mark the volume as uncertain. Attach() must succeed before adding the volume back
+			// to node status as attached.
+			uncertainError := actualStateOfWorld.MarkVolumeAsUncertain(
+				volumeToDetach.VolumeName, volumeToDetach.VolumeSpec, volumeToDetach.NodeName)
+			if uncertainError != nil {
+				klog.Errorf("DetachVolume.MarkVolumeAsUncertain failed to add the volume %q to actual state after detach error: %s", volumeToDetach.VolumeName, uncertainError)
+			}
 			eventErr, detailedErr := volumeToDetach.GenerateError("DetachVolume.Detach failed", err)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
