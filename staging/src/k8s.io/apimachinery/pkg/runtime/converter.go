@@ -608,6 +608,13 @@ func DeepCopyJSON(x map[string]interface{}) map[string]interface{} {
 	return DeepCopyJSONValue(x).(map[string]interface{})
 }
 
+// JSONCopyable represents valid value type for json deep copy.
+//
+// NOTE: actual elems type of Slice and Map might not comply with this constraint.
+type JSONCopyable interface {
+	string | int64 | bool | float64 | encodingjson.Number | []any | map[string]any
+}
+
 // DeepCopyJSONValue deep copies the passed value, assuming it is a valid JSON representation i.e. only contains
 // types produced by json.Unmarshal() and also int64.
 // bool, int64, float64, string, []interface{}, map[string]interface{}, json.Number and nil
