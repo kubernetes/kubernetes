@@ -658,7 +658,7 @@ var _ storageframework.InlineVolumeTestDriver = &hostPathDriver{}
 func InitHostPathDriver() storageframework.TestDriver {
 	return &hostPathDriver{
 		driverInfo: storageframework.DriverInfo{
-			Name:             "hostPath",
+			Name:             "host-path",
 			InTreePluginName: "kubernetes.io/host-path",
 			MaxFileSize:      storageframework.FileSizeMedium,
 			SupportedFsType: sets.NewString(
@@ -714,8 +714,8 @@ func (h *hostPathDriver) CreateVolume(ctx context.Context, config *storageframew
 	return nil
 }
 
-func (n *hostPathDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
-	provisioner := config.GetUniqueDriverName()
+func (h *hostPathDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+	provisioner := "kubernetes.io/host-path"
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)

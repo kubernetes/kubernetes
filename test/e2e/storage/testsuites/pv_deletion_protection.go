@@ -75,7 +75,6 @@ func InitTestSuite(patterns []storageframework.TestPattern) storageframework.Tes
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
-			FeatureTag: "[Feature:HonorPVReclaimPolicy]",
 		},
 	}
 }

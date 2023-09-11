@@ -343,7 +343,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
-		if strings.HasPrefix(driverName, "hostPath") {
+		if strings.HasPrefix(driverName, "host-path") {
 			// TODO: This skip should be removed once #61446 is fixed
 			e2eskipper.Skipf("Driver %s does not support reconstruction, skipping", driverName)
 		}
@@ -356,7 +356,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
-		if strings.HasPrefix(driverName, "hostPath") {
+		if strings.HasPrefix(driverName, "host-path") {
 			// TODO: This skip should be removed once #61446 is fixed
 			e2eskipper.Skipf("Driver %s does not support reconstruction, skipping", driverName)
 		}
