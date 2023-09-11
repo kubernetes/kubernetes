@@ -87,18 +87,17 @@ func InitPvDeletionProtectionTestSuite() storageframework.TestSuite {
 }
 
 func (p *pvDeletionProtectionTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
-	// Check preconditions.
-	if pattern.FeatureTag != "[Feature:HonorPVReclaimPolicy]" {
-		e2eskipper.Skipf("Suite %q, limiting only to HonorPVReclaimPolicy feature test, current: %q", p.tsInfo.Name, pattern.FeatureTag)
-	}
 	if pattern.VolType != storageframework.DynamicPV {
+		framework.Logf("Skipping HonorPVReclaimPolicy 1")
 		e2eskipper.Skipf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
 	}
 	dInfo := driver.GetDriverInfo()
 	if dInfo.Name == "nfs" {
+		framework.Logf("Skipping HonorPVReclaimPolicy 2")
 		e2eskipper.Skipf("Driver %s is not a in-tree volume", dInfo.Name)
 	}
 	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageframework.CapBlock] {
+		framework.Logf("Skipping HonorPVReclaimPolicy 3")
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
 	}
 }
