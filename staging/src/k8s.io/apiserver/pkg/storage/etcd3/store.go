@@ -621,7 +621,12 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	return s.getList(ctx, preparedKey, opts, listObj)
 }
 
+// getList gets a single object and unmarshall objects found at key into a *List api object (an object
+// that satisfies runtime.IsList definition).
 func (s *store) getList(ctx context.Context, preparedKey string, opts storage.ListOptions, listObj runtime.Object) error {
+	if opts.Recursive {
+		panic("getList should be executed only for non-recursive list request")
+	}
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -631,13 +636,6 @@ func (s *store) getList(ctx context.Context, preparedKey string, opts storage.Li
 		return fmt.Errorf("need ptr to slice: %v", err)
 	}
 
-	// For recursive lists, we need to make sure the key ended with "/" so that we only
-	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
-	// with prefix "/a" will return all three, while with prefix "/a/" will return only
-	// "/a/b" which is the correct answer.
-	if opts.Recursive && !strings.HasSuffix(preparedKey, "/") {
-		preparedKey += "/"
-	}
 	keyPrefix := preparedKey
 
 	// set the appropriate clientv3 options to filter the returned data set
@@ -662,47 +660,21 @@ func (s *store) getList(ctx context.Context, preparedKey string, opts storage.Li
 		fromRV = &parsedRV
 	}
 
-	var continueRV, withRev int64
+	var withRev int64
 	var continueKey string
-	switch {
-	case opts.Recursive && s.pagingEnabled && len(opts.Predicate.Continue) > 0:
-		continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, keyPrefix)
-		if err != nil {
-			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
-		}
-
-		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
-		}
-		preparedKey = continueKey
-		// If continueRV > 0, the LIST request needs a specific resource version.
-		// continueRV==0 is invalid.
-		// If continueRV < 0, the request is for the latest resource version.
-		if continueRV > 0 {
-			withRev = continueRV
-		}
-	default:
-		if fromRV != nil {
-			switch opts.ResourceVersionMatch {
-			case metav1.ResourceVersionMatchNotOlderThan:
-				// The not older than constraint is checked after we get a response from etcd,
-				// and returnedRV is then set to the revision we get from the etcd response.
-			case metav1.ResourceVersionMatchExact:
-				withRev = int64(*fromRV)
-			case "": // legacy case
-				if opts.Recursive && s.pagingEnabled && opts.Predicate.Limit > 0 && *fromRV > 0 {
-					withRev = int64(*fromRV)
-				}
-			default:
-				return fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
-			}
+	if fromRV != nil {
+		switch opts.ResourceVersionMatch {
+		case metav1.ResourceVersionMatchNotOlderThan:
+			// The not older than constraint is checked after we get a response from etcd,
+			// and returnedRV is then set to the revision we get from the etcd response.
+		case metav1.ResourceVersionMatchExact:
+			withRev = int64(*fromRV)
+		case "": // legacy case
+		default:
+			return fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
 		}
 	}
 
-	if opts.Recursive {
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
-		options = append(options, clientv3.WithRange(rangeEnd))
-	}
 	if withRev != 0 {
 		options = append(options, clientv3.WithRev(withRev))
 	}
@@ -721,9 +693,6 @@ func (s *store) getList(ctx context.Context, preparedKey string, opts storage.Li
 	}()
 
 	metricsOp := "get"
-	if opts.Recursive {
-		metricsOp = "list"
-	}
 
 	for {
 		startTime := time.Now()
@@ -831,6 +800,9 @@ func (s *store) getList(ctx context.Context, preparedKey string, opts storage.Li
 }
 
 func (s *store) list(ctx context.Context, preparedKey string, opts storage.ListOptions, listObj runtime.Object) error {
+	if !opts.Recursive {
+		panic("list should be executed only for non-recursive list request")
+	}
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -874,7 +846,7 @@ func (s *store) list(ctx context.Context, preparedKey string, opts storage.ListO
 	var continueRV, withRev int64
 	var continueKey string
 	switch {
-	case opts.Recursive && s.pagingEnabled && len(opts.Predicate.Continue) > 0:
+	case s.pagingEnabled && len(opts.Predicate.Continue) > 0:
 		continueKey, continueRV, err = storage.DecodeContinue(opts.Predicate.Continue, keyPrefix)
 		if err != nil {
 			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
@@ -899,7 +871,7 @@ func (s *store) list(ctx context.Context, preparedKey string, opts storage.ListO
 			case metav1.ResourceVersionMatchExact:
 				withRev = int64(*fromRV)
 			case "": // legacy case
-				if opts.Recursive && s.pagingEnabled && opts.Predicate.Limit > 0 && *fromRV > 0 {
+				if s.pagingEnabled && opts.Predicate.Limit > 0 && *fromRV > 0 {
 					withRev = int64(*fromRV)
 				}
 			default:
@@ -908,10 +880,8 @@ func (s *store) list(ctx context.Context, preparedKey string, opts storage.ListO
 		}
 	}
 
-	if opts.Recursive {
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
-		options = append(options, clientv3.WithRange(rangeEnd))
-	}
+	rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
+	options = append(options, clientv3.WithRange(rangeEnd))
 	if withRev != 0 {
 		options = append(options, clientv3.WithRev(withRev))
 	}
@@ -929,10 +899,7 @@ func (s *store) list(ctx context.Context, preparedKey string, opts storage.ListO
 		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, numEvald, numReturn)
 	}()
 
-	metricsOp := "get"
-	if opts.Recursive {
-		metricsOp = "list"
-	}
+	metricsOp := "list"
 
 	for {
 		startTime := time.Now()
