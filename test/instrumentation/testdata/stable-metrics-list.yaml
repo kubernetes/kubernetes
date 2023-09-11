@@ -33,8 +33,6 @@
   - completion_mode
   - result
   buckets:
-  - 0.001
-  - 0.002
   - 0.004
   - 0.008
   - 0.016
@@ -48,6 +46,8 @@
   - 4.096
   - 8.192
   - 16.384
+  - 32.768
+  - 65.536
 - name: job_syncs_total
   subsystem: job_controller
   help: The number of job syncs
