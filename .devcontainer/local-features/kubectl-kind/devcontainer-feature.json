@@ -13,6 +13,6 @@
         }
     },
     "installsAfter": [
-        "./local-features/go"
+        "k8s-go"
     ]
 }

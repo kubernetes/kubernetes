@@ -3,6 +3,6 @@
     "name": "Kubetest2",
     "description": "Kubetest2 a framework for deploying Kubernetes clusters and running end to end tests",
     "installsAfter": [
-        "./local-features/go"
+        "k8s-go"
     ]
 }

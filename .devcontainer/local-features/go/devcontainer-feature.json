@@ -1,5 +1,5 @@
 {
-    "id": "go",
+    "id": "k8s-go",
     "version": "1.2.0",
     "name": "Go",
     "documentationURL": "https://github.com/devcontainers/features/tree/main/src/go",
