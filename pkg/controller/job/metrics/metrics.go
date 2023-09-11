@@ -38,7 +38,7 @@ var (
 			Name:           "job_sync_duration_seconds",
 			Help:           "The time it took to sync a job",
 			StabilityLevel: metrics.STABLE,
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.004, 2, 15),
 		},
 		[]string{"completion_mode", "result", "action"},
 	)
