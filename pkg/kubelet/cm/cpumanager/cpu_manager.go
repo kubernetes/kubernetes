@@ -381,7 +381,7 @@ func (m *manager) removeStaleState() {
 	for podUID := range assignments {
 		for containerName := range assignments[podUID] {
 			if _, ok := activeContainers[podUID][containerName]; !ok {
-				klog.ErrorS(nil, "RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
+				klog.V(2).InfoS("RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
 				err := m.policyRemoveContainerByRef(podUID, containerName)
 				if err != nil {
 					klog.ErrorS(err, "RemoveStaleState: failed to remove container", "podUID", podUID, "containerName", containerName)
@@ -392,7 +392,7 @@ func (m *manager) removeStaleState() {
 
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
 		if _, ok := activeContainers[podUID][containerName]; !ok {
-			klog.ErrorS(nil, "RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
+			klog.V(2).InfoS("RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
 			err := m.policyRemoveContainerByRef(podUID, containerName)
 			if err != nil {
 				klog.ErrorS(err, "RemoveStaleState: failed to remove container", "podUID", podUID, "containerName", containerName)
