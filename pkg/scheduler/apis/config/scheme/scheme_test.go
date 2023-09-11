@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
@@ -196,7 +196,7 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName:            "default-scheduler",
-					PercentageOfNodesToScore: pointer.Int32(20),
+					PercentageOfNodesToScore: ptr.To[int32](20),
 					Plugins:                  defaults.PluginsV1,
 					PluginConfig:             defaults.PluginConfigsV1,
 				},
@@ -525,7 +525,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
 									Object: &v1.InterPodAffinityArgs{
-										HardPodAffinityWeight: pointer.Int32(5),
+										HardPodAffinityWeight: ptr.To[int32](5),
 									},
 								},
 							},
@@ -533,7 +533,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								Name: "VolumeBinding",
 								Args: runtime.RawExtension{
 									Object: &v1.VolumeBindingArgs{
-										BindTimeoutSeconds: pointer.Int64(300),
+										BindTimeoutSeconds: ptr.To[int64](300),
 										Shape: []v1.UtilizationShapePoint{
 											{
 												Utilization: 0,

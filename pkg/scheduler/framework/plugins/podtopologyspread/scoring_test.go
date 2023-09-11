@@ -37,7 +37,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var podTopologySpreadFunc = frameworkruntime.FactoryAdapter(feature.Features{}, New)
@@ -155,8 +155,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2), topologyNormalizingWeight(3)},
 			},
@@ -187,8 +187,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -228,7 +228,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New("node-x"),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(2)},
 			},
@@ -270,8 +270,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64(0),
-					{key: v1.LabelTopologyZone, value: ""}:     pointer.Int64(0),
+					{key: v1.LabelTopologyZone, value: "mars"}: ptr.To[int64](0),
+					{key: v1.LabelTopologyZone, value: ""}:     ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(4), topologyNormalizingWeight(2)},
 			},
@@ -321,7 +321,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "planet", value: "mars"}: pointer.Int64(0),
+					{key: "planet", value: "mars"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
 			},
@@ -362,7 +362,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{"planet", "mars"}: pointer.Int64(0),
+					{"planet", "mars"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1)},
 			},
@@ -394,8 +394,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -428,8 +428,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -462,8 +462,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -496,8 +496,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -529,8 +529,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -562,8 +562,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -1089,7 +1089,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				"node",
 				v1.ScheduleAnyway,
 				fooSelector,
-				pointer.Int32(10), // larger than the number of domains(3)
+				ptr.To[int32](10), // larger than the number of domains(3)
 				nil,
 				nil,
 				nil,

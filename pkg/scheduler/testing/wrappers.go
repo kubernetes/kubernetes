@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var zero int64
@@ -255,7 +255,7 @@ func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *P
 			APIVersion: gvk.GroupVersion().String(),
 			Kind:       gvk.Kind,
 			Name:       name,
-			Controller: pointer.Bool(true),
+			Controller: ptr.To(true),
 		},
 	}
 	return p
@@ -889,7 +889,7 @@ func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema
 			Kind:       gvk.Kind,
 			Name:       name,
 			UID:        types.UID(uid),
-			Controller: pointer.Bool(true),
+			Controller: ptr.To(true),
 		},
 	}
 	return wrapper
@@ -971,8 +971,8 @@ func (wrapper *PodSchedulingWrapper) OwnerReference(name, uid string, gvk schema
 			Kind:               gvk.Kind,
 			Name:               name,
 			UID:                types.UID(uid),
-			Controller:         pointer.Bool(true),
-			BlockOwnerDeletion: pointer.Bool(true),
+			Controller:         ptr.To(true),
+			BlockOwnerDeletion: ptr.To(true),
 		},
 	}
 	return wrapper

@@ -32,6 +32,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/utils/ptr"
 )
 
 type fakePodLister struct {
@@ -108,10 +109,6 @@ kube_pod_resource_request{namespace="test",node="node-one",pod="foo",priority=""
 }
 
 func Test_podResourceCollector_CollectWithStability(t *testing.T) {
-	int32p := func(i int32) *int32 {
-		return &i
-	}
-
 	tests := []struct {
 		name string
 
@@ -291,7 +288,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 					Spec: v1.PodSpec{
 						SchedulerName: "default-scheduler",
-						Priority:      int32p(0),
+						Priority:      ptr.To[int32](0),
 						NodeName:      "node-one",
 						Containers: []v1.Container{
 							{Resources: v1.ResourceRequirements{Requests: v1.ResourceList{"cpu": resource.MustParse("1")}}},

@@ -54,7 +54,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSchedulerCreation(t *testing.T) {
@@ -438,7 +438,7 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 		},
 		{
 			name:                           "percentageOfNodesScore is not nil",
-			percentageOfNodesToScoreConfig: pointer.Int32(10),
+			percentageOfNodesToScoreConfig: ptr.To[int32](10),
 			wantedPercentageOfNodesToScore: 10,
 		},
 	}

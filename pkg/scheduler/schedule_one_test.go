@@ -66,7 +66,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -2179,7 +2179,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.New("node2"),
-			wantEvaluatedNodes: pointer.Int32(1),
+			wantEvaluatedNodes: ptr.To[int32](1),
 		},
 		{
 			name: "test prefilter plugin returning non-intersecting nodes",
@@ -2277,7 +2277,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.New("node2", "node3"),
-			wantEvaluatedNodes: pointer.Int32(3),
+			wantEvaluatedNodes: ptr.To[int32](3),
 		},
 		{
 			name: "test all prescore plugins return skip",
@@ -2923,7 +2923,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 		},
 		{
 			name:              "set profile percentageOfNodesToScore and nodes number not more than 50",
-			profilePercentage: pointer.Int32(40),
+			profilePercentage: ptr.To[int32](40),
 			numAllNodes:       10,
 			wantNumNodes:      10,
 		},
@@ -2934,14 +2934,14 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 		},
 		{
 			name:              "set profile percentageOfNodesToScore and nodes number more than 50",
-			profilePercentage: pointer.Int32(40),
+			profilePercentage: ptr.To[int32](40),
 			numAllNodes:       1000,
 			wantNumNodes:      400,
 		},
 		{
 			name:              "set global and profile percentageOfNodesToScore and nodes number more than 50",
 			globalPercentage:  100,
-			profilePercentage: pointer.Int32(40),
+			profilePercentage: ptr.To[int32](40),
 			numAllNodes:       1000,
 			wantNumNodes:      400,
 		},
@@ -2958,7 +2958,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 		},
 		{
 			name:              "set profile percentageOfNodesToScore and nodes number more than 50*125",
-			profilePercentage: pointer.Int32(40),
+			profilePercentage: ptr.To[int32](40),
 			numAllNodes:       6000,
 			wantNumNodes:      2400,
 		},
