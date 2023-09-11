@@ -11061,12 +11061,17 @@ func TestValidatePodUpdate(t *testing.T) {
 		err  string
 		test string
 	}{
-		{new: core.Pod{}, old: core.Pod{}, err: "", test: "nothing"}, {
+		{
+			new: core.Pod{},
+			old: core.Pod{},
+			err: "", test: "nothing",
+		}, {
 			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			},
 			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Status:     core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			err:  "metadata.name",
 			test: "ids",
@@ -11232,6 +11237,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						ImagePullPolicy:          "Always",
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			err:  "",
 			test: "image change",
@@ -11257,6 +11263,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						ImagePullPolicy:          "Always",
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			err:  "",
 			test: "init container image change",
@@ -11331,11 +11338,14 @@ func TestValidatePodUpdate(t *testing.T) {
 				Spec: core.PodSpec{},
 			},
 			old: core.Pod{
-				Spec: core.PodSpec{},
+				Spec:   core.PodSpec{},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			err:  "",
 			test: "activeDeadlineSeconds no change, nil",
-		}, {
+		},
+
+		{
 			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
@@ -11354,7 +11364,9 @@ func TestValidatePodUpdate(t *testing.T) {
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			old:  core.Pod{},
+			old: core.Pod{
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
+			},
 			err:  "",
 			test: "activeDeadlineSeconds change to positive from nil",
 		}, {
@@ -11367,10 +11379,12 @@ func TestValidatePodUpdate(t *testing.T) {
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			err:  "",
 			test: "activeDeadlineSeconds change to smaller positive",
-		}, {
+		},
+		{
 			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
@@ -11466,6 +11480,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "",
 			test: "cpu limit change",
@@ -11497,6 +11512,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "",
 			test: "memory limit change",
@@ -11559,6 +11575,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "",
 			test: "cpu request change",
@@ -11590,6 +11607,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "",
 			test: "memory request change",
@@ -11654,6 +11672,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSGuaranteed},
 			},
 			err:  "",
 			test: "Pod QoS unchanged, guaranteed -> guaranteed",
@@ -11687,6 +11706,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable",
@@ -11719,6 +11739,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable, add limits",
@@ -11751,6 +11772,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable, remove limits",
@@ -11783,6 +11805,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable, add requests",
@@ -11815,6 +11838,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "",
 			test: "Pod QoS unchanged, burstable -> burstable, remove requests",
@@ -11848,6 +11872,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSGuaranteed},
 			},
 			err:  "Pod QoS is immutable",
 			test: "Pod QoS change, guaranteed -> burstable",
@@ -11880,6 +11905,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "Pod QoS is immutable",
 			test: "Pod QoS change, burstable -> guaranteed",
@@ -11909,6 +11935,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Image:                    "foo:V2",
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			err:  "Pod QoS is immutable",
 			test: "Pod QoS change, besteffort -> burstable",
@@ -11938,6 +11965,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBurstable},
 			},
 			err:  "Pod QoS is immutable",
 			test: "Pod QoS change, burstable -> besteffort",
@@ -12069,7 +12097,9 @@ func TestValidatePodUpdate(t *testing.T) {
 				Spec: core.PodSpec{
 					NodeName:    "node1",
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}},
-				}},
+				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
+			},
 			err:  "",
 			test: "modified tolerationSeconds in existing toleration value in pod spec updates",
 		}, {
@@ -12133,6 +12163,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					NodeName:    "node1",
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			err:  "",
 			test: "added valid new toleration to existing tolerations in pod spec updates",
@@ -12232,6 +12263,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				Spec: core.PodSpec{
 					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			err:  "",
 			test: "update termination grace period seconds",
@@ -12338,7 +12370,9 @@ func TestValidatePodUpdate(t *testing.T) {
 					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
 				},
 			},
-			old:  core.Pod{},
+			old: core.Pod{
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
+			},
 			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'foo'",
 			test: "update pod spec schedulingGates: add new scheduling gate",
 		}, {
@@ -12373,6 +12407,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				Spec: core.PodSpec{
 					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			err:  "",
 			test: "update pod spec schedulingGates: legal deletion",
@@ -12397,6 +12432,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				Spec: core.PodSpec{
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
@@ -12472,6 +12508,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
@@ -12525,6 +12562,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
@@ -12658,6 +12696,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
@@ -12967,6 +13006,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
@@ -13010,6 +13050,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
@@ -13062,6 +13103,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
@@ -13090,6 +13132,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
@@ -13121,6 +13164,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
@@ -13175,6 +13219,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Affinity:        nil,
 					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
 				},
+				Status: core.PodStatus{QOSClass: core.PodQOSBestEffort},
 			},
 			new: core.Pod{
 				Spec: core.PodSpec{
