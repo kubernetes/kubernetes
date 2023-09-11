@@ -3,6 +3,6 @@
     "name": "Kubetest2",
     "description": "Kubetest2 a framework for deploying Kubernetes clusters and running end to end tests",
     "installsAfter": [
-        "k8s-go"
+        "ghcr.io/devcontainers/features/go"
     ]
 }
