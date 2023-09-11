@@ -25,6 +25,6 @@ python3 -m pip install --user --upgrade --no-cache-dir pyyaml
 # Copies over welcome message
 cp .devcontainer/welcome-message.txt /usr/local/etc/vscode-dev-containers/first-run-notice.txt
 
-git remote add upstream https://github.com/kubernetes/kubernetes.git
+git remote add upstream https://github.com/kubernetes/kubernetes.git || true
 # Never push to upstream master
 git remote set-url --push upstream no_push
