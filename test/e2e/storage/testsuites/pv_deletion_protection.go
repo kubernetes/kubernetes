@@ -81,7 +81,7 @@ func InitTestSuite(patterns []storageframework.TestPattern) storageframework.Tes
 
 func InitPvDeletionProtectionTestSuite() storageframework.TestSuite {
 	patterns := []storageframework.TestPattern{
-		storageframework.VolumeDelete,
+		storageframework.DefaultFsDynamicPV,
 	}
 	return InitTestSuite(patterns)
 }
@@ -162,7 +162,7 @@ func (p *pvDeletionProtectionTestSuite) DefineTests(driver storageframework.Test
 		}
 	}
 
-	ginkgo.It("delete pv prior", func(ctx context.Context) {
+	ginkgo.It("[Feature:HonorPVReclaimPolicy] delete pv prior", func(ctx context.Context) {
 		init(ctx)
 		SetupStorageClass(ctx, l.testCase.Client, l.testCase.Class)
 		l.testCase.TestVolumeDeletion(ctx)
