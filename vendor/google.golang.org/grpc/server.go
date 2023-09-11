@@ -43,7 +43,6 @@ import (
 	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/internal/binarylog"
 	"google.golang.org/grpc/internal/channelz"
-	"google.golang.org/grpc/internal/grpcrand"
 	"google.golang.org/grpc/internal/grpcsync"
 	"google.golang.org/grpc/internal/grpcutil"
 	"google.golang.org/grpc/internal/transport"
@@ -146,7 +145,7 @@ type Server struct {
 	channelzID *channelz.Identifier
 	czData     *channelzData
 
-	serverWorkerChannels []chan *serverWorkerData
+	serverWorkerChannel chan *serverWorkerData
 }
 
 type serverOptions struct {
@@ -175,6 +174,7 @@ type serverOptions struct {
 	maxHeaderListSize     *uint32
 	headerTableSize       *uint32
 	numServerWorkers      uint32
+	recvBufferPool        SharedBufferPool
 }
 
 var defaultServerOptions = serverOptions{
@@ -183,6 +183,7 @@ var defaultServerOptions = serverOptions{
 	connectionTimeout:     120 * time.Second,
 	writeBufferSize:       defaultWriteBufSize,
 	readBufferSize:        defaultReadBufSize,
+	recvBufferPool:        nopBufferPool{},
 }
 var globalServerOptions []ServerOption
 
@@ -553,6 +554,27 @@ func NumStreamWorkers(numServerWorkers uint32) ServerOption {
 	})
 }
 
+// RecvBufferPool returns a ServerOption that configures the server
+// to use the provided shared buffer pool for parsing incoming messages. Depending
+// on the application's workload, this could result in reduced memory allocation.
+//
+// If you are unsure about how to implement a memory pool but want to utilize one,
+// begin with grpc.NewSharedBufferPool.
+//
+// Note: The shared buffer pool feature will not be active if any of the following
+// options are used: StatsHandler, EnableTracing, or binary logging. In such
+// cases, the shared buffer pool will be ignored.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+// later release.
+func RecvBufferPool(bufferPool SharedBufferPool) ServerOption {
+	return newFuncServerOption(func(o *serverOptions) {
+		o.recvBufferPool = bufferPool
+	})
+}
+
 // serverWorkerResetThreshold defines how often the stack must be reset. Every
 // N requests, by spawning a new goroutine in its place, a worker can reset its
 // stack so that large stacks don't live in memory forever. 2^16 should allow
@@ -561,40 +583,38 @@ func NumStreamWorkers(numServerWorkers uint32) ServerOption {
 const serverWorkerResetThreshold = 1 << 16
 
 // serverWorkers blocks on a *transport.Stream channel forever and waits for
-// data to be fed by serveStreams. This allows different requests to be
+// data to be fed by serveStreams. This allows multiple requests to be
 // processed by the same goroutine, removing the need for expensive stack
 // re-allocations (see the runtime.morestack problem [1]).
 //
 // [1] https://github.com/golang/go/issues/18138
-func (s *Server) serverWorker(ch chan *serverWorkerData) {
-	// To make sure all server workers don't reset at the same time, choose a
-	// random number of iterations before resetting.
-	threshold := serverWorkerResetThreshold + grpcrand.Intn(serverWorkerResetThreshold)
-	for completed := 0; completed < threshold; completed++ {
-		data, ok := <-ch
+func (s *Server) serverWorker() {
+	for completed := 0; completed < serverWorkerResetThreshold; completed++ {
+		data, ok := <-s.serverWorkerChannel
 		if !ok {
 			return
 		}
-		s.handleStream(data.st, data.stream, s.traceInfo(data.st, data.stream))
-		data.wg.Done()
+		s.handleSingleStream(data)
 	}
-	go s.serverWorker(ch)
+	go s.serverWorker()
 }
 
-// initServerWorkers creates worker goroutines and channels to process incoming
+func (s *Server) handleSingleStream(data *serverWorkerData) {
+	defer data.wg.Done()
+	s.handleStream(data.st, data.stream, s.traceInfo(data.st, data.stream))
+}
+
+// initServerWorkers creates worker goroutines and a channel to process incoming
 // connections to reduce the time spent overall on runtime.morestack.
 func (s *Server) initServerWorkers() {
-	s.serverWorkerChannels = make([]chan *serverWorkerData, s.opts.numServerWorkers)
+	s.serverWorkerChannel = make(chan *serverWorkerData)
 	for i := uint32(0); i < s.opts.numServerWorkers; i++ {
-		s.serverWorkerChannels[i] = make(chan *serverWorkerData)
-		go s.serverWorker(s.serverWorkerChannels[i])
+		go s.serverWorker()
 	}
 }
 
 func (s *Server) stopServerWorkers() {
-	for i := uint32(0); i < s.opts.numServerWorkers; i++ {
-		close(s.serverWorkerChannels[i])
-	}
+	close(s.serverWorkerChannel)
 }
 
 // NewServer creates a gRPC server which has no service registered and has not
@@ -898,7 +918,7 @@ func (s *Server) drainServerTransports(addr string) {
 	s.mu.Lock()
 	conns := s.conns[addr]
 	for st := range conns {
-		st.Drain()
+		st.Drain("")
 	}
 	s.mu.Unlock()
 }
@@ -946,26 +966,21 @@ func (s *Server) serveStreams(st transport.ServerTransport) {
 	defer st.Close(errors.New("finished serving streams for the server transport"))
 	var wg sync.WaitGroup
 
-	var roundRobinCounter uint32
 	st.HandleStreams(func(stream *transport.Stream) {
 		wg.Add(1)
 		if s.opts.numServerWorkers > 0 {
 			data := &serverWorkerData{st: st, wg: &wg, stream: stream}
 			select {
-			case s.serverWorkerChannels[atomic.AddUint32(&roundRobinCounter, 1)%s.opts.numServerWorkers] <- data:
+			case s.serverWorkerChannel <- data:
+				return
 			default:
 				// If all stream workers are busy, fallback to the default code path.
-				go func() {
-					s.handleStream(st, stream, s.traceInfo(st, stream))
-					wg.Done()
-				}()
 			}
-		} else {
-			go func() {
-				defer wg.Done()
-				s.handleStream(st, stream, s.traceInfo(st, stream))
-			}()
 		}
+		go func() {
+			defer wg.Done()
+			s.handleStream(st, stream, s.traceInfo(st, stream))
+		}()
 	}, func(ctx context.Context, method string) context.Context {
 		if !EnableTracing {
 			return ctx
@@ -1054,7 +1069,7 @@ func (s *Server) addConn(addr string, st transport.ServerTransport) bool {
 	if s.drain {
 		// Transport added after we drained our existing conns: drain it
 		// immediately.
-		st.Drain()
+		st.Drain("")
 	}
 
 	if s.conns[addr] == nil {
@@ -1304,7 +1319,7 @@ func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.
 	if len(shs) != 0 || len(binlogs) != 0 {
 		payInfo = &payloadInfo{}
 	}
-	d, err := recvAndDecompress(&parser{r: stream}, stream, dc, s.opts.maxReceiveMessageSize, payInfo, decomp)
+	d, err := recvAndDecompress(&parser{r: stream, recvBufferPool: s.opts.recvBufferPool}, stream, dc, s.opts.maxReceiveMessageSize, payInfo, decomp)
 	if err != nil {
 		if e := t.WriteStatus(stream, status.Convert(err)); e != nil {
 			channelz.Warningf(logger, s.channelzID, "grpc: Server.processUnaryRPC failed to write status: %v", e)
@@ -1514,7 +1529,7 @@ func (s *Server) processStreamingRPC(t transport.ServerTransport, stream *transp
 		ctx:                   ctx,
 		t:                     t,
 		s:                     stream,
-		p:                     &parser{r: stream},
+		p:                     &parser{r: stream, recvBufferPool: s.opts.recvBufferPool},
 		codec:                 s.getCodec(stream.ContentSubtype()),
 		maxReceiveMessageSize: s.opts.maxReceiveMessageSize,
 		maxSendMessageSize:    s.opts.maxSendMessageSize,
@@ -1864,7 +1879,7 @@ func (s *Server) GracefulStop() {
 	if !s.drain {
 		for _, conns := range s.conns {
 			for st := range conns {
-				st.Drain()
+				st.Drain("graceful_stop")
 			}
 		}
 		s.drain = true

@@ -77,6 +77,8 @@ type dialOptions struct {
 	defaultServiceConfig        *ServiceConfig // defaultServiceConfig is parsed from defaultServiceConfigRawJSON.
 	defaultServiceConfigRawJSON *string
 	resolvers                   []resolver.Builder
+	idleTimeout                 time.Duration
+	recvBufferPool              SharedBufferPool
 }
 
 // DialOption configures how we set up the connection.
@@ -295,6 +297,9 @@ func withBackoff(bs internalbackoff.Strategy) DialOption {
 // WithBlock returns a DialOption which makes callers of Dial block until the
 // underlying connection is up. Without this, Dial returns immediately and
 // connecting the server happens in background.
+//
+// Use of this feature is not recommended.  For more information, please see:
+// https://github.com/grpc/grpc-go/blob/master/Documentation/anti-patterns.md
 func WithBlock() DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.block = true
@@ -305,6 +310,9 @@ func WithBlock() DialOption {
 // return a string containing both the last connection error that occurred and
 // the context.DeadlineExceeded error.
 // Implies WithBlock()
+//
+// Use of this feature is not recommended.  For more information, please see:
+// https://github.com/grpc/grpc-go/blob/master/Documentation/anti-patterns.md
 //
 // # Experimental
 //
@@ -447,6 +455,9 @@ func withBinaryLogger(bl binarylog.Logger) DialOption {
 //
 // FailOnNonTempDialError only affects the initial dial, and does not do
 // anything useful unless you are also using WithBlock().
+//
+// Use of this feature is not recommended.  For more information, please see:
+// https://github.com/grpc/grpc-go/blob/master/Documentation/anti-patterns.md
 //
 // # Experimental
 //
@@ -618,6 +629,7 @@ func defaultDialOptions() dialOptions {
 			ReadBufferSize:  defaultReadBufSize,
 			UseProxy:        true,
 		},
+		recvBufferPool: nopBufferPool{},
 	}
 }
 
@@ -644,5 +656,46 @@ func withMinConnectDeadline(f func() time.Duration) DialOption {
 func WithResolvers(rs ...resolver.Builder) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.resolvers = append(o.resolvers, rs...)
+	})
+}
+
+// WithIdleTimeout returns a DialOption that configures an idle timeout for the
+// channel. If the channel is idle for the configured timeout, i.e there are no
+// ongoing RPCs and no new RPCs are initiated, the channel will enter idle mode
+// and as a result the name resolver and load balancer will be shut down. The
+// channel will exit idle mode when the Connect() method is called or when an
+// RPC is initiated.
+//
+// By default this feature is disabled, which can also be explicitly configured
+// by passing zero to this function.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+// later release.
+func WithIdleTimeout(d time.Duration) DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.idleTimeout = d
+	})
+}
+
+// WithRecvBufferPool returns a DialOption that configures the ClientConn
+// to use the provided shared buffer pool for parsing incoming messages. Depending
+// on the application's workload, this could result in reduced memory allocation.
+//
+// If you are unsure about how to implement a memory pool but want to utilize one,
+// begin with grpc.NewSharedBufferPool.
+//
+// Note: The shared buffer pool feature will not be active if any of the following
+// options are used: WithStatsHandler, EnableTracing, or binary logging. In such
+// cases, the shared buffer pool will be ignored.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+// later release.
+func WithRecvBufferPool(bufferPool SharedBufferPool) DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.recvBufferPool = bufferPool
 	})
 }

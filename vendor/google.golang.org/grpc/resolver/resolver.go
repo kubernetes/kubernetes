@@ -22,13 +22,13 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
 	"strings"
 
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/internal/pretty"
 	"google.golang.org/grpc/serviceconfig"
 )
 
@@ -124,7 +124,7 @@ type Address struct {
 	Attributes *attributes.Attributes
 
 	// BalancerAttributes contains arbitrary data about this address intended
-	// for consumption by the LB policy.  These attribes do not affect SubConn
+	// for consumption by the LB policy.  These attributes do not affect SubConn
 	// creation, connection establishment, handshaking, etc.
 	BalancerAttributes *attributes.Attributes
 
@@ -142,6 +142,10 @@ type Address struct {
 
 // Equal returns whether a and o are identical.  Metadata is compared directly,
 // not with any recursive introspection.
+//
+// This method compares all fields of the address. When used to tell apart
+// addresses during subchannel creation or connection establishment, it might be
+// more appropriate for the caller to implement custom equality logic.
 func (a Address) Equal(o Address) bool {
 	return a.Addr == o.Addr && a.ServerName == o.ServerName &&
 		a.Attributes.Equal(o.Attributes) &&
@@ -151,7 +155,17 @@ func (a Address) Equal(o Address) bool {
 
 // String returns JSON formatted string representation of the address.
 func (a Address) String() string {
-	return pretty.ToJSON(a)
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("{Addr: %q, ", a.Addr))
+	sb.WriteString(fmt.Sprintf("ServerName: %q, ", a.ServerName))
+	if a.Attributes != nil {
+		sb.WriteString(fmt.Sprintf("Attributes: %v, ", a.Attributes.String()))
+	}
+	if a.BalancerAttributes != nil {
+		sb.WriteString(fmt.Sprintf("BalancerAttributes: %v", a.BalancerAttributes.String()))
+	}
+	sb.WriteString("}")
+	return sb.String()
 }
 
 // BuildOptions includes additional information for the builder to create
@@ -254,10 +268,6 @@ type ClientConn interface {
 //   - "unknown_scheme://authority/endpoint"
 //     Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "unknown_scheme://authority/endpoint"}
 type Target struct {
-	// Deprecated: use URL.Scheme instead.
-	Scheme string
-	// Deprecated: use URL.Host instead.
-	Authority string
 	// URL contains the parsed dial target with an optional default scheme added
 	// to it if the original dial target contained no scheme or contained an
 	// unregistered scheme. Any query params specified in the original dial

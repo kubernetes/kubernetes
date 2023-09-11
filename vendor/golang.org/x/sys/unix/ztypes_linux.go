@@ -866,6 +866,11 @@ const (
 	POLLNVAL = 0x20
 )
 
+type sigset_argpack struct {
+	ss    *Sigset_t
+	ssLen uintptr
+}
+
 type SignalfdSiginfo struct {
 	Signo     uint32
 	Errno     int32

@@ -50,7 +50,7 @@ func (w *bodyWrapper) Close() error {
 var _ http.ResponseWriter = &respWriterWrapper{}
 
 // respWriterWrapper wraps a http.ResponseWriter in order to track the number of
-// bytes written, the last error, and to catch the returned statusCode
+// bytes written, the last error, and to catch the first written statusCode.
 // TODO: The wrapped http.ResponseWriter doesn't implement any of the optional
 // types (http.Hijacker, http.Pusher, http.CloseNotifier, http.Flusher, etc)
 // that may be useful when using it in real life situations.
@@ -85,11 +85,15 @@ func (w *respWriterWrapper) Write(p []byte) (int, error) {
 	return n, err
 }
 
+// WriteHeader persists initial statusCode for span attribution.
+// All calls to WriteHeader will be propagated to the underlying ResponseWriter
+// and will persist the statusCode from the first call.
+// Blocking consecutive calls to WriteHeader alters expected behavior and will
+// remove warning logs from net/http where developers will notice incorrect handler implementations.
 func (w *respWriterWrapper) WriteHeader(statusCode int) {
-	if w.wroteHeader {
-		return
+	if !w.wroteHeader {
+		w.wroteHeader = true
+		w.statusCode = statusCode
 	}
-	w.wroteHeader = true
-	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
 }
