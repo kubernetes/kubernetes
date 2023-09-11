@@ -1228,6 +1228,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// metricLabel is the label used to describe this type of container in monitoring metrics.
 	// currently: "container", "init_container" or "ephemeral_container"
 	start := func(ctx context.Context, typeName, metricLabel string, spec *startSpec) error {
+		startTime := time.Now()
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, spec.container.Name)
 		result.AddSyncResult(startContainerResult)
 
@@ -1263,6 +1264,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			return err
 		}
 
+		metrics.ContainerStartDuration.WithLabelValues(metricLabel, pod.Namespace).Observe(time.Since(startTime).Seconds())
 		return nil
 	}
 

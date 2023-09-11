@@ -36,6 +36,7 @@ const (
 	PodWorkerDurationKey               = "pod_worker_duration_seconds"
 	PodStartDurationKey                = "pod_start_duration_seconds"
 	PodStartSLIDurationKey             = "pod_start_sli_duration_seconds"
+	ContainerStartDurationKey          = "container_start_duration_seconds"
 	CgroupManagerOperationsKey         = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
@@ -736,6 +737,20 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// ContainerStartDuration tracks container start duration.
+	ContainerStartDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ContainerStartDurationKey,
+			Help:           "Duration in seconds to start a container.",
+			Buckets:        []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600},
+			StabilityLevel: metrics.ALPHA,
+		},
+		// container_type could be either "container", "init_container", or "ephemeral_container".
+		// namespace is the namespace of the pod that the container belongs to.
+		[]string{"container_type", "namespace"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -748,6 +763,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodWorkerDuration)
 		legacyregistry.MustRegister(PodStartDuration)
 		legacyregistry.MustRegister(PodStartSLIDuration)
+		legacyregistry.MustRegister(ContainerStartDuration)
 		legacyregistry.MustRegister(CgroupManagerDuration)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
 		legacyregistry.MustRegister(PodStatusSyncDuration)
