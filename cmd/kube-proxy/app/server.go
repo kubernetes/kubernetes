@@ -958,8 +958,6 @@ func (s *ProxyServer) birthCry() {
 //  1. if bindAddress is not 0.0.0.0 or ::, then it is used as the primary IP.
 //  2. if the Node object can be fetched, then its address(es) is/are used
 //  3. otherwise the node IPs are 127.0.0.1 and ::1
-//
-// In all cases, the secondary IP is the zero IP of the other IP family.
 func detectNodeIPs(client clientset.Interface, hostname, bindAddress string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
 	primaryFamily := v1.IPv4Protocol
 	nodeIPs := map[v1.IPFamily]net.IP{
@@ -1019,7 +1017,7 @@ func getNodeIPs(client clientset.Interface, name string) []net.IP {
 		nodeIPs, err = utilnode.GetNodeHostIPs(node)
 		if err != nil {
 			klog.ErrorS(err, "Failed to retrieve node IPs")
-			return false, err
+			return false, nil
 		}
 		return true, nil
 	})
