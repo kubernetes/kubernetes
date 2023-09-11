@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -44,15 +44,15 @@ func newConverterMetricFactory() *converterMetricFactory {
 	return &converterMetricFactory{durations: map[string]*metrics.HistogramVec{}, factoryLock: sync.Mutex{}}
 }
 
-var _ crConverterInterface = &converterMetric{}
+var _ CRConverter = &converterMetric{}
 
 type converterMetric struct {
-	delegate  crConverterInterface
+	delegate  CRConverter
 	latencies *metrics.HistogramVec
 	crdName   string
 }
 
-func (c *converterMetricFactory) addMetrics(crdName string, converter crConverterInterface) (crConverterInterface, error) {
+func (c *converterMetricFactory) addMetrics(crdName string, converter CRConverter) (CRConverter, error) {
 	c.factoryLock.Lock()
 	defer c.factoryLock.Unlock()
 	metric, exists := c.durations["webhook"]
@@ -74,7 +74,7 @@ func (c *converterMetricFactory) addMetrics(crdName string, converter crConverte
 	return &converterMetric{latencies: metric, delegate: converter, crdName: crdName}, nil
 }
 
-func (m *converterMetric) Convert(in runtime.Object, targetGV schema.GroupVersion) (runtime.Object, error) {
+func (m *converterMetric) Convert(in *unstructured.UnstructuredList, targetGV schema.GroupVersion) (*unstructured.UnstructuredList, error) {
 	start := time.Now()
 	obj, err := m.delegate.Convert(in, targetGV)
 	fromVersion := in.GetObjectKind().GroupVersionKind().Version

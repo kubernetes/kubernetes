@@ -26,15 +26,12 @@ import (
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/tracing"
@@ -96,7 +93,7 @@ func webhookClientConfigForCRD(crd *v1.CustomResourceDefinition) *webhook.Client
 	return &ret
 }
 
-var _ crConverterInterface = &webhookConverter{}
+var _ CRConverter = &webhookConverter{}
 
 func (f *webhookConverterFactory) NewWebhookConverter(crd *v1.CustomResourceDefinition) (*webhookConverter, error) {
 	restClient, err := f.clientManager.HookClient(*webhookClientConfigForCRD(crd))
@@ -113,36 +110,21 @@ func (f *webhookConverterFactory) NewWebhookConverter(crd *v1.CustomResourceDefi
 	}, nil
 }
 
-// getObjectsToConvert returns a list of objects requiring conversion.
-// if obj is a list, getObjectsToConvert returns a (potentially empty) list of the items that are not already in the desired version.
-// if obj is not a list, and is already in the desired version, getObjectsToConvert returns an empty list.
-// if obj is not a list, and is not already in the desired version, getObjectsToConvert returns a list containing only obj.
-func getObjectsToConvert(obj runtime.Object, apiVersion string) []runtime.RawExtension {
-	listObj, isList := obj.(*unstructured.UnstructuredList)
-	var objects []runtime.RawExtension
-	if isList {
-		for i := range listObj.Items {
-			// Only sent item for conversion, if the apiVersion is different
-			if listObj.Items[i].GetAPIVersion() != apiVersion {
-				objects = append(objects, runtime.RawExtension{Object: &listObj.Items[i]})
-			}
-		}
-	} else {
-		if obj.GetObjectKind().GroupVersionKind().GroupVersion().String() != apiVersion {
-			objects = []runtime.RawExtension{{Object: obj}}
+// createConversionReviewObjects returns ConversionReview request and response objects for the first supported version found in conversionReviewVersions.
+func createConversionReviewObjects(conversionReviewVersions []string, objects *unstructured.UnstructuredList, apiVersion string, requestUID types.UID) (request, response runtime.Object, err error) {
+	rawObjects := make([]runtime.RawExtension, len(objects.Items))
+	for i := range objects.Items {
+		rawObjects[i] = runtime.RawExtension{
+			Object: &objects.Items[i],
 		}
 	}
-	return objects
-}
 
-// createConversionReviewObjects returns ConversionReview request and response objects for the first supported version found in conversionReviewVersions.
-func createConversionReviewObjects(conversionReviewVersions []string, objects []runtime.RawExtension, apiVersion string, requestUID types.UID) (request, response runtime.Object, err error) {
 	for _, version := range conversionReviewVersions {
 		switch version {
 		case v1beta1.SchemeGroupVersion.Version:
 			return &v1beta1.ConversionReview{
 				Request: &v1beta1.ConversionRequest{
-					Objects:           objects,
+					Objects:           rawObjects,
 					DesiredAPIVersion: apiVersion,
 					UID:               requestUID,
 				},
@@ -151,7 +133,7 @@ func createConversionReviewObjects(conversionReviewVersions []string, objects []
 		case v1.SchemeGroupVersion.Version:
 			return &v1.ConversionReview{
 				Request: &v1.ConversionRequest{
-					Objects:           objects,
+					Objects:           rawObjects,
 					DesiredAPIVersion: apiVersion,
 					UID:               requestUID,
 				},
@@ -162,9 +144,13 @@ func createConversionReviewObjects(conversionReviewVersions []string, objects []
 	return nil, nil, fmt.Errorf("no supported conversion review versions")
 }
 
-func getRawExtensionObject(rx runtime.RawExtension) (runtime.Object, error) {
+func getRawExtensionObject(rx runtime.RawExtension) (*unstructured.Unstructured, error) {
 	if rx.Object != nil {
-		return rx.Object, nil
+		u, ok := rx.Object.(*unstructured.Unstructured)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type %T", rx.Object)
+		}
+		return u, nil
 	}
 	u := unstructured.Unstructured{}
 	err := u.UnmarshalJSON(rx.Raw)
@@ -227,40 +213,16 @@ func getConvertedObjectsFromResponse(expectedUID types.UID, response runtime.Obj
 	}
 }
 
-func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) (runtime.Object, error) {
+func (c *webhookConverter) Convert(in *unstructured.UnstructuredList, toGV schema.GroupVersion) (*unstructured.UnstructuredList, error) {
 	ctx := context.TODO()
-	// In general, the webhook should not do any defaulting or validation. A special case of that is an empty object
-	// conversion that must result an empty object and practically is the same as nopConverter.
-	// A smoke test in API machinery calls the converter on empty objects. As this case happens consistently
-	// it special cased here not to call webhook converter. The test initiated here:
-	// https://github.com/kubernetes/kubernetes/blob/dbb448bbdcb9e440eee57024ffa5f1698956a054/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go#L201
-	if isEmptyUnstructuredObject(in) {
-		return c.nopConverter.Convert(in, toGV)
-	}
-	t := time.Now()
-	listObj, isList := in.(*unstructured.UnstructuredList)
-
 	requestUID := uuid.NewUUID()
 	desiredAPIVersion := toGV.String()
-	objectsToConvert := getObjectsToConvert(in, desiredAPIVersion)
-	request, response, err := createConversionReviewObjects(c.conversionReviewVersions, objectsToConvert, desiredAPIVersion, requestUID)
+	request, response, err := createConversionReviewObjects(c.conversionReviewVersions, in, desiredAPIVersion, requestUID)
 	if err != nil {
 		return nil, err
 	}
-
-	objCount := len(objectsToConvert)
-	if objCount == 0 {
-		Metrics.ObserveConversionWebhookSuccess(ctx, time.Since(t))
-		// no objects needed conversion
-		if !isList {
-			// for a single item, return as-is
-			return in, nil
-		}
-		// for a list, set the version of the top-level list object (all individual objects are already in the correct version)
-		out := listObj.DeepCopy()
-		out.SetAPIVersion(toGV.String())
-		return out, nil
-	}
+	t := time.Now()
+	objCount := len(in.Items)
 
 	ctx, span := tracing.Start(ctx, "Call conversion webhook",
 		attribute.String("custom-resource-definition", c.name),
@@ -275,218 +237,28 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	// TODO: Figure out if adding one second timeout make sense here.
 	r := c.restClient.Post().Body(request).Do(ctx)
 	if err := r.Into(response); err != nil {
-		// TODO: Return a webhook specific error to be able to convert it to meta.Status
 		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookCallFailure)
+		// TODO: Return a webhook specific error to be able to convert it to meta.Status
 		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind().GroupVersionKind(), err)
 	}
 	span.AddEvent("Request completed")
 
 	convertedObjects, err := getConvertedObjectsFromResponse(requestUID, response)
 	if err != nil {
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookMalformedResponseFailure)
+		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookCallFailure)
 		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind().GroupVersionKind(), err)
 	}
 
-	if len(convertedObjects) != len(objectsToConvert) {
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookPartialResponseFailure)
-		return nil, fmt.Errorf("conversion webhook for %v returned %d objects, expected %d", in.GetObjectKind().GroupVersionKind(), len(convertedObjects), len(objectsToConvert))
-	}
-
-	if isList {
-		// start a deepcopy of the input and fill in the converted objects from the response at the right spots.
-		// The response list might be sparse because objects had the right version already.
-		convertedList := listObj.DeepCopy()
-		convertedIndex := 0
-		for i := range convertedList.Items {
-			original := &convertedList.Items[i]
-			if original.GetAPIVersion() == toGV.String() {
-				// This item has not been sent for conversion, and therefore does not show up in the response.
-				// convertedList has the right item already.
-				continue
-			}
-			converted, err := getRawExtensionObject(convertedObjects[convertedIndex])
-			if err != nil {
-				Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
-			}
-			if expected, got := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); expected != got {
-				Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid groupVersion (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), convertedIndex, expected, got)
-			}
-			if expected, got := original.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; expected != got {
-				Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid kind (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), convertedIndex, expected, got)
-			}
-			unstructConverted, ok := converted.(*unstructured.Unstructured)
-			if !ok {
-				// this should not happened
-				Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid type, expected=Unstructured, got=%T", in.GetObjectKind().GroupVersionKind(), convertedIndex, converted)
-			}
-			if err := validateConvertedObject(original, unstructConverted); err != nil {
-				Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
-			}
-			if err := restoreObjectMeta(original, unstructConverted); err != nil {
-				Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata in object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
-			}
-			convertedIndex++
-			convertedList.Items[i] = *unstructConverted
+	out := &unstructured.UnstructuredList{}
+	out.Items = make([]unstructured.Unstructured, len(convertedObjects))
+	for i := range convertedObjects {
+		u, err := getRawExtensionObject(convertedObjects[i])
+		if err != nil {
+			return nil, err
 		}
-		convertedList.SetAPIVersion(toGV.String())
-		Metrics.ObserveConversionWebhookSuccess(ctx, time.Since(t))
-		return convertedList, nil
+		out.Items[i] = *u
 	}
 
-	if len(convertedObjects) != 1 {
-		// This should not happened
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookNoObjectsReturnedFailure)
-		return nil, fmt.Errorf("conversion webhook for %v failed, no objects returned", in.GetObjectKind())
-	}
-	converted, err := getRawExtensionObject(convertedObjects[0])
-	if err != nil {
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-		return nil, err
-	}
-	if e, a := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); e != a {
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-		return nil, fmt.Errorf("conversion webhook for %v returned invalid object at index 0: invalid groupVersion (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), e, a)
-	}
-	if e, a := in.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; e != a {
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-		return nil, fmt.Errorf("conversion webhook for %v returned invalid object at index 0: invalid kind (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), e, a)
-	}
-	unstructConverted, ok := converted.(*unstructured.Unstructured)
-	if !ok {
-		// this should not happened
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-		return nil, fmt.Errorf("conversion webhook for %v failed, unexpected type %T at index 0", in.GetObjectKind().GroupVersionKind(), converted)
-	}
-	unstructIn, ok := in.(*unstructured.Unstructured)
-	if !ok {
-		// this should not happened
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-		return nil, fmt.Errorf("conversion webhook for %v failed unexpected input type %T", in.GetObjectKind().GroupVersionKind(), in)
-	}
-	if err := validateConvertedObject(unstructIn, unstructConverted); err != nil {
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-		return nil, fmt.Errorf("conversion webhook for %v returned invalid object: %v", in.GetObjectKind().GroupVersionKind(), err)
-	}
-	if err := restoreObjectMeta(unstructIn, unstructConverted); err != nil {
-		Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
-		return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata: %v", in.GetObjectKind().GroupVersionKind(), err)
-	}
 	Metrics.ObserveConversionWebhookSuccess(ctx, time.Since(t))
-	return converted, nil
-}
-
-// validateConvertedObject checks that ObjectMeta fields match, with the exception of
-// labels and annotations.
-func validateConvertedObject(in, out *unstructured.Unstructured) error {
-	if e, a := in.GetKind(), out.GetKind(); e != a {
-		return fmt.Errorf("must have the same kind: %v != %v", e, a)
-	}
-	if e, a := in.GetName(), out.GetName(); e != a {
-		return fmt.Errorf("must have the same name: %v != %v", e, a)
-	}
-	if e, a := in.GetNamespace(), out.GetNamespace(); e != a {
-		return fmt.Errorf("must have the same namespace: %v != %v", e, a)
-	}
-	if e, a := in.GetUID(), out.GetUID(); e != a {
-		return fmt.Errorf("must have the same UID: %v != %v", e, a)
-	}
-	return nil
-}
-
-// restoreObjectMeta deep-copies metadata from original into converted, while preserving labels and annotations from converted.
-func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
-	obj, found := converted.Object["metadata"]
-	if !found {
-		return fmt.Errorf("missing metadata in converted object")
-	}
-	responseMetaData, ok := obj.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("invalid metadata of type %T in converted object", obj)
-	}
-
-	if _, ok := original.Object["metadata"]; !ok {
-		// the original will always have metadata. But just to be safe, let's clear in converted
-		// with an empty object instead of nil, to be able to add labels and annotations below.
-		converted.Object["metadata"] = map[string]interface{}{}
-	} else {
-		converted.Object["metadata"] = runtime.DeepCopyJSONValue(original.Object["metadata"])
-	}
-
-	obj = converted.Object["metadata"]
-	convertedMetaData, ok := obj.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("invalid metadata of type %T in input object", obj)
-	}
-
-	for _, fld := range []string{"labels", "annotations"} {
-		obj, found := responseMetaData[fld]
-		if !found || obj == nil {
-			delete(convertedMetaData, fld)
-			continue
-		}
-		responseField, ok := obj.(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("invalid metadata.%s of type %T in converted object", fld, obj)
-		}
-
-		originalField, ok := convertedMetaData[fld].(map[string]interface{})
-		if !ok && convertedMetaData[fld] != nil {
-			return fmt.Errorf("invalid metadata.%s of type %T in original object", fld, convertedMetaData[fld])
-		}
-
-		somethingChanged := len(originalField) != len(responseField)
-		for k, v := range responseField {
-			if _, ok := v.(string); !ok {
-				return fmt.Errorf("metadata.%s[%s] must be a string, but is %T in converted object", fld, k, v)
-			}
-			if originalField[k] != interface{}(v) {
-				somethingChanged = true
-			}
-		}
-
-		if somethingChanged {
-			stringMap := make(map[string]string, len(responseField))
-			for k, v := range responseField {
-				stringMap[k] = v.(string)
-			}
-			var errs field.ErrorList
-			if fld == "labels" {
-				errs = metav1validation.ValidateLabels(stringMap, field.NewPath("metadata", "labels"))
-			} else {
-				errs = apivalidation.ValidateAnnotations(stringMap, field.NewPath("metadata", "annotation"))
-			}
-			if len(errs) > 0 {
-				return errs.ToAggregate()
-			}
-		}
-
-		convertedMetaData[fld] = responseField
-	}
-
-	return nil
-}
-
-// isEmptyUnstructuredObject returns true if in is an empty unstructured object, i.e. an unstructured object that does
-// not have any field except apiVersion and kind.
-func isEmptyUnstructuredObject(in runtime.Object) bool {
-	u, ok := in.(*unstructured.Unstructured)
-	if !ok {
-		return false
-	}
-	if len(u.Object) != 2 {
-		return false
-	}
-	if _, ok := u.Object["kind"]; !ok {
-		return false
-	}
-	if _, ok := u.Object["apiVersion"]; !ok {
-		return false
-	}
-	return true
+	return out, nil
 }
