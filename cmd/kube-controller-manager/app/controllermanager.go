@@ -215,9 +215,8 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
-		if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
-			slis.SLIMetricsWithReset{}.Install(unsecuredMux)
-		}
+		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
+
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
 		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
