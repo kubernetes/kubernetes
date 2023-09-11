@@ -498,19 +498,15 @@ func (dc *DeploymentController) handleErr(ctx context.Context, err error, key in
 		dc.queue.Forget(key)
 		return
 	}
-	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
-	if keyErr != nil {
-		logger.Error(err, "Failed to split meta namespace cache key", "cacheKey", key)
-	}
 
 	if dc.queue.NumRequeues(key) < maxRetries {
-		logger.V(2).Info("Error syncing deployment", "deployment", klog.KRef(ns, name), "err", err)
+		logger.V(2).Info("Error syncing deployment", "deployment", key, "err", err)
 		dc.queue.AddRateLimited(key)
 		return
 	}
 
 	utilruntime.HandleError(err)
-	logger.V(2).Info("Dropping deployment out of the queue", "deployment", klog.KRef(ns, name), "err", err)
+	logger.V(2).Info("Dropping deployment out of the queue", "deployment", key, "err", err)
 	dc.queue.Forget(key)
 }
 

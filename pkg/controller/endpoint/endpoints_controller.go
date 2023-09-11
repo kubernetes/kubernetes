@@ -336,18 +336,13 @@ func (e *Controller) handleErr(logger klog.Logger, err error, key interface{}) {
 		return
 	}
 
-	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
-	if keyErr != nil {
-		logger.Error(err, "Failed to split meta namespace cache key", "key", key)
-	}
-
 	if e.queue.NumRequeues(key) < maxRetries {
-		logger.V(2).Info("Error syncing endpoints, retrying", "service", klog.KRef(ns, name), "err", err)
+		logger.V(2).Info("Error syncing endpoints, retrying", "service", key, "err", err)
 		e.queue.AddRateLimited(key)
 		return
 	}
 
-	logger.Info("Dropping service out of the queue", "service", klog.KRef(ns, name), "err", err)
+	logger.Info("Dropping service out of the queue", "service", key, "err", err)
 	e.queue.Forget(key)
 	utilruntime.HandleError(err)
 }
