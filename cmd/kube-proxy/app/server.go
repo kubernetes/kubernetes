@@ -134,6 +134,8 @@ type Options struct {
 
 	// hostnameOverride, if set from the command line flag, takes precedence over the `HostnameOverride` value from the config file
 	hostnameOverride string
+	// conntrackTCPBeLiberal is used to configure liberal mode for netfilter conntrack.
+	conntrackTCPBeLiberal cliflag.Tristate
 }
 
 // AddFlags adds flags to fs and binds them to options.
@@ -199,6 +201,10 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		&o.config.Conntrack.TCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
 		o.config.Conntrack.TCPCloseWaitTimeout.Duration,
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
+	fs.Var(&o.conntrackTCPBeLiberal, "conntrack-tcp-be-liberal", "Enable liberal mode for tracking TCP packets by setting nf_conntrack_tcp_be_liberal to 1")
+	fs.DurationVar(&o.config.Conntrack.UDPTimeout.Duration, "conntrack-udp-timeout", o.config.Conntrack.UDPTimeout.Duration, "Idle timeout for UNREPLIED UDP connections (0 to leave as-is)")
+	fs.DurationVar(&o.config.Conntrack.UDPStreamTimeout.Duration, "conntrack-udp-timeout-stream", o.config.Conntrack.UDPStreamTimeout.Duration, "Idle timeout for ASSURED UDP connections (0 to leave as-is)")
+
 	fs.DurationVar(&o.config.ConfigSyncPeriod.Duration, "config-sync-period", o.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
 
 	fs.BoolVar(&o.config.IPVS.StrictARP, "ipvs-strict-arp", o.config.IPVS.StrictARP, "Enable strict ARP by setting arp_ignore to 1 and arp_announce to 2")
@@ -264,6 +270,10 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 	}
 
 	o.platformApplyDefaults(o.config)
+
+	if err := o.processConntrackTCPBeLiberalFlag(); err != nil {
+		return err
+	}
 
 	if err := o.processHostnameOverrideFlag(); err != nil {
 		return err
@@ -331,6 +341,15 @@ func (o *Options) eventHandler(ent fsnotify.Event) {
 
 func (o *Options) errorHandler(err error) {
 	o.errCh <- err
+}
+
+// processConntrackTCPBeLiberalFlag processes conntrack-tcp-be-liberal flag
+func (o *Options) processConntrackTCPBeLiberalFlag() error {
+	// Check if conntrack-tcp-be-liberal flag is set
+	if o.config.Conntrack.TCPBeLiberal == nil && o.conntrackTCPBeLiberal.Provided() {
+		o.config.Conntrack.TCPBeLiberal = pointer.Bool(o.conntrackTCPBeLiberal.Value())
+	}
+	return nil
 }
 
 // processHostnameOverrideFlag processes hostname-override flag

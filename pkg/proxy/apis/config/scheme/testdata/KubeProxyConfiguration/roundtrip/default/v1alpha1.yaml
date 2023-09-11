@@ -12,8 +12,11 @@ configSyncPeriod: 15m0s
 conntrack:
   maxPerCore: 32768
   min: 131072
+  tcpBeLiberal: null
   tcpCloseWaitTimeout: 1h0m0s
   tcpEstablishedTimeout: 24h0m0s
+  udpStreamTimeout: null
+  udpTimeout: null
 detectLocal:
   bridgeInterface: ""
   interfaceNamePrefix: ""
