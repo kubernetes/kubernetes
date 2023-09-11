@@ -19,12 +19,12 @@ package apiserver
 import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	apiextensionsoptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 
@@ -37,8 +37,7 @@ func CreateAPIExtensionsConfig(
 	pluginInitializers []admission.PluginInitializer,
 	commandOptions options.CompletedOptions,
 	masterCount int,
-	serviceResolver webhook.ServiceResolver,
-	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
+	conversionFactory conversion.Factory,
 ) (*apiextensionsapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the apiextensions
@@ -74,8 +73,7 @@ func CreateAPIExtensionsConfig(
 		ExtraConfig: apiextensionsapiserver.ExtraConfig{
 			CRDRESTOptionsGetter: apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions, genericConfig.ResourceTransformers, genericConfig.StorageObjectCountTracker),
 			MasterCount:          masterCount,
-			AuthResolverWrapper:  authResolverWrapper,
-			ServiceResolver:      serviceResolver,
+			ConversionFactory:    conversionFactory,
 		},
 	}
 

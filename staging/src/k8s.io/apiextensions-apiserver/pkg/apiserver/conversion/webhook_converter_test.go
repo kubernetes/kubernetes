@@ -61,7 +61,7 @@ func TestRestoreObjectMeta(t *testing.T) {
 		{"invalid original metadata",
 			map[string]interface{}{"metadata": []interface{}{"foo"}},
 			map[string]interface{}{"metadata": map[string]interface{}{}, "spec": map[string]interface{}{}},
-			map[string]interface{}{"metadata": []interface{}{"foo"}, "spec": map[string]interface{}{}},
+			map[string]interface{}{"metadata": map[string]interface{}{}, "spec": map[string]interface{}{}},
 			true,
 		},
 		{"changed label, annotations and non-label",
@@ -206,81 +206,19 @@ func TestRestoreObjectMeta(t *testing.T) {
 	}
 }
 
-func TestGetObjectsToConvert(t *testing.T) {
-	v1Object := &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "foo/v1", "kind": "Widget", "metadata": map[string]interface{}{"name": "myv1"}}}
-	v2Object := &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "foo/v2", "kind": "Widget", "metadata": map[string]interface{}{"name": "myv2"}}}
-	v3Object := &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "foo/v3", "kind": "Widget", "metadata": map[string]interface{}{"name": "myv3"}}}
-
-	testcases := []struct {
-		Name       string
-		Object     runtime.Object
-		APIVersion string
-
-		ExpectObjects []runtime.RawExtension
-	}{
-		{
-			Name:          "empty list",
-			Object:        &unstructured.UnstructuredList{},
-			APIVersion:    "foo/v1",
-			ExpectObjects: nil,
-		},
-		{
-			Name: "one-item list, in desired version",
-			Object: &unstructured.UnstructuredList{
-				Items: []unstructured.Unstructured{*v1Object},
-			},
-			APIVersion:    "foo/v1",
-			ExpectObjects: nil,
-		},
-		{
-			Name: "one-item list, not in desired version",
-			Object: &unstructured.UnstructuredList{
-				Items: []unstructured.Unstructured{*v2Object},
-			},
-			APIVersion:    "foo/v1",
-			ExpectObjects: []runtime.RawExtension{{Object: v2Object}},
-		},
-		{
-			Name: "multi-item list, in desired version",
-			Object: &unstructured.UnstructuredList{
-				Items: []unstructured.Unstructured{*v1Object, *v1Object, *v1Object},
-			},
-			APIVersion:    "foo/v1",
-			ExpectObjects: nil,
-		},
-		{
-			Name: "multi-item list, mixed versions",
-			Object: &unstructured.UnstructuredList{
-				Items: []unstructured.Unstructured{*v1Object, *v2Object, *v3Object},
-			},
-			APIVersion:    "foo/v1",
-			ExpectObjects: []runtime.RawExtension{{Object: v2Object}, {Object: v3Object}},
-		},
-		{
-			Name:          "single item, in desired version",
-			Object:        v1Object,
-			APIVersion:    "foo/v1",
-			ExpectObjects: nil,
-		},
-		{
-			Name:          "single item, not in desired version",
-			Object:        v2Object,
-			APIVersion:    "foo/v1",
-			ExpectObjects: []runtime.RawExtension{{Object: v2Object}},
-		},
-	}
-	for _, tc := range testcases {
-		t.Run(tc.Name, func(t *testing.T) {
-			if objects := getObjectsToConvert(tc.Object, tc.APIVersion); !reflect.DeepEqual(objects, tc.ExpectObjects) {
-				t.Errorf("unexpected diff: %s", cmp.Diff(tc.ExpectObjects, objects))
-			}
-		})
-	}
-}
-
 func TestCreateConversionReviewObjects(t *testing.T) {
-	objects := []runtime.RawExtension{
-		{Object: &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "foo/v2", "Kind": "Widget"}}},
+	objects := &unstructured.UnstructuredList{
+		Items: []unstructured.Unstructured{
+			{
+				Object: map[string]interface{}{"apiVersion": "foo/v2", "Kind": "Widget"},
+			},
+		},
+	}
+
+	rawObjects := []runtime.RawExtension{
+		{
+			Object: &objects.Items[0],
+		},
 	}
 
 	testcases := []struct {
@@ -300,7 +238,7 @@ func TestCreateConversionReviewObjects(t *testing.T) {
 			Name:     "v1",
 			Versions: []string{"v1", "v1beta1", "v2"},
 			ExpectRequest: &v1.ConversionReview{
-				Request:  &v1.ConversionRequest{UID: "uid", DesiredAPIVersion: "foo/v1", Objects: objects},
+				Request:  &v1.ConversionRequest{UID: "uid", DesiredAPIVersion: "foo/v1", Objects: rawObjects},
 				Response: &v1.ConversionResponse{},
 			},
 			ExpectResponse: &v1.ConversionReview{},
@@ -309,7 +247,7 @@ func TestCreateConversionReviewObjects(t *testing.T) {
 			Name:     "v1beta1",
 			Versions: []string{"v1beta1", "v1", "v2"},
 			ExpectRequest: &v1beta1.ConversionReview{
-				Request:  &v1beta1.ConversionRequest{UID: "uid", DesiredAPIVersion: "foo/v1", Objects: objects},
+				Request:  &v1beta1.ConversionRequest{UID: "uid", DesiredAPIVersion: "foo/v1", Objects: rawObjects},
 				Response: &v1beta1.ConversionResponse{},
 			},
 			ExpectResponse: &v1beta1.ConversionReview{},

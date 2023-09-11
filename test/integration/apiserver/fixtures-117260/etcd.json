@@ -1,0 +1,118 @@
+{
+  "apiVersion": "source.toolkit.fluxcd.io/v1",
+  "kind": "GitRepository",
+  "metadata": {
+    "creationTimestamp": "2023-04-13T13:12:31Z",
+    "finalizers": [
+      "finalizers.fluxcd.io"
+    ],
+    "generation": 1,
+    "labels": {
+      "kustomize.toolkit.fluxcd.io/name": "infra-config",
+      "kustomize.toolkit.fluxcd.io/namespace": "flux-system"
+    },
+    "managedFields": [
+      {
+        "apiVersion": "source.toolkit.fluxcd.io/v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:metadata": {
+            "f:labels": {
+              "f:kustomize.toolkit.fluxcd.io/name": {},
+              "f:kustomize.toolkit.fluxcd.io/namespace": {}
+            }
+          },
+          "f:spec": {
+            "f:interval": {},
+            "f:ref": {
+              "f:branch": {}
+            },
+            "f:url": {}
+          }
+        },
+        "manager": "kustomize-controller",
+        "operation": "Apply",
+        "time": "2023-04-13T13:12:31Z"
+      },
+      {
+        "apiVersion": "source.toolkit.fluxcd.io/v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:metadata": {
+            "f:finalizers": {
+              ".": {},
+              "v:\"finalizers.fluxcd.io\"": {}
+            }
+          }
+        },
+        "manager": "source-controller",
+        "operation": "Update",
+        "time": "2023-04-13T13:12:31Z"
+      },
+      {
+        "apiVersion": "source.toolkit.fluxcd.io/v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:status": {
+            "f:artifact": {
+              ".": {},
+              "f:digest": {},
+              "f:lastUpdateTime": {},
+              "f:path": {},
+              "f:revision": {},
+              "f:size": {},
+              "f:url": {}
+            },
+            "f:conditions": {},
+            "f:observedGeneration": {}
+          }
+        },
+        "manager": "source-controller",
+        "operation": "Update",
+        "subresource": "status",
+        "time": "2023-04-13T13:12:33Z"
+      }
+    ],
+    "name": "flux-monitoring",
+    "namespace": "flux-system",
+    "resourceVersion": "2495",
+    "uid": "98868147-370c-42e5-a679-0416557f6913"
+  },
+  "spec": {
+    "interval": "24h",
+    "ref": {
+      "branch": "main"
+    },
+    "timeout": "60s",
+    "url": "https://github.com/fluxcd/flux2"
+  },
+  "status": {
+    "artifact": {
+      "digest": "sha256:070a94239bfcbd12df6916b561a37dfc4877501b47b8ab917747e6792305214c",
+      "lastUpdateTime": "2023-04-13T13:12:33Z",
+      "path": "gitrepository/flux-system/flux-monitoring/cb8387cba6c58a796efdf8dafefb84e0ad5ec572.tar.gz",
+      "revision": "main@sha1:cb8387cba6c58a796efdf8dafefb84e0ad5ec572",
+      "size": 395809,
+      "url": "http://source-controller.flux-system.svc.cluster.local./gitrepository/flux-system/flux-monitoring/cb8387cba6c58a796efdf8dafefb84e0ad5ec572.tar.gz"
+    },
+    "conditions": [
+      {
+        "lastTransitionTime": "2023-04-13T13:12:33Z",
+        "message": "stored artifact for revision 'main@sha1:cb8387cba6c58a796efdf8dafefb84e0ad5ec572'",
+        "observedGeneration": 1,
+        "reason": "Succeeded",
+        "status": "True",
+        "type": "Ready"
+      },
+      {
+        "lastTransitionTime": "2023-04-13T13:12:33Z",
+        "message": "stored artifact for revision 'main@sha1:cb8387cba6c58a796efdf8dafefb84e0ad5ec572'",
+        "observedGeneration": 1,
+        "reason": "Succeeded",
+        "status": "True",
+        "type": "ArtifactInStorage"
+      }
+    ],
+    "observedGeneration": 1
+  }
+}

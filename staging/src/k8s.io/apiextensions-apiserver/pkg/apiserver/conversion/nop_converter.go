@@ -18,7 +18,6 @@ package conversion
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -26,16 +25,18 @@ import (
 type nopConverter struct {
 }
 
-var _ crConverterInterface = &nopConverter{}
+// NewNOPConverter creates a new no-op converter. The only "conversion" it performs is to set the group and version to
+// targetGV.
+func NewNOPConverter() *nopConverter {
+	return &nopConverter{}
+}
 
-// ConvertToVersion converts in object to the given gv in place and returns the same `in` object.
-func (c *nopConverter) Convert(in runtime.Object, targetGV schema.GroupVersion) (runtime.Object, error) {
-	// Run the converter on the list items instead of list itself
-	if list, ok := in.(*unstructured.UnstructuredList); ok {
-		for i := range list.Items {
-			list.Items[i].SetGroupVersionKind(targetGV.WithKind(list.Items[i].GroupVersionKind().Kind))
-		}
+var _ CRConverter = &nopConverter{}
+
+// Convert converts in object to the given gv in place and returns the same `in` object.
+func (c *nopConverter) Convert(list *unstructured.UnstructuredList, targetGV schema.GroupVersion) (*unstructured.UnstructuredList, error) {
+	for i := range list.Items {
+		list.Items[i].SetGroupVersionKind(targetGV.WithKind(list.Items[i].GroupVersionKind().Kind))
 	}
-	in.GetObjectKind().SetGroupVersionKind(targetGV.WithKind(in.GetObjectKind().GroupVersionKind().Kind))
-	return in, nil
+	return list, nil
 }
