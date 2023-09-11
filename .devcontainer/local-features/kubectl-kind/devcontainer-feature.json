@@ -13,6 +13,6 @@
         }
     },
     "installsAfter": [
-        "ghcr.io/devcontainers/features/go"
+        "./local-features/go"
     ]
 }

@@ -4,8 +4,6 @@
     "name": "Kubernetes with e2e testing image build and push",
     "image": "mcr.microsoft.com/devcontainers/base:bullseye",
     // Setup the go environment and mount into the dev container at the expected location
-    // "workspaceFolder": "/go/src/k8s.io/kubernetes",
-    // "workspaceMount": "source=${localWorkspaceFolder},target=/go/src/k8s.io/kubernetes,type=bind,consistency=cached",
     "hostRequirements": {
         "cpus": 4
     },
@@ -19,9 +17,7 @@
     // Install utils, go, docker-in-docker, and other tools
     // For more info about dev container Features see https://containers.dev/features
     "features": {
-        // Install go latest. Was v1.19
-        "ghcr.io/devcontainers/features/go:1": {
-            "version": "latest",
+        "./local-features/go": {
             "username": "root"
         },
         // Install kubectl, but skip minikube and helm

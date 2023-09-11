@@ -19,10 +19,6 @@ set -eux
 cd "$(dirname "$0")"
 cd ../
 
-# TODO: Figure out how to nicely include these
-# echo "Cloning kubernetes/kubectl" && mkdir -p /go/src/sigs.k8s.io && cd /go/src/sigs.k8s.io && git clone --depth=1 https://github.com/kubernetes/kubectl
-# echo "Cloning golang/term" && cd /go/src && git clone --depth=1 https://github.com/golang/term.git
-
 # Install pyyaml as required by verify.publishing-bot
 python3 -m pip install --user --upgrade --no-cache-dir pyyaml
 

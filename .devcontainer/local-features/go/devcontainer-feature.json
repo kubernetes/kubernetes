@@ -1,0 +1,36 @@
+{
+    "id": "go",
+    "version": "1.2.0",
+    "name": "Go",
+    "documentationURL": "https://github.com/devcontainers/features/tree/main/src/go",
+    "description": "Installs Go and common Go utilities. Auto-detects latest version and installs needed dependencies.",
+    "options": {
+        "golangciLintVersion": {
+            "type": "string",
+            "default": "latest",
+            "description": "Version of golangci-lint to install"
+        }
+    },
+    "init": true,
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.Go"
+            ]
+        }
+    },
+    "containerEnv": {
+        "GOROOT": "/usr/local/go",
+        "GOPATH": "/go",
+        "PATH": "/usr/local/go/bin:/go/bin:${PATH}"
+    },
+    "capAdd": [
+        "SYS_PTRACE"
+    ],
+    "securityOpt": [
+        "seccomp=unconfined"
+    ],
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils"
+    ]
+}
