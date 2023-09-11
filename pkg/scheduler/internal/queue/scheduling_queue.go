@@ -613,7 +613,7 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 
 // determineSchedulingHintForInFlightPod looks at the unschedulable plugins of the given Pod
 // and determines the scheduling hint for this Pod while checking the events that happened during in-flight.
-func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) framework.QueueingHint {
+func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) framework.QueueingHint {
 	logger.V(5).Info("Checking events for in-flight pod", "pod", klog.KObj(pInfo.Pod), "unschedulablePlugins", pInfo.UnschedulablePlugins, "inFlightEventsSize", p.inFlightEvents.Len(), "inFlightPodsSize", len(p.inFlightPods))
 
 	// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
@@ -634,17 +634,10 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 	}
 
 	if len(pInfo.UnschedulablePlugins) == 0 {
-		// When there is no unschedulable plugin, we cannot have a guess which event makes this Pod schedulable.
-		// If there has been any concurrent event for the pod, it has to go to the backoff queue because the event
-		// may have been relevant.
-		for event := inFlightPod.Next(); event != nil; event = event.Next() {
-			_, ok := event.Value.(*clusterEvent)
-			if ok {
-				// There really was a concurrent event.
-				return framework.QueueAfterBackoff
-			}
-		}
-		return framework.QueueSkip
+		// No unschedulable plugins are associated with this Pod.
+		// Meaning something unusual (a temporal failure on kube-apiserver, etc) happened and this Pod gets moved back to the queue.
+		// In this case, we should retry scheduling it because this Pod may not be retried until the next flush.
+		return framework.QueueAfterBackoff
 	}
 
 	// check if there is an event that makes this Pod schedulable based on pInfo.UnschedulablePlugins.
@@ -692,7 +685,13 @@ func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, 
 	for plugin := range pInfo.UnschedulablePlugins {
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
 	}
-	if p.moveRequestCycle >= podSchedulingCycle {
+	if p.moveRequestCycle >= podSchedulingCycle || len(pInfo.UnschedulablePlugins) == 0 {
+		// Two cases to move a Pod to the active/backoff queue:
+		// - The Pod is rejected by some plugins, but a move request is received after this Pod's scheduling cycle is started.
+		//   In this case, the received event may be make Pod schedulable and we should retry scheduling it.
+		// - No unschedulable plugins are associated with this Pod,
+		//   meaning something unusual (a temporal failure on kube-apiserver, etc) happened and this Pod gets moved back to the queue.
+		//   In this case, we should retry scheduling it because this Pod may not be retried until the next flush.
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
 			return fmt.Errorf("error adding pod %v to the backoff queue: %v", klog.KObj(pod), err)
 		}
@@ -745,8 +744,8 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
 	}
 
-	// Based on isPodWorthRequeuing(), we check whether this Pod may change its scheduling result by any of events that happened during scheduling.
-	schedulingHint := p.determineSchedulingHintForInFlightPod(logger, pInfo, podSchedulingCycle)
+	// We check whether this Pod may change its scheduling result by any of events that happened during scheduling.
+	schedulingHint := p.determineSchedulingHintForInFlightPod(logger, pInfo)
 
 	// In this case, we try to requeue this Pod to activeQ/backoffQ.
 	queue := p.requeuePodViaQueueingHint(logger, pInfo, schedulingHint, ScheduleAttemptFailure)
@@ -1115,8 +1114,7 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 	p.moveRequestCycle = p.schedulingCycle
 
-	// (no need to check the feature gate because there is always no p.inFlightPods when the feature is disabled.)
-	if len(p.inFlightPods) != 0 {
+	if p.isSchedulingQueueHintEnabled && len(p.inFlightPods) != 0 {
 		logger.V(5).Info("Event received while pods are in flight", "event", event.Label, "numPods", len(p.inFlightPods))
 		// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
 		// AddUnschedulableIfNotPresent we need to know whether events were
