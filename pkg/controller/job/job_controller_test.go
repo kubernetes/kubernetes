@@ -5172,6 +5172,64 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	}
 }
 
+func TestFinalizerCleanup(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	clientset := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	manager := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+
+	// Initialize the controller with 0 workers to make sure the
+	// pod finalizers are not removed by the "syncJob" function.
+	go manager.Run(ctx, 0)
+
+	// Start the Pod and Job informers.
+	sharedInformers.Start(ctx.Done())
+	sharedInformers.WaitForCacheSync(ctx.Done())
+
+	// Create a simple Job
+	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
+	job, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Creating job: %v", err)
+	}
+
+	// Create a Pod with the job tracking finalizer
+	pod := newPod("test-pod", job)
+	pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
+	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Creating pod: %v", err)
+	}
+
+	// Mark Job as complete.
+	job.Status.Conditions = append(job.Status.Conditions, batch.JobCondition{
+		Type:   batch.JobComplete,
+		Status: v1.ConditionTrue,
+	})
+	_, err = clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Updating job status: %v", err)
+	}
+
+	// Verify the pod finalizer is removed for a finished Job,
+	// even if the jobs pods are not tracked by the main reconciliation loop.
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		p, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return !hasJobTrackingFinalizer(p), nil
+	}); err != nil {
+		t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
+	}
+
+}
+
 func checkJobCompletionLabel(t *testing.T, p *v1.PodTemplateSpec) {
 	t.Helper()
 	labels := p.GetLabels()
