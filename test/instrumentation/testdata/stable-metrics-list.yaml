@@ -96,23 +96,6 @@
   labels:
   - name
   - stage
-- name: healthcheck
-  namespace: kubernetes
-  help: This metric records the result of a single healthcheck.
-  type: Gauge
-  stabilityLevel: BETA
-  labels:
-  - name
-  - type
-- name: healthchecks_total
-  namespace: kubernetes
-  help: This metric records the results of all healthcheck.
-  type: Counter
-  stabilityLevel: BETA
-  labels:
-  - name
-  - status
-  - type
 - name: registered_metrics_total
   help: The count of registered metrics broken by stability level and deprecation
     version.
@@ -446,6 +429,23 @@
   - priority
   - resource
   - unit
+- name: healthcheck
+  namespace: kubernetes
+  help: This metric records the result of a single healthcheck.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - type
+- name: healthchecks_total
+  namespace: kubernetes
+  help: This metric records the results of all healthcheck.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - status
+  - type
 - name: evictions_total
   subsystem: node_collector
   help: Number of Node evictions that happened since current instance of NodeController
