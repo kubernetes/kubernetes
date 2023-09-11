@@ -332,16 +332,21 @@ func (s *EtcdOptions) maybeApplyResourceTransformers(c *server.Config) (err erro
 
 		c.ResourceTransformers = dynamicTransformers
 		if !s.SkipHealthEndpoints {
-			c.AddHealthChecks(dynamicTransformers)
+			addHealthChecksWithoutLivez(c, dynamicTransformers)
 		}
 	} else {
 		c.ResourceTransformers = encryptionconfig.StaticTransformers(encryptionConfiguration.Transformers)
 		if !s.SkipHealthEndpoints {
-			c.AddHealthChecks(encryptionConfiguration.HealthChecks...)
+			addHealthChecksWithoutLivez(c, encryptionConfiguration.HealthChecks...)
 		}
 	}
 
 	return nil
+}
+
+func addHealthChecksWithoutLivez(c *server.Config, healthChecks ...healthz.HealthChecker) {
+	c.HealthzChecks = append(c.HealthzChecks, healthChecks...)
+	c.ReadyzChecks = append(c.ReadyzChecks, healthChecks...)
 }
 
 func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
