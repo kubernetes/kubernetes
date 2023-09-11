@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2022 The Kubernetes Authors.
+# Copyright 2023 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,12 +18,12 @@ set -euo pipefail
 export WORKDIR=${ARTIFACTS:-$TMPDIR}
 export PATH=$PATH:$GOPATH/bin
 mkdir -p "${WORKDIR}"
-pushd "$WORKDIR"
 go install golang.org/x/vuln/cmd/govulncheck@v1.0.1
-popd
 
 govulncheck -scan module ./... > "${WORKDIR}/head.txt"
+
 git reset --hard HEAD
 git checkout -b base "${PULL_BASE_SHA}"
 govulncheck -scan module ./... > "${WORKDIR}/pr-base.txt"
+
 diff -s -u --ignore-all-space "${WORKDIR}"/pr-base.txt "${WORKDIR}"/head.txt || true
