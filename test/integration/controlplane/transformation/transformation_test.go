@@ -132,6 +132,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 	if transformerConfigYAML != "" && reload {
 		// when reloading is enabled, this healthz endpoint is always present
 		mustBeHealthy(l, "/kms-providers", "ok", e.kubeAPIServer.ClientConfig)
+		mustNotHaveLivez(l, "/kms-providers", "404 page not found", e.kubeAPIServer.ClientConfig)
 
 		// excluding healthz endpoints even if they do not exist should work
 		mustBeHealthy(l, "", `warn: some health checks cannot be excluded: no matches for "kms-provider-0","kms-provider-1","kms-provider-2","kms-provider-3"`,
@@ -550,7 +551,7 @@ func (e *transformTest) printMetrics() error {
 func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(1*time.Second, 5*time.Minute, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
@@ -571,7 +572,7 @@ func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains st
 func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
 	t.Helper()
 	var restErr error
-	pollErr := wait.PollImmediate(1*time.Second, 5*time.Minute, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
 		restErr = err
 		if err != nil {
@@ -589,6 +590,27 @@ func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains 
 	}
 }
 
+func mustNotHaveLivez(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+	t.Helper()
+	var restErr error
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		body, ok, err := getLivez(checkName, clientConfig, excludes...)
+		restErr = err
+		if err != nil {
+			return false, err
+		}
+		done := !ok && strings.Contains(body, wantBodyContains)
+		if !done {
+			t.Logf("expected server check %q with message %q but it is not: %s", checkName, wantBodyContains, body)
+		}
+		return done, nil
+	})
+
+	if pollErr != nil {
+		t.Fatalf("failed to get the expected livez status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
+	}
+}
+
 func getHealthz(checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
 	client, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
@@ -596,6 +618,20 @@ func getHealthz(checkName string, clientConfig *rest.Config, excludes ...string)
 	}
 
 	req := client.CoreV1().RESTClient().Get().AbsPath(fmt.Sprintf("/healthz%v", checkName)).Param("verbose", "true")
+	for _, exclude := range excludes {
+		req.Param("exclude", exclude)
+	}
+	body, err := req.DoRaw(context.TODO()) // we can still have a response body during an error case
+	return string(body), err == nil, nil
+}
+
+func getLivez(checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
+	client, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to create a client: %v", err)
+	}
+
+	req := client.CoreV1().RESTClient().Get().AbsPath(fmt.Sprintf("/livez%v", checkName)).Param("verbose", "true")
 	for _, exclude := range excludes {
 		req.Param("exclude", exclude)
 	}
