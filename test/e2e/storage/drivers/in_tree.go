@@ -714,12 +714,12 @@ func (h *hostPathDriver) CreateVolume(ctx context.Context, config *storageframew
 	return nil
 }
 
-func (h *hostPathDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+/*func (h *hostPathDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/host-path"
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
-}
+}*/
 
 // HostPathSymlink
 type hostPathSymlinkDriver struct {
