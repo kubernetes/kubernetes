@@ -186,9 +186,15 @@ func TestIsQueued(t *testing.T) {
 	if q.IsQueued("foo") {
 		t.Errorf("foo should no longer be reported as queued")
 	}
+	if !q.IsQueued("bar") {
+		t.Errorf("Expected bar to be reported as queued")
+	}
 	q.Add("foo")
 	if !q.IsQueued("foo") {
 		t.Errorf("foo should be queued whilst it is processing but not done")
+	}
+	if !q.IsQueued("bar") {
+		t.Errorf("Expected bar to be reported as queued")
 	}
 }
 
