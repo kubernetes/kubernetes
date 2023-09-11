@@ -36,7 +36,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var cmpOpts = []cmp.Option{
@@ -2731,7 +2731,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node",
 				v1.DoNotSchedule,
 				fooSelector,
-				pointer.Int32(4), // larger than the number of domains(3)
+				ptr.To[int32](4), // larger than the number of domains(3)
 				nil,
 				nil,
 				nil,
@@ -2762,7 +2762,7 @@ func TestSingleConstraint(t *testing.T) {
 				"node",
 				v1.DoNotSchedule,
 				fooSelector,
-				pointer.Int32(2), // smaller than the number of domains(3)
+				ptr.To[int32](2), // smaller than the number of domains(3)
 				nil,
 				nil,
 				nil,
@@ -2793,7 +2793,7 @@ func TestSingleConstraint(t *testing.T) {
 				"zone",
 				v1.DoNotSchedule,
 				fooSelector,
-				pointer.Int32(3), // larger than the number of domains(2)
+				ptr.To[int32](3), // larger than the number of domains(2)
 				nil,
 				nil,
 				nil,
@@ -2824,7 +2824,7 @@ func TestSingleConstraint(t *testing.T) {
 				"zone",
 				v1.DoNotSchedule,
 				fooSelector,
-				pointer.Int32(1), // smaller than the number of domains(2)
+				ptr.To[int32](1), // smaller than the number of domains(2)
 				nil,
 				nil,
 				nil,
