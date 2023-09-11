@@ -249,7 +249,8 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	m.setPodPendingAdmission(p)
 
 	// Garbage collect any stranded resources before allocating CPUs.
-	m.removeStaleState()
+	logID := "alloc:" + klog.KObj(p).String()
+	m.removeStaleState(logID)
 
 	m.Lock()
 	defer m.Unlock()
@@ -320,7 +321,8 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState()
+	logID := "getHints:" + klog.KObj(pod).String()
+	m.removeStaleState(logID)
 	// Delegate to active policy
 	return m.policy.GetTopologyHints(m.state, pod, container)
 }
@@ -330,7 +332,8 @@ func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState()
+	logID := "getPodHints:" + klog.KObj(pod).String()
+	m.removeStaleState(logID)
 	// Delegate to active policy
 	return m.policy.GetPodTopologyHints(m.state, pod)
 }
@@ -345,7 +348,7 @@ type reconciledContainer struct {
 	containerID   string
 }
 
-func (m *manager) removeStaleState() {
+func (m *manager) removeStaleState(logID interface{}) {
 	// Only once all sources are ready do we attempt to remove any stale state.
 	// This ensures that the call to `m.activePods()` below will succeed with
 	// the actual active pods list.
@@ -367,33 +370,41 @@ func (m *manager) removeStaleState() {
 	}
 
 	// Build a list of (podUID, containerName) pairs for all containers in all active Pods.
+	activeContainersCount := 0
 	activeContainers := make(map[string]map[string]struct{})
 	for _, pod := range activeAndAdmittedPods {
 		activeContainers[string(pod.UID)] = make(map[string]struct{})
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 			activeContainers[string(pod.UID)][container.Name] = struct{}{}
+			activeContainersCount++
 		}
 	}
+
+	klog.V(4).InfoS("RemoveStaleState: begin", "logID", logID, "activeContainers", activeContainersCount)
+	assignmentContainerCount, assignmentRemoved, containerMapRemoved := 0, 0, 0
 
 	// Loop through the CPUManager state. Remove any state for containers not
 	// in the `activeContainers` list built above.
 	assignments := m.state.GetCPUAssignments()
 	for podUID := range assignments {
 		for containerName := range assignments[podUID] {
+			assignmentContainerCount++
 			if _, ok := activeContainers[podUID][containerName]; ok {
-				klog.V(4).InfoS("RemoveStaleState: container still active", "podUID", podUID, "containerName", containerName)
+				klog.V(4).InfoS("RemoveStaleState: container still active", "logID", logID, "podUID", podUID, "containerName", containerName)
+				continue
 			}
-			klog.V(2).InfoS("RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
+			klog.V(2).InfoS("RemoveStaleState: removing container", "logID", logID, "podUID", podUID, "containerName", containerName)
 			err := m.policyRemoveContainerByRef(podUID, containerName)
 			if err != nil {
-				klog.ErrorS(err, "RemoveStaleState: failed to remove container", "podUID", podUID, "containerName", containerName)
+				klog.ErrorS(err, "RemoveStaleState: failed to remove container", "logID", logID, "podUID", podUID, "containerName", containerName)
 			}
+			assignmentRemoved++
 		}
 	}
 
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
 		if _, ok := activeContainers[podUID][containerName]; ok {
-			klog.V(4).InfoS("RemoveStaleState: containerMap: container still active", "podUID", podUID, "containerName", containerName)
+			klog.V(4).InfoS("RemoveStaleState: containerMap: container still active", "logID", logID, "podUID", podUID, "containerName", containerName)
 			return
 		}
 		klog.V(2).InfoS("RemoveStaleState: containerMap: removing container", "podUID", podUID, "containerName", containerName)
@@ -401,7 +412,10 @@ func (m *manager) removeStaleState() {
 		if err != nil {
 			klog.ErrorS(err, "RemoveStaleState: containerMap: failed to remove container", "podUID", podUID, "containerName", containerName)
 		}
+		containerMapRemoved++
 	})
+
+	klog.V(4).InfoS("RemoveStaleState: done", "logID", logID, "activeContainers", activeContainersCount, "removed", assignmentRemoved, "mapRemoval", containerMapRemoved)
 }
 
 func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
@@ -409,7 +423,9 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
-	m.removeStaleState()
+	logID := fmt.Sprintf("reconcile%v", time.Now().Unix())
+
+	m.removeStaleState(logID)
 	for _, pod := range m.activePods() {
 		pstatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 		if !ok {
