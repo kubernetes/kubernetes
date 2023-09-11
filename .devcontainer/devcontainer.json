@@ -17,7 +17,8 @@
     // Install utils, go, docker-in-docker, and other tools
     // For more info about dev container Features see https://containers.dev/features
     "features": {
-        "./local-features/go": {
+        "ghcr.io/devcontainers/features/go:1": {
+            "version": "1.21.1",
             "username": "root"
         },
         // Install kubectl, but skip minikube and helm
