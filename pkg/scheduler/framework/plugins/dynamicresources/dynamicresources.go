@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -762,6 +763,19 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 		claim := state.claims[index]
 		if len(claim.Status.ReservedFor) == 0 ||
 			len(claim.Status.ReservedFor) == 1 && claim.Status.ReservedFor[0].UID == pod.UID {
+			// Before we tell a driver to deallocate a claim, we
+			// have to stop telling it to allocate. Otherwise,
+			// depending on timing, it will deallocate the claim,
+			// see a PodSchedulingContext with selected node, and
+			// allocate again for that same node.
+			if state.podSchedulingState.schedulingCtx != nil &&
+				state.podSchedulingState.schedulingCtx.Spec.SelectedNode != "" {
+				state.podSchedulingState.selectedNode = ptr.To("")
+				if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
+					return nil, statusError(logger, err)
+				}
+			}
+
 			claim := state.claims[index].DeepCopy()
 			claim.Status.DeallocationRequested = true
 			claim.Status.ReservedFor = nil
