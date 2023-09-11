@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -50,21 +50,21 @@ func TestWarningsForJobSpec(t *testing.T) {
 	}{
 		"valid NonIndexed": {
 			spec: &batch.JobSpec{
-				CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+				CompletionMode: ptr.To(batch.NonIndexedCompletion),
 				Template:       validPodTemplate,
 			},
 		},
 		"NondIndexed with high completions and parallelism": {
 			spec: &batch.JobSpec{
-				CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+				CompletionMode: ptr.To(batch.NonIndexedCompletion),
 				Template:       validPodTemplate,
-				Parallelism:    pointer.Int32(1_000_000_000),
-				Completions:    pointer.Int32(1_000_000_000),
+				Parallelism:    ptr.To[int32](1_000_000_000),
+				Completions:    ptr.To[int32](1_000_000_000),
 			},
 		},
 		"invalid PodTemplate": {
 			spec: &batch.JobSpec{
-				CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+				CompletionMode: ptr.To(batch.NonIndexedCompletion),
 				Template: core.PodTemplateSpec{
 					Spec: core.PodSpec{ImagePullSecrets: []core.LocalObjectReference{{Name: ""}}},
 				},
@@ -73,33 +73,33 @@ func TestWarningsForJobSpec(t *testing.T) {
 		},
 		"valid Indexed low completions low parallelism": {
 			spec: &batch.JobSpec{
-				CompletionMode: completionModePtr(batch.IndexedCompletion),
-				Completions:    pointer.Int32(10_000),
-				Parallelism:    pointer.Int32(10_000),
+				CompletionMode: ptr.To(batch.IndexedCompletion),
+				Completions:    ptr.To[int32](10_000),
+				Parallelism:    ptr.To[int32](10_000),
 				Template:       validPodTemplate,
 			},
 		},
 		"valid Indexed high completions low parallelism": {
 			spec: &batch.JobSpec{
-				CompletionMode: completionModePtr(batch.IndexedCompletion),
-				Completions:    pointer.Int32(1000_000_000),
-				Parallelism:    pointer.Int32(10_000),
+				CompletionMode: ptr.To(batch.IndexedCompletion),
+				Completions:    ptr.To[int32](1000_000_000),
+				Parallelism:    ptr.To[int32](10_000),
 				Template:       validPodTemplate,
 			},
 		},
 		"valid Indexed medium completions medium parallelism": {
 			spec: &batch.JobSpec{
-				CompletionMode: completionModePtr(batch.IndexedCompletion),
-				Completions:    pointer.Int32(100_000),
-				Parallelism:    pointer.Int32(100_000),
+				CompletionMode: ptr.To(batch.IndexedCompletion),
+				Completions:    ptr.To[int32](100_000),
+				Parallelism:    ptr.To[int32](100_000),
 				Template:       validPodTemplate,
 			},
 		},
 		"invalid Indexed high completions high parallelism": {
 			spec: &batch.JobSpec{
-				CompletionMode: completionModePtr(batch.IndexedCompletion),
-				Completions:    pointer.Int32(100_001),
-				Parallelism:    pointer.Int32(10_001),
+				CompletionMode: ptr.To(batch.IndexedCompletion),
+				Completions:    ptr.To[int32](100_001),
+				Parallelism:    ptr.To[int32](10_001),
 				Template:       validPodTemplate,
 			},
 			wantWarningsCount: 1,
@@ -114,8 +114,4 @@ func TestWarningsForJobSpec(t *testing.T) {
 			}
 		})
 	}
-}
-
-func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
-	return &m
 }
