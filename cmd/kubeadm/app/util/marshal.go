@@ -54,14 +54,11 @@ func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs s
 	return runtime.Encode(encoder, obj)
 }
 
-// UnmarshalFromYaml unmarshals yaml into an object.
-func UnmarshalFromYaml(buffer []byte) (runtime.Object, error) {
-	return UnmarshalFromYamlForCodecs(buffer, clientsetscheme.Codecs)
-}
-
-// UnmarshalFromYamlForCodecs unmarshals yaml into an object using the universal deserializer
-func UnmarshalFromYamlForCodecs(buffer []byte, codecs serializer.CodecFactory) (runtime.Object, error) {
-	obj, _, err := codecs.UniversalDeserializer().Decode(buffer, nil, nil)
+// UniversalUnmarshal unmarshals YAML or JSON into a runtime.Object using the universal deserializer.
+func UniversalUnmarshal(buffer []byte) (runtime.Object, error) {
+	codecs := clientsetscheme.Codecs
+	decoder := codecs.UniversalDeserializer()
+	obj, _, err := decoder.Decode(buffer, nil, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to decode %s into runtime.Object", buffer)
 	}

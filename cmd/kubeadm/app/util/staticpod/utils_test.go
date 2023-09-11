@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -745,6 +746,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 		description    string
 		podYamls       []string
 		expectedResult bool
+		expectedDiff   string
 		expectErr      bool
 	}{
 		{
@@ -764,12 +766,18 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			podYamls:       []string{validPod, validPod2},
 			expectedResult: false,
 			expectErr:      false,
+			expectedDiff: string(`
+- 					"2",
++ 					"1",`),
 		},
 		{
 			description:    "manifests are not equal for adding new defaults",
 			podYamls:       []string{validPod, invalidWithDefaultFields},
 			expectedResult: false,
 			expectErr:      false,
+			expectedDiff: string(`
+- 		RestartPolicy:                 "Always",
++ 		RestartPolicy:                 "",`),
 		},
 		{
 			description:    "first manifest doesn't exist",
@@ -802,7 +810,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			}
 
 			// compare them
-			result, actualErr := ManifestFilesAreEqual(filepath.Join(tmpdir, "0.yaml"), filepath.Join(tmpdir, "1.yaml"))
+			result, diff, actualErr := ManifestFilesAreEqual(filepath.Join(tmpdir, "0.yaml"), filepath.Join(tmpdir, "1.yaml"))
 			if result != rt.expectedResult {
 				t.Errorf(
 					"ManifestFilesAreEqual failed\n%s\nexpected result: %t\nactual result: %t",
@@ -818,6 +826,14 @@ func TestManifestFilesAreEqual(t *testing.T) {
 					rt.expectErr,
 					(actualErr != nil),
 					actualErr,
+				)
+			}
+			if !strings.Contains(diff, rt.expectedDiff) {
+				t.Errorf(
+					"ManifestFilesAreEqual diff doesn't expected\n%s\n\texpected diff: %s\nactual diff: %s",
+					rt.description,
+					rt.expectedDiff,
+					diff,
 				)
 			}
 		})
