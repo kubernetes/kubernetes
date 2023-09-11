@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	rbacapiv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -164,11 +166,13 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 		// initializing roles is really important.  On some e2e runs, we've seen cases where etcd is down when the server
 		// starts, the roles don't initialize, and nothing works.
 		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
-			client, err := clientset.NewForConfig(hookContext.LoopbackClientConfig)
+			clientClusterGetter, err := kcpkubernetesclientset.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to initialize client set: %v", err))
 				return false, nil
 			}
+			// TODO(sttts): make it possible to reference LocalAdminCluster here without import cycle
+			client := clientClusterGetter.Cluster(logicalcluster.Name("system:admin").Path())
 			return ensureRBACPolicy(p, client)
 		})
 		// if we're never able to make it through initialization, kill the API server

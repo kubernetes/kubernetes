@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -304,7 +305,7 @@ func DefaultGenericAPIServicePriorities() map[schema.GroupVersion]APIServicePrio
 func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration, apiVersionPriorities map[schema.GroupVersion]APIServicePriority) []*v1.APIService {
 	apiServices := []*v1.APIService{}
 
-	for _, curr := range delegateAPIServer.ListedPaths() {
+	for _, curr := range delegateAPIServer.ListedPaths(&request.Cluster{}) {
 		if curr == "/api/v1" {
 			apiService := makeAPIService(schema.GroupVersion{Group: "", Version: "v1"}, apiVersionPriorities)
 			registration.AddAPIServiceToSyncOnStart(apiService)

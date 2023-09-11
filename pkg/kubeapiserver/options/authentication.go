@@ -690,7 +690,8 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 
 	if authenticatorConfig.BootstrapToken {
 		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-			versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem), //TODO(kcp): This should be a cluster scoped lister?
+			// TODO(sttts): make it possible to reference LocalAdminCluster here without import cycle
+			versionedInformer.Core().V1().Secrets().Lister().Cluster("system:admin").Secrets(metav1.NamespaceSystem), //TODO(kcp): This should be a cluster scoped lister?
 		)
 	}
 
