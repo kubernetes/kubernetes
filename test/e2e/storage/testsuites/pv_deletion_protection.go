@@ -162,7 +162,7 @@ func (p *pvDeletionProtectionTestSuite) DefineTests(driver storageframework.Test
 		}
 	}
 
-	ginkgo.It("[Feature:HonorPVReclaimPolicy] delete pv prior", func(ctx context.Context) {
+	ginkgo.It("HonorPVReclaimPolicy delete pv prior", func(ctx context.Context) {
 		init(ctx)
 		SetupStorageClass(ctx, l.testCase.Client, l.testCase.Class)
 		l.testCase.TestVolumeDeletion(ctx)

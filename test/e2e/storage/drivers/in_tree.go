@@ -654,7 +654,7 @@ var _ storageframework.TestDriver = &hostPathDriver{}
 var _ storageframework.PreprovisionedVolumeTestDriver = &hostPathDriver{}
 var _ storageframework.InlineVolumeTestDriver = &hostPathDriver{}
 
-//var _ storageframework.DynamicPVTestDriver = &hostPathDriver{}
+// var _ storageframework.DynamicPVTestDriver = &hostPathDriver{}
 
 // InitHostPathDriver returns hostPathDriver that implements TestDriver interface
 func InitHostPathDriver() storageframework.TestDriver {
