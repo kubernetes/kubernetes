@@ -87,10 +87,6 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
 		Duration: constants.DefaultControlPlaneTimeout,
 	}
-	obj.ControllerManager.ExtraEnvs = []corev1.EnvVar{}
-	obj.APIServer.ExtraEnvs = []corev1.EnvVar{}
-	obj.Scheduler.ExtraEnvs = []corev1.EnvVar{}
-	obj.Etcd.Local.ExtraEnvs = []corev1.EnvVar{}
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
