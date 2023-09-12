@@ -510,6 +510,99 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		})
 
+		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications for partiton1 and delete pod-0", func(ctx context.Context) {
+			ginkgo.By("Creating a new StatefulSet")
+			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
+			setHTTPProbe(ss)
+			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
+					return &appsv1.RollingUpdateStatefulSetStrategy{
+						Partition: pointer.Int32(1),
+					}
+				}(),
+			}
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+			ss = waitForStatus(ctx, c, ss)
+			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			framework.ExpectEqual(currentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+				ss.Namespace, ss.Name, updateRevision, currentRevision))
+			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			for i := range pods.Items {
+				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to currentRevision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision))
+			}
+			newImage := NewWebserverImage
+			oldImage := ss.Spec.Template.Spec.Containers[0].Image
+
+			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
+			framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = newImage
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Creating a new revision")
+			ss = waitForStatus(ctx, c, ss)
+			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
+
+			ginkgo.By("Not applying an update when the partition is greater than the number of replicas")
+			for i := range pods.Items {
+				framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, oldImage, fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Spec.Containers[0].Image,
+					oldImage))
+				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision))
+			}
+
+			ginkgo.By("Restoring Pod-0 to the correct revision when all of the old pod are deleted")
+			//delete all of the old pod
+			deleteStatefulPodAtIndex(ctx, c, 0, ss)
+			e2estatefulset.WaitForRunningAndReady(ctx, c, 3, ss)
+			ss = getStatefulSet(ctx, c, ss.Namespace, ss.Name)
+
+			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
+
+			pods = e2estatefulset.GetPodList(ctx, c, ss)
+			for i := range pods.Items {
+				if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
+					framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, oldImage, fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Spec.Containers[0].Image,
+						oldImage))
+					framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to current revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+						currentRevision))
+				} else {
+					framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, newImage, fmt.Sprintf("Pod %s/%s has image %s not equal to new image  %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Spec.Containers[0].Image,
+						newImage))
+					framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], updateRevision, fmt.Sprintf("Pod %s/%s has revision %s not equal to new revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+						updateRevision))
+				}
+			}
+		})
+
 		// Do not mark this as Conformance.
 		// The legacy OnDelete strategy only exists for backward compatibility with pre-v1 APIs.
 		ginkgo.It("should implement legacy replacement when the update strategy is OnDelete", func(ctx context.Context) {
