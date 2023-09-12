@@ -3875,7 +3875,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](3),
 					Completions:    ptr.To[int32](3),
 					BackoffLimit:   ptr.To[int32](math.MaxInt32),
@@ -3924,7 +3924,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](3),
 					Completions:    ptr.To[int32](3),
 					BackoffLimit:   ptr.To[int32](math.MaxInt32),
@@ -3973,7 +3973,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](2),
 					Completions:    ptr.To[int32](2),
 					BackoffLimit:   ptr.To[int32](math.MaxInt32),
@@ -4031,7 +4031,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](2),
 					Completions:    ptr.To[int32](2),
 					BackoffLimit:   ptr.To[int32](math.MaxInt32),
@@ -4088,7 +4088,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
@@ -4138,7 +4138,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
@@ -4201,7 +4201,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					Parallelism:          ptr.To[int32](3),
 					Completions:          ptr.To[int32](3),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
@@ -4262,7 +4262,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](2),
 					Completions:    ptr.To[int32](2),
 					BackoffLimit:   ptr.To[int32](math.MaxInt32),
@@ -4326,7 +4326,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
@@ -4369,7 +4369,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](2),
 					Completions:    ptr.To[int32](2),
 					BackoffLimit:   ptr.To[int32](1),
@@ -4412,7 +4412,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](2),
 					Completions:    ptr.To[int32](2),
 					BackoffLimit:   ptr.To[int32](math.MaxInt32),
@@ -4489,7 +4489,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
@@ -4552,7 +4552,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](2),
 					Completions:    ptr.To[int32](2),
 					BackoffLimit:   ptr.To[int32](1),
@@ -4615,7 +4615,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](2),
 					Completions:    ptr.To[int32](2),
 					BackoffLimit:   ptr.To[int32](math.MaxInt32),
@@ -4690,7 +4690,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validTemplate,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					CompletionMode: ptr.To(batch.IndexedCompletion),
 					Parallelism:    ptr.To[int32](3),
 					Completions:    ptr.To[int32](3),
 					BackoffLimit:   ptr.To[int32](math.MaxInt32),
@@ -4804,7 +4804,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
@@ -4839,7 +4839,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
@@ -4864,7 +4864,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
@@ -4891,7 +4891,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
@@ -4918,7 +4918,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
@@ -4967,7 +4967,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](6),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
@@ -5031,7 +5031,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](6),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
@@ -5080,7 +5080,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](1),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
@@ -5115,7 +5115,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](2),
 					Completions:          ptr.To[int32](2),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
@@ -5151,7 +5151,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](4),
 					Completions:          ptr.To[int32](4),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 					MaxFailedIndexes:     ptr.To[int32](1),
 				},
@@ -5190,7 +5190,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					Parallelism:          ptr.To[int32](3),
 					Completions:          ptr.To[int32](3),
 					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
 					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 				Status: batch.JobStatus{
@@ -7223,10 +7223,6 @@ func (pb podBuilder) deletionTimestamp() podBuilder {
 func (pb podBuilder) customDeletionTimestamp(t time.Time) podBuilder {
 	pb.DeletionTimestamp = &metav1.Time{Time: t}
 	return pb
-}
-
-func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
-	return &m
 }
 
 func setDurationDuringTest(val *time.Duration, newVal time.Duration) func() {
