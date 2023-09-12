@@ -19,10 +19,7 @@ package metrics
 import (
 	"bytes"
 	"context"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/otel/trace"
 	"io"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,9 +27,12 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
 
+	"go.opentelemetry.io/otel/trace"
+	"k8s.io/apimachinery/pkg/util/wait"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
@@ -324,13 +324,8 @@ func TestCounterWithExemplar(t *testing.T) {
 	registry.MustRegister(counter)
 
 	// Call underlying exemplar methods.
-	go func() {
-		counter.Add(toAdd)
-		counter.Inc()
-
-		// Synthetic latency.
-		time.Sleep(600 * time.Millisecond)
-	}()
+	counter.Add(toAdd)
+	counter.Inc()
 
 	// Verify value.
 	err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, time.Second, false, func(ctx context.Context) (done bool, err error) {
@@ -375,12 +370,14 @@ func TestCounterWithExemplar(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		req.Header.Set("Accept", expfmt.OpenMetricsType)
+		req.Header.Set("Accept", expfmt.ProtoType) // application/vnd.google.protobuf
 		rsp, err := client.Do(req)
 		if err != nil {
 			return false, err
 		}
 		defer rsp.Body.Close()
+
+		t.Logf("got response type: %s", rsp.Header.Get("Content-Type")) // text/plain; version=0.0.4; charset=utf-8
 
 		body, err := io.ReadAll(rsp.Body)
 		if err != nil {
