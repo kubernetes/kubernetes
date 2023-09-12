@@ -147,6 +147,9 @@ var (
 			// https://issues.redhat.com/browse/OCPBUGS-13392
 			`\[sig-network\] NetworkPolicyLegacy \[LinuxOnly\] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
 			`\[sig-network\] NetworkPolicyLegacy \[LinuxOnly\] NetworkPolicy between server and client should enforce updated policy`,
+
+			// Feature removed in Kubernetes 1.28: https://github.com/kubernetes/kubernetes/pull/115843
+			`\[Feature:NetworkPolicyStatus\]`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
