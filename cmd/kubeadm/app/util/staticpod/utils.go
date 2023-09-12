@@ -29,8 +29,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	"github.com/pmezard/go-difflib/difflib"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -374,7 +374,24 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, string, error) {
 	if bytes.Equal(hash1, hash2) {
 		return true, "", nil
 	}
-	return false, cmp.Diff(pod2, pod1), nil
+
+	pod1Yaml, err := kubeadmutil.MarshalToYaml(pod1, v1.SchemeGroupVersion)
+	if err != nil {
+		return false, "", err
+	}
+	pod2Yaml, err := kubeadmutil.MarshalToYaml(pod2, v1.SchemeGroupVersion)
+	if err != nil {
+		return false, "", err
+	}
+
+	var buf bytes.Buffer
+	diff := difflib.UnifiedDiff{
+		A: difflib.SplitLines(string(pod1Yaml)),
+		B: difflib.SplitLines(string(pod2Yaml)),
+	}
+	difflib.WriteUnifiedDiff(&buf, diff)
+
+	return false, buf.String(), nil
 }
 
 // getProbeAddress returns a valid probe address.

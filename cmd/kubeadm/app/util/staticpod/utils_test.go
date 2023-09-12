@@ -766,18 +766,18 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			podYamls:       []string{validPod, validPod2},
 			expectedResult: false,
 			expectErr:      false,
-			expectedDiff: string(`
-- 					"2",
-+ 					"1",`),
+			expectedDiff: string(`@@ -12 +12 @@
+-  - image: gcr.io/google_containers/etcd-amd64:3.1.11
++  - image: gcr.io/google_containers/etcd-amd64:3.1.12
+`),
 		},
 		{
-			description:    "manifests are not equal for adding new defaults",
+			description:    "manifests are not equal after adding new defaults",
 			podYamls:       []string{validPod, invalidWithDefaultFields},
 			expectedResult: false,
 			expectErr:      false,
-			expectedDiff: string(`
-- 		RestartPolicy:                 "Always",
-+ 		RestartPolicy:                 "",`),
+			expectedDiff: string(`@@ -14,0 +15 @@
++  restartPolicy: Always`),
 		},
 		{
 			description:    "first manifest doesn't exist",
@@ -830,7 +830,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			}
 			if !strings.Contains(diff, rt.expectedDiff) {
 				t.Errorf(
-					"ManifestFilesAreEqual diff doesn't expected\n%s\n\texpected diff: %s\nactual diff: %s",
+					"ManifestFilesAreEqual diff doesn't expected\n%s\n\texpected diff:\n%s\nactual diff:\n%s",
 					rt.description,
 					rt.expectedDiff,
 					diff,
