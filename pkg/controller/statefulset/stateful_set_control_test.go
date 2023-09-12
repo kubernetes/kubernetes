@@ -2474,6 +2474,8 @@ func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
 	defer om.createPodTracker.inc()
 	if om.createPodTracker.errorReady() {
 		defer om.createPodTracker.reset()
+		defer om.createPodTracker.Unlock()
+		om.createPodTracker.Lock()
 		return om.createPodTracker.err
 	}
 	pod.SetUID(types.UID(pod.Name + "-uid"))
