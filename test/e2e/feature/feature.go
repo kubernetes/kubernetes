@@ -48,6 +48,7 @@ var (
 	DevicePluginProbe                       = framework.WithFeature(framework.ValidFeatures.Add("DevicePluginProbe"))
 	Downgrade                               = framework.WithFeature(framework.ValidFeatures.Add("Downgrade"))
 	DynamicResourceAllocation               = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
+	DynamicResourceAllocationQuota          = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocationQuota"))
 	EphemeralStorage                        = framework.WithFeature(framework.ValidFeatures.Add("EphemeralStorage"))
 	Example                                 = framework.WithFeature(framework.ValidFeatures.Add("Example"))
 	ExperimentalResourceUsageTracking       = framework.WithFeature(framework.ValidFeatures.Add("ExperimentalResourceUsageTracking"))

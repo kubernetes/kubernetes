@@ -5570,6 +5570,10 @@ const (
 	ResourceLimitsMemory ResourceName = "limits.memory"
 	// Local ephemeral storage limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
+	// resource.k8s.io/ResourceClaims, number
+	ResourceClaims ResourceName = "resourceclaims"
+	// <class_name><ResouceClaimsPerClass>, number
+	ResourceClaimsPerClass string = ".resourceclass.resource.k8s.io/resourceclaims"
 )
 
 // The following identify resource prefix for Kubernetes object types
