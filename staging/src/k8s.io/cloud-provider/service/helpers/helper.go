@@ -138,6 +138,9 @@ func PatchService(c corev1.CoreV1Interface, oldSvc, newSvc *v1.Service) (*v1.Ser
 		return nil, err
 	}
 
+	if oldSvc.DeletionTimestamp != nil {
+		return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	}
 	return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 
 }
