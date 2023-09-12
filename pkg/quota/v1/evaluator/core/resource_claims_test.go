@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,209 +17,156 @@ limitations under the License.
 package core
 
 import (
-	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	quota "k8s.io/apiserver/pkg/quota/v1"
-	"k8s.io/apiserver/pkg/quota/v1/generic"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
+	api "k8s.io/kubernetes/pkg/apis/resource"
 )
 
-func testVolumeClaim(name string, namespace string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
-	return &core.PersistentVolumeClaim{
+func testResourceClaim(name string, namespace string, spec api.ResourceClaimSpec) *api.ResourceClaim {
+	return &api.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec:       spec,
 	}
 }
 
-func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
-	classGold := "gold"
-	validClaim := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
-		Selector: &metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key:      "key2",
-					Operator: "Exists",
-				},
-			},
-		},
-		AccessModes: []core.PersistentVolumeAccessMode{
-			core.ReadWriteOnce,
-			core.ReadOnlyMany,
-		},
-		Resources: core.VolumeResourceRequirements{
-			Requests: core.ResourceList{
-				core.ResourceName(core.ResourceStorage): resource.MustParse("10Gi"),
-			},
-		},
-	})
-	validClaimByStorageClass := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
-		Selector: &metav1.LabelSelector{
-			MatchExpressions: []metav1.LabelSelectorRequirement{
-				{
-					Key:      "key2",
-					Operator: "Exists",
-				},
-			},
-		},
-		AccessModes: []core.PersistentVolumeAccessMode{
-			core.ReadWriteOnce,
-			core.ReadOnlyMany,
-		},
-		Resources: core.VolumeResourceRequirements{
-			Requests: core.ResourceList{
-				core.ResourceName(core.ResourceStorage): resource.MustParse("10Gi"),
-			},
-		},
-		StorageClassName: &classGold,
-	})
+func TestResourceClaimEvaluatorUsage(t *testing.T) {
+	classGpu := "gpu"
+	validClaim := testResourceClaim("foo", "ns", api.ResourceClaimSpec{Devices: api.DeviceClaim{Requests: []api.DeviceRequest{{Name: "req-0", DeviceClassName: classGpu, AllocationMode: api.DeviceAllocationModeExactCount, Count: 1}}}})
 
-	validClaimWithNonIntegerStorage := validClaim.DeepCopy()
-	validClaimWithNonIntegerStorage.Spec.Resources.Requests[core.ResourceName(core.ResourceStorage)] = resource.MustParse("1001m")
-
-	validClaimByStorageClassWithNonIntegerStorage := validClaimByStorageClass.DeepCopy()
-	validClaimByStorageClassWithNonIntegerStorage.Spec.Resources.Requests[core.ResourceName(core.ResourceStorage)] = resource.MustParse("1001m")
-
-	evaluator := NewPersistentVolumeClaimEvaluator(nil)
+	evaluator := NewResourceClaimEvaluator(nil)
 	testCases := map[string]struct {
-		pvc                        *core.PersistentVolumeClaim
-		usage                      corev1.ResourceList
-		enableRecoverFromExpansion bool
+		claim  *api.ResourceClaim
+		usage  corev1.ResourceList
+		errMsg string
 	}{
-		"pvc-usage": {
-			pvc: validClaim,
+		"simple": {
+			claim: validClaim,
 			usage: corev1.ResourceList{
-				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
-				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
 			},
-			enableRecoverFromExpansion: true,
 		},
-		"pvc-usage-by-class": {
-			pvc: validClaimByStorageClass,
+		"many-requests": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaim.DeepCopy()
+				for i := 0; i < 4; i++ {
+					claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, claim.Spec.Devices.Requests[0])
+				}
+				return claim
+			}(),
 			usage: corev1.ResourceList{
-				corev1.ResourceRequestsStorage:                                                                    resource.MustParse("10Gi"),
-				corev1.ResourcePersistentVolumeClaims:                                                             resource.MustParse("1"),
-				V1ResourceByStorageClass(classGold, corev1.ResourceRequestsStorage):                               resource.MustParse("10Gi"),
-				V1ResourceByStorageClass(classGold, corev1.ResourcePersistentVolumeClaims):                        resource.MustParse("1"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("5"),
 			},
-			enableRecoverFromExpansion: true,
 		},
-
-		"pvc-usage-rounded": {
-			pvc: validClaimWithNonIntegerStorage,
+		"count": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaim.DeepCopy()
+				claim.Spec.Devices.Requests[0].Count = 5
+				return claim
+			}(),
 			usage: corev1.ResourceList{
-				corev1.ResourceRequestsStorage:        resource.MustParse("2"), // 1001m -> 2
-				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("5"),
 			},
-			enableRecoverFromExpansion: true,
 		},
-		"pvc-usage-by-class-rounded": {
-			pvc: validClaimByStorageClassWithNonIntegerStorage,
+		"all": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaim.DeepCopy()
+				claim.Spec.Devices.Requests[0].AllocationMode = api.DeviceAllocationModeAll
+				return claim
+			}(),
 			usage: corev1.ResourceList{
-				corev1.ResourceRequestsStorage:                                                                    resource.MustParse("2"), // 1001m -> 2
-				corev1.ResourcePersistentVolumeClaims:                                                             resource.MustParse("1"),
-				V1ResourceByStorageClass(classGold, corev1.ResourceRequestsStorage):                               resource.MustParse("2"), // 1001m -> 2
-				V1ResourceByStorageClass(classGold, corev1.ResourcePersistentVolumeClaims):                        resource.MustParse("1"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": *resource.NewQuantity(api.AllocationResultsMaxSize, resource.DecimalSI),
 			},
-			enableRecoverFromExpansion: true,
 		},
-		"pvc-usage-higher-allocated-resource": {
-			pvc: getPVCWithAllocatedResource("5G", "10G"),
+		"unknown-count-mode": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaim.DeepCopy()
+				claim.Spec.Devices.Requests[0].AllocationMode = "future-mode"
+				return claim
+			}(),
 			usage: corev1.ResourceList{
-				corev1.ResourceRequestsStorage:        resource.MustParse("10G"),
-				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("0"),
 			},
-			enableRecoverFromExpansion: true,
 		},
-		"pvc-usage-lower-allocated-resource": {
-			pvc: getPVCWithAllocatedResource("10G", "5G"),
+		"admin": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaim.DeepCopy()
+				// Admins are *not* exempt from quota.
+				claim.Spec.Devices.Requests[0].AdminAccess = true
+				return claim
+			}(),
 			usage: corev1.ResourceList{
-				corev1.ResourceRequestsStorage:        resource.MustParse("10G"),
-				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
 			},
-			enableRecoverFromExpansion: true,
 		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, testCase.enableRecoverFromExpansion)()
-			actual, err := evaluator.Usage(testCase.pvc)
+			actual, err := evaluator.Usage(testCase.claim)
 			if err != nil {
-				t.Errorf("%s unexpected error: %v", testName, err)
+				if testCase.errMsg == "" {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if !strings.Contains(err.Error(), testCase.errMsg) {
+					t.Fatalf("Expected error %q, got error: %v", testCase.errMsg, err.Error())
+				}
 			}
-			if !quota.Equals(testCase.usage, actual) {
-				t.Errorf("%s expected:\n%v\n, actual:\n%v", testName, testCase.usage, actual)
+			if err == nil && testCase.errMsg != "" {
+				t.Fatalf("Expected error %q, got none", testCase.errMsg)
+			}
+			if diff := cmp.Diff(testCase.usage, actual); diff != "" {
+				t.Errorf("Unexpected usage (-want, +got):\n%s", diff)
 			}
 		})
 
 	}
 }
 
-func getPVCWithAllocatedResource(pvcSize, allocatedSize string) *core.PersistentVolumeClaim {
-	validPVCWithAllocatedResources := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
-		Resources: core.VolumeResourceRequirements{
-			Requests: core.ResourceList{
-				core.ResourceStorage: resource.MustParse(pvcSize),
-			},
-		},
-	})
-	validPVCWithAllocatedResources.Status.AllocatedResources = core.ResourceList{
-		core.ResourceName(core.ResourceStorage): resource.MustParse(allocatedSize),
-	}
-	return validPVCWithAllocatedResources
-}
-
-func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
-	evaluator := NewPersistentVolumeClaimEvaluator(nil)
+func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
+	evaluator := NewResourceClaimEvaluator(nil)
 	testCases := map[string]struct {
 		items []corev1.ResourceName
 		want  []corev1.ResourceName
 	}{
 		"supported-resources": {
 			items: []corev1.ResourceName{
-				"count/persistentvolumeclaims",
-				"requests.storage",
-				"persistentvolumeclaims",
-				"gold.storageclass.storage.k8s.io/requests.storage",
-				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+				"count/resourceclaims.resource.k8s.io",
+				"gpu.deviceclass.resource.k8s.io/devices",
 			},
 
 			want: []corev1.ResourceName{
-				"count/persistentvolumeclaims",
-				"requests.storage",
-				"persistentvolumeclaims",
-				"gold.storageclass.storage.k8s.io/requests.storage",
-				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+				"count/resourceclaims.resource.k8s.io",
+				"gpu.deviceclass.resource.k8s.io/devices",
 			},
 		},
 		"unsupported-resources": {
 			items: []corev1.ResourceName{
+				"resourceclaims", // no such alias
 				"storage",
 				"ephemeral-storage",
-				"bronze.storageclass.storage.k8s.io/storage",
-				"gold.storage.k8s.io/requests.storage",
+				"bronze.deviceclass.resource.k8s.io/storage",
+				"gpu.storage.k8s.io/requests.storage",
 			},
 			want: []corev1.ResourceName{},
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := evaluator.MatchingResources(testCase.items)
+		t.Run(testName, func(t *testing.T) {
+			actual := evaluator.MatchingResources(testCase.items)
 
-		if !reflect.DeepEqual(testCase.want, actual) {
-			t.Errorf("%s expected:\n%v\n, actual:\n%v", testName, testCase.want, actual)
-		}
+			if diff := cmp.Diff(testCase.want, actual); diff != "" {
+				t.Errorf("Unexpected response (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
