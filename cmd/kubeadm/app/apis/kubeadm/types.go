@@ -157,7 +157,7 @@ type ControlPlaneComponent struct {
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
 	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
 	// +optional
-	ExtraEnvs []v1.EnvVar
+	ExtraEnvs []EnvVar
 }
 
 // APIServer holds settings necessary for API server deployments in the cluster
@@ -275,7 +275,7 @@ type LocalEtcd struct {
 	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
 	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
 	// +optional
-	ExtraEnvs []v1.EnvVar
+	ExtraEnvs []EnvVar
 
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
 	ServerCertSANs []string
@@ -512,4 +512,9 @@ type ComponentConfigMap map[string]ComponentConfig
 type Arg struct {
 	Name  string
 	Value string
+}
+
+// EnvVar represents an environment variable present in a Container.
+type EnvVar struct {
+	v1.EnvVar
 }

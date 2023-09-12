@@ -44,8 +44,10 @@ func TestGetEtcdPodSpec(t *testing.T) {
 		Etcd: kubeadmapi.Etcd{
 			Local: &kubeadmapi.LocalEtcd{
 				DataDir: "/var/lib/etcd",
-				ExtraEnvs: []v1.EnvVar{
-					{Name: "Foo", Value: "Bar"},
+				ExtraEnvs: []kubeadmapi.EnvVar{
+					{
+						EnvVar: v1.EnvVar{Name: "Foo", Value: "Bar"},
+					},
 				},
 			},
 		},
