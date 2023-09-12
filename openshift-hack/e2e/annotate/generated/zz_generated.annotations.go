@@ -1019,7 +1019,7 @@ var Annotations = map[string]string{
 
 	"[sig-network] Netpol API should support creating NetworkPolicy API with endport field": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] Netpol API should support creating NetworkPolicy with Status subresource [Feature:NetworkPolicyStatus]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-network] Netpol API should support creating NetworkPolicy with Status subresource [Feature:NetworkPolicyStatus]": " [Disabled:RebaseInProgress] [Suite:k8s]",
 
 	"[sig-network] Netpol NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy]": " [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
