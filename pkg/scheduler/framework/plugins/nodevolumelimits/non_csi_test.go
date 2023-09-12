@@ -29,9 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	"k8s.io/utils/pointer"
 )
 
@@ -974,8 +974,8 @@ func TestGetMaxVols(t *testing.T) {
 	}
 }
 
-func getFakePVCLister(filterName string) fakeframework.PersistentVolumeClaimLister {
-	return fakeframework.PersistentVolumeClaimLister{
+func getFakePVCLister(filterName string) tf.PersistentVolumeClaimLister {
+	return tf.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeClaimSpec{
@@ -1035,8 +1035,8 @@ func getFakePVCLister(filterName string) fakeframework.PersistentVolumeClaimList
 	}
 }
 
-func getFakePVLister(filterName string) fakeframework.PersistentVolumeLister {
-	return fakeframework.PersistentVolumeLister{
+func getFakePVLister(filterName string) tf.PersistentVolumeLister {
+	return tf.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeSpec{

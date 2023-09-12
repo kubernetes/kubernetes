@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/informers"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2/ktesting"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/fc"
 
@@ -282,7 +282,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 	}
 }
 
-func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration.PluginManager, csitrans.CSITranslator, fakeframework.PersistentVolumeLister, fakeframework.PersistentVolumeClaimLister) {
+func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration.PluginManager, csitrans.CSITranslator, tf.PersistentVolumeLister, tf.PersistentVolumeClaimLister) {
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
@@ -313,7 +313,7 @@ func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration
 
 	plugMgr.Host = fakeAttachDetachVolumeHost
 
-	pvLister := fakeframework.PersistentVolumeLister{
+	pvLister := tf.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: migratedVolume},
 			Spec: v1.PersistentVolumeSpec{
@@ -339,7 +339,7 @@ func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration
 		},
 	}
 
-	pvcLister := fakeframework.PersistentVolumeClaimLister{
+	pvcLister := tf.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "migrated-pvc", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: migratedVolume},
