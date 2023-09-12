@@ -321,9 +321,10 @@ type replicaStatus struct {
 func computeReplicaStatus(pods []*v1.Pod, minReadySeconds int32, currentRevision, updateRevision *apps.ControllerRevision) replicaStatus {
 	status := replicaStatus{}
 	for _, pod := range pods {
-		if isCreated(pod) {
-			status.replicas++
-		}
+		// if isCreated(pod) {
+		// 	status.replicas++
+		// }
+		status.replicas++
 
 		// count the number of running and ready replicas
 		if isRunningAndReady(pod) {
