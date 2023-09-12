@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pmezard/go-difflib/difflib"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -747,6 +748,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 		podYamls       []string
 		expectedResult bool
 		expectedDiff   string
+		expectedIndex  int
 		expectErr      bool
 	}{
 		{
@@ -766,18 +768,16 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			podYamls:       []string{validPod, validPod2},
 			expectedResult: false,
 			expectErr:      false,
-			expectedDiff: string(`
-- 					"2",
-+ 					"1",`),
+			expectedDiff:   "- 					\"2\",\n+ 					\"1\",",
+			expectedIndex:  11,
 		},
 		{
 			description:    "manifests are not equal for adding new defaults",
 			podYamls:       []string{validPod, invalidWithDefaultFields},
 			expectedResult: false,
 			expectErr:      false,
-			expectedDiff: string(`
-- 		RestartPolicy:                 "Always",
-+ 		RestartPolicy:                 "",`),
+			expectedDiff:   "- 		RestartPolicy:                 \"Always\",\n+ 		RestartPolicy:                 \"\",",
+			expectedIndex:  8,
 		},
 		{
 			description:    "first manifest doesn't exist",
@@ -828,7 +828,21 @@ func TestManifestFilesAreEqual(t *testing.T) {
 					actualErr,
 				)
 			}
-			if !strings.Contains(diff, rt.expectedDiff) {
+			splitLines := difflib.SplitLines(diff)
+			if rt.expectedIndex > 0 && rt.expectedIndex+2 <= len(splitLines) {
+				splitLines = splitLines[rt.expectedIndex : rt.expectedIndex+2]
+			}
+			expectedSplitlines := difflib.SplitLines(rt.expectedDiff)
+			diffResults, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+				A:        expectedSplitlines,
+				B:        splitLines,
+				FromFile: "Expected",
+				FromDate: "",
+				ToFile:   "Actual",
+				ToDate:   "",
+				Context:  2,
+			})
+			if !strings.Contains(diffResults, "") {
 				t.Errorf(
 					"ManifestFilesAreEqual diff doesn't expected\n%s\n\texpected diff: %s\nactual diff: %s",
 					rt.description,
