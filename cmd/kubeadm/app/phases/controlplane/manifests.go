@@ -48,7 +48,7 @@ func CreateInitStaticPodManifestFiles(manifestDir, patchesDir string, cfg *kubea
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current configuration
 // NB. this method holds the information about how kubeadm creates static pod manifests.
-func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, proxyEnvs []v1.EnvVar) map[string]v1.Pod {
+func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, proxyEnvs []kubeadmapi.EnvVar) map[string]v1.Pod {
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
 	if proxyEnvs == nil {
@@ -67,7 +67,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			ReadinessProbe:  staticpodutil.ReadinessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/readyz", endpoint.BindPort, v1.URISchemeHTTPS),
 			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/livez", endpoint.BindPort, v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
 			Resources:       staticpodutil.ComponentResources("250m"),
-			Env:             kubeadmutil.MergeEnv(proxyEnvs, cfg.APIServer.ExtraEnvs),
+			Env:             kubeadmutil.MergeKubeadmEnvVars(proxyEnvs, cfg.APIServer.ExtraEnvs),
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer),
 			map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: endpoint.String()}),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
@@ -79,7 +79,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS),
 			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
 			Resources:       staticpodutil.ComponentResources("200m"),
-			Env:             kubeadmutil.MergeEnv(proxyEnvs, cfg.ControllerManager.ExtraEnvs),
+			Env:             kubeadmutil.MergeKubeadmEnvVars(proxyEnvs, cfg.ControllerManager.ExtraEnvs),
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager), nil),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeScheduler,
@@ -90,7 +90,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS),
 			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
 			Resources:       staticpodutil.ComponentResources("100m"),
-			Env:             kubeadmutil.MergeEnv(proxyEnvs, cfg.Scheduler.ExtraEnvs),
+			Env:             kubeadmutil.MergeKubeadmEnvVars(proxyEnvs, cfg.Scheduler.ExtraEnvs),
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler), nil),
 	}
 	return staticPodSpecs
