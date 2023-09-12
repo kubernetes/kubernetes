@@ -56,6 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -231,6 +232,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		Creater:         scheme,
 		Convertor:       scheme,
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
@@ -3345,6 +3347,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Creater:         scheme,
 		Convertor:       scheme,
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
@@ -3538,6 +3541,8 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Name = populateName
 	simple.Namespace = "default" // populated by create handler to match request URL
@@ -3618,6 +3623,8 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -3680,6 +3687,8 @@ func TestCreateYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -3732,6 +3741,8 @@ func TestCreateInNamespace(t *testing.T) {
 		t.Fatalf("unexpected error: %v\n%s", err, data)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "other" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -4330,6 +4341,7 @@ func TestXGSubresource(t *testing.T) {
 
 		Creater:         scheme,
 		Convertor:       scheme,
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
