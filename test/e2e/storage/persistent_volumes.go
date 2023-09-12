@@ -128,7 +128,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
-	ginkgo.Describe("NFS", func() {
+	ginkgo.Describe("[Driver: nfs]", func() {
 
 		var (
 			nfsServerPod *v1.Pod
