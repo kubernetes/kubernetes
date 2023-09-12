@@ -33,8 +33,8 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/pointer"
@@ -641,8 +641,8 @@ func TestCSILimits(t *testing.T) {
 	}
 }
 
-func getFakeCSIPVLister(volumeName string, driverNames ...string) fakeframework.PersistentVolumeLister {
-	pvLister := fakeframework.PersistentVolumeLister{}
+func getFakeCSIPVLister(volumeName string, driverNames ...string) tf.PersistentVolumeLister {
+	pvLister := tf.PersistentVolumeLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			volumeHandle := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -686,8 +686,8 @@ func getFakeCSIPVLister(volumeName string, driverNames ...string) fakeframework.
 	return pvLister
 }
 
-func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) fakeframework.PersistentVolumeClaimLister {
-	pvcLister := fakeframework.PersistentVolumeClaimLister{}
+func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) tf.PersistentVolumeClaimLister {
+	pvcLister := tf.PersistentVolumeClaimLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			v := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -729,8 +729,8 @@ func enableMigrationOnNode(csiNode *storagev1.CSINode, pluginName string) {
 	csiNode.Annotations = nodeInfoAnnotations
 }
 
-func getFakeCSIStorageClassLister(scName, provisionerName string) fakeframework.StorageClassLister {
-	return fakeframework.StorageClassLister{
+func getFakeCSIStorageClassLister(scName, provisionerName string) tf.StorageClassLister {
+	return tf.StorageClassLister{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: scName},
 			Provisioner: provisionerName,
@@ -738,8 +738,8 @@ func getFakeCSIStorageClassLister(scName, provisionerName string) fakeframework.
 	}
 }
 
-func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakeframework.CSINodeLister {
-	csiNodeLister := fakeframework.CSINodeLister{}
+func getFakeCSINodeLister(csiNode *storagev1.CSINode) tf.CSINodeLister {
+	csiNodeLister := tf.CSINodeLister{}
 	if csiNode != nil {
 		csiNodeLister = append(csiNodeLister, *csiNode.DeepCopy())
 	}
