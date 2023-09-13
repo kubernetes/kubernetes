@@ -206,42 +206,34 @@ func Test_loopConditionUntilContext_semantic(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for _, immediate := range []bool{true, false} {
-			t.Run(fmt.Sprintf("immediate=%t", immediate), func(t *testing.T) {
-				for _, sliding := range []bool{true, false} {
-					t.Run(fmt.Sprintf("sliding=%t", sliding), func(t *testing.T) {
-						t.Run(test.name, func(t *testing.T) {
-							contextFn := test.context
-							if contextFn == nil {
-								contextFn = defaultContext
-							}
-							ctx, cancel := contextFn()
-							defer cancel()
+		t.Run(test.name, func(t *testing.T) {
+			contextFn := test.context
+			if contextFn == nil {
+				contextFn = defaultContext
+			}
+			ctx, cancel := contextFn()
+			defer cancel()
 
-							timer := Backoff{Duration: time.Microsecond}.Timer()
-							attempts := 0
-							err := loopConditionUntilContext(ctx, timer, test.immediate, test.sliding, func(_ context.Context) (bool, error) {
-								attempts++
-								defer func() {
-									if test.cancelContextAfter > 0 && test.cancelContextAfter == attempts {
-										cancel()
-									}
-								}()
-								return test.callback(attempts)
-							})
-
-							if test.errExpected != err {
-								t.Errorf("expected error: %v but got: %v", test.errExpected, err)
-							}
-
-							if test.attemptsExpected != attempts {
-								t.Errorf("expected attempts count: %d but got: %d", test.attemptsExpected, attempts)
-							}
-						})
-					})
-				}
+			timer := Backoff{Duration: time.Microsecond}.Timer()
+			attempts := 0
+			err := loopConditionUntilContext(ctx, timer, test.immediate, test.sliding, func(_ context.Context) (bool, error) {
+				attempts++
+				defer func() {
+					if test.cancelContextAfter > 0 && test.cancelContextAfter == attempts {
+						cancel()
+					}
+				}()
+				return test.callback(attempts)
 			})
-		}
+
+			if test.errExpected != err {
+				t.Errorf("expected error: %v but got: %v", test.errExpected, err)
+			}
+
+			if test.attemptsExpected != attempts {
+				t.Errorf("expected attempts count: %d but got: %d", test.attemptsExpected, attempts)
+			}
+		})
 	}
 }
 
