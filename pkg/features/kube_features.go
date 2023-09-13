@@ -1044,7 +1044,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PDBUnhealthyPodEvictionPolicy: {Default: true, PreRelease: featuregate.Beta},
 
-	PersistentVolumeLastPhaseTransitionTime: {Default: false, PreRelease: featuregate.Alpha},
+	PersistentVolumeLastPhaseTransitionTime: {Default: true, PreRelease: featuregate.Beta},
 
 	PodAndContainerStatsFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
