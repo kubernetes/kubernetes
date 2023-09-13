@@ -86,7 +86,7 @@ type CIDRAllocator interface {
 	// AllocateOrOccupyCIDR looks at the given node, assigns it a valid
 	// CIDR if it doesn't currently have one or mark the CIDR as used if
 	// the node already have one.
-	AllocateOrOccupyCIDR(logger klog.Logger, node *v1.Node) error
+	AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node) error
 	// ReleaseCIDR releases the CIDR of the removed node.
 	ReleaseCIDR(logger klog.Logger, node *v1.Node) error
 	// Run starts all the working logic of the allocator.
