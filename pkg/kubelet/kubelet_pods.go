@@ -1720,7 +1720,6 @@ func deleteCustomResourceFromResourceRequirements(target *v1.ResourceRequirement
 }
 
 func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus) v1.PodResizeStatus {
-	var podResizeStatus v1.PodResizeStatus
 	specStatusDiffer := false
 	for _, c := range pod.Spec.Containers {
 		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
@@ -1740,12 +1739,12 @@ func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus
 		if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
 			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", pod.Name)
 		}
-	} else {
-		if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(pod.UID)); found {
-			podResizeStatus = resizeStatus
-		}
+		// clear resize status itself
+		return ""
 	}
-	return podResizeStatus
+	// when pod resource is updated, resize status cached in statusManager will be outdated.
+	// see issue: https://github.com/kubernetes/kubernetes/issues/117589
+	return pod.Status.Resize
 }
 
 // generateAPIPodStatus creates the final API pod status for a pod, given the

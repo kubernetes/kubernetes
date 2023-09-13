@@ -2640,6 +2640,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	testPod3.UID = "3333"
 	testPod3.Name = "pod3"
 	testPod3.Namespace = "ns2"
+	testPod3.Status.Resize = v1.PodResizeStatusProposed
 
 	testKubelet.fakeKubeClient = fake.NewSimpleClientset(testPod1, testPod2, testPod3)
 	kubelet.kubeClient = testKubelet.fakeKubeClient
@@ -2712,12 +2713,19 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusInfeasible,
 		},
+		{
+			name:                "No resources change, PodResizeStatus is Proposed - expect InProgress",
+			pod:                 testPod3,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedResize:      v1.PodResizeStatusInProgress,
+		},
 	}
 
 	for _, tt := range tests {
 		tt.pod.Spec.Containers[0].Resources.Requests = tt.newRequests
 		tt.pod.Status.ContainerStatuses[0].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
-		kubelet.handlePodResourcesResize(tt.pod)
+		kubelet.handlePodResourcesResize(tt.pod, &tt.pod.Status)
 		updatedPod, found := kubelet.podManager.GetPodByName(tt.pod.Namespace, tt.pod.Name)
 		assert.True(t, found, "expected to find pod %s", tt.pod.Name)
 		assert.Equal(t, tt.expectedAllocations, updatedPod.Status.ContainerStatuses[0].AllocatedResources, tt.name)
