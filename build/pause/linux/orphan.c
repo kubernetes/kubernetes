@@ -19,6 +19,7 @@ limitations under the License.
 #include <stdio.h>
 #include <unistd.h>
 
+// Creates a child process; child waits for parent to exit before printing details.
 int main() {
   pid_t pid;
   pid = fork();

@@ -34,6 +34,7 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
 	}
 }
 
+// Sets a console control handler and sleeps indefinitely if successful.
 int main(void)
 {
 	if (SetConsoleCtrlHandler(CtrlHandler, TRUE))
