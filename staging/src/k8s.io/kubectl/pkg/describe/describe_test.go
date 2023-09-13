@@ -1994,6 +1994,123 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	}
 }
 
+func TestGetPodsForPVC(t *testing.T) {
+	goldClassName := "gold"
+	testCases := []struct {
+		name            string
+		pvc             *corev1.PersistentVolumeClaim
+		requiredObjects []runtime.Object
+		expectedPods    []string
+	}{
+		{
+			name: "pvc-unused",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pvc-name"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			expectedPods: []string{},
+		},
+		{
+			name: "pvc-in-pods-volumes-list",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pvc-name"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			requiredObjects: []runtime.Object{
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod-name"},
+					Spec: corev1.PodSpec{
+						Volumes: []corev1.Volume{
+							{
+								Name: "volume",
+								VolumeSource: corev1.VolumeSource{
+									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "pvc-name",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedPods: []string{"pod-name"},
+		},
+		{
+			name: "pvc-owned-by-pod",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pvc-name",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							Kind: "Pod",
+							Name: "pod-name",
+							UID:  "pod-uid",
+						},
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			requiredObjects: []runtime.Object{
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod-name", UID: "pod-uid"},
+				},
+			},
+			expectedPods: []string{"pod-name"},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			var objects []runtime.Object
+			objects = append(objects, test.requiredObjects...)
+			objects = append(objects, test.pvc)
+			fake := fake.NewSimpleClientset(objects...)
+
+			pods, err := getPodsForPVC(fake.CoreV1().Pods(test.pvc.ObjectMeta.Namespace), test.pvc, DescriberSettings{})
+			if err != nil {
+				t.Errorf("Unexpected error for test %s: %v", test.name, err)
+			}
+
+			for _, expectedPod := range test.expectedPods {
+				foundPod := false
+				for _, pod := range pods {
+					if pod.Name == expectedPod {
+						foundPod = true
+						break
+					}
+				}
+
+				if !foundPod {
+					t.Errorf("Expected pod %s, but it was not returned: %v", expectedPod, pods)
+				}
+			}
+
+			if len(test.expectedPods) != len(pods) {
+				t.Errorf("Expected %d pods, but got %d pods", len(test.expectedPods), len(pods))
+			}
+		})
+	}
+}
+
 func TestDescribeDeployment(t *testing.T) {
 	labels := map[string]string{"k8s-app": "bar"}
 	testCases := []struct {
