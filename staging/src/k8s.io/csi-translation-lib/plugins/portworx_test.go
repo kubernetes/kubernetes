@@ -17,15 +17,19 @@ limitations under the License.
 package plugins
 
 import (
+	"reflect"
+	"testing"
+
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
-	"testing"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 )
 
 func TestTranslatePortworxInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewPortworxCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		name     string
 		inTreeSC *storage.StorageClass
@@ -71,7 +75,7 @@ func TestTranslatePortworxInTreeStorageClassToCSI(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Logf("Testing %v", tc.name)
-		result, err := translator.TranslateInTreeStorageClassToCSI(tc.inTreeSC)
+		result, err := translator.TranslateInTreeStorageClassToCSI(logger, tc.inTreeSC)
 		if err != nil && !tc.errorExp {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
@@ -86,6 +90,8 @@ func TestTranslatePortworxInTreeStorageClassToCSI(t *testing.T) {
 
 func TestTranslatePortworxInTreeInlineVolumeToCSI(t *testing.T) {
 	translator := NewPortworxCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
+
 	testCases := []struct {
 		name        string
 		inLine      *v1.Volume
@@ -136,7 +142,7 @@ func TestTranslatePortworxInTreeInlineVolumeToCSI(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("Testing %v", tc.name)
-		result, err := translator.TranslateInTreeInlineVolumeToCSI(tc.inLine, "ns")
+		result, err := translator.TranslateInTreeInlineVolumeToCSI(logger, tc.inLine, "ns")
 		if err != nil && !tc.errExpected {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
@@ -151,6 +157,7 @@ func TestTranslatePortworxInTreeInlineVolumeToCSI(t *testing.T) {
 
 func TestTranslatePortworxInTreePVToCSI(t *testing.T) {
 	translator := NewPortworxCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 
 	testCases := []struct {
 		name        string
@@ -234,7 +241,7 @@ func TestTranslatePortworxInTreePVToCSI(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("Testing %v", tc.name)
-		result, err := translator.TranslateInTreePVToCSI(tc.inTree)
+		result, err := translator.TranslateInTreePVToCSI(logger, tc.inTree)
 		if err != nil && !tc.errExpected {
 			t.Errorf("Did not expect error but got: %v", err)
 		}

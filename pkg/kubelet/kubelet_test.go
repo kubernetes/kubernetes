@@ -2997,12 +2997,6 @@ func simulateVolumeInUseUpdate(
 	}
 }
 
-func runVolumeManager(kubelet *Kubelet) chan struct{} {
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(kubelet.sourcesReady, stopCh)
-	return stopCh
-}
-
 // dirExists returns true if the path exists and represents a directory.
 func dirExists(path string) bool {
 	s, err := os.Stat(path)
