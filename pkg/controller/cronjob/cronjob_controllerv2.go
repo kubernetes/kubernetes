@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
 	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -389,7 +389,7 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 	// if the change in schedule results in next requeue having to be sooner than it already was,
 	// it will be handled here by the queue. If the next requeue is further than previous schedule,
 	// the sync loop will essentially be a no-op for the already queued key with old schedule.
-	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule || !pointer.StringEqual(oldCJ.Spec.TimeZone, newCJ.Spec.TimeZone) {
+	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule || !ptr.Equal(oldCJ.Spec.TimeZone, newCJ.Spec.TimeZone) {
 		// schedule changed, change the requeue time, pass nil recorder so that syncCronJob will output any warnings
 		sched, err := cron.ParseStandard(formatSchedule(newCJ, nil))
 		if err != nil {
@@ -494,7 +494,7 @@ func (jm *ControllerV2) syncCronJob(
 
 	logger := klog.FromContext(ctx)
 	if cronJob.Spec.TimeZone != nil {
-		timeZone := pointer.StringDeref(cronJob.Spec.TimeZone, "")
+		timeZone := ptr.Deref(cronJob.Spec.TimeZone, "")
 		if _, err := time.LoadLocation(timeZone); err != nil {
 			logger.V(4).Info("Not starting job because timeZone is invalid", "cronjob", klog.KObj(cronJob), "timeZone", timeZone, "err", err)
 			jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnknownTimeZone", "invalid timeZone: %q: %s", timeZone, err)
