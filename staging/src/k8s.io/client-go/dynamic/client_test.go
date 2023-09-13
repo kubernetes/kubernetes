@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -58,6 +59,19 @@ func getObject(version, kind, name string) *unstructured.Unstructured {
 			},
 		},
 	}
+}
+
+func getObjectList(name string, items ...*unstructured.Unstructured) *unstructured.UnstructuredList {
+	list := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"kind": "List",
+		},
+	}
+	for _, item := range items {
+		list.Items = append(list.Items, *item)
+	}
+	return list
+
 }
 
 func getClientServer(h func(http.ResponseWriter, *http.Request)) (Interface, *httptest.Server, error) {
@@ -431,6 +445,127 @@ func TestCreate(t *testing.T) {
 			t.Errorf("Create(%q) want: %v\ngot: %v", tc.name, tc.obj, got)
 		}
 	}
+}
+func TestCreateList(t *testing.T) {
+	tcs := []struct {
+		resource    string
+		subresource []string
+		name        string
+		namespace   string
+		list         *unstructured.UnstructuredList
+		path        string
+	}{
+		{
+			resource:  "rtest",
+			name:      "namespaced_create_list",
+			namespace: "nstest",
+			path:      "/apis/gtest/vtest/namespaces/nstest/rtest",
+			list:       getObjectList("namespaced_create_list",
+							getObject("vTest", "rTest", "item1"),
+							getObject("vTest", "rTest", "item2")),
+		},
+	}
+	for _, tc := range tcs {
+		resource := schema.GroupVersionResource{Group: "gtest", Version: "vtest", Resource: tc.resource}
+		cl, srv, err := getClientServer(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "POST" {
+				t.Errorf("Create(%q) got HTTP method %s. wanted POST", tc.name, r.Method)
+			}
+
+			if r.URL.Path != tc.path {
+				t.Errorf("Create(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
+			}
+
+			content := r.Header.Get("Content-Type")
+			if content != runtime.ContentTypeJSON {
+				t.Errorf("Create(%q) got Content-Type %s. wanted %s", tc.name, content, runtime.ContentTypeJSON)
+			}
+
+			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
+			data, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Errorf("Create(%q) unexpected error reading body: %v", tc.name, err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.Write(data)
+		})
+		if err != nil {
+			t.Errorf("unexpected error when creating client: %v", err)
+			continue
+		}
+		defer srv.Close()
+
+		got, err := cl.Resource(resource).Namespace(tc.namespace).CreateList(context.TODO(), tc.list, metav1.CreateOptions{}, tc.subresource...)
+		if err != nil {
+			t.Errorf("unexpected error when creating %q: %v", tc.name, err)
+			continue
+		}
+
+		if !reflect.DeepEqual(got, tc.list) {
+			t.Errorf("Create(%q) want: %v\ngot: %v", tc.name, tc.list, got)
+		}
+	}
+}
+
+func BenchmarkCreate(b *testing.B) {
+	resource := schema.GroupVersionResource{Group: "gtest", Version: "vtest", Resource: "rtest"}
+	cl, srv, err := getClientServer(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", runtime.ContentTypeJSON)
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			fmt.Errorf("Create(%q) unexpected error reading body: %v", "name", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.Write(data)
+	})
+	if err != nil {
+		fmt.Errorf("unexpected error when creating client: %v", err)
+		os.Exit(1)
+	}
+	defer srv.Close()
+	var i int
+	for i = 0; i < b.N; i++ {
+		_, err := cl.Resource(resource).Namespace("rTest").Create(context.TODO(), getObject("vTest", "rTest", "item" + fmt.Sprint(i)), metav1.CreateOptions{})
+		if err != nil {
+			fmt.Errorf("unexpected error when creating: %v", err)
+			os.Exit(1)
+		}
+	}
+	fmt.Println("BenchmarkCreate, i = ", i)
+}
+func BenchmarkCreateList(b *testing.B) {
+	resource := schema.GroupVersionResource{Group: "gtest", Version: "vtest", Resource: "rtest"}
+	cl, srv, err := getClientServer(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", runtime.ContentTypeJSON)
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			fmt.Errorf("Create(%q) unexpected error reading body: %v", "name", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.Write(data)
+	})
+	if err != nil {
+		fmt.Errorf("unexpected error when creating client: %v", err)
+		os.Exit(1)
+	}
+	defer srv.Close()
+	list := getObjectList("namespaced_create_list")
+	var i int
+	for i = 0; i < b.N; i++ {
+		list.Items = append(list.Items, *getObject("vTest", "rTest", "item" + fmt.Sprint(i)))
+	}
+	_, err = cl.Resource(resource).Namespace("rTest").CreateList(context.TODO(), list, metav1.CreateOptions{})
+	if err != nil {
+		fmt.Errorf("unexpected error when creating: %v", err)
+		os.Exit(1)
+	}
+	fmt.Println("BenchmarkCreateList, i = ", i)
 }
 
 func TestUpdate(t *testing.T) {

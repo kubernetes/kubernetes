@@ -151,6 +151,37 @@ func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Un
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
+func (c *dynamicResourceClient) CreateList(ctx context.Context, list *unstructured.UnstructuredList, options metav1.CreateOptions, subresources ...string) (*unstructured.UnstructuredList, error) {
+	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, list)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateNamespaceWithOptionalName(c.namespace); err != nil {
+		return nil, err
+	}
+
+	result := c.client.client.
+		Post().
+		AbsPath(append(c.makeURLSegments(""), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
+		Body(outBytes).
+		SpecificallyVersionedParams(&options, dynamicParameterCodec, versionV1).
+		Do(ctx)
+	if err := result.Error(); err != nil {
+		return nil, err
+	}
+
+	retBytes, err := result.Raw()
+	if err != nil {
+		return nil, err
+	}
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
+	if err != nil {
+		return nil, err
+	}
+	return uncastObj.(*unstructured.UnstructuredList), nil
+}
+
 func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
@@ -188,6 +219,45 @@ func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Un
 		return nil, err
 	}
 	return uncastObj.(*unstructured.Unstructured), nil
+}
+
+func (c *dynamicResourceClient) UpdateList(ctx context.Context, list *unstructured.UnstructuredList, opts metav1.UpdateOptions, subresources ...string) (*unstructured.UnstructuredList, error) {
+	accessor, err := meta.Accessor(list)
+	if err != nil {
+		return nil, err
+	}
+	name := accessor.GetName()
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return nil, err
+	}
+	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, list)
+	if err != nil {
+		return nil, err
+	}
+
+	result := c.client.client.
+		Put().
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
+		Body(outBytes).
+		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
+		Do(ctx)
+	if err := result.Error(); err != nil {
+		return nil, err
+	}
+
+	retBytes, err := result.Raw()
+	if err != nil {
+		return nil, err
+	}
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
+	if err != nil {
+		return nil, err
+	}
+	return uncastObj.(*unstructured.UnstructuredList), nil
 }
 
 func (c *dynamicResourceClient) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
@@ -397,6 +467,49 @@ func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *uns
 	}
 	return uncastObj.(*unstructured.Unstructured), nil
 }
+
+func (c *dynamicResourceClient) ApplyList(ctx context.Context, name string, list *unstructured.UnstructuredList, opts metav1.ApplyOptions, subresources ...string) (*unstructured.UnstructuredList, error) {
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return nil, err
+	}
+	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, list)
+	if err != nil {
+		return nil, err
+	}
+	accessor, err := meta.Accessor(list)
+	if err != nil {
+		return nil, err
+	}
+	managedFields := accessor.GetManagedFields()
+	if len(managedFields) > 0 {
+		return nil, fmt.Errorf(`cannot apply an object with managed fields already set.
+		Use the client-go/applyconfigurations "UnstructructuredExtractor" to obtain the unstructured ApplyConfiguration for the given field manager that you can use/modify here to apply`)
+	}
+	patchOpts := opts.ToPatchOptions()
+
+	result := c.client.client.
+		Patch(types.ApplyPatchType).
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		Body(outBytes).
+		SpecificallyVersionedParams(&patchOpts, dynamicParameterCodec, versionV1).
+		Do(ctx)
+	if err := result.Error(); err != nil {
+		return nil, err
+	}
+	retBytes, err := result.Raw()
+	if err != nil {
+		return nil, err
+	}
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
+	if err != nil {
+		return nil, err
+	}
+	return uncastObj.(*unstructured.UnstructuredList), nil
+}
+
 func (c *dynamicResourceClient) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, opts metav1.ApplyOptions) (*unstructured.Unstructured, error) {
 	return c.Apply(ctx, name, obj, opts, "status")
 }

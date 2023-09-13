@@ -32,7 +32,9 @@ type Interface interface {
 
 type ResourceInterface interface {
 	Create(ctx context.Context, obj *unstructured.Unstructured, options metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error)
+	CreateList(ctx context.Context, list *unstructured.UnstructuredList, options metav1.CreateOptions, subresources ...string) (*unstructured.UnstructuredList, error)
 	Update(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error)
+	UpdateList(ctx context.Context, list *unstructured.UnstructuredList, options metav1.UpdateOptions, subresources ...string) (*unstructured.UnstructuredList, error)
 	UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions) (*unstructured.Unstructured, error)
 	Delete(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) error
 	DeleteCollection(ctx context.Context, options metav1.DeleteOptions, listOptions metav1.ListOptions) error
@@ -41,6 +43,7 @@ type ResourceInterface interface {
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error)
 	Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options metav1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error)
+	ApplyList(ctx context.Context, name string, list *unstructured.UnstructuredList, options metav1.ApplyOptions, subresources ...string) (*unstructured.UnstructuredList, error)
 	ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options metav1.ApplyOptions) (*unstructured.Unstructured, error)
 }
 

@@ -210,6 +210,55 @@ func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Un
 	return ret, err
 }
 
+func (c *dynamicResourceClient) CreateList(ctx context.Context, list *unstructured.UnstructuredList, options metav1.CreateOptions, subresources ...string) (*unstructured.UnstructuredList, error) {
+		var uncastRet runtime.Object
+	var err error
+	switch {
+	case len(c.namespace) == 0 && len(subresources) == 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewRootCreateAction(c.resource, list), list)
+
+	case len(c.namespace) == 0 && len(subresources) > 0:
+		var accessor metav1.Object // avoid shadowing err
+		accessor, err = meta.Accessor(list)
+		if err != nil {
+			return nil, err
+		}
+		name := accessor.GetName()
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewRootCreateSubresourceAction(c.resource, name, strings.Join(subresources, "/"), list), list)
+
+	case len(c.namespace) > 0 && len(subresources) == 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewCreateAction(c.resource, c.namespace, list), list)
+
+	case len(c.namespace) > 0 && len(subresources) > 0:
+		var accessor metav1.Object // avoid shadowing err
+		accessor, err = meta.Accessor(list)
+		if err != nil {
+			return nil, err
+		}
+		name := accessor.GetName()
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewCreateSubresourceAction(c.resource, name, strings.Join(subresources, "/"), c.namespace, list), list)
+
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	if uncastRet == nil {
+		return nil, err
+	}
+
+	ret := &unstructured.UnstructuredList{}
+	if err := c.client.scheme.Convert(uncastRet, ret, nil); err != nil {
+		return nil, err
+	}
+	return ret, err
+}
+
+
 func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
@@ -240,6 +289,42 @@ func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Un
 	}
 
 	ret := &unstructured.Unstructured{}
+	if err := c.client.scheme.Convert(uncastRet, ret, nil); err != nil {
+		return nil, err
+	}
+	return ret, err
+}
+
+func (c *dynamicResourceClient) UpdateList(ctx context.Context, list *unstructured.UnstructuredList, opts metav1.UpdateOptions, subresources ...string) (*unstructured.UnstructuredList, error) {
+	var uncastRet runtime.Object
+	var err error
+	switch {
+	case len(c.namespace) == 0 && len(subresources) == 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewRootUpdateAction(c.resource, list), list)
+
+	case len(c.namespace) == 0 && len(subresources) > 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewRootUpdateSubresourceAction(c.resource, strings.Join(subresources, "/"), list), list)
+
+	case len(c.namespace) > 0 && len(subresources) == 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewUpdateAction(c.resource, c.namespace, list), list)
+
+	case len(c.namespace) > 0 && len(subresources) > 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewUpdateSubresourceAction(c.resource, strings.Join(subresources, "/"), c.namespace, list), list)
+
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	if uncastRet == nil {
+		return nil, err
+	}
+
+	ret := &unstructured.UnstructuredList{}
 	if err := c.client.scheme.Convert(uncastRet, ret, nil); err != nil {
 		return nil, err
 	}
@@ -490,6 +575,46 @@ func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *uns
 	}
 
 	ret := &unstructured.Unstructured{}
+	if err := c.client.scheme.Convert(uncastRet, ret, nil); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+// TODO: opts are currently ignored.
+func (c *dynamicResourceClient) ApplyList(ctx context.Context, name string, list *unstructured.UnstructuredList, options metav1.ApplyOptions, subresources ...string) (*unstructured.UnstructuredList, error) {
+	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, list)
+	if err != nil {
+		return nil, err
+	}
+	var uncastRet runtime.Object
+	switch {
+	case len(c.namespace) == 0 && len(subresources) == 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewRootPatchAction(c.resource, name, types.ApplyPatchType, outBytes), &metav1.Status{Status: "dynamic patch fail"})
+
+	case len(c.namespace) == 0 && len(subresources) > 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewRootPatchSubresourceAction(c.resource, name, types.ApplyPatchType, outBytes, subresources...), &metav1.Status{Status: "dynamic patch fail"})
+
+	case len(c.namespace) > 0 && len(subresources) == 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewPatchAction(c.resource, c.namespace, name, types.ApplyPatchType, outBytes), &metav1.Status{Status: "dynamic patch fail"})
+
+	case len(c.namespace) > 0 && len(subresources) > 0:
+		uncastRet, err = c.client.Fake.
+			Invokes(testing.NewPatchSubresourceAction(c.resource, c.namespace, name, types.ApplyPatchType, outBytes, subresources...), &metav1.Status{Status: "dynamic patch fail"})
+
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	if uncastRet == nil {
+		return nil, err
+	}
+
+	ret := &unstructured.UnstructuredList{}
 	if err := c.client.scheme.Convert(uncastRet, ret, nil); err != nil {
 		return nil, err
 	}
