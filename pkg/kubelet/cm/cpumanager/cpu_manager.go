@@ -484,7 +484,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			cset := m.state.GetCPUSetOrDefault(string(pod.UID), container.Name)
 			if cset.IsEmpty() {
 				// NOTE: This should not happen outside of tests.
-				klog.V(4).InfoS("ReconcileState: skipping container; assigned cpuset is empty", "logID", logID, "pod", klog.KObj(pod), "containerName", container.Name)
+				klog.V(2).InfoS("ReconcileState: skipping container; assigned cpuset is empty", "logID", logID, "pod", klog.KObj(pod), "containerName", container.Name)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
 				continue
 			}
