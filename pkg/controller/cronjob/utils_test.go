@@ -364,7 +364,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 		now                   time.Time
 		expectedEarliestTime  time.Time
 		expectedRecentTime    *time.Time
-		expectedTooManyMissed bool
+		expectedNumberOfMisses int64
 		wantErr               bool
 	}{
 		{
@@ -394,6 +394,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			now:                  topOfTheHour().Add(61 * time.Minute),
 			expectedRecentTime:   deltaTimeAfterTopOfTheHour(60 * time.Minute),
 			expectedEarliestTime: *topOfTheHour(),
+			expectedNumberOfMisses: 1,
 		},
 		{
 			name: "missed 5 schedules",
@@ -408,6 +409,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			now:                  *deltaTimeAfterTopOfTheHour(301 * time.Minute),
 			expectedRecentTime:   deltaTimeAfterTopOfTheHour(300 * time.Minute),
 			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(10 * time.Second),
+			expectedNumberOfMisses: 5,
 		},
 		{
 			name: "complex schedule",
@@ -425,6 +427,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			now:                  *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
 			expectedRecentTime:   deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
 			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 2,
 		},
 		{
 			name: "another complex schedule",
@@ -442,6 +445,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			now:                  *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
 			expectedRecentTime:   nil,
 			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 30,
 		},
 		{
 			name: "complex schedule with longer diff between executions",
@@ -459,6 +463,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			now:                  *deltaTimeAfterTopOfTheHour(96*time.Hour + 31*time.Minute),
 			expectedRecentTime:   deltaTimeAfterTopOfTheHour(96*time.Hour + 30*time.Minute),
 			expectedEarliestTime: *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 6,
 		},
 		{
 			name: "complex schedule with shorter diff between executions",
@@ -473,6 +478,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			now:                  *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
 			expectedRecentTime:   deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
 			expectedEarliestTime: *topOfTheHour(),
+			expectedNumberOfMisses: 7,
 		},
 		{
 			name: "@every schedule",
@@ -491,7 +497,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			now:                   *deltaTimeAfterTopOfTheHour(7 * 24 * time.Hour),
 			expectedRecentTime:    deltaTimeAfterTopOfTheHour((6 * 24 * time.Hour) + 23*time.Hour + 1*time.Minute),
 			expectedEarliestTime:  *deltaTimeAfterTopOfTheHour(1 * time.Minute),
-			expectedTooManyMissed: true,
+			expectedNumberOfMisses: 167,
 		},
 		{
 			name: "rogue cronjob",
@@ -506,6 +512,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			now:                *deltaTimeAfterTopOfTheHour(1 * time.Hour),
 			expectedRecentTime: nil,
 			wantErr:            true,
+			expectedNumberOfMisses: 0,
 		},
 		{
 			name: "earliestTime being CreationTimestamp and LastScheduleTime",
@@ -585,7 +592,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			if err != nil {
 				t.Errorf("error setting up the test, %s", err)
 			}
-			gotEarliestTime, gotRecentTime, gotTooManyMissed, err := mostRecentScheduleTime(tt.cj, tt.now, sched, tt.includeSDS)
+			gotEarliestTime, gotRecentTime, gotNumberOfMisses, err := mostRecentScheduleTime(tt.cj, tt.now, sched, tt.includeSDS)
 			if tt.wantErr {
 				if err == nil {
 					t.Error("mostRecentScheduleTime() got no error when expected one")
@@ -604,8 +611,8 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			if !reflect.DeepEqual(gotRecentTime, tt.expectedRecentTime) {
 				t.Errorf("expectedRecentTime - got %v, want %v", gotRecentTime, tt.expectedRecentTime)
 			}
-			if gotTooManyMissed != tt.expectedTooManyMissed {
-				t.Errorf("expectedNumberOfMisses - got %v, want %v", gotTooManyMissed, tt.expectedTooManyMissed)
+			if gotNumberOfMisses != tt.expectedNumberOfMisses {
+				t.Errorf("expectedNumberOfMisses - got %v, want %v", gotNumberOfMisses, tt.expectedNumberOfMisses)
 			}
 		})
 	}
