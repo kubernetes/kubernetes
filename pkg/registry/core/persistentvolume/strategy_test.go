@@ -46,9 +46,9 @@ func TestStatusUpdate(t *testing.T) {
 	now := metav1.Now()
 	origin := metav1.NewTime(now.Add(time.Hour))
 	later := metav1.NewTime(now.Add(time.Hour * 2))
-	nowFunc = func() metav1.Time { return now }
+	NowFunc = func() metav1.Time { return now }
 	defer func() {
-		nowFunc = metav1.Now
+		NowFunc = metav1.Now
 	}()
 	tests := []struct {
 		name        string
@@ -376,9 +376,9 @@ func TestStatusUpdate(t *testing.T) {
 
 func TestStatusCreate(t *testing.T) {
 	now := metav1.Now()
-	nowFunc = func() metav1.Time { return now }
+	NowFunc = func() metav1.Time { return now }
 	defer func() {
-		nowFunc = metav1.Now
+		NowFunc = metav1.Now
 	}()
 	tests := []struct {
 		name        string
