@@ -99,6 +99,7 @@ func Test_loopConditionUntilContext_semantic(t *testing.T) {
 		cancelContextAfter int
 		attemptsExpected   int
 		errExpected        error
+		timer              Timer
 	}{
 		{
 			name: "condition successful is only one attempt",
@@ -203,6 +204,54 @@ func Test_loopConditionUntilContext_semantic(t *testing.T) {
 			attemptsExpected: 0,
 			errExpected:      context.DeadlineExceeded,
 		},
+		{
+			name:      "context canceled before the second execution and immediate",
+			immediate: true,
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
+			callback: func(attempts int) (bool, error) {
+				return false, nil
+			},
+			attemptsExpected: 1,
+			errExpected:      context.DeadlineExceeded,
+			timer:            Backoff{Duration: 2 * time.Second}.Timer(),
+		},
+		{
+			name:      "immediate and long duration of condition and sliding false",
+			immediate: true,
+			sliding:   false,
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
+			callback: func(attempts int) (bool, error) {
+				if attempts >= 4 {
+					return true, nil
+				}
+				time.Sleep(time.Second / 5)
+				return false, nil
+			},
+			attemptsExpected: 4,
+			timer:            Backoff{Duration: time.Second / 5, Jitter: 0.001}.Timer(),
+		},
+		{
+			name:      "immediate and long duration of condition and sliding true",
+			immediate: true,
+			sliding:   true,
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), time.Second)
+			},
+			callback: func(attempts int) (bool, error) {
+				if attempts >= 4 {
+					return true, nil
+				}
+				time.Sleep(time.Second / 5)
+				return false, nil
+			},
+			errExpected:      context.DeadlineExceeded,
+			attemptsExpected: 3,
+			timer:            Backoff{Duration: time.Second / 5, Jitter: 0.001}.Timer(),
+		},
 	}
 
 	for _, test := range tests {
@@ -214,7 +263,10 @@ func Test_loopConditionUntilContext_semantic(t *testing.T) {
 			ctx, cancel := contextFn()
 			defer cancel()
 
-			timer := Backoff{Duration: time.Microsecond}.Timer()
+			timer := test.timer
+			if timer == nil {
+				timer = Backoff{Duration: time.Microsecond}.Timer()
+			}
 			attempts := 0
 			err := loopConditionUntilContext(ctx, timer, test.immediate, test.sliding, func(_ context.Context) (bool, error) {
 				attempts++
