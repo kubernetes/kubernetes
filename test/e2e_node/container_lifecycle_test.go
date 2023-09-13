@@ -236,7 +236,12 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 						Name:  regular1,
 						Image: busyboxImage,
 						Command: ExecCommand(regular1, execCommand{
-							Delay:    2,
+							// Allocate sufficient time for its postStart hook
+							// to complete.
+							// Note that we've observed approximately a 2s
+							// delay before the postStart hook is called.
+							// 10s > 1s + 2s(estimated maximum delay) + other possible delays
+							Delay:    10,
 							ExitCode: 0,
 						}),
 						Lifecycle: &v1.Lifecycle{
@@ -335,7 +340,12 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 						Name:  regular1,
 						Image: busyboxImage,
 						Command: ExecCommand(regular1, execCommand{
-							Delay:    2,
+							// Allocate sufficient time for its postStart hook
+							// to complete.
+							// Note that we've observed approximately a 2s
+							// delay before the postStart hook is called.
+							// 10s > 1s + 2s(estimated maximum delay) + other possible delays
+							Delay:    10,
 							ExitCode: 0,
 						}),
 						Lifecycle: &v1.Lifecycle{
