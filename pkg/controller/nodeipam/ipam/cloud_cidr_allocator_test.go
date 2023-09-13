@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	netutils "k8s.io/utils/net"
 )
 
@@ -54,11 +55,13 @@ func TestBoundedRetries(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	go ca.worker(ctx)
 	nodeName := "testNode"
-	ca.AllocateOrOccupyCIDR(logger, &v1.Node{
+	if err := ca.AllocateOrOccupyCIDR(logger, &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
 		},
-	})
+	}); err != nil {
+		t.Errorf("unexpected error in AllocateOrOccupyCIDR: %v", err)
+	}
 	for hasNodeInProcessing(ca, nodeName) {
 		// wait for node to finish processing (should terminate and not time out)
 	}

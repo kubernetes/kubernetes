@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	netutils "k8s.io/utils/net"
@@ -611,6 +612,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 			},
 		},
 	}
+
 	logger, ctx := ktesting.NewTestContext(t)
 	testFunc := func(tc testCase) {
 		// Initialize the range allocator.
@@ -756,6 +758,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			},
 		},
 	}
+
 	logger, ctx := ktesting.NewTestContext(t)
 	testFunc := func(tc releaseTestCase) {
 		// Initialize the range allocator.

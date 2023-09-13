@@ -62,6 +62,8 @@ type rangeAllocator struct {
 	nodesInProcessing sets.String
 }
 
+var _ CIDRAllocator = &rangeAllocator{}
+
 // NewCIDRRangeAllocator returns a CIDRAllocator to allocate CIDRs for node (one from each of clusterCIDRs)
 // Caller must ensure subNetMaskSize is not less than cluster CIDR mask size.
 // Caller must always pass in a list of existing nodes so the new allocator.
@@ -198,7 +200,7 @@ func (r *rangeAllocator) worker(ctx context.Context) {
 				logger.Info("Channel nodeCIDRUpdateChannel was unexpectedly closed")
 				return
 			}
-			if err := r.updateCIDRsAllocation(logger, workItem); err != nil {
+			if err := r.updateCIDRsAllocation(ctx, workItem); err != nil {
 				// Requeue the failed node for update again.
 				r.nodeCIDRUpdateChannel <- workItem
 			}
@@ -335,9 +337,10 @@ func (r *rangeAllocator) filterOutServiceRange(logger klog.Logger, serviceCIDR *
 }
 
 // updateCIDRsAllocation assigns CIDR to Node and sends an update to the API server.
-func (r *rangeAllocator) updateCIDRsAllocation(logger klog.Logger, data nodeReservedCIDRs) error {
+func (r *rangeAllocator) updateCIDRsAllocation(ctx context.Context, data nodeReservedCIDRs) error {
 	var err error
 	var node *v1.Node
+	logger := klog.FromContext(ctx)
 	defer r.removeNodeFromProcessing(data.nodeName)
 	cidrsString := ipnetToStringList(data.allocatedCIDRs)
 	node, err = r.nodeLister.Get(data.nodeName)
@@ -376,7 +379,7 @@ func (r *rangeAllocator) updateCIDRsAllocation(logger klog.Logger, data nodeRese
 
 	// If we reached here, it means that the node has no CIDR currently assigned. So we set it.
 	for i := 0; i < cidrUpdateRetries; i++ {
-		if err = nodeutil.PatchNodeCIDRs(r.client, types.NodeName(node.Name), cidrsString); err == nil {
+		if err = nodeutil.PatchNodeCIDRs(ctx, r.client, types.NodeName(node.Name), cidrsString); err == nil {
 			logger.Info("Set node PodCIDR", "node", klog.KObj(node), "podCIDRs", cidrsString)
 			return nil
 		}
