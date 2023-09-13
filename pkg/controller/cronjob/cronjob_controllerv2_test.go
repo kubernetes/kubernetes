@@ -466,9 +466,21 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        *justAfterTheHour(),
 			jobCreateError:             errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, ""),
-			expectErr:                  true,
+			expectErr:                  false,
 			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, job not present in CJ active status, create job failed, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			jobCreateError:             errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, ""),
+			expectErr:                  false,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: false,
 		},
 		"prev ran but done, is time, F": {
 			concurrencyPolicy:          "Forbid",
@@ -1790,5 +1802,105 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestControllerV2JobAlreadyExistsButNotInActiveStatus validates that an already created job that was not added to the status
+// of a CronJob initially will be added back on the next sync. Previously, if we failed to update the status after creating a job,
+// cronjob controller would retry continuously because it would attempt to create a job that already exists.
+func TestControllerV2JobAlreadyExistsButNotInActiveStatus(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	cj := cronJob()
+	cj.Spec.ConcurrencyPolicy = "Forbid"
+	cj.Spec.Schedule = everyHour
+	cj.Status.LastScheduleTime = &metav1.Time{Time: justBeforeThePriorHour()}
+	cj.Status.Active = []v1.ObjectReference{}
+	cjCopy := cj.DeepCopy()
+
+	job, err := getJobFromTemplate2(&cj, justAfterThePriorHour())
+	if err != nil {
+		t.Fatalf("Unexpected error creating a job from template: %v", err)
+	}
+	job.UID = "1234"
+	job.Namespace = cj.Namespace
+
+	client := fake.NewSimpleClientset(cjCopy, job)
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(cjCopy)
+
+	jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	jobControl := &fakeJobControl{Job: job, CreateErr: errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, "")}
+	jm.jobControl = jobControl
+	cronJobControl := &fakeCJControl{}
+	jm.cronJobControl = cronJobControl
+	jm.now = justBeforeTheHour
+
+	jm.enqueueController(cjCopy)
+	jm.processNextWorkItem(ctx)
+
+	if len(cronJobControl.Updates) != 1 {
+		t.Fatalf("Unexpected updates to cronjob, got: %d, expected 1", len(cronJobControl.Updates))
+	}
+	if len(cronJobControl.Updates[0].Status.Active) != 1 {
+		t.Errorf("Unexpected active jobs count, got: %d, expected 1", len(cronJobControl.Updates[0].Status.Active))
+	}
+
+	expectedActiveRef, err := getRef(job)
+	if err != nil {
+		t.Fatalf("Error getting expected job ref: %v", err)
+	}
+	if !reflect.DeepEqual(cronJobControl.Updates[0].Status.Active[0], *expectedActiveRef) {
+		t.Errorf("Unexpected job reference in cronjob active list, got: %v, expected: %v", cronJobControl.Updates[0].Status.Active[0], expectedActiveRef)
+	}
+}
+
+// TestControllerV2JobAlreadyExistsButDifferentOwnner validates that an already created job
+// not owned by the cronjob controller is ignored.
+func TestControllerV2JobAlreadyExistsButDifferentOwner(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	cj := cronJob()
+	cj.Spec.ConcurrencyPolicy = "Forbid"
+	cj.Spec.Schedule = everyHour
+	cj.Status.LastScheduleTime = &metav1.Time{Time: justBeforeThePriorHour()}
+	cj.Status.Active = []v1.ObjectReference{}
+	cjCopy := cj.DeepCopy()
+
+	job, err := getJobFromTemplate2(&cj, justAfterThePriorHour())
+	if err != nil {
+		t.Fatalf("Unexpected error creating a job from template: %v", err)
+	}
+	job.UID = "1234"
+	job.Namespace = cj.Namespace
+
+	// remove owners for this test since we are testing that jobs not belonging to cronjob
+	// controller are safely ignored
+	job.OwnerReferences = []metav1.OwnerReference{}
+
+	client := fake.NewSimpleClientset(cjCopy, job)
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(cjCopy)
+
+	jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	jobControl := &fakeJobControl{Job: job, CreateErr: errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, "")}
+	jm.jobControl = jobControl
+	cronJobControl := &fakeCJControl{}
+	jm.cronJobControl = cronJobControl
+	jm.now = justBeforeTheHour
+
+	jm.enqueueController(cjCopy)
+	jm.processNextWorkItem(ctx)
+
+	if len(cronJobControl.Updates) != 0 {
+		t.Fatalf("Unexpected updates to cronjob, got: %d, expected 0", len(cronJobControl.Updates))
 	}
 }
