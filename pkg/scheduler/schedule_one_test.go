@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
@@ -70,7 +71,8 @@ import (
 )
 
 const (
-	testSchedulerName = "test-scheduler"
+	testSchedulerName       = "test-scheduler"
+	mb                int64 = 1024 * 1024
 )
 
 var (
@@ -2676,6 +2678,59 @@ func TestZeroRequest(t *testing.T) {
 }
 
 func Test_prioritizeNodes(t *testing.T) {
+	imageStatus1 := []v1.ContainerImage{
+		{
+			Names: []string{
+				"gcr.io/40:latest",
+				"gcr.io/40:v1",
+			},
+			SizeBytes: int64(80 * mb),
+		},
+		{
+			Names: []string{
+				"gcr.io/300:latest",
+				"gcr.io/300:v1",
+			},
+			SizeBytes: int64(300 * mb),
+		},
+	}
+
+	imageStatus2 := []v1.ContainerImage{
+		{
+			Names: []string{
+				"gcr.io/300:latest",
+			},
+			SizeBytes: int64(300 * mb),
+		},
+		{
+			Names: []string{
+				"gcr.io/40:latest",
+				"gcr.io/40:v1",
+			},
+			SizeBytes: int64(80 * mb),
+		},
+	}
+
+	imageStatus3 := []v1.ContainerImage{
+		{
+			Names: []string{
+				"gcr.io/600:latest",
+			},
+			SizeBytes: int64(600 * mb),
+		},
+		{
+			Names: []string{
+				"gcr.io/40:latest",
+			},
+			SizeBytes: int64(80 * mb),
+		},
+		{
+			Names: []string{
+				"gcr.io/900:latest",
+			},
+			SizeBytes: int64(900 * mb),
+		},
+	}
 	tests := []struct {
 		name                string
 		pod                 *v1.Pod
@@ -2862,6 +2917,115 @@ func Test_prioritizeNodes(t *testing.T) {
 				{Name: "node2", Scores: []framework.PluginScore{}},
 			},
 		},
+		{
+			name: "the score from Image Locality plugin with image in all nodes",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Image: "gcr.io/40",
+						},
+					},
+				},
+			},
+			nodes: []*v1.Node{
+				makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10, imageStatus1...),
+				makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10, imageStatus2...),
+				makeNode("node3", 1000, schedutil.DefaultMemoryRequest*10, imageStatus3...),
+			},
+			pluginRegistrations: []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterScorePlugin(imagelocality.Name, imagelocality.New, 1),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: nil,
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
+					TotalScore: 5,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
+					TotalScore: 5,
+				},
+				{
+					Name: "node3",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
+					TotalScore: 5,
+				},
+			},
+		},
+		{
+			name: "the score from Image Locality plugin with image in partial nodes",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Image: "gcr.io/300",
+						},
+					},
+				},
+			},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10, imageStatus1...),
+				makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10, imageStatus2...),
+				makeNode("node3", 1000, schedutil.DefaultMemoryRequest*10, imageStatus3...),
+			},
+			pluginRegistrations: []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterScorePlugin(imagelocality.Name, imagelocality.New, 1),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: nil,
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 18,
+						},
+					},
+					TotalScore: 18,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 18,
+						},
+					},
+					TotalScore: 18,
+				},
+				{
+					Name: "node3",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 0,
+						},
+					},
+					TotalScore: 0,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -2869,9 +3033,16 @@ func Test_prioritizeNodes(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			cache := internalcache.New(ctx, time.Duration(0))
+			for _, node := range test.nodes {
+				cache.AddNode(klog.FromContext(ctx), node)
+			}
+			snapshot := internalcache.NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(klog.FromContext(ctx), snapshot); err != nil {
+				t.Fatal(err)
+			}
 			fwk, err := tf.NewFramework(
 				ctx,
 				test.pluginRegistrations, "",
@@ -3151,7 +3322,7 @@ func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
 	return sched
 }
 
-func makeNode(node string, milliCPU, memory int64) *v1.Node {
+func makeNode(node string, milliCPU, memory int64, images ...v1.ContainerImage) *v1.Node {
 	return &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: node},
 		Status: v1.NodeStatus{
@@ -3166,6 +3337,7 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 				"pods":            *resource.NewQuantity(100, resource.DecimalSI),
 			},
+			Images: images,
 		},
 	}
 }

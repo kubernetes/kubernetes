@@ -130,7 +130,7 @@ func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.Set[str
 		for _, name := range image.Names {
 			imageStates[name] = &framework.ImageStateSummary{
 				Size:     image.SizeBytes,
-				NumNodes: len(imageExistenceMap[name]),
+				NumNodes: imageExistenceMap[name].Len(),
 			}
 		}
 	}
