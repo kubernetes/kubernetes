@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"testing"
 
+	"context"
 	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/registry/core/persistentvolume"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -60,6 +62,7 @@ func newHostPathType(pathType string) *api.HostPathType {
 }
 
 func validNewPersistentVolume(name string) *api.PersistentVolume {
+	now := persistentvolume.NowFunc()
 	pv := &api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -75,9 +78,10 @@ func validNewPersistentVolume(name string) *api.PersistentVolume {
 			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRetain,
 		},
 		Status: api.PersistentVolumeStatus{
-			Phase:   api.VolumePending,
-			Message: "bar",
-			Reason:  "foo",
+			Phase:                   api.VolumePending,
+			Message:                 "bar",
+			Reason:                  "foo",
+			LastPhaseTransitionTime: &now,
 		},
 	}
 	return pv
@@ -181,12 +185,19 @@ func TestUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	pvStartTimestamp, err := getPhaseTranstitionTime(ctx, pvStart.Name, storage)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	pvIn := &api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
 		Status: api.PersistentVolumeStatus{
 			Phase: api.VolumeBound,
+			// Set the same timestamp as original PV so this won't get updated on phase change breaking DeepEqual() later in test.
+			LastPhaseTransitionTime: pvStartTimestamp,
 		},
 	}
 
@@ -203,6 +214,14 @@ func TestUpdateStatus(t *testing.T) {
 	if !apiequality.Semantic.DeepEqual(pvIn.Status, pvOut.Status) {
 		t.Errorf("unexpected object: %s", cmp.Diff(pvIn.Status, pvOut.Status))
 	}
+}
+
+func getPhaseTranstitionTime(ctx context.Context, pvName string, storage *REST) (*metav1.Time, error) {
+	obj, err := storage.Get(ctx, pvName, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.PersistentVolume).Status.LastPhaseTransitionTime, nil
 }
 
 func TestShortNames(t *testing.T) {
