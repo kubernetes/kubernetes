@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // maxParallelismForIndexJob is the maximum parallelism that an Indexed Job
@@ -530,7 +530,7 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.StartingDeadlineSeconds), fldPath.Child("startingDeadlineSeconds"))...)
 	}
 
-	if oldSpec == nil || !pointer.StringEqual(oldSpec.TimeZone, spec.TimeZone) {
+	if oldSpec == nil || !ptr.Equal(oldSpec.TimeZone, spec.TimeZone) {
 		allErrs = append(allErrs, validateTimeZone(spec.TimeZone, fldPath.Child("timeZone"))...)
 	}
 
