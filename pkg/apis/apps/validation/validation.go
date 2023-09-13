@@ -167,31 +167,34 @@ func ValidateStatefulSet(statefulSet *apps.StatefulSet, opts apivalidation.PodVa
 	return allErrs
 }
 
-// ValidateStatefulSetUpdate tests if required fields in the StatefulSet are set.
+// ValidateStatefulSetUpdate checks if the required fields in the StatefulSet are set and validates updates to the StatefulSet.
 func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, opts apivalidation.PodValidationOptions) field.ErrorList {
-	// First, validate that the new statefulset is valid.  Don't call
-	// ValidateStatefulSet() because we don't want to revalidate the name on
-	// update.  This is important here because we used to allow DNS subdomain
-	// for name, but that can't actually create pods.  The only reasonable
-	// thing to do it delete such an instance, but if there is a finalizer, it
-	// would need to pass update validation.  Name can't change anyway.
+	// Validate that the new StatefulSet's ObjectMeta is a valid update of the old StatefulSet's ObjectMeta.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
+	// Validate the new StatefulSet's Spec.
 	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"), opts)...)
 
-	// statefulset updates aren't super common and general updates are likely to be touching spec, so we'll do this
-	// deep copy right away.  This avoids mutating our inputs
+	// Create a deep copy of the new StatefulSet.
 	newStatefulSetClone := statefulSet.DeepCopy()
-	newStatefulSetClone.Spec.Replicas = oldStatefulSet.Spec.Replicas               // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template               // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy   // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.Ordinals = oldStatefulSet.Spec.Ordinals               // +k8s:verify-mutation:reason=clone
+	// Set the fields of the new StatefulSet's Spec that are allowed to be updated.
+	newStatefulSetClone.Spec.Replicas = oldStatefulSet.Spec.Replicas
+	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template
+	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
+	newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds
+	newStatefulSetClone.Spec.Ordinals = oldStatefulSet.Spec.Ordinals
+	newStatefulSetClone.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy
 
-	newStatefulSetClone.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy // +k8s:verify-mutation:reason=clone
+	// Add this line to the list of fields that should not cause a validation error.
+	// This line allows the PodManagementPolicy field to be updated.
+	newStatefulSetClone.Spec.PodManagementPolicy = oldStatefulSet.Spec.PodManagementPolicy
+
+	// Check if the new StatefulSet's Spec is equal to the old StatefulSet's Spec after setting the allowed fields.
+	// If they are not equal, it means a forbidden field has been updated, and an error should be returned.
 	if !apiequality.Semantic.DeepEqual(newStatefulSetClone.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy', 'minReadySeconds' and 'podManagementPolicy' are forbidden"))
 	}
 
+	// Return the list of errors, if any.
 	return allErrs
 }
 
