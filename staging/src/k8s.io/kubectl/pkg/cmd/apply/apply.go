@@ -71,9 +71,6 @@ type ApplyFlags struct {
 	All            bool
 	Overwrite      bool
 	OpenAPIPatch   bool
-
-	// DEPRECATED: Use PruneAllowlist instead
-	PruneWhitelist []string // TODO: Remove this in kubectl 1.28 or later
 	PruneAllowlist []string
 
 	genericiooptions.IOStreams
@@ -233,7 +230,7 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &flags.FieldManager, FieldManagerClientSideApply)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.Selector)
-	cmdutil.AddPruningFlags(cmd, &flags.Prune, &flags.PruneAllowlist, &flags.PruneWhitelist, &flags.All, &flags.ApplySetRef)
+	cmdutil.AddPruningFlags(cmd, &flags.Prune, &flags.PruneAllowlist, &flags.All, &flags.ApplySetRef)
 
 	cmd.Flags().BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&flags.OpenAPIPatch, "openapi-patch", flags.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
@@ -325,7 +322,7 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		applySet = NewApplySet(parent, tooling, mapper, restClient)
 	}
 	if flags.Prune {
-		pruneAllowlist := slice.ToSet(flags.PruneAllowlist, flags.PruneWhitelist)
+		pruneAllowlist := slice.ToSet(flags.PruneAllowlist)
 		flags.PruneResources, err = prune.ParseResources(mapper, pruneAllowlist)
 		if err != nil {
 			return nil, err
