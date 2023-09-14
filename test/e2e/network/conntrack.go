@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -36,6 +35,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -113,7 +115,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 
 		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(len(ips), 0)
+		gomega.Expect(ips).ToNot(gomega.BeEmpty())
 
 		clientNodeInfo = nodeInfo{
 			name:   nodes.Items[0].Name,
@@ -121,7 +123,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 
 		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(len(ips), 0)
+		gomega.Expect(ips).ToNot(gomega.BeEmpty())
 
 		serverNodeInfo = nodeInfo{
 			name:   nodes.Items[1].Name,

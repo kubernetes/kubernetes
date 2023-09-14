@@ -73,7 +73,7 @@ var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		ginkgo.By("creating a test pod on each Node")
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
+		gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty(), "no Nodes in the cluster")
 
 		for _, node := range nodes.Items {
 			// target Pod at Node

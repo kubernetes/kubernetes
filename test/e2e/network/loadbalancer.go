@@ -551,7 +551,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		acceptPod, err = cs.CoreV1().Pods(namespace).Get(ctx, acceptPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", acceptPod.Name)
 		gomega.Expect(acceptPod.Status.Phase).To(gomega.Equal(v1.PodRunning))
-		framework.ExpectNotEqual(acceptPod.Status.PodIP, "")
+		gomega.Expect(acceptPod.Status.PodIP).ToNot(gomega.BeEmpty())
 
 		// Create loadbalancer service with source range from node[0] and podAccept
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
@@ -581,7 +581,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		dropPod, err = cs.CoreV1().Pods(namespace).Get(ctx, dropPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", dropPod.Name)
 		gomega.Expect(acceptPod.Status.Phase).To(gomega.Equal(v1.PodRunning))
-		framework.ExpectNotEqual(acceptPod.Status.PodIP, "")
+		gomega.Expect(acceptPod.Status.PodIP).ToNot(gomega.BeEmpty())
 
 		ginkgo.By("Update service LoadBalancerSourceRange and check reachability")
 		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
@@ -1602,8 +1602,8 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 				noEndpointNodeMap[n.Name] = ips[0]
 			}
 		}
-		framework.ExpectNotEqual(len(endpointNodeMap), 0)
-		framework.ExpectNotEqual(len(noEndpointNodeMap), 0)
+		gomega.Expect(endpointNodeMap).ToNot(gomega.BeEmpty())
+		gomega.Expect(noEndpointNodeMap).ToNot(gomega.BeEmpty())
 
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
 		svcNodePort := int(svc.Spec.Ports[0].NodePort)
