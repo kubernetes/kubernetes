@@ -157,7 +157,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartDurationKey,
 			Help:           "Duration in seconds from kubelet seeing a pod for the first time to the pod starting to run",
-			Buckets:        metrics.DefBuckets,
+			Buckets:        []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600},
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
