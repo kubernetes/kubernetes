@@ -21,11 +21,15 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/pem"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
 	certutil "k8s.io/client-go/util/cert"
@@ -411,4 +415,833 @@ func errString(errs errors.Aggregate) string {
 		return errs.Error()
 	}
 	return ""
+}
+
+type (
+	test struct {
+		name            string
+		configuration   api.AuthorizationConfiguration
+		expectedErrList field.ErrorList
+		knownTypes      sets.String
+		repeatableTypes sets.String
+	}
+)
+
+func TestValidateAuthorizationConfiguration(t *testing.T) {
+	badKubeConfigFile := "../some/relative/path/kubeconfig"
+
+	tempKubeConfigFile, err := os.CreateTemp("/tmp", "kubeconfig")
+	if err != nil {
+		t.Fatalf("failed to set up temp file: %v", err)
+	}
+	tempKubeConfigFilePath := tempKubeConfigFile.Name()
+	defer os.Remove(tempKubeConfigFilePath)
+
+	tests := []test{
+		{
+			name: "atleast one authorizer should be defined",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("authorizers"), "at least one authorization mode must be defined")},
+			knownTypes:      sets.NewString(),
+			repeatableTypes: sets.NewString(),
+		},
+		{
+			name: "type is required if an authorizer is defined",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("type"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "bare minimum configuration with Webhook",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "bare minimum configuration with multiple webhooks",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "second-webhook",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "configuration with unknown types",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Foo",
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.NotSupported(field.NewPath("type"), "Foo", []string{"..."})},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "configuration with not repeatable types",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Foo",
+					},
+					{
+						Type: "Foo",
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Duplicate(field.NewPath("type"), "Foo")},
+			knownTypes:      sets.NewString([]string{string("Foo"), string("Webhook")}...),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "when type=Webhook, webhook needs to be defined",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("webhook"), "required when type=Webhook")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "when type!=Webhook, webhooks needs to be nil",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type:    "Foo",
+						Webhook: &api.WebhookConfiguration{},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("webhook"), "non-null", "may only be specified when type=Webhook")},
+			knownTypes:      sets.NewString(string("Foo")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "webhook name should be of non-zero length",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("name"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "webhook names should be unique",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "name-1",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "name-1",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Duplicate(field.NewPath("name"), "name-1")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "webhook names should be DNS1123 labels",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "mywebhookname",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "webhook names should be DNS1123 subdomains",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "webhookname.example.domain",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "webhook names should not be invalid DNS1123 labels or subdomains",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "WEBHOOKNAME.example.domain",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("name"), "WEBHOOKNAME.example.domain", "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "timeout should be specified",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							FailurePolicy:                            "NoOpinion",
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("timeout"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		//
+		{
+			name: "timeout shouldn't be zero",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							FailurePolicy:                            "NoOpinion",
+							Timeout:                                  metav1.Duration{Duration: 0 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("timeout"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "timeout shouldn't be negative",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							FailurePolicy:                            "NoOpinion",
+							Timeout:                                  metav1.Duration{Duration: -30 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("timeout"), time.Duration(-30*time.Second).String(), "must be > 0s and <= 30s")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "timeout shouldn't be greater than 30seconds",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							FailurePolicy:                            "NoOpinion",
+							Timeout:                                  metav1.Duration{Duration: 60 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("timeout"), time.Duration(60*time.Second).String(), "must be > 0s and <= 30s")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "authorizedTTL should be defined ",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							FailurePolicy:                            "NoOpinion",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("authorizedTTL"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "authorizedTTL shouldn't be negative",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							FailurePolicy:                            "NoOpinion",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: -30 * time.Second},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("authorizedTTL"), time.Duration(-30*time.Second).String(), "must be > 0s")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "unauthorizedTTL should be defined ",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							FailurePolicy:                            "NoOpinion",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("unauthorizedTTL"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "unauthorizedTTL shouldn't be negative",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							FailurePolicy:                            "NoOpinion",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: -30 * time.Second},
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("unauthorizedTTL"), time.Duration(-30*time.Second).String(), "must be > 0s")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "SAR should be defined",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							FailurePolicy:                            "NoOpinion",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("subjectAccessReviewVersion"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "SAR should be one of v1 and v1beta1",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v2beta1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.NotSupported(field.NewPath("subjectAccessReviewVersion"), "v2beta1", []string{"v1", "v1beta1"})},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "MatchConditionSAR should be defined",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                       "default",
+							Timeout:                    metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:              metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:            metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:              "NoOpinion",
+							SubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("matchConditionSubjectAccessReviewVersion"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "MatchConditionSAR must not be anything other than v1",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1beta1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.NotSupported(field.NewPath("matchConditionSubjectAccessReviewVersion"), "v1beta1", []string{"v1"})},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "failurePolicy should be defined",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("failurePolicy"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "failurePolicy should be one of \"NoOpinion\" or \"Deny\"",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "AlwaysAllow",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.NotSupported(field.NewPath("failurePolicy"), "AlwaysAllow", []string{"NoOpinion", "Deny"})},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "connectionInfo should be defined",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("connectionInfo"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "connectionInfo should be one of InClusterConfig or KubeConfigFile",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "ExternalClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{
+				field.NotSupported(field.NewPath("connectionInfo"), api.WebhookConnectionInfo{Type: "ExternalClusterConfig"}, []string{"InClusterConfig", "KubeConfigFile"}),
+			},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "if connectionInfo=InClusterConfig, then kubeConfigFile should be nil",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type:           "InClusterConfig",
+								KubeConfigFile: new(string),
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{
+				field.Invalid(field.NewPath("connectionInfo", "kubeConfigFile"), "", "can only be set when type=KubeConfigFile"),
+			},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "if connectionInfo=KubeConfigFile, then KubeConfigFile should be defined",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "KubeConfigFile",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("kubeConfigFile"), "")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "if connectionInfo=KubeConfigFile, then KubeConfigFile should be defined, must be an absolute path, should exist, shouldn't be a symlink",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type:           "KubeConfigFile",
+								KubeConfigFile: &badKubeConfigFile,
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("kubeConfigFile"), badKubeConfigFile, "must be an absolute path")},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "if connectionInfo=KubeConfigFile, an existent file needs to be passed",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Webhook: &api.WebhookConfiguration{
+							Name:                                     "default",
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type:           "KubeConfigFile",
+								KubeConfigFile: &tempKubeConfigFilePath,
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+
+		// TODO: When the CEL expression validator is implemented, add a few test cases to typecheck the expression
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errList := ValidateAuthorizationConfiguration(nil, &test.configuration, test.knownTypes, test.repeatableTypes)
+			if len(errList) != len(test.expectedErrList) {
+				t.Errorf("expected %d errs, got %d, errors %v", len(test.expectedErrList), len(errList), errList)
+			}
+
+			for i, expected := range test.expectedErrList {
+				if expected.Type.String() != errList[i].Type.String() {
+					t.Errorf("expected err type %s, got %s",
+						expected.Type.String(),
+						errList[i].Type.String())
+				}
+				if expected.BadValue != errList[i].BadValue {
+					t.Errorf("expected bad value '%s', got '%s'",
+						expected.BadValue,
+						errList[i].BadValue)
+				}
+			}
+		})
+
+	}
 }

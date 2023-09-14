@@ -19,8 +19,16 @@ package validation
 import (
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
+	v1 "k8s.io/api/authorization/v1"
+	"k8s.io/api/authorization/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/client-go/util/cert"
@@ -200,5 +208,149 @@ func validateClaimMappings(m api.ClaimMappings, fldPath *field.Path) field.Error
 		allErrs = append(allErrs, field.Required(fldPath.Child("groups", "claim"), "non-empty claim name is required when prefix is set"))
 	}
 
+	return allErrs
+}
+
+// ValidateAuthorizationConfiguration validates a given AuthorizationConfiguration.
+func ValidateAuthorizationConfiguration(fldPath *field.Path, c *api.AuthorizationConfiguration, knownTypes sets.String, repeatableTypes sets.String) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(c.Authorizers) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("authorizers"), "at least one authorization mode must be defined"))
+	}
+
+	seenAuthorizerTypes := sets.NewString()
+	seenWebhookNames := sets.NewString()
+	for i, a := range c.Authorizers {
+		fldPath := fldPath.Child("authorizers").Index(i)
+		aType := string(a.Type)
+		if aType == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
+			continue
+		}
+		if !knownTypes.Has(aType) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), aType, knownTypes.List()))
+			continue
+		}
+		if seenAuthorizerTypes.Has(aType) && !repeatableTypes.Has(aType) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("type"), aType))
+			continue
+		}
+		seenAuthorizerTypes.Insert(aType)
+
+		switch a.Type {
+		case api.TypeWebhook:
+			if a.Webhook == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("webhook"), "required when type=Webhook"))
+				continue
+			}
+			allErrs = append(allErrs, ValidateWebhookConfiguration(fldPath, a.Webhook, seenWebhookNames)...)
+		default:
+			if a.Webhook != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("webhook"), "non-null", "may only be specified when type=Webhook"))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfiguration, seenNames sets.String) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(c.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else if seenNames.Has(c.Name) {
+		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), c.Name))
+	} else if errs := utilvalidation.IsDNS1123Subdomain(c.Name); len(errs) != 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), c.Name, fmt.Sprintf("webhook name is invalid: %s", strings.Join(errs, ", "))))
+	}
+	seenNames.Insert(c.Name)
+
+	if c.Timeout.Duration == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("timeout"), ""))
+	} else if c.Timeout.Duration > 30*time.Second || c.Timeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("timeout"), c.Timeout.Duration.String(), "must be > 0s and <= 30s"))
+	}
+
+	if c.AuthorizedTTL.Duration == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("authorizedTTL"), ""))
+	} else if c.AuthorizedTTL.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("authorizedTTL"), c.AuthorizedTTL.Duration.String(), "must be > 0s"))
+	}
+
+	if c.UnauthorizedTTL.Duration == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("unauthorizedTTL"), ""))
+	} else if c.UnauthorizedTTL.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("unauthorizedTTL"), c.UnauthorizedTTL.Duration.String(), "must be > 0s"))
+	}
+
+	switch c.SubjectAccessReviewVersion {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("subjectAccessReviewVersion"), ""))
+	case "v1":
+		_ = &v1.SubjectAccessReview{}
+	case "v1beta1":
+		_ = &v1beta1.SubjectAccessReview{}
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("subjectAccessReviewVersion"), c.SubjectAccessReviewVersion, []string{"v1", "v1beta1"}))
+	}
+
+	switch c.MatchConditionSubjectAccessReviewVersion {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("matchConditionSubjectAccessReviewVersion"), ""))
+	case "v1":
+		_ = &v1.SubjectAccessReview{}
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("matchConditionSubjectAccessReviewVersion"), c.MatchConditionSubjectAccessReviewVersion, []string{"v1"}))
+	}
+
+	switch c.FailurePolicy {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("failurePolicy"), ""))
+	case api.FailurePolicyNoOpinion, api.FailurePolicyDeny:
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("failurePolicy"), c.FailurePolicy, []string{"NoOpinion", "Deny"}))
+	}
+
+	switch c.ConnectionInfo.Type {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("connectionInfo", "type"), ""))
+	case api.AuthorizationWebhookConnectionInfoTypeInCluster:
+		if c.ConnectionInfo.KubeConfigFile != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("connectionInfo", "kubeConfigFile"), *c.ConnectionInfo.KubeConfigFile, "can only be set when type=KubeConfigFile"))
+		}
+	case api.AuthorizationWebhookConnectionInfoTypeKubeConfig:
+		if c.ConnectionInfo.KubeConfigFile == nil || *c.ConnectionInfo.KubeConfigFile == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("connectionInfo", "kubeConfigFile"), ""))
+		} else if !filepath.IsAbs(*c.ConnectionInfo.KubeConfigFile) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("connectionInfo", "kubeConfigFile"), *c.ConnectionInfo.KubeConfigFile, "must be an absolute path"))
+		} else if info, err := os.Stat(*c.ConnectionInfo.KubeConfigFile); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("connectionInfo", "kubeConfigFile"), *c.ConnectionInfo.KubeConfigFile, fmt.Sprintf("error loading file: %v", err)))
+		} else if !info.Mode().IsRegular() {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("connectionInfo", "kubeConfigFile"), *c.ConnectionInfo.KubeConfigFile, "must be a regular file"))
+		}
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("connectionInfo", "type"), c.ConnectionInfo, []string{"InClusterConfig", "KubeConfigFile"}))
+	}
+
+	// TODO: Remove this check and ensure that correct validations below for MatchConditions are added
+	// for i, condition := range c.MatchConditions {
+	//	 fldPath := fldPath.Child("matchConditions").Index(i).Child("expression")
+	//	 if len(strings.TrimSpace(condition.Expression)) == 0 {
+	//	     allErrs = append(allErrs, field.Required(fldPath, ""))
+	//	 } else {
+	//		 allErrs = append(allErrs, ValidateWebhookMatchCondition(fldPath, sampleSAR, condition.Expression)...)
+	//	 }
+	// }
+	if len(c.MatchConditions) != 0 {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("matchConditions"), c.MatchConditions, []string{}))
+	}
+
+	return allErrs
+}
+
+func ValidateWebhookMatchCondition(fldPath *field.Path, sampleSAR runtime.Object, expression string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// TODO: typecheck CEL expression
 	return allErrs
 }
