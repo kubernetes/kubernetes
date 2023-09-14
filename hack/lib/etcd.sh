@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.5.6}
+ETCD_VERSION=${ETCD_VERSION:-3.5.9}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 # This is intentionally not called ETCD_LOG_LEVEL:
@@ -162,7 +162,7 @@ kube::etcd::install() {
 
     if [[ ${os} == "darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.zip"
-      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
+      url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
       kube::util::download_file "${url}" "${download_file}"
       unzip -o "${download_file}"
       ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
