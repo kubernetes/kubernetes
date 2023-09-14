@@ -54,6 +54,7 @@ type nodeIPAMController struct {
 	nodeIPAMControllerOptions       nodeipamcontrolleroptions.NodeIPAMControllerOptions
 }
 
+// StartNodeIpamControllerWrapper initializes and returns the NodeIpamController's start function.
 func (nodeIpamController *nodeIPAMController) StartNodeIpamControllerWrapper(initContext app.ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
 	allErrors := nodeIpamController.nodeIPAMControllerOptions.Validate()
 	if len(allErrors) > 0 {
@@ -66,6 +67,7 @@ func (nodeIpamController *nodeIPAMController) StartNodeIpamControllerWrapper(ini
 	}
 }
 
+// startNodeIpamController initializes and starts the NodeIpamController with provided configuration and context.
 func startNodeIpamController(ctx context.Context, initContext app.ControllerInitContext, ccmConfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, controllerCtx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet

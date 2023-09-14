@@ -43,6 +43,7 @@ type goPackage struct {
 	XTestImports []string
 }
 
+// main checks a JSON dependency file for restricted dependencies and reports violations.
 func main() {
 	flag.Parse()
 

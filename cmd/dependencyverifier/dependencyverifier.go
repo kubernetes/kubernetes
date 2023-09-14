@@ -56,6 +56,7 @@ func runCommand(cmd ...string) (string, error) {
 	return runCommandInDir("", cmd)
 }
 
+// runCommandInDir executes a command in the specified directory and returns its output.
 func runCommandInDir(dir string, cmd []string) (string, error) {
 	c := exec.Command(cmd[0], cmd[1:]...)
 	c.Dir = dir
@@ -66,12 +67,14 @@ func runCommandInDir(dir string, cmd []string) (string, error) {
 	return string(output), nil
 }
 
+// readFile reads the content of a file at the given path and returns it as a string.
 func readFile(path string) (string, error) {
 	content, err := os.ReadFile(path)
 	// Convert []byte to string and print to screen
 	return string(content), err
 }
 
+// moduleInSlice determines if module 'a' is in the list, considering version based on matchVersion.
 func moduleInSlice(a module, list []module, matchVersion bool) bool {
 	for _, b := range list {
 		if b == a {
@@ -147,6 +150,7 @@ type module struct {
 	version string
 }
 
+// String converts module to its string representation.
 func (m module) String() string {
 	if len(m.version) == 0 {
 		return m.name
@@ -154,6 +158,7 @@ func (m module) String() string {
 	return m.name + "@" + m.version
 }
 
+// parseModule parses a string into a module, separating name and version.
 func parseModule(s string) module {
 	if !strings.Contains(s, "@") {
 		return module{name: s}
@@ -367,10 +372,12 @@ func main() {
 	}
 }
 
+// visit traverses modules using a visitor function, handling module references and effective versions.
 func visit(visitor func(m module, via []module), main module, references map[module][]module, effectiveVersions map[string]module) {
 	doVisit(visitor, main, nil, map[module]bool{}, references, effectiveVersions)
 }
 
+// doVisit recursively visits modules, considering version overrides and avoiding revisits.
 func doVisit(visitor func(m module, via []module), from module, via []module, visited map[module]bool, references map[module][]module, effectiveVersions map[string]module) {
 	visitor(from, via)
 	via = append(via, from)

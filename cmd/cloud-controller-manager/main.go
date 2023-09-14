@@ -43,6 +43,7 @@ import (
 	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
 )
 
+// main initializes and runs the Cloud Controller Manager.
 func main() {
 	ccmOptions, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
@@ -79,6 +80,7 @@ func main() {
 	os.Exit(code)
 }
 
+// cloudInitializer initializes the cloud provider based on the provided config and validates its ClusterID.
 func cloudInitializer(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface {
 	cloudConfig := config.ComponentConfig.KubeCloudShared.CloudProvider
 	// initialize cloud provider with the cloud provider name and config file provided
