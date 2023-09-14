@@ -11,6 +11,7 @@ import (
 // with apply.
 type EtcdSpecApplyConfiguration struct {
 	StaticPodOperatorSpecApplyConfiguration `json:",inline"`
+	HardwareSpeed                           *operatorv1.ControlPlaneHardwareSpeed `json:"controlPlaneHardwareSpeed,omitempty"`
 }
 
 // EtcdSpecApplyConfiguration constructs an declarative configuration of the EtcdSpec type for use with
@@ -80,5 +81,13 @@ func (b *EtcdSpecApplyConfiguration) WithFailedRevisionLimit(value int32) *EtcdS
 // If called multiple times, the SucceededRevisionLimit field is set to the value of the last call.
 func (b *EtcdSpecApplyConfiguration) WithSucceededRevisionLimit(value int32) *EtcdSpecApplyConfiguration {
 	b.SucceededRevisionLimit = &value
+	return b
+}
+
+// WithHardwareSpeed sets the HardwareSpeed field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HardwareSpeed field is set to the value of the last call.
+func (b *EtcdSpecApplyConfiguration) WithHardwareSpeed(value operatorv1.ControlPlaneHardwareSpeed) *EtcdSpecApplyConfiguration {
+	b.HardwareSpeed = &value
 	return b
 }

@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/rbac/v1"
 
 	// install RBAC types
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
@@ -65,7 +65,7 @@ func TestHelpersRoundTrip(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(internalObj, roundTrippedObj) {
-			t.Errorf("err on %T: got difference:\n%s", internalObj, diff.ObjectDiff(internalObj, roundTrippedObj))
+			t.Errorf("err on %T: got difference:\n%s", internalObj, cmp.Diff(internalObj, roundTrippedObj))
 			continue
 		}
 	}

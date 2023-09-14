@@ -131,7 +131,7 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 
 	switch {
 	case err != nil && statusErr != nil:
-		klog.ErrorS(statusErr, "Could not update status", "statefulSet", klog.KObj(set))
+		logger.Error(statusErr, "Could not update status", "statefulSet", klog.KObj(set))
 		return currentRevision, updateRevision, currentStatus, err
 	case err != nil:
 		return currentRevision, updateRevision, currentStatus, err

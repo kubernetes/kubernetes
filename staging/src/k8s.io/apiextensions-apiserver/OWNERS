@@ -2,8 +2,8 @@
 
 approvers:
   - deads2k
-  - lavalamp
   - sttts
+  - jpbetz
 reviewers:
   - deads2k
   - sttts
@@ -15,3 +15,5 @@ reviewers:
   - jefftree
 labels:
   - sig/api-machinery
+emeritus_approvers:
+  - lavalamp

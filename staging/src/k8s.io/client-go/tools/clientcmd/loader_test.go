@@ -18,6 +18,7 @@ package clientcmd
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
 	"path"
@@ -26,12 +27,15 @@ import (
 	"strings"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
+	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -120,19 +124,82 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 }
 
 func TestToleratingMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
 	loadingRules := ClientConfigLoadingRules{
-		Precedence: []string{"bogus1", "bogus2", "bogus3"},
+		Precedence:       []string{"bogus1", "bogus2", "bogus3"},
+		WarnIfAllMissing: true,
+		Warner:           func(err error) { klog.Warning(err) },
 	}
+
+	buffer := &bytes.Buffer{}
+
+	klog.LogToStderr(false)
+	klog.SetOutput(buffer)
 
 	_, err := loadingRules.Load()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	klog.Flush()
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
+	if !strings.Contains(buffer.String(), expectedLog) {
+		t.Fatalf("expected log: \"%s\"", expectedLog)
+	}
+}
+
+func TestWarningMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
+	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
+	loadingRules := NewDefaultClientConfigLoadingRules()
+
+	buffer := &bytes.Buffer{}
+
+	flags := &flag.FlagSet{}
+	klog.InitFlags(flags)
+	flags.Set("v", "1")
+	klog.LogToStderr(false)
+	klog.SetOutput(buffer)
+
+	_, err := loadingRules.Load()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	klog.Flush()
+
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
+	if !strings.Contains(buffer.String(), expectedLog) {
+		t.Fatalf("expected log: \"%s\"", expectedLog)
+	}
+}
+
+func TestNoWarningMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
+	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
+	loadingRules := NewDefaultClientConfigLoadingRules()
+
+	buffer := &bytes.Buffer{}
+
+	flags := &flag.FlagSet{}
+	klog.InitFlags(flags)
+	flags.Set("v", "0")
+	klog.LogToStderr(false)
+	klog.SetOutput(buffer)
+
+	_, err := loadingRules.Load()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	klog.Flush()
+
+	logNotExpected := fmt.Sprintf("Config not found: %s", envVarValue)
+	if strings.Contains(buffer.String(), logNotExpected) {
+		t.Fatalf("log not expected: \"%s\"", logNotExpected)
+	}
 }
 
 func TestErrorReadingFile(t *testing.T) {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
+	defer utiltesting.CloseAndRemove(t, commandLineFile)
 
 	if err := os.WriteFile(commandLineFile.Name(), []byte("bogus value"), 0644); err != nil {
 		t.Fatalf("Error creating tempfile: %v", err)
@@ -173,9 +240,8 @@ func TestErrorReadingNonFile(t *testing.T) {
 
 func TestConflictingCurrentContext(t *testing.T) {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := os.CreateTemp("", "")
-	defer os.Remove(envVarFile.Name())
+	defer utiltesting.CloseAndRemove(t, commandLineFile, envVarFile)
 
 	mockCommandLineConfig := clientcmdapi.Config{
 		CurrentContext: "any-context-value",
@@ -248,13 +314,13 @@ preferences: {}
 users: null
 `)
 	if !bytes.Equal(expected, data) {
-		t.Error(diff.ObjectReflectDiff(string(expected), string(data)))
+		t.Error(cmp.Diff(string(expected), string(data)))
 	}
 }
 
 func TestLoadingEmptyMaps(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	mockConfig := clientcmdapi.Config{
 		CurrentContext: "any-context-value",
@@ -280,7 +346,7 @@ func TestLoadingEmptyMaps(t *testing.T) {
 
 func TestDuplicateClusterName(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
@@ -322,7 +388,7 @@ users:
 
 func TestDuplicateContextName(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
@@ -364,7 +430,7 @@ users:
 
 func TestDuplicateUserName(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
@@ -404,7 +470,7 @@ users:
 
 func TestDuplicateExtensionName(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
@@ -560,7 +626,7 @@ func TestResolveRelativePaths(t *testing.T) {
 
 func TestMigratingFile(t *testing.T) {
 	sourceFile, _ := os.CreateTemp("", "")
-	defer os.Remove(sourceFile.Name())
+	defer utiltesting.CloseAndRemove(t, sourceFile)
 	destinationFile, _ := os.CreateTemp("", "")
 	// delete the file so that we'll write to it
 	os.Remove(destinationFile.Name())
@@ -574,9 +640,8 @@ func TestMigratingFile(t *testing.T) {
 	if _, err := loadingRules.Load(); err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-
 	// the load should have recreated this file
-	defer os.Remove(destinationFile.Name())
+	defer utiltesting.CloseAndRemove(t, destinationFile)
 
 	sourceContent, err := os.ReadFile(sourceFile.Name())
 	if err != nil {
@@ -594,9 +659,8 @@ func TestMigratingFile(t *testing.T) {
 
 func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
 	sourceFile, _ := os.CreateTemp("", "")
-	defer os.Remove(sourceFile.Name())
 	destinationFile, _ := os.CreateTemp("", "")
-	defer os.Remove(destinationFile.Name())
+	defer utiltesting.CloseAndRemove(t, sourceFile, destinationFile)
 
 	WriteToFile(testConfigAlfa, sourceFile.Name())
 
@@ -622,7 +686,7 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 	sourceFilename := "some-missing-file"
 	destinationFile, _ := os.CreateTemp("", "")
 	// delete the file so that we'll write to it
-	os.Remove(destinationFile.Name())
+	utiltesting.CloseAndRemove(t, destinationFile)
 
 	loadingRules := ClientConfigLoadingRules{
 		MigrationRules: map[string]string{destinationFile.Name(): sourceFilename},
@@ -639,7 +703,7 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 
 func TestFileLocking(t *testing.T) {
 	f, _ := os.CreateTemp("", "")
-	defer os.Remove(f.Name())
+	defer utiltesting.CloseAndRemove(t, f)
 
 	err := lockFile(f.Name())
 	if err != nil {
@@ -655,9 +719,8 @@ func TestFileLocking(t *testing.T) {
 
 func Example_noMergingOnExplicitPaths() {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := os.CreateTemp("", "")
-	defer os.Remove(envVarFile.Name())
+	defer utiltesting.CloseAndRemove(&testing.T{}, commandLineFile, envVarFile)
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
@@ -704,9 +767,8 @@ func Example_noMergingOnExplicitPaths() {
 
 func Example_mergingSomeWithConflict() {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := os.CreateTemp("", "")
-	defer os.Remove(envVarFile.Name())
+	defer utiltesting.CloseAndRemove(&testing.T{}, commandLineFile, envVarFile)
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
@@ -760,13 +822,10 @@ func Example_mergingSomeWithConflict() {
 
 func Example_mergingEverythingNoConflicts() {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := os.CreateTemp("", "")
-	defer os.Remove(envVarFile.Name())
 	currentDirFile, _ := os.CreateTemp("", "")
-	defer os.Remove(currentDirFile.Name())
 	homeDirFile, _ := os.CreateTemp("", "")
-	defer os.Remove(homeDirFile.Name())
+	defer utiltesting.CloseAndRemove(&testing.T{}, commandLineFile, envVarFile, currentDirFile, homeDirFile)
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigBravo, envVarFile.Name())
@@ -897,12 +956,9 @@ func TestLoadingGetLoadingPrecedence(t *testing.T) {
 		},
 	}
 
-	kubeconfig := os.Getenv("KUBECONFIG")
-	defer os.Setenv("KUBECONFIG", kubeconfig)
-
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			os.Setenv("KUBECONFIG", test.env)
+			t.Setenv("KUBECONFIG", test.env)
 			rules := test.rules
 			if rules == nil {
 				rules = NewDefaultClientConfigLoadingRules()

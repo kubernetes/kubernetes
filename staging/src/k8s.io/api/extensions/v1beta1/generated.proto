@@ -646,11 +646,6 @@ message NetworkPolicy {
   // Specification of the desired behavior for this NetworkPolicy.
   // +optional
   optional NetworkPolicySpec spec = 2;
-
-  // Status is the current state of the NetworkPolicy.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
-  optional NetworkPolicyStatus status = 3;
 }
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyEgressRule is deprecated by networking/v1/NetworkPolicyEgressRule.
@@ -796,18 +791,6 @@ message NetworkPolicySpec {
   // This field is beta-level in 1.8
   // +optional
   repeated string policyTypes = 4;
-}
-
-// NetworkPolicyStatus describe the current state of the NetworkPolicy.
-message NetworkPolicyStatus {
-  // Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
-  // Current service state
-  // +optional
-  // +patchMergeKey=type
-  // +patchStrategy=merge
-  // +listType=map
-  // +listMapKey=type
-  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for

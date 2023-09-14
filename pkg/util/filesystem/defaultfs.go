@@ -85,7 +85,7 @@ func (fs *DefaultFs) RemoveAll(path string) error {
 	return os.RemoveAll(fs.prefix(path))
 }
 
-// Remove via os.RemoveAll
+// Remove via os.Remove
 func (fs *DefaultFs) Remove(name string) error {
 	return os.Remove(fs.prefix(name))
 }

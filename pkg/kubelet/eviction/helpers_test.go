@@ -25,8 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/diff"
-
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -633,7 +632,7 @@ func TestAddAllocatableThresholds(t *testing.T) {
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			if !thresholdsEqual(testCase.expected, addAllocatableThresholds(testCase.thresholds)) {
-				t.Errorf("Err not as expected, test: %v, Unexpected data: %s", testName, diff.ObjectDiff(testCase.expected, addAllocatableThresholds(testCase.thresholds)))
+				t.Errorf("Err not as expected, test: %v, Unexpected data: %s", testName, cmp.Diff(testCase.expected, addAllocatableThresholds(testCase.thresholds)))
 			}
 		})
 	}

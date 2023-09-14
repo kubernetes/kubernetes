@@ -58,7 +58,7 @@ const (
 var localStorageVersion = utilversion.MustParseSemantic("v1.8.0-beta.0")
 
 // variable populated in BeforeEach, never modified afterwards
-var workerNodes = sets.String{}
+var workerNodes = sets.Set[string]{}
 
 type pausePodConfig struct {
 	Name                              string
@@ -1154,7 +1154,7 @@ func createHostPortPodOnNode(ctx context.Context, f *framework.Framework, podNam
 }
 
 // GetPodsScheduled returns a number of currently scheduled and not scheduled Pods on worker nodes.
-func GetPodsScheduled(workerNodes sets.String, pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
+func GetPodsScheduled(workerNodes sets.Set[string], pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
 	for _, pod := range pods.Items {
 		if pod.Spec.NodeName != "" && workerNodes.Has(pod.Spec.NodeName) {
 			_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)

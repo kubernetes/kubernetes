@@ -26,6 +26,8 @@ import (
 	"strings"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
@@ -195,7 +197,7 @@ func TestFileExistingCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utiltesting.CloseAndRemove(t, f)
 	var tests = []struct {
 		name          string
 		check         FileExistingCheck
@@ -234,7 +236,7 @@ func TestFileAvailableCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utiltesting.CloseAndRemove(t, f)
 	var tests = []struct {
 		name          string
 		check         FileAvailableCheck
@@ -461,8 +463,8 @@ func TestConfigRootCAs(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed creating temp CA file\n\tactual:%v", err)
 	}
-	defer os.Remove(f.Name())
-	if err := os.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, f)
+	if _, err := f.Write([]byte(externalEtcdRootCAFileContent)); err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed writing contents to temp CA file %s\n\tactual:%v", f.Name(), err)
 	}
 
@@ -490,8 +492,8 @@ func TestConfigCertAndKey(t *testing.T) {
 			err,
 		)
 	}
-	defer os.Remove(certFile.Name())
-	if err := os.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, certFile)
+	if _, err := certFile.Write([]byte(externalEtcdCertFileContent)); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp CertFile file %s\n\tactual:%v",
 			certFile.Name(),
@@ -506,8 +508,8 @@ func TestConfigCertAndKey(t *testing.T) {
 			err,
 		)
 	}
-	defer os.Remove(keyFile.Name())
-	if err := os.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, keyFile)
+	if _, err := keyFile.Write([]byte(externalEtcdKeyFileContent)); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp KeyFile file %s\n\tactual:%v",
 			keyFile.Name(),
@@ -643,9 +645,7 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 		},
 	}
 
-	// Save current content of *_proxy and *_PROXY variables.
-	savedEnv := resetProxyEnv(t)
-	defer restoreEnv(savedEnv)
+	resetProxyEnv(t)
 
 	for _, rt := range tests {
 		warning, _ := rt.check.Check()
@@ -725,9 +725,7 @@ func TestHTTPProxyCheck(t *testing.T) {
 		},
 	}
 
-	// Save current content of *_proxy and *_PROXY variables.
-	savedEnv := resetProxyEnv(t)
-	defer restoreEnv(savedEnv)
+	resetProxyEnv(t)
 
 	for _, rt := range tests {
 		warning, _ := rt.check.Check()
@@ -744,23 +742,19 @@ func TestHTTPProxyCheck(t *testing.T) {
 	}
 }
 
-// resetProxyEnv is helper function that unsets all *_proxy variables
-// and return previously set values as map. This can be used to restore
-// original state of the environment.
-func resetProxyEnv(t *testing.T) map[string]string {
-	savedEnv := make(map[string]string)
+// resetProxyEnv is helper function that unsets all *_proxy variables.
+func resetProxyEnv(t *testing.T) {
 	for _, e := range os.Environ() {
-		pair := strings.Split(e, "=")
-		if strings.HasSuffix(strings.ToLower(pair[0]), "_proxy") {
-			savedEnv[pair[0]] = pair[1]
-			os.Unsetenv(pair[0])
+		key, value, _ := strings.Cut(e, "=")
+		if strings.HasSuffix(strings.ToLower(key), "_proxy") {
+			t.Cleanup(func() { os.Setenv(key, value) })
+			os.Unsetenv(key)
 		}
 	}
-	t.Log("Saved environment: ", savedEnv)
 
-	os.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
-	os.Setenv("HTTPS_PROXY", "https://proxy.example.com:3128")
-	os.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
+	t.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
+	t.Setenv("HTTPS_PROXY", "https://proxy.example.com:3128")
+	t.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
 	// Check if we can reliably execute tests:
 	// ProxyFromEnvironment caches the *_proxy environment variables and
 	// if ProxyFromEnvironment already executed before our test with empty
@@ -777,15 +771,6 @@ func resetProxyEnv(t *testing.T) map[string]string {
 		t.Skip("test skipped as ProxyFromEnvironment already initialized in environment without defined HTTP proxy")
 	}
 	t.Log("http.ProxyFromEnvironment is usable, continue executing test")
-	return savedEnv
-}
-
-// restoreEnv is helper function to restores values
-// of environment variables from saved state in the map
-func restoreEnv(e map[string]string) {
-	for k, v := range e {
-		os.Setenv(k, v)
-	}
 }
 
 func TestKubeletVersionCheck(t *testing.T) {
@@ -1087,6 +1072,9 @@ func TestJoinIPCheck(t *testing.T) {
 		t.Skip("not a privileged user")
 	}
 	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1.JoinConfiguration{
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+			CRISocket: constants.UnknownCRISocket,
+		},
 		Discovery: kubeadmapiv1.Discovery{
 			BootstrapToken: &kubeadmapiv1.BootstrapTokenDiscovery{
 				Token:                    configutil.PlaceholderToken.Token.String(),

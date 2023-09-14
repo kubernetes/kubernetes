@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"math"
@@ -30,13 +31,15 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
 
+	"k8s.io/klog/v2"
+
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/metrics"
-	"k8s.io/klog/v2"
 
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
@@ -82,7 +85,7 @@ func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64
 // exist. declType is expected to be a CEL DeclType corresponding to the structural schema.
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType, perCallLimit uint64) *Validator {
-	compiledRules, err := Compile(s, declType, perCallLimit)
+	compiledRules, err := Compile(s, declType, perCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()), StoredExpressionsEnvLoader())
 	var itemsValidator, additionalPropertiesValidator *Validator
 	var propertiesValidators map[string]Validator
 	if s.Items != nil {
@@ -257,6 +260,9 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			continue
 		}
 		if evalResult != types.True {
+			if len(compiled.NormalizedRuleFieldPath) > 0 {
+				fldPath = fldPath.Child(compiled.NormalizedRuleFieldPath)
+			}
 			if compiled.MessageExpression != nil {
 				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
 				if msgErr != nil {
@@ -268,19 +274,182 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 						return errs, -1
 					} else {
 						klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
-						errs = append(errs, field.Invalid(fldPath, sts.Type, ruleMessageOrDefault(rule)))
+						errs = append(errs, fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 						remainingBudget = newRemainingBudget
 					}
 				} else {
-					errs = append(errs, field.Invalid(fldPath, sts.Type, messageExpression))
+					errs = append(errs, fieldErrorForReason(fldPath, sts.Type, messageExpression, rule.Reason))
 					remainingBudget = newRemainingBudget
 				}
 			} else {
-				errs = append(errs, field.Invalid(fldPath, sts.Type, ruleMessageOrDefault(rule)))
+				errs = append(errs, fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 			}
 		}
 	}
 	return errs, remainingBudget
+}
+
+var unescapeMatcher = regexp.MustCompile(`\\.`)
+
+func unescapeSingleQuote(s string) (string, error) {
+	var err error
+	unescaped := unescapeMatcher.ReplaceAllStringFunc(s, func(matchStr string) string {
+		directive := matchStr[1]
+		switch directive {
+		case 'a':
+			return "\a"
+		case 'b':
+			return "\b"
+		case 'f':
+			return "\f"
+		case 'n':
+			return "\n"
+		case 'r':
+			return "\r"
+		case 't':
+			return "\t"
+		case 'v':
+			return "\v"
+		case '\'':
+			return "'"
+		case '\\':
+			return "\\"
+		default:
+			err = fmt.Errorf("invalid escape char %s", matchStr)
+			return ""
+		}
+	})
+	return unescaped, err
+}
+
+// ValidFieldPath validates that jsonPath is a valid JSON Path containing only field and map accessors
+// that are valid for the given schema, and returns a field.Path representation of the validated jsonPath or an error.
+func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath *field.Path, err error) {
+	appendToPath := func(name string, isNamed bool) error {
+		if !isNamed {
+			validFieldPath = validFieldPath.Key(name)
+			schema = schema.AdditionalProperties.Structural
+		} else {
+			validFieldPath = validFieldPath.Child(name)
+			val, ok := schema.Properties[name]
+			if !ok {
+				return fmt.Errorf("does not refer to a valid field")
+			}
+			schema = &val
+		}
+		return nil
+	}
+
+	validFieldPath = nil
+
+	scanner := bufio.NewScanner(strings.NewReader(jsonPath))
+
+	// configure the scanner to split the string into tokens.
+	// The three delimiters ('.', '[', ']') will be returned as single char tokens.
+	// All other text between delimiters is returned as string tokens.
+	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		if len(data) > 0 {
+			for i := 0; i < len(data); i++ {
+				// If in a single quoted string, look for the end of string
+				// ignoring delimiters.
+				if data[0] == '\'' {
+					if i > 0 && data[i] == '\'' && data[i-1] != '\\' {
+						// Return quoted string
+						return i + 1, data[:i+1], nil
+					}
+					continue
+				}
+				switch data[i] {
+				case '.', '[', ']': // delimiters
+					if i == 0 {
+						// Return the delimiter.
+						return 1, data[:1], nil
+					} else {
+						// Return identifier leading up to the delimiter.
+						// The next call to split will return the delimiter.
+						return i, data[:i], nil
+					}
+				}
+			}
+			if atEOF {
+				// Return the string.
+				return len(data), data, nil
+			}
+		}
+		return 0, nil, nil
+	})
+
+	var tok string
+	var isNamed bool
+	for scanner.Scan() {
+		tok = scanner.Text()
+		switch tok {
+		case "[":
+			if !scanner.Scan() {
+				return nil, fmt.Errorf("unexpected end of JSON path")
+			}
+			tok = scanner.Text()
+			if len(tok) < 2 || tok[0] != '\'' || tok[len(tok)-1] != '\'' {
+				return nil, fmt.Errorf("expected single quoted string but got %s", tok)
+			}
+			unescaped, err := unescapeSingleQuote(tok[1 : len(tok)-1])
+			if err != nil {
+				return nil, fmt.Errorf("invalid string literal: %v", err)
+			}
+
+			if schema.Properties != nil {
+				isNamed = true
+			} else if schema.AdditionalProperties != nil {
+				isNamed = false
+			} else {
+				return nil, fmt.Errorf("does not refer to a valid field")
+			}
+			if err := appendToPath(unescaped, isNamed); err != nil {
+				return nil, err
+			}
+			if !scanner.Scan() {
+				return nil, fmt.Errorf("unexpected end of JSON path")
+			}
+			tok = scanner.Text()
+			if tok != "]" {
+				return nil, fmt.Errorf("expected ] but got %s", tok)
+			}
+		case ".":
+			if !scanner.Scan() {
+				return nil, fmt.Errorf("unexpected end of JSON path")
+			}
+			tok = scanner.Text()
+			if schema.Properties != nil {
+				isNamed = true
+			} else if schema.AdditionalProperties != nil {
+				isNamed = false
+			} else {
+				return nil, fmt.Errorf("does not refer to a valid field")
+			}
+			if err := appendToPath(tok, isNamed); err != nil {
+				return nil, err
+			}
+		default:
+			return nil, fmt.Errorf("expected [ or . but got: %s", tok)
+		}
+	}
+	return validFieldPath, nil
+}
+
+func fieldErrorForReason(fldPath *field.Path, value interface{}, detail string, reason *apiextensions.FieldValueErrorReason) *field.Error {
+	if reason == nil {
+		return field.Invalid(fldPath, value, detail)
+	}
+	switch *reason {
+	case apiextensions.FieldValueForbidden:
+		return field.Forbidden(fldPath, detail)
+	case apiextensions.FieldValueRequired:
+		return field.Required(fldPath, detail)
+	case apiextensions.FieldValueDuplicate:
+		return field.Duplicate(fldPath, value)
+	default:
+		return field.Invalid(fldPath, value, detail)
+	}
 }
 
 // evalMessageExpression evaluates the given message expression and returns the evaluated string form and the remaining budget, or an error if one

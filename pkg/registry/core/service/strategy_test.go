@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -86,7 +86,7 @@ func makeValidServicePort(name string, proto api.Protocol, port int32) api.Servi
 		Name:       name,
 		Protocol:   proto,
 		Port:       port,
-		TargetPort: intstr.FromInt(int(port)),
+		TargetPort: intstr.FromInt32(port),
 	}
 }
 
@@ -218,11 +218,11 @@ func TestDropDisabledField(t *testing.T) {
 
 			// old node should never be changed
 			if !reflect.DeepEqual(tc.oldSvc, old) {
-				t.Errorf("%v: old svc changed: %v", tc.name, diff.ObjectReflectDiff(tc.oldSvc, old))
+				t.Errorf("%v: old svc changed: %v", tc.name, cmp.Diff(tc.oldSvc, old))
 			}
 
 			if !reflect.DeepEqual(tc.svc, tc.compareSvc) {
-				t.Errorf("%v: unexpected svc spec: %v", tc.name, diff.ObjectReflectDiff(tc.svc, tc.compareSvc))
+				t.Errorf("%v: unexpected svc spec: %v", tc.name, cmp.Diff(tc.svc, tc.compareSvc))
 			}
 		}()
 	}

@@ -758,15 +758,17 @@ func GetServerCert(certFile, keyFile string, hostnames sets.String) (*TLSCertifi
 	}
 
 	cert := server.Certs[0]
-	ips, dns := IPAddressesDNSNames(hostnames.List())
-	missingIps := ipsNotInSlice(ips, cert.IPAddresses)
-	missingDns := stringsNotInSlice(dns, cert.DNSNames)
-	if len(missingIps) == 0 && len(missingDns) == 0 {
+	certNames := sets.NewString()
+	for _, ip := range cert.IPAddresses {
+		certNames.Insert(ip.String())
+	}
+	certNames.Insert(cert.DNSNames...)
+	if hostnames.Equal(certNames) {
 		klog.V(4).Infof("Found existing server certificate in %s", certFile)
 		return server, nil
 	}
 
-	return nil, fmt.Errorf("Existing server certificate in %s was missing some hostnames (%v) or IP addresses (%v).", certFile, missingDns, missingIps)
+	return nil, fmt.Errorf("Existing server certificate in %s does not match required hostnames.", certFile)
 }
 
 func (ca *CA) MakeAndWriteServerCert(certFile, keyFile string, hostnames sets.String, expireDays int) (*TLSCertificateConfig, error) {
@@ -1211,42 +1213,4 @@ func writeKeyFile(f io.Writer, key crypto.PrivateKey) error {
 	}
 
 	return nil
-}
-
-func stringsNotInSlice(needles []string, haystack []string) []string {
-	missing := []string{}
-	for _, needle := range needles {
-		if !stringInSlice(needle, haystack) {
-			missing = append(missing, needle)
-		}
-	}
-	return missing
-}
-
-func stringInSlice(needle string, haystack []string) bool {
-	for _, straw := range haystack {
-		if needle == straw {
-			return true
-		}
-	}
-	return false
-}
-
-func ipsNotInSlice(needles []net.IP, haystack []net.IP) []net.IP {
-	missing := []net.IP{}
-	for _, needle := range needles {
-		if !ipInSlice(needle, haystack) {
-			missing = append(missing, needle)
-		}
-	}
-	return missing
-}
-
-func ipInSlice(needle net.IP, haystack []net.IP) bool {
-	for _, straw := range haystack {
-		if needle.Equal(straw) {
-			return true
-		}
-	}
-	return false
 }

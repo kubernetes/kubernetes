@@ -37,9 +37,6 @@ var (
 	// ErrImageNeverPull - Required Image is absent on host and PullPolicy is NeverPullImage
 	ErrImageNeverPull = errors.New("ErrImageNeverPull")
 
-	// ErrRegistryUnavailable - Get http error when pulling image from registry
-	ErrRegistryUnavailable = errors.New("RegistryUnavailable")
-
 	// ErrInvalidImageName - Unable to parse the image name.
 	ErrInvalidImageName = errors.New("InvalidImageName")
 )

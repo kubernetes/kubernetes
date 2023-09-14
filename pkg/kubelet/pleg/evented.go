@@ -46,16 +46,16 @@ var (
 // e.g. Streaming data issues from the runtime or the runtime does not implement the
 // container events stream.
 func isEventedPLEGInUse() bool {
-	eventedPLEGUsageMu.Lock()
-	defer eventedPLEGUsageMu.Unlock()
+	eventedPLEGUsageMu.RLock()
+	defer eventedPLEGUsageMu.RUnlock()
 	return eventedPLEGUsage
 }
 
 // setEventedPLEGUsage should only be accessed from
 // Start/Stop of Evented PLEG.
 func setEventedPLEGUsage(enable bool) {
-	eventedPLEGUsageMu.RLock()
-	defer eventedPLEGUsageMu.RUnlock()
+	eventedPLEGUsageMu.Lock()
+	defer eventedPLEGUsageMu.Unlock()
 	eventedPLEGUsage = enable
 }
 
@@ -229,7 +229,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 			if klog.V(6).Enabled() {
 				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID, "podStatus", status)
 			} else {
-				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID, "podStatus", status)
+				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID)
 			}
 		} else {
 			if klogV := klog.V(6); klogV.Enabled() {

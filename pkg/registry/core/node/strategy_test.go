@@ -22,11 +22,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/diff"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
@@ -167,11 +167,11 @@ func TestDropFields(t *testing.T) {
 			old := tc.oldNode.DeepCopy()
 			// old node  should never be changed
 			if !reflect.DeepEqual(tc.oldNode, old) {
-				t.Errorf("%v: old node changed: %v", tc.name, diff.ObjectReflectDiff(tc.oldNode, old))
+				t.Errorf("%v: old node changed: %v", tc.name, cmp.Diff(tc.oldNode, old))
 			}
 
 			if !reflect.DeepEqual(tc.node, tc.compareNode) {
-				t.Errorf("%v: unexpected node spec: %v", tc.name, diff.ObjectReflectDiff(tc.node, tc.compareNode))
+				t.Errorf("%v: unexpected node spec: %v", tc.name, cmp.Diff(tc.node, tc.compareNode))
 			}
 		}()
 	}

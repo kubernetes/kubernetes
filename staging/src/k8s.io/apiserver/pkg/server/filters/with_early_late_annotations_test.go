@@ -257,7 +257,7 @@ func TestWithStartupEarlyAnnotation(t *testing.T) {
 			if ac == nil {
 				t.Fatalf("expected audit context inside the request context")
 			}
-			ac.Event = &auditinternal.Event{
+			ac.Event = auditinternal.Event{
 				Level: auditinternal.LevelMetadata,
 			}
 

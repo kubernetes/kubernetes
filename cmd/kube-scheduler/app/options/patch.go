@@ -7,5 +7,5 @@ import (
 )
 
 func LoadKubeSchedulerConfiguration(logger klog.Logger, file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	return loadConfigFromFile(logger, file)
+	return LoadConfigFromFile(logger, file)
 }

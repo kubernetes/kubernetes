@@ -147,41 +147,41 @@ func TestPreFilterResultMerge(t *testing.T) {
 	}{
 		"all nil": {},
 		"nil receiver empty input": {
-			in:   &PreFilterResult{NodeNames: sets.NewString()},
-			want: &PreFilterResult{NodeNames: sets.NewString()},
+			in:   &PreFilterResult{NodeNames: sets.New[string]()},
+			want: &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 		"empty receiver nil input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString()},
-			want:     &PreFilterResult{NodeNames: sets.NewString()},
+			receiver: &PreFilterResult{NodeNames: sets.New[string]()},
+			want:     &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 		"empty receiver empty input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString()},
-			in:       &PreFilterResult{NodeNames: sets.NewString()},
-			want:     &PreFilterResult{NodeNames: sets.NewString()},
+			receiver: &PreFilterResult{NodeNames: sets.New[string]()},
+			in:       &PreFilterResult{NodeNames: sets.New[string]()},
+			want:     &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 		"nil receiver populated input": {
-			in:   &PreFilterResult{NodeNames: sets.NewString("node1")},
-			want: &PreFilterResult{NodeNames: sets.NewString("node1")},
+			in:   &PreFilterResult{NodeNames: sets.New("node1")},
+			want: &PreFilterResult{NodeNames: sets.New("node1")},
 		},
 		"empty receiver populated input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString()},
-			in:       &PreFilterResult{NodeNames: sets.NewString("node1")},
-			want:     &PreFilterResult{NodeNames: sets.NewString()},
+			receiver: &PreFilterResult{NodeNames: sets.New[string]()},
+			in:       &PreFilterResult{NodeNames: sets.New("node1")},
+			want:     &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 
 		"populated receiver nil input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString("node1")},
-			want:     &PreFilterResult{NodeNames: sets.NewString("node1")},
+			receiver: &PreFilterResult{NodeNames: sets.New("node1")},
+			want:     &PreFilterResult{NodeNames: sets.New("node1")},
 		},
 		"populated receiver empty input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString("node1")},
-			in:       &PreFilterResult{NodeNames: sets.NewString()},
-			want:     &PreFilterResult{NodeNames: sets.NewString()},
+			receiver: &PreFilterResult{NodeNames: sets.New("node1")},
+			in:       &PreFilterResult{NodeNames: sets.New[string]()},
+			want:     &PreFilterResult{NodeNames: sets.New[string]()},
 		},
 		"populated receiver and input": {
-			receiver: &PreFilterResult{NodeNames: sets.NewString("node1", "node2")},
-			in:       &PreFilterResult{NodeNames: sets.NewString("node2", "node3")},
-			want:     &PreFilterResult{NodeNames: sets.NewString("node2")},
+			receiver: &PreFilterResult{NodeNames: sets.New("node1", "node2")},
+			in:       &PreFilterResult{NodeNames: sets.New("node2", "node3")},
+			want:     &PreFilterResult{NodeNames: sets.New("node2")},
 		},
 	}
 	for name, test := range tests {

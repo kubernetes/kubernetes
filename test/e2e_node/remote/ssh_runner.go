@@ -32,17 +32,17 @@ func (s *SSHRunner) StartTests(suite TestSuite, archivePath string, results chan
 		numTests++
 		go func(host string, junitFileName string) {
 			output, exitOk, err := RunRemote(RunRemoteConfig{
-				suite:          suite,
-				archive:        archivePath,
-				host:           host,
-				cleanup:        s.cfg.Cleanup,
-				imageDesc:      "",
-				junitFileName:  junitFileName,
-				testArgs:       s.cfg.TestArgs,
-				ginkgoArgs:     s.cfg.GinkgoFlags,
-				systemSpecName: s.cfg.SystemSpecName,
-				extraEnvs:      s.cfg.ExtraEnvs,
-				runtimeConfig:  s.cfg.RuntimeConfig,
+				Suite:          suite,
+				Archive:        archivePath,
+				Host:           host,
+				Cleanup:        s.cfg.Cleanup,
+				ImageDesc:      "",
+				JunitFileName:  junitFileName,
+				TestArgs:       s.cfg.TestArgs,
+				GinkgoArgs:     s.cfg.GinkgoFlags,
+				SystemSpecName: s.cfg.SystemSpecName,
+				ExtraEnvs:      s.cfg.ExtraEnvs,
+				RuntimeConfig:  s.cfg.RuntimeConfig,
 			})
 			results <- &TestResult{
 				Output: output,

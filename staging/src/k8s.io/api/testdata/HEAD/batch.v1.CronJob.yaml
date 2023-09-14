@@ -71,9 +71,11 @@ spec:
     spec:
       activeDeadlineSeconds: 3
       backoffLimit: 7
+      backoffLimitPerIndex: 12
       completionMode: completionModeValue
       completions: 2
       manualSelector: true
+      maxFailedIndexes: 13
       parallelism: 1
       podFailurePolicy:
         rules:
@@ -86,6 +88,7 @@ spec:
           onPodConditions:
           - status: statusValue
             type: typeValue
+      podReplacementPolicy: podReplacementPolicyValue
       selector:
         matchExpressions:
         - key: keyValue
@@ -374,6 +377,7 @@ spec:
                 limitsKey: "0"
               requests:
                 requestsKey: "0"
+            restartPolicy: restartPolicyValue
             securityContext:
               allowPrivilegeEscalation: true
               capabilities:
@@ -580,6 +584,7 @@ spec:
                 limitsKey: "0"
               requests:
                 requestsKey: "0"
+            restartPolicy: restartPolicyValue
             securityContext:
               allowPrivilegeEscalation: true
               capabilities:
@@ -788,6 +793,7 @@ spec:
                 limitsKey: "0"
               requests:
                 requestsKey: "0"
+            restartPolicy: restartPolicyValue
             securityContext:
               allowPrivilegeEscalation: true
               capabilities:

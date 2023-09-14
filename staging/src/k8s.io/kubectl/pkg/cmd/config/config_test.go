@@ -23,11 +23,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utiltesting "k8s.io/client-go/util/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -55,7 +56,7 @@ func Example_view() {
 		expectedConfig: expectedConfig,
 	}
 
-	output := test.run(nil)
+	output := test.run(&testing.T{})
 	fmt.Printf("%v", output)
 	// Output:
 	// apiVersion: v1
@@ -266,7 +267,7 @@ func TestAdditionalAuth(t *testing.T) {
 
 func TestEmbedClientCert(t *testing.T) {
 	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "")
-	defer os.Remove(fakeCertFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
 	fakeData := []byte("fake-data")
 	os.WriteFile(fakeCertFile.Name(), fakeData, 0600)
 	expectedConfig := newRedFederalCowHammerConfig()
@@ -285,7 +286,7 @@ func TestEmbedClientCert(t *testing.T) {
 
 func TestEmbedClientKey(t *testing.T) {
 	fakeKeyFile, _ := os.CreateTemp(os.TempDir(), "")
-	defer os.Remove(fakeKeyFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeKeyFile)
 	fakeData := []byte("fake-data")
 	os.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
 	expectedConfig := newRedFederalCowHammerConfig()
@@ -331,7 +332,7 @@ func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
 
 func TestEmptyTokenAndCertAllowed(t *testing.T) {
 	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "cert-file")
-	defer os.Remove(fakeCertFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientCertificate = path.Base(fakeCertFile.Name())
@@ -574,7 +575,7 @@ func TestUnsetBytes(t *testing.T) {
 
 func TestCAClearsInsecure(t *testing.T) {
 	fakeCAFile, _ := os.CreateTemp(os.TempDir(), "ca-file")
-	defer os.Remove(fakeCAFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeCAFile)
 	clusterInfoWithInsecure := clientcmdapi.NewCluster()
 	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
 
@@ -643,7 +644,7 @@ func TestInsecureClearsCA(t *testing.T) {
 
 func TestCADataClearsCA(t *testing.T) {
 	fakeCAFile, _ := os.CreateTemp(os.TempDir(), "")
-	defer os.Remove(fakeCAFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeCAFile)
 	fakeData := []byte("cadata")
 	os.WriteFile(fakeCAFile.Name(), fakeData, 0600)
 
@@ -857,7 +858,7 @@ func TestToBool(t *testing.T) {
 
 func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *testing.T) (string, clientcmdapi.Config) {
 	fakeKubeFile, _ := os.CreateTemp(os.TempDir(), "")
-	defer os.Remove(fakeKubeFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
 	err := clientcmd.WriteToFile(startingConfig, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -867,7 +868,7 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 	argsToUse = append(argsToUse, "--kubeconfig="+fakeKubeFile.Name())
 	argsToUse = append(argsToUse, args...)
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), streams)
 	// "context" is a global flag, inherited from base kubectl command in the real world
 	cmd.PersistentFlags().String("context", "", "The name of the kubeconfig context to use")
@@ -906,7 +907,7 @@ func (test configCommandTest) run(t *testing.T) string {
 	testClearLocationOfOrigin(&actualConfig)
 
 	if !apiequality.Semantic.DeepEqual(test.expectedConfig, actualConfig) {
-		t.Errorf("diff: %v", diff.ObjectDiff(test.expectedConfig, actualConfig))
+		t.Errorf("diff: %v", cmp.Diff(test.expectedConfig, actualConfig))
 		t.Errorf("expected: %#v\n actual:   %#v", test.expectedConfig, actualConfig)
 	}
 

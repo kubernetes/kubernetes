@@ -18,10 +18,10 @@ limitations under the License.
  * This file defines various csi volume test drivers for TestSuites.
  *
  * There are two ways, how to prepare test drivers:
- * 1) With containerized server (NFS, Ceph, Gluster, iSCSI, ...)
+ * 1) With containerized server (NFS, Ceph, iSCSI, ...)
  * It creates a server pod which defines one volume for the tests.
  * These tests work only when privileged containers are allowed, exporting
- * various filesystems (NFS, GlusterFS, ...) usually needs some mounting or
+ * various filesystems (ex: NFS) usually needs some mounting or
  * other privileged magic in the server pod.
  *
  * Note that the server containers are for testing purposes only and should not

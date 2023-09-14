@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -107,7 +108,7 @@ func TestWatchBasedManager(t *testing.T) {
 			for j := 0; j < 100; j++ {
 				name := fmt.Sprintf("s%d", i*100+j)
 				start := time.Now()
-				store.AddReference(testNamespace, name)
+				store.AddReference(testNamespace, name, types.UID(name))
 				err := wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
 					obj, err := store.Get(testNamespace, name)
 					if err != nil {

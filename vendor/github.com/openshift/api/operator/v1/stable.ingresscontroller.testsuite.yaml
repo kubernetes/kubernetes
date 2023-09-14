@@ -13,3 +13,466 @@ tests:
       kind: IngressController
       spec:
         httpEmptyRequestsPolicy: Respond
+  - name: Should be able to create an IngressController with valid Actions
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY
+            - name: X-Cache-Info
+              action:
+                type: Set
+                set:
+                  value: "not cacheable; meta data too large"            
+            - name: X-XSS-Protection
+              action:
+                type: Delete
+            - name: X-Source
+              action:
+                type: Set
+                set:
+                  value: "%[res.hdr(X-Value),lower]"       
+            request:
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der,base64]"
+            - name:   Content-Language
+              action:
+                type: Delete
+            - name: X-Target
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(host),lower]"
+            - name: X-Conditional
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(Host)] if foo"
+            - name: X-Condition
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(Host)]\ if\ foo"
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      spec:
+        httpEmptyRequestsPolicy: Respond
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY
+            - name: X-Cache-Info
+              action:
+                type: Set
+                set:
+                  value: "not cacheable; meta data too large"          
+            - name: X-XSS-Protection
+              action:
+                type: Delete
+            - name: X-Source
+              action:
+                type: Set
+                set:
+                  value: "%[res.hdr(X-Value),lower]"       
+            request:
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der,base64]"
+            - name:   Content-Language
+              action:
+                type: Delete
+            - name: X-Target
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(host),lower]"
+            - name: X-Conditional
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(Host)] if foo"
+            - name: X-Condition
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(Host)]\ if\ foo"
+  - name: Should not allow to set/delete HSTS header.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-hsts
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY
+            - name: Strict-Transport-Security
+              action:
+                type: Delete
+            request:
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "strict-transport-security header may not be modified via header actions"
+  - name: Should not allow to set/delete Proxy header.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-hsts
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY
+            request:
+            - name: Proxy
+              action:
+                type: Set
+                set:
+                  value: example.xyz      
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "proxy header may not be modified via header actions"
+  - name: Should not allow to set/delete Host header.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-hsts
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY
+            request:
+            - name: Host
+              action:
+                type: Set
+                set:
+                  value: example.xyz      
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "host header may not be modified via header actions"
+  - name: Should not allow to set/delete cookie header.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-hsts
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY
+            request:
+            - name: Cookie
+              action:
+                type: Set
+                set:
+                  value: "PHPSESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1"      
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "cookie header may not be modified via header actions"
+  - name: Should not allow to set/delete set-cookie header.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-hsts
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: Set-Cookie
+              action:
+                type: Set
+                set:
+                  value: "sessionId=e8bb43229de9; Domain=foo.example.com"
+            request:    
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "set-cookie header may not be modified via header actions"
+  - name: Should not allow to set/delete dynamic headers with unclosed braces.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-unclosed-braces
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            request:
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name:   Content-Language
+              action:
+                type: Delete
+            - name: expires
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(host),lower"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are req.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set dynamic response header values with not allowed sample fetchers.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-not-allowed-values
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY      
+            - name: X-Target 
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdrs(host),lower]"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are res.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow empty value in response.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-not-allowed-values
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value:
+    expectedError: 'IngressController.operator.openshift.io "default-not-allowed-values" is invalid: [spec.httpHeaders.actions.response[0].action.set.value: Required value, <nil>: Invalid value: "null": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation]'
+  - name: Should not allow empty value in request.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-not-allowed-values
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            request:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value:
+    expectedError: 'IngressController.operator.openshift.io "default-not-allowed-values" is invalid: [spec.httpHeaders.actions.request[0].action.set.value: Required value, <nil>: Invalid value: "null": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation]'
+  - name: Should not allow to set dynamic response header values with not allowed converters.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-not-allowed-values
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY      
+            - name: X-Source 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der,bogus]"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are res.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set dynamic request header values containing sample fetcher res.hdr.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-not-allowed-values
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            request:    
+            - name: X-Target 
+              action:
+                type: Set
+                set:
+                  value: "%[res.hdr(X-Value),lower]"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are req.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set dynamic response headers value containing sample fetcher req.hdr.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-not-allowed-values
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:
+            response:    
+            - name: X-Source 
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(host),lower]"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are res.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set dynamic request header values with not allowed converters.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-not-allowed-values
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:          
+            request:
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der,hello]"
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are req.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set dynamic request header values with not allowed sample fetchers.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata:
+        name: default-not-allowed-values
+        namespace: openshift-ingress-operator
+      spec:
+        httpHeaders:
+          actions:          
+            request:
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der1234,base64]"
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are req.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should be required to specify the set field when the discriminant type is Set.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+    expectedError: "set is required when type is Set, and forbidden otherwise"
+  - name: Should be able to add set field only when discriminant type is Set.
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      metadata: 
+        name: default-not-allowed-values
+        namespace: openshift-ingress-operator      
+      spec:
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                set:
+                  value: DENY
+    expectedError: 'IngressController.operator.openshift.io "default-not-allowed-values" is invalid: [spec.httpHeaders.actions.response[0].action.type: Required value, <nil>: Invalid value: "null": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation]'

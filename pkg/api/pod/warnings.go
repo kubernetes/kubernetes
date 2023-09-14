@@ -112,6 +112,11 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 				msg,
 			))
 		}
+
+		// warn if labelSelector is empty which is no-match.
+		if t.LabelSelector == nil {
+			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Child("spec", "topologySpreadConstraints").Index(i).Child("labelSelector")))
+		}
 	}
 
 	// use of deprecated annotations
@@ -155,6 +160,12 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		if v.Ephemeral != nil && v.Ephemeral.VolumeClaimTemplate != nil {
 			warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(fieldPath.Child("spec", "volumes").Index(i).Child("ephemeral").Child("volumeClaimTemplate").Child("spec"), v.Ephemeral.VolumeClaimTemplate.Spec)...)
 		}
+		if v.CephFS != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.28, non-functional in v1.31+", fieldPath.Child("spec", "volumes").Index(i).Child("cephfs")))
+		}
+		if v.RBD != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.28, non-functional in v1.31+", fieldPath.Child("spec", "volumes").Index(i).Child("rbd")))
+		}
 	}
 
 	// duplicate hostAliases (#91670, #58477)
@@ -184,18 +195,6 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 	for i, item := range podSpec.ImagePullSecrets {
 		if len(item.Name) == 0 {
 			warnings = append(warnings, fmt.Sprintf("%s: invalid empty name %q", fieldPath.Child("spec", "imagePullSecrets").Index(i).Child("name"), item.Name))
-		}
-	}
-
-	// duplicate volume names (#78266, #58477)
-	if len(podSpec.Volumes) > 1 {
-		items := sets.NewString()
-		for i, item := range podSpec.Volumes {
-			if items.Has(item.Name) {
-				warnings = append(warnings, fmt.Sprintf("%s: duplicate name %q", fieldPath.Child("spec", "volumes").Index(i).Child("name"), item.Name))
-			} else {
-				items.Insert(item.Name)
-			}
 		}
 	}
 
@@ -241,7 +240,25 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 			items := sets.NewString()
 			for i, item := range c.Env {
 				if items.Has(item.Name) {
-					warnings = append(warnings, fmt.Sprintf("%s: duplicate name %q", p.Child("env").Index(i).Child("name"), item.Name))
+					// a previous value exists, but it might be OK
+					bad := false
+					ref := fmt.Sprintf("$(%s)", item.Name) // what does a ref to this name look like
+					// if we are replacing it with a valueFrom, warn
+					if item.ValueFrom != nil {
+						bad = true
+					}
+					// if this is X="$(X)", warn
+					if item.Value == ref {
+						bad = true
+					}
+					// if the new value does not contain a reference to the old
+					// value (e.g. X="abc"; X="$(X)123"), warn
+					if !strings.Contains(item.Value, ref) {
+						bad = true
+					}
+					if bad {
+						warnings = append(warnings, fmt.Sprintf("%s: hides previous definition of %q", p.Child("env").Index(i), item.Name))
+					}
 				} else {
 					items.Insert(item.Name)
 				}
@@ -250,9 +267,78 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		return true
 	})
 
+	type portBlock struct {
+		field *field.Path
+		port  api.ContainerPort
+	}
+
+	// Accumulate ports across all containers
+	allPorts := map[string][]portBlock{}
+	pods.VisitContainersWithPath(podSpec, fieldPath.Child("spec"), func(c *api.Container, fldPath *field.Path) bool {
+		for i, port := range c.Ports {
+			if port.HostIP != "" && port.HostPort == 0 {
+				warnings = append(warnings, fmt.Sprintf("%s: hostIP set without hostPort: %+v",
+					fldPath.Child("ports").Index(i), port))
+			}
+			k := fmt.Sprintf("%d/%s", port.ContainerPort, port.Protocol)
+			if others, found := allPorts[k]; found {
+				// Someone else has this protcol+port, but it still might not be a conflict.
+				for _, other := range others {
+					if port.HostIP == other.port.HostIP && port.HostPort == other.port.HostPort {
+						// Exactly-equal is obvious. Validation should already filter for this except when these are unspecified.
+						warnings = append(warnings, fmt.Sprintf("%s: duplicate port definition with %s", fldPath.Child("ports").Index(i), other.field))
+					} else if port.HostPort == 0 || other.port.HostPort == 0 {
+						// HostPort = 0 is redundant with any other value, which is odd but not really dangerous.  HostIP doesn't matter here.
+						warnings = append(warnings, fmt.Sprintf("%s: overlapping port definition with %s", fldPath.Child("ports").Index(i), other.field))
+					} else if a, b := port.HostIP == "", other.port.HostIP == ""; port.HostPort == other.port.HostPort && ((a || b) && !(a && b)) {
+						// If the HostPorts are the same and either HostIP is not specified while the other is not, the behavior is undefined.
+						warnings = append(warnings, fmt.Sprintf("%s: dangerously ambiguous port definition with %s", fldPath.Child("ports").Index(i), other.field))
+					}
+				}
+				allPorts[k] = append(allPorts[k], portBlock{field: fldPath.Child("ports").Index(i), port: port})
+			} else {
+				allPorts[k] = []portBlock{{field: fldPath.Child("ports").Index(i), port: port}}
+			}
+		}
+		return true
+	})
+
 	// warn if the terminationGracePeriodSeconds is negative.
 	if podSpec.TerminationGracePeriodSeconds != nil && *podSpec.TerminationGracePeriodSeconds < 0 {
 		warnings = append(warnings, fmt.Sprintf("%s: must be >= 0; negative values are invalid and will be treated as 1", fieldPath.Child("spec", "terminationGracePeriodSeconds")))
+	}
+
+	if podSpec.Affinity != nil {
+		if affinity := podSpec.Affinity.PodAffinity; affinity != nil {
+			warnings = append(warnings, warningsForPodAffinityTerms(affinity.RequiredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAffinity", "requiredDuringSchedulingIgnoredDuringExecution"))...)
+			warnings = append(warnings, warningsForWeightedPodAffinityTerms(affinity.PreferredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAffinity", "preferredDuringSchedulingIgnoredDuringExecution"))...)
+		}
+		if affinity := podSpec.Affinity.PodAntiAffinity; affinity != nil {
+			warnings = append(warnings, warningsForPodAffinityTerms(affinity.RequiredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAntiAffinity", "requiredDuringSchedulingIgnoredDuringExecution"))...)
+			warnings = append(warnings, warningsForWeightedPodAffinityTerms(affinity.PreferredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAntiAffinity", "preferredDuringSchedulingIgnoredDuringExecution"))...)
+		}
+	}
+
+	return warnings
+}
+
+func warningsForPodAffinityTerms(terms []api.PodAffinityTerm, fieldPath *field.Path) []string {
+	var warnings []string
+	for i, t := range terms {
+		if t.LabelSelector == nil {
+			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Index(i).Child("labelSelector")))
+		}
+	}
+	return warnings
+}
+
+func warningsForWeightedPodAffinityTerms(terms []api.WeightedPodAffinityTerm, fieldPath *field.Path) []string {
+	var warnings []string
+	for i, t := range terms {
+		// warn if labelSelector is empty which is no-match.
+		if t.PodAffinityTerm.LabelSelector == nil {
+			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Index(i).Child("podAffinityTerm", "labelSelector")))
+		}
 	}
 	return warnings
 }

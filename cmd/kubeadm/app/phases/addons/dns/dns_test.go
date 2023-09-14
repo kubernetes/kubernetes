@@ -17,7 +17,9 @@ limitations under the License.
 package dns
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -25,11 +27,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
-
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+
+	"github.com/lithammer/dedent"
 )
 
 func TestCompileManifests(t *testing.T) {
@@ -547,6 +552,617 @@ func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion strin
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating deployment: %v", err)
+	}
+	return client
+}
+
+func TestDeployedDNSReplicas(t *testing.T) {
+	tests := []struct {
+		name           string
+		deploymentSize int
+		want           int32
+		wantErr        bool
+	}{
+		{
+			name:           "one coredns addon deployment",
+			deploymentSize: 1,
+			want:           2,
+			wantErr:        false,
+		},
+		{
+			name:           "no coredns addon deployment",
+			deploymentSize: 0,
+			want:           5,
+			wantErr:        false,
+		},
+		{
+			name:           "multiple coredns addon deployments",
+			deploymentSize: 3,
+			want:           5,
+			wantErr:        true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newMockClientForTest(t, 2, tt.deploymentSize)
+			got, err := deployedDNSReplicas(client, 5)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("deployedDNSReplicas() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if *got != tt.want {
+				t.Errorf("deployedDNSReplicas() = %v, want %v", *got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCoreDNSAddon(t *testing.T) {
+	type args struct {
+		cfg           *kubeadmapi.ClusterConfiguration
+		client        clientset.Interface
+		printManifest bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantOut string
+		wantErr bool
+	}{
+		{
+			name: "cfg is empty",
+			args: args{
+				cfg:           &kubeadmapi.ClusterConfiguration{},
+				client:        newMockClientForTest(t, 2, 1),
+				printManifest: false,
+			},
+			wantOut: "",
+			wantErr: true,
+		},
+		{
+			name: "cfg is valid and not print Manifest",
+			args: args{
+				cfg: &kubeadmapi.ClusterConfiguration{
+					DNS: kubeadmapi.DNS{
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageRepository: "daocloud.io",
+						},
+					},
+					Networking: kubeadmapi.Networking{
+						ServiceSubnet: "10.0.0.0/16",
+					},
+				},
+				client:        newMockClientForTest(t, 2, 1),
+				printManifest: false,
+			},
+			wantOut: "[addons] Applied essential addon: CoreDNS\n",
+			wantErr: false,
+		},
+		{
+			name: "cfg is valid and print Manifest",
+			args: args{
+				cfg: &kubeadmapi.ClusterConfiguration{
+					DNS: kubeadmapi.DNS{
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageRepository: "daocloud.io",
+						},
+					},
+					Networking: kubeadmapi.Networking{
+						ServiceSubnet: "10.0.0.0/16",
+					},
+				},
+				client:        newMockClientForTest(t, 2, 1),
+				printManifest: true,
+			},
+			wantOut: dedent.Dedent(`---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coredns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+    spec:
+      priorityClassName: system-cluster-critical
+      serviceAccountName: coredns
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: k8s-app
+                  operator: In
+                  values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: coredns
+        image: daocloud.io/coredns:v1.10.1
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        args: [ "-conf", "/etc/coredns/Corefile" ]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/coredns
+          readOnly: true
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        - containerPort: 9153
+          name: metrics
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8181
+            scheme: HTTP
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            drop:
+            - all
+          readOnlyRootFilesystem: true
+      dnsPolicy: Default
+      volumes:
+        - name: config-volume
+          configMap:
+            name: coredns
+            items:
+            - key: Corefile
+              path: Corefile
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        kubernetes  in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+           max_concurrent 1000
+        }
+        cache 30
+        loop
+        reload
+        loadbalance
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "CoreDNS"
+  name: kube-dns
+  namespace: kube-system
+  annotations:
+    prometheus.io/port: "9153"
+    prometheus.io/scrape: "true"
+  # Without this resourceVersion value, an update of the Service between versions will yield:
+  #   Service "kube-dns" is invalid: metadata.resourceVersion: Invalid value: "": must be specified for an update
+  resourceVersion: "0"
+spec:
+  clusterIP: 10.0.0.10
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+    targetPort: 53
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+    targetPort: 53
+  - name: metrics
+    port: 9153
+    protocol: TCP
+    targetPort: 9153
+  selector:
+    k8s-app: kube-dns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:coredns
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - services
+  - pods
+  - namespaces
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:coredns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:coredns
+subjects:
+- kind: ServiceAccount
+  name: coredns
+  namespace: kube-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: coredns
+  namespace: kube-system
+`),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &bytes.Buffer{}
+			var replicas int32
+			replicas = 3
+			if err := coreDNSAddon(tt.args.cfg, tt.args.client, &replicas, out, tt.args.printManifest); (err != nil) != tt.wantErr {
+				t.Errorf("coreDNSAddon() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotOut := out.String(); gotOut != tt.wantOut {
+				t.Errorf("Actual output of coreDNSAddon() does not match expected.\nActual:  %v\nExpected: %v\n", gotOut, tt.wantOut)
+			}
+		})
+	}
+}
+
+func TestEnsureDNSAddon(t *testing.T) {
+	type args struct {
+		cfg           *kubeadmapi.ClusterConfiguration
+		client        clientset.Interface
+		printManifest bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantOut string
+		wantErr bool
+	}{
+		{
+			name: "not print Manifest",
+			args: args{
+				cfg: &kubeadmapi.ClusterConfiguration{
+					DNS: kubeadmapi.DNS{
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageRepository: "daocloud.io",
+						},
+					},
+					Networking: kubeadmapi.Networking{
+						ServiceSubnet: "10.0.0.0/16",
+					},
+				},
+				client:        newMockClientForTest(t, 0, 1),
+				printManifest: false,
+			},
+			wantOut: "[addons] Applied essential addon: CoreDNS\n",
+		},
+		{
+			name: "not print Manifest",
+			args: args{
+				cfg: &kubeadmapi.ClusterConfiguration{
+					DNS: kubeadmapi.DNS{
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageRepository: "daocloud.io",
+						},
+					},
+					Networking: kubeadmapi.Networking{
+						ServiceSubnet: "10.0.0.0/16",
+					},
+				},
+				client:        newMockClientForTest(t, 0, 1),
+				printManifest: true,
+			},
+			wantOut: dedent.Dedent(`---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coredns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+    spec:
+      priorityClassName: system-cluster-critical
+      serviceAccountName: coredns
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: k8s-app
+                  operator: In
+                  values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: coredns
+        image: daocloud.io/coredns:v1.10.1
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        args: [ "-conf", "/etc/coredns/Corefile" ]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/coredns
+          readOnly: true
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        - containerPort: 9153
+          name: metrics
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8181
+            scheme: HTTP
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            drop:
+            - all
+          readOnlyRootFilesystem: true
+      dnsPolicy: Default
+      volumes:
+        - name: config-volume
+          configMap:
+            name: coredns
+            items:
+            - key: Corefile
+              path: Corefile
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        kubernetes  in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+           max_concurrent 1000
+        }
+        cache 30
+        loop
+        reload
+        loadbalance
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "CoreDNS"
+  name: kube-dns
+  namespace: kube-system
+  annotations:
+    prometheus.io/port: "9153"
+    prometheus.io/scrape: "true"
+  # Without this resourceVersion value, an update of the Service between versions will yield:
+  #   Service "kube-dns" is invalid: metadata.resourceVersion: Invalid value: "": must be specified for an update
+  resourceVersion: "0"
+spec:
+  clusterIP: 10.0.0.10
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+    targetPort: 53
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+    targetPort: 53
+  - name: metrics
+    port: 9153
+    protocol: TCP
+    targetPort: 9153
+  selector:
+    k8s-app: kube-dns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:coredns
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - services
+  - pods
+  - namespaces
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:coredns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:coredns
+subjects:
+- kind: ServiceAccount
+  name: coredns
+  namespace: kube-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: coredns
+  namespace: kube-system
+`),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &bytes.Buffer{}
+			if err := EnsureDNSAddon(tt.args.cfg, tt.args.client, out, tt.args.printManifest); (err != nil) != tt.wantErr {
+				t.Errorf("EnsureDNSAddon() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotOut := out.String(); gotOut != tt.wantOut {
+				t.Errorf("Actual output of EnsureDNSAddon() does not match expected.\nActual:  %v\nExpected: %v\n", gotOut, tt.wantOut)
+			}
+		})
+	}
+}
+
+// replicas is replica of each DNS deployment
+// deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
+func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int) *clientsetfake.Clientset {
+	client := clientsetfake.NewSimpleClientset()
+	for i := 0; i < deploymentSize; i++ {
+		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("coredns-%d", i),
+				Namespace: metav1.NamespaceSystem,
+				Labels: map[string]string{
+					"k8s-app": "kube-dns",
+				},
+			},
+			Spec: apps.DeploymentSpec{
+				Replicas: &replicas,
+				Template: v1.PodTemplateSpec{},
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("error creating deployment: %v", err)
+		}
 	}
 	return client
 }

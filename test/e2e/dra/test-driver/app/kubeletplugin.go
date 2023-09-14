@@ -24,9 +24,12 @@ import (
 	"path/filepath"
 	"sync"
 
+	"google.golang.org/grpc"
+
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
+	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
+	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 )
 
 type ExamplePlugin struct {
@@ -38,8 +41,25 @@ type ExamplePlugin struct {
 	driverName string
 	nodeName   string
 
-	mutex    sync.Mutex
-	prepared map[ClaimID]bool
+	mutex     sync.Mutex
+	prepared  map[ClaimID]bool
+	gRPCCalls []GRPCCall
+
+	block bool
+}
+
+type GRPCCall struct {
+	// FullMethod is the fully qualified, e.g. /package.service/method.
+	FullMethod string
+
+	// Request contains the parameters of the call.
+	Request interface{}
+
+	// Response contains the reply of the plugin. It is nil for calls that are in progress.
+	Response interface{}
+
+	// Err contains the error return value of the plugin. It is nil for calls that are in progress or succeeded.
+	Err error
 }
 
 // ClaimID contains both claim name and UID to simplify debugging. The
@@ -50,7 +70,7 @@ type ClaimID struct {
 	UID  string
 }
 
-var _ drapbv1.NodeServer = &ExamplePlugin{}
+var _ drapbv1alpha2.NodeServer = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
 func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
@@ -94,6 +114,7 @@ func StartPlugin(logger klog.Logger, cdiDir, driverName string, nodeName string,
 	opts = append(opts,
 		kubeletplugin.Logger(logger),
 		kubeletplugin.DriverName(driverName),
+		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 	)
 	d, err := kubeletplugin.Start(ex, opts...)
 	if err != nil {
@@ -117,12 +138,25 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 	return status.PluginRegistered
 }
 
+// Block sets a flag to block Node[Un]PrepareResources
+// to emulate time consuming or stuck calls
+func (ex *ExamplePlugin) Block() {
+	ex.block = true
+}
+
 // NodePrepareResource ensures that the CDI file for the claim exists. It uses
 // a deterministic name to simplify NodeUnprepareResource (no need to remember
 // or discover the name) and idempotency (when called again, the file simply
 // gets written again).
-func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.NodePrepareResourceRequest) (*drapbv1.NodePrepareResourceResponse, error) {
+func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1alpha2.NodePrepareResourceRequest) (*drapbv1alpha2.NodePrepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
+
+	// Block to emulate plugin stuckness or slowness.
+	// By default the call will not be blocked as ex.block = false.
+	if ex.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 
 	// Determine environment variables.
 	var p parameters
@@ -168,7 +202,7 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	}
 
 	dev := vendor + "/" + class + "=" + deviceName
-	resp := &drapbv1.NodePrepareResourceResponse{CdiDevices: []string{dev}}
+	resp := &drapbv1alpha2.NodePrepareResourceResponse{CdiDevices: []string{dev}}
 
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
@@ -178,11 +212,42 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	return resp, nil
 }
 
+func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1alpha3.NodePrepareResourcesRequest) (*drapbv1alpha3.NodePrepareResourcesResponse, error) {
+	resp := &drapbv1alpha3.NodePrepareResourcesResponse{
+		Claims: make(map[string]*drapbv1alpha3.NodePrepareResourceResponse),
+	}
+	for _, claimReq := range req.Claims {
+		claimResp, err := ex.NodePrepareResource(ctx, &drapbv1alpha2.NodePrepareResourceRequest{
+			Namespace:      claimReq.Namespace,
+			ClaimName:      claimReq.Name,
+			ClaimUid:       claimReq.Uid,
+			ResourceHandle: claimReq.ResourceHandle,
+		})
+		if err != nil {
+			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodePrepareResourceResponse{
+				Error: err.Error(),
+			}
+		} else {
+			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodePrepareResourceResponse{
+				CDIDevices: claimResp.CdiDevices,
+			}
+		}
+	}
+	return resp, nil
+}
+
 // NodeUnprepareResource removes the CDI file created by
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
-func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1.NodeUnprepareResourceRequest) (*drapbv1.NodeUnprepareResourceResponse, error) {
+func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1alpha2.NodeUnprepareResourceRequest) (*drapbv1alpha2.NodeUnprepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
+
+	// Block to emulate plugin stuckness or slowness.
+	// By default the call will not be blocked as ex.block = false.
+	if ex.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 
 	filePath := ex.getJSONFilePath(req.ClaimUid)
 	if err := ex.fileOps.Remove(filePath); err != nil {
@@ -194,7 +259,29 @@ func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1
 	defer ex.mutex.Unlock()
 	delete(ex.prepared, ClaimID{Name: req.ClaimName, UID: req.ClaimUid})
 
-	return &drapbv1.NodeUnprepareResourceResponse{}, nil
+	return &drapbv1alpha2.NodeUnprepareResourceResponse{}, nil
+}
+
+func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
+	resp := &drapbv1alpha3.NodeUnprepareResourcesResponse{
+		Claims: make(map[string]*drapbv1alpha3.NodeUnprepareResourceResponse),
+	}
+	for _, claimReq := range req.Claims {
+		_, err := ex.NodeUnprepareResource(ctx, &drapbv1alpha2.NodeUnprepareResourceRequest{
+			Namespace:      claimReq.Namespace,
+			ClaimName:      claimReq.Name,
+			ClaimUid:       claimReq.Uid,
+			ResourceHandle: claimReq.ResourceHandle,
+		})
+		if err != nil {
+			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodeUnprepareResourceResponse{
+				Error: err.Error(),
+			}
+		} else {
+			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodeUnprepareResourceResponse{}
+		}
+	}
+	return resp, nil
 }
 
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
@@ -205,4 +292,36 @@ func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
 		prepared = append(prepared, claimID)
 	}
 	return prepared
+}
+
+func (ex *ExamplePlugin) recordGRPCCall(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	call := GRPCCall{
+		FullMethod: info.FullMethod,
+		Request:    req,
+	}
+	ex.mutex.Lock()
+	ex.gRPCCalls = append(ex.gRPCCalls, call)
+	index := len(ex.gRPCCalls) - 1
+	ex.mutex.Unlock()
+
+	// We don't hold the mutex here to allow concurrent calls.
+	call.Response, call.Err = handler(ctx, req)
+
+	ex.mutex.Lock()
+	ex.gRPCCalls[index] = call
+	ex.mutex.Unlock()
+
+	return call.Response, call.Err
+}
+
+func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+
+	// We must return a new slice, otherwise adding new calls would become
+	// visible to the caller. We also need to copy the entries because
+	// they get mutated by recordGRPCCall.
+	calls := make([]GRPCCall, 0, len(ex.gRPCCalls))
+	calls = append(calls, ex.gRPCCalls...)
+	return calls
 }

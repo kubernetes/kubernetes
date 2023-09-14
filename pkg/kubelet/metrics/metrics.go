@@ -613,7 +613,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedHostProcessContainersTotalKey,
-			Help:           "Cumulative number of hostprocess containers started. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			Help:           "Cumulative number of hostprocess containers started. This metric will only be collected on Windows.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type"},
@@ -623,7 +623,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedHostProcessContainersErrorsTotalKey,
-			Help:           "Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			Help:           "Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type", "code"},
@@ -776,19 +776,14 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(OrphanedRuntimePodTotal)
 		legacyregistry.MustRegister(RestartedPodTotal)
 		legacyregistry.MustRegister(ManagedEphemeralContainers)
-		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
-			legacyregistry.MustRegister(PodResourcesEndpointRequestsTotalCount)
-
-			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGetAllocatable) {
-				legacyregistry.MustRegister(PodResourcesEndpointRequestsListCount)
-				legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
-				legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
-				legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
-			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
-				legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
-				legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
-			}
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsTotalCount)
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsListCount)
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
+		legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
+		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
+			legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
+			legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
 		}
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)

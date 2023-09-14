@@ -27,6 +27,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
+	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	"k8s.io/component-base/cli"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -45,7 +46,7 @@ func main() {
 	}
 
 	fss := cliflag.NamedFlagSets{}
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers(), fss, wait.NeverStop)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers(), names.CCMControllerAliases(), fss, wait.NeverStop)
 	code := cli.Run(command)
 	os.Exit(code)
 }
@@ -55,21 +56,21 @@ func main() {
 // separately.
 func controllerInitializers() map[string]app.ControllerInitFuncConstructor {
 	controllerInitializers := app.DefaultInitFuncConstructors
-	if constructor, ok := controllerInitializers["cloud-node"]; ok {
+	if constructor, ok := controllerInitializers[names.CloudNodeController]; ok {
 		constructor.InitContext.ClientName = "mycloud-external-cloud-node-controller"
-		controllerInitializers["cloud-node"] = constructor
+		controllerInitializers[names.CloudNodeController] = constructor
 	}
-	if constructor, ok := controllerInitializers["cloud-node-lifecycle"]; ok {
+	if constructor, ok := controllerInitializers[names.CloudNodeLifecycleController]; ok {
 		constructor.InitContext.ClientName = "mycloud-external-cloud-node-lifecycle-controller"
-		controllerInitializers["cloud-node-lifecycle"] = constructor
+		controllerInitializers[names.CloudNodeLifecycleController] = constructor
 	}
-	if constructor, ok := controllerInitializers["service"]; ok {
+	if constructor, ok := controllerInitializers[names.ServiceLBController]; ok {
 		constructor.InitContext.ClientName = "mycloud-external-service-controller"
-		controllerInitializers["service"] = constructor
+		controllerInitializers[names.ServiceLBController] = constructor
 	}
-	if constructor, ok := controllerInitializers["route"]; ok {
+	if constructor, ok := controllerInitializers[names.NodeRouteController]; ok {
 		constructor.InitContext.ClientName = "mycloud-external-route-controller"
-		controllerInitializers["route"] = constructor
+		controllerInitializers[names.NodeRouteController] = constructor
 	}
 	return controllerInitializers
 }

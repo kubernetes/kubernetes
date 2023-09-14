@@ -57,7 +57,6 @@ type DNSSpec struct {
 	// infrastructure provider for DNS.
 	// When omitted, this means the user has no opinion and the platform is left
 	// to choose reasonable defaults. These defaults are subject to change over time.
-	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
 	// +optional
 	Platform DNSPlatformSpec `json:"platform,omitempty"`
 }

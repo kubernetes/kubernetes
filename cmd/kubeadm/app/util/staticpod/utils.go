@@ -29,12 +29,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -93,7 +93,7 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotati
 func ComponentResources(cpu string) v1.ResourceRequirements {
 	return v1.ResourceRequirements{
 		Requests: v1.ResourceList{
-			v1.ResourceName(v1.ResourceCPU): resource.MustParse(cpu),
+			v1.ResourceCPU: resource.MustParse(cpu),
 		},
 	}
 }
@@ -398,11 +398,5 @@ func GetUsersAndGroups() (*users.UsersAndGroups, error) {
 // Copied from k8s.io/kubernetes/pkg/util/hash/hash.go#DeepHashObject
 func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
-	printer := spew.ConfigState{
-		Indent:         " ",
-		SortKeys:       true,
-		DisableMethods: true,
-		SpewKeys:       true,
-	}
-	printer.Fprintf(hasher, "%#v", objectToWrite)
+	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
 }

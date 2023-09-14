@@ -106,16 +106,6 @@ var (
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
-	// SchedulerGoroutines isn't called in some parts where goroutines start.
-	// Goroutines metric replaces SchedulerGoroutines metric. Goroutine metric tracks all goroutines.
-	SchedulerGoroutines = metrics.NewGaugeVec(
-		&metrics.GaugeOpts{
-			Subsystem:         SchedulerSubsystem,
-			DeprecatedVersion: "1.26.0",
-			Name:              "scheduler_goroutines",
-			Help:              "Number of running goroutines split by the work they do such as binding. This metric is replaced by the \"goroutines\" metric.",
-			StabilityLevel:    metrics.ALPHA,
-		}, []string{"work"})
 	Goroutines = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -220,7 +210,6 @@ var (
 		FrameworkExtensionPointDuration,
 		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
-		SchedulerGoroutines,
 		Goroutines,
 		PermitWaitDuration,
 		CacheSize,

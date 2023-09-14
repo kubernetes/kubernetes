@@ -23,12 +23,12 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/apis/audit"
 
 	// import to call webhook's init() function to register audit.Policy to schema
 	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -113,7 +113,7 @@ func TestParser(t *testing.T) {
 
 	assert.Len(t, policy.Rules, 3) // Sanity check.
 	if !reflect.DeepEqual(policy, expectedPolicy) {
-		t.Errorf("Unexpected policy! Diff:\n%s", diff.ObjectDiff(policy, expectedPolicy))
+		t.Errorf("Unexpected policy! Diff:\n%s", cmp.Diff(policy, expectedPolicy))
 	}
 }
 

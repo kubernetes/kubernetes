@@ -23,16 +23,17 @@
 "containers":[
     {
     "name": "cloud-controller-manager",
-    "image": "gcr.io/k8s-staging-cloud-provider-gcp/cloud-controller-manager:v1.25.2-alpha_ae91c1fc0c443c464a4c878ffa2a4544483c6d1f",
+    "image": "gcr.io/k8s-staging-cloud-provider-gcp/cloud-controller-manager:v26.2.4",
     "resources": {
       "requests": {
         "cpu": "{{cpurequest}}"
       }
     },
-    "command": ["/cloud-controller-manager"],
     "args": [
       "--log-file=/var/log/cloud-controller-manager.log",
-      "--logtostderr=false",
+      "--also-stdout=false",
+      "--redirect-stderr=true",
+      "/cloud-controller-manager",
       {{params}}
     ],
     {{container_env}}

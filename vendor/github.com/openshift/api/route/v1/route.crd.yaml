@@ -101,6 +101,130 @@ spec:
                   maxLength: 253
                   pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
                   type: string
+                httpHeaders:
+                  description: httpHeaders defines policy for HTTP headers.
+                  properties:
+                    actions:
+                      description: 'actions specifies options for modifying headers and their values. Note that this option only applies to cleartext HTTP connections and to secure HTTP connections for which the ingress controller terminates encryption (that is, edge-terminated or reencrypt connections).  Headers cannot be modified for TLS passthrough connections. Setting the HSTS (`Strict-Transport-Security`) header is not supported via actions. `Strict-Transport-Security` may only be configured using the "haproxy.router.openshift.io/hsts_header" route annotation, and only in accordance with the policy specified in Ingress.Spec.RequiredHSTSPolicies. In case of HTTP request headers, the actions specified in spec.httpHeaders.actions on the Route will be executed after the actions specified in the IngressController''s spec.httpHeaders.actions field. In case of HTTP response headers, the actions specified in spec.httpHeaders.actions on the IngressController will be executed after the actions specified in the Route''s spec.httpHeaders.actions field. The headers set via this API will not appear in access logs. Any actions defined here are applied after any actions related to the following other fields: cache-control, spec.clientTLS, spec.httpHeaders.forwardedHeaderPolicy, spec.httpHeaders.uniqueId, and spec.httpHeaders.headerNameCaseAdjustments. The following header names are reserved and may not be modified via this API: Strict-Transport-Security, Proxy, Cookie, Set-Cookie. Note that the total size of all net added headers *after* interpolating dynamic values must not exceed the value of spec.tuningOptions.headerBufferMaxRewriteBytes on the IngressController. Please refer to the documentation for that API field for more details.'
+                      properties:
+                        request:
+                          description: 'request is a list of HTTP request headers to modify. Currently, actions may define to either `Set` or `Delete` headers values. Actions defined here will modify the request headers of all requests made through a route. These actions are applied to a specific Route defined within a cluster i.e. connections made through a route. Currently, actions may define to either `Set` or `Delete` headers values. Route actions will be executed after IngressController actions for request headers. Actions are applied in sequence as defined in this list. A maximum of 20 request header actions may be configured. You can use this field to specify HTTP request headers that should be set or deleted when forwarding connections from the client to your application. Sample fetchers allowed are "req.hdr" and "ssl_c_der". Converters allowed are "lower" and "base64". Example header values: "%[req.hdr(X-target),lower]", "%{+Q}[ssl_c_der,base64]". Any request header configuration applied directly via a Route resource using this API will override header configuration for a header of the same name applied via spec.httpHeaders.actions on the IngressController or route annotation. Note: This field cannot be used if your route uses TLS passthrough.'
+                          items:
+                            description: RouteHTTPHeader specifies configuration for setting or deleting an HTTP header.
+                            properties:
+                              action:
+                                description: action specifies actions to perform on headers, such as setting or deleting headers.
+                                properties:
+                                  set:
+                                    description: 'set defines the HTTP header that should be set: added if it doesn''t exist or replaced if it does. This field is required when type is Set and forbidden otherwise.'
+                                    properties:
+                                      value:
+                                        description: value specifies a header value. Dynamic values can be added. The value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. The value of this field must be no more than 16384 characters in length. Note that the total size of all net added headers *after* interpolating dynamic values must not exceed the value of spec.tuningOptions.headerBufferMaxRewriteBytes on the IngressController.
+                                        maxLength: 16384
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                      - value
+                                    type: object
+                                  type:
+                                    description: type defines the type of the action to be applied on the header. Possible values are Set or Delete. Set allows you to set HTTP request and response headers. Delete allows you to delete HTTP request and response headers.
+                                    enum:
+                                      - Set
+                                      - Delete
+                                    type: string
+                                required:
+                                  - type
+                                type: object
+                                x-kubernetes-validations:
+                                  - message: set is required when type is Set, and forbidden otherwise
+                                    rule: 'has(self.type) && self.type == ''Set'' ?  has(self.set) : !has(self.set)'
+                              name:
+                                description: 'name specifies the name of a header on which to perform an action. Its value must be a valid HTTP header name as defined in RFC 2616 section 4.2. The name must consist only of alphanumeric and the following special characters, "-!#$%&''*+.^_`". The following header names are reserved and may not be modified via this API: Strict-Transport-Security, Proxy, Cookie, Set-Cookie. It must be no more than 255 characters in length. Header name must be unique.'
+                                maxLength: 255
+                                minLength: 1
+                                pattern: ^[-!#$%&'*+.0-9A-Z^_`a-z|~]+$
+                                type: string
+                                x-kubernetes-validations:
+                                  - message: strict-transport-security header may not be modified via header actions
+                                    rule: self.lowerAscii() != 'strict-transport-security'
+                                  - message: proxy header may not be modified via header actions
+                                    rule: self.lowerAscii() != 'proxy'
+                                  - message: cookie header may not be modified via header actions
+                                    rule: self.lowerAscii() != 'cookie'
+                                  - message: set-cookie header may not be modified via header actions
+                                    rule: self.lowerAscii() != 'set-cookie'
+                            required:
+                              - action
+                              - name
+                            type: object
+                          maxItems: 20
+                          type: array
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
+                          x-kubernetes-validations:
+                            - message: Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are req.hdr, ssl_c_der. Converters allowed are lower, base64.
+                              rule: self.all(key, key.action.type == "Delete" || (has(key.action.set) && key.action.set.value.matches('^(?:%(?:%|(?:\\{[-+]?[QXE](?:,[-+]?[QXE])*\\})?\\[(?:req\\.hdr\\([0-9A-Za-z-]+\\)|ssl_c_der)(?:,(?:lower|base64))*\\])|[^%[:cntrl:]])+$')))
+                        response:
+                          description: 'response is a list of HTTP response headers to modify. Currently, actions may define to either `Set` or `Delete` headers values. Actions defined here will modify the response headers of all requests made through a route. These actions are applied to a specific Route defined within a cluster i.e. connections made through a route. Route actions will be executed before IngressController actions for response headers. Actions are applied in sequence as defined in this list. A maximum of 20 response header actions may be configured. You can use this field to specify HTTP response headers that should be set or deleted when forwarding responses from your application to the client. Sample fetchers allowed are "res.hdr" and "ssl_c_der". Converters allowed are "lower" and "base64". Example header values: "%[res.hdr(X-target),lower]", "%{+Q}[ssl_c_der,base64]". Note: This field cannot be used if your route uses TLS passthrough.'
+                          items:
+                            description: RouteHTTPHeader specifies configuration for setting or deleting an HTTP header.
+                            properties:
+                              action:
+                                description: action specifies actions to perform on headers, such as setting or deleting headers.
+                                properties:
+                                  set:
+                                    description: 'set defines the HTTP header that should be set: added if it doesn''t exist or replaced if it does. This field is required when type is Set and forbidden otherwise.'
+                                    properties:
+                                      value:
+                                        description: value specifies a header value. Dynamic values can be added. The value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. The value of this field must be no more than 16384 characters in length. Note that the total size of all net added headers *after* interpolating dynamic values must not exceed the value of spec.tuningOptions.headerBufferMaxRewriteBytes on the IngressController.
+                                        maxLength: 16384
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                      - value
+                                    type: object
+                                  type:
+                                    description: type defines the type of the action to be applied on the header. Possible values are Set or Delete. Set allows you to set HTTP request and response headers. Delete allows you to delete HTTP request and response headers.
+                                    enum:
+                                      - Set
+                                      - Delete
+                                    type: string
+                                required:
+                                  - type
+                                type: object
+                                x-kubernetes-validations:
+                                  - message: set is required when type is Set, and forbidden otherwise
+                                    rule: 'has(self.type) && self.type == ''Set'' ?  has(self.set) : !has(self.set)'
+                              name:
+                                description: 'name specifies the name of a header on which to perform an action. Its value must be a valid HTTP header name as defined in RFC 2616 section 4.2. The name must consist only of alphanumeric and the following special characters, "-!#$%&''*+.^_`". The following header names are reserved and may not be modified via this API: Strict-Transport-Security, Proxy, Cookie, Set-Cookie. It must be no more than 255 characters in length. Header name must be unique.'
+                                maxLength: 255
+                                minLength: 1
+                                pattern: ^[-!#$%&'*+.0-9A-Z^_`a-z|~]+$
+                                type: string
+                                x-kubernetes-validations:
+                                  - message: strict-transport-security header may not be modified via header actions
+                                    rule: self.lowerAscii() != 'strict-transport-security'
+                                  - message: proxy header may not be modified via header actions
+                                    rule: self.lowerAscii() != 'proxy'
+                                  - message: cookie header may not be modified via header actions
+                                    rule: self.lowerAscii() != 'cookie'
+                                  - message: set-cookie header may not be modified via header actions
+                                    rule: self.lowerAscii() != 'set-cookie'
+                            required:
+                              - action
+                              - name
+                            type: object
+                          maxItems: 20
+                          type: array
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
+                          x-kubernetes-validations:
+                            - message: Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are res.hdr, ssl_c_der. Converters allowed are lower, base64.
+                              rule: self.all(key, key.action.type == "Delete" || (has(key.action.set) && key.action.set.value.matches('^(?:%(?:%|(?:\\{[-+]?[QXE](?:,[-+]?[QXE])*\\})?\\[(?:res\\.hdr\\([0-9A-Za-z-]+\\)|ssl_c_der)(?:,(?:lower|base64))*\\])|[^%[:cntrl:]])+$')))
+                      type: object
+                  type: object
                 path:
                   description: path that the router watches for, to route traffic for to the service. Optional
                   pattern: ^/
@@ -174,7 +298,7 @@ spec:
                       description: key provides key file contents
                       type: string
                     termination:
-                      description: "termination indicates termination type. \n * edge - TLS termination is done by the router and http is used to communicate with the backend (default) * passthrough - Traffic is sent straight to the destination without the router providing TLS termination * reencrypt - TLS termination is done by the router and https is used to communicate with the backend"
+                      description: "termination indicates termination type. \n * edge - TLS termination is done by the router and http is used to communicate with the backend (default) * passthrough - Traffic is sent straight to the destination without the router providing TLS termination * reencrypt - TLS termination is done by the router and https is used to communicate with the backend \n Note: passthrough termination is incompatible with httpHeader actions"
                       enum:
                         - edge
                         - reencrypt
@@ -222,6 +346,9 @@ spec:
               required:
                 - to
               type: object
+              x-kubernetes-validations:
+                - message: header actions are not permitted when tls termination is passthrough.
+                  rule: '!has(self.tls) || self.tls.termination != ''passthrough'' || !has(self.httpHeaders)'
             status:
               description: status is the current state of the route
               properties:

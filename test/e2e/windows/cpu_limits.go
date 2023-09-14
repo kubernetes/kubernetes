@@ -32,6 +32,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
@@ -59,7 +60,7 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 					p.Name,
 					metav1.GetOptions{})
 				framework.ExpectNoError(err, "Error retrieving pod")
-				framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
+				gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 				allPods = append(allPods, pod)
 			}
 			for _, p := range podsMilli {
@@ -68,7 +69,7 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 					p.Name,
 					metav1.GetOptions{})
 				framework.ExpectNoError(err, "Error retrieving pod")
-				framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
+				gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 				allPods = append(allPods, pod)
 			}
 			ginkgo.By("Ensuring cpu doesn't exceed limit by >5%")

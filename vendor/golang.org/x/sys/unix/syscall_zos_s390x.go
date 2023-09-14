@@ -212,8 +212,8 @@ func (cmsg *Cmsghdr) SetLen(length int) {
 //sys	sendmsg(s int, msg *Msghdr, flags int) (n int, err error) = SYS___SENDMSG_A
 //sys   mmap(addr uintptr, length uintptr, prot int, flag int, fd int, pos int64) (ret uintptr, err error) = SYS_MMAP
 //sys   munmap(addr uintptr, length uintptr) (err error) = SYS_MUNMAP
-//sys   ioctl(fd int, req uint, arg uintptr) (err error) = SYS_IOCTL
-//sys   ioctlPtr(fd int, req uint, arg unsafe.Pointer) (err error) = SYS_IOCTL
+//sys   ioctl(fd int, req int, arg uintptr) (err error) = SYS_IOCTL
+//sys   ioctlPtr(fd int, req int, arg unsafe.Pointer) (err error) = SYS_IOCTL
 
 //sys   Access(path string, mode uint32) (err error) = SYS___ACCESS_A
 //sys   Chdir(path string) (err error) = SYS___CHDIR_A

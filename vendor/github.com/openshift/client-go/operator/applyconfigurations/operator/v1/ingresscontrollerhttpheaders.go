@@ -12,6 +12,7 @@ type IngressControllerHTTPHeadersApplyConfiguration struct {
 	ForwardedHeaderPolicy     *v1.IngressControllerHTTPHeaderPolicy                        `json:"forwardedHeaderPolicy,omitempty"`
 	UniqueId                  *IngressControllerHTTPUniqueIdHeaderPolicyApplyConfiguration `json:"uniqueId,omitempty"`
 	HeaderNameCaseAdjustments []v1.IngressControllerHTTPHeaderNameCaseAdjustment           `json:"headerNameCaseAdjustments,omitempty"`
+	Actions                   *IngressControllerHTTPHeaderActionsApplyConfiguration        `json:"actions,omitempty"`
 }
 
 // IngressControllerHTTPHeadersApplyConfiguration constructs an declarative configuration of the IngressControllerHTTPHeaders type for use with
@@ -43,5 +44,13 @@ func (b *IngressControllerHTTPHeadersApplyConfiguration) WithHeaderNameCaseAdjus
 	for i := range values {
 		b.HeaderNameCaseAdjustments = append(b.HeaderNameCaseAdjustments, values[i])
 	}
+	return b
+}
+
+// WithActions sets the Actions field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Actions field is set to the value of the last call.
+func (b *IngressControllerHTTPHeadersApplyConfiguration) WithActions(value *IngressControllerHTTPHeaderActionsApplyConfiguration) *IngressControllerHTTPHeadersApplyConfiguration {
+	b.Actions = value
 	return b
 }

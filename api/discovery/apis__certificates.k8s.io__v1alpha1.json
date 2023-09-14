@@ -1,0 +1,24 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "certificates.k8s.io/v1alpha1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "ClusterTrustBundle",
+      "name": "clustertrustbundles",
+      "namespaced": false,
+      "singularName": "clustertrustbundle",
+      "storageVersionHash": "XGGGW2kGm+w=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    }
+  ]
+}

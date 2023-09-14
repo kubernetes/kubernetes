@@ -18,12 +18,13 @@ package cel
 
 import (
 	"fmt"
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
-	"sync"
 
 	"github.com/google/cel-go/cel"
 
+	"k8s.io/apimachinery/pkg/util/version"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
@@ -32,107 +33,11 @@ const (
 	OldObjectVarName                 = "oldObject"
 	ParamsVarName                    = "params"
 	RequestVarName                   = "request"
+	NamespaceVarName                 = "namespaceObject"
 	AuthorizerVarName                = "authorizer"
 	RequestResourceAuthorizerVarName = "authorizer.requestResource"
+	VariableVarName                  = "variables"
 )
-
-var (
-	initEnvsOnce sync.Once
-	initEnvs     envs
-	initEnvsErr  error
-)
-
-func getEnvs() (envs, error) {
-	initEnvsOnce.Do(func() {
-		requiredVarsEnv, err := buildRequiredVarsEnv()
-		if err != nil {
-			initEnvsErr = err
-			return
-		}
-
-		initEnvs, err = buildWithOptionalVarsEnvs(requiredVarsEnv)
-		if err != nil {
-			initEnvsErr = err
-			return
-		}
-	})
-	return initEnvs, initEnvsErr
-}
-
-// This is a similar code as in k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/compilation.go
-// If any changes are made here, consider to make the same changes there as well.
-func buildBaseEnv() (*cel.Env, error) {
-	var opts []cel.EnvOption
-	opts = append(opts, cel.HomogeneousAggregateLiterals())
-	// Validate function declarations once during base env initialization,
-	// so they don't need to be evaluated each time a CEL rule is compiled.
-	// This is a relatively expensive operation.
-	opts = append(opts, cel.EagerlyValidateDeclarations(true), cel.DefaultUTCTimeZone(true))
-	opts = append(opts, library.ExtensionLibs...)
-
-	return cel.NewEnv(opts...)
-}
-
-func buildRequiredVarsEnv() (*cel.Env, error) {
-	baseEnv, err := buildBaseEnv()
-	if err != nil {
-		return nil, err
-	}
-	var propDecls []cel.EnvOption
-	reg := apiservercel.NewRegistry(baseEnv)
-
-	requestType := BuildRequestType()
-	rt, err := apiservercel.NewRuleTypes(requestType.TypeName(), requestType, reg)
-	if err != nil {
-		return nil, err
-	}
-	if rt == nil {
-		return nil, nil
-	}
-	opts, err := rt.EnvOptions(baseEnv.TypeProvider())
-	if err != nil {
-		return nil, err
-	}
-	propDecls = append(propDecls, cel.Variable(ObjectVarName, cel.DynType))
-	propDecls = append(propDecls, cel.Variable(OldObjectVarName, cel.DynType))
-	propDecls = append(propDecls, cel.Variable(RequestVarName, requestType.CelType()))
-
-	opts = append(opts, propDecls...)
-	env, err := baseEnv.Extend(opts...)
-	if err != nil {
-		return nil, err
-	}
-	return env, nil
-}
-
-type envs map[OptionalVariableDeclarations]*cel.Env
-
-func buildEnvWithVars(baseVarsEnv *cel.Env, options OptionalVariableDeclarations) (*cel.Env, error) {
-	var opts []cel.EnvOption
-	if options.HasParams {
-		opts = append(opts, cel.Variable(ParamsVarName, cel.DynType))
-	}
-	if options.HasAuthorizer {
-		opts = append(opts, cel.Variable(AuthorizerVarName, library.AuthorizerType))
-		opts = append(opts, cel.Variable(RequestResourceAuthorizerVarName, library.ResourceCheckType))
-	}
-	return baseVarsEnv.Extend(opts...)
-}
-
-func buildWithOptionalVarsEnvs(requiredVarsEnv *cel.Env) (envs, error) {
-	envs := make(envs, 4) // since the number of variable combinations is small, pre-build a environment for each
-	for _, hasParams := range []bool{false, true} {
-		for _, hasAuthorizer := range []bool{false, true} {
-			opts := OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer}
-			env, err := buildEnvWithVars(requiredVarsEnv, opts)
-			if err != nil {
-				return nil, err
-			}
-			envs[opts] = env
-		}
-	}
-	return envs, nil
-}
 
 // BuildRequestType generates a DeclType for AdmissionRequest. This may be replaced with a utility that
 // converts the native type definition to apiservercel.DeclType once such a utility becomes available.
@@ -181,6 +86,56 @@ func BuildRequestType() *apiservercel.DeclType {
 	))
 }
 
+// BuildNamespaceType generates a DeclType for Namespace.
+// Certain nested fields in Namespace (e.g. managedFields, ownerReferences etc.) are omitted in the generated DeclType
+// by design.
+func BuildNamespaceType() *apiservercel.DeclType {
+	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
+		return apiservercel.NewDeclField(name, declType, required, nil, nil)
+	}
+	fields := func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField {
+		result := make(map[string]*apiservercel.DeclField, len(fields))
+		for _, f := range fields {
+			result[f.Name] = f
+		}
+		return result
+	}
+
+	specType := apiservercel.NewObjectType("kubernetes.NamespaceSpec", fields(
+		field("finalizers", apiservercel.NewListType(apiservercel.StringType, -1), true),
+	))
+	conditionType := apiservercel.NewObjectType("kubernetes.NamespaceCondition", fields(
+		field("status", apiservercel.StringType, true),
+		field("type", apiservercel.StringType, true),
+		field("lastTransitionTime", apiservercel.TimestampType, true),
+		field("message", apiservercel.StringType, true),
+		field("reason", apiservercel.StringType, true),
+	))
+	statusType := apiservercel.NewObjectType("kubernetes.NamespaceStatus", fields(
+		field("conditions", apiservercel.NewListType(conditionType, -1), true),
+		field("phase", apiservercel.StringType, true),
+	))
+	metadataType := apiservercel.NewObjectType("kubernetes.NamespaceMetadata", fields(
+		field("name", apiservercel.StringType, true),
+		field("generateName", apiservercel.StringType, true),
+		field("namespace", apiservercel.StringType, true),
+		field("labels", apiservercel.NewMapType(apiservercel.StringType, apiservercel.StringType, -1), true),
+		field("annotations", apiservercel.NewMapType(apiservercel.StringType, apiservercel.StringType, -1), true),
+		field("UID", apiservercel.StringType, true),
+		field("creationTimestamp", apiservercel.TimestampType, true),
+		field("deletionGracePeriodSeconds", apiservercel.IntType, true),
+		field("deletionTimestamp", apiservercel.TimestampType, true),
+		field("generation", apiservercel.IntType, true),
+		field("resourceVersion", apiservercel.StringType, true),
+		field("finalizers", apiservercel.NewListType(apiservercel.StringType, -1), true),
+	))
+	return apiservercel.NewObjectType("kubernetes.Namespace", fields(
+		field("metadata", metadataType, true),
+		field("spec", specType, true),
+		field("status", statusType, true),
+	))
+}
+
 // CompilationResult represents a compiled validations expression.
 type CompilationResult struct {
 	Program            cel.Program
@@ -188,45 +143,48 @@ type CompilationResult struct {
 	ExpressionAccessor ExpressionAccessor
 }
 
+// Compiler provides a CEL expression compiler configured with the desired admission related CEL variables and
+// environment mode.
+type Compiler interface {
+	CompileCELExpression(expressionAccessor ExpressionAccessor, options OptionalVariableDeclarations, mode environment.Type) CompilationResult
+}
+
+type compiler struct {
+	varEnvs variableDeclEnvs
+}
+
+func NewCompiler(env *environment.EnvSet) Compiler {
+	return &compiler{varEnvs: mustBuildEnvs(env)}
+}
+
+type variableDeclEnvs map[OptionalVariableDeclarations]*environment.EnvSet
+
 // CompileCELExpression returns a compiled CEL expression.
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func CompileCELExpression(expressionAccessor ExpressionAccessor, optionalVars OptionalVariableDeclarations, perCallLimit uint64) CompilationResult {
-	var env *cel.Env
-	envs, err := getEnvs()
-	if err != nil {
+func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, options OptionalVariableDeclarations, envType environment.Type) CompilationResult {
+	resultError := func(errorString string, errType apiservercel.ErrorType) CompilationResult {
 		return CompilationResult{
 			Error: &apiservercel.Error{
-				Type:   apiservercel.ErrorTypeInternal,
-				Detail: "compiler initialization failed: " + err.Error(),
-			},
-			ExpressionAccessor: expressionAccessor,
-		}
-	}
-	env, ok := envs[optionalVars]
-	if !ok {
-		return CompilationResult{
-			Error: &apiservercel.Error{
-				Type:   apiservercel.ErrorTypeInvalid,
-				Detail: fmt.Sprintf("compiler initialization failed: failed to load environment for %v", optionalVars),
+				Type:   errType,
+				Detail: errorString,
 			},
 			ExpressionAccessor: expressionAccessor,
 		}
 	}
 
+	env, err := c.varEnvs[options].Env(envType)
+	if err != nil {
+		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
+	}
+
 	ast, issues := env.Compile(expressionAccessor.GetExpression())
 	if issues != nil {
-		return CompilationResult{
-			Error: &apiservercel.Error{
-				Type:   apiservercel.ErrorTypeInvalid,
-				Detail: "compilation failed: " + issues.String(),
-			},
-			ExpressionAccessor: expressionAccessor,
-		}
+		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
 	}
 	found := false
 	returnTypes := expressionAccessor.ReturnTypes()
 	for _, returnType := range returnTypes {
-		if ast.OutputType() == returnType {
+		if ast.OutputType() == returnType || cel.AnyType == returnType {
 			found = true
 			break
 		}
@@ -239,43 +197,64 @@ func CompileCELExpression(expressionAccessor ExpressionAccessor, optionalVars Op
 			reason = fmt.Sprintf("must evaluate to one of %v", returnTypes)
 		}
 
-		return CompilationResult{
-			Error: &apiservercel.Error{
-				Type:   apiservercel.ErrorTypeInvalid,
-				Detail: reason,
-			},
-			ExpressionAccessor: expressionAccessor,
-		}
+		return resultError(reason, apiservercel.ErrorTypeInvalid)
 	}
 
 	_, err = cel.AstToCheckedExpr(ast)
 	if err != nil {
 		// should be impossible since env.Compile returned no issues
-		return CompilationResult{
-			Error: &apiservercel.Error{
-				Type:   apiservercel.ErrorTypeInternal,
-				Detail: "unexpected compilation error: " + err.Error(),
-			},
-			ExpressionAccessor: expressionAccessor,
-		}
+		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
 	prog, err := env.Program(ast,
-		cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost),
-		cel.OptimizeRegex(library.ExtensionLibRegexOptimizations...),
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
-		cel.CostLimit(perCallLimit),
 	)
 	if err != nil {
-		return CompilationResult{
-			Error: &apiservercel.Error{
-				Type:   apiservercel.ErrorTypeInvalid,
-				Detail: "program instantiation failed: " + err.Error(),
-			},
-			ExpressionAccessor: expressionAccessor,
-		}
+		return resultError("program instantiation failed: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
 	return CompilationResult{
 		Program:            prog,
 		ExpressionAccessor: expressionAccessor,
 	}
+}
+
+func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
+	requestType := BuildRequestType()
+	namespaceType := BuildNamespaceType()
+	envs := make(variableDeclEnvs, 4) // since the number of variable combinations is small, pre-build a environment for each
+	for _, hasParams := range []bool{false, true} {
+		for _, hasAuthorizer := range []bool{false, true} {
+			var envOpts []cel.EnvOption
+			if hasParams {
+				envOpts = append(envOpts, cel.Variable(ParamsVarName, cel.DynType))
+			}
+			if hasAuthorizer {
+				envOpts = append(envOpts,
+					cel.Variable(AuthorizerVarName, library.AuthorizerType),
+					cel.Variable(RequestResourceAuthorizerVarName, library.ResourceCheckType))
+			}
+			envOpts = append(envOpts,
+				cel.Variable(ObjectVarName, cel.DynType),
+				cel.Variable(OldObjectVarName, cel.DynType),
+				cel.Variable(NamespaceVarName, namespaceType.CelType()),
+				cel.Variable(RequestVarName, requestType.CelType()))
+
+			extended, err := baseEnv.Extend(
+				environment.VersionedOptions{
+					// Feature epoch was actually 1.26, but we artificially set it to 1.0 because these
+					// options should always be present.
+					IntroducedVersion: version.MajorMinor(1, 0),
+					EnvOptions:        envOpts,
+					DeclTypes: []*apiservercel.DeclType{
+						namespaceType,
+						requestType,
+					},
+				},
+			)
+			if err != nil {
+				panic(fmt.Sprintf("environment misconfigured: %v", err))
+			}
+			envs[OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer}] = extended
+		}
+	}
+	return envs
 }

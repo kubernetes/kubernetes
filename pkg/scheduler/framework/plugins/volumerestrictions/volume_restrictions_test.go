@@ -18,7 +18,6 @@ package volumerestrictions
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -51,18 +50,53 @@ func TestGCEDiskConflicts(t *testing.T) {
 			},
 		},
 	}
+	volWithNoRestriction := v1.Volume{
+		Name:         "volume with no restriction",
+		VolumeSource: v1.VolumeSource{},
+	}
 	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
-		pod        *v1.Pod
-		nodeInfo   *framework.NodeInfo
-		isOk       bool
-		name       string
-		wantStatus *framework.Status
+		pod                 *v1.Pod
+		nodeInfo            *framework.NodeInfo
+		name                string
+		preFilterWantStatus *framework.Status
+		wantStatus          *framework.Status
 	}{
-		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "one state", nil},
-		{st.MakePod().Volume(volState).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), false, "same state", errStatus},
-		{st.MakePod().Volume(volState2).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "different state", nil},
+		{
+			pod:                 &v1.Pod{},
+			nodeInfo:            framework.NewNodeInfo(),
+			name:                "nothing",
+			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			wantStatus:          nil,
+		},
+		{
+			pod:                 &v1.Pod{},
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "one state",
+			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			wantStatus:          nil,
+		},
+		{
+			pod:                 st.MakePod().Volume(volState).Obj(),
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "same state",
+			preFilterWantStatus: nil,
+			wantStatus:          errStatus,
+		},
+		{
+			pod:                 st.MakePod().Volume(volState2).Obj(),
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "different state",
+			preFilterWantStatus: nil,
+			wantStatus:          nil,
+		},
+		{
+			pod:                 st.MakePod().Volume(volWithNoRestriction).Obj(),
+			nodeInfo:            framework.NewNodeInfo(),
+			name:                "pod with a volume that doesn't have restrictions",
+			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			wantStatus:          nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -71,10 +105,16 @@ func TestGCEDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
-			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
+				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
+			}
+			// If PreFilter fails, then Filter will not run.
+			if test.preFilterWantStatus.IsSuccess() {
+				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
+				}
 			}
 		})
 	}
@@ -97,16 +137,40 @@ func TestAWSDiskConflicts(t *testing.T) {
 	}
 	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
-		pod        *v1.Pod
-		nodeInfo   *framework.NodeInfo
-		isOk       bool
-		name       string
-		wantStatus *framework.Status
+		pod                 *v1.Pod
+		nodeInfo            *framework.NodeInfo
+		name                string
+		wantStatus          *framework.Status
+		preFilterWantStatus *framework.Status
 	}{
-		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "one state", nil},
-		{st.MakePod().Volume(volState).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), false, "same state", errStatus},
-		{st.MakePod().Volume(volState2).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "different state", nil},
+		{
+			pod:                 &v1.Pod{},
+			nodeInfo:            framework.NewNodeInfo(),
+			name:                "nothing",
+			wantStatus:          nil,
+			preFilterWantStatus: framework.NewStatus(framework.Skip),
+		},
+		{
+			pod:                 &v1.Pod{},
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "one state",
+			wantStatus:          nil,
+			preFilterWantStatus: framework.NewStatus(framework.Skip),
+		},
+		{
+			pod:                 st.MakePod().Volume(volState).Obj(),
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "same state",
+			wantStatus:          errStatus,
+			preFilterWantStatus: nil,
+		},
+		{
+			pod:                 st.MakePod().Volume(volState2).Obj(),
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "different state",
+			wantStatus:          nil,
+			preFilterWantStatus: nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -115,10 +179,16 @@ func TestAWSDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
-			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
+				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
+			}
+			// If PreFilter fails, then Filter will not run.
+			if test.preFilterWantStatus.IsSuccess() {
+				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
+				}
 			}
 		})
 	}
@@ -147,16 +217,40 @@ func TestRBDDiskConflicts(t *testing.T) {
 	}
 	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
-		pod        *v1.Pod
-		nodeInfo   *framework.NodeInfo
-		isOk       bool
-		name       string
-		wantStatus *framework.Status
+		pod                 *v1.Pod
+		nodeInfo            *framework.NodeInfo
+		name                string
+		wantStatus          *framework.Status
+		preFilterWantStatus *framework.Status
 	}{
-		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "one state", nil},
-		{st.MakePod().Volume(volState).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), false, "same state", errStatus},
-		{st.MakePod().Volume(volState2).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "different state", nil},
+		{
+			pod:                 &v1.Pod{},
+			nodeInfo:            framework.NewNodeInfo(),
+			name:                "nothing",
+			wantStatus:          nil,
+			preFilterWantStatus: framework.NewStatus(framework.Skip),
+		},
+		{
+			pod:                 &v1.Pod{},
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "one state",
+			wantStatus:          nil,
+			preFilterWantStatus: framework.NewStatus(framework.Skip),
+		},
+		{
+			pod:                 st.MakePod().Volume(volState).Obj(),
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "same state",
+			wantStatus:          errStatus,
+			preFilterWantStatus: nil,
+		},
+		{
+			pod:                 st.MakePod().Volume(volState2).Obj(),
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "different state",
+			wantStatus:          nil,
+			preFilterWantStatus: nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -165,10 +259,16 @@ func TestRBDDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
-			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
+				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
+			}
+			// If PreFilter fails, then Filter will not run.
+			if test.preFilterWantStatus.IsSuccess() {
+				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
+				}
 			}
 		})
 	}
@@ -197,16 +297,40 @@ func TestISCSIDiskConflicts(t *testing.T) {
 	}
 	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
-		pod        *v1.Pod
-		nodeInfo   *framework.NodeInfo
-		isOk       bool
-		name       string
-		wantStatus *framework.Status
+		pod                 *v1.Pod
+		nodeInfo            *framework.NodeInfo
+		name                string
+		wantStatus          *framework.Status
+		preFilterWantStatus *framework.Status
 	}{
-		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "one state", nil},
-		{st.MakePod().Volume(volState).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), false, "same state", errStatus},
-		{st.MakePod().Volume(volState2).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "different state", nil},
+		{
+			pod:                 &v1.Pod{},
+			nodeInfo:            framework.NewNodeInfo(),
+			name:                "nothing",
+			wantStatus:          nil,
+			preFilterWantStatus: framework.NewStatus(framework.Skip),
+		},
+		{
+			pod:                 &v1.Pod{},
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "one state",
+			wantStatus:          nil,
+			preFilterWantStatus: framework.NewStatus(framework.Skip),
+		},
+		{
+			pod:                 st.MakePod().Volume(volState).Obj(),
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "same state",
+			wantStatus:          errStatus,
+			preFilterWantStatus: nil,
+		},
+		{
+			pod:                 st.MakePod().Volume(volState2).Obj(),
+			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
+			name:                "different state",
+			wantStatus:          nil,
+			preFilterWantStatus: nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -215,10 +339,16 @@ func TestISCSIDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
-			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
+				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
+			}
+			// If PreFilter fails, then Filter will not run.
+			if test.preFilterWantStatus.IsSuccess() {
+				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
+				}
 			}
 		})
 	}
@@ -289,7 +419,18 @@ func TestAccessModeConflicts(t *testing.T) {
 			existingNodes:          []*v1.Node{},
 			existingPVCs:           []*v1.PersistentVolumeClaim{},
 			enableReadWriteOncePod: true,
-			preFilterWantStatus:    nil,
+			preFilterWantStatus:    framework.NewStatus(framework.Skip),
+			wantStatus:             nil,
+		},
+		{
+			name:                   "nothing, ReadWriteOncePod disabled",
+			pod:                    &v1.Pod{},
+			nodeInfo:               framework.NewNodeInfo(),
+			existingPods:           []*v1.Pod{},
+			existingNodes:          []*v1.Node{},
+			existingPVCs:           []*v1.PersistentVolumeClaim{},
+			enableReadWriteOncePod: false,
+			preFilterWantStatus:    framework.NewStatus(framework.Skip),
 			wantStatus:             nil,
 		},
 		{
@@ -311,7 +452,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			existingNodes:          []*v1.Node{node},
 			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC1, readWriteManyPVC},
 			enableReadWriteOncePod: true,
-			preFilterWantStatus:    nil,
+			preFilterWantStatus:    framework.NewStatus(framework.Skip),
 			wantStatus:             nil,
 		},
 		{

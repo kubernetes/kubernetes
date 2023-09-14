@@ -118,8 +118,8 @@ func SetDefaults_Service(obj *v1.Service) {
 		if sp.Protocol == "" {
 			sp.Protocol = v1.ProtocolTCP
 		}
-		if sp.TargetPort == intstr.FromInt(0) || sp.TargetPort == intstr.FromString("") {
-			sp.TargetPort = intstr.FromInt(int(sp.Port))
+		if sp.TargetPort == intstr.FromInt32(0) || sp.TargetPort == intstr.FromString("") {
+			sp.TargetPort = intstr.FromInt32(sp.Port)
 		}
 	}
 	// Defaults ExternalTrafficPolicy field for NodePort / LoadBalancer service
@@ -199,6 +199,11 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		enableServiceLinks := v1.DefaultEnableServiceLinks
 		obj.Spec.EnableServiceLinks = &enableServiceLinks
 	}
+
+	if obj.Spec.HostNetwork {
+		defaultHostNetworkPorts(&obj.Spec.Containers)
+		defaultHostNetworkPorts(&obj.Spec.InitContainers)
+	}
 }
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:
@@ -211,9 +216,11 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
 	}
-	if obj.HostNetwork {
-		defaultHostNetworkPorts(&obj.Containers)
-		defaultHostNetworkPorts(&obj.InitContainers)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
+		if obj.HostNetwork {
+			defaultHostNetworkPorts(&obj.Containers)
+			defaultHostNetworkPorts(&obj.InitContainers)
+		}
 	}
 	if obj.SecurityContext == nil {
 		obj.SecurityContext = &v1.PodSecurityContext{}

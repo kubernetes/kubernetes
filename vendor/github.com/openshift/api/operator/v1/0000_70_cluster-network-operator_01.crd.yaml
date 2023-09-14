@@ -219,6 +219,59 @@ spec:
                             ipForwarding:
                               description: IPForwarding controls IP forwarding for all traffic on OVN-Kubernetes managed interfaces (such as br-ex). By default this is set to Restricted, and Kubernetes related traffic is still forwarded appropriately, but other IP traffic will not be routed by the OCP node. If there is a desire to allow the host to forward traffic across OVN-Kubernetes managed interfaces, then set this field to "Global". The supported values are "Restricted" and "Global".
                               type: string
+                            ipv4:
+                              description: ipv4 allows users to configure IP settings for IPv4 connections. When omitted, this means no opinion and the default configuration is used. Check individual members fields within ipv4 for details of default values.
+                              type: object
+                              properties:
+                                internalMasqueradeSubnet:
+                                  description: internalMasqueradeSubnet contains the masquerade addresses in IPV4 CIDR format used internally by ovn-kubernetes to enable host to service traffic. Each host in the cluster is configured with these addresses, as well as the shared gateway bridge interface. The values can be changed after installation. The subnet chosen should not overlap with other networks specified for OVN-Kubernetes as well as other networks used on the host. Additionally the subnet must be large enough to accommodate 6 IPs (maximum prefix length /29). When omitted, this means no opinion and the platform is left to choose a reasonable default which is subject to change over time. The current default subnet is 169.254.169.0/29 The value must be in proper IPV4 CIDR format
+                                  type: string
+                                  maxLength: 18
+                                  x-kubernetes-validations:
+                                    - rule: self.indexOf('/') == self.lastIndexOf('/')
+                                      message: CIDR format must contain exactly one '/'
+                                    - rule: '[int(self.split(''/'')[1])].all(x, x <= 29 && x >= 0)'
+                                      message: subnet must be in the range /0 to /29 inclusive
+                                    - rule: self.split('/')[0].split('.').size() == 4
+                                      message: a valid IPv4 address must contain 4 octets
+                                    - rule: '[self.findAll(''[0-9]+'')[0]].all(x, x != ''0'' && int(x) <= 255 && !x.startsWith(''0''))'
+                                      message: first IP address octet must not contain leading zeros, must be greater than 0 and less or equal to 255
+                                    - rule: '[self.findAll(''[0-9]+'')[1], self.findAll(''[0-9]+'')[2], self.findAll(''[0-9]+'')[3]].all(x, int(x) <= 255 && (x == ''0'' || !x.startsWith(''0'')))'
+                                      message: IP address octets must not contain leading zeros, and must be less or equal to 255
+                            ipv6:
+                              description: ipv6 allows users to configure IP settings for IPv6 connections. When omitted, this means no opinion and the default configuration is used. Check individual members fields within ipv6 for details of default values.
+                              type: object
+                              properties:
+                                internalMasqueradeSubnet:
+                                  description: internalMasqueradeSubnet contains the masquerade addresses in IPV6 CIDR format used internally by ovn-kubernetes to enable host to service traffic. Each host in the cluster is configured with these addresses, as well as the shared gateway bridge interface. The values can be changed after installation. The subnet chosen should not overlap with other networks specified for OVN-Kubernetes as well as other networks used on the host. Additionally the subnet must be large enough to accommodate 6 IPs (maximum prefix length /125). When omitted, this means no opinion and the platform is left to choose a reasonable default which is subject to change over time. The current default subnet is fd69::/125 Note that IPV6 dual addresses are not permitted
+                                  type: string
+                                  x-kubernetes-validations:
+                                    - rule: self.indexOf('/') == self.lastIndexOf('/')
+                                      message: CIDR format must contain exactly one '/'
+                                    - rule: self.split('/').size() == 2 && [int(self.split('/')[1])].all(x, x <= 125 && x >= 0)
+                                      message: subnet must be in the range /0 to /125 inclusive
+                                    - rule: self.indexOf('::') == self.lastIndexOf('::')
+                                      message: IPv6 addresses must contain at most one '::' and may only be shortened once
+                                    - rule: 'self.contains(''::'') ? self.split(''/'')[0].split('':'').size() <= 8 : self.split(''/'')[0].split('':'').size() == 8'
+                                      message: a valid IPv6 address must contain 8 segments unless elided (::), in which case it must contain at most 6 non-empty segments
+                                    - rule: 'self.split(''/'')[0].split('':'').size() >=1 ? [self.split(''/'')[0].split('':'', 8)[0]].all(x, x == '''' || x.matches(''[0-9A-Fa-f]{1,4}'')) : true'
+                                      message: each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 1
+                                    - rule: 'self.split(''/'')[0].split('':'').size() >=2 ? [self.split(''/'')[0].split('':'', 8)[1]].all(x, x == '''' || x.matches(''[0-9A-Fa-f]{1,4}'')) : true'
+                                      message: each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 2
+                                    - rule: 'self.split(''/'')[0].split('':'').size() >=3 ? [self.split(''/'')[0].split('':'', 8)[2]].all(x, x == '''' || x.matches(''[0-9A-Fa-f]{1,4}'')) : true'
+                                      message: each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 3
+                                    - rule: 'self.split(''/'')[0].split('':'').size() >=4 ? [self.split(''/'')[0].split('':'', 8)[3]].all(x, x == '''' || x.matches(''[0-9A-Fa-f]{1,4}'')) : true'
+                                      message: each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 4
+                                    - rule: 'self.split(''/'')[0].split('':'').size() >=5 ? [self.split(''/'')[0].split('':'', 8)[4]].all(x, x == '''' || x.matches(''[0-9A-Fa-f]{1,4}'')) : true'
+                                      message: each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 5
+                                    - rule: 'self.split(''/'')[0].split('':'').size() >=6 ? [self.split(''/'')[0].split('':'', 8)[5]].all(x, x == '''' || x.matches(''[0-9A-Fa-f]{1,4}'')) : true'
+                                      message: each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 6
+                                    - rule: 'self.split(''/'')[0].split('':'').size() >=7 ? [self.split(''/'')[0].split('':'', 8)[6]].all(x, x == '''' || x.matches(''[0-9A-Fa-f]{1,4}'')) : true'
+                                      message: each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 7
+                                    - rule: 'self.split(''/'')[0].split('':'').size() >=8 ? [self.split(''/'')[0].split('':'', 8)[7]].all(x, x == '''' || x.matches(''[0-9A-Fa-f]{1,4}'')) : true'
+                                      message: each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 8
+                                    - rule: '!self.contains(''.'')'
+                                      message: IPv6 dual addresses are not permitted, value should not contain `.` characters
                             routingViaHost:
                               description: RoutingViaHost allows pod egress traffic to exit via the ovn-k8s-mp0 management port into the host before sending it out. If this is not set, traffic will always egress directly from OVN to outside without touching the host stack. Setting this to true means hardware offload will not be supported. Default is false if GatewayConfig is specified.
                               type: boolean
@@ -272,9 +325,11 @@ spec:
                               default: 50
                               minimum: 1
                             maxLogFiles:
-                              description: 'maxLogFiles specifies the maximum number of ACL_audit log files that can be present. Default: 5'
+                              description: maxLogFiles specifies the maximum number of ACL_audit log files that can be present.
                               type: integer
                               format: int32
+                              default: 5
+                              minimum: 1
                             rateLimit:
                               description: rateLimit is the approximate maximum number of messages to generate per-second per-node. If unset the default of 20 msg/sec is used.
                               type: integer

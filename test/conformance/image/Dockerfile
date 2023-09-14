@@ -12,15 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASEIMAGE
 ARG RUNNERIMAGE
-
-FROM ${BASEIMAGE} as debbase
-
 FROM ${RUNNERIMAGE}
-
-# This is a dependency for `kubectl diff` tests
-COPY --from=debbase /usr/bin/diff /usr/local/bin/
 
 COPY cluster /kubernetes/cluster
 COPY ginkgo /usr/local/bin/

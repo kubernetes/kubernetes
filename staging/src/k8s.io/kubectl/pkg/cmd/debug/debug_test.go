@@ -28,7 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/utils/pointer"
 )
@@ -289,6 +289,8 @@ func TestGenerateDebugContainer(t *testing.T) {
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
+						AllowPrivilegeEscalation: pointer.Bool(false),
+						SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 					},
 				},
 			},
@@ -316,7 +318,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
+			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
 			suffixCounter = 0
 
 			if tc.pod == nil {
@@ -1274,10 +1276,12 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							Image:           "busybox",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot: pointer.Bool(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
-								RunAsNonRoot: pointer.Bool(true),
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
 					},
@@ -1334,7 +1338,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
 			}
-			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
+			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
 			suffixCounter = 0
 
 			if tc.havePod == nil {
@@ -1646,6 +1650,8 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
 					},
@@ -1716,7 +1722,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
 			}
-			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
+			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
 			suffixCounter = 0
 
 			pod, err := tc.opts.generateNodeDebugPod(tc.node)
@@ -1732,7 +1738,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 
 func TestCompleteAndValidate(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 	cmpFilter := cmp.FilterPath(func(p cmp.Path) bool {
 		switch p.String() {
 		// IOStreams contains unexported fields

@@ -140,3 +140,30 @@ func (s *Service) RecoveryCommand() (string, error) {
 	p := (*windows.SERVICE_FAILURE_ACTIONS)(unsafe.Pointer(&b[0]))
 	return windows.UTF16PtrToString(p.Command), nil
 }
+
+// SetRecoveryActionsOnNonCrashFailures sets the failure actions flag. If the
+// flag is set to false, recovery actions will only be performed if the service
+// terminates without reporting a status of SERVICE_STOPPED. If the flag is set
+// to true, recovery actions are also perfomed if the service stops with a
+// nonzero exit code.
+func (s *Service) SetRecoveryActionsOnNonCrashFailures(flag bool) error {
+	var setting windows.SERVICE_FAILURE_ACTIONS_FLAG
+	if flag {
+		setting.FailureActionsOnNonCrashFailures = 1
+	}
+	return windows.ChangeServiceConfig2(s.Handle, windows.SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, (*byte)(unsafe.Pointer(&setting)))
+}
+
+// RecoveryActionsOnNonCrashFailures returns the current value of the failure
+// actions flag. If the flag is set to false, recovery actions will only be
+// performed if the service terminates without reporting a status of
+// SERVICE_STOPPED. If the flag is set to true, recovery actions are also
+// perfomed if the service stops with a nonzero exit code.
+func (s *Service) RecoveryActionsOnNonCrashFailures() (bool, error) {
+	b, err := s.queryServiceConfig2(windows.SERVICE_CONFIG_FAILURE_ACTIONS_FLAG)
+	if err != nil {
+		return false, err
+	}
+	p := (*windows.SERVICE_FAILURE_ACTIONS_FLAG)(unsafe.Pointer(&b[0]))
+	return p.FailureActionsOnNonCrashFailures != 0, nil
+}

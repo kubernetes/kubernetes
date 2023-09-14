@@ -1237,13 +1237,36 @@ func (GCPPlatformSpec) SwaggerDoc() map[string]string {
 }
 
 var map_GCPPlatformStatus = map[string]string{
-	"":          "GCPPlatformStatus holds the current status of the Google Cloud Platform infrastructure provider.",
-	"projectID": "resourceGroupName is the Project ID for new GCP resources created for the cluster.",
-	"region":    "region holds the region for new GCP resources created for the cluster.",
+	"":               "GCPPlatformStatus holds the current status of the Google Cloud Platform infrastructure provider.",
+	"projectID":      "resourceGroupName is the Project ID for new GCP resources created for the cluster.",
+	"region":         "region holds the region for new GCP resources created for the cluster.",
+	"resourceLabels": "resourceLabels is a list of additional labels to apply to GCP resources created for the cluster. See https://cloud.google.com/compute/docs/labeling-resources for information on labeling GCP resources. GCP supports a maximum of 64 labels per resource. OpenShift reserves 32 labels for internal use, allowing 32 labels for user configuration.",
+	"resourceTags":   "resourceTags is a list of additional tags to apply to GCP resources created for the cluster. See https://cloud.google.com/resource-manager/docs/tags/tags-overview for information on tagging GCP resources. GCP supports a maximum of 50 tags per resource.",
 }
 
 func (GCPPlatformStatus) SwaggerDoc() map[string]string {
 	return map_GCPPlatformStatus
+}
+
+var map_GCPResourceLabel = map[string]string{
+	"":      "GCPResourceLabel is a label to apply to GCP resources created for the cluster.",
+	"key":   "key is the key part of the label. A label key can have a maximum of 63 characters and cannot be empty. Label key must begin with a lowercase letter, and must contain only lowercase letters, numeric characters, and the following special characters `_-`. Label key must not have the reserved prefixes `kubernetes-io` and `openshift-io`.",
+	"value": "value is the value part of the label. A label value can have a maximum of 63 characters and cannot be empty. Value must contain only lowercase letters, numeric characters, and the following special characters `_-`.",
+}
+
+func (GCPResourceLabel) SwaggerDoc() map[string]string {
+	return map_GCPResourceLabel
+}
+
+var map_GCPResourceTag = map[string]string{
+	"":         "GCPResourceTag is a tag to apply to GCP resources created for the cluster.",
+	"parentID": "parentID is the ID of the hierarchical resource where the tags are defined, e.g. at the Organization or the Project level. To find the Organization or Project ID refer to the following pages: https://cloud.google.com/resource-manager/docs/creating-managing-organization#retrieving_your_organization_id, https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects. An OrganizationID must consist of decimal numbers, and cannot have leading zeroes. A ProjectID must be 6 to 30 characters in length, can only contain lowercase letters, numbers, and hyphens, and must start with a letter, and cannot end with a hyphen.",
+	"key":      "key is the key part of the tag. A tag key can have a maximum of 63 characters and cannot be empty. Tag key must begin and end with an alphanumeric character, and must contain only uppercase, lowercase alphanumeric characters, and the following special characters `._-`.",
+	"value":    "value is the value part of the tag. A tag value can have a maximum of 63 characters and cannot be empty. Tag value must begin and end with an alphanumeric character, and must contain only uppercase, lowercase alphanumeric characters, and the following special characters `_-.@%=+:,*#&(){}[]` and spaces.",
+}
+
+func (GCPResourceTag) SwaggerDoc() map[string]string {
+	return map_GCPResourceTag
 }
 
 var map_IBMCloudPlatformSpec = map[string]string{

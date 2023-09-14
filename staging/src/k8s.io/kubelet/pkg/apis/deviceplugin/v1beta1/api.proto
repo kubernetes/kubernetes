@@ -164,6 +164,15 @@ message ContainerAllocateRequest {
 	repeated string devices_ids = 1 [(gogoproto.customname) = "DevicesIDs"];
 }
 
+// CDIDevice specifies a CDI device information.
+message CDIDevice {
+	// Fully qualified CDI device name
+	// for example: vendor.com/gpu=gpudevice1
+	// see more details in the CDI specification:
+	// https://github.com/container-orchestrated-devices/container-device-interface/blob/main/SPEC.md
+	string name = 1;
+}
+
 // AllocateResponse includes the artifacts that needs to be injected into
 // a container for accessing 'deviceIDs' that were mentioned as part of
 // 'AllocateRequest'.
@@ -185,6 +194,8 @@ message ContainerAllocateResponse {
 	repeated DeviceSpec devices = 3;
 	// Container annotations to pass to the container runtime
 	map<string, string> annotations = 4;
+	// CDI devices for the container.
+	repeated CDIDevice cdi_devices = 5 [(gogoproto.customname) = "CDIDevices"];
 }
 
 // Mount specifies a host volume to mount into a container.

@@ -1675,7 +1675,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			service:         getTestService("test1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "true"}, false, 80),
 			loadBalancerSku: "basic",
 			wantLb:          true,
-			expectedProbes:  getDefaultTestProbes("Http", "/healthz", lbNodesHealthCheckPort),
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
 			expectedRules:   getDefaultTestRules(false),
 		},
 		{
@@ -1683,7 +1683,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			service:         getTestService("test1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "True"}, false, 80),
 			loadBalancerSku: "standard",
 			wantLb:          true,
-			expectedProbes:  getDefaultTestProbes("Http", "/healthz", lbNodesHealthCheckPort),
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
 			expectedRules:   getDefaultTestRules(true),
 		},
 		{
@@ -1691,7 +1691,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			service:         getTestService("test1", v1.ProtocolTCP, nil, false, 80),
 			loadBalancerSku: "standard",
 			wantLb:          true,
-			expectedProbes:  getDefaultTestProbes("Http", "/healthz", lbNodesHealthCheckPort),
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
 			expectedRules:   getDefaultTestRules(true),
 		},
 		{
@@ -1701,7 +1701,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			wantLb:          true,
 			probeProtocol:   "http",
 			probePath:       "/healthy",
-			expectedProbes:  getDefaultTestProbes("http", "/healthy", lbNodesHealthCheckPort),
+			expectedProbes:  getDefaultTestProbes("http", "/healthy"),
 			expectedRules:   getDefaultTestRules(true),
 		},
 		{
@@ -1712,7 +1712,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			}, false, 80),
 			loadBalancerSku: "standard",
 			wantLb:          true,
-			expectedProbes:  getDefaultTestProbes("Http", "/healthz", lbNodesHealthCheckPort),
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
 			expectedRules:   getHATestRules(true),
 		},
 		{
@@ -1723,7 +1723,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			}, false, 80, 8080),
 			loadBalancerSku: "standard",
 			wantLb:          true,
-			expectedProbes:  getDefaultTestProbes("Http", "/healthz", lbNodesHealthCheckPort),
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
 			expectedRules:   getHATestRules(true),
 		},
 		{
@@ -1732,7 +1732,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			loadBalancerSku: "standard",
 			wantLb:          true,
 			probeProtocol:   "Tcp",
-			expectedProbes:  getDefaultTestProbes("Tcp", "", 10080),
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
 			expectedRules:   getDefaultTestRules(true),
 		},
 	}
@@ -1759,13 +1759,13 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 	}
 }
 
-func getDefaultTestProbes(protocol, path string, port int32) []network.Probe {
+func getDefaultTestProbes(protocol, path string) []network.Probe {
 	expectedProbes := []network.Probe{
 		{
 			Name: pointer.String("atest1-TCP-80"),
 			ProbePropertiesFormat: &network.ProbePropertiesFormat{
 				Protocol:          network.ProbeProtocol(protocol),
-				Port:              pointer.Int32(port),
+				Port:              pointer.Int32(10080),
 				IntervalInSeconds: pointer.Int32(5),
 				NumberOfProbes:    pointer.Int32(2),
 			},
@@ -1970,19 +1970,6 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			},
 		},
 	}
-	expectedLb1.Probes = &[]network.Probe{
-		{
-			Name: pointer.String("aservice1-" + string(service3.Spec.Ports[0].Protocol) +
-				"-" + strconv.Itoa(int(service3.Spec.Ports[0].Port))),
-			ProbePropertiesFormat: &network.ProbePropertiesFormat{
-				Port:              pointer.Int32(lbNodesHealthCheckPort),
-				RequestPath:       pointer.String("/healthz"),
-				Protocol:          network.ProbeProtocol(network.ProtocolHTTP),
-				IntervalInSeconds: pointer.Int32(5),
-				NumberOfProbes:    pointer.Int32(2),
-			},
-		},
-	}
 
 	service4 := getTestService("service1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "true"}, false, 80)
 	existingSLB := getTestLoadBalancer(pointer.String("testCluster"), pointer.String("rg"), pointer.String("testCluster"), pointer.String("aservice1"), service4, "Standard")
@@ -2035,19 +2022,6 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			ID:   pointer.String("bservice1"),
 			FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
 				PublicIPAddress: &network.PublicIPAddress{ID: pointer.String("testCluster-bservice1")},
-			},
-		},
-	}
-	expectedSLb.Probes = &[]network.Probe{
-		{
-			Name: pointer.String("aservice1-" + string(service3.Spec.Ports[0].Protocol) +
-				"-" + strconv.Itoa(int(service3.Spec.Ports[0].Port))),
-			ProbePropertiesFormat: &network.ProbePropertiesFormat{
-				Port:              pointer.Int32(lbNodesHealthCheckPort),
-				RequestPath:       pointer.String("/healthz"),
-				Protocol:          network.ProbeProtocol(network.ProtocolHTTP),
-				IntervalInSeconds: pointer.Int32(5),
-				NumberOfProbes:    pointer.Int32(2),
 			},
 		},
 	}
@@ -2105,19 +2079,6 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			ID:   pointer.String("bservice1"),
 			FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
 				PublicIPAddress: &network.PublicIPAddress{ID: pointer.String("testCluster-bservice1")},
-			},
-		},
-	}
-	expectedSLb5.Probes = &[]network.Probe{
-		{
-			Name: pointer.String("aservice1-" + string(service3.Spec.Ports[0].Protocol) +
-				"-" + strconv.Itoa(int(service3.Spec.Ports[0].Port))),
-			ProbePropertiesFormat: &network.ProbePropertiesFormat{
-				Port:              pointer.Int32(lbNodesHealthCheckPort),
-				RequestPath:       pointer.String("/healthz"),
-				Protocol:          network.ProbeProtocol(network.ProtocolHTTP),
-				IntervalInSeconds: pointer.Int32(5),
-				NumberOfProbes:    pointer.Int32(2),
 			},
 		},
 	}
@@ -2194,9 +2155,8 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			Name: pointer.String("aservice1-" + string(service8.Spec.Ports[0].Protocol) +
 				"-" + strconv.Itoa(int(service7.Spec.Ports[0].Port))),
 			ProbePropertiesFormat: &network.ProbePropertiesFormat{
-				Port:              pointer.Int32(lbNodesHealthCheckPort),
-				Protocol:          network.ProbeProtocolHTTP,
-				RequestPath:       pointer.String("/healthz"),
+				Port:              pointer.Int32(10080),
+				Protocol:          network.ProbeProtocolTCP,
 				IntervalInSeconds: pointer.Int32(5),
 				NumberOfProbes:    pointer.Int32(2),
 			},

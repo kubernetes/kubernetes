@@ -55,7 +55,7 @@ var _ = SIGDescribe("Unknown Pods [Serial] [Disruptive]", func() {
 			staticPodName = "unknown-test-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
-			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			podPath = kubeletCfg.StaticPodPath
 
 			framework.Logf("create the static pod %v", staticPodName)
 			err := createStaticPodWithGracePeriod(podPath, staticPodName, ns)

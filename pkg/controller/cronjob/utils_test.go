@@ -28,16 +28,26 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 func TestGetJobFromTemplate2(t *testing.T) {
 	// getJobFromTemplate2() needs to take the job template and copy the labels and annotations
 	// and other fields, and add a created-by reference.
+	var (
+		one             int64 = 1
+		no              bool
+		timeZoneUTC     = "UTC"
+		timeZoneCorrect = "Europe/Rome"
+		scheduledTime   = *topOfTheHour()
+	)
 
-	var one int64 = 1
-	var no bool
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CronJobsScheduledAnnotation, true)()
 
 	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -50,8 +60,8 @@ func TestGetJobFromTemplate2(t *testing.T) {
 			ConcurrencyPolicy: batchv1.AllowConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      map[string]string{"a": "b"},
-					Annotations: map[string]string{"x": "y"},
+					CreationTimestamp: metav1.Time{Time: scheduledTime},
+					Labels:            map[string]string{"a": "b"},
 				},
 				Spec: batchv1.JobSpec{
 					ActiveDeadlineSeconds: &one,
@@ -73,19 +83,72 @@ func TestGetJobFromTemplate2(t *testing.T) {
 		},
 	}
 
-	var job *batchv1.Job
-	job, err := getJobFromTemplate2(&cj, time.Time{})
-	if err != nil {
-		t.Errorf("Did not expect error: %s", err)
+	testCases := []struct {
+		name                        string
+		timeZone                    *string
+		inputAnnotations            map[string]string
+		expectedScheduledTime       func() time.Time
+		expectedNumberOfAnnotations int
+	}{
+		{
+			name:             "UTC timezone and one annotation",
+			timeZone:         &timeZoneUTC,
+			inputAnnotations: map[string]string{"x": "y"},
+			expectedScheduledTime: func() time.Time {
+				return scheduledTime
+			},
+			expectedNumberOfAnnotations: 2,
+		},
+		{
+			name:             "nil timezone and one annotation",
+			timeZone:         nil,
+			inputAnnotations: map[string]string{"x": "y"},
+			expectedScheduledTime: func() time.Time {
+				return scheduledTime
+			},
+			expectedNumberOfAnnotations: 2,
+		},
+		{
+			name:             "correct timezone and multiple annotation",
+			timeZone:         &timeZoneCorrect,
+			inputAnnotations: map[string]string{"x": "y", "z": "x"},
+			expectedScheduledTime: func() time.Time {
+				location, _ := time.LoadLocation(timeZoneCorrect)
+				return scheduledTime.In(location)
+			},
+			expectedNumberOfAnnotations: 3,
+		},
 	}
-	if !strings.HasPrefix(job.ObjectMeta.Name, "mycronjob-") {
-		t.Errorf("Wrong Name")
-	}
-	if len(job.ObjectMeta.Labels) != 1 {
-		t.Errorf("Wrong number of labels")
-	}
-	if len(job.ObjectMeta.Annotations) != 1 {
-		t.Errorf("Wrong number of annotations")
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			cj.Spec.JobTemplate.Annotations = tt.inputAnnotations
+			cj.Spec.TimeZone = tt.timeZone
+
+			var job *batchv1.Job
+			job, err := getJobFromTemplate2(&cj, scheduledTime)
+			if err != nil {
+				t.Errorf("Did not expect error: %s", err)
+			}
+			if !strings.HasPrefix(job.ObjectMeta.Name, "mycronjob-") {
+				t.Errorf("Wrong Name")
+			}
+			if len(job.ObjectMeta.Labels) != 1 {
+				t.Errorf("Wrong number of labels")
+			}
+			if len(job.ObjectMeta.Annotations) != tt.expectedNumberOfAnnotations {
+				t.Errorf("Wrong number of annotations")
+			}
+
+			scheduledAnnotation := job.ObjectMeta.Annotations[batchv1.CronJobScheduledTimestampAnnotation]
+			timeZoneLocation, err := time.LoadLocation(pointer.StringDeref(tt.timeZone, ""))
+			if err != nil {
+				t.Errorf("Wrong timezone location")
+			}
+			if len(job.ObjectMeta.Annotations) != 0 && scheduledAnnotation != tt.expectedScheduledTime().Format(time.RFC3339) {
+				t.Errorf("Wrong cronJob scheduled timestamp annotation, expexted %s, got %s.", tt.expectedScheduledTime().In(timeZoneLocation).Format(time.RFC3339), scheduledAnnotation)
+			}
+		})
 	}
 }
 

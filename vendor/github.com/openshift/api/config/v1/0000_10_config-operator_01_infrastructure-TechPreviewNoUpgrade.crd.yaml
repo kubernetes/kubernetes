@@ -634,6 +634,9 @@ spec:
                             - message: state may not be added or removed once set
                               rule: (has(self.state) == has(oldSelf.state)) || (!has(oldSelf.state) && self.state != "External")
                       type: object
+                      x-kubernetes-validations:
+                        - message: cloudControllerManager may not be added or removed once set
+                          rule: has(self.cloudControllerManager) == has(oldSelf.cloudControllerManager)
                     gcp:
                       description: GCP contains settings specific to the Google Cloud Platform infrastructure provider.
                       properties:
@@ -643,7 +646,80 @@ spec:
                         region:
                           description: region holds the region for new GCP resources created for the cluster.
                           type: string
+                        resourceLabels:
+                          description: resourceLabels is a list of additional labels to apply to GCP resources created for the cluster. See https://cloud.google.com/compute/docs/labeling-resources for information on labeling GCP resources. GCP supports a maximum of 64 labels per resource. OpenShift reserves 32 labels for internal use, allowing 32 labels for user configuration.
+                          items:
+                            description: GCPResourceLabel is a label to apply to GCP resources created for the cluster.
+                            properties:
+                              key:
+                                description: key is the key part of the label. A label key can have a maximum of 63 characters and cannot be empty. Label key must begin with a lowercase letter, and must contain only lowercase letters, numeric characters, and the following special characters `_-`. Label key must not have the reserved prefixes `kubernetes-io` and `openshift-io`.
+                                maxLength: 63
+                                minLength: 1
+                                pattern: ^[a-z][0-9a-z_-]+$
+                                type: string
+                                x-kubernetes-validations:
+                                  - message: label keys must not start with either `openshift-io` or `kubernetes-io`
+                                    rule: '!self.startsWith(''openshift-io'') && !self.startsWith(''kubernetes-io'')'
+                              value:
+                                description: value is the value part of the label. A label value can have a maximum of 63 characters and cannot be empty. Value must contain only lowercase letters, numeric characters, and the following special characters `_-`.
+                                maxLength: 63
+                                minLength: 1
+                                pattern: ^[0-9a-z_-]+$
+                                type: string
+                            required:
+                              - key
+                              - value
+                            type: object
+                          maxItems: 32
+                          type: array
+                          x-kubernetes-list-map-keys:
+                            - key
+                          x-kubernetes-list-type: map
+                          x-kubernetes-validations:
+                            - message: resourceLabels are immutable and may only be configured during installation
+                              rule: self.all(x, x in oldSelf) && oldSelf.all(x, x in self)
+                        resourceTags:
+                          description: resourceTags is a list of additional tags to apply to GCP resources created for the cluster. See https://cloud.google.com/resource-manager/docs/tags/tags-overview for information on tagging GCP resources. GCP supports a maximum of 50 tags per resource.
+                          items:
+                            description: GCPResourceTag is a tag to apply to GCP resources created for the cluster.
+                            properties:
+                              key:
+                                description: key is the key part of the tag. A tag key can have a maximum of 63 characters and cannot be empty. Tag key must begin and end with an alphanumeric character, and must contain only uppercase, lowercase alphanumeric characters, and the following special characters `._-`.
+                                maxLength: 63
+                                minLength: 1
+                                pattern: ^[a-zA-Z0-9]([0-9A-Za-z_.-]{0,61}[a-zA-Z0-9])?$
+                                type: string
+                              parentID:
+                                description: 'parentID is the ID of the hierarchical resource where the tags are defined, e.g. at the Organization or the Project level. To find the Organization or Project ID refer to the following pages: https://cloud.google.com/resource-manager/docs/creating-managing-organization#retrieving_your_organization_id, https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects. An OrganizationID must consist of decimal numbers, and cannot have leading zeroes. A ProjectID must be 6 to 30 characters in length, can only contain lowercase letters, numbers, and hyphens, and must start with a letter, and cannot end with a hyphen.'
+                                maxLength: 32
+                                minLength: 1
+                                pattern: (^[1-9][0-9]{0,31}$)|(^[a-z][a-z0-9-]{4,28}[a-z0-9]$)
+                                type: string
+                              value:
+                                description: value is the value part of the tag. A tag value can have a maximum of 63 characters and cannot be empty. Tag value must begin and end with an alphanumeric character, and must contain only uppercase, lowercase alphanumeric characters, and the following special characters `_-.@%=+:,*#&(){}[]` and spaces.
+                                maxLength: 63
+                                minLength: 1
+                                pattern: ^[a-zA-Z0-9]([0-9A-Za-z_.@%=+:,*#&()\[\]{}\-\s]{0,61}[a-zA-Z0-9])?$
+                                type: string
+                            required:
+                              - key
+                              - parentID
+                              - value
+                            type: object
+                          maxItems: 50
+                          type: array
+                          x-kubernetes-list-map-keys:
+                            - key
+                          x-kubernetes-list-type: map
+                          x-kubernetes-validations:
+                            - message: resourceTags are immutable and may only be configured during installation
+                              rule: self.all(x, x in oldSelf) && oldSelf.all(x, x in self)
                       type: object
+                      x-kubernetes-validations:
+                        - message: resourceLabels may only be configured during installation
+                          rule: '!has(oldSelf.resourceLabels) && !has(self.resourceLabels) || has(oldSelf.resourceLabels) && has(self.resourceLabels)'
+                        - message: resourceTags may only be configured during installation
+                          rule: '!has(oldSelf.resourceTags) && !has(self.resourceTags) || has(oldSelf.resourceTags) && has(self.resourceTags)'
                     ibmcloud:
                       description: IBMCloud contains settings specific to the IBMCloud infrastructure provider.
                       properties:

@@ -1,6 +1,11 @@
 language: go
 
 go:
-  - 1.8
-  - 1.7
-  - 1.6
+  - tip
+  - 1.15.x
+  - 1.14.x
+  - 1.13.x
+  - 1.12.x
+  
+env:
+  - GO111MODULE=on

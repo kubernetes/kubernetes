@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -770,16 +771,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
-func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, openAPIModels map[string]*spec.Schema) error {
-	var typeConverter managedfields.TypeConverter
-
-	if len(openAPIModels) > 0 {
-		var err error
-		typeConverter, err = managedfields.NewTypeConverter(openAPIModels, false)
-		if err != nil {
-			return err
-		}
-	}
+func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, typeConverter managedfields.TypeConverter) error {
 	var resourceInfos []*storageversion.ResourceInfo
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
@@ -878,6 +870,9 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 // underlying storage will be destroyed on this servers shutdown.
 func (s *GenericAPIServer) InstallAPIGroups(apiGroupInfos ...*APIGroupInfo) error {
 	for _, apiGroupInfo := range apiGroupInfos {
+		if len(apiGroupInfo.PrioritizedVersions) == 0 {
+			return fmt.Errorf("no version priority set for %#v", *apiGroupInfo)
+		}
 		// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
 		// Catching these here places the error  much closer to its origin
 		if len(apiGroupInfo.PrioritizedVersions[0].Group) == 0 {
@@ -950,9 +945,22 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 }
 
 func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion) *genericapi.APIGroupVersion {
+
+	allServedVersionsByResource := map[string][]string{}
+	for version, resourcesInVersion := range apiGroupInfo.VersionedResourcesStorageMap {
+		for resource := range resourcesInVersion {
+			if len(groupVersion.Group) == 0 {
+				allServedVersionsByResource[resource] = append(allServedVersionsByResource[resource], version)
+			} else {
+				allServedVersionsByResource[resource] = append(allServedVersionsByResource[resource], fmt.Sprintf("%s/%s", groupVersion.Group, version))
+			}
+		}
+	}
+
 	return &genericapi.APIGroupVersion{
-		GroupVersion:     groupVersion,
-		MetaGroupVersion: apiGroupInfo.MetaGroupVersion,
+		GroupVersion:                groupVersion,
+		AllServedVersionsByResource: allServedVersionsByResource,
+		MetaGroupVersion:            apiGroupInfo.MetaGroupVersion,
 
 		ParameterCodec:        apiGroupInfo.ParameterCodec,
 		Serializer:            apiGroupInfo.NegotiatedSerializer,
@@ -987,13 +995,13 @@ func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec
 }
 
 // getOpenAPIModels is a private method for getting the OpenAPI models
-func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*APIGroupInfo) (map[string]*spec.Schema, error) {
+func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*APIGroupInfo) (managedfields.TypeConverter, error) {
 	if s.openAPIV3Config == nil {
-		//!TODO: A future work should add a requirement that
-		// OpenAPIV3 config is required. May require some refactoring of tests.
-		return nil, nil
+		// SSA is GA and requires OpenAPI config to be set
+		// to create models.
+		return nil, errors.New("OpenAPIV3 config must not be nil")
 	}
-	pathsToIgnore := openapiutil.NewTrie(s.openAPIConfig.IgnorePrefixes)
+	pathsToIgnore := openapiutil.NewTrie(s.openAPIV3Config.IgnorePrefixes)
 	resourceNames := make([]string, 0)
 	for _, apiGroupInfo := range apiGroupInfos {
 		groupResources, err := getResourceNamesForGroup(apiPrefix, apiGroupInfo, pathsToIgnore)
@@ -1011,7 +1019,13 @@ func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*
 	for _, apiGroupInfo := range apiGroupInfos {
 		apiGroupInfo.StaticOpenAPISpec = openAPISpec
 	}
-	return openAPISpec, nil
+
+	typeConverter, err := managedfields.NewTypeConverter(openAPISpec, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return typeConverter, nil
 }
 
 // getResourceNamesForGroup is a private method for getting the canonical names for each resource to build in an api group

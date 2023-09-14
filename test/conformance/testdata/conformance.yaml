@@ -312,6 +312,14 @@
     definitions MUST be published for custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
+- testname: Discovery, confirm the groupVerion and a resourcefrom each apiGroup
+  codename: '[sig-api-machinery] Discovery should locate the groupVersion and a resource
+    within each APIGroup [Conformance]'
+  description: A resourceList MUST be found for each apiGroup that is retrieved. For
+    each apiGroup the groupVersion MUST equal the groupVersion as reported by the
+    schema. From each resourceList a valid resource MUST be found.
+  release: v1.28
+  file: test/e2e/apimachinery/discovery.go
 - testname: Discovery, confirm the PreferredVersion for each api group
   codename: '[sig-api-machinery] Discovery should validate PreferredVersion for each
     APIGroup [Conformance]'
@@ -487,8 +495,7 @@
     be found. Patching the hard status values MUST succeed. The reported hard status
     values MUST equal the new spec hard values. Getting the /status MUST succeed and
     the reported hard status values MUST equal the spec hard values. Repatching the
-    hard status values MUST succeed. The spec spec MUST NOT be changed when patching
-    /status.
+    hard status values MUST succeed. The spec MUST NOT be changed when patching /status.
   release: v1.26
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, update and delete
@@ -1942,6 +1949,15 @@
     visible at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
+- testname: Ephemeral Container, update ephemeral containers
+  codename: '[sig-node] Ephemeral Containers [NodeConformance] should update the ephemeral
+    containers in an existing pod [Conformance]'
+  description: Adding an ephemeral container to pod.spec MUST result in the container
+    running. There MUST now be only one ephermal container found. Updating the pod
+    with another ephemeral container MUST succeed. There MUST now be two ephermal
+    containers found.
+  release: v1.28
+  file: test/e2e/common/node/ephemeral_containers.go
 - testname: Ephemeral Container Creation
   codename: '[sig-node] Ephemeral Containers [NodeConformance] will start an ephemeral
     container in an existing pod [Conformance]'
@@ -2548,18 +2564,20 @@
     pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: CSIDriver, lifecycle
+  codename: '[sig-storage] CSIInlineVolumes should run through the lifecycle of a
+    CSIDriver [Conformance]'
+  description: Creating two CSIDrivers MUST succeed. Patching a CSIDriver MUST succeed
+    with its new label found. Updating a CSIDriver MUST succeed with its new label
+    found. Two CSIDrivers MUST be found when listed. Deleting the first CSIDriver
+    MUST succeed. Deleting the second CSIDriver via deleteCollection MUST succeed.
+  release: v1.28
+  file: test/e2e/storage/csi_inline.go
 - testname: CSIInlineVolumes should support Pods with inline volumes
   codename: '[sig-storage] CSIInlineVolumes should support CSIVolumeSource in Pod
     API [Conformance]'
   description: Pod resources with CSIVolumeSource should support create, get, list,
     patch, and delete operations.
-  release: v1.26
-  file: test/e2e/storage/csi_inline.go
-- testname: CSIInlineVolumes should support ephemeral CSIDrivers
-  codename: '[sig-storage] CSIInlineVolumes should support ephemeral VolumeLifecycleMode
-    in CSIDriver API [Conformance]'
-  description: CSIDriver resources with ephemeral VolumeLifecycleMode should support
-    create, get, list, and delete operations.
   release: v1.26
   file: test/e2e/storage/csi_inline.go
 - testname: CSIStorageCapacity API

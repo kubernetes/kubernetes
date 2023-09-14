@@ -36,7 +36,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
@@ -82,7 +82,7 @@ type GetOptions struct {
 	NoHeaders      bool
 	IgnoreNotFound bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -131,7 +131,7 @@ var (
 		# List one or more resources by their type and names
 		kubectl get rc/web service/frontend pods/web-pod-13je7
 
-		# List status subresource for a single pod.
+		# List the 'status' subresource for a single pod
 		kubectl get pod web-pod-13je7 --subresource status`))
 )
 
@@ -142,7 +142,7 @@ const (
 var supportedSubresources = []string{"status", "scale"}
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
-func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
+func NewGetOptions(parent string, streams genericiooptions.IOStreams) *GetOptions {
 	return &GetOptions{
 		PrintFlags: NewGetPrintFlags(),
 		CmdParent:  parent,
@@ -155,7 +155,7 @@ func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptio
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
-func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewGetOptions(parent, streams)
 
 	cmd := &cobra.Command{

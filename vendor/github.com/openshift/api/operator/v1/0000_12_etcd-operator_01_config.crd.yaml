@@ -6,6 +6,7 @@ metadata:
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/feature-set: Default
   name: etcds.operator.openshift.io
 spec:
   group: operator.openshift.io
@@ -102,6 +103,13 @@ spec:
                         type: string
                       type:
                         type: string
+                controlPlaneHardwareSpeed:
+                  description: ControlPlaneHardwareSpeed declares valid hardware speed tolerance levels
+                  type: string
+                  enum:
+                    - ""
+                    - Standard
+                    - Slower
                 generations:
                   description: generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
                   type: array

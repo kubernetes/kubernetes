@@ -1699,12 +1699,23 @@ func PtracePokeUser(pid int, addr uintptr, data []byte) (count int, err error) {
 	return ptracePoke(PTRACE_POKEUSR, PTRACE_PEEKUSR, pid, addr, data)
 }
 
+// elfNT_PRSTATUS is a copy of the debug/elf.NT_PRSTATUS constant so
+// x/sys/unix doesn't need to depend on debug/elf and thus
+// compress/zlib, debug/dwarf, and other packages.
+const elfNT_PRSTATUS = 1
+
 func PtraceGetRegs(pid int, regsout *PtraceRegs) (err error) {
-	return ptracePtr(PTRACE_GETREGS, pid, 0, unsafe.Pointer(regsout))
+	var iov Iovec
+	iov.Base = (*byte)(unsafe.Pointer(regsout))
+	iov.SetLen(int(unsafe.Sizeof(*regsout)))
+	return ptracePtr(PTRACE_GETREGSET, pid, uintptr(elfNT_PRSTATUS), unsafe.Pointer(&iov))
 }
 
 func PtraceSetRegs(pid int, regs *PtraceRegs) (err error) {
-	return ptracePtr(PTRACE_SETREGS, pid, 0, unsafe.Pointer(regs))
+	var iov Iovec
+	iov.Base = (*byte)(unsafe.Pointer(regs))
+	iov.SetLen(int(unsafe.Sizeof(*regs)))
+	return ptracePtr(PTRACE_SETREGSET, pid, uintptr(elfNT_PRSTATUS), unsafe.Pointer(&iov))
 }
 
 func PtraceSetOptions(pid int, options int) (err error) {
@@ -1873,7 +1884,6 @@ func Getpgrp() (pid int) {
 //sys	OpenTree(dfd int, fileName string, flags uint) (r int, err error)
 //sys	PerfEventOpen(attr *PerfEventAttr, pid int, cpu int, groupFd int, flags int) (fd int, err error)
 //sys	PivotRoot(newroot string, putold string) (err error) = SYS_PIVOT_ROOT
-//sysnb	Prlimit(pid int, resource int, newlimit *Rlimit, old *Rlimit) (err error) = SYS_PRLIMIT64
 //sys	Prctl(option int, arg2 uintptr, arg3 uintptr, arg4 uintptr, arg5 uintptr) (err error)
 //sys	Pselect(nfd int, r *FdSet, w *FdSet, e *FdSet, timeout *Timespec, sigmask *Sigset_t) (n int, err error) = SYS_PSELECT6
 //sys	read(fd int, p []byte) (n int, err error)
@@ -1886,6 +1896,15 @@ func Getpgrp() (pid int) {
 //sysnb	Setsid() (pid int, err error)
 //sysnb	Settimeofday(tv *Timeval) (err error)
 //sys	Setns(fd int, nstype int) (err error)
+
+//go:linkname syscall_prlimit syscall.prlimit
+func syscall_prlimit(pid, resource int, newlimit, old *syscall.Rlimit) error
+
+func Prlimit(pid, resource int, newlimit, old *Rlimit) error {
+	// Just call the syscall version, because as of Go 1.21
+	// it will affect starting a new process.
+	return syscall_prlimit(pid, resource, (*syscall.Rlimit)(newlimit), (*syscall.Rlimit)(old))
+}
 
 // PrctlRetInt performs a prctl operation specified by option and further
 // optional arguments arg2 through arg5 depending on option. It returns a
@@ -2105,11 +2124,15 @@ func writevRacedetect(iovecs []Iovec, n int) {
 
 // mmap varies by architecture; see syscall_linux_*.go.
 //sys	munmap(addr uintptr, length uintptr) (err error)
+//sys	mremap(oldaddr uintptr, oldlength uintptr, newlength uintptr, flags int, newaddr uintptr) (xaddr uintptr, err error)
 
-var mapper = &mmapper{
-	active: make(map[*byte][]byte),
-	mmap:   mmap,
-	munmap: munmap,
+var mapper = &mremapMmapper{
+	mmapper: mmapper{
+		active: make(map[*byte][]byte),
+		mmap:   mmap,
+		munmap: munmap,
+	},
+	mremap: mremap,
 }
 
 func Mmap(fd int, offset int64, length int, prot int, flags int) (data []byte, err error) {
@@ -2118,6 +2141,10 @@ func Mmap(fd int, offset int64, length int, prot int, flags int) (data []byte, e
 
 func Munmap(b []byte) (err error) {
 	return mapper.Munmap(b)
+}
+
+func Mremap(oldData []byte, newLength int, flags int) (data []byte, err error) {
+	return mapper.Mremap(oldData, newLength, flags)
 }
 
 //sys	Madvise(b []byte, advice int) (err error)
@@ -2412,6 +2439,21 @@ func PthreadSigmask(how int, set, oldset *Sigset_t) error {
 	return rtSigprocmask(how, set, oldset, _C__NSIG/8)
 }
 
+//sysnb	getresuid(ruid *_C_int, euid *_C_int, suid *_C_int)
+//sysnb	getresgid(rgid *_C_int, egid *_C_int, sgid *_C_int)
+
+func Getresuid() (ruid, euid, suid int) {
+	var r, e, s _C_int
+	getresuid(&r, &e, &s)
+	return int(r), int(e), int(s)
+}
+
+func Getresgid() (rgid, egid, sgid int) {
+	var r, e, s _C_int
+	getresgid(&r, &e, &s)
+	return int(r), int(e), int(s)
+}
+
 /*
  * Unimplemented
  */
@@ -2453,7 +2495,6 @@ func PthreadSigmask(how int, set, oldset *Sigset_t) error {
 // MqTimedreceive
 // MqTimedsend
 // MqUnlink
-// Mremap
 // Msgctl
 // Msgget
 // Msgrcv

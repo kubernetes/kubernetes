@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -55,18 +56,20 @@ func (opt *TestOptions) Run(args []string) error {
 
 	// These settings are matched to upstream's ginkgo configuration. See:
 	// https://github.com/kubernetes/kubernetes/blob/v1.25.0/test/e2e/framework/test_context.go#L354-L355
-	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
-	suiteConfig.EmitSpecProgress = true
 	// Randomize specs as well as suites
 	suiteConfig.RandomizeAllSpecs = true
-	// turn off stdout/stderr capture see https://github.com/kubernetes/kubernetes/pull/111240
-	suiteConfig.OutputInterceptorMode = "none"
 	// https://github.com/kubernetes/kubernetes/blob/v1.25.0/hack/ginkgo-e2e.sh#L172-L173
 	suiteConfig.Timeout = 24 * time.Hour
 	reporterConfig.NoColor = true
+	reporterConfig.Verbose = true
 
 	ginkgo.SetReporterConfig(reporterConfig)
-	ginkgo.GetSuite().RunSpec(test.spec, ginkgo.Labels{}, "", ginkgo.GetFailer(), ginkgo.GetWriter(), suiteConfig)
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	ginkgo.GetSuite().RunSpec(test.spec, ginkgo.Labels{}, "Kubernetes e2e suite", cwd, ginkgo.GetFailer(), ginkgo.GetWriter(), suiteConfig, reporterConfig)
 
 	var summary types.SpecReport
 	for _, report := range ginkgo.GetSuite().GetReport().SpecReports {

@@ -21,19 +21,20 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types/ref"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
@@ -43,8 +44,17 @@ import (
 const maxTypesToCheck = 10
 
 type TypeChecker struct {
-	schemaResolver resolver.SchemaResolver
-	restMapper     meta.RESTMapper
+	SchemaResolver resolver.SchemaResolver
+	RestMapper     meta.RESTMapper
+}
+
+// TypeCheckingContext holds information about the policy being type-checked.
+// The struct is opaque to the caller.
+type TypeCheckingContext struct {
+	gvks          []schema.GroupVersionKind
+	declTypes     []*apiservercel.DeclType
+	paramGVK      schema.GroupVersionKind
+	paramDeclType *apiservercel.DeclType
 }
 
 type typeOverwrite struct {
@@ -52,127 +62,148 @@ type typeOverwrite struct {
 	params *apiservercel.DeclType
 }
 
-// typeCheckingResult holds the issues found during type checking, any returned
+// TypeCheckingResult holds the issues found during type checking, any returned
 // error, and the gvk that the type checking is performed against.
-type typeCheckingResult struct {
-	gvk schema.GroupVersionKind
+type TypeCheckingResult struct {
+	// GVK is the associated GVK
+	GVK schema.GroupVersionKind
+	// Issues contain machine-readable information about the typechecking result.
+	Issues *cel.Issues
+	// Err is the possible error that was encounter during type checking.
+	Err error
+}
 
-	issues *cel.Issues
-	err    error
+// TypeCheckingResults is a collection of TypeCheckingResult
+type TypeCheckingResults []*TypeCheckingResult
+
+func (rs TypeCheckingResults) String() string {
+	var messages []string
+	for _, r := range rs {
+		message := r.String()
+		if message != "" {
+			messages = append(messages, message)
+		}
+	}
+	return strings.Join(messages, "\n")
+}
+
+// String converts the result to human-readable form as a string.
+func (r *TypeCheckingResult) String() string {
+	if r.Issues == nil && r.Err == nil {
+		return ""
+	}
+	if r.Err != nil {
+		return fmt.Sprintf("%v: type checking error: %v\n", r.GVK, r.Err)
+	}
+	return fmt.Sprintf("%v: %s\n", r.GVK, r.Issues)
 }
 
 // Check preforms the type check against the given policy, and format the result
 // as []ExpressionWarning that is ready to be set in policy.Status
 // The result is nil if type checking returns no warning.
 // The policy object is NOT mutated. The caller should update Status accordingly
-func (c *TypeChecker) Check(policy *v1alpha1.ValidatingAdmissionPolicy) []v1alpha1.ExpressionWarning {
-	exps := make([]string, 0, len(policy.Spec.Validations))
-	// check main validation expressions, located in spec.validations[*]
+func (c *TypeChecker) Check(policy *v1beta1.ValidatingAdmissionPolicy) []v1beta1.ExpressionWarning {
+	ctx := c.CreateContext(policy)
+
+	// warnings to return, note that the capacity is optimistically set to zero
+	var warnings []v1beta1.ExpressionWarning // intentionally not setting capacity
+
+	// check main validation expressions and their message expressions, located in spec.validations[*]
 	fieldRef := field.NewPath("spec", "validations")
-	for _, v := range policy.Spec.Validations {
-		exps = append(exps, v.Expression)
-	}
-	msgs := c.CheckExpressions(exps, policy.Spec.ParamKind != nil, policy)
-	var results []v1alpha1.ExpressionWarning // intentionally not setting capacity
-	for i, msg := range msgs {
-		if msg != "" {
-			results = append(results, v1alpha1.ExpressionWarning{
+	for i, v := range policy.Spec.Validations {
+		results := c.CheckExpression(ctx, v.Expression)
+		if len(results) != 0 {
+			warnings = append(warnings, v1beta1.ExpressionWarning{
 				FieldRef: fieldRef.Index(i).Child("expression").String(),
-				Warning:  msg,
+				Warning:  results.String(),
+			})
+		}
+		// Note that MessageExpression is optional
+		if v.MessageExpression == "" {
+			continue
+		}
+		results = c.CheckExpression(ctx, v.MessageExpression)
+		if len(results) != 0 {
+			warnings = append(warnings, v1beta1.ExpressionWarning{
+				FieldRef: fieldRef.Index(i).Child("messageExpression").String(),
+				Warning:  results.String(),
 			})
 		}
 	}
-	return results
+
+	return warnings
 }
 
-// CheckExpressions checks a set of compiled CEL programs against the GVKs defined in
-// policy.Spec.MatchConstraints
-// The result is a human-readable form that describe which expressions
-// violate what types at what place. The indexes of the return []string
-// matches these of the input expressions.
-// TODO: It is much more useful to have machine-readable output and let the
-// client format it. That requires an update to the KEP, probably in coming
-// releases.
-func (c *TypeChecker) CheckExpressions(expressions []string, hasParams bool, policy *v1alpha1.ValidatingAdmissionPolicy) []string {
-	var allWarnings []string
+// CreateContext resolves all types and their schemas from a policy definition and creates the context.
+func (c *TypeChecker) CreateContext(policy *v1beta1.ValidatingAdmissionPolicy) *TypeCheckingContext {
+	ctx := new(TypeCheckingContext)
 	allGvks := c.typesToCheck(policy)
 	gvks := make([]schema.GroupVersionKind, 0, len(allGvks))
-	schemas := make([]common.Schema, 0, len(allGvks))
+	declTypes := make([]*apiservercel.DeclType, 0, len(allGvks))
 	for _, gvk := range allGvks {
-		s, err := c.schemaResolver.ResolveSchema(gvk)
+		declType, err := c.declType(gvk)
 		if err != nil {
 			// type checking errors MUST NOT alter the behavior of the policy
 			// even if an error occurs.
 			if !errors.Is(err, resolver.ErrSchemaNotFound) {
 				// Anything except ErrSchemaNotFound is an internal error
-				klog.ErrorS(err, "internal error: schema resolution failure", "gvk", gvk)
+				klog.V(2).ErrorS(err, "internal error: schema resolution failure", "gvk", gvk)
 			}
-			// skip if an unrecoverable error occurs.
+			// skip for not found or internal error
 			continue
 		}
 		gvks = append(gvks, gvk)
-		schemas = append(schemas, &openapi.Schema{Schema: s})
+		declTypes = append(declTypes, declType)
 	}
+	ctx.gvks = gvks
+	ctx.declTypes = declTypes
 
-	paramsType := c.paramsType(policy)
-	paramsDeclType, err := c.declType(paramsType)
+	paramsGVK := c.paramsGVK(policy) // maybe empty, correctly handled
+	paramsDeclType, err := c.declType(paramsGVK)
 	if err != nil {
 		if !errors.Is(err, resolver.ErrSchemaNotFound) {
-			klog.V(2).ErrorS(err, "cannot resolve schema for params", "gvk", paramsType)
+			klog.V(2).ErrorS(err, "internal error: cannot resolve schema for params", "gvk", paramsGVK)
 		}
 		paramsDeclType = nil
 	}
-
-	for _, exp := range expressions {
-		var results []typeCheckingResult
-		for i, gvk := range gvks {
-			s := schemas[i]
-			issues, err := c.checkExpression(exp, hasParams, typeOverwrite{
-				object: common.SchemaDeclType(s, true),
-				params: paramsDeclType,
-			})
-			// save even if no issues are found, for the sake of formatting.
-			results = append(results, typeCheckingResult{
-				gvk:    gvk,
-				issues: issues,
-				err:    err,
-			})
-		}
-		allWarnings = append(allWarnings, c.formatWarning(results))
-	}
-
-	return allWarnings
+	ctx.paramGVK = paramsGVK
+	ctx.paramDeclType = paramsDeclType
+	return ctx
 }
 
-// formatWarning converts the resulting issues and possible error during
-// type checking into a human-readable string
-func (c *TypeChecker) formatWarning(results []typeCheckingResult) string {
-	var sb strings.Builder
-	for _, result := range results {
-		if result.issues == nil && result.err == nil {
-			continue
-		}
-		if result.err != nil {
-			sb.WriteString(fmt.Sprintf("%v: type checking error: %v\n", result.gvk, result.err))
-		} else {
-			sb.WriteString(fmt.Sprintf("%v: %s\n", result.gvk, result.issues))
+// CheckExpression type checks a single expression, given the context
+func (c *TypeChecker) CheckExpression(ctx *TypeCheckingContext, expression string) TypeCheckingResults {
+	var results TypeCheckingResults
+	for i, gvk := range ctx.gvks {
+		declType := ctx.declTypes[i]
+		// TODO(jiahuif) hasAuthorizer always true for now, will change after expending type checking to all fields.
+		issues, err := c.checkExpression(expression, ctx.paramDeclType != nil, true, typeOverwrite{
+			object: declType,
+			params: ctx.paramDeclType,
+		})
+		if issues != nil || err != nil {
+			results = append(results, &TypeCheckingResult{Issues: issues, Err: err, GVK: gvk})
 		}
 	}
-	return strings.TrimSuffix(sb.String(), "\n")
+	return results
+}
+
+func generateUniqueTypeName(kind string) string {
+	return fmt.Sprintf("%s%d", kind, time.Now().Nanosecond())
 }
 
 func (c *TypeChecker) declType(gvk schema.GroupVersionKind) (*apiservercel.DeclType, error) {
 	if gvk.Empty() {
 		return nil, nil
 	}
-	s, err := c.schemaResolver.ResolveSchema(gvk)
+	s, err := c.SchemaResolver.ResolveSchema(gvk)
 	if err != nil {
 		return nil, err
 	}
-	return common.SchemaDeclType(&openapi.Schema{Schema: s}, true), nil
+	return common.SchemaDeclType(&openapi.Schema{Schema: s}, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
 }
 
-func (c *TypeChecker) paramsType(policy *v1alpha1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
+func (c *TypeChecker) paramsGVK(policy *v1beta1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
 	if policy.Spec.ParamKind == nil {
 		return schema.GroupVersionKind{}
 	}
@@ -183,8 +214,8 @@ func (c *TypeChecker) paramsType(policy *v1alpha1.ValidatingAdmissionPolicy) sch
 	return gv.WithKind(policy.Spec.ParamKind.Kind)
 }
 
-func (c *TypeChecker) checkExpression(expression string, hasParams bool, types typeOverwrite) (*cel.Issues, error) {
-	env, err := buildEnv(hasParams, types)
+func (c *TypeChecker) checkExpression(expression string, hasParams, hasAuthorizer bool, types typeOverwrite) (*cel.Issues, error) {
+	env, err := buildEnv(hasParams, hasAuthorizer, types)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +233,7 @@ func (c *TypeChecker) checkExpression(expression string, hasParams bool, types t
 
 // typesToCheck extracts a list of GVKs that needs type checking from the policy
 // the result is sorted in the order of Group, Version, and Kind
-func (c *TypeChecker) typesToCheck(p *v1alpha1.ValidatingAdmissionPolicy) []schema.GroupVersionKind {
+func (c *TypeChecker) typesToCheck(p *v1beta1.ValidatingAdmissionPolicy) []schema.GroupVersionKind {
 	gvks := sets.New[schema.GroupVersionKind]()
 	if p.Spec.MatchConstraints == nil || len(p.Spec.MatchConstraints.ResourceRules) == 0 {
 		return nil
@@ -235,7 +266,7 @@ func (c *TypeChecker) typesToCheck(p *v1alpha1.ValidatingAdmissionPolicy) []sche
 						Version:  version,
 						Resource: resource,
 					}
-					resolved, err := c.restMapper.KindsFor(gvr)
+					resolved, err := c.RestMapper.KindsFor(gvr)
 					if err != nil {
 						continue
 					}
@@ -263,7 +294,7 @@ func (c *TypeChecker) typesToCheck(p *v1alpha1.ValidatingAdmissionPolicy) []sche
 	return sortGVKList(gvks.UnsortedList())
 }
 
-func extractGroups(rule *v1alpha1.Rule) []string {
+func extractGroups(rule *v1beta1.Rule) []string {
 	groups := make([]string, 0, len(rule.APIGroups))
 	for _, group := range rule.APIGroups {
 		// give up if wildcard
@@ -275,7 +306,7 @@ func extractGroups(rule *v1alpha1.Rule) []string {
 	return groups
 }
 
-func extractVersions(rule *v1alpha1.Rule) []string {
+func extractVersions(rule *v1beta1.Rule) []string {
 	versions := make([]string, 0, len(rule.APIVersions))
 	for _, version := range rule.APIVersions {
 		if strings.ContainsAny(version, "*") {
@@ -286,7 +317,7 @@ func extractVersions(rule *v1alpha1.Rule) []string {
 	return versions
 }
 
-func extractResources(rule *v1alpha1.Rule) []string {
+func extractResources(rule *v1beta1.Rule) []string {
 	resources := make([]string, 0, len(rule.Resources))
 	for _, resource := range rule.Resources {
 		// skip wildcard and subresources
@@ -313,123 +344,64 @@ func sortGVKList(list []schema.GroupVersionKind) []schema.GroupVersionKind {
 	return list
 }
 
-func buildEnv(hasParams bool, types typeOverwrite) (*cel.Env, error) {
-	baseEnv, err := getBaseEnv()
-	if err != nil {
-		return nil, err
-	}
-	reg := apiservercel.NewRegistry(baseEnv)
+func buildEnv(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*cel.Env, error) {
+	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	requestType := plugincel.BuildRequestType()
+	namespaceType := plugincel.BuildNamespaceType()
 
 	var varOpts []cel.EnvOption
-	var rts []*apiservercel.RuleTypes
+	var declTypes []*apiservercel.DeclType
+
+	// namespace, hand-crafted type
+	declTypes = append(declTypes, namespaceType)
+	varOpts = append(varOpts, createVariableOpts(namespaceType, plugincel.NamespaceVarName)...)
 
 	// request, hand-crafted type
-	rt, opts, err := createRuleTypesAndOptions(reg, requestType, plugincel.RequestVarName)
-	if err != nil {
-		return nil, err
-	}
-	rts = append(rts, rt)
-	varOpts = append(varOpts, opts...)
+	declTypes = append(declTypes, requestType)
+	varOpts = append(varOpts, createVariableOpts(requestType, plugincel.RequestVarName)...)
 
 	// object and oldObject, same type, type(s) resolved from constraints
-	rt, opts, err = createRuleTypesAndOptions(reg, types.object, plugincel.ObjectVarName, plugincel.OldObjectVarName)
-	if err != nil {
-		return nil, err
-	}
-	rts = append(rts, rt)
-	varOpts = append(varOpts, opts...)
+	declTypes = append(declTypes, types.object)
+	varOpts = append(varOpts, createVariableOpts(types.object, plugincel.ObjectVarName, plugincel.OldObjectVarName)...)
 
 	// params, defined by ParamKind
-	if hasParams {
-		rt, opts, err := createRuleTypesAndOptions(reg, types.params, plugincel.ParamsVarName)
-		if err != nil {
-			return nil, err
-		}
-		rts = append(rts, rt)
-		varOpts = append(varOpts, opts...)
+	if hasParams && types.params != nil {
+		declTypes = append(declTypes, types.params)
+		varOpts = append(varOpts, createVariableOpts(types.params, plugincel.ParamsVarName)...)
 	}
 
-	opts, err = ruleTypesOpts(rts, baseEnv.TypeProvider())
+	// authorizer, implicitly available to all expressions of a policy
+	if hasAuthorizer {
+		// we only need its structure but not the variable itself
+		varOpts = append(varOpts, cel.Variable("authorizer", library.AuthorizerType))
+	}
+
+	env, err := baseEnv.Extend(
+		environment.VersionedOptions{
+			// Feature epoch was actually 1.26, but we artificially set it to 1.0 because these
+			// options should always be present.
+			IntroducedVersion: version.MajorMinor(1, 0),
+			EnvOptions:        varOpts,
+			DeclTypes:         declTypes,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	opts = append(opts, varOpts...) // add variables after ruleTypes.
-	env, err := baseEnv.Extend(opts...)
-	if err != nil {
-		return nil, err
-	}
-	return env, nil
+	return env.Env(environment.StoredExpressions)
 }
 
-// createRuleTypeAndOptions creates the cel RuleTypes and a slice of EnvOption
+// createVariableOpts creates a slice of EnvOption
 // that can be used for creating a CEL env containing variables of declType.
 // declType can be nil, in which case the variables will be of DynType.
-func createRuleTypesAndOptions(registry *apiservercel.Registry, declType *apiservercel.DeclType, variables ...string) (*apiservercel.RuleTypes, []cel.EnvOption, error) {
+func createVariableOpts(declType *apiservercel.DeclType, variables ...string) []cel.EnvOption {
 	opts := make([]cel.EnvOption, 0, len(variables))
-	// untyped, use DynType
-	if declType == nil {
-		for _, v := range variables {
-			opts = append(opts, cel.Variable(v, cel.DynType))
-		}
-		return nil, opts, nil
-	}
-	// create a RuleType for the given type
-	rt, err := apiservercel.NewRuleTypes(declType.TypeName(), declType, registry)
-	if err != nil {
-		return nil, nil, err
-	}
-	if rt == nil {
-		return nil, nil, nil
+	t := cel.DynType
+	if declType != nil {
+		t = declType.CelType()
 	}
 	for _, v := range variables {
-		opts = append(opts, cel.Variable(v, declType.CelType()))
+		opts = append(opts, cel.Variable(v, t))
 	}
-	return rt, opts, nil
+	return opts
 }
-
-func ruleTypesOpts(ruleTypes []*apiservercel.RuleTypes, underlyingTypeProvider ref.TypeProvider) ([]cel.EnvOption, error) {
-	var providers []ref.TypeProvider // may be unused, too small to matter
-	var adapters []ref.TypeAdapter
-	for _, rt := range ruleTypes {
-		if rt != nil {
-			withTP, err := rt.WithTypeProvider(underlyingTypeProvider)
-			if err != nil {
-				return nil, err
-			}
-			providers = append(providers, withTP)
-			adapters = append(adapters, withTP)
-		}
-	}
-	var tp ref.TypeProvider
-	var ta ref.TypeAdapter
-	switch len(providers) {
-	case 0:
-		return nil, nil
-	case 1:
-		tp = providers[0]
-		ta = adapters[0]
-	default:
-		tp = &apiservercel.CompositedTypeProvider{Providers: providers}
-		ta = &apiservercel.CompositedTypeAdapter{Adapters: adapters}
-	}
-	return []cel.EnvOption{cel.CustomTypeProvider(tp), cel.CustomTypeAdapter(ta)}, nil
-}
-
-func getBaseEnv() (*cel.Env, error) {
-	typeCheckingBaseEnvInit.Do(func() {
-		var opts []cel.EnvOption
-		opts = append(opts, cel.HomogeneousAggregateLiterals())
-		// Validate function declarations once during base env initialization,
-		// so they don't need to be evaluated each time a CEL rule is compiled.
-		// This is a relatively expensive operation.
-		opts = append(opts, cel.EagerlyValidateDeclarations(true), cel.DefaultUTCTimeZone(true))
-		opts = append(opts, library.ExtensionLibs...)
-		typeCheckingBaseEnv, typeCheckingBaseEnvError = cel.NewEnv(opts...)
-	})
-	return typeCheckingBaseEnv, typeCheckingBaseEnvError
-}
-
-var typeCheckingBaseEnv *cel.Env
-var typeCheckingBaseEnvError error
-var typeCheckingBaseEnvInit sync.Once

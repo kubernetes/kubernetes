@@ -111,7 +111,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		// Keeping pod on same node reproduces the scenario that volume might already be mounted when resize is attempted.
 		// We should consider adding a unit test that exercises this better.
 		ginkgo.By("Creating a deployment with selected PVC")
-		deployment, err := e2edeployment.CreateDeployment(ctx, c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
+		deployment, err := e2edeployment.CreateDeployment(ctx, c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, admissionapi.LevelRestricted, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
 		ginkgo.DeferCleanup(c.AppsV1().Deployments(ns).Delete, deployment.Name, metav1.DeleteOptions{})
 

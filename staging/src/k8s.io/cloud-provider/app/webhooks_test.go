@@ -19,8 +19,8 @@ package app
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/cloud-provider/app/config"
 	cpconfig "k8s.io/cloud-provider/config"
 	"k8s.io/cloud-provider/fake"
@@ -103,10 +103,10 @@ func TestWebhookEnableDisable(t *testing.T) {
 			t.Fatalf(
 				"FAILED: %q\n---\nActual:\n%s\nExpected:\n%s\ntc.webhookConfigs:\n%s\ntc.completedConfig:\n%s\n",
 				tc.desc,
-				spew.Sdump(actual),
-				spew.Sdump(tc.expected),
-				spew.Sdump(tc.webhookConfigs),
-				spew.Sdump(tc.completedConfig),
+				dump.Pretty(actual),
+				dump.Pretty(tc.expected),
+				dump.Pretty(tc.webhookConfigs),
+				dump.Pretty(tc.completedConfig),
 			)
 		}
 	}

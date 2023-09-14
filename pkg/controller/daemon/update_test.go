@@ -358,7 +358,7 @@ func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
 }
 
 func newUpdateSurge(value intstr.IntOrString) apps.DaemonSetUpdateStrategy {
-	zero := intstr.FromInt(0)
+	zero := intstr.FromInt32(0)
 	return apps.DaemonSetUpdateStrategy{
 		Type: apps.RollingUpdateDaemonSetStrategyType,
 		RollingUpdate: &apps.RollingUpdateDaemonSet{
@@ -399,7 +399,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			},
 			ds: func() *apps.DaemonSet {
 				ds := newDaemonSet("x")
-				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromInt(0))
+				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromInt32(0))
 				return ds
 			}(),
 			nodeToPods:     make(map[string][]*v1.Pod),
@@ -418,7 +418,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			},
 			ds: func() *apps.DaemonSet {
 				ds := newDaemonSet("x")
-				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromInt(1))
+				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromInt32(1))
 				return ds
 			}(),
 			nodeToPods: func() map[string][]*v1.Pod {
@@ -446,7 +446,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			},
 			ds: func() *apps.DaemonSet {
 				ds := newDaemonSet("x")
-				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromInt(0))
+				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromInt32(0))
 				return ds
 			}(),
 			nodeToPods: func() map[string][]*v1.Pod {
@@ -471,7 +471,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			},
 			ds: func() *apps.DaemonSet {
 				ds := newDaemonSet("x")
-				ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(0))
+				ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(0))
 				return ds
 			}(),
 			nodeToPods: func() map[string][]*v1.Pod {

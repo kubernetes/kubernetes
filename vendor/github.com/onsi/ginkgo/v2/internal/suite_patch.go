@@ -48,7 +48,7 @@ func (suite *Suite) ClearBeforeAndAfterSuiteNodes() {
 	suite.suiteNodes = newNodes
 }
 
-func (suite *Suite) RunSpec(spec types.TestSpec, suiteLabels Labels, suitePath string, failer *Failer, writer WriterInterface, suiteConfig types.SuiteConfig) (bool, bool) {
+func (suite *Suite) RunSpec(spec types.TestSpec, suiteLabels Labels, suiteDescription, suitePath string, failer *Failer, writer WriterInterface, suiteConfig types.SuiteConfig, reporterConfig types.ReporterConfig) (bool, bool) {
 	if suite.phase != PhaseBuildTree {
 		panic("cannot run before building the tree = call suite.BuildTree() first")
 	}
@@ -56,7 +56,7 @@ func (suite *Suite) RunSpec(spec types.TestSpec, suiteLabels Labels, suitePath s
 	suite.phase = PhaseRun
 	suite.client = nil
 	suite.failer = failer
-	suite.reporter = reporters.NoopReporter{}
+	suite.reporter = reporters.NewDefaultReporter(reporterConfig, writer)
 	suite.writer = writer
 	suite.outputInterceptor = NoopOutputInterceptor{}
 	if suite.config.Timeout > 0 {
@@ -65,7 +65,7 @@ func (suite *Suite) RunSpec(spec types.TestSpec, suiteLabels Labels, suitePath s
 	suite.interruptHandler = interrupt_handler.NewInterruptHandler(nil)
 	suite.config = suiteConfig
 
-	success := suite.runSpecs("", suiteLabels, suitePath, false, []Spec{spec.(Spec)})
+	success := suite.runSpecs(suiteDescription, suiteLabels, suitePath, false, []Spec{spec.(Spec)})
 
 	return success, false
 }

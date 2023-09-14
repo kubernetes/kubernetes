@@ -71,7 +71,7 @@ func (runtime *CRIRuntime) Socket() string {
 
 // crictl creates a crictl command for the provided args.
 func (runtime *CRIRuntime) crictl(args ...string) utilsexec.Cmd {
-	cmd := runtime.exec.Command(runtime.crictlPath, append([]string{"-r", runtime.Socket()}, args...)...)
+	cmd := runtime.exec.Command(runtime.crictlPath, append([]string{"-r", runtime.Socket(), "-i", runtime.Socket()}, args...)...)
 	cmd.SetEnv(os.Environ())
 	return cmd
 }

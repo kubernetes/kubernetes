@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -142,17 +143,16 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 			metricValue := int64(100)
 			metricTarget := 2 * metricValue
 			metricSpecs := []autoscalingv2.MetricSpec{
-				objectMetricSpecWithAverageValueTarget(metricTarget),
+				objectMetricSpecWithValueTarget(metricTarget),
 			}
 			tc := CustomMetricTestCase{
 				framework:       f,
 				kubeClient:      f.ClientSet,
 				initialReplicas: initialReplicas,
 				scaledReplicas:  1,
-				// Metric exported by deployment is ignored
-				deployment: monitoring.SimpleStackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 0 /* ignored */),
-				pod:        monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, metricValue),
-				hpa:        hpa("custom-metrics-objects-hpa", f.Namespace.ObjectMeta.Name, dummyDeploymentName, 1, 3, metricSpecs),
+				deployment:      noExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas)),
+				pod:             monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, metricValue),
+				hpa:             hpa("custom-metrics-objects-hpa", f.Namespace.ObjectMeta.Name, dummyDeploymentName, 1, 3, metricSpecs),
 			}
 			tc.Run(ctx)
 		})
@@ -163,17 +163,16 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 			metricValue := int64(0)
 			metricTarget := int64(200)
 			metricSpecs := []autoscalingv2.MetricSpec{
-				objectMetricSpecWithAverageValueTarget(metricTarget),
+				objectMetricSpecWithValueTarget(metricTarget),
 			}
 			tc := CustomMetricTestCase{
 				framework:       f,
 				kubeClient:      f.ClientSet,
 				initialReplicas: initialReplicas,
 				scaledReplicas:  0,
-				// Metric exported by deployment is ignored
-				deployment: monitoring.SimpleStackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 0 /* ignored */),
-				pod:        monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, metricValue),
-				hpa:        hpa("custom-metrics-objects-hpa", f.Namespace.ObjectMeta.Name, dummyDeploymentName, 0, 3, metricSpecs),
+				deployment:      noExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas)),
+				pod:             monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, metricValue),
+				hpa:             hpa("custom-metrics-objects-hpa", f.Namespace.ObjectMeta.Name, dummyDeploymentName, 0, 3, metricSpecs),
 			}
 			tc.Run(ctx)
 		})
@@ -186,7 +185,7 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 			metricValue := externalMetricValue
 			metricTarget := 3 * metricValue
 			metricSpecs := []autoscalingv2.MetricSpec{
-				externalMetricSpecWithTarget("target", externalMetricTarget{
+				externalMetricSpecWithTarget("target", f.Namespace.ObjectMeta.Name, externalMetricTarget{
 					value:     metricTarget,
 					isAverage: false,
 				}),
@@ -196,10 +195,9 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 				kubeClient:      f.ClientSet,
 				initialReplicas: initialReplicas,
 				scaledReplicas:  1,
-				// Metric exported by deployment is ignored
-				deployment: monitoring.SimpleStackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 0 /* ignored */),
-				pod:        monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, "target", metricValue),
-				hpa:        hpa("custom-metrics-external-hpa", f.Namespace.ObjectMeta.Name, dummyDeploymentName, 1, 3, metricSpecs),
+				deployment:      noExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas)),
+				pod:             monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, "target", metricValue),
+				hpa:             hpa("custom-metrics-external-hpa", f.Namespace.ObjectMeta.Name, dummyDeploymentName, 1, 3, metricSpecs),
 			}
 			tc.Run(ctx)
 		})
@@ -210,7 +208,7 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 			metricValue := externalMetricValue
 			metricAverageTarget := 3 * metricValue
 			metricSpecs := []autoscalingv2.MetricSpec{
-				externalMetricSpecWithTarget("target_average", externalMetricTarget{
+				externalMetricSpecWithTarget("target_average", f.Namespace.ObjectMeta.Name, externalMetricTarget{
 					value:     metricAverageTarget,
 					isAverage: true,
 				}),
@@ -220,10 +218,9 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 				kubeClient:      f.ClientSet,
 				initialReplicas: initialReplicas,
 				scaledReplicas:  1,
-				// Metric exported by deployment is ignored
-				deployment: monitoring.SimpleStackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 0 /* ignored */),
-				pod:        monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, "target_average", externalMetricValue),
-				hpa:        hpa("custom-metrics-external-hpa", f.Namespace.ObjectMeta.Name, dummyDeploymentName, 1, 3, metricSpecs),
+				deployment:      noExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas)),
+				pod:             monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, "target_average", externalMetricValue),
+				hpa:             hpa("custom-metrics-external-hpa", f.Namespace.ObjectMeta.Name, dummyDeploymentName, 1, 3, metricSpecs),
 			}
 			tc.Run(ctx)
 		})
@@ -237,13 +234,13 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 			metric2Value := externalMetricValue
 			metric2Target := int64(math.Ceil(0.5 * float64(metric2Value)))
 			metricSpecs := []autoscalingv2.MetricSpec{
-				externalMetricSpecWithTarget("external_metric_1", externalMetricTarget{
+				externalMetricSpecWithTarget("external_metric_1", f.Namespace.ObjectMeta.Name, externalMetricTarget{
 					value:     metric1Target,
-					isAverage: false,
+					isAverage: true,
 				}),
-				externalMetricSpecWithTarget("external_metric_2", externalMetricTarget{
+				externalMetricSpecWithTarget("external_metric_2", f.Namespace.ObjectMeta.Name, externalMetricTarget{
 					value:     metric2Target,
-					isAverage: false,
+					isAverage: true,
 				}),
 			}
 			containers := []monitoring.CustomMetricContainerSpec{
@@ -277,9 +274,9 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 			// Second metric is external metric which is present, it should cause scale up.
 			metricSpecs := []autoscalingv2.MetricSpec{
 				podMetricSpecWithAverageValueTarget(monitoring.CustomMetricName, 2*externalMetricValue),
-				externalMetricSpecWithTarget("external_metric", externalMetricTarget{
+				externalMetricSpecWithTarget("external_metric", f.Namespace.ObjectMeta.Name, externalMetricTarget{
 					value:     int64(math.Ceil(0.5 * float64(externalMetricValue))),
-					isAverage: false,
+					isAverage: true,
 				}),
 			}
 			containers := []monitoring.CustomMetricContainerSpec{
@@ -307,7 +304,7 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 			// Second metric is object metric which is present, it should cause scale up.
 			metricSpecs := []autoscalingv2.MetricSpec{
 				resourceMetricSpecWithAverageUtilizationTarget(50),
-				objectMetricSpecWithAverageValueTarget(int64(math.Ceil(0.5 * float64(metricValue)))),
+				objectMetricSpecWithValueTarget(int64(math.Ceil(0.5 * float64(metricValue)))),
 			}
 			tc := CustomMetricTestCase{
 				framework:       f,
@@ -326,9 +323,9 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 			// Second metric is external metric which is present, it should cause scale down if the first metric wasn't missing.
 			metricSpecs := []autoscalingv2.MetricSpec{
 				containerResourceMetricSpecWithAverageUtilizationTarget("container-resource-metric", 50),
-				externalMetricSpecWithTarget("external_metric", externalMetricTarget{
+				externalMetricSpecWithTarget("external_metric", f.Namespace.ObjectMeta.Name, externalMetricTarget{
 					value:     2 * externalMetricValue,
-					isAverage: false,
+					isAverage: true,
 				}),
 			}
 			containers := []monitoring.CustomMetricContainerSpec{
@@ -356,7 +353,7 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 			// First metric an object metric which is missing.
 			// Second metric is pod metric which is present, it should cause scale down if the first metric wasn't missing.
 			metricSpecs := []autoscalingv2.MetricSpec{
-				objectMetricSpecWithAverageValueTarget(int64(math.Ceil(0.5 * float64(metricValue)))),
+				objectMetricSpecWithValueTarget(int64(math.Ceil(0.5 * float64(metricValue)))),
 				podMetricSpecWithAverageValueTarget("pod_metric", 2*metricValue),
 			}
 			containers := []monitoring.CustomMetricContainerSpec{
@@ -495,7 +492,7 @@ func podMetricSpecWithAverageValueTarget(metric string, targetValue int64) autos
 	}
 }
 
-func objectMetricSpecWithAverageValueTarget(targetValue int64) autoscalingv2.MetricSpec {
+func objectMetricSpecWithValueTarget(targetValue int64) autoscalingv2.MetricSpec {
 	return autoscalingv2.MetricSpec{
 		Type: autoscalingv2.ObjectMetricSourceType,
 		Object: &autoscalingv2.ObjectMetricSource{
@@ -541,19 +538,17 @@ func containerResourceMetricSpecWithAverageUtilizationTarget(containerName strin
 	}
 }
 
-func externalMetricSpecWithTarget(metric string, target externalMetricTarget) autoscalingv2.MetricSpec {
+func externalMetricSpecWithTarget(metric string, namespace string, target externalMetricTarget) autoscalingv2.MetricSpec {
 	selector := &metav1.LabelSelector{
-		MatchLabels: map[string]string{"resource.type": "gke_container"},
+		MatchLabels: map[string]string{"resource.type": "k8s_pod"},
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
-				Key:      "resource.labels.namespace_id",
+				Key:      "resource.labels.namespace_name",
 				Operator: metav1.LabelSelectorOpIn,
-				// TODO(bskiba): change default to real namespace name once it is available
-				// from Stackdriver.
-				Values: []string{"default", "dummy"},
+				Values:   []string{namespace},
 			},
 			{
-				Key:      "resource.labels.pod_id",
+				Key:      "resource.labels.pod_name",
 				Operator: metav1.LabelSelectorOpExists,
 				Values:   []string{},
 			},
@@ -636,4 +631,19 @@ func ensureDesiredReplicasInRange(ctx context.Context, deploymentName, namespace
 		return
 	}
 	framework.ExpectNoErrorWithOffset(1, err)
+}
+
+func noExporterDeployment(name, namespace string, replicas int32) *appsv1.Deployment {
+	d := e2edeployment.NewDeployment(name, replicas, map[string]string{"name": name}, "", "", appsv1.RollingUpdateDeploymentStrategyType)
+	d.ObjectMeta.Namespace = namespace
+	d.Spec.Template.Spec = v1.PodSpec{Containers: []v1.Container{
+		{
+			Name:            "sleeper",
+			Image:           "registry.k8s.io/e2e-test-images/agnhost:2.40",
+			ImagePullPolicy: v1.PullAlways,
+			Command:         []string{"/agnhost"},
+			Args:            []string{"pause"}, // do nothing forever
+		},
+	}}
+	return d
 }

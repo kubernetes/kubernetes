@@ -55,12 +55,12 @@ func SetDefaults_DaemonSet(obj *extensionsv1beta1.DaemonSet) {
 		}
 		if updateStrategy.RollingUpdate.MaxUnavailable == nil {
 			// Set default MaxUnavailable as 1 by default.
-			maxUnavailable := intstr.FromInt(1)
+			maxUnavailable := intstr.FromInt32(1)
 			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 		if updateStrategy.RollingUpdate.MaxSurge == nil {
 			// Set default MaxSurge as 0 by default.
-			maxSurge := intstr.FromInt(0)
+			maxSurge := intstr.FromInt32(0)
 			updateStrategy.RollingUpdate.MaxSurge = &maxSurge
 		}
 	}
@@ -99,12 +99,12 @@ func SetDefaults_Deployment(obj *extensionsv1beta1.Deployment) {
 		}
 		if strategy.RollingUpdate.MaxUnavailable == nil {
 			// Set default MaxUnavailable as 1 by default.
-			maxUnavailable := intstr.FromInt(1)
+			maxUnavailable := intstr.FromInt32(1)
 			strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 		if strategy.RollingUpdate.MaxSurge == nil {
 			// Set default MaxSurge as 1 by default.
-			maxSurge := intstr.FromInt(1)
+			maxSurge := intstr.FromInt32(1)
 			strategy.RollingUpdate.MaxSurge = &maxSurge
 		}
 	}

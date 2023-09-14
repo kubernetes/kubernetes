@@ -139,7 +139,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			framework.ExpectNotEqual(pvc, nil)
 		}
 
-		pod := makePod(ns, pvc, ephemeral)
+		pod := makePod(f, pvc, ephemeral)
 		pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -190,7 +190,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 
 		ginkgo.By("Creating a pod and expecting it to fail")
-		pod := makePod(ns, pvc, ephemeral)
+		pod := makePod(f, pvc, ephemeral)
 		pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Pod %s/%s", pod.Namespace, pod.Name)
 
@@ -215,7 +215,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			framework.ExpectNotEqual(pvc, nil)
 		}
 
-		pod := makePod(ns, pvc, isEphemeral)
+		pod := makePod(f, pvc, isEphemeral)
 		pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -280,7 +280,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			framework.ExpectNotEqual(pvcBlock, nil)
 		}
 
-		pod := makePod(ns, pvcBlock, isEphemeral)
+		pod := makePod(f, pvcBlock, isEphemeral)
 		pod.Spec.Containers[0].VolumeDevices = []v1.VolumeDevice{{
 			Name:       pod.Spec.Volumes[0].Name,
 			DevicePath: "/mnt/" + pvcBlock.Name,
@@ -346,7 +346,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			framework.ExpectNotEqual(pvc, nil)
 		}
 
-		pod := makePod(ns, pvc, isEphemeral)
+		pod := makePod(f, pvc, isEphemeral)
 		pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -377,7 +377,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			framework.ExpectNotEqual(pvc, nil)
 		}
 
-		pod := makePod(ns, pvc, isEphemeral)
+		pod := makePod(f, pvc, isEphemeral)
 		pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -407,7 +407,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			framework.ExpectNotEqual(pvc, nil)
 		}
 
-		pod := makePod(ns, pvc, isEphemeral)
+		pod := makePod(f, pvc, isEphemeral)
 
 		// Get metrics
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
@@ -890,9 +890,9 @@ func waitForADControllerStatesMetrics(ctx context.Context, metricsGrabber *e2eme
 
 // makePod creates a pod which either references the PVC or creates it via a
 // generic ephemeral volume claim template.
-func makePod(ns string, pvc *v1.PersistentVolumeClaim, isEphemeral bool) *v1.Pod {
+func makePod(f *framework.Framework, pvc *v1.PersistentVolumeClaim, isEphemeral bool) *v1.Pod {
 	claims := []*v1.PersistentVolumeClaim{pvc}
-	pod := e2epod.MakePod(ns, nil, claims, false, "")
+	pod := e2epod.MakePod(f.Namespace.Name, nil, claims, f.NamespacePodSecurityLevel, "")
 	if isEphemeral {
 		volSrc := pod.Spec.Volumes[0]
 		volSrc.PersistentVolumeClaim = nil

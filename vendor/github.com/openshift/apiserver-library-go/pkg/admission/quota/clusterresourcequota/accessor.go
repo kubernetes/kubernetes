@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -14,6 +12,7 @@ import (
 	utilquota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/storage"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/utils/lru"
 
 	quotav1 "github.com/openshift/api/quota/v1"
 	quotatypedclient "github.com/openshift/client-go/quota/clientset/versioned/typed/quota/v1"
@@ -42,12 +41,7 @@ func newQuotaAccessor(
 	clusterQuotaClient quotatypedclient.ClusterResourceQuotasGetter,
 	clusterQuotaMapper clusterquotamapping.ClusterQuotaMapper,
 ) *clusterQuotaAccessor {
-	updatedCache, err := lru.New(100)
-	if err != nil {
-		// this should never happen
-		panic(err)
-	}
-
+	updatedCache := lru.New(100)
 	return &clusterQuotaAccessor{
 		clusterQuotaLister:   clusterQuotaLister,
 		namespaceLister:      namespaceLister,

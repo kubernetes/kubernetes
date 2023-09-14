@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.5.7}
+ETCD_VERSION=${ETCD_VERSION:-3.5.9}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 # This is intentionally not called ETCD_LOG_LEVEL:
@@ -45,7 +45,7 @@ kube::etcd::validate() {
   fi
   if ${port_check_command} -nat | grep "LISTEN" | grep "[\.:]${ETCD_PORT:?}" >/dev/null 2>&1; then
     kube::log::usage "unable to start etcd as port ${ETCD_PORT} is in use. please stop the process listening on this port and retry."
-    kube::log::usage "$(netstat -nat | grep "[\.:]${ETCD_PORT:?} .*LISTEN")"
+    kube::log::usage "$(${port_check_command} -nat | grep "LISTEN" | grep "[\.:]${ETCD_PORT:?}")"
     exit 1
   fi
 
@@ -160,7 +160,7 @@ kube::etcd::install() {
 
     if [[ ${os} == "darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.zip"
-      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
+      url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
       kube::util::download_file "${url}" "${download_file}"
       unzip -o "${download_file}"
       ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd

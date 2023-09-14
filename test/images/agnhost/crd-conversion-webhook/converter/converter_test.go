@@ -92,7 +92,7 @@ request:
 				return
 			}
 
-			yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, scheme)
+			yamlSerializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{Yaml: true})
 			if _, _, err := yamlSerializer.Decode(response.Body.Bytes(), nil, &convertReview); err != nil {
 				t.Fatalf("cannot decode data: \n %v\n Error: %v", response.Body, err)
 			}

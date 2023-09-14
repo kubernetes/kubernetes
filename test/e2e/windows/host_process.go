@@ -22,10 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/gomega"
-
 	semver "github.com/blang/semver/v4"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -142,7 +141,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 	})
 
 	ginkgo.It("should support init containers", func(ctx context.Context) {
@@ -202,7 +201,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			}
 			framework.Logf("Pod phase: %v\nlogs:\n%s", p.Status.Phase, logs)
 		}
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 	})
 
 	ginkgo.It("container command path validation", func(ctx context.Context) {
@@ -511,7 +510,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 	})
 
 	ginkgo.It("metrics should report count of started and failed to start HostProcess containers", func(ctx context.Context) {
@@ -793,7 +792,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 
 		// whoami will output %COMPUTER_NAME%/{randomly generated username} here.
 		// It is sufficient to just check that the logs do not container `nt authority`

@@ -27,6 +27,11 @@ const (
 	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#label-selector-and-annotation-conventions
 	labelPrefix = "batch.kubernetes.io/"
 
+	// CronJobScheduledTimestampAnnotation is the scheduled timestamp annotation for the Job.
+	// It records the original/expected scheduled timestamp for the running job, represented in RFC3339.
+	// The CronJob controller adds this annotation if the CronJobsScheduledAnnotation feature gate (beta in 1.28) is enabled.
+	CronJobScheduledTimestampAnnotation = labelPrefix + "cronjob-scheduled-timestamp"
+
 	JobCompletionIndexAnnotation = labelPrefix + "job-completion-index"
 	// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
 	// being deleted before being accounted in the Job status.
@@ -45,6 +50,13 @@ const (
 	// ControllerUid is used to programatically get pods corresponding to a Job.
 	// There is a corresponding label without the batch.kubernetes.io that we support for legacy reasons.
 	ControllerUidLabel = labelPrefix + "controller-uid"
+	// Annotation indicating the number of failures for the index corresponding
+	// to the pod, which are counted towards the backoff limit.
+	JobIndexFailureCountAnnotation = labelPrefix + "job-index-failure-count"
+	// Annotation indicating the number of failures for the index corresponding
+	// to the pod, which don't count towards the backoff limit, according to the
+	// pod failure policy. When the annotation is absent zero is implied.
+	JobIndexIgnoredFailureCountAnnotation = labelPrefix + "job-index-ignored-failure-count"
 )
 
 // +genclient
@@ -109,6 +121,11 @@ const (
 	// pod's job as Failed and terminate all running pods.
 	PodFailurePolicyActionFailJob PodFailurePolicyAction = "FailJob"
 
+	// This is an action which might be taken on a pod failure - mark the
+	// Job's index as failed to avoid restarts within this index. This action
+	// can only be used when backoffLimitPerIndex is set.
+	PodFailurePolicyActionFailIndex PodFailurePolicyAction = "FailIndex"
+
 	// This is an action which might be taken on a pod failure - the counter towards
 	// .backoffLimit, represented by the job's .status.failed field, is not
 	// incremented and a replacement pod is created.
@@ -126,6 +143,19 @@ type PodFailurePolicyOnExitCodesOperator string
 const (
 	PodFailurePolicyOnExitCodesOpIn    PodFailurePolicyOnExitCodesOperator = "In"
 	PodFailurePolicyOnExitCodesOpNotIn PodFailurePolicyOnExitCodesOperator = "NotIn"
+)
+
+// PodReplacementPolicy specifies the policy for creating pod replacements.
+// +enum
+type PodReplacementPolicy string
+
+const (
+	// TerminatingOrFailed means that we recreate pods
+	// when they are terminating (has a metadata.deletionTimestamp) or failed.
+	TerminatingOrFailed PodReplacementPolicy = "TerminatingOrFailed"
+	// Failed means to wait until a previously created Pod is fully terminated (has phase
+	// Failed or Succeeded) before creating a replacement Pod.
+	Failed PodReplacementPolicy = "Failed"
 )
 
 // PodFailurePolicyOnExitCodesRequirement describes the requirement for handling
@@ -186,6 +216,10 @@ type PodFailurePolicyRule struct {
 	//
 	// - FailJob: indicates that the pod's job is marked as Failed and all
 	//   running pods are terminated.
+	// - FailIndex: indicates that the pod's index is marked as Failed and will
+	//   not be restarted.
+	//   This value is alpha-level. It can be used when the
+	//   `JobBackoffLimitPerIndex` feature gate is enabled (disabled by default).
 	// - Ignore: indicates that the counter towards the .backoffLimit is not
 	//   incremented and a replacement pod is created.
 	// - Count: indicates that the pod is handled in the default way - the
@@ -202,6 +236,7 @@ type PodFailurePolicyRule struct {
 	// as a list of pod condition patterns. The requirement is satisfied if at
 	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
 	// +listType=atomic
+	// +optional
 	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions" protobuf:"bytes,3,opt,name=onPodConditions"`
 }
 
@@ -261,6 +296,30 @@ type JobSpec struct {
 	// Defaults to 6
 	// +optional
 	BackoffLimit *int32 `json:"backoffLimit,omitempty" protobuf:"varint,7,opt,name=backoffLimit"`
+
+	// Specifies the limit for the number of retries within an
+	// index before marking this index as failed. When enabled the number of
+	// failures per index is kept in the pod's
+	// batch.kubernetes.io/job-index-failure-count annotation. It can only
+	// be set when Job's completionMode=Indexed, and the Pod's restart
+	// policy is Never. The field is immutable.
+	// This field is alpha-level. It can be used when the `JobBackoffLimitPerIndex`
+	// feature gate is enabled (disabled by default).
+	// +optional
+	BackoffLimitPerIndex *int32 `json:"backoffLimitPerIndex,omitempty" protobuf:"varint,12,opt,name=backoffLimitPerIndex"`
+
+	// Specifies the maximal number of failed indexes before marking the Job as
+	// failed, when backoffLimitPerIndex is set. Once the number of failed
+	// indexes exceeds this number the entire Job is marked as Failed and its
+	// execution is terminated. When left as null the job continues execution of
+	// all of its indexes and is marked with the `Complete` Job condition.
+	// It can only be specified when backoffLimitPerIndex is set.
+	// It can be null or up to completions. It is required and must be
+	// less than or equal to 10^4 when is completions greater than 10^5.
+	// This field is alpha-level. It can be used when the `JobBackoffLimitPerIndex`
+	// feature gate is enabled (disabled by default).
+	// +optional
+	MaxFailedIndexes *int32 `json:"maxFailedIndexes,omitempty" protobuf:"varint,13,opt,name=maxFailedIndexes"`
 
 	// TODO enabled it when https://github.com/kubernetes/kubernetes/issues/28486 has been fixed
 	// Optional number of failed pods to retain.
@@ -336,6 +395,19 @@ type JobSpec struct {
 	//
 	// +optional
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,10,opt,name=suspend"`
+
+	// podReplacementPolicy specifies when to create replacement Pods.
+	// Possible values are:
+	// - TerminatingOrFailed means that we recreate pods
+	//   when they are terminating (has a metadata.deletionTimestamp) or failed.
+	// - Failed means to wait until a previously created Pod is fully terminated (has phase
+	//   Failed or Succeeded) before creating a replacement Pod.
+	//
+	// When using podFailurePolicy, Failed is the the only allowed value.
+	// TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.
+	// This is an alpha field. Enable JobPodReplacementPolicy to be able to use this field.
+	// +optional
+	PodReplacementPolicy *PodReplacementPolicy `json:"podReplacementPolicy,omitempty" protobuf:"bytes,14,opt,name=podReplacementPolicy,casttype=podReplacementPolicy"`
 }
 
 // JobStatus represents the current state of a Job.
@@ -379,6 +451,14 @@ type JobStatus struct {
 	// +optional
 	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
 
+	// The number of pods which are terminating (in phase Pending or Running
+	// and have a deletionTimestamp).
+	//
+	// This field is alpha-level. The job controller populates the field when
+	// the feature gate JobPodReplacementPolicy is enabled (disabled by default).
+	// +optional
+	Terminating *int32 `json:"terminating,omitempty" protobuf:"varint,11,opt,name=terminating"`
+
 	// completedIndexes holds the completed indexes when .spec.completionMode =
 	// "Indexed" in a text format. The indexes are represented as decimal integers
 	// separated by commas. The numbers are listed in increasing order. Three or
@@ -388,6 +468,19 @@ type JobStatus struct {
 	// represented as "1,3-5,7".
 	// +optional
 	CompletedIndexes string `json:"completedIndexes,omitempty" protobuf:"bytes,7,opt,name=completedIndexes"`
+
+	// FailedIndexes holds the failed indexes when backoffLimitPerIndex=true.
+	// The indexes are represented in the text format analogous as for the
+	// `completedIndexes` field, ie. they are kept as decimal integers
+	// separated by commas. The numbers are listed in increasing order. Three or
+	// more consecutive numbers are compressed and represented by the first and
+	// last element of the series, separated by a hyphen.
+	// For example, if the failed indexes are 1, 3, 4, 5 and 7, they are
+	// represented as "1,3-5,7".
+	// This field is alpha-level. It can be used when the `JobBackoffLimitPerIndex`
+	// feature gate is enabled (disabled by default).
+	// +optional
+	FailedIndexes *string `json:"failedIndexes,omitempty" protobuf:"bytes,10,opt,name=failedIndexes"`
 
 	// uncountedTerminatedPods holds the UIDs of Pods that have terminated but
 	// the job controller hasn't yet accounted for in the status counters.

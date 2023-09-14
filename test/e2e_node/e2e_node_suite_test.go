@@ -130,6 +130,10 @@ func TestMain(m *testing.M) {
 
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
+	if pflag.CommandLine.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "unknown additional command line arguments: %s", pflag.CommandLine.Args())
+		os.Exit(1)
+	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
 	if err := e2eskipper.InitFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
@@ -248,6 +252,13 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	framework.TestContext.BearerToken = string(token)
 	// update test context with node configuration.
 	gomega.Expect(updateTestContext(ctx)).To(gomega.Succeed(), "update test context with node config.")
+
+	// Store current Kubelet configuration in the package variable
+	// This assumes all tests which dynamically change kubelet configuration
+	// must: 1) run in serial; 2) restore kubelet configuration after test.
+	var err error
+	kubeletCfg, err = getCurrentKubeletConfig(ctx)
+	framework.ExpectNoError(err)
 })
 
 // Tear down the kubelet on the node
@@ -334,14 +345,6 @@ func updateTestContext(ctx context.Context) error {
 
 	framework.Logf("Node name: %s", framework.TestContext.NodeName)
 
-	// Update test context with current kubelet configuration.
-	// This assumes all tests which dynamically change kubelet configuration
-	// must: 1) run in serial; 2) restore kubelet configuration after test.
-	kubeletCfg, err := getCurrentKubeletConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get kubelet configuration: %w", err)
-	}
-	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
 	return nil
 }
 

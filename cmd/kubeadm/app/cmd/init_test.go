@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	v1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -81,7 +81,7 @@ func TestNewInitData(t *testing.T) {
 	}{
 		// Init data passed using flags
 		{
-			name: "pass without any flag (use defaults)",
+			name: "pass without any flag except the cri socket (use defaults)",
 		},
 		{
 			name: "fail if unknown feature gates flag are passed",
@@ -121,12 +121,12 @@ func TestNewInitData(t *testing.T) {
 							AdvertiseAddress: "1.2.3.4",
 							BindPort:         6443,
 						},
-						BootstrapTokens: []v1.BootstrapToken{
+						BootstrapTokens: []bootstraptokenv1.BootstrapToken{
 							{
-								Token:  &v1.BootstrapTokenString{ID: "abcdef", Secret: "0123456789abcdef"},
+								Token:  &bootstraptokenv1.BootstrapTokenString{ID: "abcdef", Secret: "0123456789abcdef"},
 								Usages: []string{"signing", "authentication"},
 								TTL: &metav1.Duration{
-									Duration: constants.DefaultTokenDuration,
+									Duration: bootstraptokenv1.DefaultTokenDuration,
 								},
 								Groups: []string{"system:bootstrappers:kubeadm:default-node-token"},
 							},
@@ -190,6 +190,15 @@ func TestNewInitData(t *testing.T) {
 			initOptions := newInitOptions()
 			cmd := newCmdInit(nil, initOptions)
 
+			// set the cri socket here, otherwise the testcase might fail if is run on the node with multiple
+			// cri endpoints configured, the failure caused by this is normally not an expected failure.
+			if tc.flags == nil {
+				tc.flags = make(map[string]string)
+			}
+			// set `cri-socket` only if `CfgPath` is not set
+			if _, okay := tc.flags[options.CfgPath]; !okay {
+				tc.flags[options.NodeCRISocket] = constants.UnknownCRISocket
+			}
 			// sets cmd flags (that will be reflected on the init options)
 			for f, v := range tc.flags {
 				cmd.Flags().Set(f, v)

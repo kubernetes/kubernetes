@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -205,7 +206,6 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		for _, m := range msg {
 			printer.Printf("[upgrade/config] %s\n", m)
 		}
-		return nil, nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
 
 	// If the user told us to print this information out; do it!
@@ -224,7 +224,7 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 		return
 	}
 
-	cfgYaml, err := configutil.MarshalKubeadmConfigObject(clustercfg)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(clustercfg, kubeadmapiv1.SchemeGroupVersion)
 	if err == nil {
 		printer.Fprintln(w, "[upgrade/config] Configuration used:")
 

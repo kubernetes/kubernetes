@@ -125,7 +125,7 @@ type InTreeToCSITranslator interface {
 //
 // This integrates into the existing scheduler workflow as follows:
 //  1. The scheduler takes a Pod off the scheduler queue and processes it serially:
-//     a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
+//     a. Invokes all pre-filter plugins for the pod. GetPodVolumeClaims() is invoked
 //     here, pod volume information will be saved in current scheduling cycle state for later use.
 //     If pod has bound immediate PVCs, GetEligibleNodes() is invoked to potentially reduce
 //     down the list of eligible nodes based on the bound PV's NodeAffinity (if any).
@@ -157,7 +157,7 @@ type SchedulerVolumeBinder interface {
 	//
 	// If eligibleNodes is 'nil', then it indicates that such eligible node reduction cannot be made
 	// and all nodes should be considered.
-	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String)
+	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.Set[string])
 
 	// FindPodVolumes checks if all of a Pod's PVCs can be satisfied by the
 	// node and returns pod's volumes information.
@@ -386,7 +386,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, podVolumeClaims *PodVolumeCla
 //
 // Returning 'nil' for eligibleNodes indicates that such eligible node reduction cannot be made and all nodes
 // should be considered.
-func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
+func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.Set[string]) {
 	if len(boundClaims) == 0 {
 		return
 	}
@@ -407,13 +407,13 @@ func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim)
 			// on the first found list of eligible nodes for the local PersistentVolume,
 			// insert to the eligible node set.
 			if eligibleNodes == nil {
-				eligibleNodes = sets.NewString(nodeNames...)
+				eligibleNodes = sets.New(nodeNames...)
 			} else {
 				// for subsequent finding of eligible nodes for the local PersistentVolume,
 				// take the intersection of the nodes with the existing eligible nodes
 				// for cases if PV1 has node affinity to node1 and PV2 has node affinity to node2,
 				// then the eligible node list should be empty.
-				eligibleNodes = eligibleNodes.Intersection(sets.NewString(nodeNames...))
+				eligibleNodes = eligibleNodes.Intersection(sets.New(nodeNames...))
 			}
 		}
 	}
@@ -1088,7 +1088,7 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 	case csiplugins.AWSEBSInTreePluginName:
 		return true
 	case csiplugins.GCEPDInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+		return true
 	case csiplugins.AzureDiskInTreePluginName:
 		return true
 	case csiplugins.CinderInTreePluginName:
@@ -1112,13 +1112,13 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) 
 		return false
 	}
 
-	var mpaSet sets.String
+	var mpaSet sets.Set[string]
 	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
 	if len(mpa) == 0 {
-		mpaSet = sets.NewString()
+		mpaSet = sets.New[string]()
 	} else {
 		tok := strings.Split(mpa, ",")
-		mpaSet = sets.NewString(tok...)
+		mpaSet = sets.New(tok...)
 	}
 
 	return mpaSet.Has(pluginName)

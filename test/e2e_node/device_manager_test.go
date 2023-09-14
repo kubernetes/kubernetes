@@ -721,11 +721,14 @@ func hasFailed(hasFailed bool) types.GomegaMatcher {
 	}).WithTemplate("expected Pod failed {{.To}} be in {{format .Data}}\nGot instead:\n{{.FormattedActual}}").WithTemplateData(hasFailed)
 }
 
-func getPod(ctx context.Context, f *framework.Framework, podName string) (bool, error) {
+func getPodByName(ctx context.Context, f *framework.Framework, podName string) (*v1.Pod, error) {
+	return e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+}
 
-	pod, err := e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+func getPod(ctx context.Context, f *framework.Framework, podName string) (bool, error) {
+	pod, err := getPodByName(ctx, f, podName)
 	if err != nil {
-		return false, fmt.Errorf("expected node to get pod=%q got err=%q", pod.Name, err)
+		return false, err
 	}
 
 	expectedStatusReason := "UnexpectedAdmissionError"

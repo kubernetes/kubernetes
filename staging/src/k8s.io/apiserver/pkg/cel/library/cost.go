@@ -41,7 +41,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		// This cost is set to allow for only two authorization checks per expression
 		cost := uint64(350000)
 		return &cost
-	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "denied", "reason":
+	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "reason", "error", "errored":
 		// All authorization builder and accessor functions have a nominal cost
 		cost := uint64(1)
 		return &cost
@@ -91,7 +91,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 		// An authorization check has a fixed cost
 		// This cost is set to allow for only two authorization checks per expression
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 350000, Max: 350000}}
-	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "denied", "reason":
+	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "reason", "error", "errored":
 		// All authorization builder and accessor functions have a nominal cost
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":
@@ -126,13 +126,51 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			sz := l.sizeEstimate(*target)
 			toReplaceSz := l.sizeEstimate(args[0])
 			replaceWithSz := l.sizeEstimate(args[1])
-			// smallest possible result: smallest input size composed of the largest possible substrings being replaced by smallest possible replacement
-			minSz := uint64(math.Ceil(float64(sz.Min)/float64(toReplaceSz.Max))) * replaceWithSz.Min
-			// largest possible result: largest input size composed of the smallest possible substrings being replaced by largest possible replacement
-			maxSz := uint64(math.Ceil(float64(sz.Max)/float64(toReplaceSz.Min))) * replaceWithSz.Max
+
+			var replaceCount, retainedSz checker.SizeEstimate
+			// find the longest replacement:
+			if toReplaceSz.Min == 0 {
+				// if the string being replaced is empty, replace surrounds all characters in the input string with the replacement.
+				if sz.Max < math.MaxUint64 {
+					replaceCount.Max = sz.Max + 1
+				} else {
+					replaceCount.Max = sz.Max
+				}
+				// Include the length of the longest possible original string length.
+				retainedSz.Max = sz.Max
+			} else if replaceWithSz.Max <= toReplaceSz.Min {
+				// If the replacement does not make the result longer, use the original string length.
+				replaceCount.Max = 0
+				retainedSz.Max = sz.Max
+			} else {
+				// Replace the smallest possible substrings with the largest possible replacement
+				// as many times as possible.
+				replaceCount.Max = uint64(math.Ceil(float64(sz.Max) / float64(toReplaceSz.Min)))
+			}
+
+			// find the shortest replacement:
+			if toReplaceSz.Max == 0 {
+				// if the string being replaced is empty, replace surrounds all characters in the input string with the replacement.
+				if sz.Min < math.MaxUint64 {
+					replaceCount.Min = sz.Min + 1
+				} else {
+					replaceCount.Min = sz.Min
+				}
+				// Include the length of the shortest possible original string length.
+				retainedSz.Min = sz.Min
+			} else if toReplaceSz.Max <= replaceWithSz.Min {
+				// If the replacement does not make the result shorter, use the original string length.
+				replaceCount.Min = 0
+				retainedSz.Min = sz.Min
+			} else {
+				// Replace the largest possible substrings being with the smallest possible replacement
+				// as many times as possible.
+				replaceCount.Min = uint64(math.Ceil(float64(sz.Min) / float64(toReplaceSz.Max)))
+			}
+			size := replaceCount.Multiply(replaceWithSz).Add(retainedSz)
 
 			// cost is the traversal plus the construction of the result
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * common.StringTraversalCostFactor), ResultSize: &checker.SizeEstimate{Min: minSz, Max: maxSz}}
+			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * common.StringTraversalCostFactor), ResultSize: &size}
 		}
 	case "split":
 		if target != nil {

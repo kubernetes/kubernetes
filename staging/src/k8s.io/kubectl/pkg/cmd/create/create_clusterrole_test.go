@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -149,7 +149,7 @@ func TestCreateClusterRole(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 		cmd := NewCmdCreateClusterRole(tf, ioStreams)
 		cmd.Flags().Set("dry-run", "client")
 		cmd.Flags().Set("output", "yaml")
@@ -163,7 +163,7 @@ func TestCreateClusterRole(t *testing.T) {
 		cmd.Run(cmd, []string{clusterRoleName})
 		actual := &rbac.ClusterRole{}
 		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), buf.Bytes(), actual); err != nil {
-			t.Log(string(buf.Bytes()))
+			t.Log(buf.String())
 			t.Fatal(err)
 		}
 		if !equality.Semantic.DeepEqual(test.expectedClusterRole, actual) {
@@ -496,7 +496,7 @@ func TestClusterRoleValidate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			test.clusterRoleOptions.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
+			test.clusterRoleOptions.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
 			var err error
 			test.clusterRoleOptions.Mapper, err = tf.ToRESTMapper()
 			if err != nil {

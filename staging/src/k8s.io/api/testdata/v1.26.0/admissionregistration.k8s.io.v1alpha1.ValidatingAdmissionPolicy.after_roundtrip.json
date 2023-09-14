@@ -126,7 +126,8 @@
         "reason": "reasonValue"
       }
     ],
-    "failurePolicy": "failurePolicyValue"
+    "failurePolicy": "failurePolicyValue",
+    "variables": null
   },
   "status": {}
 }

@@ -41,7 +41,7 @@ func TestFindPort(t *testing.T) {
 	}{{
 		name:       "valid int, no ports",
 		containers: []v1.Container{{}},
-		port:       intstr.FromInt(93),
+		port:       intstr.FromInt32(93),
 		expected:   93,
 		pass:       true,
 	}, {
@@ -55,7 +55,7 @@ func TestFindPort(t *testing.T) {
 			ContainerPort: 22,
 			Protocol:      "TCP",
 		}}}},
-		port:     intstr.FromInt(93),
+		port:     intstr.FromInt32(93),
 		expected: 93,
 		pass:     true,
 	}, {

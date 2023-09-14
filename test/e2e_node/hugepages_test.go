@@ -70,7 +70,7 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity,
 	// convert the cgroup name to its literal form
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
 	cgroupFsName := ""
-	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+	if kubeletCfg.CgroupDriver == "systemd" {
 		cgroupFsName = cgroupName.ToSystemd()
 	} else {
 		cgroupFsName = cgroupName.ToCgroupfs()
@@ -227,7 +227,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-3Mi"]
 			return isPresent
-		}, 30*time.Second, framework.Poll).Should(gomega.Equal(false))
+		}, 30*time.Second, framework.Poll).Should(gomega.BeFalse())
 	})
 
 	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func(ctx context.Context) {
@@ -247,7 +247,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-2Mi"]
 			return isPresent
-		}, 30*time.Second, framework.Poll).Should(gomega.Equal(true))
+		}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 	})
 
 	ginkgo.When("start the pod", func() {

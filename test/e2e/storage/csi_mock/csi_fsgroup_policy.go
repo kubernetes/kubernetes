@@ -104,8 +104,8 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 				// Delete the created file. This step is mandatory, as the mock driver
 				// won't clean up the contents automatically.
 				defer func() {
-					delete := fmt.Sprintf("rm -fr %s", dirName)
-					_, _, err = e2evolume.PodExec(f, pod, delete)
+					deleteDir := fmt.Sprintf("rm -fr %s", dirName)
+					_, _, err = e2evolume.PodExec(f, pod, deleteDir)
 					framework.ExpectNoError(err, "failed: deleting the directory: %s", err)
 				}()
 

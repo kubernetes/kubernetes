@@ -12,6 +12,10 @@ type FakeConfigV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeConfigV1alpha1) Backups() v1alpha1.BackupInterface {
+	return &FakeBackups{c}
+}
+
 func (c *FakeConfigV1alpha1) InsightsDataGathers() v1alpha1.InsightsDataGatherInterface {
 	return &FakeInsightsDataGathers{c}
 }

@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	apiserver "k8s.io/apiserver/pkg/server"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	appconfig "k8s.io/cloud-provider/app/config"
@@ -150,7 +150,7 @@ func TestDefaultFlags(t *testing.T) {
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s))
 	}
 }
 
@@ -162,7 +162,7 @@ func TestAddFlags(t *testing.T) {
 		t.Errorf("unexpected err: %v", err)
 	}
 
-	for _, f := range s.Flags([]string{""}, []string{""}, []string{""}, []string{""}).FlagSets {
+	for _, f := range s.Flags([]string{""}, []string{""}, nil, []string{""}, []string{""}).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -309,7 +309,7 @@ func TestAddFlags(t *testing.T) {
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 	}
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s))
 	}
 }
 
@@ -321,7 +321,7 @@ func TestCreateConfig(t *testing.T) {
 		t.Errorf("unexpected err: %v", err)
 	}
 
-	for _, f := range s.Flags([]string{""}, []string{""}, []string{""}, []string{""}).FlagSets {
+	for _, f := range s.Flags([]string{""}, []string{""}, nil, []string{""}, []string{""}).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -371,7 +371,7 @@ func TestCreateConfig(t *testing.T) {
 		fmt.Printf("%s: %s\n", f.Name, f.Value)
 	})
 
-	c, err := s.Config([]string{"foo", "bar"}, []string{}, []string{"foo", "bar", "baz"}, []string{})
+	c, err := s.Config([]string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar", "baz"}, []string{})
 	assert.Nil(t, err, "unexpected error: %s", err)
 
 	expected := &appconfig.Config{
@@ -444,6 +444,42 @@ func TestCreateConfig(t *testing.T) {
 	c.LoopbackClientConfig = nil
 
 	if !reflect.DeepEqual(expected, c) {
-		t.Errorf("Got different config than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, c))
+		t.Errorf("Got different config than expected.\nDifference detected on:\n%s", cmp.Diff(expected, c))
+	}
+}
+
+func TestCloudControllerManagerAliases(t *testing.T) {
+	opts, err := NewCloudControllerManagerOptions()
+	if err != nil {
+		t.Errorf("expected no error, error found %+v", err)
+	}
+	opts.KubeCloudShared.CloudProvider.Name = "gce"
+	opts.Generic.Controllers = []string{"service-controller", "-service", "route", "-cloud-node-lifecycle-controller"}
+	expectedControllers := []string{"service-controller", "-service-controller", "route-controller", "-cloud-node-lifecycle-controller"}
+
+	allControllers := []string{
+		"cloud-node-controller",
+		"service-controller",
+		"route-controller",
+		"cloud-node-lifecycle-controller",
+	}
+	disabledByDefaultControllers := []string{}
+	controllerAliases := map[string]string{
+		"cloud-node":           "cloud-node-controller",
+		"service":              "service-controller",
+		"route":                "route-controller",
+		"cloud-node-lifecycle": "cloud-node-lifecycle-controller",
+	}
+
+	if err := opts.Validate(allControllers, disabledByDefaultControllers, controllerAliases, nil, nil); err != nil {
+		t.Errorf("expected no error, error found %v", err)
+	}
+
+	cfg := &cmconfig.GenericControllerManagerConfiguration{}
+	if err := opts.Generic.ApplyTo(cfg, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
+		t.Errorf("expected no error, error found %v", err)
+	}
+	if !reflect.DeepEqual(cfg.Controllers, expectedControllers) {
+		t.Errorf("controller aliases not resolved correctly, expected %+v, got %+v", expectedControllers, cfg.Controllers)
 	}
 }

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
@@ -77,11 +78,11 @@ type RolloutStatusOptions struct {
 	DynamicClient  dynamic.Interface
 
 	FilenameOptions *resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewRolloutStatusOptions returns an initialized RolloutStatusOptions instance
-func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatusOptions {
+func NewRolloutStatusOptions(streams genericiooptions.IOStreams) *RolloutStatusOptions {
 	return &RolloutStatusOptions{
 		PrintFlags:      genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
@@ -92,7 +93,7 @@ func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatus
 }
 
 // NewCmdRolloutStatus returns a Command instance for the 'rollout status' sub command
-func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdRolloutStatus(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewRolloutStatusOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
@@ -173,7 +174,9 @@ func (o *RolloutStatusOptions) Run() error {
 		return err
 	}
 
-	return r.Visit(func(info *resource.Info, _ error) error {
+	resourceFound := false
+	err = r.Visit(func(info *resource.Info, _ error) error {
+		resourceFound = true
 		mapping := info.ResourceMapping()
 		statusViewer, err := o.StatusViewerFn(mapping)
 		if err != nil {
@@ -227,4 +230,14 @@ func (o *RolloutStatusOptions) Run() error {
 			return err
 		})
 	})
+
+	if err != nil {
+		return err
+	}
+
+	if !resourceFound {
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+	}
+
+	return nil
 }

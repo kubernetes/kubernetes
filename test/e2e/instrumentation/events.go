@@ -26,7 +26,6 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -160,7 +160,7 @@ var _ = common.SIGDescribe("Events API", func() {
 
 		testEvent.Series = eventSeries
 		if !apiequality.Semantic.DeepEqual(testEvent, event) {
-			framework.Failf("test event wasn't properly patched: %v", diff.ObjectReflectDiff(testEvent, event))
+			framework.Failf("test event wasn't properly patched: %v", cmp.Diff(testEvent, event))
 		}
 
 		ginkgo.By("updating the test event")
@@ -178,7 +178,7 @@ var _ = common.SIGDescribe("Events API", func() {
 		event.ObjectMeta.ResourceVersion = ""
 		event.ObjectMeta.ManagedFields = nil
 		if !apiequality.Semantic.DeepEqual(testEvent, event) {
-			framework.Failf("test event wasn't properly updated: %v", diff.ObjectReflectDiff(testEvent, event))
+			framework.Failf("test event wasn't properly updated: %v", cmp.Diff(testEvent, event))
 		}
 
 		ginkgo.By("deleting the test event")

@@ -1339,26 +1339,26 @@ func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
 	tests := []struct {
 		name string
 		term *v1.PodAffinityTerm
-		want sets.String
+		want sets.Set[string]
 	}{
 		{
 			name: "podAffinityTerm_namespace_empty",
 			term: &v1.PodAffinityTerm{},
-			want: sets.String{metav1.NamespaceDefault: sets.Empty{}},
+			want: sets.Set[string]{metav1.NamespaceDefault: sets.Empty{}},
 		},
 		{
 			name: "podAffinityTerm_namespace_not_empty",
 			term: &v1.PodAffinityTerm{
 				Namespaces: []string{metav1.NamespacePublic, metav1.NamespaceSystem},
 			},
-			want: sets.NewString(metav1.NamespacePublic, metav1.NamespaceSystem),
+			want: sets.New(metav1.NamespacePublic, metav1.NamespaceSystem),
 		},
 		{
 			name: "podAffinityTerm_namespace_selector_not_nil",
 			term: &v1.PodAffinityTerm{
 				NamespaceSelector: &metav1.LabelSelector{},
 			},
-			want: sets.String{},
+			want: sets.Set[string]{},
 		},
 	}
 
@@ -1390,8 +1390,32 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
+				NodeToStatusMap: NodeToStatusMap{
+					// They're inserted by the framework.
+					// We don't include them in the reason message because they'd be just duplicates.
+					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				},
 			},
 			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter.",
+		},
+		{
+			name:        "nodes failed Prefilter plugin and the preemption also failed",
+			numAllNodes: 3,
+			diagnosis: Diagnosis{
+				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
+				NodeToStatusMap: NodeToStatusMap{
+					// They're inserted by the framework.
+					// We don't include them in the reason message because they'd be just duplicates.
+					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				},
+				// PostFilterMsg will be included.
+				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
+			},
+			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter. Error running PostFilter plugin FailedPostFilter.",
 		},
 		{
 			name:        "nodes failed one Filter plugin with an empty PostFilterMsg",
@@ -1446,6 +1470,28 @@ func TestFitError_Error(t *testing.T) {
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
 			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter.",
+		},
+		{
+			name:        "failed to Permit on node",
+			numAllNodes: 1,
+			diagnosis: Diagnosis{
+				NodeToStatusMap: NodeToStatusMap{
+					// There should be only one node here.
+					"node1": NewStatus(Unschedulable, "Node failed Permit plugin Permit-1"),
+				},
+			},
+			wantReasonMsg: "0/1 nodes are available: 1 Node failed Permit plugin Permit-1.",
+		},
+		{
+			name:        "failed to Reserve on node",
+			numAllNodes: 1,
+			diagnosis: Diagnosis{
+				NodeToStatusMap: NodeToStatusMap{
+					// There should be only one node here.
+					"node1": NewStatus(Unschedulable, "Node failed Reserve plugin Reserve-1"),
+				},
+			},
+			wantReasonMsg: "0/1 nodes are available: 1 Node failed Reserve plugin Reserve-1.",
 		},
 	}
 	for _, tt := range tests {

@@ -51,6 +51,7 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestInsecurePodLogs(t *testing.T) {
@@ -77,7 +78,11 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 -----END CERTIFICATE-----
 `))
 
-	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			// I have no idea what this cert is, but it doesn't matter, we just want something that always fails validation
@@ -92,7 +97,7 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 	}))
 	defer fakeKubeletServer.Close()
 
-	pod := prepareFakeNodeAndPod(context.TODO(), t, clientSet, fakeKubeletServer)
+	pod := prepareFakeNodeAndPod(ctx, t, clientSet, fakeKubeletServer)
 
 	insecureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{InsecureSkipTLSVerifyBackend: true}).Do(context.TODO())
 	if err := insecureResult.Error(); err != nil {
@@ -104,7 +109,7 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 		t.Fatal(insecureStatusCode)
 	}
 
-	secureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).Do(context.TODO())
+	secureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).Do(ctx)
 	if err := secureResult.Error(); err == nil || !strings.Contains(err.Error(), "x509: certificate signed by unknown authority") {
 		t.Fatal(err)
 	}
@@ -250,7 +255,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 		Bytes: fakeKubeletServer.Certificate().Raw,
 	}))
 
-	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			opts.KubeletConfig.TLSClientConfig.CAFile = kubeletCA

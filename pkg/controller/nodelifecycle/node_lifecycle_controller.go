@@ -422,7 +422,7 @@ func NewNodeLifecycleController(
 			nc.taintManager.NodeUpdated(oldNode, newNode)
 			return nil
 		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
 			nc.taintManager.NodeUpdated(node, nil)
 			return nil
 		}),
@@ -438,7 +438,7 @@ func NewNodeLifecycleController(
 			nc.nodeUpdateQueue.Add(newNode.Name)
 			return nil
 		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
 			nc.nodesToRetry.Delete(node.Name)
 			return nil
 		}),
@@ -653,9 +653,11 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 	}
 }
 
-// monitorNodeHealth verifies node health are constantly updated by kubelet, and
-// if not, post "NodeReady==ConditionUnknown".
-// This function will taint nodes who are not ready or not reachable for a long period of time.
+// monitorNodeHealth verifies node health are constantly updated by kubelet, and if not, post "NodeReady==ConditionUnknown".
+// This function will
+//   - add nodes which are not ready or not reachable for a long period of time to a rate-limited
+//     queue so that NoExecute taints can be added by the goroutine running the doNoExecuteTaintingPass function,
+//   - update the PodReady condition Pods according to the state of the Node Ready condition.
 func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 	start := nc.now()
 	defer func() {
@@ -742,7 +744,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			switch {
 			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
 				// Report node event only once when status changed.
-				controllerutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
+				controllerutil.RecordNodeStatusChange(logger, nc.recorder, node, "NodeNotReady")
 				fallthrough
 			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {

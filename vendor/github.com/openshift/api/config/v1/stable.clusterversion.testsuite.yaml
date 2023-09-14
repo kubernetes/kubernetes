@@ -98,6 +98,38 @@ tests:
           version: 4.11.1
           image: bar
     expectedError: "cannot set both Architecture and Image"
+  - name: Should be able to create a ClusterVersion with base capability None, and additional capabilities baremetal and MachineAPI
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - baremetal
+          - MachineAPI
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - baremetal
+          - MachineAPI
+  - name: Should not be able to create a ClusterVersion with base capability None, and additional capabilities baremetal without MachineAPI
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - baremetal
+    expectedError: the `baremetal` capability requires the `MachineAPI` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `MachineAPI` capability
   onUpdate:
   - name: Should not allow image to be set if architecture set
     initial: |
@@ -136,3 +168,111 @@ tests:
           version: 4.11.1
           image: bar
     expectedError: "cannot set both Architecture and Image"
+  - name: Should be able to add the baremetal capability with a ClusterVersion with base capability None, and implicitly enabled MachineAPI
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+      status:
+        desired:
+          version: foo
+          image: foo
+        observedGeneration: 1
+        versionHash: foo
+        availableUpdates:
+        - version: foo
+          image: foo
+        capabilities:
+          enabledCapabilities:
+          - MachineAPI
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - baremetal
+      status:
+        desired:
+          version: foo
+          image: foo
+        observedGeneration: 1
+        versionHash: foo
+        availableUpdates:
+        - version: foo
+          image: foo
+        capabilities:
+          enabledCapabilities:
+          - MachineAPI
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - baremetal
+      status:
+        desired:
+          version: foo
+          image: foo
+        observedGeneration: 1
+        versionHash: foo
+        availableUpdates:
+        - version: foo
+          image: foo
+        capabilities:
+          enabledCapabilities:
+          - MachineAPI
+  - name: Should be able to add the baremetal capability with a ClusterVersion with base capability None, with the Machine API capability
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - baremetal
+          - MachineAPI
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - baremetal
+          - MachineAPI
+  - name: Should not be able to add the baremetal capability with a ClusterVersion with base capability None, and without MachineAPI
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: ClusterVersion
+      spec:
+        clusterID: foo
+        capabilities:
+          baselineCapabilitySet: None
+          additionalEnabledCapabilities:
+          - baremetal
+    expectedError: the `baremetal` capability requires the `MachineAPI` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `MachineAPI` capability

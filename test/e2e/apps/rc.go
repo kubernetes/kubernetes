@@ -501,7 +501,7 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 	pods, err := e2epod.PodsCreated(ctx, f.ClientSet, f.Namespace.Name, name, replicas)
 	framework.ExpectNoError(err)
 
-	// Wait for the pods to enter the running state. Waiting loops until the pods
+	// Wait for the pods to enter the running state and are Ready. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
 	framework.Logf("Ensuring all pods for ReplicationController %q are running", name)
 	running := int32(0)
@@ -509,7 +509,7 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout)
 		if err != nil {
 			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 			if getErr == nil {
@@ -519,12 +519,12 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 			}
 		}
 		framework.ExpectNoError(err)
-		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
+		framework.Logf("Pod %q is running and ready(conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
 
 	// Sanity check
-	framework.ExpectEqual(running, replicas, "unexpected number of running pods: %+v", pods.Items)
+	framework.ExpectEqual(running, replicas, "unexpected number of running and ready pods: %+v", pods.Items)
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")

@@ -8,9 +8,11 @@
 
 package md4
 
-var shift1 = []uint{3, 7, 11, 19}
-var shift2 = []uint{3, 5, 9, 13}
-var shift3 = []uint{3, 9, 11, 15}
+import "math/bits"
+
+var shift1 = []int{3, 7, 11, 19}
+var shift2 = []int{3, 5, 9, 13}
+var shift3 = []int{3, 9, 11, 15}
 
 var xIndex2 = []uint{0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15}
 var xIndex3 = []uint{0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15}
@@ -48,7 +50,7 @@ func _Block(dig *digest, p []byte) int {
 			s := shift1[i%4]
 			f := ((c ^ d) & b) ^ d
 			a += f + X[x]
-			a = a<<s | a>>(32-s)
+			a = bits.RotateLeft32(a, s)
 			a, b, c, d = d, a, b, c
 		}
 
@@ -58,7 +60,7 @@ func _Block(dig *digest, p []byte) int {
 			s := shift2[i%4]
 			g := (b & c) | (b & d) | (c & d)
 			a += g + X[x] + 0x5a827999
-			a = a<<s | a>>(32-s)
+			a = bits.RotateLeft32(a, s)
 			a, b, c, d = d, a, b, c
 		}
 
@@ -68,7 +70,7 @@ func _Block(dig *digest, p []byte) int {
 			s := shift3[i%4]
 			h := b ^ c ^ d
 			a += h + X[x] + 0x6ed9eba1
-			a = a<<s | a>>(32-s)
+			a = bits.RotateLeft32(a, s)
 			a, b, c, d = d, a, b, c
 		}
 

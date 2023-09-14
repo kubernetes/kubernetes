@@ -27,7 +27,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -46,7 +46,7 @@ type GetContextsOptions struct {
 	outputFormat string
 	noHeaders    bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -62,7 +62,7 @@ var (
 
 // NewCmdConfigGetContexts creates a command object for the "get-contexts" action, which
 // retrieves one or more contexts from a kubeconfig.
-func NewCmdConfigGetContexts(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigGetContexts(streams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &GetContextsOptions{
 		configAccess: configAccess,
 

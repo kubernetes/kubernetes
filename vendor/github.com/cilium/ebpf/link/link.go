@@ -1,12 +1,14 @@
 package link
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
-	"unsafe"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/internal"
-	"github.com/cilium/ebpf/internal/btf"
+	"github.com/cilium/ebpf/internal/sys"
 )
 
 var ErrNotSupported = internal.ErrNotSupported
@@ -35,12 +37,53 @@ type Link interface {
 	// not called.
 	Close() error
 
+	// Info returns metadata on a link.
+	//
+	// May return an error wrapping ErrNotSupported.
+	Info() (*Info, error)
+
 	// Prevent external users from implementing this interface.
 	isLink()
 }
 
+// LoadPinnedLink loads a link that was persisted into a bpffs.
+func LoadPinnedLink(fileName string, opts *ebpf.LoadPinOptions) (Link, error) {
+	raw, err := loadPinnedRawLink(fileName, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return wrapRawLink(raw)
+}
+
+// wrap a RawLink in a more specific type if possible.
+//
+// The function takes ownership of raw and closes it on error.
+func wrapRawLink(raw *RawLink) (Link, error) {
+	info, err := raw.Info()
+	if err != nil {
+		raw.Close()
+		return nil, err
+	}
+
+	switch info.Type {
+	case RawTracepointType:
+		return &rawTracepoint{*raw}, nil
+	case TracingType:
+		return &tracing{*raw}, nil
+	case CgroupType:
+		return &linkCgroup{*raw}, nil
+	case IterType:
+		return &Iter{*raw}, nil
+	case NetNsType:
+		return &NetNsLink{*raw}, nil
+	default:
+		return raw, nil
+	}
+}
+
 // ID uniquely identifies a BPF link.
-type ID uint32
+type ID = sys.LinkID
 
 // RawLinkOptions control the creation of a raw link.
 type RawLinkOptions struct {
@@ -52,13 +95,53 @@ type RawLinkOptions struct {
 	Attach ebpf.AttachType
 	// BTF is the BTF of the attachment target.
 	BTF btf.TypeID
+	// Flags control the attach behaviour.
+	Flags uint32
 }
 
-// RawLinkInfo contains metadata on a link.
-type RawLinkInfo struct {
+// Info contains metadata on a link.
+type Info struct {
 	Type    Type
 	ID      ID
 	Program ebpf.ProgramID
+	extra   interface{}
+}
+
+type TracingInfo sys.TracingLinkInfo
+type CgroupInfo sys.CgroupLinkInfo
+type NetNsInfo sys.NetNsLinkInfo
+type XDPInfo sys.XDPLinkInfo
+
+// Tracing returns tracing type-specific link info.
+//
+// Returns nil if the type-specific link info isn't available.
+func (r Info) Tracing() *TracingInfo {
+	e, _ := r.extra.(*TracingInfo)
+	return e
+}
+
+// Cgroup returns cgroup type-specific link info.
+//
+// Returns nil if the type-specific link info isn't available.
+func (r Info) Cgroup() *CgroupInfo {
+	e, _ := r.extra.(*CgroupInfo)
+	return e
+}
+
+// NetNs returns netns type-specific link info.
+//
+// Returns nil if the type-specific link info isn't available.
+func (r Info) NetNs() *NetNsInfo {
+	e, _ := r.extra.(*NetNsInfo)
+	return e
+}
+
+// ExtraNetNs returns XDP type-specific link info.
+//
+// Returns nil if the type-specific link info isn't available.
+func (r Info) XDP() *XDPInfo {
+	e, _ := r.extra.(*XDPInfo)
+	return e
 }
 
 // RawLink is the low-level API to bpf_link.
@@ -66,7 +149,7 @@ type RawLinkInfo struct {
 // You should consider using the higher level interfaces in this
 // package instead.
 type RawLink struct {
-	fd         *internal.FD
+	fd         *sys.FD
 	pinnedPath string
 }
 
@@ -77,21 +160,22 @@ func AttachRawLink(opts RawLinkOptions) (*RawLink, error) {
 	}
 
 	if opts.Target < 0 {
-		return nil, fmt.Errorf("invalid target: %s", internal.ErrClosedFd)
+		return nil, fmt.Errorf("invalid target: %s", sys.ErrClosedFd)
 	}
 
 	progFd := opts.Program.FD()
 	if progFd < 0 {
-		return nil, fmt.Errorf("invalid program: %s", internal.ErrClosedFd)
+		return nil, fmt.Errorf("invalid program: %s", sys.ErrClosedFd)
 	}
 
-	attr := bpfLinkCreateAttr{
-		targetFd:    uint32(opts.Target),
-		progFd:      uint32(progFd),
-		attachType:  opts.Attach,
-		targetBTFID: uint32(opts.BTF),
+	attr := sys.LinkCreateAttr{
+		TargetFd:    uint32(opts.Target),
+		ProgFd:      uint32(progFd),
+		AttachType:  sys.AttachType(opts.Attach),
+		TargetBtfId: uint32(opts.BTF),
+		Flags:       opts.Flags,
 	}
-	fd, err := bpfLinkCreate(&attr)
+	fd, err := sys.LinkCreate(&attr)
 	if err != nil {
 		return nil, fmt.Errorf("can't create link: %s", err)
 	}
@@ -99,44 +183,23 @@ func AttachRawLink(opts RawLinkOptions) (*RawLink, error) {
 	return &RawLink{fd, ""}, nil
 }
 
-// LoadPinnedRawLink loads a persisted link from a bpffs.
-//
-// Returns an error if the pinned link type doesn't match linkType. Pass
-// UnspecifiedType to disable this behaviour.
-func LoadPinnedRawLink(fileName string, linkType Type, opts *ebpf.LoadPinOptions) (*RawLink, error) {
-	fd, err := internal.BPFObjGet(fileName, opts.Marshal())
+func loadPinnedRawLink(fileName string, opts *ebpf.LoadPinOptions) (*RawLink, error) {
+	fd, err := sys.ObjGet(&sys.ObjGetAttr{
+		Pathname:  sys.NewStringPointer(fileName),
+		FileFlags: opts.Marshal(),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("load pinned link: %w", err)
 	}
 
-	link := &RawLink{fd, fileName}
-	if linkType == UnspecifiedType {
-		return link, nil
-	}
-
-	info, err := link.Info()
-	if err != nil {
-		link.Close()
-		return nil, fmt.Errorf("get pinned link info: %s", err)
-	}
-
-	if info.Type != linkType {
-		link.Close()
-		return nil, fmt.Errorf("link type %v doesn't match %v", info.Type, linkType)
-	}
-
-	return link, nil
+	return &RawLink{fd, fileName}, nil
 }
 
 func (l *RawLink) isLink() {}
 
 // FD returns the raw file descriptor.
 func (l *RawLink) FD() int {
-	fd, err := l.fd.Value()
-	if err != nil {
-		return -1
-	}
-	return int(fd)
+	return l.fd.Int()
 }
 
 // Close breaks the link.
@@ -185,49 +248,66 @@ type RawLinkUpdateOptions struct {
 func (l *RawLink) UpdateArgs(opts RawLinkUpdateOptions) error {
 	newFd := opts.New.FD()
 	if newFd < 0 {
-		return fmt.Errorf("invalid program: %s", internal.ErrClosedFd)
+		return fmt.Errorf("invalid program: %s", sys.ErrClosedFd)
 	}
 
 	var oldFd int
 	if opts.Old != nil {
 		oldFd = opts.Old.FD()
 		if oldFd < 0 {
-			return fmt.Errorf("invalid replacement program: %s", internal.ErrClosedFd)
+			return fmt.Errorf("invalid replacement program: %s", sys.ErrClosedFd)
 		}
 	}
 
-	linkFd, err := l.fd.Value()
-	if err != nil {
-		return fmt.Errorf("can't update link: %s", err)
+	attr := sys.LinkUpdateAttr{
+		LinkFd:    l.fd.Uint(),
+		NewProgFd: uint32(newFd),
+		OldProgFd: uint32(oldFd),
+		Flags:     opts.Flags,
 	}
-
-	attr := bpfLinkUpdateAttr{
-		linkFd:    linkFd,
-		newProgFd: uint32(newFd),
-		oldProgFd: uint32(oldFd),
-		flags:     opts.Flags,
-	}
-	return bpfLinkUpdate(&attr)
-}
-
-// struct bpf_link_info
-type bpfLinkInfo struct {
-	typ     uint32
-	id      uint32
-	prog_id uint32
+	return sys.LinkUpdate(&attr)
 }
 
 // Info returns metadata about the link.
-func (l *RawLink) Info() (*RawLinkInfo, error) {
-	var info bpfLinkInfo
-	err := internal.BPFObjGetInfoByFD(l.fd, unsafe.Pointer(&info), unsafe.Sizeof(info))
-	if err != nil {
+func (l *RawLink) Info() (*Info, error) {
+	var info sys.LinkInfo
+
+	if err := sys.ObjInfo(l.fd, &info); err != nil {
 		return nil, fmt.Errorf("link info: %s", err)
 	}
 
-	return &RawLinkInfo{
-		Type(info.typ),
-		ID(info.id),
-		ebpf.ProgramID(info.prog_id),
+	var extra interface{}
+	switch info.Type {
+	case CgroupType:
+		extra = &CgroupInfo{}
+	case IterType:
+		// not supported
+	case NetNsType:
+		extra = &NetNsInfo{}
+	case RawTracepointType:
+		// not supported
+	case TracingType:
+		extra = &TracingInfo{}
+	case XDPType:
+		extra = &XDPInfo{}
+	case PerfEventType:
+		// no extra
+	default:
+		return nil, fmt.Errorf("unknown link info type: %d", info.Type)
+	}
+
+	if info.Type != RawTracepointType && info.Type != IterType && info.Type != PerfEventType {
+		buf := bytes.NewReader(info.Extra[:])
+		err := binary.Read(buf, internal.NativeEndian, extra)
+		if err != nil {
+			return nil, fmt.Errorf("can not read extra link info: %w", err)
+		}
+	}
+
+	return &Info{
+		info.Type,
+		info.Id,
+		ebpf.ProgramID(info.ProgId),
+		extra,
 	}, nil
 }

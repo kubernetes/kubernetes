@@ -69,6 +69,9 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	podresourcesapiv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	"k8s.io/kubelet/pkg/cri/streaming"
+	"k8s.io/kubelet/pkg/cri/streaming/portforward"
+	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
@@ -77,9 +80,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	podresourcesgrpc "k8s.io/kubernetes/pkg/kubelet/apis/podresources/grpc"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
-	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
-	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -218,18 +218,19 @@ type PodResourcesProviders struct {
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
-func ListenAndServePodResources(socket string, providers podresources.PodResourcesProviders) {
+func ListenAndServePodResources(endpoint string, providers podresources.PodResourcesProviders) {
 	server := grpc.NewServer(podresourcesgrpc.WithRateLimiter(podresourcesgrpc.DefaultQPS, podresourcesgrpc.DefaultBurstTokens))
 
 	podresourcesapiv1alpha1.RegisterPodResourcesListerServer(server, podresources.NewV1alpha1PodResourcesServer(providers))
 	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(providers))
 
-	l, err := util.CreateListener(socket)
+	l, err := util.CreateListener(endpoint)
 	if err != nil {
 		klog.ErrorS(err, "Failed to create listener for podResources endpoint")
 		os.Exit(1)
 	}
 
+	klog.InfoS("Starting to serve the podresources API", "endpoint", endpoint)
 	if err := server.Serve(l); err != nil {
 		klog.ErrorS(err, "Failed to serve")
 		os.Exit(1)

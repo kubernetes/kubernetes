@@ -31,10 +31,28 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
+	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 )
+
+func init() {
+	// If instantiated more than once or together with other servers, the
+	// servers would try to modify the global logging state. This must get
+	// ignored during testing.
+	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
+
+	// Because the test server gets started after other goroutines are
+	// running already, we also have to initialize logging here when
+	// those goroutines are not running yet. This works because the
+	// test server uses the default config.
+	config := logsapi.NewLoggingConfiguration()
+	if err := logsapi.ValidateAndApply(config, nil); err != nil {
+		panic(err)
+	}
+}
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
@@ -107,7 +125,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		return cloud
 	}
 	fss := cliflag.NamedFlagSets{}
-	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, fss, stopCh)
+	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, names.CCMControllerAliases(), fss, stopCh)
 
 	commandArgs := []string{}
 	listeners := []net.Listener{}

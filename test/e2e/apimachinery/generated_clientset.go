@@ -101,7 +101,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func(ctx context.Context) {
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		ginkgo.By("constructing the pod")
@@ -214,7 +214,7 @@ func newTestingCronJob(name string, value string) *batchv1.CronJob {
 
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should create v1 cronJobs, delete cronJobs, watch cronJobs", func(ctx context.Context) {
 		cronJobClient := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name)

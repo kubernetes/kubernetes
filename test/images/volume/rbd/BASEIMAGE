@@ -1,4 +1,4 @@
-linux/amd64=fedora:36
-linux/arm64=arm64v8/fedora:36
-linux/ppc64le=ppc64le/fedora:36
-linux/s390x=s390x/fedora:36
+linux/amd64=fedora:38
+linux/arm64=arm64v8/fedora:38
+linux/ppc64le=ppc64le/fedora:38
+linux/s390x=s390x/fedora:38

@@ -45,7 +45,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/features"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -81,9 +80,6 @@ type expandController struct {
 	pvcLister  corelisters.PersistentVolumeClaimLister
 	pvcsSynced cache.InformerSynced
 
-	pvLister corelisters.PersistentVolumeLister
-	pvSynced cache.InformerSynced
-
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
 
@@ -100,32 +96,25 @@ type expandController struct {
 	translator CSINameTranslator
 
 	csiMigratedPluginManager csimigration.PluginManager
-
-	filteredDialOptions *proxyutil.FilteredDialOptions
 }
 
 // NewExpandController expands the pvs
 func NewExpandController(
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	translator CSINameTranslator,
-	csiMigratedPluginManager csimigration.PluginManager,
-	filteredDialOptions *proxyutil.FilteredDialOptions) (ExpandController, error) {
+	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
 
 	expc := &expandController{
 		kubeClient:               kubeClient,
 		cloud:                    cloud,
 		pvcLister:                pvcInformer.Lister(),
 		pvcsSynced:               pvcInformer.Informer().HasSynced,
-		pvLister:                 pvInformer.Lister(),
-		pvSynced:                 pvInformer.Informer().HasSynced,
 		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
 		translator:               translator,
 		csiMigratedPluginManager: csiMigratedPluginManager,
-		filteredDialOptions:      filteredDialOptions,
 	}
 
 	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
@@ -339,7 +328,7 @@ func (expc *expandController) Run(ctx context.Context) {
 	logger.Info("Starting expand controller")
 	defer logger.Info("Shutting down expand controller")
 
-	if !cache.WaitForNamedCacheSync("expand", ctx.Done(), expc.pvcsSynced, expc.pvSynced) {
+	if !cache.WaitForNamedCacheSync("expand", ctx.Done(), expc.pvcsSynced) {
 		return
 	}
 
@@ -465,6 +454,7 @@ func (expc *expandController) GetServiceAccountTokenFunc() func(_, _ string, _ *
 
 func (expc *expandController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
+		//nolint:logcheck
 		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in expandController")
 	}
 }
@@ -484,8 +474,4 @@ func (expc *expandController) GetEventRecorder() record.EventRecorder {
 func (expc *expandController) GetSubpather() subpath.Interface {
 	// not needed for expand controller
 	return nil
-}
-
-func (expc *expandController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
-	return expc.filteredDialOptions
 }

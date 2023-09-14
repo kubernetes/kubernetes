@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 )
 
 func TestPluginPathsAreUnaltered(t *testing.T) {
@@ -46,7 +46,7 @@ func TestPluginPathsAreUnaltered(t *testing.T) {
 		}
 	}()
 
-	ioStreams, _, _, errOut := genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, errOut := genericiooptions.NewTestIOStreams()
 	verifier := newFakePluginPathVerifier()
 	pluginPaths := []string{tempDir, tempDir2}
 	o := &PluginListOptions{
@@ -132,7 +132,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 
 	for _, test := range tc {
 		t.Run(test.name, func(t *testing.T) {
-			ioStreams, _, out, errOut := genericclioptions.NewTestIOStreams()
+			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
 			o := &PluginListOptions{
 				Verifier:  test.verifier,
 				IOStreams: ioStreams,
@@ -188,7 +188,7 @@ func TestListPlugins(t *testing.T) {
 	}
 
 	verifier := newFakePluginPathVerifier()
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 	pluginPaths := []string{pluginPath}
 
 	o := &PluginListOptions{

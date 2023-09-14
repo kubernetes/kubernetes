@@ -55,7 +55,7 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 		// if there are 0 cluster-wide endpoints, we can try to fallback to any terminating endpoints that are ready.
 		// When falling back to terminating endpoints, we do NOT consider topology aware routing since this is a best
 		// effort attempt to avoid dropping connections.
-		if len(clusterEndpoints) == 0 && utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) {
+		if len(clusterEndpoints) == 0 {
 			clusterEndpoints = filterEndpoints(endpoints, func(ep Endpoint) bool {
 				if ep.IsServing() && ep.IsTerminating() {
 					return true
@@ -87,7 +87,7 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 			if ep.GetIsLocal() {
 				hasLocalReadyEndpoints = true
 			}
-		} else if ep.IsServing() && ep.IsTerminating() && utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) {
+		} else if ep.IsServing() && ep.IsTerminating() {
 			hasAnyEndpoints = true
 			if ep.GetIsLocal() {
 				hasLocalServingTerminatingEndpoints = true

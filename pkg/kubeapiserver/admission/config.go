@@ -17,8 +17,8 @@ limitations under the License.
 package admission
 
 import (
-	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -28,7 +28,6 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
-	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	egressselector "k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -48,14 +47,14 @@ type Config struct {
 }
 
 // New sets up the plugins and admission start hooks needed for admission
-func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselector.EgressSelector, serviceResolver webhook.ServiceResolver, tp trace.TracerProvider, schemaResolver resolver.SchemaResolver) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
+func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselector.EgressSelector, serviceResolver webhook.ServiceResolver, tp trace.TracerProvider) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
 	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, egressSelector, c.LoopbackClientConfig, tp)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 
 	var cloudConfig []byte
 	if c.CloudConfigFile != "" {
 		var err error
-		cloudConfig, err = ioutil.ReadFile(c.CloudConfigFile)
+		cloudConfig, err = os.ReadFile(c.CloudConfigFile)
 		if err != nil {
 			klog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
 		}
@@ -70,7 +69,6 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 		cloudConfig,
 		NewAdmissionRESTMapper(discoveryRESTMapper),
 		quotainstall.NewQuotaConfigurationForAdmission(),
-		schemaResolver,
 	)
 
 	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {

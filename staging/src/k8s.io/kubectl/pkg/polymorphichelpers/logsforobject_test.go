@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	fakeexternal "k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
@@ -422,7 +422,7 @@ func TestLogsForObject(t *testing.T) {
 			got := fakeClientset.Actions()[i]
 			want := test.actions[i]
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("%s: unexpected diff for action: %s", test.name, diff.ObjectDiff(got, want))
+				t.Errorf("%s: unexpected diff for action: %s", test.name, cmp.Diff(got, want))
 			}
 		}
 		for i++; i < len(fakeClientset.Actions()); i++ {

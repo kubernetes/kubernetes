@@ -381,14 +381,35 @@ var DefaultObjectDescriber ObjectDescriber
 func init() {
 	d := &Describers{}
 	err := d.Add(
-		describeLimitRange,
-		describeQuota,
-		describePod,
-		describeService,
-		describeReplicationController,
+		describeCertificateSigningRequest,
+		describeCronJob,
+		describeCSINode,
 		describeDaemonSet,
-		describeNode,
+		describeDeployment,
+		describeEndpoints,
+		describeEndpointSliceV1,
+		describeEndpointSliceV1beta1,
+		describeHorizontalPodAutoscalerV1,
+		describeHorizontalPodAutoscalerV2,
+		describeJob,
+		describeLimitRange,
 		describeNamespace,
+		describeNetworkPolicy,
+		describeNode,
+		describePersistentVolume,
+		describePersistentVolumeClaim,
+		describePod,
+		describePodDisruptionBudgetV1,
+		describePodDisruptionBudgetV1beta1,
+		describePriorityClass,
+		describeQuota,
+		describeReplicaSet,
+		describeReplicationController,
+		describeSecret,
+		describeService,
+		describeServiceAccount,
+		describeStatefulSet,
+		describeStorageClass,
 	)
 	if err != nil {
 		klog.Fatalf("Cannot register describers: %v", err)
@@ -5009,8 +5030,12 @@ func (fn typeFunc) Matches(types []reflect.Type) bool {
 // Describe invokes the nested function with the exact number of arguments.
 func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, error) {
 	values := []reflect.Value{reflect.ValueOf(exact)}
-	for _, obj := range extra {
-		values = append(values, reflect.ValueOf(obj))
+	for i, obj := range extra {
+		if obj != nil {
+			values = append(values, reflect.ValueOf(obj))
+		} else {
+			values = append(values, reflect.New(fn.Extra[i]).Elem())
+		}
 	}
 	out := fn.Fn.Call(values)
 	s := out[0].Interface().(string)
@@ -5184,8 +5209,7 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	}
 
 	out.Flush()
-	str := string(buf.String())
-	return str, nil
+	return buf.String(), nil
 }
 
 type SortableResourceNames []corev1.ResourceName

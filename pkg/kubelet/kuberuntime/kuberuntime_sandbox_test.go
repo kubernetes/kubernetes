@@ -48,15 +48,6 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 		"io.kubernetes.pod.namespace": pod.Namespace,
 		"io.kubernetes.pod.uid":       string(pod.UID),
 	}
-	expectedLinuxPodSandboxConfig := &runtimeapi.LinuxPodSandboxConfig{
-		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
-			SelinuxOptions: &runtimeapi.SELinuxOption{
-				User: "qux",
-			},
-			RunAsUser:  &runtimeapi.Int64Value{Value: 1000},
-			RunAsGroup: &runtimeapi.Int64Value{Value: 10},
-		},
-	}
 	expectedMetadata := &runtimeapi.PodSandboxMetadata{
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
@@ -75,9 +66,6 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 	assert.Equal(t, expectedLogDirectory, podSandboxConfig.LogDirectory)
 	assert.Equal(t, expectedMetadata, podSandboxConfig.Metadata)
 	assert.Equal(t, expectedPortMappings, podSandboxConfig.PortMappings)
-	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.SelinuxOptions, podSandboxConfig.Linux.SecurityContext.SelinuxOptions)
-	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.RunAsUser, podSandboxConfig.Linux.SecurityContext.RunAsUser)
-	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.RunAsGroup, podSandboxConfig.Linux.SecurityContext.RunAsGroup)
 }
 
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.
@@ -185,8 +173,6 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 }
 
 func newTestPod() *v1.Pod {
-	anyGroup := int64(10)
-	anyUser := int64(1000)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -194,13 +180,6 @@ func newTestPod() *v1.Pod {
 			Namespace: "new",
 		},
 		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &v1.SELinuxOptions{
-					User: "qux",
-				},
-				RunAsUser:  &anyUser,
-				RunAsGroup: &anyGroup,
-			},
 			Containers: []v1.Container{
 				{
 					Name:            "foo",

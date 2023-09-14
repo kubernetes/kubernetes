@@ -40,14 +40,14 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		{
 			// Should not scale up.
 			deploymentReplicas: 10,
-			maxSurge:           intstr.FromInt(0),
+			maxSurge:           intstr.FromInt32(0),
 			oldReplicas:        10,
 			newReplicas:        0,
 			scaleExpected:      false,
 		},
 		{
 			deploymentReplicas:  10,
-			maxSurge:            intstr.FromInt(2),
+			maxSurge:            intstr.FromInt32(2),
 			oldReplicas:         10,
 			newReplicas:         0,
 			scaleExpected:       true,
@@ -55,7 +55,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		},
 		{
 			deploymentReplicas:  10,
-			maxSurge:            intstr.FromInt(2),
+			maxSurge:            intstr.FromInt32(2),
 			oldReplicas:         5,
 			newReplicas:         0,
 			scaleExpected:       true,
@@ -63,7 +63,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		},
 		{
 			deploymentReplicas: 10,
-			maxSurge:           intstr.FromInt(2),
+			maxSurge:           intstr.FromInt32(2),
 			oldReplicas:        10,
 			newReplicas:        2,
 			scaleExpected:      false,
@@ -71,7 +71,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		{
 			// Should scale down.
 			deploymentReplicas:  10,
-			maxSurge:            intstr.FromInt(2),
+			maxSurge:            intstr.FromInt32(2),
 			oldReplicas:         2,
 			newReplicas:         11,
 			scaleExpected:       true,
@@ -85,7 +85,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		newRS := rs("foo-v2", test.newReplicas, nil, noTimestamp)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
 		allRSs := []*apps.ReplicaSet{newRS, oldRS}
-		maxUnavailable := intstr.FromInt(0)
+		maxUnavailable := intstr.FromInt32(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &test.maxSurge, &maxUnavailable, map[string]string{"foo": "bar"})
 		fake := fake.Clientset{}
 		controller := &DeploymentController{
@@ -134,7 +134,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 	}{
 		{
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(0),
+			maxUnavailable:      intstr.FromInt32(0),
 			oldReplicas:         10,
 			newReplicas:         0,
 			readyPodsFromOldRS:  10,
@@ -144,7 +144,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		},
 		{
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(2),
+			maxUnavailable:      intstr.FromInt32(2),
 			oldReplicas:         10,
 			newReplicas:         0,
 			readyPodsFromOldRS:  10,
@@ -154,7 +154,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		},
 		{ // expect unhealthy replicas from old replica sets been cleaned up
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(2),
+			maxUnavailable:      intstr.FromInt32(2),
 			oldReplicas:         10,
 			newReplicas:         0,
 			readyPodsFromOldRS:  8,
@@ -164,7 +164,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		},
 		{ // expect 1 unhealthy replica from old replica sets been cleaned up, and 1 ready pod been scaled down
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(2),
+			maxUnavailable:      intstr.FromInt32(2),
 			oldReplicas:         10,
 			newReplicas:         0,
 			readyPodsFromOldRS:  9,
@@ -174,7 +174,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		},
 		{ // the unavailable pods from the newRS would not make us scale down old RSs in a further step
 			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(2),
+			maxUnavailable:     intstr.FromInt32(2),
 			oldReplicas:        8,
 			newReplicas:        2,
 			readyPodsFromOldRS: 8,
@@ -194,7 +194,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		oldRS.Status.AvailableReplicas = int32(test.readyPodsFromOldRS)
 		oldRSs := []*apps.ReplicaSet{oldRS}
 		allRSs := []*apps.ReplicaSet{oldRS, newRS}
-		maxSurge := intstr.FromInt(0)
+		maxSurge := intstr.FromInt32(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, newSelector)
 		fakeClientset := fake.Clientset{}
 		controller := &DeploymentController{
@@ -261,8 +261,8 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
 		oldRS.Status.AvailableReplicas = int32(test.readyPods)
 		oldRSs := []*apps.ReplicaSet{oldRS}
-		maxSurge := intstr.FromInt(2)
-		maxUnavailable := intstr.FromInt(2)
+		maxSurge := intstr.FromInt32(2)
+		maxUnavailable := intstr.FromInt32(2)
 		deployment := newDeployment("foo", 10, nil, &maxSurge, &maxUnavailable, nil)
 		fakeClientset := fake.Clientset{}
 
@@ -294,7 +294,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 	}{
 		{
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(0),
+			maxUnavailable:      intstr.FromInt32(0),
 			readyPods:           10,
 			oldReplicas:         10,
 			scaleExpected:       true,
@@ -302,7 +302,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		},
 		{
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(2),
+			maxUnavailable:      intstr.FromInt32(2),
 			readyPods:           10,
 			oldReplicas:         10,
 			scaleExpected:       true,
@@ -310,21 +310,21 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		},
 		{
 			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(2),
+			maxUnavailable:     intstr.FromInt32(2),
 			readyPods:          8,
 			oldReplicas:        10,
 			scaleExpected:      false,
 		},
 		{
 			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(2),
+			maxUnavailable:     intstr.FromInt32(2),
 			readyPods:          10,
 			oldReplicas:        0,
 			scaleExpected:      false,
 		},
 		{
 			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(2),
+			maxUnavailable:     intstr.FromInt32(2),
 			readyPods:          1,
 			oldReplicas:        10,
 			scaleExpected:      false,
@@ -338,7 +338,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		oldRS.Status.AvailableReplicas = int32(test.readyPods)
 		allRSs := []*apps.ReplicaSet{oldRS}
 		oldRSs := []*apps.ReplicaSet{oldRS}
-		maxSurge := intstr.FromInt(0)
+		maxSurge := intstr.FromInt32(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, map[string]string{"foo": "bar"})
 		fakeClientset := fake.Clientset{}
 		controller := &DeploymentController{

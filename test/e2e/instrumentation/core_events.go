@@ -24,12 +24,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -140,7 +140,7 @@ var _ = common.SIGDescribe("Events", func() {
 		event.ObjectMeta.ResourceVersion = ""
 		event.ObjectMeta.ManagedFields = nil
 		if !apiequality.Semantic.DeepEqual(testEvent, event) {
-			framework.Failf("test event wasn't properly updated: %v", diff.ObjectReflectDiff(testEvent, event))
+			framework.Failf("test event wasn't properly updated: %v", cmp.Diff(testEvent, event))
 		}
 
 		ginkgo.By("deleting the test event")

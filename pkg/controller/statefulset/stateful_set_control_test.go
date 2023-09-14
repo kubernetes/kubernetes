@@ -227,6 +227,31 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set UpdatedReplicas correctly")
 	}
+	// Check all pods have correct pod index label.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+		if err != nil {
+			t.Error(err)
+		}
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(pods) != 3 {
+			t.Errorf("Expected 3 pods, got %d", len(pods))
+		}
+		for _, pod := range pods {
+			podIndexFromLabel, exists := pod.Labels[apps.PodIndexLabel]
+			if !exists {
+				t.Errorf("Missing pod index label: %s", apps.PodIndexLabel)
+				continue
+			}
+			podIndexFromName := strconv.Itoa(getOrdinal(pod))
+			if podIndexFromLabel != podIndexFromName {
+				t.Errorf("Pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
+			}
+		}
+	}
 }
 
 func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
@@ -1043,7 +1068,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// Setup the statefulSet controller
 		totalPods := 6
 		var partition int32 = 3
-		var maxUnavailable = intstr.FromInt(2)
+		var maxUnavailable = intstr.FromInt32(2)
 		set := setupPodManagementPolicy(tc.policyType, newStatefulSet(totalPods))
 		set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 			Type: apps.RollingUpdateStatefulSetStrategyType,
@@ -1131,7 +1156,7 @@ func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, Sta
 	set := newStatefulSet(totalPods)
 	// update all pods >=3(3,4,5)
 	var partition int32 = 3
-	var maxUnavailable = intstr.FromInt(2)
+	var maxUnavailable = intstr.FromInt32(2)
 	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 		Type: apps.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {

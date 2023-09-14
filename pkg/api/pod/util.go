@@ -19,10 +19,10 @@ package pod
 import (
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -342,37 +342,6 @@ func usesIndivisibleHugePagesValues(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// haveSameExpandedDNSConfig returns true if the oldPodSpec already had
-// ExpandedDNSConfig and podSpec has the same DNSConfig
-func haveSameExpandedDNSConfig(podSpec, oldPodSpec *api.PodSpec) bool {
-	if oldPodSpec == nil || oldPodSpec.DNSConfig == nil {
-		return false
-	}
-	if podSpec == nil || podSpec.DNSConfig == nil {
-		return false
-	}
-
-	if len(oldPodSpec.DNSConfig.Searches) <= apivalidation.MaxDNSSearchPathsLegacy &&
-		len(strings.Join(oldPodSpec.DNSConfig.Searches, " ")) <= apivalidation.MaxDNSSearchListCharsLegacy {
-		// didn't have ExpandedDNSConfig
-		return false
-	}
-
-	if len(oldPodSpec.DNSConfig.Searches) != len(podSpec.DNSConfig.Searches) {
-		// updates DNSConfig
-		return false
-	}
-
-	for i, oldSearch := range oldPodSpec.DNSConfig.Searches {
-		if podSpec.DNSConfig.Searches[i] != oldSearch {
-			// updates DNSConfig
-			return false
-		}
-	}
-
-	return true
-}
-
 // hasInvalidTopologySpreadConstraintLabelSelector return true if spec.TopologySpreadConstraints have any entry with invalid labelSelector
 func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 	for _, constraint := range spec.TopologySpreadConstraints {
@@ -389,16 +358,19 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	// default pod validation options based on feature gate
 	opts := apivalidation.PodValidationOptions{
 		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
+		// Allow pod spec to use status.hostIPs in downward API if feature is enabled
+		AllowHostIPsField: utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs),
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
-		AllowIndivisibleHugePagesValues: false,
-		// Allow pod spec with expanded DNS configuration
-		AllowExpandedDNSConfig:                            utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
+		AllowIndivisibleHugePagesValues:                   false,
 		AllowInvalidLabelValueInSelector:                  false,
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
 	}
 
 	if oldPodSpec != nil {
+		// if old spec has status.hostIPs downwardAPI set, we must allow it
+		opts.AllowHostIPsField = opts.AllowHostIPsField || hasUsedDownwardAPIFieldPathWithPodSpec(oldPodSpec, "status.hostIPs")
+
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
 
@@ -413,6 +385,55 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	}
 
 	return opts
+}
+
+func hasUsedDownwardAPIFieldPathWithPodSpec(podSpec *api.PodSpec, fieldPath string) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, vol := range podSpec.Volumes {
+		if hasUsedDownwardAPIFieldPathWithVolume(&vol, fieldPath) {
+			return true
+		}
+	}
+	for _, c := range podSpec.InitContainers {
+		if hasUsedDownwardAPIFieldPathWithContainer(&c, fieldPath) {
+			return true
+		}
+	}
+	for _, c := range podSpec.Containers {
+		if hasUsedDownwardAPIFieldPathWithContainer(&c, fieldPath) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUsedDownwardAPIFieldPathWithVolume(volume *api.Volume, fieldPath string) bool {
+	if volume == nil || volume.DownwardAPI == nil {
+		return false
+	}
+	for _, file := range volume.DownwardAPI.Items {
+		if file.FieldRef != nil &&
+			file.FieldRef.FieldPath == fieldPath {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUsedDownwardAPIFieldPathWithContainer(container *api.Container, fieldPath string) bool {
+	if container == nil {
+		return false
+	}
+	for _, env := range container.Env {
+		if env.ValueFrom != nil &&
+			env.ValueFrom.FieldRef != nil &&
+			env.ValueFrom.FieldRef.FieldPath == fieldPath {
+			return true
+		}
+	}
+	return false
 }
 
 // GetValidationOptionsFromPodTemplate will return pod validation options for specified template.
@@ -495,22 +516,8 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ProbeTerminationGracePeriod) && !probeGracePeriodInUse(oldPodSpec) {
-		// Set pod-level terminationGracePeriodSeconds to nil if the feature is disabled and it is not used
-		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-			if c.LivenessProbe != nil {
-				c.LivenessProbe.TerminationGracePeriodSeconds = nil
-			}
-			if c.StartupProbe != nil {
-				c.StartupProbe.TerminationGracePeriodSeconds = nil
-			}
-			// cannot be set for readiness probes
-			return true
-		})
-	}
-
 	// If the feature is disabled and not in use, drop the hostUsers field.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) && !hostUsersInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && !hostUsersInUse(oldPodSpec) {
 		// Drop the field in podSpec only if SecurityContext is not nil.
 		// If it is nil, there is no need to set hostUsers=nil (it will be nil too).
 		if podSpec.SecurityContext != nil {
@@ -543,6 +550,14 @@ func dropDisabledFields(
 			podSpec.EphemeralContainers[i].ResizePolicy = nil
 		}
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && !restartableInitContainersInUse(oldPodSpec) {
+		// Drop the RestartPolicy field of init containers.
+		for i := range podSpec.InitContainers {
+			podSpec.InitContainers[i].RestartPolicy = nil
+		}
+		// For other types of containers, validateContainers will handle them.
+	}
 }
 
 // dropDisabledPodStatusFields removes disabled fields from the pod status
@@ -565,6 +580,22 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropResourcesFields(podStatus.EphemeralContainerStatuses)
 		podStatus.Resize = ""
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
+		podStatus.ResourceClaimStatuses = nil
+	}
+
+	// drop HostIPs to empty (disable PodHostIPs).
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) && !hostIPsInUse(oldPodStatus) {
+		podStatus.HostIPs = nil
+	}
+}
+
+func hostIPsInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	return len(podStatus.HostIPs) > 0
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from
@@ -782,33 +813,29 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 	return false
 }
 
-// probeGracePeriodInUse returns true if the pod spec is non-nil and has a probe that makes use
-// of the probe-level terminationGracePeriodSeconds feature
-func probeGracePeriodInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		// cannot be set for readiness probes
-		if (c.LivenessProbe != nil && c.LivenessProbe.TerminationGracePeriodSeconds != nil) ||
-			(c.StartupProbe != nil && c.StartupProbe.TerminationGracePeriodSeconds != nil) {
-			inUse = true
-			return false
-		}
-		return true
-	})
-
-	return inUse
-}
-
 // schedulingGatesInUse returns true if the pod spec is non-nil and it has SchedulingGates field set.
 func schedulingGatesInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
 	return len(podSpec.SchedulingGates) != 0
+}
+
+// restartableInitContainersInUse returns true if the pod spec is non-nil and
+// it has any init container with ContainerRestartPolicyAlways.
+func restartableInitContainersInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, InitContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.RestartPolicy != nil && *c.RestartPolicy == api.ContainerRestartPolicyAlways {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
 }
 
 func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
@@ -850,7 +877,7 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 		if c.Resources.Requests == nil {
 			continue
 		}
-		if diff.ObjectDiff(oldPod.Spec.Containers[i].Resources, c.Resources) == "" {
+		if cmp.Equal(oldPod.Spec.Containers[i].Resources, c.Resources) {
 			continue
 		}
 		findContainerStatus := func(css []api.ContainerStatus, cName string) (api.ContainerStatus, bool) {
@@ -862,7 +889,7 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 			return api.ContainerStatus{}, false
 		}
 		if cs, ok := findContainerStatus(newPod.Status.ContainerStatuses, c.Name); ok {
-			if diff.ObjectDiff(c.Resources.Requests, cs.AllocatedResources) != "" {
+			if !cmp.Equal(c.Resources.Requests, cs.AllocatedResources) {
 				newPod.Status.Resize = api.PodResizeStatusProposed
 				break
 			}

@@ -110,7 +110,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating pod to attach PVs to the node")
-		pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verify all volumes are accessible and available in the pod")

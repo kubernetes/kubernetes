@@ -29,7 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
@@ -142,7 +142,7 @@ func TestPodAndContainer(t *testing.T) {
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			cmd := NewCmdExec(tf, genericclioptions.NewTestIOStreamsDiscard())
+			cmd := NewCmdExec(tf, genericiooptions.NewTestIOStreamsDiscard())
 			options := test.p
 			options.ErrOut = bytes.NewBuffer([]byte{})
 			options.Out = bytes.NewBuffer([]byte{})
@@ -235,11 +235,11 @@ func TestExec(t *testing.T) {
 				StreamOptions: StreamOptions{
 					PodName:       "foo",
 					ContainerName: "bar",
-					IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
+					IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
 				},
 				Executor: ex,
 			}
-			cmd := NewCmdExec(tf, genericclioptions.NewTestIOStreamsDiscard())
+			cmd := NewCmdExec(tf, genericiooptions.NewTestIOStreamsDiscard())
 			args := []string{"pod/foo", "command"}
 			if err := params.Complete(tf, cmd, args, -1); err != nil {
 				t.Fatal(err)
@@ -290,7 +290,7 @@ func execPod() *corev1.Pod {
 }
 
 func TestSetupTTY(t *testing.T) {
-	streams, _, _, stderr := genericclioptions.NewTestIOStreams()
+	streams, _, _, stderr := genericiooptions.NewTestIOStreams()
 
 	// test 1 - don't attach stdin
 	o := &StreamOptions{

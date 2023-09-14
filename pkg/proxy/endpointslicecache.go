@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -81,7 +81,7 @@ type endpointInfo struct {
 	Addresses []string
 	NodeName  *string
 	Zone      *string
-	ZoneHints sets.String
+	ZoneHints sets.Set[string]
 
 	Ready       bool
 	Serving     bool
@@ -141,7 +141,7 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
 				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
-					epInfo.ZoneHints = sets.String{}
+					epInfo.ZoneHints = sets.New[string]()
 					for _, zone := range endpoint.Hints.ForZones {
 						epInfo.ZoneHints.Insert(zone.Name)
 					}
@@ -190,11 +190,11 @@ func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.Endpoint
 
 // pendingChanges returns a set whose keys are the names of the services whose endpoints
 // have changed since the last time checkoutChanges was called
-func (cache *EndpointSliceCache) pendingChanges() sets.String {
+func (cache *EndpointSliceCache) pendingChanges() sets.Set[string] {
 	cache.lock.Lock()
 	defer cache.lock.Unlock()
 
-	changes := sets.NewString()
+	changes := sets.New[string]()
 	for serviceNN, esTracker := range cache.trackerByServiceMap {
 		if len(esTracker.pending) > 0 {
 			changes.Insert(serviceNN.String())
@@ -290,7 +290,7 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		if (cache.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(endpoint.Addresses[0]) {
 			// Emit event on the corresponding service which had a different IP
 			// version than the endpoint.
-			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], svcPortName.NamespacedName.Namespace, svcPortName.NamespacedName.Name, "")
+			proxyutil.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], svcPortName.NamespacedName.Namespace, svcPortName.NamespacedName.Name, "")
 			continue
 		}
 

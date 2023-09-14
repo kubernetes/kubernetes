@@ -152,8 +152,8 @@ func TestV1beta2StatefulSetUpdateStrategyConversion(t *testing.T) {
 }
 
 func TestV1beta2RollingUpdateDaemonSetConversion(t *testing.T) {
-	intorstr := intstr.FromInt(1)
-	maxSurge := intstr.FromInt(0)
+	intorstr := intstr.FromInt32(1)
+	maxSurge := intstr.FromInt32(0)
 	testcases := map[string]struct {
 		rollingUpdateDs1 *apps.RollingUpdateDaemonSet
 		rollingUpdateDs2 *v1beta2.RollingUpdateDaemonSet
@@ -489,8 +489,8 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 }
 
 func TestV1beta2DeploymentStrategyConversion(t *testing.T) {
-	maxUnavailable := intstr.FromInt(2)
-	maxSurge := intstr.FromInt(2)
+	maxUnavailable := intstr.FromInt32(2)
+	maxSurge := intstr.FromInt32(2)
 	extensionsRollingUpdate := apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge}
 	v1beta2RollingUpdate := v1beta2.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge}
 	testcases := map[string]struct {
@@ -530,8 +530,8 @@ func TestV1beta2DeploymentStrategyConversion(t *testing.T) {
 
 func TestV1beta2RollingUpdateDeploymentConversion(t *testing.T) {
 	nilIntStr := intstr.IntOrString{}
-	maxUnavailable := intstr.FromInt(2)
-	maxSurge := intstr.FromInt(2)
+	maxUnavailable := intstr.FromInt32(2)
+	maxSurge := intstr.FromInt32(2)
 	testcases := map[string]struct {
 		rollingUpdateDeployment1 *apps.RollingUpdateDeployment
 		rollingUpdateDeployment2 *v1beta2.RollingUpdateDeployment

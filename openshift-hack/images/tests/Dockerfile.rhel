@@ -9,7 +9,7 @@ RUN make WHAT=openshift-hack/e2e/k8s-e2e.test; \
     cp /go/src/k8s.io/kubernetes/openshift-hack/test-kubernetes-e2e.sh /tmp/build/
 
 
-FROM registry.svc.ci.openshift.org/ocp/4.13:tools
+FROM registry.ci.openshift.org/ocp/4.14:tools
 COPY --from=builder /tmp/build/k8s-e2e.test /usr/bin/
 COPY --from=builder /tmp/build/ginkgo /usr/bin/
 COPY --from=builder /tmp/build/test-kubernetes-e2e.sh /usr/bin/

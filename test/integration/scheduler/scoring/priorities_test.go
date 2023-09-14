@@ -17,7 +17,6 @@ limitations under the License.
 package scoring
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -73,11 +72,16 @@ const (
 )
 
 // This file tests the scheduler priority functions.
-func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
-	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+func initTestSchedulerForPriorityTest(t *testing.T, preScorePluginName, scorePluginName string) *testutils.TestContext {
+	cc := configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
+				PreScore: configv1.PluginSet{
+					Disabled: []configv1.Plugin{
+						{Name: "*"},
+					},
+				},
 				Score: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
 						{Name: scorePluginName, Weight: pointer.Int32(1)},
@@ -88,14 +92,18 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 				},
 			},
 		}},
-	})
+	}
+	if preScorePluginName != "" {
+		cc.Profiles[0].Plugins.PreScore.Enabled = append(cc.Profiles[0].Plugins.PreScore.Enabled, configv1.Plugin{Name: preScorePluginName})
+	}
+	cfg := configtesting.V1ToInternalWithDefaults(t, cc)
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
 		testutils.InitTestAPIServer(t, strings.ToLower(scorePluginName), nil),
 		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
 }
@@ -131,7 +139,7 @@ func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext 
 		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
 }
@@ -140,7 +148,6 @@ func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext 
 // works correctly.
 func TestNodeResourcesScoring(t *testing.T) {
 	testCtx := initTestSchedulerForNodeResourcesTest(t)
-	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
 	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Capacity(
 		map[v1.ResourceName]string{
@@ -203,8 +210,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 // TestNodeAffinityScoring verifies that scheduler's node affinity priority function
 // works correctly.
 func TestNodeAffinityScoring(t *testing.T) {
-	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name)
-	defer testutils.CleanupTest(t, testCtx)
+	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name, nodeaffinity.Name)
 	// Add a few nodes.
 	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode(), 4)
 	if err != nil {
@@ -323,8 +329,7 @@ func TestPodAffinityScoring(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
-			defer testutils.CleanupTest(t, testCtx)
+			testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name, interpodaffinity.Name)
 			// Add a few nodes.
 			nodesInTopology, err := createAndWaitForNodesInCache(testCtx, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
 			if err != nil {
@@ -368,8 +373,7 @@ func TestPodAffinityScoring(t *testing.T) {
 // TestImageLocalityScoring verifies that the scheduler's image locality priority function
 // works correctly, i.e., the pod gets scheduled to the node where its container images are ready.
 func TestImageLocalityScoring(t *testing.T) {
-	testCtx := initTestSchedulerForPriorityTest(t, imagelocality.Name)
-	defer testutils.CleanupTest(t, testCtx)
+	testCtx := initTestSchedulerForPriorityTest(t, "", imagelocality.Name)
 
 	// Create a node with the large image.
 	// We use a fake large image as the test image used by the pod, which has
@@ -601,8 +605,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
 
-			testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
-			defer testutils.CleanupTest(t, testCtx)
+			testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name, podtopologyspread.Name)
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name
 
@@ -619,9 +622,9 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			tt.incomingPod.SetNamespace(ns)
 
 			allPods := append(tt.existingPods, tt.incomingPod)
-			defer testutils.CleanupPods(cs, t, allPods)
+			defer testutils.CleanupPods(testCtx.Ctx, cs, t, allPods)
 			for _, pod := range tt.existingPods {
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 				}
@@ -631,7 +634,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				}
 			}
 
-			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(context.TODO(), tt.incomingPod, metav1.CreateOptions{})
+			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(testCtx.Ctx, tt.incomingPod, metav1.CreateOptions{})
 			if err != nil && !apierrors.IsInvalid(err) {
 				t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 			}
@@ -652,10 +655,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 // with the system default spreading spreads Pods belonging to a Service.
 // The setup has 300 nodes over 3 zones.
 func TestDefaultPodTopologySpreadScoring(t *testing.T) {
-	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
-	t.Cleanup(func() {
-		testutils.CleanupTest(t, testCtx)
-	})
+	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name, podtopologyspread.Name)
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
 

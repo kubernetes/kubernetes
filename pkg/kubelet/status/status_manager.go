@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	clientset "k8s.io/client-go/kubernetes"
 
 	v1 "k8s.io/api/core/v1"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status/state"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -348,8 +349,9 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 			status.Conditions = append(status.Conditions, condition)
 		}
 	}
-	updateConditionFunc(v1.PodReady, GeneratePodReadyCondition(&pod.Spec, status.Conditions, status.ContainerStatuses, status.Phase))
-	updateConditionFunc(v1.ContainersReady, GenerateContainersReadyCondition(&pod.Spec, status.ContainerStatuses, status.Phase))
+	allContainerStatuses := append(status.InitContainerStatuses, status.ContainerStatuses...)
+	updateConditionFunc(v1.PodReady, GeneratePodReadyCondition(&pod.Spec, status.Conditions, allContainerStatuses, status.Phase))
+	updateConditionFunc(v1.ContainersReady, GenerateContainersReadyCondition(&pod.Spec, allContainerStatuses, status.Phase))
 	m.updateStatusInternal(pod, status, false, false)
 }
 
@@ -504,12 +506,25 @@ func hasPodInitialized(pod *v1.Pod) bool {
 	}
 	// if the last init container has ever completed with a zero exit code, the pod is initialized
 	if l := len(pod.Status.InitContainerStatuses); l > 0 {
-		container := pod.Status.InitContainerStatuses[l-1]
-		if state := container.LastTerminationState; state.Terminated != nil && state.Terminated.ExitCode == 0 {
-			return true
+		container, ok := kubeutil.GetContainerByIndex(pod.Spec.InitContainers, pod.Status.InitContainerStatuses, l-1)
+		if !ok {
+			klog.V(4).InfoS("Mismatch between pod spec and status, likely programmer error", "pod", klog.KObj(pod), "containerName", container.Name)
+			return false
 		}
-		if state := container.State; state.Terminated != nil && state.Terminated.ExitCode == 0 {
-			return true
+
+		containerStatus := pod.Status.InitContainerStatuses[l-1]
+		if kubetypes.IsRestartableInitContainer(&container) {
+			if containerStatus.State.Running != nil &&
+				containerStatus.Started != nil && *containerStatus.Started {
+				return true
+			}
+		} else { // regular init container
+			if state := containerStatus.LastTerminationState; state.Terminated != nil && state.Terminated.ExitCode == 0 {
+				return true
+			}
+			if state := containerStatus.State; state.Terminated != nil && state.Terminated.ExitCode == 0 {
+				return true
+			}
 		}
 	}
 	// otherwise the pod has no record of being initialized
@@ -535,23 +550,47 @@ func initializedContainers(containers []v1.ContainerStatus) []v1.ContainerStatus
 // checkContainerStateTransition ensures that no container is trying to transition
 // from a terminated to non-terminated state, which is illegal and indicates a
 // logical error in the kubelet.
-func checkContainerStateTransition(oldStatuses, newStatuses []v1.ContainerStatus, restartPolicy v1.RestartPolicy) error {
+func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSpec *v1.PodSpec) error {
 	// If we should always restart, containers are allowed to leave the terminated state
-	if restartPolicy == v1.RestartPolicyAlways {
+	if podSpec.RestartPolicy == v1.RestartPolicyAlways {
 		return nil
 	}
-	for _, oldStatus := range oldStatuses {
+	for _, oldStatus := range oldStatuses.ContainerStatuses {
 		// Skip any container that wasn't terminated
 		if oldStatus.State.Terminated == nil {
 			continue
 		}
 		// Skip any container that failed but is allowed to restart
-		if oldStatus.State.Terminated.ExitCode != 0 && restartPolicy == v1.RestartPolicyOnFailure {
+		if oldStatus.State.Terminated.ExitCode != 0 && podSpec.RestartPolicy == v1.RestartPolicyOnFailure {
 			continue
 		}
-		for _, newStatus := range newStatuses {
+		for _, newStatus := range newStatuses.ContainerStatuses {
 			if oldStatus.Name == newStatus.Name && newStatus.State.Terminated == nil {
 				return fmt.Errorf("terminated container %v attempted illegal transition to non-terminated state", newStatus.Name)
+			}
+		}
+	}
+
+	for i, oldStatus := range oldStatuses.InitContainerStatuses {
+		initContainer, ok := kubeutil.GetContainerByIndex(podSpec.InitContainers, oldStatuses.InitContainerStatuses, i)
+		if !ok {
+			return fmt.Errorf("found mismatch between pod spec and status, container: %v", oldStatus.Name)
+		}
+		// Skip any restartable init container as it always is allowed to restart
+		if kubetypes.IsRestartableInitContainer(&initContainer) {
+			continue
+		}
+		// Skip any container that wasn't terminated
+		if oldStatus.State.Terminated == nil {
+			continue
+		}
+		// Skip any container that failed but is allowed to restart
+		if oldStatus.State.Terminated.ExitCode != 0 && podSpec.RestartPolicy == v1.RestartPolicyOnFailure {
+			continue
+		}
+		for _, newStatus := range newStatuses.InitContainerStatuses {
+			if oldStatus.Name == newStatus.Name && newStatus.State.Terminated == nil {
+				return fmt.Errorf("terminated init container %v attempted illegal transition to non-terminated state", newStatus.Name)
 			}
 		}
 	}
@@ -580,11 +619,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Check for illegal state transition in containers
-	if err := checkContainerStateTransition(oldStatus.ContainerStatuses, status.ContainerStatuses, pod.Spec.RestartPolicy); err != nil {
-		klog.ErrorS(err, "Status update on pod aborted", "pod", klog.KObj(pod))
-		return
-	}
-	if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses, pod.Spec.RestartPolicy); err != nil {
+	if err := checkContainerStateTransition(&oldStatus, &status, &pod.Spec); err != nil {
 		klog.ErrorS(err, "Status update on pod aborted", "pod", klog.KObj(pod))
 		return
 	}
@@ -598,8 +633,8 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	// Set InitializedCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodInitialized)
 
-	// Set PodHasNetwork.LastTransitionTime.
-	updateLastTransitionTime(&status, &oldStatus, kubetypes.PodHasNetwork)
+	// Set PodReadyToStartContainersCondition.LastTransitionTime.
+	updateLastTransitionTime(&status, &oldStatus, kubetypes.PodReadyToStartContainers)
 
 	// Set PodScheduledCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodScheduled)
@@ -948,7 +983,7 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 	}
 	klog.V(3).InfoS("Pod status is inconsistent with cached status for pod, a reconciliation should be triggered",
 		"pod", klog.KObj(pod),
-		"statusDiff", diff.ObjectDiff(podStatus, &status))
+		"statusDiff", cmp.Diff(podStatus, &status))
 
 	return true
 }
@@ -1046,6 +1081,9 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 		}
 	}
 	newPodStatus.Conditions = podConditions
+
+	// ResourceClaimStatuses is not owned and not modified by kubelet.
+	newPodStatus.ResourceClaimStatuses = oldPodStatus.ResourceClaimStatuses
 
 	// Delay transitioning a pod to a terminal status unless the pod is actually terminal.
 	// The Kubelet should never transition a pod to terminal status that could have running

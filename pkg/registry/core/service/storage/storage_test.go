@@ -206,7 +206,7 @@ func TestGenericUpdate(t *testing.T) {
 				Ports: []api.ServicePort{{
 					Port:       6502,
 					Protocol:   api.ProtocolTCP,
-					TargetPort: intstr.FromInt(6502),
+					TargetPort: intstr.FromInt32(6502),
 				}},
 				InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 			}
@@ -957,16 +957,16 @@ func TestVerifyEquiv(t *testing.T) {
 		input: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP)),
 				svctest.SetNodePorts(93)),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
 		output: svctest.MakeService("foo", svctest.SetTypeNodePort,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP)),
 			svctest.SetNodePorts(93, 76)),
 		expect: true,
 	}, {
@@ -6147,16 +6147,16 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeNodePort,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+				svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 		expectNodePorts: true,
 	}, {
 		name: "type:NodePort_multiport_specified",
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeNodePort,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP)),
 			svctest.SetUniqueNodePorts),
 		expectNodePorts: true,
 	}, {
@@ -6164,8 +6164,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeNodePort,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP)),
 			svctest.SetNodePorts(30080, 30080)),
 		expectError: true,
 	}, {
@@ -6173,16 +6173,16 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeNodePort,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
+				svctest.MakeServicePort("p", 53, intstr.FromInt32(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt32(53), api.ProtocolUDP))),
 		expectNodePorts: true,
 	}, {
 		name: "type:NodePort_multiport_multiproto_specified",
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeNodePort,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+				svctest.MakeServicePort("p", 53, intstr.FromInt32(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt32(53), api.ProtocolUDP)),
 			svctest.SetUniqueNodePorts),
 		expectNodePorts: true,
 	}, {
@@ -6190,8 +6190,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeNodePort,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+				svctest.MakeServicePort("p", 53, intstr.FromInt32(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt32(53), api.ProtocolUDP)),
 			svctest.SetNodePorts(30053, 30053)),
 		expectNodePorts: true,
 	}, {
@@ -6199,8 +6199,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeNodePort,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 93, intstr.FromInt(93), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 76, intstr.FromInt(76), api.ProtocolUDP)),
+				svctest.MakeServicePort("p", 93, intstr.FromInt32(93), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 76, intstr.FromInt32(76), api.ProtocolUDP)),
 			svctest.SetNodePorts(30093, 30093)),
 		expectError: true,
 	}, {
@@ -6234,8 +6234,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP)),
 			svctest.SetAllocateLoadBalancerNodePorts(false)),
 		expectNodePorts: false,
 	}, {
@@ -6243,8 +6243,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP)),
 			svctest.SetAllocateLoadBalancerNodePorts(true)),
 		expectNodePorts: true,
 	}, {
@@ -6252,8 +6252,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP)),
 			svctest.SetUniqueNodePorts,
 			svctest.SetAllocateLoadBalancerNodePorts(false)),
 		expectNodePorts: true,
@@ -6262,8 +6262,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP)),
 			svctest.SetUniqueNodePorts,
 			svctest.SetAllocateLoadBalancerNodePorts(true)),
 		expectNodePorts: true,
@@ -6272,8 +6272,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP)),
+				svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP)),
 			svctest.SetNodePorts(30080, 30080)),
 		expectError: true,
 	}, {
@@ -6281,16 +6281,16 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
+				svctest.MakeServicePort("p", 53, intstr.FromInt32(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt32(53), api.ProtocolUDP))),
 		expectNodePorts: true,
 	}, {
 		name: "type:LoadBalancer_multiport_multiproto_specified",
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+				svctest.MakeServicePort("p", 53, intstr.FromInt32(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt32(53), api.ProtocolUDP)),
 			svctest.SetUniqueNodePorts),
 		expectNodePorts: true,
 	}, {
@@ -6298,8 +6298,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
+				svctest.MakeServicePort("p", 53, intstr.FromInt32(53), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 53, intstr.FromInt32(53), api.ProtocolUDP)),
 			svctest.SetNodePorts(30053, 30053)),
 		expectNodePorts: true,
 	}, {
@@ -6307,8 +6307,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 93, intstr.FromInt(93), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 76, intstr.FromInt(76), api.ProtocolUDP)),
+				svctest.MakeServicePort("p", 93, intstr.FromInt32(93), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 76, intstr.FromInt32(76), api.ProtocolUDP)),
 			svctest.SetNodePorts(30093, 30093)),
 		expectError: true,
 	}}
@@ -6889,8 +6889,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 				svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 30076),
 				svctest.SetHealthCheckNodePort(30118)),
 			expectClusterIPs:          true,
@@ -6902,8 +6902,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP))),
 			expectClusterIPs:          true,
 			expectNodePorts:           true,
 			expectHealthCheckNodePort: true,
@@ -6923,8 +6923,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 				svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 30076),
 				svctest.SetHealthCheckNodePort(30118)),
 			expectClusterIPs:          true,
@@ -6945,8 +6945,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 30076),
 				svctest.SetHealthCheckNodePort(30118)),
 			expectClusterIPs:          true,
@@ -6958,8 +6958,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 0)), // provide just 1 value
 			expectClusterIPs:          true,
 			expectNodePorts:           true,
@@ -6976,8 +6976,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 30076),
 				svctest.SetHealthCheckNodePort(30118)),
 			expectClusterIPs:          true,
@@ -6990,8 +6990,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
 					// swapped from above
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP),
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP))),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP))),
 			expectClusterIPs:          true,
 			expectNodePorts:           true,
 			expectHealthCheckNodePort: true,
@@ -7007,8 +7007,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 30076),
 				svctest.SetHealthCheckNodePort(30118)),
 			expectClusterIPs:          true,
@@ -7020,8 +7020,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30076, 0), // set [0] to [1]'s value, omit [1]
 				svctest.SetHealthCheckNodePort(30118)),
 			expectClusterIPs:          true,
@@ -7039,8 +7039,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 30076),
 				svctest.SetHealthCheckNodePort(30118)),
 			expectClusterIPs:          true,
@@ -7052,8 +7052,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30076, 30118)), // set [0] to HCNP's value
 			expectError: true,
 		},
@@ -7064,8 +7064,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 30076),
 				svctest.SetHealthCheckNodePort(30118)),
 			expectClusterIPs:          true,
@@ -7077,8 +7077,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30118, 0)), // set [0] to HCNP's value, omit [1]
 			expectError: true,
 		},
@@ -7089,8 +7089,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 30076),
 				svctest.SetHealthCheckNodePort(30118)),
 			expectClusterIPs:          true,
@@ -7102,8 +7102,8 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetTypeLoadBalancer,
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+					svctest.MakeServicePort("p", 867, intstr.FromInt32(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt32(5309), api.ProtocolTCP)),
 				svctest.SetNodePorts(30093, 30076),
 				svctest.SetHealthCheckNodePort(30111)),
 			expectError: true,
@@ -10577,14 +10577,14 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP))),
 			expectClusterIPs: true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 		},
 	}, {
@@ -10592,14 +10592,14 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP))),
 			expectClusterIPs: true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
@@ -10608,15 +10608,15 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 		},
 	}, {
@@ -10624,14 +10624,14 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP))),
 			expectClusterIPs: true,
 		},
 	}, {
@@ -10639,14 +10639,14 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
@@ -10655,15 +10655,15 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeClusterIP,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP))),
 			expectClusterIPs: true,
 		},
 	}, {
@@ -10671,16 +10671,16 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP),
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP))),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
@@ -10689,16 +10689,16 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 8080, intstr.FromInt(8080), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 8443, intstr.FromInt(8443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 8080, intstr.FromInt32(8080), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 8443, intstr.FromInt32(8443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
@@ -10707,16 +10707,16 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolUDP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolUDP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolUDP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolUDP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
@@ -10725,16 +10725,16 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("r", 53, intstr.FromInt(53), api.ProtocolTCP),
-					svctest.MakeServicePort("s", 53, intstr.FromInt(53), api.ProtocolUDP))),
+					svctest.MakeServicePort("r", 53, intstr.FromInt32(53), api.ProtocolTCP),
+					svctest.MakeServicePort("s", 53, intstr.FromInt32(53), api.ProtocolUDP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
@@ -10743,15 +10743,15 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 53, intstr.FromInt32(53), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
+					svctest.MakeServicePort("p", 53, intstr.FromInt32(53), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 53, intstr.FromInt32(53), api.ProtocolUDP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
@@ -10760,8 +10760,8 @@ func TestFeaturePorts(t *testing.T) {
 		create: svcTestCase{
 			svc: svctest.MakeService("foo", svctest.SetTypeNodePort,
 				svctest.SetPorts(
-					svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-					svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
+					svctest.MakeServicePort("p", 80, intstr.FromInt32(80), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 443, intstr.FromInt32(443), api.ProtocolTCP))),
 			expectClusterIPs: true,
 			expectNodePorts:  true,
 		},
@@ -11590,7 +11590,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		_, err := storage.Create(ctx,
 			svctest.MakeService(name,
 				svctest.SetPorts(
-					svctest.MakeServicePort("", 93, intstr.FromInt(80), api.ProtocolTCP))),
+					svctest.MakeServicePort("", 93, intstr.FromInt32(80), api.ProtocolTCP))),
 			rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("unexpected error creating service %q: %v", name, err)
@@ -11600,8 +11600,8 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	_, err := storage.Create(ctx,
 		svctest.MakeService("named",
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 93, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 76, intstr.FromInt(81), api.ProtocolTCP))),
+				svctest.MakeServicePort("p", 93, intstr.FromInt32(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 76, intstr.FromInt32(81), api.ProtocolTCP))),
 		rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error creating service %q: %v", "named", err)

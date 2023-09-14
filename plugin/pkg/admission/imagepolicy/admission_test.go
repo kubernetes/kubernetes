@@ -29,6 +29,8 @@ import (
 	"testing"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"k8s.io/api/imagepolicy/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
@@ -200,7 +202,7 @@ current-context: default
 					return err
 				}
 				p := tempfile.Name()
-				defer os.Remove(p)
+				defer utiltesting.CloseAndRemove(t, tempfile)
 
 				tmpl, err := template.New("test").Parse(tt.kubeConfigTmpl)
 				if err != nil {
@@ -215,7 +217,7 @@ current-context: default
 					return err
 				}
 				pc := tempconfigfile.Name()
-				defer os.Remove(pc)
+				defer utiltesting.CloseAndRemove(t, tempconfigfile)
 
 				configTmpl, err := template.New("testconfig").Parse(defaultConfigTmplJSON)
 				if err != nil {

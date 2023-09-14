@@ -1,0 +1,62 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[TechPreview] Etcd"
+crd: 0000_12_etcd-operator_01_config-TechPreviewNoUpgrade.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create with Standard hardware speed
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Etcd
+      spec:
+        controlPlaneHardwareSpeed: Standard
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Etcd
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal
+        controlPlaneHardwareSpeed: Standard
+  - name: Should be able to create with Slower hardware speed
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Etcd
+      spec:
+        controlPlaneHardwareSpeed: Slower
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Etcd
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal
+        controlPlaneHardwareSpeed: Slower
+  onUpdate:
+  - name: Should be able to create with Standard, then set to Slower
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Etcd
+      spec:
+        controlPlaneHardwareSpeed: Standard
+    updated: |
+      apiVersion: operator.openshift.io/v1
+      kind: Etcd
+      spec:
+        controlPlaneHardwareSpeed: Slower
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Etcd
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal
+        controlPlaneHardwareSpeed: Slower
+  - name: Should not be allowed to try to set invalid hardware speed
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Etcd
+      spec:
+        controlPlaneHardwareSpeed: Standard
+    updated: |
+      apiVersion: operator.openshift.io/v1
+      kind: Etcd
+      spec:
+        controlPlaneHardwareSpeed: foo
+    expectedError: Unsupported value

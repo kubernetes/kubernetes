@@ -41,7 +41,6 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework/internal/junit"
 	"k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
@@ -244,8 +243,6 @@ type NodeTestContextType struct {
 	NodeConformance bool
 	// PrepullImages indicates whether node e2e framework should prepull images.
 	PrepullImages bool
-	// KubeletConfig is the kubelet configuration the test is running against.
-	KubeletConfig kubeletconfig.KubeletConfiguration
 	// ImageDescription is the description of the image on which the test is running.
 	ImageDescription string
 	// RuntimeConfig is a map of API server runtime configuration values.
@@ -350,18 +347,13 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the simplified JUnit XML reports and other tests results should be saved. Default is empty, which doesn't generate these reports.  If ginkgo's -junit-report parameter is used, that parameter instead of -report-dir determines the location of a single JUnit report.")
 	flags.BoolVar(&TestContext.ReportCompleteGinkgo, "report-complete-ginkgo", false, "Enables writing a complete test report as Ginkgo JSON to <report dir>/ginkgo/report.json. Ignored if --report-dir is not set.")
 	flags.BoolVar(&TestContext.ReportCompleteJUnit, "report-complete-junit", false, "Enables writing a complete test report as JUnit XML to <report dir>/ginkgo/report.json. Ignored if --report-dir is not set.")
-	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
-	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
-	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
-	flags.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
+	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
+	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "containerd", "The name of the container runtime process.")
+	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/run/containerd/containerd.pid", "The pid file of the container runtime.")
+	flags.StringVar(&TestContext.SystemdServices, "systemd-services", "containerd*", "The comma separated list of systemd services the framework will dump logs for.")
 	flags.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flags.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
-	// TODO: remove the node-role.kubernetes.io/master taint in 1.25 or later.
-	// The change will likely require an action for some users that do not
-	// use k8s originated tools like kubeadm or kOps for creating clusters
-	// and taint their control plane nodes with "master", expecting the test
-	// suite to work with this legacy non-blocking taint.
-	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane,node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests. The default taint 'node-role.kubernetes.io/master' is DEPRECATED and will be removed from the list in a future release.")
+	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for running tests.")
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")

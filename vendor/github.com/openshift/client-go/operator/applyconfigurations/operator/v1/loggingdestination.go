@@ -9,9 +9,9 @@ import (
 // LoggingDestinationApplyConfiguration represents an declarative configuration of the LoggingDestination type for use
 // with apply.
 type LoggingDestinationApplyConfiguration struct {
-	Type      *v1.LoggingDestinationType                            `json:"type,omitempty"`
-	Syslog    *SyslogLoggingDestinationParametersApplyConfiguration `json:"syslog,omitempty"`
-	Container *v1.ContainerLoggingDestinationParameters             `json:"container,omitempty"`
+	Type      *v1.LoggingDestinationType                               `json:"type,omitempty"`
+	Syslog    *SyslogLoggingDestinationParametersApplyConfiguration    `json:"syslog,omitempty"`
+	Container *ContainerLoggingDestinationParametersApplyConfiguration `json:"container,omitempty"`
 }
 
 // LoggingDestinationApplyConfiguration constructs an declarative configuration of the LoggingDestination type for use with
@@ -39,7 +39,7 @@ func (b *LoggingDestinationApplyConfiguration) WithSyslog(value *SyslogLoggingDe
 // WithContainer sets the Container field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Container field is set to the value of the last call.
-func (b *LoggingDestinationApplyConfiguration) WithContainer(value v1.ContainerLoggingDestinationParameters) *LoggingDestinationApplyConfiguration {
-	b.Container = &value
+func (b *LoggingDestinationApplyConfiguration) WithContainer(value *ContainerLoggingDestinationParametersApplyConfiguration) *LoggingDestinationApplyConfiguration {
+	b.Container = value
 	return b
 }

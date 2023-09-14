@@ -18,6 +18,7 @@ package serialize
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -196,11 +197,11 @@ func (f Formatter) KVFormat(b *bytes.Buffer, k, v interface{}) {
 	case textWriter:
 		writeTextWriterValue(b, v)
 	case fmt.Stringer:
-		writeStringValue(b, true, StringerToString(v))
+		writeStringValue(b, StringerToString(v))
 	case string:
-		writeStringValue(b, true, v)
+		writeStringValue(b, v)
 	case error:
-		writeStringValue(b, true, ErrorToString(v))
+		writeStringValue(b, ErrorToString(v))
 	case logr.Marshaler:
 		value := MarshalerToValue(v)
 		// A marshaler that returns a string is useful for
@@ -215,9 +216,9 @@ func (f Formatter) KVFormat(b *bytes.Buffer, k, v interface{}) {
 		// value directly.
 		switch value := value.(type) {
 		case string:
-			writeStringValue(b, true, value)
+			writeStringValue(b, value)
 		default:
-			writeStringValue(b, false, f.AnyToString(value))
+			f.formatAny(b, value)
 		}
 	case []byte:
 		// In https://github.com/kubernetes/klog/pull/237 it was decided
@@ -234,7 +235,7 @@ func (f Formatter) KVFormat(b *bytes.Buffer, k, v interface{}) {
 		b.WriteByte('=')
 		b.WriteString(fmt.Sprintf("%+q", v))
 	default:
-		writeStringValue(b, false, f.AnyToString(v))
+		f.formatAny(b, v)
 	}
 }
 
@@ -242,12 +243,25 @@ func KVFormat(b *bytes.Buffer, k, v interface{}) {
 	Formatter{}.KVFormat(b, k, v)
 }
 
-// AnyToString is the historic fallback formatter.
-func (f Formatter) AnyToString(v interface{}) string {
+// formatAny is the fallback formatter for a value. It supports a hook (for
+// example, for YAML encoding) and itself uses JSON encoding.
+func (f Formatter) formatAny(b *bytes.Buffer, v interface{}) {
+	b.WriteRune('=')
 	if f.AnyToStringHook != nil {
-		return f.AnyToStringHook(v)
+		b.WriteString(f.AnyToStringHook(v))
+		return
 	}
-	return fmt.Sprintf("%+v", v)
+	encoder := json.NewEncoder(b)
+	l := b.Len()
+	if err := encoder.Encode(v); err != nil {
+		// This shouldn't happen. We discard whatever the encoder
+		// wrote and instead dump an error string.
+		b.Truncate(l)
+		b.WriteString(fmt.Sprintf(`"<internal error: %v>"`, err))
+		return
+	}
+	// Remove trailing newline.
+	b.Truncate(b.Len() - 1)
 }
 
 // StringerToString converts a Stringer to a string,
@@ -287,7 +301,7 @@ func ErrorToString(err error) (ret string) {
 }
 
 func writeTextWriterValue(b *bytes.Buffer, v textWriter) {
-	b.WriteRune('=')
+	b.WriteByte('=')
 	defer func() {
 		if err := recover(); err != nil {
 			fmt.Fprintf(b, `"<panic: %s>"`, err)
@@ -296,18 +310,13 @@ func writeTextWriterValue(b *bytes.Buffer, v textWriter) {
 	v.WriteText(b)
 }
 
-func writeStringValue(b *bytes.Buffer, quote bool, v string) {
+func writeStringValue(b *bytes.Buffer, v string) {
 	data := []byte(v)
 	index := bytes.IndexByte(data, '\n')
 	if index == -1 {
 		b.WriteByte('=')
-		if quote {
-			// Simple string, quote quotation marks and non-printable characters.
-			b.WriteString(strconv.Quote(v))
-			return
-		}
-		// Non-string with no line breaks.
-		b.WriteString(v)
+		// Simple string, quote quotation marks and non-printable characters.
+		b.WriteString(strconv.Quote(v))
 		return
 	}
 

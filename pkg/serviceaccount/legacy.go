@@ -29,12 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func LegacyClaims(serviceAccount v1.ServiceAccount, secret v1.Secret) (*jwt.Claims, interface{}) {
@@ -64,7 +62,7 @@ func NewLegacyValidator(lookup bool, getter ServiceAccountTokenGetter, secretsWr
 	if lookup && getter == nil {
 		return nil, errors.New("ServiceAccountTokenGetter must be provided")
 	}
-	if lookup && secretsWriter == nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenTracking) {
+	if lookup && secretsWriter == nil {
 		return nil, errors.New("SecretsWriter must be provided")
 	}
 	return &legacyValidator{
@@ -146,25 +144,23 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 			return nil, fmt.Errorf("ServiceAccount UID (%s) does not match claim (%s)", serviceAccount.UID, serviceAccountUID)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenTracking) {
-			for _, ref := range serviceAccount.Secrets {
-				if ref.Name == secret.Name {
-					warning.AddWarning(ctx, "", "Use tokens from the TokenRequest API or manually created secret-based tokens instead of auto-generated secret-based tokens.")
-					break
-				}
+		for _, ref := range serviceAccount.Secrets {
+			if ref.Name == secret.Name {
+				warning.AddWarning(ctx, "", "Use tokens from the TokenRequest API or manually created secret-based tokens instead of auto-generated secret-based tokens.")
+				break
 			}
-			now := time.Now().UTC()
-			today := now.Format("2006-01-02")
-			tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
-			lastUsed := secret.Labels[LastUsedLabelKey]
-			if lastUsed != today && lastUsed != tomorrow {
-				patchContent, err := json.Marshal(applyv1.Secret(secret.Name, secret.Namespace).WithLabels(map[string]string{LastUsedLabelKey: today}))
-				if err != nil {
-					klog.Errorf("Failed to marshal legacy service account token tracking labels, err: %v", err)
-				} else {
-					if _, err := v.secretsWriter.Secrets(namespace).Patch(ctx, secret.Name, types.MergePatchType, patchContent, metav1.PatchOptions{}); err != nil {
-						klog.Errorf("Failed to label legacy service account token secret with last-used, err: %v", err)
-					}
+		}
+		now := time.Now().UTC()
+		today := now.Format("2006-01-02")
+		tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
+		lastUsed := secret.Labels[LastUsedLabelKey]
+		if lastUsed != today && lastUsed != tomorrow {
+			patchContent, err := json.Marshal(applyv1.Secret(secret.Name, secret.Namespace).WithLabels(map[string]string{LastUsedLabelKey: today}))
+			if err != nil {
+				klog.Errorf("Failed to marshal legacy service account token tracking labels, err: %v", err)
+			} else {
+				if _, err := v.secretsWriter.Secrets(namespace).Patch(ctx, secret.Name, types.MergePatchType, patchContent, metav1.PatchOptions{}); err != nil {
+					klog.Errorf("Failed to label legacy service account token secret with last-used, err: %v", err)
 				}
 			}
 		}

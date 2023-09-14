@@ -46,7 +46,7 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 	f := framework.NewDefaultFramework("critical-pod-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when we need to admit a critical pod", func() {
-		ginkgo.It("[Flaky] should be able to create and delete a critical pod", func(ctx context.Context) {
+		ginkgo.It("should be able to create and delete a critical pod", func(ctx context.Context) {
 			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.
 			node := getNodeName(ctx, f)
 			// Define test pods
@@ -84,7 +84,7 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 				if p.Name == nonCriticalBestEffort.Name {
 					framework.ExpectEqual(p.Status.Phase, v1.PodRunning, fmt.Sprintf("pod: %v should not be preempted with status: %#v", p.Name, p.Status))
 				} else {
-					framework.ExpectEqual(p.Status.Phase, v1.PodFailed, fmt.Sprintf("pod: %v should be preempted with status: %#v", p.Name, p.Status))
+					framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded, fmt.Sprintf("pod: %v should be preempted with status: %#v", p.Name, p.Status))
 				}
 			}
 		})

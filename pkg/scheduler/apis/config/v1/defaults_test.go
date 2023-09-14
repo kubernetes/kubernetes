@@ -440,6 +440,44 @@ func TestSchedulerDefaults(t *testing.T) {
 			},
 		},
 		{
+			name: "set non default delayCacheUntilActive",
+			config: &configv1.KubeSchedulerConfiguration{
+				DelayCacheUntilActive: true,
+			},
+			expected: &configv1.KubeSchedulerConfiguration{
+				Parallelism:           pointer.Int32(16),
+				DelayCacheUntilActive: true,
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.Bool(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "leases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds: pointer.Int64(1),
+				PodMaxBackoffSeconds:     pointer.Int64(10),
+				Profiles: []configv1.KubeSchedulerProfile{
+					{
+						Plugins:       getDefaultPlugins(),
+						PluginConfig:  pluginConfigs,
+						SchedulerName: pointer.String("default-scheduler"),
+					},
+				},
+			},
+		},
+		{
 			name: "set non default global percentageOfNodesToScore",
 			config: &configv1.KubeSchedulerConfiguration{
 				PercentageOfNodesToScore: pointer.Int32(50),

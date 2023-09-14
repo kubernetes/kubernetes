@@ -514,7 +514,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			runPausePod(ctx, f, mediumPodCfg)
 
 			ginkgo.By("Verify there are 3 Pods left in this namespace")
-			wantPods := sets.NewString("high", "medium", "low")
+			wantPods := sets.New("high", "medium", "low")
 
 			// Wait until the number of pods stabilizes. Note that `medium` pod can get scheduled once the
 			// second low priority pod is marked as terminating.

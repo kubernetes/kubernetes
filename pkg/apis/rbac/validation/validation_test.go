@@ -402,12 +402,10 @@ func TestValidateRoleNonResourceURL(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "default",
 			},
-			Rules: []rbac.PolicyRule{
-				{
-					Verbs:           []string{"get"},
-					NonResourceURLs: []string{"/*"},
-				},
-			},
+			Rules: []rbac.PolicyRule{{
+				Verbs:           []string{"get"},
+				NonResourceURLs: []string{"/*"},
+			}},
 		},
 		wantErr: false,
 	}.test(t)
@@ -420,13 +418,11 @@ func TestValidateRoleNamespacedNonResourceURL(t *testing.T) {
 				Namespace: "default",
 				Name:      "default",
 			},
-			Rules: []rbac.PolicyRule{
-				{
-					// non-resource URLs are invalid for namespaced rules
-					Verbs:           []string{"get"},
-					NonResourceURLs: []string{"/*"},
-				},
-			},
+			Rules: []rbac.PolicyRule{{
+				// non-resource URLs are invalid for namespaced rules
+				Verbs:           []string{"get"},
+				NonResourceURLs: []string{"/*"},
+			}},
 		},
 		wantErr: true,
 		errType: field.ErrorTypeInvalid,
@@ -440,12 +436,10 @@ func TestValidateRoleNonResourceURLNoVerbs(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "default",
 			},
-			Rules: []rbac.PolicyRule{
-				{
-					Verbs:           []string{},
-					NonResourceURLs: []string{"/*"},
-				},
-			},
+			Rules: []rbac.PolicyRule{{
+				Verbs:           []string{},
+				NonResourceURLs: []string{"/*"},
+			}},
 		},
 		wantErr: true,
 		errType: field.ErrorTypeRequired,
@@ -460,14 +454,12 @@ func TestValidateRoleMixedNonResourceAndResource(t *testing.T) {
 				Name:      "default",
 				Namespace: "default",
 			},
-			Rules: []rbac.PolicyRule{
-				{
-					Verbs:           []string{"get"},
-					NonResourceURLs: []string{"/*"},
-					APIGroups:       []string{"v1"},
-					Resources:       []string{"pods"},
-				},
-			},
+			Rules: []rbac.PolicyRule{{
+				Verbs:           []string{"get"},
+				NonResourceURLs: []string{"/*"},
+				APIGroups:       []string{"v1"},
+				Resources:       []string{"pods"},
+			}},
 		},
 		wantErr: true,
 		errType: field.ErrorTypeInvalid,
@@ -482,13 +474,11 @@ func TestValidateRoleValidResource(t *testing.T) {
 				Name:      "default",
 				Namespace: "default",
 			},
-			Rules: []rbac.PolicyRule{
-				{
-					Verbs:     []string{"get"},
-					APIGroups: []string{"v1"},
-					Resources: []string{"pods"},
-				},
-			},
+			Rules: []rbac.PolicyRule{{
+				Verbs:     []string{"get"},
+				APIGroups: []string{"v1"},
+				Resources: []string{"pods"},
+			}},
 		},
 		wantErr: false,
 	}.test(t)
@@ -501,12 +491,10 @@ func TestValidateRoleNoAPIGroup(t *testing.T) {
 				Name:      "default",
 				Namespace: "default",
 			},
-			Rules: []rbac.PolicyRule{
-				{
-					Verbs:     []string{"get"},
-					Resources: []string{"pods"},
-				},
-			},
+			Rules: []rbac.PolicyRule{{
+				Verbs:     []string{"get"},
+				Resources: []string{"pods"},
+			}},
 		},
 		wantErr: true,
 		errType: field.ErrorTypeRequired,
@@ -521,12 +509,10 @@ func TestValidateRoleNoResources(t *testing.T) {
 				Name:      "default",
 				Namespace: "default",
 			},
-			Rules: []rbac.PolicyRule{
-				{
-					Verbs:     []string{"get"},
-					APIGroups: []string{"v1"},
-				},
-			},
+			Rules: []rbac.PolicyRule{{
+				Verbs:     []string{"get"},
+				APIGroups: []string{"v1"},
+			}},
 		},
 		wantErr: true,
 		errType: field.ErrorTypeRequired,

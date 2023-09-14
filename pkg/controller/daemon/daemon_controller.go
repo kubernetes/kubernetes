@@ -278,7 +278,7 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 	}
 
 	// Delete expectations for the DaemonSet so if we create a new one with the same name it starts clean
-	dsc.expectations.DeleteExpectations(key)
+	dsc.expectations.DeleteExpectations(logger, key)
 
 	dsc.queue.Add(key)
 }
@@ -529,7 +529,7 @@ func (dsc *DaemonSetsController) addPod(logger klog.Logger, obj interface{}) {
 			return
 		}
 		logger.V(4).Info("Pod added", "pod", klog.KObj(pod))
-		dsc.expectations.CreationObserved(dsKey)
+		dsc.expectations.CreationObserved(logger, dsKey)
 		dsc.enqueueDaemonSet(ds)
 		return
 	}
@@ -646,7 +646,7 @@ func (dsc *DaemonSetsController) deletePod(logger klog.Logger, obj interface{}) 
 		return
 	}
 	logger.V(4).Info("Pod deleted", "pod", klog.KObj(pod))
-	dsc.expectations.DeletionObserved(dsKey)
+	dsc.expectations.DeletionObserved(logger, dsKey)
 	dsc.enqueueDaemonSet(ds)
 }
 
@@ -780,7 +780,7 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ctx context.Context, ds *a
 		}
 		nodeName, err := util.GetTargetNodeName(pod)
 		if err != nil {
-			logger.Info("Failed to get target node name of Pod in DaemonSet",
+			logger.V(4).Info("Failed to get target node name of Pod in DaemonSet",
 				"pod", klog.KObj(pod), "daemonset", klog.KObj(ds))
 			continue
 		}
@@ -945,7 +945,7 @@ func (dsc *DaemonSetsController) updateDaemonSet(ctx context.Context, ds *apps.D
 	}
 
 	// Process rolling updates if we're ready.
-	if dsc.expectations.SatisfiedExpectations(key) {
+	if dsc.expectations.SatisfiedExpectations(klog.FromContext(ctx), key) {
 		switch ds.Spec.UpdateStrategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
 		case apps.RollingUpdateDaemonSetStrategyType:
@@ -1019,7 +1019,7 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 		deleteDiff = dsc.burstReplicas
 	}
 
-	dsc.expectations.SetExpectations(dsKey, createDiff, deleteDiff)
+	dsc.expectations.SetExpectations(logger, dsKey, createDiff, deleteDiff)
 
 	// error channel to communicate back failures.  make the buffer big enough to avoid any blocking
 	errCh := make(chan error, createDiff+deleteDiff)
@@ -1068,7 +1068,7 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 				}
 				if err != nil {
 					logger.V(2).Info("Failed creation, decrementing expectations for daemon set", "daemonset", klog.KObj(ds))
-					dsc.expectations.CreationObserved(dsKey)
+					dsc.expectations.CreationObserved(logger, dsKey)
 					errCh <- err
 					utilruntime.HandleError(err)
 				}
@@ -1079,7 +1079,7 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 		skippedPods := createDiff - (batchSize + pos)
 		if errorCount < len(errCh) && skippedPods > 0 {
 			logger.V(2).Info("Slow-start failure. Skipping creation pods, decrementing expectations for daemon set", "skippedPods", skippedPods, "daemonset", klog.KObj(ds))
-			dsc.expectations.LowerExpectations(dsKey, skippedPods, 0)
+			dsc.expectations.LowerExpectations(logger, dsKey, skippedPods, 0)
 			// The skipped pods will be retried later. The next controller resync will
 			// retry the slow start process.
 			break
@@ -1093,7 +1093,7 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 		go func(ix int) {
 			defer deleteWait.Done()
 			if err := dsc.podControl.DeletePod(ctx, ds.Namespace, podsToDelete[ix], ds); err != nil {
-				dsc.expectations.DeletionObserved(dsKey)
+				dsc.expectations.DeletionObserved(logger, dsKey)
 				if !apierrors.IsNotFound(err) {
 					logger.V(2).Info("Failed deletion, decremented expectations for daemon set", "daemonset", klog.KObj(ds))
 					errCh <- err
@@ -1243,7 +1243,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 	ds, err := dsc.dsLister.DaemonSets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
 		logger.V(3).Info("Daemon set has been deleted", "daemonset", key)
-		dsc.expectations.DeleteExpectations(key)
+		dsc.expectations.DeleteExpectations(logger, key)
 		return nil
 	}
 	if err != nil {
@@ -1288,7 +1288,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 	}
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
-	if !dsc.expectations.SatisfiedExpectations(dsKey) {
+	if !dsc.expectations.SatisfiedExpectations(logger, dsKey) {
 		// Only update status. Don't raise observedGeneration since controller didn't process object of that generation.
 		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, false)
 	}

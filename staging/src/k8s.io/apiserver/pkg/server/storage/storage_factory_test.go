@@ -191,33 +191,36 @@ func TestConfigs(t *testing.T) {
 	defaultEtcdLocations := []string{"http://127.0.0.1", "http://127.0.0.2"}
 
 	testCases := []struct {
-		resource    schema.GroupResource
+		resource    *schema.GroupResource
 		servers     []string
 		wantConfigs []storagebackend.Config
 	}{
 		{
 			wantConfigs: []storagebackend.Config{
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1"}}, Prefix: "/registry", Paging: true},
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.2"}}, Prefix: "/registry", Paging: true},
+				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry", Paging: true},
 			},
 		},
 		{
-			resource: schema.GroupResource{Group: example.GroupName, Resource: "resource"},
+			resource: &schema.GroupResource{Group: example.GroupName, Resource: "resource"},
+			servers:  []string{},
+			wantConfigs: []storagebackend.Config{
+				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry", Paging: true},
+			},
+		},
+		{
+			resource: &schema.GroupResource{Group: example.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000"},
 			wantConfigs: []storagebackend.Config{
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1"}}, Prefix: "/registry", Paging: true},
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.2"}}, Prefix: "/registry", Paging: true},
+				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry", Paging: true},
 				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1:10000"}}, Prefix: "/registry", Paging: true},
 			},
 		},
 		{
-			resource: schema.GroupResource{Group: example.GroupName, Resource: "resource"},
+			resource: &schema.GroupResource{Group: example.GroupName, Resource: "resource"},
 			servers:  []string{"http://127.0.0.1:10000", "https://127.0.0.1", "http://127.0.0.2"},
 			wantConfigs: []storagebackend.Config{
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1"}}, Prefix: "/registry", Paging: true},
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.2"}}, Prefix: "/registry", Paging: true},
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1:10000"}}, Prefix: "/registry", Paging: true},
-				{Transport: storagebackend.TransportConfig{ServerList: []string{"https://127.0.0.1"}}, Prefix: "/registry", Paging: true},
+				{Transport: storagebackend.TransportConfig{ServerList: defaultEtcdLocations}, Prefix: "/registry", Paging: true},
+				{Transport: storagebackend.TransportConfig{ServerList: []string{"http://127.0.0.1:10000", "https://127.0.0.1", "http://127.0.0.2"}}, Prefix: "/registry", Paging: true},
 			},
 		},
 	}
@@ -230,8 +233,8 @@ func TestConfigs(t *testing.T) {
 			},
 		}
 		storageFactory := NewDefaultStorageFactory(defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
-		if len(test.servers) > 0 {
-			storageFactory.SetEtcdLocation(test.resource, test.servers)
+		if test.resource != nil {
+			storageFactory.SetEtcdLocation(*test.resource, test.servers)
 		}
 
 		got := storageFactory.Configs()

@@ -296,7 +296,7 @@ func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*Cgrou
 		if configs[v1.PodQOSBurstable].ResourceParameters.Unified == nil {
 			configs[v1.PodQOSBurstable].ResourceParameters.Unified = make(map[string]string)
 		}
-		configs[v1.PodQOSBurstable].ResourceParameters.Unified[MemoryMin] = strconv.FormatInt(burstableMin, 10)
+		configs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryMin] = strconv.FormatInt(burstableMin, 10)
 		klog.V(4).InfoS("MemoryQoS config for qos", "qos", v1.PodQOSBurstable, "memoryMin", burstableMin)
 	}
 
@@ -304,7 +304,7 @@ func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*Cgrou
 		if configs[v1.PodQOSGuaranteed].ResourceParameters.Unified == nil {
 			configs[v1.PodQOSGuaranteed].ResourceParameters.Unified = make(map[string]string)
 		}
-		configs[v1.PodQOSGuaranteed].ResourceParameters.Unified[MemoryMin] = strconv.FormatInt(guaranteedMin, 10)
+		configs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin] = strconv.FormatInt(guaranteedMin, 10)
 		klog.V(4).InfoS("MemoryQoS config for qos", "qos", v1.PodQOSGuaranteed, "memoryMin", guaranteedMin)
 	}
 }

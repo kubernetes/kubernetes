@@ -19,9 +19,6 @@ package volume
 import (
 	"context"
 	"fmt"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"math/rand"
 	"os"
 	"strconv"
@@ -1045,7 +1042,6 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 // assignment and binding of PVCs with storage class name set to nil or "" with
 // and without presence of a default SC.
 func TestRetroactiveStorageClassAssignment(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, true)()
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=DefaultStorageClass"}, framework.SharedEtcd())
 	defer s.TearDownFn()
 	namespaceName := "retro-pvc-sc"

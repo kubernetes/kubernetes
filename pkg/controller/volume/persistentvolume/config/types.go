@@ -28,10 +28,10 @@ type PersistentVolumeBinderControllerConfiguration struct {
 	PVClaimBinderSyncPeriod metav1.Duration
 	// volumeConfiguration holds configuration for volume related features.
 	VolumeConfiguration VolumeConfiguration
-	// VolumeHostCIDRDenylist is a list of CIDRs that should not be reachable by the
+	// DEPRECATED: VolumeHostCIDRDenylist is a list of CIDRs that should not be reachable by the
 	// controller from plugins.
 	VolumeHostCIDRDenylist []string
-	// VolumeHostAllowLocalLoopback indicates if local loopback hosts (127.0.0.1, etc)
+	// DEPRECATED: VolumeHostAllowLocalLoopback indicates if local loopback hosts (127.0.0.1, etc)
 	// should be allowed from plugins.
 	VolumeHostAllowLocalLoopback bool
 }

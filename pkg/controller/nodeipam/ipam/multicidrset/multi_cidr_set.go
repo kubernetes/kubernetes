@@ -247,10 +247,7 @@ func (s *MultiCIDRSet) getBeginningAndEndIndices(cidr *net.IPNet) (int, int, err
 		if netutils.IsIPv6(cidr.IP) {
 			ipSize = net.IPv6len
 		}
-		begin, err = s.getIndexForCIDR(&net.IPNet{
-			IP:   cidr.IP.Mask(s.nodeMask),
-			Mask: s.nodeMask,
-		})
+		begin, err = s.getIndexForIP(cidr.IP.Mask(s.nodeMask))
 		if err != nil {
 			return -1, -1, err
 		}
@@ -266,10 +263,7 @@ func (s *MultiCIDRSet) getBeginningAndEndIndices(cidr *net.IPNet) (int, int, err
 			binary.BigEndian.PutUint64(ip[:net.IPv6len/2], ipIntLeft)
 			binary.BigEndian.PutUint64(ip[net.IPv6len/2:], ipIntRight)
 		}
-		end, err = s.getIndexForCIDR(&net.IPNet{
-			IP:   net.IP(ip).Mask(s.nodeMask),
-			Mask: s.nodeMask,
-		})
+		end, err = s.getIndexForIP(net.IP(ip).Mask(s.nodeMask))
 		if err != nil {
 			return -1, -1, err
 		}
@@ -331,10 +325,6 @@ func (s *MultiCIDRSet) Occupy(cidr *net.IPNet) (err error) {
 	cidrSetUsage.WithLabelValues(s.Label).Set(float64(s.allocatedCIDRs) / float64(s.MaxCIDRs))
 
 	return nil
-}
-
-func (s *MultiCIDRSet) getIndexForCIDR(cidr *net.IPNet) (int, error) {
-	return s.getIndexForIP(cidr.IP)
 }
 
 func (s *MultiCIDRSet) getIndexForIP(ip net.IP) (int, error) {

@@ -17,6 +17,7 @@ type RouteSpecApplyConfiguration struct {
 	Port              *RoutePortApplyConfiguration             `json:"port,omitempty"`
 	TLS               *TLSConfigApplyConfiguration             `json:"tls,omitempty"`
 	WildcardPolicy    *routev1.WildcardPolicyType              `json:"wildcardPolicy,omitempty"`
+	HTTPHeaders       *RouteHTTPHeadersApplyConfiguration      `json:"httpHeaders,omitempty"`
 }
 
 // RouteSpecApplyConfiguration constructs an declarative configuration of the RouteSpec type for use with
@@ -91,5 +92,13 @@ func (b *RouteSpecApplyConfiguration) WithTLS(value *TLSConfigApplyConfiguration
 // If called multiple times, the WildcardPolicy field is set to the value of the last call.
 func (b *RouteSpecApplyConfiguration) WithWildcardPolicy(value routev1.WildcardPolicyType) *RouteSpecApplyConfiguration {
 	b.WildcardPolicy = &value
+	return b
+}
+
+// WithHTTPHeaders sets the HTTPHeaders field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HTTPHeaders field is set to the value of the last call.
+func (b *RouteSpecApplyConfiguration) WithHTTPHeaders(value *RouteHTTPHeadersApplyConfiguration) *RouteSpecApplyConfiguration {
+	b.HTTPHeaders = value
 	return b
 }

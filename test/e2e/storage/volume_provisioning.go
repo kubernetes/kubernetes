@@ -638,7 +638,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			ginkgo.By("creating a StorageClass")
 			test.Class = testsuites.SetupStorageClass(ctx, test.Client, newStorageClass(test, ns, "invalid-aws"))
 
-			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
+			ginkgo.By("creating a claim object")
 			claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &test.Class.Name,

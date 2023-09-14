@@ -507,6 +507,63 @@ type GatewayConfig struct {
 	// The supported values are "Restricted" and "Global".
 	// +optional
 	IPForwarding IPForwardingMode `json:"ipForwarding,omitempty"`
+	// ipv4 allows users to configure IP settings for IPv4 connections. When omitted, this means no opinion and the default
+	// configuration is used. Check individual members fields within ipv4 for details of default values.
+	// +optional
+	IPv4 IPv4GatewayConfig `json:"ipv4,omitempty"`
+	// ipv6 allows users to configure IP settings for IPv6 connections. When omitted, this means no opinion and the default
+	// configuration is used. Check individual members fields within ipv6 for details of default values.
+	// +optional
+	IPv6 IPv6GatewayConfig `json:"ipv6,omitempty"`
+}
+
+// IPV4GatewayConfig holds the configuration paramaters for IPV4 connections in the GatewayConfig for OVN-Kubernetes
+type IPv4GatewayConfig struct {
+	// internalMasqueradeSubnet contains the masquerade addresses in IPV4 CIDR format used internally by
+	// ovn-kubernetes to enable host to service traffic. Each host in the cluster is configured with these
+	// addresses, as well as the shared gateway bridge interface. The values can be changed after
+	// installation. The subnet chosen should not overlap with other networks specified for
+	// OVN-Kubernetes as well as other networks used on the host. Additionally the subnet must
+	// be large enough to accommodate 6 IPs (maximum prefix length /29).
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default which is subject to change over time.
+	// The current default subnet is 169.254.169.0/29
+	// The value must be in proper IPV4 CIDR format
+	// +kubebuilder:validation:MaxLength=18
+	// +kubebuilder:validation:XValidation:rule="self.indexOf('/') == self.lastIndexOf('/')",message="CIDR format must contain exactly one '/'"
+	// +kubebuilder:validation:XValidation:rule="[int(self.split('/')[1])].all(x, x <= 29 && x >= 0)",message="subnet must be in the range /0 to /29 inclusive"
+	// +kubebuilder:validation:XValidation:rule="self.split('/')[0].split('.').size() == 4",message="a valid IPv4 address must contain 4 octets"
+	// +kubebuilder:validation:XValidation:rule="[self.findAll('[0-9]+')[0]].all(x, x != '0' && int(x) <= 255 && !x.startsWith('0'))",message="first IP address octet must not contain leading zeros, must be greater than 0 and less or equal to 255"
+	// +kubebuilder:validation:XValidation:rule="[self.findAll('[0-9]+')[1], self.findAll('[0-9]+')[2], self.findAll('[0-9]+')[3]].all(x, int(x) <= 255 && (x == '0' || !x.startsWith('0')))",message="IP address octets must not contain leading zeros, and must be less or equal to 255"
+	// +optional
+	InternalMasqueradeSubnet string `json:"internalMasqueradeSubnet,omitempty"`
+}
+
+// IPV6GatewayConfig holds the configuration paramaters for IPV6 connections in the GatewayConfig for OVN-Kubernetes
+type IPv6GatewayConfig struct {
+	// internalMasqueradeSubnet contains the masquerade addresses in IPV6 CIDR format used internally by
+	// ovn-kubernetes to enable host to service traffic. Each host in the cluster is configured with these
+	// addresses, as well as the shared gateway bridge interface. The values can be changed after
+	// installation. The subnet chosen should not overlap with other networks specified for
+	// OVN-Kubernetes as well as other networks used on the host. Additionally the subnet must
+	// be large enough to accommodate 6 IPs (maximum prefix length /125).
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default which is subject to change over time.
+	// The current default subnet is fd69::/125
+	// Note that IPV6 dual addresses are not permitted
+	// +kubebuilder:validation:XValidation:rule="self.indexOf('/') == self.lastIndexOf('/')",message="CIDR format must contain exactly one '/'"
+	// +kubebuilder:validation:XValidation:rule="self.split('/').size() == 2 && [int(self.split('/')[1])].all(x, x <= 125 && x >= 0)",message="subnet must be in the range /0 to /125 inclusive"
+	// +kubebuilder:validation:XValidation:rule="self.indexOf('::') == self.lastIndexOf('::')",message="IPv6 addresses must contain at most one '::' and may only be shortened once"
+	// +kubebuilder:validation:XValidation:rule="self.contains('::') ? self.split('/')[0].split(':').size() <= 8 : self.split('/')[0].split(':').size() == 8",message="a valid IPv6 address must contain 8 segments unless elided (::), in which case it must contain at most 6 non-empty segments"
+	// +kubebuilder:validation:XValidation:rule="self.split('/')[0].split(':').size() >=1 ? [self.split('/')[0].split(':', 8)[0]].all(x, x == '' || x.matches('[0-9A-Fa-f]{1,4}')) : true",message="each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 1"
+	// +kubebuilder:validation:XValidation:rule="self.split('/')[0].split(':').size() >=2 ? [self.split('/')[0].split(':', 8)[1]].all(x, x == '' || x.matches('[0-9A-Fa-f]{1,4}')) : true",message="each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 2"
+	// +kubebuilder:validation:XValidation:rule="self.split('/')[0].split(':').size() >=3 ? [self.split('/')[0].split(':', 8)[2]].all(x, x == '' || x.matches('[0-9A-Fa-f]{1,4}')) : true",message="each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 3"
+	// +kubebuilder:validation:XValidation:rule="self.split('/')[0].split(':').size() >=4 ? [self.split('/')[0].split(':', 8)[3]].all(x, x == '' || x.matches('[0-9A-Fa-f]{1,4}')) : true",message="each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 4"
+	// +kubebuilder:validation:XValidation:rule="self.split('/')[0].split(':').size() >=5 ? [self.split('/')[0].split(':', 8)[4]].all(x, x == '' || x.matches('[0-9A-Fa-f]{1,4}')) : true",message="each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 5"
+	// +kubebuilder:validation:XValidation:rule="self.split('/')[0].split(':').size() >=6 ? [self.split('/')[0].split(':', 8)[5]].all(x, x == '' || x.matches('[0-9A-Fa-f]{1,4}')) : true",message="each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 6"
+	// +kubebuilder:validation:XValidation:rule="self.split('/')[0].split(':').size() >=7 ? [self.split('/')[0].split(':', 8)[6]].all(x, x == '' || x.matches('[0-9A-Fa-f]{1,4}')) : true",message="each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 7"
+	// +kubebuilder:validation:XValidation:rule="self.split('/')[0].split(':').size() >=8 ? [self.split('/')[0].split(':', 8)[7]].all(x, x == '' || x.matches('[0-9A-Fa-f]{1,4}')) : true",message="each segment of an IPv6 address must be a hexadecimal number between 0 and FFFF, failed on segment 8"
+	// +kubebuilder:validation:XValidation:rule="!self.contains('.')",message="IPv6 dual addresses are not permitted, value should not contain `.` characters"
+	// +optional
+	InternalMasqueradeSubnet string `json:"internalMasqueradeSubnet,omitempty"`
 }
 
 type ExportNetworkFlows struct {
@@ -562,7 +619,8 @@ type PolicyAuditConfig struct {
 	MaxFileSize *uint32 `json:"maxFileSize,omitempty"`
 
 	// maxLogFiles specifies the maximum number of ACL_audit log files that can be present.
-	// Default: 5
+	// +kubebuilder:default=5
+	// +kubebuilder:validation:Minimum=1
 	// +optional
 	MaxLogFiles *int32 `json:"maxLogFiles,omitempty"`
 

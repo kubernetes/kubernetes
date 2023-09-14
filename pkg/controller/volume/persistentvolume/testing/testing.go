@@ -20,17 +20,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/klog/v2"
 	"reflect"
 	"strconv"
 	"sync"
+
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -349,7 +350,7 @@ func (r *VolumeReactor) CheckVolumes(expectedVolumes []*v1.PersistentVolume) err
 	if !reflect.DeepEqual(expectedMap, gotMap) {
 		// Print ugly but useful diff of expected and received objects for
 		// easier debugging.
-		return fmt.Errorf("Volume check failed [A-expected, B-got]: %s", diff.ObjectDiff(expectedMap, gotMap))
+		return fmt.Errorf("Volume check failed [A-expected, B-got]: %s", cmp.Diff(expectedMap, gotMap))
 	}
 	return nil
 }
@@ -378,7 +379,7 @@ func (r *VolumeReactor) CheckClaims(expectedClaims []*v1.PersistentVolumeClaim) 
 	if !reflect.DeepEqual(expectedMap, gotMap) {
 		// Print ugly but useful diff of expected and received objects for
 		// easier debugging.
-		return fmt.Errorf("Claim check failed [A-expected, B-got result]: %s", diff.ObjectDiff(expectedMap, gotMap))
+		return fmt.Errorf("Claim check failed [A-expected, B-got result]: %s", cmp.Diff(expectedMap, gotMap))
 	}
 	return nil
 }

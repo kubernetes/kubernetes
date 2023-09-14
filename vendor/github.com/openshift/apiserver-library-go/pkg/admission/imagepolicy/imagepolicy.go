@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,6 +24,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/lru"
 
 	imagev1 "github.com/openshift/api/image/v1"
 	imagepolicy "github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/apis/imagepolicy/v1"
@@ -160,11 +159,7 @@ func (a *ImagePolicyPlugin) ValidateInitialization() error {
 	if a.imageMutators == nil {
 		return fmt.Errorf("%s needs an image mutators", imagepolicy.PluginName)
 	}
-	imageResolver, err := newImageResolutionCache(a.Client.ImageV1(), a.integratedRegistryMatcher)
-	if err != nil {
-		return fmt.Errorf("unable to create image policy controller: %v", err)
-	}
-	a.resolver = imageResolver
+	a.resolver = newImageResolutionCache(a.Client.ImageV1(), a.integratedRegistryMatcher)
 	return nil
 }
 
@@ -270,17 +265,14 @@ type imageCacheEntry struct {
 }
 
 // newImageResolutionCache creates a new resolver that caches frequently loaded images for one minute.
-func newImageResolutionCache(imageClient imagev1typedclient.ImageV1Interface, integratedRegistry rules.RegistryMatcher) (*imageResolutionCache, error) {
-	imageCache, err := lru.New(128)
-	if err != nil {
-		return nil, err
-	}
+func newImageResolutionCache(imageClient imagev1typedclient.ImageV1Interface, integratedRegistry rules.RegistryMatcher) *imageResolutionCache {
+	imageCache := lru.New(128)
 	return &imageResolutionCache{
 		imageClient: imageClient,
 		integrated:  integratedRegistry,
 		cache:       imageCache,
 		expiration:  time.Minute,
-	}, nil
+	}
 }
 
 var now = time.Now

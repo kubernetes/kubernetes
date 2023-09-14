@@ -27,6 +27,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
@@ -55,6 +56,11 @@ type remoteRuntimeService struct {
 const (
 	// How frequently to report identical errors
 	identicalErrorDelay = 1 * time.Minute
+
+	// connection parameters
+	maxBackoffDelay      = 3 * time.Second
+	baseBackoffDelay     = 100 * time.Millisecond
+	minConnectionTimeout = 5 * time.Second
 )
 
 // CRIVersion is the type for valid Container Runtime Interface (CRI) API
@@ -79,7 +85,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	dialOpts := []grpc.DialOption{}
+	var dialOpts []grpc.DialOption
 	dialOpts = append(dialOpts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
@@ -95,6 +101,17 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
 			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
 	}
+
+	connParams := grpc.ConnectParams{
+		Backoff: backoff.DefaultConfig,
+	}
+	connParams.MinConnectTimeout = minConnectionTimeout
+	connParams.Backoff.BaseDelay = baseBackoffDelay
+	connParams.Backoff.MaxDelay = maxBackoffDelay
+	dialOpts = append(dialOpts,
+		grpc.WithConnectParams(connParams),
+	)
+
 	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
 		klog.ErrorS(err, "Connect remote runtime failed", "address", addr)
@@ -847,4 +864,19 @@ func (r *remoteRuntimeService) ListPodSandboxMetrics(ctx context.Context) ([]*ru
 	klog.V(10).InfoS("[RemoteRuntimeService] ListPodSandboxMetrics Response", "stats", resp.GetPodMetrics())
 
 	return resp.GetPodMetrics(), nil
+}
+
+// RuntimeConfig returns the configuration information of the runtime.
+func (r *remoteRuntimeService) RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.RuntimeConfig(ctx, &runtimeapi.RuntimeConfigRequest{})
+	if err != nil {
+		klog.ErrorS(err, "RuntimeConfig from runtime service failed")
+		return nil, err
+	}
+	klog.V(10).InfoS("[RemoteRuntimeService] RuntimeConfigResponse", "linuxConfig", resp.GetLinux())
+
+	return resp, nil
 }
