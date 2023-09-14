@@ -86,7 +86,8 @@ func (t *TopologyCache) GetOverloadedServices() []string {
 }
 
 // AddHints adds or updates topology hints on EndpointSlices and returns updated
-// lists of EndpointSlices to create and update.
+// lists of EndpointSlices to create and update. It also adds the topology hints
+// to the topology cache.
 func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*EventBuilder) {
 	totalEndpoints := si.getTotalReadyEndpoints()
 	allocations, allocationsEvent := t.getAllocations(totalEndpoints)
@@ -95,7 +96,7 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 		logger.Info(allocationsEvent.Message+", removing hints", "key", si.ServiceKey, "addressType", si.AddressType)
 		allocationsEvent.Message = FormatWithAddressType(allocationsEvent.Message, si.AddressType)
 		events = append(events, allocationsEvent)
-		t.RemoveHints(si.ServiceKey, si.AddressType)
+		t.unsetHints(si.ServiceKey, si.AddressType)
 		slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
 		return slicesToCreate, slicesToUpdate, events
 	}
@@ -121,7 +122,7 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 					Reason:    "TopologyAwareHintsDisabled",
 					Message:   FormatWithAddressType(NoZoneSpecified, si.AddressType),
 				})
-				t.RemoveHints(si.ServiceKey, si.AddressType)
+				t.unsetHints(si.ServiceKey, si.AddressType)
 				slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
 				return slicesToCreate, slicesToUpdate, events
 			}
@@ -148,7 +149,7 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 			Reason:    "TopologyAwareHintsDisabled",
 			Message:   FormatWithAddressType(NoAllocatedHintsForZones, si.AddressType),
 		})
-		t.RemoveHints(si.ServiceKey, si.AddressType)
+		t.unsetHints(si.ServiceKey, si.AddressType)
 		slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
 		return slicesToCreate, slicesToUpdate, events
 	}
@@ -189,9 +190,34 @@ func (t *TopologyCache) setHintsLocked(serviceKey string, addrType discovery.Add
 	t.hintsPopulatedByService.Insert(serviceKey)
 }
 
-// RemoveHints removes topology hints for the provided serviceKey and addrType
-// from this cache.
-func (t *TopologyCache) RemoveHints(serviceKey string, addrType discovery.AddressType) {
+// RemoveHints removes topology hints on EndpointSlices and returns updated
+// lists of EndpointSlices to create and update. It also removes the topology
+// hints from the topology cache.
+func (t *TopologyCache) RemoveHints(logger klog.Logger, si *SliceInfo) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*EventBuilder) {
+	slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
+	events := []*EventBuilder{}
+
+	if t == nil {
+		return slicesToCreate, slicesToUpdate, events
+	}
+
+	t.unsetHints(si.ServiceKey, si.AddressType)
+
+	hintsEnabled := t.hasPopulatedHints(si.ServiceKey)
+	// If hints were enabled before, we publish an event to indicate we disabled them.
+	if hintsEnabled {
+		logger.Info("TopologyAwareHints annotation has changed, removing hints", "serviceKey", si.ServiceKey, "addressType", si.AddressType)
+		events = append(events, &EventBuilder{
+			EventType: v1.EventTypeWarning,
+			Reason:    "TopologyAwareHintsDisabled",
+			Message:   FormatWithAddressType(TopologyAwareHintsDisabled, si.AddressType),
+		})
+	}
+
+	return slicesToCreate, slicesToUpdate, events
+}
+
+func (t *TopologyCache) unsetHints(serviceKey string, addrType discovery.AddressType) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -266,8 +292,8 @@ func (t *TopologyCache) SetNodes(logger klog.Logger, nodes []*v1.Node) {
 	}
 }
 
-// HasPopulatedHints checks whether there are populated hints for a given service in the cache.
-func (t *TopologyCache) HasPopulatedHints(serviceKey string) bool {
+// hasPopulatedHints checks whether there are populated hints for a given service in the cache.
+func (t *TopologyCache) hasPopulatedHints(serviceKey string) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 

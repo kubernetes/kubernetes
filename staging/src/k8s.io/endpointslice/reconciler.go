@@ -86,7 +86,11 @@ func (r *Reconciler) Reconcile(logger klog.Logger, service *corev1.Service, pods
 				if err != nil {
 					logger.Info("Couldn't get key to remove EndpointSlice from topology cache", "existingSlice", existingSlice, "err", err)
 				} else {
-					r.topologyCache.RemoveHints(svcKey, existingSlice.AddressType)
+					si := &topologycache.SliceInfo{
+						ServiceKey:  svcKey,
+						AddressType: existingSlice.AddressType,
+					}
+					r.topologyCache.RemoveHints(logger, si)
 				}
 			}
 
@@ -136,7 +140,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 	slicesToCreate := []*discovery.EndpointSlice{}
 	slicesToUpdate := []*discovery.EndpointSlice{}
 	slicesToDelete := []*discovery.EndpointSlice{}
-	events := []*topologycache.EventBuilder{}
+	var events []*topologycache.EventBuilder
 
 	// Build data structures for existing state.
 	existingSlicesByPortMap := map[endpointsliceutil.PortMapKey][]*discovery.EndpointSlice{}
@@ -264,19 +268,9 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 	if r.topologyCache != nil && hintsEnabled(service.Annotations) {
 		slicesToCreate, slicesToUpdate, events = r.topologyCache.AddHints(logger, si)
 	} else {
-		if r.topologyCache != nil {
-			if r.topologyCache.HasPopulatedHints(si.ServiceKey) {
-				logger.Info("TopologyAwareHints annotation has changed, removing hints", "serviceKey", si.ServiceKey, "addressType", si.AddressType)
-				events = append(events, &topologycache.EventBuilder{
-					EventType: corev1.EventTypeWarning,
-					Reason:    "TopologyAwareHintsDisabled",
-					Message:   topologycache.FormatWithAddressType(topologycache.TopologyAwareHintsDisabled, si.AddressType),
-				})
-			}
-			r.topologyCache.RemoveHints(si.ServiceKey, addressType)
-		}
-		slicesToCreate, slicesToUpdate = topologycache.RemoveHintsFromSlices(si)
+		slicesToCreate, slicesToUpdate, events = r.topologyCache.RemoveHints(logger, si)
 	}
+
 	err := r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)
 	if err != nil {
 		errs = append(errs, err)

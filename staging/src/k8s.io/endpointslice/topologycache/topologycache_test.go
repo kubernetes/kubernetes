@@ -424,6 +424,99 @@ func TestAddHints(t *testing.T) {
 	}
 }
 
+// Invoking RemoveHints() when TopologyCache is nil should NOT fail. It should
+// simply remove any Topology hints in the EndpointSlice(s).
+func TestRemoveHints_nilTopologyCache(t *testing.T) {
+	// Input
+	inputSliceInfo := &SliceInfo{
+		ServiceKey:  "ns/svc",
+		AddressType: discovery.AddressTypeIPv4,
+		ToCreate: []*discovery.EndpointSlice{
+			{
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses:  []string{"10.1.2.3"},
+						Zone:       pointer.String("zone-a"),
+						Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
+						Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					}, {
+						Addresses:  []string{"10.1.2.4"},
+						Zone:       pointer.String("zone-b"),
+						Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
+						Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					},
+				},
+			}, {
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses:  []string{"10.1.3.3"},
+						Zone:       pointer.String("zone-c"),
+						Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-c"}}},
+						Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					},
+				},
+			},
+		},
+		ToUpdate: []*discovery.EndpointSlice{
+			{
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses:  []string{"10.2.2.3"},
+						Zone:       pointer.String("zone-a"),
+						Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
+						Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					},
+				},
+			},
+		},
+	}
+
+	// Want hints to be removed.
+	wantSlicesToCreate := []*discovery.EndpointSlice{
+		{
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses:  []string{"10.1.2.3"},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				}, {
+					Addresses:  []string{"10.1.2.4"},
+					Zone:       pointer.String("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				},
+			},
+		}, {
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses:  []string{"10.1.3.3"},
+					Zone:       pointer.String("zone-c"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				},
+			},
+		},
+	}
+	wantSlicesToUpdate := []*discovery.EndpointSlice{
+		{
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses:  []string{"10.2.2.3"},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				},
+			},
+		},
+	}
+
+	// Invoke function under test.
+	var topologyCache *TopologyCache // nil TopologyCache
+	logger, _ := ktesting.NewTestContext(t)
+	gotSlicesToCreate, gotSlicesToUpdate, _ := topologyCache.RemoveHints(logger, inputSliceInfo)
+
+	// Verify results
+	expectEquivalentSlices(t, gotSlicesToCreate, wantSlicesToCreate)
+	expectEquivalentSlices(t, gotSlicesToUpdate, wantSlicesToUpdate)
+}
+
 func TestSetNodes(t *testing.T) {
 	type nodeInfo struct {
 		zone   string
@@ -629,7 +722,21 @@ func TestSetNodes(t *testing.T) {
 }
 
 func TestTopologyCacheRace(t *testing.T) {
-	sliceInfo := &SliceInfo{
+	sliceInfo1 := &SliceInfo{
+		ServiceKey:  "ns/svc",
+		AddressType: discovery.AddressTypeIPv4,
+		ToCreate: []*discovery.EndpointSlice{{
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.1.2.3"},
+				Zone:       pointer.String("zone-a"),
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			}, {
+				Addresses:  []string{"10.1.2.4"},
+				Zone:       pointer.String("zone-b"),
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			}},
+		}}}
+	sliceInfo2 := &SliceInfo{
 		ServiceKey:  "ns/svc",
 		AddressType: discovery.AddressTypeIPv4,
 		ToCreate: []*discovery.EndpointSlice{{
@@ -688,10 +795,13 @@ func TestTopologyCacheRace(t *testing.T) {
 		cache.SetNodes(logger, nodes)
 	}()
 	go func() {
-		cache.AddHints(logger, sliceInfo)
+		cache.AddHints(logger, sliceInfo1)
 	}()
 	go func() {
-		cache.HasPopulatedHints(sliceInfo.ServiceKey)
+		cache.RemoveHints(logger, sliceInfo2)
+	}()
+	go func() {
+		cache.hasPopulatedHints(sliceInfo1.ServiceKey)
 	}()
 }
 
