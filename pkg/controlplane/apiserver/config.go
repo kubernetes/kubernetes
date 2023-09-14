@@ -174,7 +174,10 @@ func BuildGenericConfig(
 
 // BuildAuthorizer constructs the authorizer
 func BuildAuthorizer(s controlplaneapiserver.CompletedOptions, EgressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
-	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
+	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	if EgressSelector != nil {
 		egressDialer, err := EgressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
