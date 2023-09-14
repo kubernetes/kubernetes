@@ -467,7 +467,7 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disru
 var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("pidpressure-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	pressureTimeout := 3 * time.Minute
+	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodePIDPressure
 	expectedStarvedResource := noStarvedResource
 
@@ -717,7 +717,8 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 			}
 		}
 		gomega.Expect(priorityPod).NotTo(gomega.BeNil())
-		gomega.Expect(priorityPod.Status.Phase).ToNot(gomega.Equal(v1.PodSucceeded), "pod: %s succeeded unexpectedly", priorityPod.Name)
+		gomega.Expect(priorityPod.Status.Phase).ToNot(gomega.Equal(v1.PodSucceeded),
+			fmt.Sprintf("pod: %s succeeded unexpectedly", priorityPod.Name))
 
 		// Check eviction ordering.
 		// Note: it is alright for a priority 1 and priority 2 pod (for example) to fail in the same round,
@@ -731,8 +732,9 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 			}
 			gomega.Expect(lowPriorityPod).NotTo(gomega.BeNil())
 			if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == v1.PodRunning {
-				gomega.Expect(priorityPod.Status.Phase).ToNot(gomega.Equal(v1.PodFailed), "priority %d pod: %s failed before priority %d pod: %s",
-					priorityPodSpec.evictionPriority, priorityPodSpec.pod.Name, lowPriorityPodSpec.evictionPriority, lowPriorityPodSpec.pod.Name)
+				gomega.Expect(priorityPod.Status.Phase).ToNot(gomega.Equal(v1.PodFailed),
+					fmt.Sprintf("priority %d pod: %s failed before priority %d pod: %s",
+						priorityPodSpec.evictionPriority, priorityPodSpec.pod.Name, lowPriorityPodSpec.evictionPriority, lowPriorityPodSpec.pod.Name))
 			}
 		}
 
@@ -743,7 +745,8 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 
 		// EvictionPriority 0 pods should not fail
 		if priorityPodSpec.evictionPriority == 0 {
-			gomega.Expect(priorityPod.Status.Phase).ToNot(gomega.Equal(v1.PodFailed), "priority 0 pod: %s failed", priorityPod.Name)
+			gomega.Expect(priorityPod.Status.Phase).ToNot(gomega.Equal(v1.PodFailed),
+				fmt.Sprintf("priority 0 pod: %s failed", priorityPod.Name))
 		}
 
 		// If a pod that is not evictionPriority 0 has not been evicted, we are not done
@@ -947,10 +950,15 @@ func eventuallyGetSummary(ctx context.Context) (s *kubeletstatsv1alpha1.Summary)
 
 // returns a pod that does not use any resources
 func innocentPod() *v1.Pod {
+	// Due to https://github.com/kubernetes/kubernetes/issues/115819,
+	// When evictionHard to used, we were setting grace period to 0 which meant the default setting (30 seconds)
+	// This could help with flakiness as we should send sigterm right away.
+	var gracePeriod int64 = 1
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "innocent-pod"},
 		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever,
+			RestartPolicy:                 v1.RestartPolicyNever,
+			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers: []v1.Container{
 				{
 					Image: busyboxImage,
@@ -996,6 +1004,10 @@ func pidConsumingPod(name string, numProcesses int) *v1.Pod {
 
 // podWithCommand returns a pod with the provided volumeSource and resourceRequirements.
 func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirements, iterations int, name, command string) *v1.Pod {
+	// Due to https://github.com/kubernetes/kubernetes/issues/115819,
+	// When evictionHard to used, we were setting grace period to 0 which meant the default setting (30 seconds)
+	// This could help with flakiness as we should send sigterm right away.
+	var gracePeriod int64 = 1
 	volumeMounts := []v1.VolumeMount{}
 	volumes := []v1.Volume{}
 	if volumeSource != nil {
@@ -1005,7 +1017,8 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-pod", name)},
 		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever,
+			RestartPolicy:                 v1.RestartPolicyNever,
+			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers: []v1.Container{
 				{
 					Image: busyboxImage,
@@ -1025,6 +1038,10 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 }
 
 func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *v1.Pod {
+	// Due to https://github.com/kubernetes/kubernetes/issues/115819,
+	// When evictionHard to used, we were setting grace period to 0 which meant the default setting (30 seconds)
+	// This could help with flakiness as we should send sigterm right away.
+	var gracePeriod int64 = 1
 	env := []v1.EnvVar{
 		{
 			Name: "MEMORY_LIMIT",
@@ -1053,7 +1070,8 @@ func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever,
+			RestartPolicy:                 v1.RestartPolicyNever,
+			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers: []v1.Container{
 				{
 					Name:            ctnName,
