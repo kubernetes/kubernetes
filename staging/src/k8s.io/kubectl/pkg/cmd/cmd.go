@@ -141,14 +141,9 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 		} else if err == nil {
 			// Command exists(e.g. kubectl create), but it is not certain that
 			// subcommand also exists (e.g. kubectl create networkpolicy)
-			if IsSubcommandPluginAllowed(foundCmd.Name()) {
-				var subcommand string
-				for _, arg := range foundArgs { // first "non-flag" argument as subcommand
-					if !strings.HasPrefix(arg, "-") {
-						subcommand = arg
-						break
-					}
-				}
+			// we also have to eliminate kubectl create -f
+			if IsSubcommandPluginAllowed(foundCmd.Name()) && len(foundArgs) >= 1 && !strings.HasPrefix(foundArgs[0], "-") {
+				subcommand := foundArgs[0]
 				builtinSubcmdExist := false
 				for _, subcmd := range foundCmd.Commands() {
 					if subcmd.Name() == subcommand {
