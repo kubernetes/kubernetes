@@ -1179,6 +1179,58 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "csistoragecapacities",
+              "responseKind": {
+                "group": "",
+                "kind": "CSIStorageCapacity",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "csistoragecapacity",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "csistoragecapacities",
+              "responseKind": {
+                "group": "",
+                "kind": "CSIStorageCapacity",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "csistoragecapacity",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     },
@@ -1728,6 +1780,82 @@
             }
           ],
           "version": "v1beta2"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "flowschemas",
+              "responseKind": {
+                "group": "",
+                "kind": "FlowSchema",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "flowschema",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "FlowSchema",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "prioritylevelconfigurations",
+              "responseKind": {
+                "group": "",
+                "kind": "PriorityLevelConfiguration",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "prioritylevelconfiguration",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "PriorityLevelConfiguration",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
         }
       ]
     },
