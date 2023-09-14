@@ -34,11 +34,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// init registers the audit scheme for configuration parsing.
 func init() {
 	// Register audit scheme to parse audit config.
 	auditinstall.Install(auditpkg.Scheme)
 }
 
+// TestCreateMasterAuditPolicy validates the generated master audit policy.
 func TestCreateMasterAuditPolicy(t *testing.T) {
 	baseDir, err := os.MkdirTemp("", "configure-helper-test") // cleaned up by c.tearDown()
 	require.NoError(t, err, "Failed to create temp directory")
@@ -165,6 +167,7 @@ type auditTester struct {
 	evaluator auditpkg.PolicyRuleEvaluator
 }
 
+// testResources checks if given users, verbs, and resources match the expected audit level.
 func (t *auditTester) testResources(level audit.Level, usrVerbRes ...interface{}) {
 	verbs := []string{}
 	users := []user.Info{}
@@ -204,6 +207,7 @@ func (t *auditTester) testResources(level audit.Level, usrVerbRes ...interface{}
 	}
 }
 
+// testNonResources tests audit levels for non-resource requests given users and paths.
 func (t *auditTester) testNonResources(level audit.Level, users []user.Info, paths ...string) {
 	for _, usr := range users {
 		for _, verb := range []string{"get", "post"} {
@@ -220,6 +224,7 @@ func (t *auditTester) testNonResources(level audit.Level, users []user.Info, pat
 	}
 }
 
+// expectLevel validates expected audit level for given attributes.
 func (t *auditTester) expectLevel(expected audit.Level, attrs authorizer.Attributes) {
 	obj := attrs.GetPath()
 	if attrs.IsResourceRequest() {
@@ -239,6 +244,7 @@ func (t *auditTester) expectLevel(expected audit.Level, attrs authorizer.Attribu
 	})
 }
 
+// newUserInfo creates a new user with the specified name and groups.
 func newUserInfo(name string, groups ...string) user.Info {
 	return &user.DefaultInfo{
 		Name:   name,
@@ -250,6 +256,7 @@ type Resource struct {
 	Group, Resource, Subresource, Namespace string
 }
 
+// resource constructs a Resource from given kind, namespace
 func resource(kind string, nsGroupSub ...string) Resource {
 	res := Resource{Resource: kind}
 	if len(nsGroupSub) > 0 {

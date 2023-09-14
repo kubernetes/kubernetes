@@ -34,6 +34,7 @@ const (
 	defaultRootfs    = "/home/kubernetes/containerized_mounter/rootfs"
 )
 
+// Handles CLI arguments, verifies rootfs, and mounts as specified.
 func main() {
 
 	if len(os.Args) < 2 {
