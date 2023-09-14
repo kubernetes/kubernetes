@@ -690,10 +690,10 @@ func containerNameToRef(pod *corev1.Pod) map[string]*corev1.Container {
 	return names
 }
 
-// waitForContainer watches the given pod until the container is running
-func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, containerName string) (*corev1.Pod, error) {
-	// TODO: expose the timeout
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, 0*time.Second)
+// waitForContainer watches the given pod until the container is running.
+// Infinite timeout can be expressed as 0 duration.
+func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, containerName string, timeout time.Duration) (*corev1.Pod, error) {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, timeout)
 	defer cancel()
 
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", podName).String()
@@ -764,7 +764,7 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter gen
 	opts.Config = config
 	opts.AttachFunc = attach.DefaultAttachFunc
 
-	pod, err := o.waitForContainer(ctx, ns, podName, containerName)
+	pod, err := o.waitForContainer(ctx, ns, podName, containerName, 0*time.Second)
 	if err != nil {
 		return err
 	}
