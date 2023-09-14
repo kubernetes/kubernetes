@@ -342,16 +342,6 @@ func getPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) map[string]v1
 		claim := templates[i]
 		claim.Name = getPersistentVolumeClaimName(set, &claim, ordinal)
 		claim.Namespace = set.Namespace
-		var ownReferences []metav1.OwnerReference
-		for _, reference := range pod.OwnerReferences {
-			ownReferences = append(ownReferences, *reference.DeepCopy())
-		}
-		ownReferences = append(ownReferences, metav1.OwnerReference{
-			APIVersion: "v1",
-			Kind:       "Pod",
-			Name:       pod.Name,
-		})
-		claim.OwnerReferences = ownReferences
 		if claim.Labels != nil {
 			for key, value := range set.Spec.Selector.MatchLabels {
 				claim.Labels[key] = value

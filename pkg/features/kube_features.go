@@ -549,6 +549,8 @@ const (
 	// Enable MatchLabelKeys in PodTopologySpread.
 	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
 
+	PodNotExistInclusionPolicyInPodTopologySpread featuregate.Feature = "PodNotExistInclusionPolicyInPodTopologySpread"
+
 	// owner: @krmayankk
 	// alpha: v1.24
 	//
@@ -1099,6 +1101,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	LogarithmicScaleDown: {Default: true, PreRelease: featuregate.Beta},
 
 	MatchLabelKeysInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
+
+	PodNotExistInclusionPolicyInPodTopologySpread: {Default: false, PreRelease: featuregate.Alpha},
 
 	MaxUnavailableStatefulSet: {Default: false, PreRelease: featuregate.Alpha},
 

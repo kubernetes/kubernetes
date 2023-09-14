@@ -54,18 +54,19 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
-	systemDefaulted                              bool
-	parallelizer                                 parallelize.Parallelizer
-	defaultConstraints                           []v1.TopologySpreadConstraint
-	sharedLister                                 framework.SharedLister
-	services                                     corelisters.ServiceLister
-	replicationCtrls                             corelisters.ReplicationControllerLister
-	replicaSets                                  appslisters.ReplicaSetLister
-	statefulSets                                 appslisters.StatefulSetLister
-	pvcs                                         corelisters.PersistentVolumeClaimLister
-	enableMinDomainsInPodTopologySpread          bool
-	enableNodeInclusionPolicyInPodTopologySpread bool
-	enableMatchLabelKeysInPodTopologySpread      bool
+	systemDefaulted                                     bool
+	parallelizer                                        parallelize.Parallelizer
+	defaultConstraints                                  []v1.TopologySpreadConstraint
+	sharedLister                                        framework.SharedLister
+	services                                            corelisters.ServiceLister
+	replicationCtrls                                    corelisters.ReplicationControllerLister
+	replicaSets                                         appslisters.ReplicaSetLister
+	statefulSets                                        appslisters.StatefulSetLister
+	pvcs                                                corelisters.PersistentVolumeClaimLister
+	enableMinDomainsInPodTopologySpread                 bool
+	enableNodeInclusionPolicyInPodTopologySpread        bool
+	enableMatchLabelKeysInPodTopologySpread             bool
+	enablePodNotExistInclusionPolicyInPodTopologySpread bool
 }
 
 var _ framework.PreFilterPlugin = &PodTopologySpread{}
@@ -99,8 +100,9 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 		sharedLister:                        h.SnapshotSharedLister(),
 		defaultConstraints:                  args.DefaultConstraints,
 		enableMinDomainsInPodTopologySpread: fts.EnableMinDomainsInPodTopologySpread,
-		enableNodeInclusionPolicyInPodTopologySpread: fts.EnableNodeInclusionPolicyInPodTopologySpread,
-		enableMatchLabelKeysInPodTopologySpread:      fts.EnableMatchLabelKeysInPodTopologySpread,
+		enableNodeInclusionPolicyInPodTopologySpread:        fts.EnableNodeInclusionPolicyInPodTopologySpread,
+		enableMatchLabelKeysInPodTopologySpread:             fts.EnableMatchLabelKeysInPodTopologySpread,
+		enablePodNotExistInclusionPolicyInPodTopologySpread: fts.EnablePodNotExistInclusionPolicyInPodTopologySpread,
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints
@@ -111,6 +113,10 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 			return nil, fmt.Errorf("SharedInformerFactory is nil")
 		}
 		pl.setListers(h.SharedInformerFactory())
+	}
+	if pl.enablePodNotExistInclusionPolicyInPodTopologySpread {
+		pl.statefulSets = h.SharedInformerFactory().Apps().V1().StatefulSets().Lister()
+		pl.pvcs = h.SharedInformerFactory().Core().V1().PersistentVolumeClaims().Lister()
 	}
 	return pl, nil
 }
@@ -127,8 +133,6 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 	pl.services = factory.Core().V1().Services().Lister()
 	pl.replicationCtrls = factory.Core().V1().ReplicationControllers().Lister()
 	pl.replicaSets = factory.Apps().V1().ReplicaSets().Lister()
-	pl.statefulSets = factory.Apps().V1().StatefulSets().Lister()
-	pl.pvcs = factory.Core().V1().PersistentVolumeClaims().Lister()
 }
 
 // EventsToRegister returns the possible events that may make a Pod

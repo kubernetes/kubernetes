@@ -280,10 +280,6 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	if len(constraints) == 0 {
 		return &preFilterState{}, nil
 	}
-	podNotExist, err := pl.calPodNotExistWithVolume(ctx, pod)
-	if err != nil {
-		return nil, fmt.Errorf("caculate not exist pod failed: %w", err)
-	}
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
 		return nil, fmt.Errorf("listing NodeInfos: %w", err)
@@ -293,7 +289,14 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		Constraints:          constraints,
 		TpKeyToCriticalPaths: make(map[string]*criticalPaths, len(constraints)),
 		TpPairToMatchNum:     make(map[topologyPair]int, sizeHeuristic(len(allNodes), constraints)),
-		PodNotExist:          podNotExist,
+		PodNotExist:          make(map[string][]*framework.PodInfo),
+	}
+	if pl.enablePodNotExistInclusionPolicyInPodTopologySpread {
+		podNotExist, err := pl.calPodNotExistWithVolume(ctx, pod)
+		if err != nil {
+			return nil, fmt.Errorf("caculate not exist pod failed: %w", err)
+		}
+		s.PodNotExist = podNotExist
 	}
 
 	tpCountsByNode := make([]map[topologyPair]int, len(allNodes))
@@ -324,7 +327,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			pods := nodeInfo.Pods
-			if podItems, ok := podNotExist[node.Name]; ok {
+			if podItems, ok := s.PodNotExist[node.Name]; ok {
 				pods = append(pods, podItems...)
 			}
 			count := countPodsMatchSelector(pods, c.Selector, pod.Namespace)
@@ -364,7 +367,7 @@ func (pl *PodTopologySpread) calPodNotExistWithVolume(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("listing PersistentVolumeClaims: %w", err)
 	}
-	podNotExist := map[string][]*framework.PodInfo{}
+	podNotExist := make([]map[string]*framework.PodInfo, len(allPvcs))
 	processPVC := func(i int) {
 		pvc := allPvcs[i]
 		var nodeName string
@@ -387,7 +390,7 @@ func (pl *PodTopologySpread) calPodNotExistWithVolume(ctx context.Context,
 			return
 		}
 		for _, podItem := range node.Pods {
-			if podItem.Pod.Namespace == pod.Namespace && podItem.Pod.Name == podReference.Name {
+			if podItem.Pod.Namespace == pvc.Namespace && podItem.Pod.Name == podReference.Name {
 				return
 			}
 		}
@@ -395,21 +398,33 @@ func (pl *PodTopologySpread) calPodNotExistWithVolume(ctx context.Context,
 		if err != nil {
 			return
 		}
-		podItem := &v1.Pod{
-			Spec: sts.Spec.Template.Spec,
+		terminatedPod := &v1.Pod{
+			ObjectMeta: sts.Spec.Template.ObjectMeta,
+			Spec:       sts.Spec.Template.Spec,
 		}
-		podInfo := &framework.PodInfo{
-			Pod: podItem,
+		terminatedPod.Name = podReference.Name
+		terminatedPod.Namespace = pvc.Namespace
+
+		podInfo := &framework.PodInfo{}
+		if err := podInfo.Update(terminatedPod); err != nil {
+			return
 		}
-		podInfo.Update(podItem)
-		if _, ok := podNotExist[nodeName]; !ok {
-			podNotExist[nodeName] = []*framework.PodInfo{podInfo}
-		} else {
-			podNotExist[nodeName] = append(podNotExist[nodeName], podInfo)
+		podNotExist[i] = map[string]*framework.PodInfo{
+			nodeName: podInfo,
 		}
 	}
 	pl.parallelizer.Until(ctx, len(allPvcs), processPVC, pl.Name())
-	return podNotExist, nil
+	podNotExistNodeMap := make(map[string][]*framework.PodInfo)
+	for _, podInfo := range podNotExist {
+		for nodeName, info := range podInfo {
+			if _, ok := podNotExistNodeMap[nodeName]; !ok {
+				podNotExistNodeMap[nodeName] = []*framework.PodInfo{info}
+			} else {
+				podNotExistNodeMap[nodeName] = append(podNotExistNodeMap[nodeName], info)
+			}
+		}
+	}
+	return podNotExistNodeMap, nil
 }
 
 // Filter invoked at the filter extension point.

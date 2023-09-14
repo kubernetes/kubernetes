@@ -131,6 +131,7 @@ func (pl *PodTopologySpread) PreScore(
 	state := &preScoreState{
 		IgnoredNodes:            sets.New[string](),
 		TopologyPairToPodCounts: make(map[topologyPair]*int64),
+		PodNotExist:             make(map[string][]*framework.PodInfo),
 	}
 	// Only require that nodes have all the topology labels if using
 	// non-system-default spreading rules. This allows nodes that don't have a
@@ -140,17 +141,17 @@ func (pl *PodTopologySpread) PreScore(
 	if err != nil {
 		return framework.AsStatus(fmt.Errorf("calculating preScoreState: %w", err))
 	}
-
-	podNotExist, err := pl.calPodNotExistWithVolume(ctx, pod)
-	if err != nil {
-		return framework.AsStatus(fmt.Errorf("caculate not exist pod failed: %w", err))
+	if pl.enablePodNotExistInclusionPolicyInPodTopologySpread {
+		podNotExist, err := pl.calPodNotExistWithVolume(ctx, pod)
+		if err != nil {
+			return framework.AsStatus(fmt.Errorf("caculate not exist pod failed: %w", err))
+		}
+		state.PodNotExist = podNotExist
 	}
-	state.PodNotExist = podNotExist
 	// return Skip if incoming pod doesn't have soft topology spread Constraints.
 	if len(state.Constraints) == 0 {
 		return framework.NewStatus(framework.Skip)
 	}
-
 	// Ignore parsing errors for backwards compatibility.
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	processAllNode := func(i int) {
@@ -184,8 +185,10 @@ func (pl *PodTopologySpread) PreScore(
 				continue
 			}
 			pods := nodeInfo.Pods
-			if podItems, ok := podNotExist[node.Name]; ok {
-				pods = append(pods, podItems...)
+			if pl.enablePodNotExistInclusionPolicyInPodTopologySpread {
+				if podItems, ok := state.PodNotExist[node.Name]; ok {
+					pods = append(pods, podItems...)
+				}
 			}
 			count := countPodsMatchSelector(pods, c.Selector, pod.Namespace)
 			atomic.AddInt64(tpCount, int64(count))

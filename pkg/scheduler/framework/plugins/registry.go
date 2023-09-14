@@ -46,16 +46,17 @@ import (
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
-		EnableDynamicResourceAllocation:              feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation),
-		EnableReadWriteOncePod:                       feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
-		EnableVolumeCapacityPriority:                 feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
-		EnableMinDomainsInPodTopologySpread:          feature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread),
-		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
-		EnableMatchLabelKeysInPodTopologySpread:      feature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
-		EnablePodSchedulingReadiness:                 feature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
-		EnablePodDisruptionConditions:                feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions),
-		EnableInPlacePodVerticalScaling:              feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		EnableSidecarContainers:                      feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
+		EnableDynamicResourceAllocation:                     feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation),
+		EnableReadWriteOncePod:                              feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		EnableVolumeCapacityPriority:                        feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
+		EnableMinDomainsInPodTopologySpread:                 feature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread),
+		EnableNodeInclusionPolicyInPodTopologySpread:        feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
+		EnableMatchLabelKeysInPodTopologySpread:             feature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
+		EnablePodSchedulingReadiness:                        feature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
+		EnablePodDisruptionConditions:                       feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions),
+		EnableInPlacePodVerticalScaling:                     feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		EnableSidecarContainers:                             feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
+		EnablePodNotExistInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.PodNotExistInclusionPolicyInPodTopologySpread),
 	}
 
 	registry := runtime.Registry{
