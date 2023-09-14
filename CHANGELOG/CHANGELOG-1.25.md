@@ -458,6 +458,7 @@ name | architectures
 ### Bug or Regression
 
 - Cherry-pick #115769: Fix the problem Pod terminating stuck because of trying to umount not actual mounted dir. ([#119832](https://github.com/kubernetes/kubernetes/pull/119832), [@cartermckinnon](https://github.com/cartermckinnon)) [SIG Node and Storage]
+- Fixes an issue where a CronJob could fail to clean up Jobs when the ResourceQuota for Jobs had been reached. ([#120322](https://github.com/kubernetes/kubernetes/pull/120322), [@asverdlov](https://github.com/asverdlov)) [SIG App]
 - Fixes a bug where images pinned by the container runtime can be garbage collected by kubelet. ([#120056](https://github.com/kubernetes/kubernetes/pull/120056), [@ruiwen-zhao](https://github.com/ruiwen-zhao)) [SIG Node]
 - Fixes regression in 1.25.10 causing running pods with devices to be terminated if kubelet is restarted ([#119707](https://github.com/kubernetes/kubernetes/pull/119707), [@ffromani](https://github.com/ffromani)) [SIG Node and Testing]
 - Ignore context canceled from validate and mutate webhook ([#120017](https://github.com/kubernetes/kubernetes/pull/120017), [@divyasri537](https://github.com/divyasri537)) [SIG API Machinery]
