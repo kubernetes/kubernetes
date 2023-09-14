@@ -177,6 +177,12 @@ func (r *VolumeResource) CleanupResource(ctx context.Context) error {
 			if errs := e2epv.PVPVCCleanup(ctx, f.ClientSet, f.Namespace.Name, r.Pv, r.Pvc); len(errs) != 0 {
 				framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
 			}
+			if r.Pv != nil {
+				if err := e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, r.Pv.Name, 5*time.Second, f.Timeouts.PVDelete); err != nil {
+					cleanUpErrs = append(cleanUpErrs, fmt.Errorf(
+						"error deleting pre-provisioned PersistentVolume %v: %w", r.Pv.Name, err))
+				}
+			}
 		case DynamicPV:
 			ginkgo.By("Deleting pvc")
 			// We only delete the PVC so that PV (and disk) can be cleaned up by dynamic provisioner
@@ -215,7 +221,7 @@ func (r *VolumeResource) CleanupResource(ctx context.Context) error {
 					err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, 5*time.Second, f.Timeouts.PVDelete)
 					if err != nil {
 						cleanUpErrs = append(cleanUpErrs, fmt.Errorf(
-							"persistent Volume %v not deleted by dynamic provisioner: %w", pv.Name, err))
+							"error deleting dynamic PersistentVolume %v: %w", pv.Name, err))
 					}
 				}
 			}
