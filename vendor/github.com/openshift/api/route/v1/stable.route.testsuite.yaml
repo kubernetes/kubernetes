@@ -1,0 +1,675 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] Route"
+crd: route.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal Route
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      spec:
+        to:
+          kind: Service
+          name: foo
+    expected: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      spec:
+        to:
+          kind: Service
+          name: foo
+          weight: 100
+        wildcardPolicy: None
+  - name: "cannot have both spec.tls.termination: passthrough and spec.tls.insecureEdgeTerminationPolicy: Allow"
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      spec:
+        to:
+          kind: Service
+          name: foo
+        tls:
+          termination: passthrough
+          insecureEdgeTerminationPolicy: Allow
+    expectedError: "cannot have both spec.tls.termination: passthrough and spec.tls.insecureEdgeTerminationPolicy: Allow"
+  - name: "spec.tls.termination: passthrough is compatible with spec.tls.insecureEdgeTerminationPolicy: Redirect"
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      spec:
+        host: test.foo
+        to:
+          kind: Service
+          name: foo
+        tls:
+          termination: passthrough
+          insecureEdgeTerminationPolicy: Redirect
+    expected: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      spec:
+        host: test.foo
+        to:
+          kind: Service
+          name: foo
+          weight: 100
+        tls:
+          termination: passthrough
+          insecureEdgeTerminationPolicy: Redirect
+        wildcardPolicy: None
+  - name: "spec.tls.termination: passthrough is compatible with spec.tls.insecureEdgeTerminationPolicy: None"
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      spec:
+        host: test.foo
+        to:
+          kind: Service
+          name: foo
+        tls:
+          termination: passthrough
+          insecureEdgeTerminationPolicy: None
+    expected: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      spec:
+        host: test.foo
+        to:
+          kind: Service
+          name: foo
+          weight: 100
+        tls:
+          termination: passthrough
+          insecureEdgeTerminationPolicy: None
+        wildcardPolicy: None
+  - name: Should be able to create a Route with valid actions
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-actions
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY
+            - name: X-Cache-Info
+              action:
+                type: Set
+                set:
+                  value: "not cacheable; meta data too large"
+            - name: X-XSS-Protection
+              action:
+                type: Delete
+            - name: X-Source
+              action:
+                type: Set
+                set:
+                  value: "%[res.hdr(X-Value),lower]"         
+            request:
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der,base64]"
+            - name:   Content-Language
+              action:
+                type: Delete
+            - name: X-Target
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(host),lower]"
+            - name: X-Conditional
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(Host)] if foo"
+            - name: X-Condition
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(Host)]\ if\ foo"
+    expected: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-actions
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+          weight: 100
+        wildcardPolicy: None      
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY
+            - name: X-Cache-Info
+              action:
+                type: Set
+                set:
+                  value: "not cacheable; meta data too large"
+            - name: X-XSS-Protection
+              action:
+                type: Delete
+            - name: X-Source
+              action:
+                type: Set
+                set:
+                  value: "%[res.hdr(X-Value),lower]"        
+            request:
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der,base64]"
+            - name:   Content-Language
+              action:
+                type: Delete
+            - name: X-Target
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(host),lower]"
+            - name: X-Conditional
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(Host)] if foo"
+            - name: X-Condition
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(Host)]\ if\ foo"
+  - name: "Should not allow response header actions if tls termination is set to passthrough"
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-passthrough
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: passthrough
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY    
+            - name: X-XSS-Protection
+              action:
+                type: Delete
+    expectedError: "header actions are not permitted when tls termination is passthrough."
+  - name: "Should not allow request header actions if tls termination is set to passthrough"
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-passthrough
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: passthrough
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            request:
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der,base64]"
+            - name:   Content-Language
+              action:
+                type: Delete
+            - name: X-Target
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(host),lower]"
+    expectedError: "header actions are not permitted when tls termination is passthrough."
+  - name: Should not allow to set/delete HSTS header.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-hsts
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+                set:
+                  value: DENY
+            - name: Strict-Transport-Security
+              action:
+                type: Delete
+            request:
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "strict-transport-security header may not be modified via header actions"
+  - name: Should not allow to set proxy request header.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        name: hello-openshift-edge-proxy
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            request:
+            - name: Proxy
+              action:
+                type: Set
+                set: 
+                  value: example.xyz
+    expectedError: "proxy header may not be modified via header actions"
+  - name: Should not allow to set cookie header.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        name: hello-openshift-edge-proxy
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            request:
+            - name: Cookie
+              action:
+                type: Set
+                set: 
+                  value: "PHPSESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1"
+    expectedError: "cookie header may not be modified via header actions"
+  - name: Should not allow to set set-cookie header.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        name: hello-openshift-edge-proxy
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: Set-Cookie
+              action:
+                type: Set
+                set: 
+                  value: "sessionId=e8bb43229de9; Domain=foo.example.com"
+    expectedError: "set-cookie header may not be modified via header actions"
+  - name: Should not allow to set/delete dynamic headers with unclosed braces.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-unclosed-braces
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            request:
+            - name: Content-Location
+              action:
+                type: Set
+                set:
+                  value: /my-first-blog-post
+            - name:   Content-Language
+              action:
+                type: Delete
+            - name: expires
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(host),lower"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are req.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set dynamic response header values with not allowed sample fetchers.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-not-allowed-values
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Target
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der1,base64]"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are res.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set/delete dynamic response header values with not allowed converters.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-not-allowed-values
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Target
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der,bogus]"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are res.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set/delete dynamic response header values containing req.hdr fetcher.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-not-allowed-values
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Target
+              action:
+                type: Set
+                set:
+                  value: "%[req.hdr(host),lower]"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are res.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set/delete dynamic response header values containing req.hdr fetcher.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-not-allowed-values
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            request:
+            - name: X-Source
+              action:
+                type: Set
+                set:
+                  value: "%[res.hdr(X-Value),lower]"
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are req.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set/delete dynamic request header values with not allowed converters.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-not-allowed-values
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            request:
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der,bogus]"
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are req.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow to set dynamic request header values with not allowed sample fetchers.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-not-allowed-values
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            request:
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value: "%{+Q}[ssl_c_der1122,base64]"
+            - name:   Content-Language
+              action:
+                type: Delete
+    expectedError: "Either the header value provided is not in correct format or the sample fetcher/converter specified is not allowed. The dynamic header value will be interpreted as an HAProxy format string as defined in http://cbonte.github.io/haproxy-dconv/2.6/configuration.html#8.2.6 and may use HAProxy's %[] syntax and otherwise must be a valid HTTP header value as defined in https://datatracker.ietf.org/doc/html/rfc7230#section-3.2. Sample fetchers allowed are req.hdr, ssl_c_der. Converters allowed are lower, base64."
+  - name: Should not allow empty value in request
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-not-allowed-values
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            request:
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value:
+    expectedError: 'Route.route.openshift.io "hello-openshift-edge-not-allowed-values" is invalid: [spec.httpHeaders.actions.request[0].action.set.value: Required value, <nil>: Invalid value: "null": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation]'
+  - name: Should not allow empty value in response
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-edge-not-allowed-values
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: X-SSL-Client-Cert 
+              action:
+                type: Set
+                set:
+                  value:
+    expectedError: 'Route.route.openshift.io "hello-openshift-edge-not-allowed-values" is invalid: [spec.httpHeaders.actions.response[0].action.set.value: Required value, <nil>: Invalid value: "null": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation]'
+  - name: Should be required to specify the set field when the discriminant type is Set.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-actions
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                type: Set
+    expectedError: "set is required when type is Set, and forbidden otherwise"
+  - name: Should be required to specify the set field when the discriminant type is Set.
+    initial: |
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        labels:
+          type: sharded
+        name: hello-openshift-actions
+        namespace: hello-openshift
+      spec:
+        subdomain: hello-openshift
+        tls:
+          termination: edge
+        to:
+          kind: Service
+          name: hello-openshift
+        httpHeaders:
+          actions:
+            response:
+            - name: X-Frame-Options
+              action:
+                set:
+                  value: DENY
+    expectedError: 'Route.route.openshift.io "hello-openshift-actions" is invalid: [spec.httpHeaders.actions.response[0].action.type: Required value, <nil>: Invalid value: "null": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation]'

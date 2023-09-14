@@ -1,0 +1,438 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/486
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  name: consoles.operator.openshift.io
+spec:
+  group: operator.openshift.io
+  names:
+    kind: Console
+    listKind: ConsoleList
+    plural: consoles
+    singular: console
+  scope: Cluster
+  versions:
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: "Console provides a means to configure an operator to manage the console. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: ConsoleSpec is the specification of the desired behavior of the Console.
+              type: object
+              properties:
+                customization:
+                  description: customization is used to optionally provide a small set of customization options to the web console.
+                  type: object
+                  properties:
+                    addPage:
+                      description: addPage allows customizing actions on the Add page in developer perspective.
+                      type: object
+                      properties:
+                        disabledActions:
+                          description: disabledActions is a list of actions that are not shown to users. Each action in the list is represented by its ID.
+                          type: array
+                          minItems: 1
+                          items:
+                            type: string
+                    brand:
+                      description: brand is the default branding of the web console which can be overridden by providing the brand field.  There is a limited set of specific brand options. This field controls elements of the console such as the logo. Invalid value will prevent a console rollout.
+                      type: string
+                      enum:
+                        - openshift
+                        - okd
+                        - online
+                        - ocp
+                        - dedicated
+                        - azure
+                        - OpenShift
+                        - OKD
+                        - Online
+                        - OCP
+                        - Dedicated
+                        - Azure
+                        - ROSA
+                    customLogoFile:
+                      description: 'customLogoFile replaces the default OpenShift logo in the masthead and about dialog. It is a reference to a ConfigMap in the openshift-config namespace. This can be created with a command like ''oc create configmap custom-logo --from-file=/path/to/file -n openshift-config''. Image size must be less than 1 MB due to constraints on the ConfigMap size. The ConfigMap key should include a file extension so that the console serves the file with the correct MIME type. Recommended logo specifications: Dimensions: Max height of 68px and max width of 200px SVG format preferred'
+                      type: object
+                      properties:
+                        key:
+                          description: Key allows pointing to a specific key/value inside of the configmap.  This is useful for logical file references.
+                          type: string
+                        name:
+                          type: string
+                    customProductName:
+                      description: customProductName is the name that will be displayed in page titles, logo alt text, and the about dialog instead of the normal OpenShift product name.
+                      type: string
+                    developerCatalog:
+                      description: developerCatalog allows to configure the shown developer catalog categories (filters) and types (sub-catalogs).
+                      type: object
+                      properties:
+                        categories:
+                          description: categories which are shown in the developer catalog.
+                          type: array
+                          items:
+                            description: DeveloperConsoleCatalogCategory for the developer console catalog.
+                            type: object
+                            required:
+                              - id
+                              - label
+                            properties:
+                              id:
+                                description: ID is an identifier used in the URL to enable deep linking in console. ID is required and must have 1-32 URL safe (A-Z, a-z, 0-9, - and _) characters.
+                                type: string
+                                maxLength: 32
+                                minLength: 1
+                                pattern: ^[A-Za-z0-9-_]+$
+                              label:
+                                description: label defines a category display label. It is required and must have 1-64 characters.
+                                type: string
+                                maxLength: 64
+                                minLength: 1
+                              subcategories:
+                                description: subcategories defines a list of child categories.
+                                type: array
+                                items:
+                                  description: DeveloperConsoleCatalogCategoryMeta are the key identifiers of a developer catalog category.
+                                  type: object
+                                  required:
+                                    - id
+                                    - label
+                                  properties:
+                                    id:
+                                      description: ID is an identifier used in the URL to enable deep linking in console. ID is required and must have 1-32 URL safe (A-Z, a-z, 0-9, - and _) characters.
+                                      type: string
+                                      maxLength: 32
+                                      minLength: 1
+                                      pattern: ^[A-Za-z0-9-_]+$
+                                    label:
+                                      description: label defines a category display label. It is required and must have 1-64 characters.
+                                      type: string
+                                      maxLength: 64
+                                      minLength: 1
+                                    tags:
+                                      description: tags is a list of strings that will match the category. A selected category show all items which has at least one overlapping tag between category and item.
+                                      type: array
+                                      items:
+                                        type: string
+                              tags:
+                                description: tags is a list of strings that will match the category. A selected category show all items which has at least one overlapping tag between category and item.
+                                type: array
+                                items:
+                                  type: string
+                        types:
+                          description: types allows enabling or disabling of sub-catalog types that user can see in the Developer catalog. When omitted, all the sub-catalog types will be shown.
+                          type: object
+                          required:
+                            - state
+                          properties:
+                            disabled:
+                              description: 'disabled is a list of developer catalog types (sub-catalogs IDs) that are not shown to users. Types (sub-catalogs) are added via console plugins, the available types (sub-catalog IDs) are available in the console on the cluster configuration page, or when editing the YAML in the console. Example: "Devfile", "HelmChart", "BuilderImage" If the list is empty or all the available sub-catalog types are added, then the complete developer catalog should be hidden.'
+                              type: array
+                              items:
+                                type: string
+                              x-kubernetes-list-type: set
+                            enabled:
+                              description: 'enabled is a list of developer catalog types (sub-catalogs IDs) that will be shown to users. Types (sub-catalogs) are added via console plugins, the available types (sub-catalog IDs) are available in the console on the cluster configuration page, or when editing the YAML in the console. Example: "Devfile", "HelmChart", "BuilderImage" If the list is non-empty, a new type will not be shown to the user until it is added to list. If the list is empty the complete developer catalog will be shown.'
+                              type: array
+                              items:
+                                type: string
+                              x-kubernetes-list-type: set
+                            state:
+                              description: state defines if a list of catalog types should be enabled or disabled.
+                              type: string
+                              default: Enabled
+                              enum:
+                                - Enabled
+                                - Disabled
+                          x-kubernetes-validations:
+                            - rule: 'self.state == ''Enabled'' ? true : !has(self.enabled)'
+                              message: enabled is forbidden when state is not Enabled
+                            - rule: 'self.state == ''Disabled'' ? true : !has(self.disabled)'
+                              message: disabled is forbidden when state is not Disabled
+                    documentationBaseURL:
+                      description: documentationBaseURL links to external documentation are shown in various sections of the web console.  Providing documentationBaseURL will override the default documentation URL. Invalid value will prevent a console rollout.
+                      type: string
+                      pattern: ^$|^((https):\/\/?)[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|\/?))\/$
+                    perspectives:
+                      description: perspectives allows enabling/disabling of perspective(s) that user can see in the Perspective switcher dropdown.
+                      type: array
+                      items:
+                        description: Perspective defines a perspective that cluster admins want to show/hide in the perspective switcher dropdown
+                        type: object
+                        required:
+                          - id
+                          - visibility
+                        properties:
+                          id:
+                            description: 'id defines the id of the perspective. Example: "dev", "admin". The available perspective ids can be found in the code snippet section next to the yaml editor. Incorrect or unknown ids will be ignored.'
+                            type: string
+                          pinnedResources:
+                            description: pinnedResources defines the list of default pinned resources that users will see on the perspective navigation if they have not customized these pinned resources themselves. The list of available Kubernetes resources could be read via `kubectl api-resources`. The console will also provide a configuration UI and a YAML snippet that will list the available resources that can be pinned to the navigation. Incorrect or unknown resources will be ignored.
+                            type: array
+                            maxItems: 100
+                            items:
+                              description: PinnedResourceReference includes the group, version and type of resource
+                              type: object
+                              required:
+                                - group
+                                - resource
+                                - version
+                              properties:
+                                group:
+                                  description: 'group is the API Group of the Resource. Enter empty string for the core group. This value should consist of only lowercase alphanumeric characters, hyphens and periods. Example: "", "apps", "build.openshift.io", etc.'
+                                  type: string
+                                  pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                resource:
+                                  description: 'resource is the type that is being referenced. It is normally the plural form of the resource kind in lowercase. This value should consist of only lowercase alphanumeric characters and hyphens. Example: "deployments", "deploymentconfigs", "pods", etc.'
+                                  type: string
+                                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                                version:
+                                  description: 'version is the API Version of the Resource. This value should consist of only lowercase alphanumeric characters. Example: "v1", "v1beta1", etc.'
+                                  type: string
+                                  pattern: ^[a-z0-9]+$
+                          visibility:
+                            description: visibility defines the state of perspective along with access review checks if needed for that perspective.
+                            type: object
+                            required:
+                              - state
+                            properties:
+                              accessReview:
+                                description: accessReview defines required and missing access review checks.
+                                type: object
+                                minProperties: 1
+                                properties:
+                                  missing:
+                                    description: missing defines a list of permission checks. The perspective will only be shown when at least one check fails. When omitted, the access review is skipped and the perspective will not be shown unless it is required to do so based on the configuration of the required access review list.
+                                    type: array
+                                    items:
+                                      description: ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface
+                                      type: object
+                                      properties:
+                                        group:
+                                          description: Group is the API Group of the Resource.  "*" means all.
+                                          type: string
+                                        name:
+                                          description: Name is the name of the resource being requested for a "get" or deleted for a "delete". "" (empty) means all.
+                                          type: string
+                                        namespace:
+                                          description: Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces "" (empty) is defaulted for LocalSubjectAccessReviews "" (empty) is empty for cluster-scoped resources "" (empty) means "all" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview
+                                          type: string
+                                        resource:
+                                          description: Resource is one of the existing resource types.  "*" means all.
+                                          type: string
+                                        subresource:
+                                          description: Subresource is one of the existing resource types.  "" means none.
+                                          type: string
+                                        verb:
+                                          description: 'Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  "*" means all.'
+                                          type: string
+                                        version:
+                                          description: Version is the API Version of the Resource.  "*" means all.
+                                          type: string
+                                  required:
+                                    description: required defines a list of permission checks. The perspective will only be shown when all checks are successful. When omitted, the access review is skipped and the perspective will not be shown unless it is required to do so based on the configuration of the missing access review list.
+                                    type: array
+                                    items:
+                                      description: ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface
+                                      type: object
+                                      properties:
+                                        group:
+                                          description: Group is the API Group of the Resource.  "*" means all.
+                                          type: string
+                                        name:
+                                          description: Name is the name of the resource being requested for a "get" or deleted for a "delete". "" (empty) means all.
+                                          type: string
+                                        namespace:
+                                          description: Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces "" (empty) is defaulted for LocalSubjectAccessReviews "" (empty) is empty for cluster-scoped resources "" (empty) means "all" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview
+                                          type: string
+                                        resource:
+                                          description: Resource is one of the existing resource types.  "*" means all.
+                                          type: string
+                                        subresource:
+                                          description: Subresource is one of the existing resource types.  "" means none.
+                                          type: string
+                                        verb:
+                                          description: 'Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  "*" means all.'
+                                          type: string
+                                        version:
+                                          description: Version is the API Version of the Resource.  "*" means all.
+                                          type: string
+                              state:
+                                description: state defines the perspective is enabled or disabled or access review check is required.
+                                type: string
+                                enum:
+                                  - Enabled
+                                  - Disabled
+                                  - AccessReview
+                            x-kubernetes-validations:
+                              - rule: 'self.state == ''AccessReview'' ?  has(self.accessReview) : !has(self.accessReview)'
+                                message: accessReview configuration is required when state is AccessReview, and forbidden otherwise
+                        x-kubernetes-validations:
+                          - rule: 'has(self.id) && self.id != ''dev''? !has(self.pinnedResources) : true'
+                            message: pinnedResources is allowed only for dev and forbidden for other perspectives
+                      x-kubernetes-list-map-keys:
+                        - id
+                      x-kubernetes-list-type: map
+                    projectAccess:
+                      description: projectAccess allows customizing the available list of ClusterRoles in the Developer perspective Project access page which can be used by a project admin to specify roles to other users and restrict access within the project. If set, the list will replace the default ClusterRole options.
+                      type: object
+                      properties:
+                        availableClusterRoles:
+                          description: availableClusterRoles is the list of ClusterRole names that are assignable to users through the project access tab.
+                          type: array
+                          items:
+                            type: string
+                    quickStarts:
+                      description: quickStarts allows customization of available ConsoleQuickStart resources in console.
+                      type: object
+                      properties:
+                        disabled:
+                          description: disabled is a list of ConsoleQuickStart resource names that are not shown to users.
+                          type: array
+                          items:
+                            type: string
+                logLevel:
+                  description: "logLevel is an intent based logging for an overall component.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for their operands. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                  type: string
+                  default: Normal
+                  enum:
+                    - ""
+                    - Normal
+                    - Debug
+                    - Trace
+                    - TraceAll
+                managementState:
+                  description: managementState indicates whether and how the operator should manage the component
+                  type: string
+                  pattern: ^(Managed|Unmanaged|Force|Removed)$
+                observedConfig:
+                  description: observedConfig holds a sparse config that controller has observed from the cluster state.  It exists in spec because it is an input to the level for the operator
+                  type: object
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+                operatorLogLevel:
+                  description: "operatorLogLevel is an intent based logging for the operator itself.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for themselves. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                  type: string
+                  default: Normal
+                  enum:
+                    - ""
+                    - Normal
+                    - Debug
+                    - Trace
+                    - TraceAll
+                plugins:
+                  description: plugins defines a list of enabled console plugin names.
+                  type: array
+                  items:
+                    type: string
+                providers:
+                  description: providers contains configuration for using specific service providers.
+                  type: object
+                  properties:
+                    statuspage:
+                      description: statuspage contains ID for statuspage.io page that provides status info about.
+                      type: object
+                      properties:
+                        pageID:
+                          description: pageID is the unique ID assigned by Statuspage for your page. This must be a public page.
+                          type: string
+                route:
+                  description: route contains hostname and secret reference that contains the serving certificate. If a custom route is specified, a new route will be created with the provided hostname, under which console will be available. In case of custom hostname uses the default routing suffix of the cluster, the Secret specification for a serving certificate will not be needed. In case of custom hostname points to an arbitrary domain, manual DNS configurations steps are necessary. The default console route will be maintained to reserve the default hostname for console if the custom route is removed. If not specified, default route will be used. DEPRECATED
+                  type: object
+                  properties:
+                    hostname:
+                      description: hostname is the desired custom domain under which console will be available.
+                      type: string
+                    secret:
+                      description: 'secret points to secret in the openshift-config namespace that contains custom certificate and key and needs to be created manually by the cluster admin. Referenced Secret is required to contain following key value pairs: - "tls.crt" - to specifies custom certificate - "tls.key" - to specifies private key of the custom certificate If the custom hostname uses the default routing suffix of the cluster, the Secret specification for a serving certificate will not be needed.'
+                      type: object
+                      required:
+                        - name
+                      properties:
+                        name:
+                          description: name is the metadata.name of the referenced secret
+                          type: string
+                unsupportedConfigOverrides:
+                  description: unsupportedConfigOverrides overrides the final configuration that was computed by the operator. Red Hat does not support the use of this field. Misuse of this field could lead to unexpected behavior or conflict with other configuration options. Seek guidance from the Red Hat support before using this field. Use of this property blocks cluster upgrades, it must be removed before upgrading your cluster.
+                  type: object
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+            status:
+              description: ConsoleStatus defines the observed status of the Console.
+              type: object
+              properties:
+                conditions:
+                  description: conditions is a list of conditions and their status
+                  type: array
+                  items:
+                    description: OperatorCondition is just the standard condition fields.
+                    type: object
+                    properties:
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      message:
+                        type: string
+                      reason:
+                        type: string
+                      status:
+                        type: string
+                      type:
+                        type: string
+                generations:
+                  description: generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
+                  type: array
+                  items:
+                    description: GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made.
+                    type: object
+                    properties:
+                      group:
+                        description: group is the group of the thing you're tracking
+                        type: string
+                      hash:
+                        description: hash is an optional field set for resources without generation that are content sensitive like secrets and configmaps
+                        type: string
+                      lastGeneration:
+                        description: lastGeneration is the last generation of the workload controller involved
+                        type: integer
+                        format: int64
+                      name:
+                        description: name is the name of the thing you're tracking
+                        type: string
+                      namespace:
+                        description: namespace is where the thing you're tracking is
+                        type: string
+                      resource:
+                        description: resource is the resource type of the thing you're tracking
+                        type: string
+                observedGeneration:
+                  description: observedGeneration is the last generation change you've dealt with
+                  type: integer
+                  format: int64
+                readyReplicas:
+                  description: readyReplicas indicates how many replicas are ready and at the desired state
+                  type: integer
+                  format: int32
+                version:
+                  description: version is the level this availability applies to
+                  type: string
+      served: true
+      storage: true
+      subresources:
+        status: {}

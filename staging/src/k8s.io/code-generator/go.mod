@@ -30,7 +30,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/onsi/ginkgo/v2 v2.9.4 // indirect
+	github.com/onsi/ginkgo/v2 v2.9.2 // indirect
 	github.com/onsi/gomega v1.27.6 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/stretchr/testify v1.8.2 // indirect
@@ -44,4 +44,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20230811135323-13a5964cc98e
+	k8s.io/code-generator => ../code-generator
+)

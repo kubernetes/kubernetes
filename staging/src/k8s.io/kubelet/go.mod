@@ -9,14 +9,14 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/stretchr/testify v1.8.2
 	google.golang.org/grpc v1.54.0
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/apiserver v0.0.0
-	k8s.io/client-go v0.0.0
-	k8s.io/component-base v0.0.0
+	k8s.io/api v0.28.1
+	k8s.io/apimachinery v0.28.1
+	k8s.io/apiserver v0.28.1
+	k8s.io/client-go v0.28.1
+	k8s.io/component-base v0.28.1
 	k8s.io/cri-api v0.0.0
 	k8s.io/klog/v2 v2.100.1
-	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
 require (
@@ -30,6 +30,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -59,6 +60,7 @@ require (
 )
 
 replace (
+	github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20230811135323-13a5964cc98e
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

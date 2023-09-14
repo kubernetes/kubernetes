@@ -1,0 +1,16 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] Config"
+crd: 0000_10_config-operator_01_config.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal Config
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Config
+      spec: {} # No spec is required for a Config
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Config
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal

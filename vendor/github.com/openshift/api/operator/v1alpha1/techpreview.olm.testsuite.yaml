@@ -1,0 +1,28 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Tech Preview] OLM"
+crd: 0000_10_config-operator_01_olm-TechPreviewNoUpgrade.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal OLM
+    initial: |
+      apiVersion: operator.openshift.io/v1alpha1
+      kind: OLM
+      metadata:
+        name: cluster
+      spec: {} # No spec is required for an OLM
+    expected: |
+      apiVersion: operator.openshift.io/v1alpha1
+      kind: OLM
+      metadata:
+        name: cluster
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal
+  - name: Should reject an OLM with an invalid name
+    initial: |
+      apiVersion: operator.openshift.io/v1alpha1
+      kind: OLM
+      metadata:
+        name: foo
+      spec: {} # No spec is required for an OLM
+    expectedError: "Invalid value: \"object\": olm is a singleton, .metadata.name must be 'cluster'"

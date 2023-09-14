@@ -72,6 +72,7 @@ func deepMap(dst, src reflect.Value, visited map[uintptr]*visit, depth int, conf
 	case reflect.Struct:
 		srcMap := src.Interface().(map[string]interface{})
 		for key := range srcMap {
+			config.overwriteWithEmptyValue = true
 			srcValue := srcMap[key]
 			fieldName := changeInitialCase(key, unicode.ToUpper)
 			dstElement := dst.FieldByName(fieldName)
