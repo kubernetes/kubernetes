@@ -1337,6 +1337,25 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: resourceGroupName
       type:
         scalar: string
+    - name: serviceEndpoints
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.config.v1.IBMCloudServiceEndpoint
+          elementRelationship: associative
+          keys:
+          - name
+- name: com.github.openshift.api.config.v1.IBMCloudServiceEndpoint
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: url
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.config.v1.IdentityProvider
   map:
     fields:

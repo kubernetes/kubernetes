@@ -9,11 +9,12 @@ import (
 // IBMCloudPlatformStatusApplyConfiguration represents an declarative configuration of the IBMCloudPlatformStatus type for use
 // with apply.
 type IBMCloudPlatformStatusApplyConfiguration struct {
-	Location          *string                  `json:"location,omitempty"`
-	ResourceGroupName *string                  `json:"resourceGroupName,omitempty"`
-	ProviderType      *v1.IBMCloudProviderType `json:"providerType,omitempty"`
-	CISInstanceCRN    *string                  `json:"cisInstanceCRN,omitempty"`
-	DNSInstanceCRN    *string                  `json:"dnsInstanceCRN,omitempty"`
+	Location          *string                                     `json:"location,omitempty"`
+	ResourceGroupName *string                                     `json:"resourceGroupName,omitempty"`
+	ProviderType      *v1.IBMCloudProviderType                    `json:"providerType,omitempty"`
+	CISInstanceCRN    *string                                     `json:"cisInstanceCRN,omitempty"`
+	DNSInstanceCRN    *string                                     `json:"dnsInstanceCRN,omitempty"`
+	ServiceEndpoints  []IBMCloudServiceEndpointApplyConfiguration `json:"serviceEndpoints,omitempty"`
 }
 
 // IBMCloudPlatformStatusApplyConfiguration constructs an declarative configuration of the IBMCloudPlatformStatus type for use with
@@ -59,5 +60,18 @@ func (b *IBMCloudPlatformStatusApplyConfiguration) WithCISInstanceCRN(value stri
 // If called multiple times, the DNSInstanceCRN field is set to the value of the last call.
 func (b *IBMCloudPlatformStatusApplyConfiguration) WithDNSInstanceCRN(value string) *IBMCloudPlatformStatusApplyConfiguration {
 	b.DNSInstanceCRN = &value
+	return b
+}
+
+// WithServiceEndpoints adds the given value to the ServiceEndpoints field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ServiceEndpoints field.
+func (b *IBMCloudPlatformStatusApplyConfiguration) WithServiceEndpoints(values ...*IBMCloudServiceEndpointApplyConfiguration) *IBMCloudPlatformStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithServiceEndpoints")
+		}
+		b.ServiceEndpoints = append(b.ServiceEndpoints, *values[i])
+	}
 	return b
 }

@@ -1162,6 +1162,30 @@ type VSpherePlatformStatus struct {
 	LoadBalancer *VSpherePlatformLoadBalancer `json:"loadBalancer,omitempty"`
 }
 
+// IBMCloudServiceEndpoint stores the configuration of a custom url to
+// override existing defaults of IBM Cloud Services.
+type IBMCloudServiceEndpoint struct {
+	// name is the name of the IBM Cloud service.
+	// For example, the IBM Cloud Private IAM service could be configured with the
+	// service `name` of `IAM` and `url` of `https://private.iam.cloud.ibm.com`
+	// Whereas the IBM Cloud Private VPC service for US South (Dallas) could be configured
+	// with the service `name` of `VPC` and `url` of `https://us.south.private.iaas.cloud.ibm.com`
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9-]+$`
+	// +kubebuilder:validation:MaxLength=32
+	Name string `json:"name"`
+
+	// url is fully qualified URI with scheme https, that overrides the default generated
+	// endpoint for a client.
+	// This must be provided and cannot be empty.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:XValidation:rule="isURL(self)",message="url must be a valid absolute URL"
+	URL string `json:"url"`
+}
+
 // IBMCloudPlatformSpec holds the desired state of the IBMCloud infrastructure provider.
 // This only includes fields that can be modified in the cluster.
 type IBMCloudPlatformSpec struct{}
@@ -1184,6 +1208,14 @@ type IBMCloudPlatformStatus struct {
 	// DNSInstanceCRN is the CRN of the DNS Services instance managing the DNS zone
 	// for the cluster's base domain
 	DNSInstanceCRN string `json:"dnsInstanceCRN,omitempty"`
+
+        // serviceEndpoints is a list of custom endpoints which will override the default
+        // service endpoints of an IBM Cloud service. These endpoints are consumed by
+	// components within the cluster to reach the respective IBM Cloud Services.
+        // +listType=map
+        // +listMapKey=name
+        // +optional
+        ServiceEndpoints []IBMCloudServiceEndpoint `json:"serviceEndpoints,omitempty"`
 }
 
 // KubevirtPlatformSpec holds the desired state of the kubevirt infrastructure provider.

@@ -738,6 +738,30 @@ spec:
                         resourceGroupName:
                           description: ResourceGroupName is the Resource Group for new IBMCloud resources created for the cluster.
                           type: string
+                        serviceEndpoints:
+                          description: serviceEndpoints is a list of custom endpoints which will override the default service endpoints of an IBM Cloud service. These endpoints are consumed by components within the cluster to reach the respective IBM Cloud Services.
+                          items:
+                            description: IBMCloudServiceEndpoint stores the configuration of a custom url to override existing defaults of IBM Cloud Services.
+                            properties:
+                              name:
+                                description: name is the name of the IBM Cloud service. For example, the IBM Cloud Private IAM service could be configured with the service `name` of `IAM` and `url` of `https://private.iam.cloud.ibm.com` Whereas the IBM Cloud Private VPC service for US South (Dallas) could be configured with the service `name` of `VPC` and `url` of `https://us.south.private.iaas.cloud.ibm.com`
+                                maxLength: 32
+                                pattern: ^[a-zA-Z0-9-]+$
+                                type: string
+                              url:
+                                description: url is fully qualified URI with scheme https, that overrides the default generated endpoint for a client. This must be provided and cannot be empty.
+                                type: string
+                                x-kubernetes-validations:
+                                  - message: url must be a valid absolute URL
+                                    rule: isURL(self)
+                            required:
+                              - name
+                              - url
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
                       type: object
                     kubevirt:
                       description: Kubevirt contains settings specific to the kubevirt infrastructure provider.

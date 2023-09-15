@@ -30,7 +30,7 @@ require (
 	github.com/docker/distribution v2.8.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.9.0
-	github.com/evanphx/json-patch v5.6.0+incompatible
+	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-logr/logr v1.2.4
 	github.com/godbus/dbus/v5 v5.0.6
@@ -55,10 +55,10 @@ require (
 	github.com/onsi/gomega v1.27.6
 	github.com/opencontainers/runc v1.1.7
 	github.com/opencontainers/selinux v1.10.0
-	github.com/openshift/api v0.0.0-20230911111751-da2f2ca9ae0f
-	github.com/openshift/apiserver-library-go v0.0.0-20230911140513-b96ca0d4c1de
-	github.com/openshift/client-go v0.0.0-20230911120204-48b43e1706c2
-	github.com/openshift/library-go v0.0.0-20230911132332-ab5ef2a77a1a
+	github.com/openshift/api v0.0.0-20230915112357-693d4b64813c
+	github.com/openshift/apiserver-library-go v0.0.0-20230915134751-5c71e94d6f05
+	github.com/openshift/client-go v0.0.0-20230915115245-53bd8980dfb7
+	github.com/openshift/library-go v0.0.0-20230915122714-b753831a0dce
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.16.0
@@ -99,16 +99,16 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.28.1
-	k8s.io/apiextensions-apiserver v0.28.1
-	k8s.io/apimachinery v0.28.1
-	k8s.io/apiserver v0.28.1
+	k8s.io/api v0.28.2
+	k8s.io/apiextensions-apiserver v0.28.2
+	k8s.io/apimachinery v0.28.2
+	k8s.io/apiserver v0.28.2
 	k8s.io/cli-runtime v0.0.0
-	k8s.io/client-go v0.28.1
+	k8s.io/client-go v0.28.2
 	k8s.io/cloud-provider v0.0.0
 	k8s.io/cluster-bootstrap v0.0.0
-	k8s.io/code-generator v0.28.1
-	k8s.io/component-base v0.28.1
+	k8s.io/code-generator v0.28.2
+	k8s.io/component-base v0.28.2
 	k8s.io/component-helpers v0.25.0
 	k8s.io/controller-manager v0.0.0
 	k8s.io/cri-api v0.0.0
@@ -117,8 +117,8 @@ require (
 	k8s.io/endpointslice v0.0.0
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
 	k8s.io/klog/v2 v2.100.1
-	k8s.io/kms v0.28.1
-	k8s.io/kube-aggregator v0.28.1
+	k8s.io/kms v0.28.2
+	k8s.io/kube-aggregator v0.28.2
 	k8s.io/kube-controller-manager v0.0.0
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9
 	k8s.io/kube-proxy v0.0.0
