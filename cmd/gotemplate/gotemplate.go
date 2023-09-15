@@ -35,6 +35,7 @@ import (
 // - indent <number of spaces> <string>: replace each newline with "newline + spaces", indent the newline at the end
 // - trim <string>: strip leading and trailing whitespace
 
+// main parses CLI key-value pairs and feeds them to the generate function.
 func main() {
 	kvs := make(map[string]string)
 
@@ -53,6 +54,7 @@ func main() {
 	}
 }
 
+// generate processes and writes a template using given data.
 func generate(in io.Reader, out io.Writer, data interface{}) error {
 	var buf bytes.Buffer
 	if _, err := buf.ReadFrom(in); err != nil {
@@ -76,6 +78,7 @@ func generate(in io.Reader, out io.Writer, data interface{}) error {
 	return nil
 }
 
+// Reads and returns the content of a given file.
 func include(filename string) (string, error) {
 	content, err := os.ReadFile(filename)
 	if err != nil {
@@ -84,6 +87,7 @@ func include(filename string) (string, error) {
 	return string(content), nil
 }
 
+// Adds the specified number of spaces as an indent to each line of the given content.
 func indent(numSpaces int, content string) string {
 	if content == "" {
 		return ""
@@ -92,6 +96,7 @@ func indent(numSpaces int, content string) string {
 	return strings.ReplaceAll(content, "\n", "\n"+prefix)
 }
 
+// Removes leading and trailing whitespace from the provided content.
 func trim(content string) string {
 	return strings.TrimSpace(content)
 }

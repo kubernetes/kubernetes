@@ -20,6 +20,7 @@ import (
 	"testing"
 )
 
+// TestValidDir tests if the given directory path is valid.
 func TestValidDir(t *testing.T) {
 	_, err := OutDir("./")
 	if err != nil {
@@ -27,6 +28,7 @@ func TestValidDir(t *testing.T) {
 	}
 }
 
+// TestInvalidDir tests the behavior when provided an invalid directory path.
 func TestInvalidDir(t *testing.T) {
 	_, err := OutDir("./nondir")
 	if err == nil {
@@ -34,6 +36,7 @@ func TestInvalidDir(t *testing.T) {
 	}
 }
 
+// TestNotDir tests the behavior when provided a file path instead of a directory.
 func TestNotDir(t *testing.T) {
 	_, err := OutDir("./genutils_test.go")
 	if err == nil {

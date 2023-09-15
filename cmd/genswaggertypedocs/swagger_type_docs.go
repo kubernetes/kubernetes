@@ -33,6 +33,7 @@ var (
 	verify       = flag.BoolP("verify", "v", false, "Verifies if the given type-src file has documentation for every type")
 )
 
+// main generates or verifies swagger documentation based on the provided source file.
 func main() {
 	flag.Parse()
 

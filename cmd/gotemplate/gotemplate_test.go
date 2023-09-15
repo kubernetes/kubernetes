@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestGenerate tests the generate function with various inputs and checks for expected outputs or errors.
 func TestGenerate(t *testing.T) {
 	for name, tt := range map[string]struct {
 		in          string
@@ -74,6 +75,7 @@ func TestGenerate(t *testing.T) {
 	}
 }
 
+// TestIndent tests the indent function with various indentation levels and content scenarios.
 func TestIndent(t *testing.T) {
 	for name, tt := range map[string]struct {
 		numSpaces int
