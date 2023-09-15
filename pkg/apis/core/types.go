@@ -3733,6 +3733,8 @@ type PodStatus struct {
 	// init container will have ready = true, the most recently started container will have
 	// startTime set.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
+	// A Pod can have one or more init containers, which are run before the app containers are started.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#understanding-init-containers
 	InitContainerStatuses []ContainerStatus
 	// The list has one entry per app container in the manifest.
 	// +optional
