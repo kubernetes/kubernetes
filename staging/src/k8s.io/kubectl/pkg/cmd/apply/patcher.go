@@ -37,6 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/openapi3"
+	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -50,6 +53,10 @@ const (
 	backOffPeriod = 1 * time.Second
 	// how many times we can retry before back off
 	triesBeforeBackOff = 1
+	// groupVersionKindExtensionKey is the key used to lookup the
+	// GroupVersionKind value for an object definition from the
+	// definition's "extensions" map.
+	groupVersionKindExtensionKey = "x-kubernetes-group-version-kind"
 )
 
 var createPatchErrFormat = "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
@@ -74,6 +81,7 @@ type Patcher struct {
 	Retries int
 
 	OpenapiSchema openapi.Resources
+	OpenAPIV3Root openapi3.Root
 }
 
 func newPatcher(o *ApplyOptions, info *resource.Info, helper *resource.Helper) (*Patcher, error) {
@@ -92,6 +100,7 @@ func newPatcher(o *ApplyOptions, info *resource.Info, helper *resource.Helper) (
 		Timeout:           o.DeleteOptions.Timeout,
 		GracePeriod:       o.DeleteOptions.GracePeriod,
 		OpenapiSchema:     openapiSchema,
+		OpenAPIV3Root:     o.OpenAPIV3Root,
 		Retries:           maxPatchRetry,
 	}, nil
 }
@@ -118,7 +127,35 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	var patchType types.PatchType
 	var patch []byte
 
-	if p.OpenapiSchema != nil {
+	if p.OpenAPIV3Root != nil {
+		gvkSupported, err := p.gvkSupportsPatchOpenAPIV3(p.Mapping.GroupVersionKind)
+		if err != nil {
+			// Realistically this error logging is not needed (not present in V2),
+			// but would help us in debugging if users encounter a problem
+			// with OpenAPI V3 not present in V2.
+			klog.V(5).Infof("warning: OpenAPI V3 path does not exist - group: %s, version %s, kind %s\n",
+				p.Mapping.GroupVersionKind.Group, p.Mapping.GroupVersionKind.Version, p.Mapping.GroupVersionKind.Kind)
+		} else {
+			if gvkSupported {
+				patch, err = p.buildStrategicMergePatchFromOpenAPIV3(original, modified, current)
+				if err != nil {
+					// Fall back to OpenAPI V2 if there is a problem
+					// We should remove the fallback in the future,
+					// but for the first release it might be beneficial
+					// to fall back to OpenAPI V2 while logging the error
+					// and seeing if we get any bug reports.
+					fmt.Fprintf(errOut, "warning: error calculating patch from openapi v3 spec: %v\n", err)
+				} else {
+					patchType = types.StrategicMergePatchType
+				}
+			} else {
+				klog.V(5).Infof("warning: OpenAPI V3 path does not support strategic merge patch - group: %s, version %s, kind %s\n",
+					p.Mapping.GroupVersionKind.Group, p.Mapping.GroupVersionKind.Version, p.Mapping.GroupVersionKind.Kind)
+			}
+		}
+	}
+
+	if patch == nil && p.OpenapiSchema != nil {
 		// if openapischema is used, we'll try to get required patch type for this GVK from Open API.
 		// if it fails or could not find any patch type, fall back to baked-in patch type determination.
 		if patchType, err = p.getPatchTypeFromOpenAPI(p.Mapping.GroupVersionKind); err == nil && patchType == types.StrategicMergePatchType {
@@ -180,6 +217,90 @@ func (p *Patcher) buildMergePatch(original, modified, current []byte) ([]byte, e
 	}
 
 	return patch, nil
+}
+
+// gvkSupportsPatchOpenAPIV3 checks if a particular GVK supports the patch operation.
+// It returns an error if the OpenAPI V3 could not be downloaded.
+func (p *Patcher) gvkSupportsPatchOpenAPIV3(gvk schema.GroupVersionKind) (bool, error) {
+	gvSpec, err := p.OpenAPIV3Root.GVSpec(schema.GroupVersion{
+		Group:   p.Mapping.GroupVersionKind.Group,
+		Version: p.Mapping.GroupVersionKind.Version,
+	})
+	if err != nil {
+		return false, err
+	}
+	if gvSpec == nil || gvSpec.Paths == nil || gvSpec.Paths.Paths == nil {
+		return false, fmt.Errorf("gvk group: %s, version: %s, kind: %s does not exist for OpenAPI V3", gvk.Group, gvk.Version, gvk.Kind)
+	}
+	for _, path := range gvSpec.Paths.Paths {
+		if path.Patch != nil {
+			if gvkMatchesSingle(p.Mapping.GroupVersionKind, path.Patch.Extensions) {
+				if path.Patch.RequestBody == nil || path.Patch.RequestBody.Content == nil {
+					// GVK exists but does not support requestBody. Indication of malformed OpenAPI.
+					return false, nil
+				}
+				if _, ok := path.Patch.RequestBody.Content["application/strategic-merge-patch+json"]; ok {
+					return true, nil
+				}
+				// GVK exists but strategic-merge-patch is not supported. Likely to be a CRD or aggregated resource.
+				return false, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+func gvkMatchesArray(targetGVK schema.GroupVersionKind, ext spec.Extensions) bool {
+	var gvkList []map[string]string
+	err := ext.GetObject(groupVersionKindExtensionKey, &gvkList)
+	if err != nil {
+		return false
+	}
+	for _, gvkMap := range gvkList {
+		if gvkMap["group"] == targetGVK.Group &&
+			gvkMap["version"] == targetGVK.Version &&
+			gvkMap["kind"] == targetGVK.Kind {
+			return true
+		}
+	}
+	return false
+}
+
+func gvkMatchesSingle(targetGVK schema.GroupVersionKind, ext spec.Extensions) bool {
+	var gvkMap map[string]string
+	err := ext.GetObject(groupVersionKindExtensionKey, &gvkMap)
+	if err != nil {
+		return false
+	}
+	return gvkMap["group"] == targetGVK.Group &&
+		gvkMap["version"] == targetGVK.Version &&
+		gvkMap["kind"] == targetGVK.Kind
+}
+
+func (p *Patcher) buildStrategicMergePatchFromOpenAPIV3(original, modified, current []byte) ([]byte, error) {
+	gvSpec, err := p.OpenAPIV3Root.GVSpec(schema.GroupVersion{
+		Group:   p.Mapping.GroupVersionKind.Group,
+		Version: p.Mapping.GroupVersionKind.Version,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if gvSpec == nil || gvSpec.Components == nil {
+		return nil, fmt.Errorf("OpenAPI V3 Components is nil")
+	}
+	for _, c := range gvSpec.Components.Schemas {
+		if !gvkMatchesArray(p.Mapping.GroupVersionKind, c.Extensions) {
+			continue
+		}
+		lookupPatchMeta := strategicpatch.PatchMetaFromOpenAPIV3{Schema: c, SchemaList: gvSpec.Components.Schemas}
+		if openapiv3Patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite); err != nil {
+			return nil, err
+		} else {
+			return openapiv3Patch, nil
+		}
+
+	}
+	return nil, nil
 }
 
 // buildStrategicMergeFromOpenAPI builds patch from OpenAPI if it is enabled.

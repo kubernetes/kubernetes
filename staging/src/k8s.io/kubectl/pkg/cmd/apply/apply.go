@@ -39,6 +39,8 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	cachedopenapi "k8s.io/client-go/openapi/cached"
+	"k8s.io/client-go/openapi3"
 	"k8s.io/client-go/util/csaupgrade"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
@@ -106,6 +108,7 @@ type ApplyOptions struct {
 	Mapper              meta.RESTMapper
 	DynamicClient       dynamic.Interface
 	OpenAPISchema       openapi.Resources
+	OpenAPIV3Root       openapi3.Root
 
 	Namespace        string
 	EnforceNamespace bool
@@ -283,6 +286,12 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 	}
 
 	openAPISchema, _ := f.OpenAPISchema()
+	var openAPIV3Root openapi3.Root
+	openAPIV3Client, err := f.OpenAPIV3Client()
+	if err == nil {
+		cachedOpenAPIV3Client := cachedopenapi.NewClient(openAPIV3Client)
+		openAPIV3Root = openapi3.NewRoot(cachedOpenAPIV3Client)
+	}
 
 	validationDirective, err := cmdutil.GetValidationDirective(cmd)
 	if err != nil {
@@ -361,6 +370,7 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		Mapper:              mapper,
 		DynamicClient:       dynamicClient,
 		OpenAPISchema:       openAPISchema,
+		OpenAPIV3Root:       openAPIV3Root,
 
 		IOStreams: flags.IOStreams,
 

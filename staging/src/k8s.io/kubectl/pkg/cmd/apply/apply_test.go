@@ -47,6 +47,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
+	openapiclient "k8s.io/client-go/openapi"
+	"k8s.io/client-go/openapi/openapitest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	testing2 "k8s.io/client-go/testing"
@@ -64,10 +66,15 @@ import (
 
 var (
 	fakeSchema                = sptest.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
+	fakeOpenAPIV3Legacy       = sptest.OpenAPIV3Getter{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "v3", "api", "v1.json")}
+	fakeOpenAPIV3AppsV1       = sptest.OpenAPIV3Getter{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "v3", "apis", "apps", "v1.json")}
 	testingOpenAPISchemas     = []testOpenAPISchema{AlwaysErrorsOpenAPISchema, FakeOpenAPISchema}
 	AlwaysErrorsOpenAPISchema = testOpenAPISchema{
 		OpenAPISchemaFn: func() (openapi.Resources, error) {
 			return nil, errors.New("cannot get openapi spec")
+		},
+		OpenAPIV3ClientFunc: func() (openapiclient.Client, error) {
+			return nil, errors.New("cannot get openapiv3 client")
 		},
 	}
 	FakeOpenAPISchema = testOpenAPISchema{
@@ -78,12 +85,19 @@ var (
 			}
 			return openapi.NewOpenAPIData(s)
 		},
+		OpenAPIV3ClientFunc: func() (openapiclient.Client, error) {
+			c := openapitest.NewFakeClient()
+			c.PathsMap["api/v1"] = openapitest.FakeGroupVersion{GVSpec: fakeOpenAPIV3Legacy.SchemaBytesOrDie()}
+			c.PathsMap["apis/apps/v1"] = openapitest.FakeGroupVersion{GVSpec: fakeOpenAPIV3AppsV1.SchemaBytesOrDie()}
+			return c, nil
+		},
 	}
 	codec = scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 )
 
 type testOpenAPISchema struct {
-	OpenAPISchemaFn func() (openapi.Resources, error)
+	OpenAPISchemaFn     func() (openapi.Resources, error)
+	OpenAPIV3ClientFunc func() (openapiclient.Client, error)
 }
 
 func TestApplyExtraArgsFail(t *testing.T) {
@@ -684,6 +698,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 		}),
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	tf.OpenAPIV3ClientFunc = FakeOpenAPISchema.OpenAPIV3ClientFunc
 
 	ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -730,6 +745,7 @@ func TestApplyObject(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+			tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
@@ -778,6 +794,7 @@ func TestApplyPruneObjects(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+			tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
@@ -1014,6 +1031,7 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 					}),
 				}
 				tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+				tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 				tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 				for _, resource := range tc.currentResources {
@@ -1192,6 +1210,7 @@ func TestApplyCSAMigration(t *testing.T) {
 		}),
 	}
 	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
+	tf.OpenAPIV3ClientFunc = FakeOpenAPISchema.OpenAPIV3ClientFunc
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
@@ -1280,6 +1299,7 @@ func TestApplyObjectOutput(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+			tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
@@ -1341,6 +1361,7 @@ func TestApplyRetry(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+			tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
@@ -1516,6 +1537,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+			tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
@@ -1611,6 +1633,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+			tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
@@ -1673,6 +1696,7 @@ func TestUnstructuredApply(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+			tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
@@ -1737,6 +1761,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+			tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
@@ -1979,6 +2004,7 @@ func TestForceApply(t *testing.T) {
 			fakeDynamicClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
 			tf.FakeDynamicClient = fakeDynamicClient
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+			tf.OpenAPIV3ClientFunc = testingOpenAPISchema.OpenAPIV3ClientFunc
 			tf.Client = tf.UnstructuredClient
 			tf.ClientConfigVal = &restclient.Config{}
 
@@ -2830,6 +2856,7 @@ func TestApplyWithPruneV2(t *testing.T) {
 			}
 
 			tf.Client = tf.UnstructuredClient
+			tf.OpenAPIV3ClientFunc = FakeOpenAPISchema.OpenAPIV3ClientFunc
 
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 				manifests := []string{"manifest1", "manifest2"}
@@ -3104,6 +3131,7 @@ func TestApplyWithPruneV2Fail(t *testing.T) {
 	}
 
 	tf.Client = tf.UnstructuredClient
+	tf.OpenAPIV3ClientFunc = FakeOpenAPISchema.OpenAPIV3ClientFunc
 
 	testdirs := []string{"testdata/prune/simple"}
 	for _, testdir := range testdirs {
