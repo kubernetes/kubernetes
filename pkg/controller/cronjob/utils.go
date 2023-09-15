@@ -147,11 +147,12 @@ func nextScheduleTimeDuration(cj *batchv1.CronJob, now time.Time, schedule cron.
 		// we still have to requeue at some point, so aim for the next scheduling slot from now
 		mostRecentTime = &now
 	} else if mostRecentTime == nil {
-		// no missed schedules since earliestTime
-		mostRecentTime = &earliestTime
 		if numberOfMissedSchedules > 0 {
 			// if there are missed schedules since earliestTime
 			mostRecentTime = &now
+		} else {
+			// no missed schedules since earliestTime
+			mostRecentTime = &earliestTime
 		}
 	}
 
