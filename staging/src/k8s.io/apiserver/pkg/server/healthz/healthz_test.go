@@ -211,19 +211,19 @@ func TestGetExcludedChecks(t *testing.T) {
 	tests := []struct {
 		name string
 		r    *http.Request
-		want sets.String
+		want sets.Set[string]
 	}{
 		{"Should have no excluded health checks",
 			createGetRequestWithUrl("/healthz?verbose=true"),
-			sets.NewString(),
+			sets.New[string](),
 		},
 		{"Should extract out the ping health check",
 			createGetRequestWithUrl("/healthz?exclude=ping"),
-			sets.NewString("ping"),
+			sets.New[string]("ping"),
 		},
 		{"Should extract out ping and log health check",
 			createGetRequestWithUrl("/healthz?exclude=ping&exclude=log"),
-			sets.NewString("ping", "log"),
+			sets.New[string]("ping", "log"),
 		},
 	}
 	for _, tt := range tests {

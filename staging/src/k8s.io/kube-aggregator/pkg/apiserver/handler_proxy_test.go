@@ -85,8 +85,8 @@ func contextHandler(handler http.Handler, user user.Info) http.Handler {
 			ctx = genericapirequest.WithUser(ctx, user)
 		}
 		resolver := &genericapirequest.RequestInfoFactory{
-			APIPrefixes:          sets.NewString("api", "apis"),
-			GrouplessAPIPrefixes: sets.NewString("api"),
+			APIPrefixes:          sets.New[string]("api", "apis"),
+			GrouplessAPIPrefixes: sets.New[string]("api"),
 		}
 		info, err := resolver.NewRequestInfo(req)
 		if err == nil {

@@ -81,7 +81,7 @@ func TestNewWithDelegate(t *testing.T) {
 	delegateConfig := NewConfig(codecs)
 	delegateConfig.ExternalAddress = "192.168.10.4:443"
 	delegateConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
-	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
+	delegateConfig.LegacyAPIGroupPrefixes = sets.New[string]("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
 	clientset := fake.NewSimpleClientset()
 	if clientset == nil {
@@ -113,7 +113,7 @@ func TestNewWithDelegate(t *testing.T) {
 	wrappingConfig := NewConfig(codecs)
 	wrappingConfig.ExternalAddress = "192.168.10.4:443"
 	wrappingConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
-	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
+	wrappingConfig.LegacyAPIGroupPrefixes = sets.New[string]("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
 
 	wrappingConfig.HealthzChecks = append(wrappingConfig.HealthzChecks, healthz.NamedCheck("wrapping-health", func(r *http.Request) error {
@@ -266,11 +266,11 @@ func checkExpectedPathsAtRoot(url string, expectedPaths []string, t *testing.T) 
 		if !ok {
 			t.Errorf("paths not found")
 		}
-		pathset := sets.NewString()
+		pathset := sets.New[string]()
 		for _, p := range paths {
 			pathset.Insert(p.(string))
 		}
-		expectedset := sets.NewString(expectedPaths...)
+		expectedset := sets.New[string](expectedPaths...)
 		for p := range pathset.Difference(expectedset) {
 			t.Errorf("Got %v path, which we did not expect", p)
 		}

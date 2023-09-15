@@ -237,7 +237,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
-		RootScopedKinds: sets.NewString("SimpleRoot"),
+		RootScopedKinds: sets.New[string]("SimpleRoot"),
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
@@ -296,8 +296,8 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 func testRequestInfoResolver() *request.RequestInfoFactory {
 	return &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 }
 
@@ -3311,7 +3311,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
-		RootScopedKinds: sets.NewString("SimpleRoot"),
+		RootScopedKinds: sets.New[string]("SimpleRoot"),
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
@@ -4454,8 +4454,8 @@ func newTestServer(handler http.Handler) *httptest.Server {
 
 func newTestRequestInfoResolver() *request.RequestInfoFactory {
 	return &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 }
 

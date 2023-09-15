@@ -88,7 +88,7 @@ func (ftr *fsTestingRecord) addDigests(digests []RequestDigest, matches bool) {
 	}
 }
 
-var flowDistinguisherMethodTypes = sets.NewString(
+var flowDistinguisherMethodTypes = sets.New[string](
 	string(flowcontrol.FlowDistinguisherMethodByUserType),
 	string(flowcontrol.FlowDistinguisherMethodByNamespaceType),
 )
@@ -192,7 +192,7 @@ var mandFTRCatchAll = &fsTestingRecord{
 // relatively likely to be well formed but might not be.  An ill
 // formed spec references a priority level drawn from badPLNames.
 // goodPLNames may be empty, but badPLNames may not.
-func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool, goodPLNames, badPLNames sets.String) *fsTestingRecord {
+func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool, goodPLNames, badPLNames sets.Set[string]) *fsTestingRecord {
 	fs := &flowcontrol.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       flowcontrol.FlowSchemaSpec{}}
@@ -654,7 +654,7 @@ func genNonResourceRule(rng *rand.Rand, pfx string, matchAllNonResources, someMa
 	return nrr, matchingRIs, skippingRIs
 }
 
-func pickSetString(rng *rand.Rand, set sets.String) string {
+func pickSetString(rng *rand.Rand, set sets.Set[string]) string {
 	i, n := 0, rng.Intn(len(set))
 	for s := range set {
 		if i == n {

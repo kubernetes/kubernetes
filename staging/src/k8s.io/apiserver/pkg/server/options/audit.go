@@ -470,7 +470,7 @@ func (o *AuditLogOptions) Validate() []error {
 	}
 
 	// Check log format
-	if !sets.NewString(pluginlog.AllowedFormats...).Has(o.Format) {
+	if !sets.New[string](pluginlog.AllowedFormats...).Has(o.Format) {
 		allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.Format, strings.Join(pluginlog.AllowedFormats, ",")))
 	}
 

@@ -185,8 +185,8 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 
 func newTestRequestInfoResolver() *RequestInfoFactory {
 	return &RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 }
 

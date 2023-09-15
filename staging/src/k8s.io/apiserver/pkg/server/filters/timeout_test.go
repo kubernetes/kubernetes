@@ -388,8 +388,8 @@ func TestErrConnKilled(t *testing.T) {
 		panic(http.ErrAbortHandler)
 	})
 	resolver := &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 
 	ts := httptest.NewServer(WithPanicRecovery(handler, resolver))
@@ -448,8 +448,8 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 		panic(http.ErrAbortHandler)
 	})
 	resolver := &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 
 	// test server

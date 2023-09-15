@@ -29,7 +29,7 @@ import (
 // Each path is either a fully matching path or it ends in * in case a prefix match is done. A leading / is optional.
 func NewAuthorizer(alwaysAllowPaths []string) (authorizer.Authorizer, error) {
 	var prefixes []string
-	paths := sets.NewString()
+	paths := sets.New[string]()
 	for _, p := range alwaysAllowPaths {
 		p = strings.TrimPrefix(p, "/")
 		if len(p) == 0 {

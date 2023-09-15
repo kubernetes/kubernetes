@@ -304,7 +304,7 @@ var (
 
 	// these are the valid request methods which we report in our metrics. Any other request methods
 	// will be aggregated under 'unknown'
-	validRequestMethods = utilsets.NewString(
+	validRequestMethods = utilsets.New[string](
 		"APPLY",
 		"CONNECT",
 		"CREATE",
@@ -321,7 +321,7 @@ var (
 		"WATCHLIST")
 
 	// These are the valid connect requests which we report in our metrics.
-	validConnectRequests = utilsets.NewString(
+	validConnectRequests = utilsets.New[string](
 		"log",
 		"exec",
 		"portforward",
@@ -697,7 +697,7 @@ func cleanDryRun(u *url.URL) string {
 	// we have to dedup and sort the elements before joining them together
 	// TODO: this is a fairly large allocation for what it does, consider
 	//   a sort and dedup in a single pass
-	return strings.Join(utilsets.NewString(dryRun...).List(), ",")
+	return strings.Join(utilsets.New[string](dryRun...).UnsortedList(), ",")
 }
 
 func cleanFieldValidation(u *url.URL) string {

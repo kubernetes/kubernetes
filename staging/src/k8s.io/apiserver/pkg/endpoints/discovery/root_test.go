@@ -84,8 +84,8 @@ func contextHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		resolver := &request.RequestInfoFactory{
-			APIPrefixes:          sets.NewString("api", "apis"),
-			GrouplessAPIPrefixes: sets.NewString("api"),
+			APIPrefixes:          sets.New[string]("api", "apis"),
+			GrouplessAPIPrefixes: sets.New[string]("api"),
 		}
 		info, err := resolver.NewRequestInfo(req)
 		if err == nil {

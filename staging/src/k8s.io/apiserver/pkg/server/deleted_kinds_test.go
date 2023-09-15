@@ -339,25 +339,25 @@ func Test_removeDeletedKinds(t *testing.T) {
 func Test_shouldRemoveResource(t *testing.T) {
 	tests := []struct {
 		name              string
-		resourcesToRemove sets.String
+		resourcesToRemove sets.Set[string]
 		resourceName      string
 		want              bool
 	}{
 		{
 			name:              "prefix-matches",
-			resourcesToRemove: sets.NewString("foo"),
+			resourcesToRemove: sets.New[string]("foo"),
 			resourceName:      "foo/scale",
 			want:              true,
 		},
 		{
 			name:              "exact-matches",
-			resourcesToRemove: sets.NewString("foo"),
+			resourcesToRemove: sets.New[string]("foo"),
 			resourceName:      "foo",
 			want:              true,
 		},
 		{
 			name:              "no-match",
-			resourcesToRemove: sets.NewString("foo"),
+			resourcesToRemove: sets.New[string]("foo"),
 			resourceName:      "bar",
 			want:              false,
 		},

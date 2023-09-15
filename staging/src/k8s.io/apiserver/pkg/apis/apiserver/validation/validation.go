@@ -164,7 +164,7 @@ func validateCertificateAuthority(certificateAuthority string, fldPath *field.Pa
 func validateClaimValidationRules(rules []api.ClaimValidationRule, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	seenClaims := sets.NewString()
+	seenClaims := sets.New[string]()
 	for i, rule := range rules {
 		fldPath := fldPath.Index(i)
 

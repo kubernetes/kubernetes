@@ -118,7 +118,7 @@ type GenericAPIServer struct {
 
 	// legacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup
-	legacyAPIGroupPrefixes sets.String
+	legacyAPIGroupPrefixes sets.Set[string]
 
 	// admissionControl is used to build the RESTStorage that backs an API Group.
 	admissionControl admission.Interface
@@ -184,7 +184,7 @@ type GenericAPIServer struct {
 	postStartHookLock      sync.Mutex
 	postStartHooks         map[string]postStartHookEntry
 	postStartHooksCalled   bool
-	disabledPostStartHooks sets.String
+	disabledPostStartHooks sets.Set[string]
 
 	preShutdownHookLock    sync.Mutex
 	preShutdownHooks       map[string]preShutdownHookEntry
@@ -806,7 +806,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 // underlying storage will be destroyed on this servers shutdown.
 func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	if !s.legacyAPIGroupPrefixes.Has(apiPrefix) {
-		return fmt.Errorf("%q is not in the allowed legacy API prefixes: %v", apiPrefix, s.legacyAPIGroupPrefixes.List())
+		return fmt.Errorf("%q is not in the allowed legacy API prefixes: %v", apiPrefix, s.legacyAPIGroupPrefixes.UnsortedList())
 	}
 
 	openAPIModels, err := s.getOpenAPIModels(apiPrefix, apiGroupInfo)

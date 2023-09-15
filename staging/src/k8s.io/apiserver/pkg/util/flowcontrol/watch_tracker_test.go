@@ -99,8 +99,8 @@ func TestRegisterWatch(t *testing.T) {
 	}
 
 	requestInfoFactory := &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 
 	for _, testCase := range testCases {
@@ -152,8 +152,8 @@ func TestGetInterestedWatchCount(t *testing.T) {
 		httpRequest("GET", "apis/group/v1/namespaces/bar/pods", "watch=true&fieldSelector=metadata.name=mypod"),
 	}
 	requestInfoFactory := &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 	for _, req := range registeredWatches {
 		requestInfo, err := requestInfoFactory.NewRequestInfo(req)
@@ -277,8 +277,8 @@ func TestGetInterestedWatchCountWithIndex(t *testing.T) {
 		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName=node2"),
 	}
 	requestInfoFactory := &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 	for _, req := range registeredWatches {
 		requestInfo, err := requestInfoFactory.NewRequestInfo(req)

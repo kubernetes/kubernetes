@@ -70,7 +70,7 @@ type EtcdOptions struct {
 	SkipHealthEndpoints bool
 }
 
-var storageTypes = sets.NewString(
+var storageTypes = sets.New[string](
 	storagebackend.StorageTypeETCD3,
 )
 
@@ -98,7 +98,7 @@ func (s *EtcdOptions) Validate() []error {
 	}
 
 	if s.StorageConfig.Type != storagebackend.StorageTypeUnset && !storageTypes.Has(s.StorageConfig.Type) {
-		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, allowed values: %s. If not specified, it will default to 'etcd3'", strings.Join(storageTypes.List(), ", ")))
+		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, allowed values: %s. If not specified, it will default to 'etcd3'", strings.Join(storageTypes.UnsortedList(), ", ")))
 	}
 
 	for _, override := range s.EtcdServersOverrides {

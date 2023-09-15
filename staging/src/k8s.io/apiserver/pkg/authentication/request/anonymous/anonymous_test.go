@@ -37,7 +37,7 @@ func TestAnonymous(t *testing.T) {
 	if r.User.GetName() != user.Anonymous {
 		t.Fatalf("Expected username %s, got %s", user.Anonymous, r.User.GetName())
 	}
-	if !sets.NewString(r.User.GetGroups()...).Equal(sets.NewString(user.AllUnauthenticated)) {
+	if !sets.New[string](r.User.GetGroups()...).Equal(sets.New[string](user.AllUnauthenticated)) {
 		t.Fatalf("Expected group %s, got %v", user.AllUnauthenticated, r.User.GetGroups())
 	}
 }

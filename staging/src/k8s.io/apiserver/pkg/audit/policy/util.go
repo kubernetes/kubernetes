@@ -22,8 +22,8 @@ import (
 )
 
 // AllStages returns all possible stages
-func AllStages() sets.String {
-	return sets.NewString(
+func AllStages() sets.Set[string] {
+	return sets.New[string](
 		string(audit.StageRequestReceived),
 		string(audit.StageResponseStarted),
 		string(audit.StageResponseComplete),
@@ -32,8 +32,8 @@ func AllStages() sets.String {
 }
 
 // AllLevels returns all possible levels
-func AllLevels() sets.String {
-	return sets.NewString(
+func AllLevels() sets.Set[string] {
+	return sets.New[string](
 		string(audit.LevelNone),
 		string(audit.LevelMetadata),
 		string(audit.LevelRequest),
@@ -59,9 +59,9 @@ func ConvertStagesToStrings(stages []audit.Stage) []string {
 }
 
 // ConvertStringSetToStages converts a string set to an array of stages
-func ConvertStringSetToStages(set sets.String) []audit.Stage {
+func ConvertStringSetToStages(set sets.Set[string]) []audit.Stage {
 	stages := make([]audit.Stage, len(set))
-	for i, stage := range set.List() {
+	for i, stage := range set.UnsortedList() {
 		stages[i] = audit.Stage(stage)
 	}
 	return stages

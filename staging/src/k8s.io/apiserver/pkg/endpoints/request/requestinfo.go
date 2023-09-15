@@ -68,21 +68,21 @@ type RequestInfo struct {
 // CRUDdy GET/POST/PUT/DELETE actions on REST objects.
 // TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
 // master's Mux.
-var specialVerbs = sets.NewString("proxy", "watch")
+var specialVerbs = sets.New[string]("proxy", "watch")
 
 // specialVerbsNoSubresources contains root verbs which do not allow subresources
-var specialVerbsNoSubresources = sets.NewString("proxy")
+var specialVerbsNoSubresources = sets.New[string]("proxy")
 
 // namespaceSubresources contains subresources of namespace
 // this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
-var namespaceSubresources = sets.NewString("status", "finalize")
+var namespaceSubresources = sets.New[string]("status", "finalize")
 
 // NamespaceSubResourcesForTest exports namespaceSubresources for testing in pkg/controlplane/master_test.go, so we never drift
-var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
+var NamespaceSubResourcesForTest = sets.New[string](namespaceSubresources.UnsortedList()...)
 
 type RequestInfoFactory struct {
-	APIPrefixes          sets.String // without leading and trailing slashes
-	GrouplessAPIPrefixes sets.String // without leading and trailing slashes
+	APIPrefixes          sets.Set[string] // without leading and trailing slashes
+	GrouplessAPIPrefixes sets.Set[string] // without leading and trailing slashes
 }
 
 // TODO write an integration test against the swagger doc to test the RequestInfo and match up behavior to responses

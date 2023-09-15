@@ -155,10 +155,10 @@ type removedInterface interface {
 // removeDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
 func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
-	versionsToRemove := sets.NewString()
-	for apiVersion := range sets.StringKeySet(versionedResourcesStorageMap) {
+	versionsToRemove := sets.New[string]()
+	for apiVersion := range sets.KeySet[string](versionedResourcesStorageMap) {
 		versionToResource := versionedResourcesStorageMap[apiVersion]
-		resourcesToRemove := sets.NewString()
+		resourcesToRemove := sets.New[string]()
 		for resourceName, resourceServingInfo := range versionToResource {
 			if !e.shouldServe(schema.GroupVersion{Group: groupName, Version: apiVersion}, versioner, resourceServingInfo) {
 				resourcesToRemove.Insert(resourceName)
@@ -180,14 +180,14 @@ func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versi
 		}
 	}
 
-	for _, apiVersion := range versionsToRemove.List() {
+	for _, apiVersion := range versionsToRemove.UnsortedList() {
 		klog.V(1).Infof("Removing version %v.%v because it is time to stop serving it because it has no resources per APILifecycle.", apiVersion, groupName)
 		delete(versionedResourcesStorageMap, apiVersion)
 	}
 }
 
-func shouldRemoveResourceAndSubresources(resourcesToRemove sets.String, resourceName string) bool {
-	for _, resourceToRemove := range resourcesToRemove.List() {
+func shouldRemoveResourceAndSubresources(resourcesToRemove sets.Set[string], resourceName string) bool {
+	for _, resourceToRemove := range resourcesToRemove.UnsortedList() {
 		if resourceName == resourceToRemove {
 			return true
 		}

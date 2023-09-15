@@ -1134,7 +1134,7 @@ func TestKMSProviderName(t *testing.T) {
 		desc             string
 		in               *config.KMSConfiguration
 		reload           bool
-		kmsProviderNames sets.String
+		kmsProviderNames sets.Set[string]
 		want             field.ErrorList
 	}{{
 		desc: "valid name",
@@ -1159,7 +1159,7 @@ func TestKMSProviderName(t *testing.T) {
 	}, {
 		desc:             "duplicate name, kms v2, reload=false",
 		in:               &config.KMSConfiguration{APIVersion: "v2", Name: "foo"},
-		kmsProviderNames: sets.NewString("foo"),
+		kmsProviderNames: sets.New[string]("foo"),
 		want: field.ErrorList{
 			field.Invalid(nameField, "foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
 		},
@@ -1167,20 +1167,20 @@ func TestKMSProviderName(t *testing.T) {
 		desc:             "duplicate name, kms v2, reload=true",
 		in:               &config.KMSConfiguration{APIVersion: "v2", Name: "foo"},
 		reload:           true,
-		kmsProviderNames: sets.NewString("foo"),
+		kmsProviderNames: sets.New[string]("foo"),
 		want: field.ErrorList{
 			field.Invalid(nameField, "foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
 		},
 	}, {
 		desc:             "duplicate name, kms v1, reload=false",
 		in:               &config.KMSConfiguration{APIVersion: "v1", Name: "foo"},
-		kmsProviderNames: sets.NewString("foo"),
+		kmsProviderNames: sets.New[string]("foo"),
 		want:             field.ErrorList{},
 	}, {
 		desc:             "duplicate name, kms v1, reload=true",
 		in:               &config.KMSConfiguration{APIVersion: "v1", Name: "foo"},
 		reload:           true,
-		kmsProviderNames: sets.NewString("foo"),
+		kmsProviderNames: sets.New[string]("foo"),
 		want: field.ErrorList{
 			field.Invalid(nameField, "foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
 		},

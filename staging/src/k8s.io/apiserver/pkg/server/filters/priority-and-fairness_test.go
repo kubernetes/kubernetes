@@ -164,8 +164,8 @@ func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Inte
 }
 
 func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func()) http.Handler {
-	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
-	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
+	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.New[string]("apis", "api"), GrouplessAPIPrefixes: sets.New[string]("api")}
+	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.New[string]("watch"), sets.New[string]("proxy"))
 
 	apfHandler := WithPriorityAndFairness(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		onExecute()
@@ -1228,8 +1228,8 @@ func newClientset(t *testing.T, objects ...runtime.Object) clientset.Interface {
 // a real apiserver.
 // the specified user is added as the authenticated user to the request context.
 func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.Interface, userName string, requestTimeout time.Duration) http.Handler {
-	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
-	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
+	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.New[string]("apis", "api"), GrouplessAPIPrefixes: sets.New[string]("api")}
+	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.New[string]("watch"), sets.New[string]("proxy"))
 
 	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator)
 

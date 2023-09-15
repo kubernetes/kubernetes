@@ -198,7 +198,7 @@ type configController struct {
 
 type updateAttempt struct {
 	timeUpdated  time.Time
-	updatedItems sets.String // FlowSchema names
+	updatedItems sets.Set[string] // FlowSchema names
 }
 
 // priorityLevelState holds the state specific to a priority level.
@@ -558,7 +558,7 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 	var errs []error
 	currResult := updateAttempt{
 		timeUpdated:  cfgCtlr.clock.Now(),
-		updatedItems: sets.String{},
+		updatedItems: sets.New[string](),
 	}
 	var suggestedDelay time.Duration
 	for _, fsu := range fsStatusUpdates {

@@ -30,7 +30,7 @@ import (
 )
 
 // readOnlyVerbs contains verbs for read-only requests.
-var readOnlyVerbs = sets.NewString("get", "list", "watch", "proxy")
+var readOnlyVerbs = sets.New[string]("get", "list", "watch", "proxy")
 
 // watchIdentifier identifies group of watches that are similar.
 // As described in the "Priority and Fairness" KEP, we consider

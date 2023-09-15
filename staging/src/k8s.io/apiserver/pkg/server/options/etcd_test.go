@@ -383,8 +383,8 @@ func TestReadinessCheck(t *testing.T) {
 func healthChecksAreEqual(t *testing.T, want []string, healthChecks []healthz.HealthChecker, checkerType string) {
 	t.Helper()
 
-	wantSet := sets.NewString(want...)
-	gotSet := sets.NewString()
+	wantSet := sets.New[string](want...)
+	gotSet := sets.New[string]()
 
 	for _, h := range healthChecks {
 		gotSet.Insert(h.Name())
@@ -393,6 +393,6 @@ func healthChecksAreEqual(t *testing.T, want []string, healthChecks []healthz.He
 	gotSet.Delete("log", "ping") // not relevant for our tests
 
 	if !wantSet.Equal(gotSet) {
-		t.Errorf("%s checks are not equal, missing=%q, extra=%q", checkerType, wantSet.Difference(gotSet).List(), gotSet.Difference(wantSet).List())
+		t.Errorf("%s checks are not equal, missing=%q, extra=%q", checkerType, wantSet.Difference(gotSet).UnsortedList(), gotSet.Difference(wantSet).UnsortedList())
 	}
 }

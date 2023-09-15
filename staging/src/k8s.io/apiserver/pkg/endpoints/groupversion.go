@@ -72,7 +72,7 @@ type APIGroupVersion struct {
 	MetaGroupVersion *schema.GroupVersion
 
 	// RootScopedKinds are the root scoped kinds for the primary GroupVersion
-	RootScopedKinds sets.String
+	RootScopedKinds sets.Set[string]
 
 	// Serializer is used to determine how to convert responses from API methods into bytes to send over
 	// the wire.

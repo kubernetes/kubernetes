@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	watchVerbs = sets.NewString("watch")
+	watchVerbs = sets.New[string]("watch")
 )
 
 // WithLatencyTrackers adds a LatencyTrackers instance to the

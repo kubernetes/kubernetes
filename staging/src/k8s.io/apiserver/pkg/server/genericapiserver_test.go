@@ -128,7 +128,7 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
 	config.ExternalAddress = "192.168.10.4:443"
 	config.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
-	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
+	config.LegacyAPIGroupPrefixes = sets.New[string]("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
 
 	clientset := fake.NewSimpleClientset()
@@ -170,7 +170,7 @@ func TestNew(t *testing.T) {
 func TestInstallAPIGroups(t *testing.T) {
 	config, assert := setUp(t)
 
-	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
+	config.LegacyAPIGroupPrefixes = sets.New[string]("/apiPrefix")
 	config.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: "ExternalAddress"}
 
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
@@ -211,7 +211,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	err = s.InstallLegacyAPIGroup("/apiPrefix", &apis[0])
 	assert.NoError(err)
 	groupPaths := []string{
-		config.LegacyAPIGroupPrefixes.List()[0], // /apiPrefix
+		config.LegacyAPIGroupPrefixes.UnsortedList()[0], // /apiPrefix
 	}
 	for _, api := range apis[1:] {
 		err = s.InstallAPIGroup(&api)
@@ -300,14 +300,14 @@ func TestInstallAPIGroups(t *testing.T) {
 		for _, r := range resources.APIResources {
 			switch r.Name {
 			case "getter":
-				if got, expected := sets.NewString([]string(r.Verbs)...), sets.NewString("get"); !got.Equal(expected) {
+				if got, expected := sets.New[string]([]string(r.Verbs)...), sets.New[string]("get"); !got.Equal(expected) {
 					t.Errorf("[%d] unexpected verbs for resource %s/%s: got=%v expected=%v", i, resources.GroupVersion, r.Name, got, expected)
 				}
 			case "noverbs":
 				if r.Verbs == nil {
 					t.Errorf("[%d] unexpected nil verbs slice. Expected: []string{}", i)
 				}
-				if got, expected := sets.NewString([]string(r.Verbs)...), sets.NewString(); !got.Equal(expected) {
+				if got, expected := sets.New[string]([]string(r.Verbs)...), sets.New[string](); !got.Equal(expected) {
 					t.Errorf("[%d] unexpected verbs for resource %s/%s: got=%v expected=%v", i, resources.GroupVersion, r.Name, got, expected)
 				}
 			}
@@ -450,7 +450,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 
 	authz := mockAuthorizer{}
 
-	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
+	config.LegacyAPIGroupPrefixes = sets.New[string]("/apiPrefix")
 	config.Authorization.Authorizer = &authz
 
 	config.EnableIndex = true

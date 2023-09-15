@@ -158,16 +158,16 @@ func (ctr *ctlrTestRequest) Finish(execute func()) bool {
 	return ctr.cqs.countActive == 0
 }
 
-func (cts *ctlrTestState) getQueueSetNames() sets.String {
+func (cts *ctlrTestState) getQueueSetNames() sets.Set[string] {
 	cts.lock.Lock()
 	defer cts.lock.Unlock()
-	return sets.StringKeySet(cts.queues)
+	return sets.KeySet(cts.queues)
 }
 
-func (cts *ctlrTestState) getNonIdleQueueSetNames() sets.String {
+func (cts *ctlrTestState) getNonIdleQueueSetNames() sets.Set[string] {
 	cts.lock.Lock()
 	defer cts.lock.Unlock()
-	ans := sets.NewString()
+	ans := sets.New[string]()
 	for name, qs := range cts.queues {
 		if qs.countActive > 0 {
 			ans.Insert(name)
@@ -221,8 +221,8 @@ func (cts *ctlrTestState) popHeldRequest() (plName string, hr *heldRequest, nCou
 	}
 }
 
-var mandQueueSetNames = func() sets.String {
-	mandQueueSetNames := sets.NewString()
+var mandQueueSetNames = func() sets.Set[string] {
+	mandQueueSetNames := sets.New[string]()
 	for _, mpl := range fcboot.MandatoryPriorityLevelConfigurations {
 		mandQueueSetNames.Insert(mpl.Name)
 	}
@@ -258,7 +258,7 @@ func TestConfigConsumer(t *testing.T) {
 				QueueSetFactory:        cts,
 			})
 			cts.cfgCtlr = ctlr
-			persistingPLNames := sets.NewString()
+			persistingPLNames := sets.New[string]()
 			trialStep := fmt.Sprintf("trial%d-0", i)
 			_, _, desiredPLNames, newBadPLNames := genPLs(rng, trialStep, persistingPLNames, 0)
 			_, _, newFTRs, newCatchAlls := genFSs(t, rng, trialStep, desiredPLNames, newBadPLNames, 0)
@@ -268,7 +268,7 @@ func TestConfigConsumer(t *testing.T) {
 					t.Logf("For %s, newFTRs=%#+v", trialStep, newFTRs)
 				}
 				// Check that the latest digestion did the right thing
-				nextPLNames := sets.NewString()
+				nextPLNames := sets.New[string]()
 				for oldPLName := range persistingPLNames {
 					if mandPLs[oldPLName] != nil || cts.hasNonIdleQueueSet(oldPLName) {
 						nextPLNames.Insert(oldPLName)
@@ -490,11 +490,11 @@ func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTes
 	startWG.Wait()
 }
 
-func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []*flowcontrol.PriorityLevelConfiguration, plMap map[string]*flowcontrol.PriorityLevelConfiguration, goodNames, badNames sets.String) {
+func genPLs(rng *rand.Rand, trial string, oldPLNames sets.Set[string], n int) (pls []*flowcontrol.PriorityLevelConfiguration, plMap map[string]*flowcontrol.PriorityLevelConfiguration, goodNames, badNames sets.Set[string]) {
 	pls = make([]*flowcontrol.PriorityLevelConfiguration, 0, n)
 	plMap = make(map[string]*flowcontrol.PriorityLevelConfiguration, n)
-	goodNames = sets.NewString()
-	badNames = sets.NewString(trial+"-nopl1", trial+"-nopl2")
+	goodNames = sets.New[string]()
+	badNames = sets.New[string](trial+"-nopl1", trial+"-nopl2")
 	addGood := func(pl *flowcontrol.PriorityLevelConfiguration) {
 		pls = append(pls, pl)
 		plMap[pl.Name] = pl
@@ -521,7 +521,7 @@ func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []
 	return
 }
 
-func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*flowcontrol.FlowSchema, newFSMap map[string]*flowcontrol.FlowSchema, newFTRs map[string]*fsTestingRecord, catchAlls map[bool]*flowcontrol.FlowSchema) {
+func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.Set[string], n int) (newFSs []*flowcontrol.FlowSchema, newFSMap map[string]*flowcontrol.FlowSchema, newFTRs map[string]*fsTestingRecord, catchAlls map[bool]*flowcontrol.FlowSchema) {
 	newFTRs = map[string]*fsTestingRecord{}
 	catchAlls = map[bool]*flowcontrol.FlowSchema{
 		false: fcboot.MandatoryFlowSchemaCatchAll,

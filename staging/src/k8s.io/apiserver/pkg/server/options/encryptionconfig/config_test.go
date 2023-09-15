@@ -2087,7 +2087,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 				t.Errorf("log mismatch (-want +got):\n%s", diff)
 			}
 
-			ignoredFields := sets.NewString("Transformer", "EncryptedObject.EncryptedDEKSource", "UID", "CacheKey")
+			ignoredFields := sets.New[string]("Transformer", "EncryptedObject.EncryptedDEKSource", "UID", "CacheKey")
 
 			gotState := *h.state.Load()
 

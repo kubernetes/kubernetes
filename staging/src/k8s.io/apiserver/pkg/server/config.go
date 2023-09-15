@@ -142,7 +142,7 @@ type Config struct {
 	EnableContentionProfiling bool
 	EnableMetrics             bool
 
-	DisabledPostStartHooks sets.String
+	DisabledPostStartHooks sets.Set[string]
 	// done values in this values for this map are ignored.
 	PostStartHooks map[string]PostStartHookConfigEntry
 
@@ -184,7 +184,7 @@ type Config struct {
 	ReadyzChecks []healthz.HealthChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
-	LegacyAPIGroupPrefixes sets.String
+	LegacyAPIGroupPrefixes sets.Set[string]
 	// RequestInfoResolver is used to assign attributes (used by admission and authorization) based on a request URL.
 	// Use-cases that are like kubelets may need to customize this.
 	RequestInfoResolver apirequest.RequestInfoResolver
@@ -405,8 +405,8 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		BuildHandlerChainFunc:          DefaultBuildHandlerChain,
 		NonLongRunningRequestWaitGroup: new(utilwaitgroup.SafeWaitGroup),
 		WatchRequestWaitGroup:          &utilwaitgroup.RateLimitedSafeWaitGroup{},
-		LegacyAPIGroupPrefixes:         sets.NewString(DefaultLegacyAPIPrefix),
-		DisabledPostStartHooks:         sets.NewString(),
+		LegacyAPIGroupPrefixes:         sets.New[string](DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:         sets.New[string](),
 		PostStartHooks:                 map[string]PostStartHookConfigEntry{},
 		HealthzChecks:                  append([]healthz.HealthChecker{}, defaultHealthChecks...),
 		ReadyzChecks:                   append([]healthz.HealthChecker{}, defaultHealthChecks...),
@@ -442,7 +442,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc:                     genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		LongRunningFunc:                     genericfilters.BasicLongRunningRequestCheck(sets.New[string]("watch"), sets.New[string]()),
 		lifecycleSignals:                    lifecycleSignals,
 		StorageObjectCountTracker:           flowcontrolrequest.NewStorageObjectCountTracker(),
 		ShutdownWatchTerminationGracePeriod: time.Duration(0),
@@ -1017,8 +1017,8 @@ func installAPI(s *GenericAPIServer, c *Config) {
 }
 
 func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {
-	apiPrefixes := sets.NewString(strings.Trim(APIGroupPrefix, "/")) // all possible API prefixes
-	legacyAPIPrefixes := sets.String{}                               // APIPrefixes that won't have groups (legacy)
+	apiPrefixes := sets.New[string](strings.Trim(APIGroupPrefix, "/")) // all possible API prefixes
+	legacyAPIPrefixes := sets.New[string]()                            // APIPrefixes that won't have groups (legacy)
 	for legacyAPIPrefix := range c.LegacyAPIGroupPrefixes {
 		apiPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))
 		legacyAPIPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))

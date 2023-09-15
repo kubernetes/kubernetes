@@ -78,7 +78,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		patchType := types.PatchType(contentType)
 
 		// Ensure the patchType is one we support
-		if !sets.NewString(patchTypes...).Has(contentType) {
+		if !sets.New[string](patchTypes...).Has(contentType) {
 			scope.err(negotiation.NewUnsupportedMediaTypeError(patchTypes), w, req)
 			return
 		}

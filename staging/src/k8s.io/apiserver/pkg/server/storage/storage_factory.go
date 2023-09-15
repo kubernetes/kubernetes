@@ -309,7 +309,7 @@ func Backends(storageConfig storagebackend.Config) []Backend {
 }
 
 func backends(storageConfig storagebackend.Config, grOverrides map[schema.GroupResource]groupResourceOverrides) []Backend {
-	servers := sets.NewString(storageConfig.Transport.ServerList...)
+	servers := sets.New[string](storageConfig.Transport.ServerList...)
 
 	for _, overrides := range grOverrides {
 		servers.Insert(overrides.etcdLocation...)

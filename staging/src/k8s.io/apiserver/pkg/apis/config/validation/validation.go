@@ -78,7 +78,7 @@ func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration, reload b
 	}
 
 	// kmsProviderNames is used to track config names to ensure they are unique.
-	kmsProviderNames := sets.NewString()
+	kmsProviderNames := sets.New[string]()
 	for i, conf := range c.Resources {
 		r := root.Index(i).Child("resources")
 		p := root.Index(i).Child("providers")
@@ -363,7 +363,7 @@ func validateKey(key config.Key, fieldPath *field.Path, expectedLen []int) field
 	return allErrs
 }
 
-func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.String, reload bool) field.ErrorList {
+func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.Set[string], reload bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validateKMSConfigName(c, fieldPath.Child("name"), kmsProviderNames, reload)...)
@@ -425,7 +425,7 @@ func validateKMSAPIVersion(c *config.KMSConfiguration, fieldPath *field.Path) fi
 	return allErrs
 }
 
-func validateKMSConfigName(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.String, reload bool) field.ErrorList {
+func validateKMSConfigName(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.Set[string], reload bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if c.Name == "" {
 		allErrs = append(allErrs, field.Required(fieldPath, fmt.Sprintf(mandatoryFieldErrFmt, "name", "provider")))

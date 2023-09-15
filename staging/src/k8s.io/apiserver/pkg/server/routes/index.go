@@ -36,14 +36,14 @@ type ListedPathProviders []ListedPathProvider
 
 // ListedPaths unions and sorts the included paths.
 func (p ListedPathProviders) ListedPaths() []string {
-	ret := sets.String{}
+	ret := sets.New[string]()
 	for _, provider := range p {
 		for _, path := range provider.ListedPaths() {
 			ret.Insert(path)
 		}
 	}
 
-	return ret.List()
+	return ret.UnsortedList()
 }
 
 // Index provides a webservice for the http root / listing all known paths.

@@ -214,7 +214,7 @@ func NewCustomResourceDefinitionHandler(
 // watches are expected to handle storage disruption gracefully,
 // both on the server-side (by terminating the watch connection)
 // and on the client side (by restarting the watch)
-var longRunningFilter = genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString())
+var longRunningFilter = genericfilters.BasicLongRunningRequestCheck(sets.New[string]("watch"), sets.New[string]())
 
 // possiblyAcrossAllNamespacesVerbs contains those verbs which can be per-namespace and across all
 // namespaces for namespaces resources. I.e. for these an empty namespace in the requestInfo is fine.

@@ -137,8 +137,8 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return err
 	}
 	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
-		sets.NewString("watch", "proxy"),
-		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
+		sets.New[string]("watch", "proxy"),
+		sets.New[string]("attach", "exec", "proxy", "log", "portforward"),
 	)
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(aggregatorscheme.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "kube-aggregator"
