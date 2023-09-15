@@ -18,8 +18,8 @@ package fc
 
 import (
 	"fmt"
-	"os"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
