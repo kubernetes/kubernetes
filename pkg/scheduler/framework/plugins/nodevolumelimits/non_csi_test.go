@@ -129,7 +129,7 @@ func TestEphemeralLimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		extraClaims         []v1.PersistentVolumeClaim
 		ephemeralEnabled    bool
-		maxVols             int
+		maxVols             int32
 		test                string
 		wantStatus          *framework.Status
 		wantPreFilterStatus *framework.Status
@@ -182,7 +182,7 @@ func TestEphemeralLimits(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			fts := feature.Features{}
-			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), filterName)
+			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, filterName)
 			p := newNonCSILimits(filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
@@ -241,7 +241,7 @@ func TestAzureDiskLimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		filterName          string
 		driverName          string
-		maxVols             int
+		maxVols             int32
 		test                string
 		wantStatus          *framework.Status
 		wantPreFilterStatus *framework.Status
@@ -412,7 +412,7 @@ func TestAzureDiskLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
+			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, test.filterName)
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
@@ -476,7 +476,7 @@ func TestEBSLimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		filterName          string
 		driverName          string
-		maxVols             int
+		maxVols             int32
 		test                string
 		wantStatus          *framework.Status
 		wantPreFilterStatus *framework.Status
@@ -693,7 +693,7 @@ func TestEBSLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
+			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, test.filterName)
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
@@ -752,7 +752,7 @@ func TestGCEPDLimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		filterName          string
 		driverName          string
-		maxVols             int
+		maxVols             int32
 		test                string
 		wantStatus          *framework.Status
 		wantPreFilterStatus *framework.Status
@@ -923,7 +923,7 @@ func TestGCEPDLimits(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
+			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, test.maxVols, test.filterName)
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
 			_, gotPreFilterStatus := p.(*nonCSILimits).PreFilter(context.Background(), nil, test.newPod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
