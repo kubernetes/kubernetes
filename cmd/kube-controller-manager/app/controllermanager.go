@@ -482,7 +482,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 		register(names.LegacyServiceAccountTokenCleanerController, startLegacySATokenCleaner)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidatingAdmissionPolicy) {
-		register("validatingadmissionpolicy-status-controller", startValidatingAdmissionPolicyStatusController)
+		register(names.ValidatingAdmissionPolicyStatusController, startValidatingAdmissionPolicyStatusController)
 	}
 
 	return controllers

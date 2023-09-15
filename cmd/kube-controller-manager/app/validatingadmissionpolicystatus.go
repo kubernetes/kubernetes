@@ -23,6 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
@@ -35,7 +36,7 @@ func startValidatingAdmissionPolicyStatusController(ctx context.Context, control
 	}
 	c, err := validatingadmissionpolicystatus.NewController(
 		controllerContext.InformerFactory.Admissionregistration().V1beta1().ValidatingAdmissionPolicies(),
-		controllerContext.ClientBuilder.ClientOrDie("validatingadmissionpolicy-status-controller").AdmissionregistrationV1beta1().ValidatingAdmissionPolicies(),
+		controllerContext.ClientBuilder.ClientOrDie(names.ValidatingAdmissionPolicyStatusController).AdmissionregistrationV1beta1().ValidatingAdmissionPolicies(),
 		typeChecker,
 	)
 
