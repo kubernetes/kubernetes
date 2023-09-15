@@ -17,8 +17,8 @@ limitations under the License.
 package util
 
 import (
-	"os"
 	"io/fs"
+	"os"
 	"path/filepath"
 )
 
