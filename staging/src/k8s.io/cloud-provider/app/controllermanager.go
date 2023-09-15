@@ -202,9 +202,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	// Start the controller manager HTTP server
 	if c.SecureServing != nil {
 		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
-		if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
-			slis.SLIMetricsWithReset{}.Install(unsecuredMux)
-		}
+
+		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
+
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
 		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
