@@ -33,6 +33,7 @@ import (
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 )
 
+// main generates markdown documentation for specified Kubernetes module commands.
 func main() {
 	// use os.Args instead of "flags" because "flags" will mess up the man pages!
 	path := ""
