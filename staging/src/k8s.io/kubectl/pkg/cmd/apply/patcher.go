@@ -222,6 +222,7 @@ func (p *Patcher) buildMergePatch(original, modified, current []byte) ([]byte, e
 // gvkSupportsPatchOpenAPIV3 checks if a particular GVK supports the patch operation.
 // It returns an error if the OpenAPI V3 could not be downloaded.
 func (p *Patcher) gvkSupportsPatchOpenAPIV3(gvk schema.GroupVersionKind) (bool, error) {
+	// Bypassing root to save apiserver memory.
 	gvSpec, err := p.OpenAPIV3Root.GVSpec(schema.GroupVersion{
 		Group:   p.Mapping.GroupVersionKind.Group,
 		Version: p.Mapping.GroupVersionKind.Version,

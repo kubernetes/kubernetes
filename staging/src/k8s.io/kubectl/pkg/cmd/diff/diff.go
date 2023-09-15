@@ -35,6 +35,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/openapi3"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -110,6 +111,7 @@ type DiffOptions struct {
 	Concurrency      int
 	Selector         string
 	OpenAPISchema    openapi.Resources
+	OpenAPIV3Root    openapi3.Root
 	DynamicClient    dynamic.Interface
 	CmdNamespace     string
 	EnforceNamespace bool
@@ -324,6 +326,7 @@ type InfoObject struct {
 	Info            *resource.Info
 	Encoder         runtime.Encoder
 	OpenAPI         openapi.Resources
+	OpenAPIV3Root   openapi3.Root
 	Force           bool
 	ServerSideApply bool
 	FieldManager    string
@@ -396,6 +399,7 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		Overwrite:       true,
 		BackOff:         clockwork.NewRealClock(),
 		OpenapiSchema:   obj.OpenAPI,
+		OpenAPIV3Root:   obj.OpenAPIV3Root,
 		ResourceVersion: resourceVersion,
 	}
 
@@ -641,6 +645,11 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		if err != nil {
 			return err
 		}
+		openAPIV3Client, err := f.OpenAPIV3Client()
+		if err != nil {
+			return err
+		}
+		o.OpenAPIV3Root = openapi3.NewRoot(openAPIV3Client)
 	}
 
 	o.DynamicClient, err = f.DynamicClient()
@@ -722,6 +731,7 @@ func (o *DiffOptions) Run() error {
 				Info:            info,
 				Encoder:         scheme.DefaultJSONEncoder(),
 				OpenAPI:         o.OpenAPISchema,
+				OpenAPIV3Root:   o.OpenAPIV3Root,
 				Force:           force,
 				ServerSideApply: o.ServerSideApply,
 				FieldManager:    o.FieldManager,

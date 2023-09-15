@@ -183,7 +183,7 @@ func resolve(l *PatchMetaFromOpenAPIV3) error {
 		if ok {
 			l.Schema = sch
 		} else {
-			return fmt.Errorf("Unable to resolve %s in OpenAPI V3", refString)
+			return fmt.Errorf("unable to resolve %s in OpenAPI V3", refString)
 		}
 	}
 	return nil
@@ -225,7 +225,7 @@ func (s PatchMetaFromOpenAPIV3) LookupPatchMetadataForSlice(key string) (LookupP
 	if l.Schema.Items != nil {
 		l.Schema = l.Schema.Items.Schema
 	}
-	resolve(&l)
+	err = resolve(&l)
 	return l, p, err
 }
 
