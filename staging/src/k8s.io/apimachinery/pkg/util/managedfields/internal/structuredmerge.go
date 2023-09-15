@@ -33,7 +33,7 @@ type structuredMergeManager struct {
 	objectDefaulter runtime.ObjectDefaulter
 	groupVersion    schema.GroupVersion
 	hubVersion      schema.GroupVersion
-	updater         merge.Updater
+	updater         *merge.Updater
 }
 
 var _ Manager = &structuredMergeManager{}
@@ -44,16 +44,19 @@ func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runt
 	if typeConverter == nil {
 		return nil, fmt.Errorf("typeconverter must not be nil")
 	}
+	builder := merge.UpdaterBuilder{
+		// This is the converter provided to SMD from k8s
+		Converter:         newVersionConverter(typeConverter, objectConverter, hub),
+		IgnoredFields:     resetFields,
+		ReturnInputOnNoop: true,
+	}
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
 		objectDefaulter: objectDefaulter,
 		groupVersion:    gv,
 		hubVersion:      hub,
-		updater: merge.Updater{
-			Converter:     newVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
-			IgnoredFields: resetFields,
-		},
+		updater:         builder.BuildUpdater(),
 	}, nil
 }
 
@@ -61,16 +64,18 @@ func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runt
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
 func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields map[fieldpath.APIVersion]*fieldpath.Set) (_ Manager, err error) {
+	builder := merge.UpdaterBuilder{
+		Converter:         newCRDVersionConverter(typeConverter, objectConverter, hub),
+		IgnoredFields:     resetFields,
+		ReturnInputOnNoop: true,
+	}
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
 		objectDefaulter: objectDefaulter,
 		groupVersion:    gv,
 		hubVersion:      hub,
-		updater: merge.Updater{
-			Converter:     newCRDVersionConverter(typeConverter, objectConverter, hub),
-			IgnoredFields: resetFields,
-		},
+		updater:         builder.BuildUpdater(),
 	}, nil
 }
 

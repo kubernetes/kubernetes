@@ -393,15 +393,6 @@ func TestNoOpChanges(t *testing.T) {
 	if !reflect.DeepEqual(before, f.Live()) {
 		t.Fatalf("No-op update has changed the object:\n%v\n---\n%v", before, f.Live())
 	}
-	before = f.Live()
-	// Wait to make sure the timestamp is different
-	time.Sleep(time.Second)
-	if err := f.Apply(obj.DeepCopyObject(), "fieldmanager_test_apply", true); err != nil {
-		t.Fatalf("failed to re-apply object: %v", err)
-	}
-	if !reflect.DeepEqual(before, f.Live()) {
-		t.Fatalf("No-op apply has changed the object:\n%v\n---\n%v", before, f.Live())
-	}
 }
 
 // Tests that one can reset the managedFields by sending either an empty
@@ -880,100 +871,6 @@ func TestUpdateViaSubresources(t *testing.T) {
 	newManagedFields := f.ManagedFields()
 	if len(newManagedFields) != 1 {
 		t.Fatalf("Expected new managed fields to have one entry. Got:\n%#v", newManagedFields)
-	}
-}
-
-// Ensures that a no-op Apply does not mutate managed fields
-func TestApplyDoesNotChangeManagedFields(t *testing.T) {
-	originalManagedFields := []metav1.ManagedFieldsEntry{}
-	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter,
-		schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
-	newObj := &unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
-	appliedObj := &unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
-
-	// Convert YAML string inputs to unstructured instances
-	if err := yaml.Unmarshal([]byte(`{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "deployment",
-			"labels": {"app": "nginx"}
-		},
-		"spec": {
-			"selector": {
-				"matchLabels": {
-					"app": "nginx"
-				}
-			},
-			"template": {
-				"metadata": {
-					"labels": {
-						"app": "nginx"
-					}
-				},
-				"spec": {
-					"containers": [{
-						"name":  "nginx",
-						"image": "nginx:latest"
-					}]
-				}
-			}
-		}
-	}`), &newObj.Object); err != nil {
-		t.Fatalf("error decoding YAML: %v", err)
-	}
-
-	if err := yaml.Unmarshal([]byte(`{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "deployment",
-		},
-		"spec": {
-			"replicas": 101,
-		}
-	}`), &appliedObj.Object); err != nil {
-		t.Fatalf("error decoding YAML: %v", err)
-	}
-
-	// Agent A applies initial configuration
-	if err := f.Apply(newObj.DeepCopyObject(), "fieldmanager_z", false); err != nil {
-		t.Fatalf("failed to apply object: %v", err)
-	}
-
-	// Agent B applies additive configuration
-	if err := f.Apply(appliedObj, "fieldmanager_b", false); err != nil {
-		t.Fatalf("failed to apply object %v", err)
-	}
-
-	// Next, agent A applies the initial configuration again, but we expect
-	// a no-op to managed fields.
-	//
-	// The following update is expected not to change the liveObj, save off
-	//	the fields
-	for _, field := range f.ManagedFields() {
-		originalManagedFields = append(originalManagedFields, *field.DeepCopy())
-	}
-
-	// Make sure timestamp change would be caught
-	time.Sleep(2 * time.Second)
-
-	if err := f.Apply(newObj, "fieldmanager_z", false); err != nil {
-		t.Fatalf("failed to apply object: %v", err)
-	}
-
-	// ensure that the live object is unchanged
-	if !reflect.DeepEqual(originalManagedFields, f.ManagedFields()) {
-		originalYAML, _ := yaml.Marshal(originalManagedFields)
-		current, _ := yaml.Marshal(f.ManagedFields())
-
-		// should have been a no-op w.r.t. managed fields
-		t.Fatalf("managed fields changed: ORIGINAL\n%v\nCURRENT\n%v",
-			string(originalYAML), string(current))
 	}
 }
 

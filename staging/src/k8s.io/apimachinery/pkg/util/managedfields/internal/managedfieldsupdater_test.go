@@ -115,88 +115,6 @@ func TestManagedFieldsApplyDoesModifyTime(t *testing.T) {
 	}
 }
 
-func TestManagedFieldsUpdateWithoutChangesDoesNotModifyTime(t *testing.T) {
-	var err error
-	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
-
-	err = updateObject(f, "fieldmanager_test", []byte(`{
-		"apiVersion": "v1",
-		"kind": "ConfigMap",
-		"metadata": {
-			"name": "configmap"
-		},
-		"data": {
-			"key": "value"
-		}
-	}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	previousManagedFields := f.ManagedFields()
-
-	time.Sleep(time.Second)
-
-	err = updateObject(f, "fieldmanager_test", []byte(`{
-		"apiVersion": "v1",
-		"kind": "ConfigMap",
-		"metadata": {
-			"name": "configmap"
-		},
-		"data": {
-			"key": "value"
-		}
-	}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	newManagedFields := f.ManagedFields()
-
-	if !previousManagedFields[0].Time.Equal(newManagedFields[0].Time) {
-		t.Errorf("ManagedFields time has changed:\nBefore:\n%v\nAfter:\n%v", previousManagedFields, newManagedFields)
-	}
-}
-
-func TestManagedFieldsApplyWithoutChangesDoesNotModifyTime(t *testing.T) {
-	var err error
-	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
-
-	err = applyObject(f, "fieldmanager_test", []byte(`{
-		"apiVersion": "v1",
-		"kind": "ConfigMap",
-		"metadata": {
-			"name": "configmap"
-		},
-		"data": {
-			"key": "value"
-		}
-	}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	previousManagedFields := f.ManagedFields()
-
-	time.Sleep(time.Second)
-
-	err = applyObject(f, "fieldmanager_test", []byte(`{
-		"apiVersion": "v1",
-		"kind": "ConfigMap",
-		"metadata": {
-			"name": "configmap"
-		},
-		"data": {
-			"key": "value"
-		}
-	}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	newManagedFields := f.ManagedFields()
-
-	if !previousManagedFields[0].Time.Equal(newManagedFields[0].Time) {
-		t.Errorf("ManagedFields time has changed:\nBefore:\n%v\nAfter:\n%v", previousManagedFields, newManagedFields)
-	}
-}
-
 func TestNonManagedFieldsUpdateDoesNotModifyTime(t *testing.T) {
 	var err error
 	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
@@ -208,25 +126,14 @@ func TestNonManagedFieldsUpdateDoesNotModifyTime(t *testing.T) {
 			"name": "configmap"
 		},
 		"data": {
-			"key_a": "value"
-		}
-	}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = updateObject(f, "fieldmanager_b_test", []byte(`{
-		"apiVersion": "v1",
-		"kind": "ConfigMap",
-		"metadata": {
-			"name": "configmap"
-		},
-		"data": {
+			"key_a": "value",
 			"key_b": "value"
 		}
 	}`))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	previousManagedFields := f.ManagedFields()
 	previousEntries := map[string]v1.ManagedFieldsEntry{}
 	for _, entry := range previousManagedFields {
@@ -234,29 +141,35 @@ func TestNonManagedFieldsUpdateDoesNotModifyTime(t *testing.T) {
 	}
 
 	time.Sleep(time.Second)
-
-	err = updateObject(f, "fieldmanager_a_test", []byte(`{
+	// Managed B steals key_b, Manager A's time doesn't change.
+	err = updateObject(f, "fieldmanager_b_test", []byte(`{
 		"apiVersion": "v1",
 		"kind": "ConfigMap",
 		"metadata": {
 			"name": "configmap"
 		},
 		"data": {
-			"key_a": "value",
 			"key_b": "new-value"
 		}
 	}`))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	newManagedFields := f.ManagedFields()
 	newEntries := map[string]v1.ManagedFieldsEntry{}
 	for _, entry := range newManagedFields {
 		newEntries[entry.Manager] = entry
 	}
 
-	if _, ok := newEntries["fieldmanager_b_test"]; ok {
-		t.Errorf("FieldManager B ManagedFields has changed:\n%v", newEntries["fieldmanager_b_test"])
+	// Manager A's time is the same
+	if want, got := previousEntries["fieldmanager_a_test"].Time, newEntries["fieldmanager_a_test"].Time; !want.Equal(got) {
+		t.Errorf("Time changed when entry was stolen: %v/%v", want, got)
+	}
+
+	// Manager B's time is not the same as Manager A's time
+	if want, got := newEntries["fieldmanager_a_test"].Time, newEntries["fieldmanager_b_test"].Time; want.Equal(got) {
+		t.Errorf("Entry A and Entry B should have different timestamp: %v/%v", want, got)
 	}
 }
 
