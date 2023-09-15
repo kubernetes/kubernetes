@@ -281,7 +281,7 @@ func TestCSILimits(t *testing.T) {
 		existingPods        []*v1.Pod
 		extraClaims         []v1.PersistentVolumeClaim
 		filterName          string
-		maxVols             int
+		maxVols             int32
 		driverNames         []string
 		test                string
 		migrationEnabled    bool
@@ -613,7 +613,7 @@ func TestCSILimits(t *testing.T) {
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, int64(test.maxVols), test.driverNames...)
+			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, test.maxVols, test.driverNames...)
 			if csiNode != nil {
 				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
 			}
@@ -746,7 +746,7 @@ func getFakeCSINodeLister(csiNode *storagev1.CSINode) tf.CSINodeLister {
 	return csiNodeLister
 }
 
-func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
+func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int32, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
 	nodeInfo := framework.NewNodeInfo(pods...)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
@@ -758,7 +758,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	addLimitToNode := func() {
 		for _, driver := range driverNames {
-			node.Status.Allocatable[getVolumeLimitKey(driver)] = *resource.NewQuantity(limit, resource.DecimalSI)
+			node.Status.Allocatable[getVolumeLimitKey(driver)] = *resource.NewQuantity(int64(limit), resource.DecimalSI)
 		}
 	}
 
@@ -780,7 +780,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 			}
 			if addLimits {
 				driver.Allocatable = &storagev1.VolumeNodeResources{
-					Count: ptr.To(int32(limit)),
+					Count: ptr.To(limit),
 				}
 			}
 			csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, driver)
