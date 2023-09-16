@@ -25,6 +25,7 @@ import (
 	"k8s.io/component-base/cli/globalflag"
 )
 
+// Registers GCE-specific global flags and marks them as deprecated.
 func registerLegacyGlobalFlags(fs *pflag.FlagSet) {
 	globalflag.Register(fs, "cloud-provider-gce-lb-src-cidrs")
 	globalflag.Register(fs, "cloud-provider-gce-l7lb-src-cidrs")
