@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// makeOptionsWithCIDRs constructs a ServerRunOptions with primary and secondary CIDRs.
 func makeOptionsWithCIDRs(serviceCIDR string, secondaryServiceCIDR string) *ServerRunOptions {
 	value := serviceCIDR
 	if len(secondaryServiceCIDR) > 0 {
@@ -58,6 +59,7 @@ func makeOptionsWithCIDRs(serviceCIDR string, secondaryServiceCIDR string) *Serv
 	}
 }
 
+// TestClusterServiceIPRange validates the service CIDRs based on different test scenarios.
 func TestClusterServiceIPRange(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -157,6 +159,7 @@ func TestClusterServiceIPRange(t *testing.T) {
 	}
 }
 
+// Tests IP family compatibility between service CIDRs and server addresses.
 func TestValidatePublicIPServiceClusterIPRangeIPFamilies(t *testing.T) {
 	_, ipv4cidr, err := netutils.ParseCIDRSloppy("192.168.0.0/24")
 	if err != nil {
@@ -287,11 +290,13 @@ func TestValidatePublicIPServiceClusterIPRangeIPFamilies(t *testing.T) {
 	}
 }
 
+// Converts a CIDR string to its IPNet representation.
 func getIPnetFromCIDR(cidr string) *net.IPNet {
 	_, ipnet, _ := netutils.ParseCIDRSloppy(cidr)
 	return ipnet
 }
 
+// Tests the validation of service node ports.
 func TestValidateServiceNodePort(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -340,6 +345,7 @@ func TestValidateServiceNodePort(t *testing.T) {
 	}
 }
 
+// Creates ServerRunOptions with specified service node port settings.
 func makeOptionsWithPort(kubernetesServiceNodePort int, base int, size int) *ServerRunOptions {
 	var portRange = utilnet.PortRange{
 		Base: base,
@@ -353,6 +359,7 @@ func makeOptionsWithPort(kubernetesServiceNodePort int, base int, size int) *Ser
 	}
 }
 
+// Tests the validation of CIDR range based on maximum allowed CIDR bits.
 func TestValidateMaxCIDRRange(t *testing.T) {
 	testCases := []struct {
 		// tc.cidr, tc.maxCIDRBits, tc.cidrFlag) tc.expectedErrorMessage
