@@ -972,3 +972,95 @@ tests:
             type: External
             external: {}
       expectedStatusError: " status.platformStatus.external: Invalid value: \"object\": cloudControllerManager may not be added or removed once set"
+    - name: Should be able to add valid (URL) ServiceEndpoints to IBMCloud PlatformStatus
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints: []
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: DummyVPC
+                url: https://dummy.vpc.com
+              - name: DummyCOS
+                url: https://dummy.cos.com
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          cpuPartitioning: None
+          infrastructureTopology: HighlyAvailable
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: DummyVPC
+                url: https://dummy.vpc.com
+              - name: DummyCOS
+                url: https://dummy.cos.com
+    - name: Should not be able to add empty (URL) ServiceEndpoints to IBMCloud PlatformStatus
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints: []
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: EmptyCOS
+                url: " "
+      expectedStatusError: " status.platformStatus.ibmcloud.serviceEndpoints[0].url: Invalid value: \"string\": url must be a valid absolute URL"
+    - name: Should not be able to add invalid (URL) ServiceEndpoints to IBMCloud PlatformStatus
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints: []
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec: {}
+        status:
+          platform: IBMCloud
+          platformStatus:
+            type: IBMCloud
+            ibmcloud:
+              serviceEndpoints:
+              - name: DummyVPC
+                url: https://dummy.vpc.com
+              - name: BadCOS
+                url: dummy-cos-com
+      expectedStatusError: " status.platformStatus.ibmcloud.serviceEndpoints[1].url: Invalid value: \"string\": url must be a valid absolute URL"
