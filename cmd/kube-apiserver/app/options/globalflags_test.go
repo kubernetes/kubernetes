@@ -30,6 +30,7 @@ import (
 	"k8s.io/component-base/logs"
 )
 
+// TestAddCustomGlobalFlags tests if custom global flags are correctly added and match expected flags.
 func TestAddCustomGlobalFlags(t *testing.T) {
 	namedFlagSets := &cliflag.NamedFlagSets{}
 
