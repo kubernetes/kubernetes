@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// Registers legacy global flags; no-op without legacy providers.
 func registerLegacyGlobalFlags(fs *pflag.FlagSet) {
 	// no-op when no legacy providers are compiled in
 }
