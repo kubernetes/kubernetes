@@ -169,6 +169,7 @@ func (i *ImportRestriction) isForbidden(imp string) bool {
 
 var rootPackage string
 
+// main validates imports based on configured restrictions and logs violations.
 func main() {
 	if len(os.Args) != 3 {
 		log.Fatalf("Usage: %s ROOT RESTRICTIONS.yaml", os.Args[0])
@@ -214,6 +215,7 @@ func main() {
 	}
 }
 
+// loadImportRestrictions loads and parses import restrictions from a YAML configuration file.
 func loadImportRestrictions(configFile string) ([]ImportRestriction, error) {
 	config, err := os.ReadFile(configFile)
 	if err != nil {
@@ -228,6 +230,7 @@ func loadImportRestrictions(configFile string) ([]ImportRestriction, error) {
 	return importRestrictions, nil
 }
 
+// resolvePackageTree resolves package tree from current or ./vendor directory.
 func resolvePackageTree(treeBase string) ([]Package, error) {
 	// try resolving with $cwd
 	packages, err := resolvePackageTreeInDir("", treeBase)
@@ -243,6 +246,7 @@ func resolvePackageTree(treeBase string) ([]Package, error) {
 	return packages, err
 }
 
+// resolvePackageTreeInDir retrieves package list by executing `go list` in the specified directory.
 func resolvePackageTreeInDir(dir string, treeBase string) ([]Package, error) {
 	cmd := "go"
 	args := []string{"list", "-json", fmt.Sprintf("%s...", treeBase)}
@@ -267,6 +271,7 @@ func resolvePackageTreeInDir(dir string, treeBase string) ([]Package, error) {
 	return packages, nil
 }
 
+// decodePackages decodes and extracts a list of packages from the given JSON reader.
 func decodePackages(r io.Reader) ([]Package, error) {
 	// `go list -json` concatenates package definitions
 	// instead of emitting a single valid JSON, so we
@@ -286,6 +291,7 @@ func decodePackages(r io.Reader) ([]Package, error) {
 	return packages, nil
 }
 
+// logForbiddenPackages logs the packages that are forbidden to be imported from the specified base package.
 func logForbiddenPackages(base string, forbidden []string) {
 	log.Printf("-- found forbidden imports for %s:\n", base)
 	for _, forbiddenPackage := range forbidden {
