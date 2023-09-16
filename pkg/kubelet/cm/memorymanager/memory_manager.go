@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // memoryManagerStateFileName is the file name where memory manager stores its state
@@ -206,6 +207,13 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 	for _, initContainer := range pod.Spec.InitContainers {
 		if initContainer.Name == container.Name {
 			break
+		}
+
+		// Since a restartable init container remains running for the full
+		// duration of the pod's lifecycle, we should not remove it from the
+		// memory manager state.
+		if types.IsRestartableInitContainer(&initContainer) {
+			continue
 		}
 
 		m.policyRemoveContainerByRef(string(pod.UID), initContainer.Name)
