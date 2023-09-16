@@ -24,8 +24,8 @@ import (
 )
 
 // Get creates a function which retrieves the pod anew each time the function
-// is called. Fatal errors are detected by framework.HandleRetry and cause
+// is called. Fatal errors are detected by framework.GetObject and cause
 // polling to stop.
 func Get(c clientset.Interface, pod framework.NamedObject) framework.GetFunc[*v1.Pod] {
-	return framework.HandleRetry(framework.GetObject(c.CoreV1().Pods(pod.GetNamespace()).Get, pod.GetName(), metav1.GetOptions{}))
+	return framework.GetObject(c.CoreV1().Pods(pod.GetNamespace()).Get, pod.GetName(), metav1.GetOptions{})
 }

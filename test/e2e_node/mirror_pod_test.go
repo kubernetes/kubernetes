@@ -348,7 +348,7 @@ func createStaticPodUsingNfs(nfsIP string, nodeName string, cmd string, dir stri
 					VolumeSource: v1.VolumeSource{
 						NFS: &v1.NFSVolumeSource{
 							Server:   nfsIP,
-							Path:     "/exports",
+							Path:     "/",
 							ReadOnly: false,
 						},
 					},

@@ -30,8 +30,13 @@ import (
 	celgo "github.com/google/cel-go/cel"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,12 +46,6 @@ import (
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/util/webhook"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
 var (
@@ -63,10 +62,10 @@ const (
 )
 
 var supportedValidationReason = sets.NewString(
-	string(field.ErrorTypeInvalid),
-	string(field.ErrorTypeForbidden),
-	string(field.ErrorTypeRequired),
-	string(field.ErrorTypeDuplicate),
+	string(apiextensions.FieldValueRequired),
+	string(apiextensions.FieldValueForbidden),
+	string(apiextensions.FieldValueInvalid),
+	string(apiextensions.FieldValueDuplicate),
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -219,7 +218,7 @@ func ValidateCustomResourceDefinitionStoredVersions(storedVersions []string, ver
 	for _, v := range versions {
 		_, ok := storedVersionsMap[v.Name]
 		if v.Storage && !ok {
-			allErrs = append(allErrs, field.Invalid(fldPath, v, "must have the storage version "+v.Name))
+			allErrs = append(allErrs, field.Invalid(fldPath, storedVersions, "must have the storage version "+v.Name))
 		}
 		if ok {
 			delete(storedVersionsMap, v.Name)
@@ -1092,9 +1091,6 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must not contain line breaks"))
 			}
 			if len(rule.FieldPath) > 0 {
-				if errs := validateSimpleJSONPath(rule.FieldPath, fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath")); len(errs) > 0 {
-					allErrs.SchemaErrors = append(allErrs.SchemaErrors, errs...)
-				}
 				if !pathValid(schema, rule.FieldPath) {
 					allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must be a valid path"))
 				}
@@ -1163,7 +1159,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 func pathValid(schema *apiextensions.JSONSchemaProps, path string) bool {
 	// To avoid duplicated code and better maintain, using ValidaFieldPath func to check if the path is valid
 	if ss, err := structuralschema.NewStructural(schema); err == nil {
-		_, err := cel.ValidFieldPath(path, nil, ss)
+		_, err := cel.ValidFieldPath(path, ss)
 		return err == nil
 	}
 	return true

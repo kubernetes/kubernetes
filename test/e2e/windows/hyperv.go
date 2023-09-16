@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -140,6 +141,6 @@ var _ = SIGDescribe("[Feature:WindowsHyperVContainers] HyperV containers", func(
 			framework.Logf("Pod phase: %v\nlogs:\n%s", p.Status.Phase, logs)
 		}
 
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded, "pod should have succeeded")
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "pod should have succeeded")
 	})
 })

@@ -366,6 +366,7 @@ func TestMounterSetUp(t *testing.T) {
 func TestMounterSetUpSimple(t *testing.T) {
 	fakeClient := fakeclient.NewSimpleClientset()
 	plug, tmpDir := newTestPlugin(t, fakeClient)
+	transientError := volumetypes.NewTransientOperationFailure("")
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
@@ -377,6 +378,8 @@ func TestMounterSetUpSimple(t *testing.T) {
 		spec                 func(string, []string) *volume.Spec
 		newMounterShouldFail bool
 		setupShouldFail      bool
+		unsetClient          bool
+		exitError            error
 	}{
 		{
 			name:            "setup with ephemeral source",
@@ -415,6 +418,21 @@ func TestMounterSetUpSimple(t *testing.T) {
 			newMounterShouldFail: true,
 			spec:                 func(fsType string, options []string) *volume.Spec { return nil },
 		},
+		{
+			name:   "setup with unknown CSI driver",
+			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			mode:   storage.VolumeLifecyclePersistent,
+			fsType: "zfs",
+			spec: func(fsType string, options []string) *volume.Spec {
+				pvSrc := makeTestPV("pv1", 20, "unknown-driver", "vol1")
+				pvSrc.Spec.CSI.FSType = fsType
+				pvSrc.Spec.MountOptions = options
+				return volume.NewSpecFromPersistentVolume(pvSrc, false)
+			},
+			setupShouldFail: true,
+			unsetClient:     true,
+			exitError:       transientError,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -450,13 +468,26 @@ func TestMounterSetUpSimple(t *testing.T) {
 				t.Fatalf("failed to setup VolumeAttachment: %v", err)
 			}
 
+			if tc.unsetClient {
+				// Clear out the clients
+				csiMounter.csiClient = nil
+				csiMounter.csiClientGetter.csiClient = nil
+				t.Log("driver name is ", csiMounter.csiClientGetter.driverName)
+			}
+
 			// Mounter.SetUp()
 			err = csiMounter.SetUp(volume.MounterArgs{})
-			if tc.setupShouldFail && err != nil {
-				t.Log(err)
-				return
-			}
-			if !tc.setupShouldFail && err != nil {
+			if tc.setupShouldFail {
+				if err != nil {
+					if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
+						t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(tc.exitError), reflect.TypeOf(err), err)
+					}
+					t.Log(err)
+					return
+				} else {
+					t.Error("test should fail, but no error occurred")
+				}
+			} else if err != nil {
 				t.Fatal("unexpected error:", err)
 			}
 
@@ -1061,6 +1092,64 @@ func TestUnmounterTeardown(t *testing.T) {
 		t.Error("csi server may not have received NodeUnpublishVolume call")
 	}
 
+}
+
+func TestUnmounterTeardownNoClientError(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	pv := makeTestPV("test-pv", 10, testDriver, testVol)
+
+	// save the data file prior to unmount
+	targetDir := getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host)
+	dir := filepath.Join(targetDir, "mount")
+	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
+		t.Errorf("failed to create dir [%s]: %v", dir, err)
+	}
+
+	// do a fake local mount
+	diskMounter := util.NewSafeFormatAndMountFromHost(plug.GetPluginName(), plug.host)
+	device := "/fake/device"
+	if goruntime.GOOS == "windows" {
+		// We need disk numbers on Windows.
+		device = "1"
+	}
+	if err := diskMounter.FormatAndMount(device, dir, "testfs", nil); err != nil {
+		t.Errorf("failed to mount dir [%s]: %v", dir, err)
+	}
+
+	if err := saveVolumeData(
+		targetDir,
+		volDataFileName,
+		map[string]string{
+			volDataKey.specVolID:  pv.ObjectMeta.Name,
+			volDataKey.driverName: testDriver,
+			volDataKey.volHandle:  testVol,
+		},
+	); err != nil {
+		t.Fatalf("failed to save volume data: %v", err)
+	}
+
+	unmounter, err := plug.NewUnmounter(pv.ObjectMeta.Name, testPodUID)
+	if err != nil {
+		t.Fatalf("failed to make a new Unmounter: %v", err)
+	}
+
+	csiUnmounter := unmounter.(*csiMountMgr)
+
+	// Clear out the cached client
+	// The lookup to generate a new client will fail when it tries to query a driver with an unknown name
+	csiUnmounter.csiClientGetter.csiClient = nil
+	// Note that registerFakePlugin above will create a driver with a name of "test-driver"
+	csiUnmounter.csiClientGetter.driverName = "unknown-driver"
+
+	err = csiUnmounter.TearDownAt(dir)
+	if err == nil {
+		t.Errorf("test should fail, but no error occurred")
+	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
+		t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
+	}
 }
 
 func TestIsCorruptedDir(t *testing.T) {

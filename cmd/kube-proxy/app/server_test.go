@@ -19,13 +19,18 @@ package app
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -364,6 +369,125 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 	}
 }
 
+// TestOptionsComplete checks that command line flags are combined with a
+// config properly.
+func TestOptionsComplete(t *testing.T) {
+	header := `apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+`
+
+	// Determine default config (depends on platform defaults).
+	o := NewOptions()
+	require.NoError(t, o.Complete(new(pflag.FlagSet)))
+	expected := o.config
+
+	config := header + `logging:
+  format: json
+  flushFrequency: 1s
+  verbosity: 10
+  vmodule:
+  - filePattern: foo.go
+    verbosity: 6
+  - filePattern: bar.go
+    verbosity: 8
+`
+	expectedLoggingConfig := logsapi.LoggingConfiguration{
+		Format:         "json",
+		FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: time.Second}, SerializeAsString: true},
+		Verbosity:      10,
+		VModule: []logsapi.VModuleItem{
+			{
+				FilePattern: "foo.go",
+				Verbosity:   6,
+			},
+			{
+				FilePattern: "bar.go",
+				Verbosity:   8,
+			},
+		},
+		Options: logsapi.FormatOptions{
+			JSON: logsapi.JSONOptions{
+				InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+			},
+		},
+	}
+
+	for name, tc := range map[string]struct {
+		config   string
+		flags    []string
+		expected *kubeproxyconfig.KubeProxyConfiguration
+	}{
+		"empty": {
+			expected: expected,
+		},
+		"empty-config": {
+			config:   header,
+			expected: expected,
+		},
+		"logging-config": {
+			config: config,
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Logging = *expectedLoggingConfig.DeepCopy()
+				return c
+			}(),
+		},
+		"flags": {
+			flags: []string{
+				"-v=7",
+				"--vmodule", "goo.go=8",
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Logging.Verbosity = 7
+				c.Logging.VModule = append(c.Logging.VModule, logsapi.VModuleItem{
+					FilePattern: "goo.go",
+					Verbosity:   8,
+				})
+				return c
+			}(),
+		},
+		"both": {
+			config: config,
+			flags: []string{
+				"-v=7",
+				"--vmodule", "goo.go=8",
+				"--ipvs-scheduler", "some-scheduler", // Overwritten by config.
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Logging = *expectedLoggingConfig.DeepCopy()
+				// Flag wins.
+				c.Logging.Verbosity = 7
+				// Flag and config get merged with command line flags first.
+				c.Logging.VModule = append([]logsapi.VModuleItem{
+					{
+						FilePattern: "goo.go",
+						Verbosity:   8,
+					},
+				}, c.Logging.VModule...)
+				return c
+			}(),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			options := NewOptions()
+			fs := new(pflag.FlagSet)
+			options.AddFlags(fs)
+			flags := tc.flags
+			if len(tc.config) > 0 {
+				tmp := t.TempDir()
+				configFile := path.Join(tmp, "kube-proxy.conf")
+				require.NoError(t, ioutil.WriteFile(configFile, []byte(tc.config), 0666))
+				flags = append(flags, "--config", configFile)
+			}
+			require.NoError(t, fs.Parse(flags))
+			require.NoError(t, options.Complete(fs))
+			assert.Equal(t, tc.expected, options.config)
+		})
+	}
+}
+
 type fakeProxyServerLongRun struct{}
 
 // Run runs the specified ProxyServer.
@@ -510,30 +634,30 @@ func Test_detectNodeIPs(t *testing.T) {
 	}{
 		{
 			name:           "Bind address IPv4 unicast address and no Node object",
-			nodeInfo:       makeNodeWithAddresses("", "", ""),
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", ""),
 			hostname:       "fakeHost",
 			bindAddress:    "10.0.0.1",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "10.0.0.1",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
 		{
 			name:           "Bind address IPv6 unicast address and no Node object",
-			nodeInfo:       makeNodeWithAddresses("", "", ""),
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", ""),
 			hostname:       "fakeHost",
 			bindAddress:    "fd00:4321::2",
 			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "fd00:4321::2",
 		},
 		{
 			name:           "No Valid IP found",
-			nodeInfo:       makeNodeWithAddresses("", "", ""),
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "", ""),
 			hostname:       "fakeHost",
 			bindAddress:    "",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "127.0.0.1",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
 		// Disabled because the GetNodeIP method has a backoff retry mechanism
 		// and the test takes more than 30 seconds
@@ -554,7 +678,7 @@ func Test_detectNodeIPs(t *testing.T) {
 			bindAddress:    "0.0.0.0",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "192.168.1.1",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
 		{
 			name:           "Bind address :: and node with IPv4 InternalIP set",
@@ -563,7 +687,7 @@ func Test_detectNodeIPs(t *testing.T) {
 			bindAddress:    "::",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "192.168.1.1",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
 		{
 			name:           "Bind address 0.0.0.0 and node with IPv6 InternalIP set",
@@ -571,7 +695,7 @@ func Test_detectNodeIPs(t *testing.T) {
 			hostname:       "fakeHost",
 			bindAddress:    "0.0.0.0",
 			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "fd00:1234::1",
 		},
 		{
@@ -580,7 +704,7 @@ func Test_detectNodeIPs(t *testing.T) {
 			hostname:       "fakeHost",
 			bindAddress:    "::",
 			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "fd00:1234::1",
 		},
 		{
@@ -590,7 +714,7 @@ func Test_detectNodeIPs(t *testing.T) {
 			bindAddress:    "0.0.0.0",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "90.90.90.90",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
 		{
 			name:           "Bind address :: and node with only IPv4 ExternalIP set",
@@ -599,7 +723,7 @@ func Test_detectNodeIPs(t *testing.T) {
 			bindAddress:    "::",
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "90.90.90.90",
-			expectedIPv6:   "::",
+			expectedIPv6:   "::1",
 		},
 		{
 			name:           "Bind address 0.0.0.0 and node with only IPv6 ExternalIP set",
@@ -607,7 +731,7 @@ func Test_detectNodeIPs(t *testing.T) {
 			hostname:       "fakeHost",
 			bindAddress:    "0.0.0.0",
 			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "2001:db8::2",
 		},
 		{
@@ -616,8 +740,62 @@ func Test_detectNodeIPs(t *testing.T) {
 			hostname:       "fakeHost",
 			bindAddress:    "::",
 			expectedFamily: v1.IPv6Protocol,
-			expectedIPv4:   "0.0.0.0",
+			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name:           "Dual stack, primary IPv4",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "90.90.90.90", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "::",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name:           "Dual stack, primary IPv6",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "2001:db8::2", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "0.0.0.0",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name:           "Dual stack, override IPv4",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "2001:db8::2", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "80.80.80.80",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "80.80.80.80",
+			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name:           "Dual stack, override IPv6",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "90.90.90.90", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "2001:db8::555",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "2001:db8::555",
+		},
+		{
+			name:           "Dual stack, override primary family, IPv4",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "2001:db8::2", "90.90.90.90"),
+			hostname:       "fakeHost",
+			bindAddress:    "127.0.0.1",
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "127.0.0.1",
+			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name:           "Dual stack, override primary family, IPv6",
+			nodeInfo:       makeNodeWithAddresses("fakeHost", "90.90.90.90", "2001:db8::2"),
+			hostname:       "fakeHost",
+			bindAddress:    "::1",
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "::1",
 		},
 	}
 	for _, c := range cases {

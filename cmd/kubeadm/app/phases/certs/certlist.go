@@ -393,9 +393,8 @@ func KubeadmCertEtcdHealthcheck() *KubeadmCert {
 		CAName:   "etcd-ca",
 		config: pkiutil.CertConfig{
 			Config: certutil.Config{
-				CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
-				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				CommonName: kubeadmconstants.EtcdHealthcheckClientCertCommonName,
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			},
 		},
 	}
@@ -410,9 +409,8 @@ func KubeadmCertEtcdAPIClient() *KubeadmCert {
 		CAName:   "etcd-ca",
 		config: pkiutil.CertConfig{
 			Config: certutil.Config{
-				CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
-				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				CommonName: kubeadmconstants.APIServerEtcdClientCertCommonName,
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			},
 		},
 	}

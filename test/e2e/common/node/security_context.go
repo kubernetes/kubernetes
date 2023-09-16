@@ -405,7 +405,7 @@ var _ = SIGDescribe("Security Context", func() {
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
 			framework.ExpectNoError(err)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
-			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
 		ginkgo.It("should run with an image specified user ID", func(ctx context.Context) {
 			name := "implicit-nonroot-uid"
@@ -423,7 +423,7 @@ var _ = SIGDescribe("Security Context", func() {
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
 			framework.ExpectNoError(err)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
-			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
 	})
 

@@ -66,24 +66,23 @@ type Controller struct {
 // changed. crdCache is a cached.Replaceable and updates are thread
 // safe. Thus, no lock is needed to protect this struct.
 type specCache struct {
-	crdCache          cached.Replaceable[*apiextensionsv1.CustomResourceDefinition]
-	mergedVersionSpec cached.Data[*spec.Swagger]
+	crdCache          cached.LastSuccess[*apiextensionsv1.CustomResourceDefinition]
+	mergedVersionSpec cached.Value[*spec.Swagger]
 }
 
 func (s *specCache) update(crd *apiextensionsv1.CustomResourceDefinition) {
-	s.crdCache.Replace(cached.NewResultOK(crd, generateCRDHash(crd)))
+	s.crdCache.Store(cached.Static(crd, generateCRDHash(crd)))
 }
 
 func createSpecCache(crd *apiextensionsv1.CustomResourceDefinition) *specCache {
 	s := specCache{}
 	s.update(crd)
 
-	s.mergedVersionSpec = cached.NewTransformer[*apiextensionsv1.CustomResourceDefinition](func(result cached.Result[*apiextensionsv1.CustomResourceDefinition]) cached.Result[*spec.Swagger] {
-		if result.Err != nil {
+	s.mergedVersionSpec = cached.Transform[*apiextensionsv1.CustomResourceDefinition](func(crd *apiextensionsv1.CustomResourceDefinition, etag string, err error) (*spec.Swagger, string, error) {
+		if err != nil {
 			// This should never happen, but return the err if it does.
-			return cached.NewResultErr[*spec.Swagger](result.Err)
+			return nil, "", err
 		}
-		crd := result.Data
 		mergeSpec := &spec.Swagger{}
 		for _, v := range crd.Spec.Versions {
 			if !v.Served {
@@ -93,15 +92,15 @@ func createSpecCache(crd *apiextensionsv1.CustomResourceDefinition) *specCache {
 			// Defaults must be pruned here for CRDs to cleanly merge with the static
 			// spec that already has defaults pruned
 			if err != nil {
-				return cached.NewResultErr[*spec.Swagger](err)
+				return nil, "", err
 			}
 			s.Definitions = handler.PruneDefaults(s.Definitions)
 			mergeSpec, err = builder.MergeSpecs(mergeSpec, s)
 			if err != nil {
-				return cached.NewResultErr[*spec.Swagger](err)
+				return nil, "", err
 			}
 		}
-		return cached.NewResultOK(mergeSpec, generateCRDHash(crd))
+		return mergeSpec, generateCRDHash(crd), nil
 	}, &s.crdCache)
 	return &s
 }
@@ -234,27 +233,27 @@ func (c *Controller) sync(name string) error {
 
 // updateSpecLocked updates the cached spec graph.
 func (c *Controller) updateSpecLocked() {
-	specList := make([]cached.Data[*spec.Swagger], 0, len(c.specsByName))
+	specList := make([]cached.Value[*spec.Swagger], 0, len(c.specsByName))
 	for crd := range c.specsByName {
 		specList = append(specList, c.specsByName[crd].mergedVersionSpec)
 	}
 
-	cache := cached.NewListMerger(func(results []cached.Result[*spec.Swagger]) cached.Result[*spec.Swagger] {
+	cache := cached.MergeList(func(results []cached.Result[*spec.Swagger]) (*spec.Swagger, string, error) {
 		localCRDSpec := make([]*spec.Swagger, 0, len(results))
 		for k := range results {
 			if results[k].Err == nil {
-				localCRDSpec = append(localCRDSpec, results[k].Data)
+				localCRDSpec = append(localCRDSpec, results[k].Value)
 			}
 		}
 		mergedSpec, err := builder.MergeSpecs(c.staticSpec, localCRDSpec...)
 		if err != nil {
-			return cached.NewResultErr[*spec.Swagger](fmt.Errorf("failed to merge specs: %v", err))
+			return nil, "", fmt.Errorf("failed to merge specs: %v", err)
 		}
 		// A UUID is returned for the etag because we will only
 		// create a new merger when a CRD has changed. A hash based
 		// etag is more expensive because the CRDs are not
 		// premarshalled.
-		return cached.NewResultOK(mergedSpec, uuid.New().String())
+		return mergedSpec, uuid.New().String(), nil
 	}, specList)
 	c.openAPIService.UpdateSpecLazy(cache)
 }

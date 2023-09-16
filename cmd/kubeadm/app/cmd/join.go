@@ -251,7 +251,7 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.JoinConfigurati
 	)
 	flagSet.StringVar(
 		&cfg.ControlPlane.CertificateKey, options.CertificateKey, cfg.ControlPlane.CertificateKey,
-		"Use this key to decrypt the certificate secrets uploaded by init.",
+		"Use this key to decrypt the certificate secrets uploaded by init. The certificate key is a hex encoded string that is an AES key of size 32 bytes.",
 	)
 	// add control plane endpoint flags to the specified flagset
 	flagSet.StringVar(
@@ -454,7 +454,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 
 	// if dry running, creates a temporary folder to save kubeadm generated files
 	dryRunDir := ""
-	if opt.dryRun {
+	if opt.dryRun || cfg.DryRun {
 		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-join-dryrun"); err != nil {
 			return nil, errors.Wrap(err, "couldn't create a temporary directory on dryrun")
 		}
@@ -462,11 +462,11 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 
 	return &joinData{
 		cfg:                   cfg,
+		dryRun:                cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, cfg.DryRun, opt.dryRun).(bool),
 		tlsBootstrapCfg:       tlsBootstrapCfg,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		outputWriter:          out,
 		patchesDir:            opt.patchesDir,
-		dryRun:                opt.dryRun,
 		dryRunDir:             dryRunDir,
 	}, nil
 }

@@ -147,13 +147,13 @@ func New(c Config) (*legacyProvider, error) {
 	return p, nil
 }
 
-func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
-	apiGroupInfo, err := c.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
+func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
+	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	podDisruptionClient, err := policyclient.NewForConfig(c.LoopbackClientConfig)
+	podDisruptionClient, err := policyclient.NewForConfig(p.LoopbackClientConfig)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -182,7 +182,7 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, c.Proxy.KubeletClientConfig, c.Proxy.Transport)
+	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, p.Proxy.KubeletClientConfig, p.Proxy.Transport)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -190,7 +190,7 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	podStorage, err := podstore.NewStorage(
 		restOptionsGetter,
 		nodeStorage.KubeletConnectionInfo,
-		c.Proxy.Transport,
+		p.Proxy.Transport,
 		podDisruptionClient,
 	)
 	if err != nil {
@@ -199,12 +199,12 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 
 	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
 		restOptionsGetter,
-		c.primaryServiceClusterIPAllocator.IPFamily(),
-		c.serviceClusterIPAllocators,
-		c.serviceNodePortAllocator,
+		p.primaryServiceClusterIPAllocator.IPFamily(),
+		p.serviceClusterIPAllocators,
+		p.serviceNodePortAllocator,
 		endpointsStorage,
 		podStorage.Pod,
-		c.Proxy.Transport)
+		p.Proxy.Transport)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -216,8 +216,8 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 
 	// potentially override the generic serviceaccount storage with one that supports pods
 	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), c.ExtendExpiration)
+	if p.ServiceAccountIssuer != nil {
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), p.ExtendExpiration)
 		if err != nil {
 			return genericapiserver.APIGroupInfo{}, err
 		}
@@ -303,7 +303,7 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	}
 
 	if resource := "componentstatuses"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate)
+		storage[resource] = componentstatus.NewStorage(componentStatusStorage{p.StorageFactory}.serversToValidate)
 	}
 
 	if len(storage) > 0 {

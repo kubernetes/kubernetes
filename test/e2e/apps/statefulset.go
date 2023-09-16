@@ -357,7 +357,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
-			framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
+			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
@@ -366,7 +366,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating a new revision")
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
+			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
 
 			ginkgo.By("Not applying an update when the partition is greater than the number of replicas")
 			for i := range pods.Items {
@@ -553,7 +553,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
-			framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
+			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
@@ -562,7 +562,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating a new revision")
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
+			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
 
 			ginkgo.By("Recreating Pods at the new revision")
 			deleteStatefulPodAtIndex(ctx, c, 0, ss)
@@ -1463,7 +1463,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	ginkgo.Describe("Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal]", func() {
+	ginkgo.Describe("Scaling StatefulSetStartOrdinal", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -1500,7 +1500,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 0")
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
-			expectPodNames(pods, []string{"ss-0", "ss-1"})
+			err = expectPodNames(pods, []string{"ss-0", "ss-1"})
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Setting .spec.replicas = 3 .spec.ordinals.start = 2")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
@@ -1510,12 +1511,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 				*(update.Spec.Replicas) = 3
 			})
 			framework.ExpectNoError(err)
+
+			// we need to ensure we wait for all the new ones to show up, not
+			// just for any random 3
+			waitForStatus(ctx, c, ss)
+			waitForPodNames(ctx, c, ss, []string{"ss-2", "ss-3", "ss-4"})
+			ginkgo.By("Confirming 3 replicas, with start ordinal 2")
 			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 3)
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 3)
-
-			ginkgo.By("Confirming 3 replicas, with start ordinal 2")
-			pods = e2estatefulset.GetPodList(ctx, c, ss)
-			expectPodNames(pods, []string{"ss-2", "ss-3", "ss-4"})
 		})
 
 		ginkgo.It("Increasing .start.ordinal", func(ctx context.Context) {
@@ -1532,7 +1535,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 2")
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
-			expectPodNames(pods, []string{"ss-2", "ss-3"})
+			err = expectPodNames(pods, []string{"ss-2", "ss-3"})
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Increasing .spec.ordinals.start = 4")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
@@ -1541,13 +1545,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 			})
 			framework.ExpectNoError(err)
+
+			// since we are replacing 2 pods for 2, we need to ensure we wait
+			// for the new ones to show up, not just for any random 2
+			ginkgo.By("Confirming 2 replicas, with start ordinal 4")
 			waitForStatus(ctx, c, ss)
+			waitForPodNames(ctx, c, ss, []string{"ss-4", "ss-5"})
 			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 2)
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
-
-			ginkgo.By("Confirming 2 replicas, with start ordinal 4")
-			pods = e2estatefulset.GetPodList(ctx, c, ss)
-			expectPodNames(pods, []string{"ss-4", "ss-5"})
 		})
 
 		ginkgo.It("Decreasing .start.ordinal", func(ctx context.Context) {
@@ -1564,7 +1569,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 3")
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
-			expectPodNames(pods, []string{"ss-3", "ss-4"})
+			err = expectPodNames(pods, []string{"ss-3", "ss-4"})
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Decreasing .spec.ordinals.start = 2")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
@@ -1573,13 +1579,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 			})
 			framework.ExpectNoError(err)
+
+			// since we are replacing 2 pods for 2, we need to ensure we wait
+			// for the new ones to show up, not just for any random 2
+			ginkgo.By("Confirming 2 replicas, with start ordinal 2")
 			waitForStatus(ctx, c, ss)
+			waitForPodNames(ctx, c, ss, []string{"ss-2", "ss-3"})
 			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 2)
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
-
-			ginkgo.By("Confirming 2 replicas, with start ordinal 2")
-			pods = e2estatefulset.GetPodList(ctx, c, ss)
-			expectPodNames(pods, []string{"ss-2", "ss-3"})
 		})
 
 		ginkgo.It("Removing .start.ordinal", func(ctx context.Context) {
@@ -1595,19 +1602,22 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 3")
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
-			expectPodNames(pods, []string{"ss-3", "ss-4"})
+			err = expectPodNames(pods, []string{"ss-3", "ss-4"})
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Removing .spec.ordinals")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Ordinals = nil
 			})
 			framework.ExpectNoError(err)
+
+			// since we are replacing 2 pods for 2, we need to ensure we wait
+			// for the new ones to show up, not just for any random 2
+			framework.Logf("Confirming 2 replicas, with start ordinal 0")
+			waitForStatus(ctx, c, ss)
+			waitForPodNames(ctx, c, ss, []string{"ss-0", "ss-1"})
 			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 2)
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
-
-			ginkgo.By("Confirming 2 replicas, with start ordinal 0")
-			pods = e2estatefulset.GetPodList(ctx, c, ss)
-			expectPodNames(pods, []string{"ss-0", "ss-1"})
 		})
 	})
 })
@@ -1859,7 +1869,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 	ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
-	framework.ExpectNotEqual(oldImage, newImage, "Incorrect test setup: should update to a different image")
+	gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
 	ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = newImage
 	})
@@ -1868,7 +1878,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	ginkgo.By("Creating a new revision")
 	ss = waitForStatus(ctx, c, ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-	framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
+	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
 
 	ginkgo.By("Updating Pods in reverse ordinal order")
 	pods = e2estatefulset.GetPodList(ctx, c, ss)
@@ -1907,7 +1917,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	ss = waitForStatus(ctx, c, ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	framework.ExpectEqual(priorRevision, updateRevision, "Prior revision should equal update revision during roll back")
-	framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during roll back")
+	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during roll back")
 
 	ginkgo.By("Rolling back update in reverse ordinal order")
 	pods = e2estatefulset.GetPodList(ctx, c, ss)
@@ -2174,7 +2184,7 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(ctx context.Context, c clientset.In
 // expectPodNames compares the names of the pods from actualPods with expectedPodNames.
 // actualPods can be in any list, since we'll sort by their ordinals and filter
 // active ones. expectedPodNames should be ordered by statefulset ordinals.
-func expectPodNames(actualPods *v1.PodList, expectedPodNames []string) {
+func expectPodNames(actualPods *v1.PodList, expectedPodNames []string) error {
 	e2estatefulset.SortStatefulPods(actualPods)
 	pods := []string{}
 	for _, pod := range actualPods.Items {
@@ -2186,6 +2196,7 @@ func expectPodNames(actualPods *v1.PodList, expectedPodNames []string) {
 	}
 	if !reflect.DeepEqual(expectedPodNames, pods) {
 		diff := cmp.Diff(expectedPodNames, pods)
-		framework.Failf("Pod names don't match. Diff (- for expected, + for actual):\n%s", diff)
+		return fmt.Errorf("pod names don't match, diff (- for expected, + for actual):\n%s", diff)
 	}
+	return nil
 }

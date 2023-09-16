@@ -581,10 +581,11 @@ func WaitForPodsResponding(ctx context.Context, c clientset.Interface, ns string
 
 			if err != nil {
 				// We may encounter errors here because of a race between the pod readiness and apiserver
-				// proxy. So, we log the error and retry if this occurs.
-				return nil, fmt.Errorf("Controller %s: failed to Get from replica pod %s:\n%s\nPod status:\n%s",
+				// proxy or because of temporary failures. The error gets wrapped for framework.HandleRetry.
+				// Gomega+Ginkgo will handle logging.
+				return nil, fmt.Errorf("controller %s: failed to Get from replica pod %s:\n%w\nPod status:\n%s",
 					controllerName, pod.Name,
-					format.Object(err, 1), format.Object(pod.Status, 1))
+					err, format.Object(pod.Status, 1))
 			}
 			responses = append(responses, response{podName: pod.Name, response: string(body)})
 		}

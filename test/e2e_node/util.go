@@ -51,13 +51,13 @@ import (
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	"github.com/coreos/go-systemd/v22/dbus"
@@ -393,7 +393,7 @@ const (
 )
 
 func performContainerRuntimeUnitOp(op containerRuntimeUnitOp) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	conn, err := dbus.NewWithContext(ctx)
@@ -409,12 +409,13 @@ func performContainerRuntimeUnitOp(op containerRuntimeUnitOp) error {
 
 	switch op {
 	case startContainerRuntimeUnitOp:
-		conn.StartUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
+		_, err = conn.StartUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
 	case stopContainerRuntimeUnitOp:
-		conn.StopUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
+		_, err = conn.StopUnitContext(ctx, containerRuntimeUnitName, "replace", reschan)
 	default:
 		framework.Failf("Unexpected container runtime op: %v", op)
 	}
+	framework.ExpectNoError(err, "dbus connection error")
 
 	job := <-reschan
 	framework.ExpectEqual(job, "done", "Expected job to complete with done")

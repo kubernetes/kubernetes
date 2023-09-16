@@ -184,7 +184,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
 	for _, ip := range ipStrings {
 		// Handle only the valid IPs
-		if ipFamily := GetIPFamilyFromIP(ip); ipFamily != "" {
+		if ipFamily := GetIPFamilyFromIP(ip); ipFamily != v1.IPFamilyUnknown {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
 			// this function is called in multiple places. All of which
@@ -206,7 +206,7 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
 	for _, cidr := range cidrStrings {
 		// Handle only the valid CIDRs
-		if ipFamily := getIPFamilyFromCIDR(cidr); ipFamily != "" {
+		if ipFamily := getIPFamilyFromCIDR(cidr); ipFamily != v1.IPFamilyUnknown {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 		} else {
 			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
@@ -215,12 +215,12 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 	return ipFamilyMap
 }
 
-// GetIPFamilyFromIP Returns the IP family of ipStr, or "" if ipStr can't be parsed as an IP
+// GetIPFamilyFromIP Returns the IP family of ipStr, or IPFamilyUnknown if ipStr can't be parsed as an IP
 func GetIPFamilyFromIP(ipStr string) v1.IPFamily {
 	return convertToV1IPFamily(netutils.IPFamilyOfString(ipStr))
 }
 
-// Returns the IP family of cidrStr, or "" if cidrStr can't be parsed as a CIDR
+// Returns the IP family of cidrStr, or IPFamilyUnknown if cidrStr can't be parsed as a CIDR
 func getIPFamilyFromCIDR(cidrStr string) v1.IPFamily {
 	return convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidrStr))
 }
@@ -234,7 +234,7 @@ func convertToV1IPFamily(ipFamily netutils.IPFamily) v1.IPFamily {
 		return v1.IPv6Protocol
 	}
 
-	return ""
+	return v1.IPFamilyUnknown
 }
 
 // OtherIPFamily returns the other ip family

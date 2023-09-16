@@ -77,7 +77,7 @@ func (t *TestFixture) BuildServiceSpec() *v1.Service {
 			Selector: t.Labels,
 			Ports: []v1.ServicePort{{
 				Port:       80,
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt32(80),
 			}},
 		},
 	}

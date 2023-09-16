@@ -56,6 +56,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*AuthenticationConfiguration)(nil), (*apiserver.AuthenticationConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AuthenticationConfiguration_To_apiserver_AuthenticationConfiguration(a.(*AuthenticationConfiguration), b.(*apiserver.AuthenticationConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiserver.AuthenticationConfiguration)(nil), (*AuthenticationConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserver_AuthenticationConfiguration_To_v1alpha1_AuthenticationConfiguration(a.(*apiserver.AuthenticationConfiguration), b.(*AuthenticationConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ClaimMappings)(nil), (*apiserver.ClaimMappings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClaimMappings_To_apiserver_ClaimMappings(a.(*ClaimMappings), b.(*apiserver.ClaimMappings), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiserver.ClaimMappings)(nil), (*ClaimMappings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserver_ClaimMappings_To_v1alpha1_ClaimMappings(a.(*apiserver.ClaimMappings), b.(*ClaimMappings), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ClaimValidationRule)(nil), (*apiserver.ClaimValidationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClaimValidationRule_To_apiserver_ClaimValidationRule(a.(*ClaimValidationRule), b.(*apiserver.ClaimValidationRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiserver.ClaimValidationRule)(nil), (*ClaimValidationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserver_ClaimValidationRule_To_v1alpha1_ClaimValidationRule(a.(*apiserver.ClaimValidationRule), b.(*ClaimValidationRule), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*Connection)(nil), (*apiserver.Connection)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_Connection_To_apiserver_Connection(a.(*Connection), b.(*apiserver.Connection), scope)
 	}); err != nil {
@@ -78,6 +108,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*apiserver.EgressSelectorConfiguration)(nil), (*EgressSelectorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apiserver_EgressSelectorConfiguration_To_v1alpha1_EgressSelectorConfiguration(a.(*apiserver.EgressSelectorConfiguration), b.(*EgressSelectorConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*Issuer)(nil), (*apiserver.Issuer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Issuer_To_apiserver_Issuer(a.(*Issuer), b.(*apiserver.Issuer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiserver.Issuer)(nil), (*Issuer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserver_Issuer_To_v1alpha1_Issuer(a.(*apiserver.Issuer), b.(*Issuer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*JWTAuthenticator)(nil), (*apiserver.JWTAuthenticator)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_JWTAuthenticator_To_apiserver_JWTAuthenticator(a.(*JWTAuthenticator), b.(*apiserver.JWTAuthenticator), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiserver.JWTAuthenticator)(nil), (*JWTAuthenticator)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserver_JWTAuthenticator_To_v1alpha1_JWTAuthenticator(a.(*apiserver.JWTAuthenticator), b.(*JWTAuthenticator), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PrefixedClaimOrExpression)(nil), (*apiserver.PrefixedClaimOrExpression)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression(a.(*PrefixedClaimOrExpression), b.(*apiserver.PrefixedClaimOrExpression), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiserver.PrefixedClaimOrExpression)(nil), (*PrefixedClaimOrExpression)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression(a.(*apiserver.PrefixedClaimOrExpression), b.(*PrefixedClaimOrExpression), scope)
 	}); err != nil {
 		return err
 	}
@@ -183,6 +243,78 @@ func Convert_apiserver_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginC
 	return autoConvert_apiserver_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(in, out, s)
 }
 
+func autoConvert_v1alpha1_AuthenticationConfiguration_To_apiserver_AuthenticationConfiguration(in *AuthenticationConfiguration, out *apiserver.AuthenticationConfiguration, s conversion.Scope) error {
+	out.JWT = *(*[]apiserver.JWTAuthenticator)(unsafe.Pointer(&in.JWT))
+	return nil
+}
+
+// Convert_v1alpha1_AuthenticationConfiguration_To_apiserver_AuthenticationConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_AuthenticationConfiguration_To_apiserver_AuthenticationConfiguration(in *AuthenticationConfiguration, out *apiserver.AuthenticationConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AuthenticationConfiguration_To_apiserver_AuthenticationConfiguration(in, out, s)
+}
+
+func autoConvert_apiserver_AuthenticationConfiguration_To_v1alpha1_AuthenticationConfiguration(in *apiserver.AuthenticationConfiguration, out *AuthenticationConfiguration, s conversion.Scope) error {
+	out.JWT = *(*[]JWTAuthenticator)(unsafe.Pointer(&in.JWT))
+	return nil
+}
+
+// Convert_apiserver_AuthenticationConfiguration_To_v1alpha1_AuthenticationConfiguration is an autogenerated conversion function.
+func Convert_apiserver_AuthenticationConfiguration_To_v1alpha1_AuthenticationConfiguration(in *apiserver.AuthenticationConfiguration, out *AuthenticationConfiguration, s conversion.Scope) error {
+	return autoConvert_apiserver_AuthenticationConfiguration_To_v1alpha1_AuthenticationConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_ClaimMappings_To_apiserver_ClaimMappings(in *ClaimMappings, out *apiserver.ClaimMappings, s conversion.Scope) error {
+	if err := Convert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression(&in.Username, &out.Username, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression(&in.Groups, &out.Groups, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_ClaimMappings_To_apiserver_ClaimMappings is an autogenerated conversion function.
+func Convert_v1alpha1_ClaimMappings_To_apiserver_ClaimMappings(in *ClaimMappings, out *apiserver.ClaimMappings, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ClaimMappings_To_apiserver_ClaimMappings(in, out, s)
+}
+
+func autoConvert_apiserver_ClaimMappings_To_v1alpha1_ClaimMappings(in *apiserver.ClaimMappings, out *ClaimMappings, s conversion.Scope) error {
+	if err := Convert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression(&in.Username, &out.Username, s); err != nil {
+		return err
+	}
+	if err := Convert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression(&in.Groups, &out.Groups, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_apiserver_ClaimMappings_To_v1alpha1_ClaimMappings is an autogenerated conversion function.
+func Convert_apiserver_ClaimMappings_To_v1alpha1_ClaimMappings(in *apiserver.ClaimMappings, out *ClaimMappings, s conversion.Scope) error {
+	return autoConvert_apiserver_ClaimMappings_To_v1alpha1_ClaimMappings(in, out, s)
+}
+
+func autoConvert_v1alpha1_ClaimValidationRule_To_apiserver_ClaimValidationRule(in *ClaimValidationRule, out *apiserver.ClaimValidationRule, s conversion.Scope) error {
+	out.Claim = in.Claim
+	out.RequiredValue = in.RequiredValue
+	return nil
+}
+
+// Convert_v1alpha1_ClaimValidationRule_To_apiserver_ClaimValidationRule is an autogenerated conversion function.
+func Convert_v1alpha1_ClaimValidationRule_To_apiserver_ClaimValidationRule(in *ClaimValidationRule, out *apiserver.ClaimValidationRule, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ClaimValidationRule_To_apiserver_ClaimValidationRule(in, out, s)
+}
+
+func autoConvert_apiserver_ClaimValidationRule_To_v1alpha1_ClaimValidationRule(in *apiserver.ClaimValidationRule, out *ClaimValidationRule, s conversion.Scope) error {
+	out.Claim = in.Claim
+	out.RequiredValue = in.RequiredValue
+	return nil
+}
+
+// Convert_apiserver_ClaimValidationRule_To_v1alpha1_ClaimValidationRule is an autogenerated conversion function.
+func Convert_apiserver_ClaimValidationRule_To_v1alpha1_ClaimValidationRule(in *apiserver.ClaimValidationRule, out *ClaimValidationRule, s conversion.Scope) error {
+	return autoConvert_apiserver_ClaimValidationRule_To_v1alpha1_ClaimValidationRule(in, out, s)
+}
+
 func autoConvert_v1alpha1_Connection_To_apiserver_Connection(in *Connection, out *apiserver.Connection, s conversion.Scope) error {
 	out.ProxyProtocol = apiserver.ProtocolType(in.ProxyProtocol)
 	out.Transport = (*apiserver.Transport)(unsafe.Pointer(in.Transport))
@@ -264,6 +396,84 @@ func autoConvert_apiserver_EgressSelectorConfiguration_To_v1alpha1_EgressSelecto
 // Convert_apiserver_EgressSelectorConfiguration_To_v1alpha1_EgressSelectorConfiguration is an autogenerated conversion function.
 func Convert_apiserver_EgressSelectorConfiguration_To_v1alpha1_EgressSelectorConfiguration(in *apiserver.EgressSelectorConfiguration, out *EgressSelectorConfiguration, s conversion.Scope) error {
 	return autoConvert_apiserver_EgressSelectorConfiguration_To_v1alpha1_EgressSelectorConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_Issuer_To_apiserver_Issuer(in *Issuer, out *apiserver.Issuer, s conversion.Scope) error {
+	out.URL = in.URL
+	out.CertificateAuthority = in.CertificateAuthority
+	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
+	return nil
+}
+
+// Convert_v1alpha1_Issuer_To_apiserver_Issuer is an autogenerated conversion function.
+func Convert_v1alpha1_Issuer_To_apiserver_Issuer(in *Issuer, out *apiserver.Issuer, s conversion.Scope) error {
+	return autoConvert_v1alpha1_Issuer_To_apiserver_Issuer(in, out, s)
+}
+
+func autoConvert_apiserver_Issuer_To_v1alpha1_Issuer(in *apiserver.Issuer, out *Issuer, s conversion.Scope) error {
+	out.URL = in.URL
+	out.CertificateAuthority = in.CertificateAuthority
+	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
+	return nil
+}
+
+// Convert_apiserver_Issuer_To_v1alpha1_Issuer is an autogenerated conversion function.
+func Convert_apiserver_Issuer_To_v1alpha1_Issuer(in *apiserver.Issuer, out *Issuer, s conversion.Scope) error {
+	return autoConvert_apiserver_Issuer_To_v1alpha1_Issuer(in, out, s)
+}
+
+func autoConvert_v1alpha1_JWTAuthenticator_To_apiserver_JWTAuthenticator(in *JWTAuthenticator, out *apiserver.JWTAuthenticator, s conversion.Scope) error {
+	if err := Convert_v1alpha1_Issuer_To_apiserver_Issuer(&in.Issuer, &out.Issuer, s); err != nil {
+		return err
+	}
+	out.ClaimValidationRules = *(*[]apiserver.ClaimValidationRule)(unsafe.Pointer(&in.ClaimValidationRules))
+	if err := Convert_v1alpha1_ClaimMappings_To_apiserver_ClaimMappings(&in.ClaimMappings, &out.ClaimMappings, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_JWTAuthenticator_To_apiserver_JWTAuthenticator is an autogenerated conversion function.
+func Convert_v1alpha1_JWTAuthenticator_To_apiserver_JWTAuthenticator(in *JWTAuthenticator, out *apiserver.JWTAuthenticator, s conversion.Scope) error {
+	return autoConvert_v1alpha1_JWTAuthenticator_To_apiserver_JWTAuthenticator(in, out, s)
+}
+
+func autoConvert_apiserver_JWTAuthenticator_To_v1alpha1_JWTAuthenticator(in *apiserver.JWTAuthenticator, out *JWTAuthenticator, s conversion.Scope) error {
+	if err := Convert_apiserver_Issuer_To_v1alpha1_Issuer(&in.Issuer, &out.Issuer, s); err != nil {
+		return err
+	}
+	out.ClaimValidationRules = *(*[]ClaimValidationRule)(unsafe.Pointer(&in.ClaimValidationRules))
+	if err := Convert_apiserver_ClaimMappings_To_v1alpha1_ClaimMappings(&in.ClaimMappings, &out.ClaimMappings, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_apiserver_JWTAuthenticator_To_v1alpha1_JWTAuthenticator is an autogenerated conversion function.
+func Convert_apiserver_JWTAuthenticator_To_v1alpha1_JWTAuthenticator(in *apiserver.JWTAuthenticator, out *JWTAuthenticator, s conversion.Scope) error {
+	return autoConvert_apiserver_JWTAuthenticator_To_v1alpha1_JWTAuthenticator(in, out, s)
+}
+
+func autoConvert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression(in *PrefixedClaimOrExpression, out *apiserver.PrefixedClaimOrExpression, s conversion.Scope) error {
+	out.Claim = in.Claim
+	out.Prefix = (*string)(unsafe.Pointer(in.Prefix))
+	return nil
+}
+
+// Convert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression is an autogenerated conversion function.
+func Convert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression(in *PrefixedClaimOrExpression, out *apiserver.PrefixedClaimOrExpression, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression(in, out, s)
+}
+
+func autoConvert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression(in *apiserver.PrefixedClaimOrExpression, out *PrefixedClaimOrExpression, s conversion.Scope) error {
+	out.Claim = in.Claim
+	out.Prefix = (*string)(unsafe.Pointer(in.Prefix))
+	return nil
+}
+
+// Convert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression is an autogenerated conversion function.
+func Convert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression(in *apiserver.PrefixedClaimOrExpression, out *PrefixedClaimOrExpression, s conversion.Scope) error {
+	return autoConvert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression(in, out, s)
 }
 
 func autoConvert_v1alpha1_TCPTransport_To_apiserver_TCPTransport(in *TCPTransport, out *apiserver.TCPTransport, s conversion.Scope) error {

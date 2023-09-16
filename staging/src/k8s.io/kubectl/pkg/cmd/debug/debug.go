@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/distribution/reference"
+	"github.com/distribution/reference"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
@@ -111,6 +111,7 @@ type DebugOptions struct {
 	Args            []string
 	ArgsOnly        bool
 	Attach          bool
+	AttachFunc      func(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, cmdPath string, ns, podName, containerName string) error
 	Container       string
 	CopyTo          string
 	Replace         bool
@@ -212,6 +213,14 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
 		o.Attach = true
+		// Downstream tools may want to use their own customized
+		// attach function to do extra work or use attach command
+		// with different flags instead of the static one defined in
+		// handleAttachPod. But if this function is not set explicitly,
+		// we fall back to default.
+		if o.AttachFunc == nil {
+			o.AttachFunc = o.handleAttachPod
+		}
 	}
 
 	// Environment
@@ -377,26 +386,8 @@ func (o *DebugOptions) Run(restClientGetter genericclioptions.RESTClientGetter, 
 			return visitErr
 		}
 
-		if o.Attach && len(containerName) > 0 {
-			opts := &attach.AttachOptions{
-				StreamOptions: exec.StreamOptions{
-					IOStreams: o.IOStreams,
-					Stdin:     o.Interactive,
-					TTY:       o.TTY,
-					Quiet:     o.Quiet,
-				},
-				CommandName: cmd.Parent().CommandPath() + " attach",
-
-				Attach: &attach.DefaultRemoteAttach{},
-			}
-			config, err := restClientGetter.ToRESTConfig()
-			if err != nil {
-				return err
-			}
-			opts.Config = config
-			opts.AttachFunc = attach.DefaultAttachFunc
-
-			if err := o.handleAttachPod(ctx, restClientGetter, debugPod.Namespace, debugPod.Name, containerName, opts); err != nil {
+		if o.Attach && len(containerName) > 0 && o.AttachFunc != nil {
+			if err := o.AttachFunc(ctx, restClientGetter, cmd.Parent().CommandPath(), debugPod.Namespace, debugPod.Name, containerName); err != nil {
 				return err
 			}
 		}
@@ -469,51 +460,10 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q)", err)
 		}
 
-		// The Kind used for the /ephemeralcontainers subresource changed in 1.22. When presented with an unexpected
-		// Kind the api server will respond with a not-registered error. When this happens we can optimistically try
-		// using the old API.
-		if runtime.IsNotRegisteredError(err) {
-			klog.V(1).Infof("Falling back to legacy API because server returned error: %v", err)
-			return o.debugByEphemeralContainerLegacy(ctx, pod, debugContainer)
-		}
-
 		return nil, "", err
 	}
 
 	return result, debugContainer.Name, nil
-}
-
-// debugByEphemeralContainerLegacy adds debugContainer as an ephemeral container using the pre-1.22 /ephemeralcontainers API
-// This may be removed when we no longer wish to support releases prior to 1.22.
-func (o *DebugOptions) debugByEphemeralContainerLegacy(ctx context.Context, pod *corev1.Pod, debugContainer *corev1.EphemeralContainer) (*corev1.Pod, string, error) {
-	// We no longer have the v1.EphemeralContainers Kind since it was removed in 1.22, but
-	// we can present a JSON 6902 patch that the api server will apply.
-	patch, err := json.Marshal([]map[string]interface{}{{
-		"op":    "add",
-		"path":  "/ephemeralContainers/-",
-		"value": debugContainer,
-	}})
-	if err != nil {
-		return nil, "", fmt.Errorf("error creating JSON 6902 patch for old /ephemeralcontainers API: %s", err)
-	}
-
-	result := o.podClient.RESTClient().Patch(types.JSONPatchType).
-		Namespace(pod.Namespace).
-		Resource("pods").
-		Name(pod.Name).
-		SubResource("ephemeralcontainers").
-		Body(patch).
-		Do(ctx)
-	if err := result.Error(); err != nil {
-		return nil, "", err
-	}
-
-	newPod, err := o.podClient.Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, "", err
-	}
-
-	return newPod, debugContainer.Name, nil
 }
 
 // debugByCopy runs a copy of the target Pod with a debug container added or an original container modified
@@ -795,7 +745,25 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 	return result, err
 }
 
-func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, ns, podName, containerName string, opts *attach.AttachOptions) error {
+func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, cmdPath string, ns, podName, containerName string) error {
+	opts := &attach.AttachOptions{
+		StreamOptions: exec.StreamOptions{
+			IOStreams: o.IOStreams,
+			Stdin:     o.Interactive,
+			TTY:       o.TTY,
+			Quiet:     o.Quiet,
+		},
+		CommandName: cmdPath + " attach",
+
+		Attach: &attach.DefaultRemoteAttach{},
+	}
+	config, err := restClientGetter.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	opts.Config = config
+	opts.AttachFunc = attach.DefaultAttachFunc
+
 	pod, err := o.waitForContainer(ctx, ns, podName, containerName)
 	if err != nil {
 		return err

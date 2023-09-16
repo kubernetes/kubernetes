@@ -222,7 +222,7 @@ func (t *dnsTestCommon) createUtilPodLabel(ctx context.Context, baseName string)
 				{
 					Protocol:   v1.ProtocolTCP,
 					Port:       servicePort,
-					TargetPort: intstr.FromInt(servicePort),
+					TargetPort: intstr.FromInt32(servicePort),
 				},
 			},
 		},
@@ -497,7 +497,7 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 
 		return false, nil
 	}))
-	framework.ExpectEqual(len(failed), 0)
+	gomega.Expect(failed).To(gomega.BeEmpty())
 }
 
 func validateDNSResults(ctx context.Context, f *framework.Framework, pod *v1.Pod, fileNames []string) {

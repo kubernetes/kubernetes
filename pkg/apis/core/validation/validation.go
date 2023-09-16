@@ -2022,6 +2022,8 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 	EnableRecoverFromExpansionFailure bool
 	// Allow to validate the label value of the label selector
 	AllowInvalidLabelValueInSelector bool
+	// Allow to validate the API group of the data source and data source reference
+	AllowInvalidAPIGroupInDataSourceOrRef bool
 }
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
@@ -2034,6 +2036,10 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 		// If there's no old PVC, use the options based solely on feature enablement
 		return opts
 	}
+
+	// If the old object had an invalid API group in the data source or data source reference, continue to allow it in the new object
+	opts.AllowInvalidAPIGroupInDataSourceOrRef = allowInvalidAPIGroupInDataSourceOrRef(&oldPvc.Spec)
+
 	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
 		AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
 	}
@@ -2077,6 +2083,17 @@ func ValidationOptionsForPersistentVolumeClaimTemplate(claimTemplate, oldClaimTe
 	return opts
 }
 
+// allowInvalidAPIGroupInDataSourceOrRef returns true if the spec contains a data source or data source reference with an API group
+func allowInvalidAPIGroupInDataSourceOrRef(spec *core.PersistentVolumeClaimSpec) bool {
+	if spec.DataSource != nil && spec.DataSource.APIGroup != nil {
+		return true
+	}
+	if spec.DataSourceRef != nil && spec.DataSourceRef.APIGroup != nil {
+		return true
+	}
+	return false
+}
+
 // ValidatePersistentVolumeClaim validates a PersistentVolumeClaim
 func ValidatePersistentVolumeClaim(pvc *core.PersistentVolumeClaim, opts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMeta(&pvc.ObjectMeta, true, ValidatePersistentVolumeName, field.NewPath("metadata"))
@@ -2085,7 +2102,7 @@ func ValidatePersistentVolumeClaim(pvc *core.PersistentVolumeClaim, opts Persist
 }
 
 // validateDataSource validates a DataSource/DataSourceRef in a PersistentVolumeClaimSpec
-func validateDataSource(dataSource *core.TypedLocalObjectReference, fldPath *field.Path) field.ErrorList {
+func validateDataSource(dataSource *core.TypedLocalObjectReference, fldPath *field.Path, allowInvalidAPIGroupInDataSourceOrRef bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(dataSource.Name) == 0 {
@@ -2101,12 +2118,17 @@ func validateDataSource(dataSource *core.TypedLocalObjectReference, fldPath *fie
 	if len(apiGroup) == 0 && dataSource.Kind != "PersistentVolumeClaim" {
 		allErrs = append(allErrs, field.Invalid(fldPath, dataSource.Kind, "must be 'PersistentVolumeClaim' when referencing the default apiGroup"))
 	}
+	if len(apiGroup) > 0 && !allowInvalidAPIGroupInDataSourceOrRef {
+		for _, errString := range validation.IsDNS1123Subdomain(apiGroup) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), apiGroup, errString))
+		}
+	}
 
 	return allErrs
 }
 
 // validateDataSourceRef validates a DataSourceRef in a PersistentVolumeClaimSpec
-func validateDataSourceRef(dataSourceRef *core.TypedObjectReference, fldPath *field.Path) field.ErrorList {
+func validateDataSourceRef(dataSourceRef *core.TypedObjectReference, fldPath *field.Path, allowInvalidAPIGroupInDataSourceOrRef bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(dataSourceRef.Name) == 0 {
@@ -2121,6 +2143,11 @@ func validateDataSourceRef(dataSourceRef *core.TypedObjectReference, fldPath *fi
 	}
 	if len(apiGroup) == 0 && dataSourceRef.Kind != "PersistentVolumeClaim" {
 		allErrs = append(allErrs, field.Invalid(fldPath, dataSourceRef.Kind, "must be 'PersistentVolumeClaim' when referencing the default apiGroup"))
+	}
+	if len(apiGroup) > 0 && !allowInvalidAPIGroupInDataSourceOrRef {
+		for _, errString := range validation.IsDNS1123Subdomain(apiGroup) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), apiGroup, errString))
+		}
 	}
 
 	if dataSourceRef.Namespace != nil && len(*dataSourceRef.Namespace) > 0 {
@@ -2185,10 +2212,10 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	}
 
 	if spec.DataSource != nil {
-		allErrs = append(allErrs, validateDataSource(spec.DataSource, fldPath.Child("dataSource"))...)
+		allErrs = append(allErrs, validateDataSource(spec.DataSource, fldPath.Child("dataSource"), opts.AllowInvalidAPIGroupInDataSourceOrRef)...)
 	}
 	if spec.DataSourceRef != nil {
-		allErrs = append(allErrs, validateDataSourceRef(spec.DataSourceRef, fldPath.Child("dataSourceRef"))...)
+		allErrs = append(allErrs, validateDataSourceRef(spec.DataSourceRef, fldPath.Child("dataSourceRef"), opts.AllowInvalidAPIGroupInDataSourceOrRef)...)
 	}
 	if spec.DataSourceRef != nil && spec.DataSourceRef.Namespace != nil && len(*spec.DataSourceRef.Namespace) > 0 {
 		if spec.DataSource != nil {
@@ -5332,10 +5359,6 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 	return allErrs
 }
 
-func needsExternalTrafficPolicy(svc *core.Service) bool {
-	return svc.Spec.Type == core.ServiceTypeLoadBalancer || svc.Spec.Type == core.ServiceTypeNodePort
-}
-
 var validExternalTrafficPolicies = sets.NewString(
 	string(core.ServiceExternalTrafficPolicyCluster),
 	string(core.ServiceExternalTrafficPolicyLocal))
@@ -5345,10 +5368,10 @@ func validateServiceExternalTrafficPolicy(service *core.Service) field.ErrorList
 
 	fldPath := field.NewPath("spec")
 
-	if !needsExternalTrafficPolicy(service) {
+	if !apiservice.ExternallyAccessible(service) {
 		if service.Spec.ExternalTrafficPolicy != "" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("externalTrafficPolicy"), service.Spec.ExternalTrafficPolicy,
-				"may only be set when `type` is 'NodePort' or 'LoadBalancer'"))
+				"may only be set for externally-accessible services"))
 		}
 	} else {
 		if service.Spec.ExternalTrafficPolicy == "" {
@@ -5441,7 +5464,7 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 // ValidateServiceStatusUpdate tests if required fields in the Service are set when updating status.
 func ValidateServiceStatusUpdate(service, oldService *core.Service) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateLoadBalancerStatus(&service.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
+	allErrs = append(allErrs, ValidateLoadBalancerStatus(&service.Status.LoadBalancer, field.NewPath("status", "loadBalancer"), &service.Spec)...)
 	return allErrs
 }
 
@@ -7053,32 +7076,37 @@ var (
 )
 
 // ValidateLoadBalancerStatus validates required fields on a LoadBalancerStatus
-func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.Path) field.ErrorList {
+func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.Path, spec *core.ServiceSpec) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for i, ingress := range status.Ingress {
-		idxPath := fldPath.Child("ingress").Index(i)
-		if len(ingress.IP) > 0 {
-			if isIP := (netutils.ParseIPSloppy(ingress.IP) != nil); !isIP {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
-			}
-		}
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && ingress.IPMode == nil {
+	ingrPath := fldPath.Child("ingress")
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AllowServiceLBStatusOnNonLB) && spec.Type != core.ServiceTypeLoadBalancer && len(status.Ingress) != 0 {
+		allErrs = append(allErrs, field.Forbidden(ingrPath, "may only be used when `spec.type` is 'LoadBalancer'"))
+	} else {
+		for i, ingress := range status.Ingress {
+			idxPath := ingrPath.Index(i)
 			if len(ingress.IP) > 0 {
-				allErrs = append(allErrs, field.Required(idxPath.Child("ipMode"), "must be specified when `ip` is set"))
+				if isIP := (netutils.ParseIPSloppy(ingress.IP) != nil); !isIP {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
+				}
 			}
-		} else if ingress.IPMode != nil && len(ingress.IP) == 0 {
-			allErrs = append(allErrs, field.Forbidden(idxPath.Child("ipMode"), "may not be specified when `ip` is not set"))
-		} else if ingress.IPMode != nil && !supportedLoadBalancerIPMode.Has(string(*ingress.IPMode)) {
-			allErrs = append(allErrs, field.NotSupported(idxPath.Child("ipMode"), ingress.IPMode, supportedLoadBalancerIPMode.List()))
-		}
 
-		if len(ingress.Hostname) > 0 {
-			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
+			if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && ingress.IPMode == nil {
+				if len(ingress.IP) > 0 {
+					allErrs = append(allErrs, field.Required(idxPath.Child("ipMode"), "must be specified when `ip` is set"))
+				}
+			} else if ingress.IPMode != nil && len(ingress.IP) == 0 {
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child("ipMode"), "may not be specified when `ip` is not set"))
+			} else if ingress.IPMode != nil && !supportedLoadBalancerIPMode.Has(string(*ingress.IPMode)) {
+				allErrs = append(allErrs, field.NotSupported(idxPath.Child("ipMode"), ingress.IPMode, supportedLoadBalancerIPMode.List()))
 			}
-			if isIP := (netutils.ParseIPSloppy(ingress.Hostname) != nil); isIP {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, "must be a DNS name, not an IP address"))
+
+			if len(ingress.Hostname) > 0 {
+				for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
+				}
+				if isIP := (netutils.ParseIPSloppy(ingress.Hostname) != nil); isIP {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, "must be a DNS name, not an IP address"))
+				}
 			}
 		}
 	}

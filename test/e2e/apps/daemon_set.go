@@ -373,7 +373,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		waitForHistoryCreated(ctx, c, ns, label, 2)
 		cur := curHistory(listDaemonHistories(ctx, c, ns, label), ds)
 		framework.ExpectEqual(cur.Revision, int64(2))
-		framework.ExpectNotEqual(cur.Labels[appsv1.DefaultDaemonSetUniqueLabelKey], firstHash)
+		gomega.Expect(cur.Labels).NotTo(gomega.HaveKeyWithValue(appsv1.DefaultDaemonSetUniqueLabelKey, firstHash))
 		checkDaemonSetPodsLabels(listDaemonPods(ctx, c, ns, label), firstHash)
 	})
 
@@ -486,9 +486,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		if len(schedulableNodes.Items) < 2 {
 			framework.ExpectEqual(len(existingPods), 0)
 		} else {
-			framework.ExpectNotEqual(len(existingPods), 0)
+			gomega.Expect(existingPods).NotTo(gomega.BeEmpty())
 		}
-		framework.ExpectNotEqual(len(newPods), 0)
+		gomega.Expect(newPods).NotTo(gomega.BeEmpty())
 
 		framework.Logf("Roll back the DaemonSet before rollout is complete")
 		rollbackDS, err := updateDaemonSetWithRetries(ctx, c, ns, ds.Name, func(update *appsv1.DaemonSet) {
@@ -521,7 +521,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		maxSurgeOverlap := 60 * time.Second
 		maxSurge := 1
 		surgePercent := intstr.FromString("20%")
-		zero := intstr.FromInt(0)
+		zero := intstr.FromInt32(0)
 		oldVersion := "1"
 		ds := newDaemonSet(dsName, image, label)
 		ds.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{

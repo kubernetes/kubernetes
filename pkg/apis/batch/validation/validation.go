@@ -78,7 +78,7 @@ var (
 		string(api.ConditionTrue),
 		string(api.ConditionUnknown))
 
-	supportedPodRecreationPolicy = sets.New(
+	supportedPodReplacementPolicy = sets.New(
 		string(batch.Failed),
 		string(batch.TerminatingOrFailed))
 )
@@ -295,9 +295,9 @@ func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) fiel
 			if *spec.PodReplacementPolicy != batch.Failed {
 				allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, []string{string(batch.Failed)}))
 			}
-			// If PodFailurePolicy not specified we allow values in supportedPodRecreationPolicy.
-		} else if !supportedPodRecreationPolicy.Has(string(*spec.PodReplacementPolicy)) {
-			allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, sets.List(supportedPodRecreationPolicy)))
+			// If PodFailurePolicy not specified we allow values in supportedPodReplacementPolicy.
+		} else if !supportedPodReplacementPolicy.Has(string(*spec.PodReplacementPolicy)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, sets.List(supportedPodReplacementPolicy)))
 		}
 	}
 	return allErrs

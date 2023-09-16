@@ -71,6 +71,7 @@ const (
 	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
 	PodSchedulingContext  GVK = "PodSchedulingContext"
 	ResourceClaim         GVK = "ResourceClaim"
+	ResourceClass         GVK = "ResourceClass"
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	CSINode               GVK = "storage.k8s.io/CSINode"
 	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
@@ -177,6 +178,7 @@ type QueuedPodInfo struct {
 	// latency for a pod.
 	InitialAttemptTimestamp *time.Time
 	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
+	// It's registered only when the Pod is rejected in PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
 	UnschedulablePlugins sets.Set[string]
 	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
 	Gated bool
@@ -306,44 +308,54 @@ type FitError struct {
 const (
 	// NoNodeAvailableMsg is used to format message when no nodes available.
 	NoNodeAvailableMsg = "0/%v nodes are available"
-	// SeparatorFormat is used to separate PreFilterMsg, FilterMsg and PostFilterMsg.
-	SeparatorFormat = " %v."
 )
 
 // Error returns detailed information of why the pod failed to fit on each node.
 // A message format is "0/X nodes are available: <PreFilterMsg>. <FilterMsg>. <PostFilterMsg>."
 func (f *FitError) Error() string {
-	reasons := make(map[string]int)
-	for _, status := range f.Diagnosis.NodeToStatusMap {
-		for _, reason := range status.Reasons() {
-			reasons[reason]++
-		}
-	}
-
 	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+":", f.NumAllNodes)
-	// Add the messages from PreFilter plugins to reasonMsg.
 	preFilterMsg := f.Diagnosis.PreFilterMsg
 	if preFilterMsg != "" {
-		reasonMsg += fmt.Sprintf(SeparatorFormat, preFilterMsg)
-	}
-	sortReasonsHistogram := func() []string {
-		var reasonStrings []string
-		for k, v := range reasons {
-			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
-		}
-		sort.Strings(reasonStrings)
-		return reasonStrings
-	}
-	sortedFilterMsg := sortReasonsHistogram()
-	if len(sortedFilterMsg) != 0 {
-		reasonMsg += fmt.Sprintf(SeparatorFormat, strings.Join(sortedFilterMsg, ", "))
-	}
-	// Add the messages from PostFilter plugins to reasonMsg.
-	postFilterMsg := f.Diagnosis.PostFilterMsg
-	if postFilterMsg != "" {
-		reasonMsg += fmt.Sprintf(SeparatorFormat, postFilterMsg)
+		// PreFilter plugin returns unschedulable.
+		// Add the messages from PreFilter plugins to reasonMsg.
+		reasonMsg += fmt.Sprintf(" %v.", preFilterMsg)
 	}
 
+	if preFilterMsg == "" {
+		// the scheduling cycle went through PreFilter extension point successfully.
+		//
+		// When the prefilter plugin returns unschedulable,
+		// the scheduling framework inserts the same unschedulable status to all nodes in NodeToStatusMap.
+		// So, we shouldn't add the message from NodeToStatusMap when the PreFilter failed.
+		// Otherwise, we will have duplicated reasons in the error message.
+		reasons := make(map[string]int)
+		for _, status := range f.Diagnosis.NodeToStatusMap {
+			for _, reason := range status.Reasons() {
+				reasons[reason]++
+			}
+		}
+
+		sortReasonsHistogram := func() []string {
+			var reasonStrings []string
+			for k, v := range reasons {
+				reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
+			}
+			sort.Strings(reasonStrings)
+			return reasonStrings
+		}
+		sortedFilterMsg := sortReasonsHistogram()
+		if len(sortedFilterMsg) != 0 {
+			reasonMsg += fmt.Sprintf(" %v.", strings.Join(sortedFilterMsg, ", "))
+		}
+	}
+
+	// Add the messages from PostFilter plugins to reasonMsg.
+	// We can add this message regardless of whether the scheduling cycle fails at PreFilter or Filter
+	// since we may run PostFilter (if enabled) in both cases.
+	postFilterMsg := f.Diagnosis.PostFilterMsg
+	if postFilterMsg != "" {
+		reasonMsg += fmt.Sprintf(" %v", postFilterMsg)
+	}
 	return reasonMsg
 }
 
@@ -705,21 +717,27 @@ func podWithRequiredAntiAffinity(p *v1.Pod) bool {
 		len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
 }
 
-func removeFromSlice(s []*PodInfo, k string) []*PodInfo {
+func removeFromSlice(s []*PodInfo, k string) ([]*PodInfo, bool) {
+	var removed bool
 	for i := range s {
-		k2, err := GetPodKey(s[i].Pod)
+		tmpKey, err := GetPodKey(s[i].Pod)
 		if err != nil {
 			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
 			continue
 		}
-		if k == k2 {
+		if k == tmpKey {
 			// delete the element
 			s[i] = s[len(s)-1]
 			s = s[:len(s)-1]
+			removed = true
 			break
 		}
 	}
-	return s
+	// resets the slices to nil so that we can do DeepEqual in unit tests.
+	if len(s) == 0 {
+		return nil, removed
+	}
+	return s, removed
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
@@ -729,27 +747,16 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 		return err
 	}
 	if podWithAffinity(pod) {
-		n.PodsWithAffinity = removeFromSlice(n.PodsWithAffinity, k)
+		n.PodsWithAffinity, _ = removeFromSlice(n.PodsWithAffinity, k)
 	}
 	if podWithRequiredAntiAffinity(pod) {
-		n.PodsWithRequiredAntiAffinity = removeFromSlice(n.PodsWithRequiredAntiAffinity, k)
+		n.PodsWithRequiredAntiAffinity, _ = removeFromSlice(n.PodsWithRequiredAntiAffinity, k)
 	}
 
-	for i := range n.Pods {
-		k2, err := GetPodKey(n.Pods[i].Pod)
-		if err != nil {
-			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(n.Pods[i].Pod))
-			continue
-		}
-		if k == k2 {
-			// delete the element
-			n.Pods[i] = n.Pods[len(n.Pods)-1]
-			n.Pods = n.Pods[:len(n.Pods)-1]
-
-			n.update(pod, -1)
-			n.resetSlicesIfEmpty()
-			return nil
-		}
+	var removed bool
+	if n.Pods, removed = removeFromSlice(n.Pods, k); removed {
+		n.update(pod, -1)
+		return nil
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
@@ -775,19 +782,6 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 	n.updatePVCRefCounts(pod, sign > 0)
 
 	n.Generation = nextGeneration()
-}
-
-// resets the slices to nil so that we can do DeepEqual in unit tests.
-func (n *NodeInfo) resetSlicesIfEmpty() {
-	if len(n.PodsWithAffinity) == 0 {
-		n.PodsWithAffinity = nil
-	}
-	if len(n.PodsWithRequiredAntiAffinity) == 0 {
-		n.PodsWithRequiredAntiAffinity = nil
-	}
-	if len(n.Pods) == 0 {
-		n.Pods = nil
-	}
 }
 
 func max(a, b int64) int64 {

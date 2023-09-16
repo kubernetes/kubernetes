@@ -53,7 +53,7 @@ type queueSetFactory struct {
 // - whose Set method is invoked with the queueSet locked, and
 // - whose Get method is invoked with the queueSet not locked.
 // The parameters are the same as for `promise.NewWriteOnce`.
-type promiseFactory func(initial interface{}, doneCh <-chan struct{}, doneVal interface{}) promise.WriteOnce
+type promiseFactory func(initial interface{}, doneCtx context.Context, doneVal interface{}) promise.WriteOnce
 
 // promiseFactoryFactory returns the promiseFactory to use for the given queueSet
 type promiseFactoryFactory func(*queueSet) promiseFactory
@@ -448,6 +448,7 @@ func (req *request) wait() (bool, bool) {
 		qs.totRequestsCancelled++
 		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "cancelled")
 		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
+		metrics.AddSeatsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -req.MaxSeats())
 		req.NoteQueued(false)
 		qs.reqsGaugePair.RequestsWaiting.Add(-1)
 		qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
@@ -583,7 +584,7 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 		fsName:            fsName,
 		flowDistinguisher: flowDistinguisher,
 		ctx:               ctx,
-		decision:          qs.promiseFactory(nil, ctx.Done(), decisionCancel),
+		decision:          qs.promiseFactory(nil, ctx, decisionCancel),
 		arrivalTime:       qs.clock.Now(),
 		arrivalR:          qs.currentR,
 		queue:             queue,
@@ -652,6 +653,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueToBoundLocked(queue *queue, f
 				disqueueSeats += req.MaxSeats()
 				req.NoteQueued(false)
 				metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
+				metrics.AddSeatsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -req.MaxSeats())
 			}
 			// we need to check if the next request has timed out.
 			return true
@@ -702,6 +704,7 @@ func (qs *queueSet) enqueueToBoundLocked(request *request) {
 	qs.totRequestsWaiting++
 	qs.totSeatsWaiting += request.MaxSeats()
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, 1)
+	metrics.AddSeatsInQueues(request.ctx, qs.qCfg.Name, request.fsName, request.MaxSeats())
 	request.NoteQueued(true)
 	qs.reqsGaugePair.RequestsWaiting.Add(1)
 	qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
@@ -722,7 +725,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 		flowDistinguisher: flowDistinguisher,
 		ctx:               ctx,
 		startTime:         now,
-		decision:          qs.promiseFactory(decisionExecute, ctx.Done(), decisionCancel),
+		decision:          qs.promiseFactory(decisionExecute, ctx, decisionCancel),
 		arrivalTime:       now,
 		arrivalR:          qs.currentR,
 		descr1:            descr1,
@@ -760,6 +763,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	qs.totRequestsWaiting--
 	qs.totSeatsWaiting -= request.MaxSeats()
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
+	metrics.AddSeatsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -request.MaxSeats())
 	request.NoteQueued(false)
 	qs.reqsGaugePair.RequestsWaiting.Add(-1)
 	defer qs.boundNextDispatchLocked(queue)

@@ -22,7 +22,6 @@ package app
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
@@ -37,10 +36,6 @@ import (
 )
 
 func startHPAController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if !controllerContext.AvailableResources[schema.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}] {
-		return nil, false, nil
-	}
-
 	return startHPAControllerWithRESTClient(ctx, controllerContext)
 }
 

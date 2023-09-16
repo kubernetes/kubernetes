@@ -37,7 +37,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var podTopologySpreadFunc = frameworkruntime.FactoryAdapter(feature.Features{}, New)
@@ -155,8 +155,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2), topologyNormalizingWeight(3)},
 			},
@@ -187,8 +187,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -228,7 +228,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New("node-x"),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(2)},
 			},
@@ -270,8 +270,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64(0),
-					{key: v1.LabelTopologyZone, value: ""}:     pointer.Int64(0),
+					{key: v1.LabelTopologyZone, value: "mars"}: ptr.To[int64](0),
+					{key: v1.LabelTopologyZone, value: ""}:     ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(4), topologyNormalizingWeight(2)},
 			},
@@ -321,7 +321,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "planet", value: "mars"}: pointer.Int64(0),
+					{key: "planet", value: "mars"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
 			},
@@ -362,7 +362,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{"planet", "mars"}: pointer.Int64(0),
+					{"planet", "mars"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1)},
 			},
@@ -394,8 +394,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -428,8 +428,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -462,8 +462,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -496,8 +496,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -529,8 +529,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -562,8 +562,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64(0),
-					{key: "zone", value: "zone2"}: pointer.Int64(0),
+					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -1089,7 +1089,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				"node",
 				v1.ScheduleAnyway,
 				fooSelector,
-				pointer.Int32(10), // larger than the number of domains(3)
+				ptr.To[int32](10), // larger than the number of domains(3)
 				nil,
 				nil,
 				nil,
@@ -1435,86 +1435,6 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 				}
 
 				status = p.NormalizeScore(context.Background(), state, tt.pod, gotList)
-				if !status.IsSuccess() {
-					b.Fatal(status)
-				}
-			}
-		})
-	}
-}
-
-// The following test allows to compare PodTopologySpread.Score with
-// SelectorSpread.Score by using a similar rule.
-// See pkg/scheduler/framework/plugins/selectorspread/selector_spread_perf_test.go
-// for the equivalent test.
-
-var (
-	tests = []struct {
-		name            string
-		existingPodsNum int
-		allNodesNum     int
-	}{
-		{
-			name:            "100nodes",
-			existingPodsNum: 1000,
-			allNodesNum:     100,
-		},
-		{
-			name:            "1000nodes",
-			existingPodsNum: 10000,
-			allNodesNum:     1000,
-		},
-		{
-			name:            "5000nodes",
-			existingPodsNum: 50000,
-			allNodesNum:     5000,
-		},
-	}
-)
-
-func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
-	for _, tt := range tests {
-		b.Run(tt.name, func(b *testing.B) {
-			pod := st.MakePod().Name("p").Label("foo", "").Obj()
-			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
-			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(existingPods, allNodes)
-			client := fake.NewSimpleClientset(
-				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
-			)
-			_, ctx := ktesting.NewTestContext(b)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			f, err := frameworkruntime.NewFramework(ctx, nil, nil,
-				frameworkruntime.WithSnapshotSharedLister(snapshot),
-				frameworkruntime.WithInformerFactory(informerFactory))
-			if err != nil {
-				b.Fatalf("Failed creating framework runtime: %v", err)
-			}
-			pl, err := New(&config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, f, feature.Features{})
-			if err != nil {
-				b.Fatalf("Failed creating plugin: %v", err)
-			}
-			p := pl.(*PodTopologySpread)
-
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
-			b.ResetTimer()
-
-			for i := 0; i < b.N; i++ {
-				status := p.PreScore(ctx, state, pod, filteredNodes)
-				if !status.IsSuccess() {
-					b.Fatalf("unexpected error: %v", status)
-				}
-				gotList := make(framework.NodeScoreList, len(filteredNodes))
-				scoreNode := func(i int) {
-					n := filteredNodes[i]
-					score, _ := p.Score(ctx, state, pod, n.Name)
-					gotList[i] = framework.NodeScore{Name: n.Name, Score: score}
-				}
-				p.parallelizer.Until(ctx, len(filteredNodes), scoreNode, "")
-				status = p.NormalizeScore(ctx, state, pod, gotList)
 				if !status.IsSuccess() {
 					b.Fatal(status)
 				}

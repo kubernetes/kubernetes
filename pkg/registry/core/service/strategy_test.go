@@ -107,9 +107,10 @@ func TestServiceStatusStrategy(t *testing.T) {
 		t.Errorf("Service must be namespace scoped")
 	}
 	oldService := makeValidService()
-	newService := makeValidService()
+	oldService.Spec.Type = api.ServiceTypeLoadBalancer
 	oldService.ResourceVersion = "4"
-	newService.ResourceVersion = "4"
+	oldService.Spec.SessionAffinity = "None"
+	newService := oldService.DeepCopy()
 	newService.Spec.SessionAffinity = "ClientIP"
 	newService.Status = api.ServiceStatus{
 		LoadBalancer: api.LoadBalancerStatus{
@@ -509,6 +510,18 @@ func TestDropTypeDependentFields(t *testing.T) {
 			svc.Spec.Ports[i].NodePort += 100
 		}
 	}
+	setExternalIPs := func(svc *api.Service) {
+		svc.Spec.ExternalIPs = []string{"1.1.1.1"}
+	}
+	clearExternalIPs := func(svc *api.Service) {
+		svc.Spec.ExternalIPs = nil
+	}
+	setExternalTrafficPolicyCluster := func(svc *api.Service) {
+		svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyCluster
+	}
+	clearExternalTrafficPolicy := func(svc *api.Service) {
+		svc.Spec.ExternalTrafficPolicy = ""
+	}
 	clearIPFamilies := func(svc *api.Service) {
 		svc.Spec.IPFamilies = nil
 	}
@@ -650,7 +663,7 @@ func TestDropTypeDependentFields(t *testing.T) {
 			name:   "don't clear changed healthCheckNodePort",
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setHCNodePort),
 			patch:  patches(setTypeClusterIP, changeHCNodePort),
-			expect: makeValidServiceCustom(setHCNodePort, changeHCNodePort),
+			expect: makeValidServiceCustom(setHCNodePort, changeHCNodePort, clearExternalTrafficPolicy),
 		}, { // allocatedLoadBalancerNodePorts cases
 			name:   "clear allocatedLoadBalancerNodePorts true -> true",
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsTrue),
@@ -721,6 +734,11 @@ func TestDropTypeDependentFields(t *testing.T) {
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
 			patch:  nil,
 			expect: makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+		}, {
+			name:   "clear externalTrafficPolicy when removing externalIPs for Type=ClusterIP",
+			svc:    makeValidServiceCustom(setTypeClusterIP, setExternalIPs, setExternalTrafficPolicyCluster),
+			patch:  patches(clearExternalIPs),
+			expect: makeValidServiceCustom(setTypeClusterIP, clearExternalTrafficPolicy),
 		}}
 
 	for _, tc := range testCases {
@@ -757,6 +775,9 @@ func TestDropTypeDependentFields(t *testing.T) {
 			}
 			if !reflect.DeepEqual(result.Spec.LoadBalancerClass, tc.expect.Spec.LoadBalancerClass) {
 				t.Errorf("failed %q: expected LoadBalancerClass %v, got %v", tc.name, tc.expect.Spec.LoadBalancerClass, result.Spec.LoadBalancerClass)
+			}
+			if !reflect.DeepEqual(result.Spec.ExternalTrafficPolicy, tc.expect.Spec.ExternalTrafficPolicy) {
+				t.Errorf("failed %q: expected ExternalTrafficPolicy %v, got %v", tc.name, tc.expect.Spec.ExternalTrafficPolicy, result.Spec.ExternalTrafficPolicy)
 			}
 		})
 	}

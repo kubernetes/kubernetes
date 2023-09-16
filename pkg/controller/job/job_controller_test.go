@@ -167,7 +167,7 @@ func newPodList(count int, status v1.PodPhase, job *batch.Job) []*v1.Pod {
 	return pods
 }
 
-func setPodsStatuses(podIndexer cache.Indexer, job *batch.Job, pendingPods, activePods, succeededPods, failedPods, readyPods int) {
+func setPodsStatuses(podIndexer cache.Indexer, job *batch.Job, pendingPods, activePods, succeededPods, failedPods, terminatingPods, readyPods int) {
 	for _, pod := range newPodList(pendingPods, v1.PodPending, job) {
 		podIndexer.Add(pod)
 	}
@@ -188,6 +188,14 @@ func setPodsStatuses(podIndexer cache.Indexer, job *batch.Job, pendingPods, acti
 		podIndexer.Add(pod)
 	}
 	for _, pod := range newPodList(failedPods, v1.PodFailed, job) {
+		podIndexer.Add(pod)
+	}
+	terminating := newPodList(terminatingPods, v1.PodRunning, job)
+	for _, p := range terminating {
+		now := metav1.Now()
+		p.DeletionTimestamp = &now
+	}
+	for _, pod := range terminating {
 		podIndexer.Add(pod)
 	}
 }
@@ -234,17 +242,18 @@ func TestControllerSyncJob(t *testing.T) {
 
 	testCases := map[string]struct {
 		// job setup
-		parallelism    int32
-		completions    int32
-		backoffLimit   int32
-		deleting       bool
-		podLimit       int
-		completionMode batch.CompletionMode
-		wasSuspended   bool
-		suspend        bool
-		initialStatus  *jobInitialStatus
-		backoffRecord  *backoffRecord
-		controllerTime *time.Time
+		parallelism          int32
+		completions          int32
+		backoffLimit         int32
+		deleting             bool
+		podLimit             int
+		completionMode       batch.CompletionMode
+		wasSuspended         bool
+		suspend              bool
+		podReplacementPolicy *batch.PodReplacementPolicy
+		initialStatus        *jobInitialStatus
+		backoffRecord        *backoffRecord
+		controllerTime       *time.Time
 
 		// pod setup
 
@@ -257,6 +266,7 @@ func TestControllerSyncJob(t *testing.T) {
 		readyPods                 int
 		succeededPods             int
 		failedPods                int
+		terminatingPods           int
 		podsWithIndexes           []indexPhase
 		fakeExpectationAtCreation int32 // negative: ExpectDeletions, positive: ExpectCreations
 
@@ -268,6 +278,7 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedSucceeded       int32
 		expectedCompletedIdxs   string
 		expectedFailed          int32
+		expectedTerminating     *int32
 		expectedCondition       *batch.JobConditionType
 		expectedConditionStatus v1.ConditionStatus
 		expectedConditionReason string
@@ -275,8 +286,9 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedPodPatches      int
 
 		// features
-		jobReadyPodsEnabled   bool
-		podIndexLabelDisabled bool
+		jobReadyPodsEnabled     bool
+		podIndexLabelDisabled   bool
+		jobPodReplacementPolicy bool
 	}{
 		"job start": {
 			parallelism:       2,
@@ -335,6 +347,35 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded:  1,
 			expectedPodPatches: 1,
 		},
+		"WQ job: recreate pods when failed": {
+			parallelism:             1,
+			completions:             -1,
+			backoffLimit:            6,
+			activePods:              1,
+			failedPods:              1,
+			podReplacementPolicy:    podReplacementPolicy(batch.Failed),
+			jobPodReplacementPolicy: true,
+			terminatingPods:         1,
+			expectedTerminating:     pointer.Int32(1),
+			expectedPodPatches:      2,
+			expectedDeletions:       1,
+			expectedFailed:          1,
+		},
+		"WQ job: recreate pods when terminating or failed": {
+			parallelism:             1,
+			completions:             -1,
+			backoffLimit:            6,
+			activePods:              1,
+			failedPods:              1,
+			podReplacementPolicy:    podReplacementPolicy(batch.TerminatingOrFailed),
+			jobPodReplacementPolicy: true,
+			terminatingPods:         1,
+			expectedTerminating:     pointer.Int32(1),
+			expectedActive:          1,
+			expectedPodPatches:      2,
+			expectedFailed:          2,
+		},
+
 		"too few active pods and active back-off": {
 			parallelism:  1,
 			completions:  1,
@@ -585,6 +626,33 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:         2,
 			expectedCreatedIndexes: sets.New(0, 1),
 		},
+		"indexed job with some pods deleted, podReplacementPolicy Failed": {
+			parallelism:             2,
+			completions:             5,
+			backoffLimit:            6,
+			completionMode:          batch.IndexedCompletion,
+			expectedCreations:       1,
+			expectedActive:          1,
+			expectedCreatedIndexes:  sets.New(0),
+			podReplacementPolicy:    podReplacementPolicy(batch.Failed),
+			jobPodReplacementPolicy: true,
+			terminatingPods:         1,
+			expectedTerminating:     pointer.Int32(1),
+		},
+		"indexed job with some pods deleted, podReplacementPolicy TerminatingOrFailed": {
+			parallelism:             2,
+			completions:             5,
+			backoffLimit:            6,
+			completionMode:          batch.IndexedCompletion,
+			expectedCreations:       2,
+			expectedActive:          2,
+			expectedCreatedIndexes:  sets.New(0, 1),
+			podReplacementPolicy:    podReplacementPolicy(batch.TerminatingOrFailed),
+			jobPodReplacementPolicy: true,
+			terminatingPods:         1,
+			expectedTerminating:     pointer.Int32(1),
+			expectedPodPatches:      1,
+		},
 		"indexed job completed": {
 			parallelism:    2,
 			completions:    3,
@@ -800,7 +868,7 @@ func TestControllerSyncJob(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodIndexLabel, !tc.podIndexLabelDisabled)()
-
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.jobPodReplacementPolicy)()
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -820,6 +888,9 @@ func TestControllerSyncJob(t *testing.T) {
 			// job & pods setup
 			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, tc.completionMode)
 			job.Spec.Suspend = pointer.Bool(tc.suspend)
+			if tc.jobPodReplacementPolicy {
+				job.Spec.PodReplacementPolicy = tc.podReplacementPolicy
+			}
 			if tc.initialStatus != nil {
 				startTime := metav1.Now()
 				job.Status.StartTime = &startTime
@@ -855,7 +926,7 @@ func TestControllerSyncJob(t *testing.T) {
 			}
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-			setPodsStatuses(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods, tc.readyPods)
+			setPodsStatuses(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods, tc.terminatingPods, tc.readyPods)
 			setPodsStatusesWithIndexes(podIndexer, job, tc.podsWithIndexes)
 
 			actual := job
@@ -936,6 +1007,9 @@ func TestControllerSyncJob(t *testing.T) {
 			}
 			if actual.Status.Failed != tc.expectedFailed {
 				t.Errorf("Unexpected number of failed pods.  Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
+			}
+			if diff := cmp.Diff(tc.expectedTerminating, actual.Status.Terminating); diff != "" {
+				t.Errorf("Unexpected number of terminating pods (-want,+got): %s", diff)
 			}
 			if actual.Status.StartTime != nil && tc.suspend {
 				t.Error("Unexpected .status.startTime not nil when suspend is true")
@@ -1905,7 +1979,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			job.Status.StartTime = &start
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-			setPodsStatuses(podIndexer, job, 0, tc.activePods, tc.succeededPods, tc.failedPods, 0)
+			setPodsStatuses(podIndexer, job, 0, tc.activePods, tc.succeededPods, tc.failedPods, 0, 0)
 
 			// run
 			err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
@@ -2175,12 +2249,14 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	testCases := map[string]struct {
 		enableJobPodFailurePolicy     bool
 		enablePodDisruptionConditions bool
+		enableJobPodReplacementPolicy bool
 		job                           batch.Job
 		pods                          []v1.Pod
 		wantConditions                *[]batch.JobCondition
 		wantStatusFailed              int32
 		wantStatusActive              int32
 		wantStatusSucceeded           int32
+		wantStatusTerminating         *int32
 	}{
 		"default handling for pod failure if the container matching the exit codes does not match the containerName restriction": {
 			enableJobPodFailurePolicy: true,
@@ -3149,15 +3225,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					},
 				},
 			},
-			wantConditions: &[]batch.JobCondition{
-				{
-					Type:    batch.JobFailed,
-					Status:  v1.ConditionTrue,
-					Reason:  "BackoffLimitExceeded",
-					Message: "Job has reached the specified backoff limit",
-				},
-			},
-			wantStatusFailed: 1,
 		},
 		"terminating Pod not considered failed when PodDisruptionConditions is enabled": {
 			enableJobPodFailurePolicy:     true,
@@ -3195,13 +3262,17 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					},
 				},
 			},
-			wantStatusActive: 1, // This is a replacement Pod: the terminating Pod is neither active nor failed.
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
+
+			if tc.job.Spec.PodReplacementPolicy == nil {
+				tc.job.Spec.PodReplacementPolicy = podReplacementPolicy(batch.Failed)
+			}
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(ctx, clientset, controller.NoResyncPeriodFunc)
 			fakePodControl := controller.FakePodControl{}
@@ -3253,6 +3324,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			}
 			if actual.Status.Failed != tc.wantStatusFailed {
 				t.Errorf("unexpected number of failed pods. Expected %d, saw %d\n", tc.wantStatusFailed, actual.Status.Failed)
+			}
+			if pointer.Int32Deref(actual.Status.Terminating, 0) != pointer.Int32Deref(tc.wantStatusTerminating, 0) {
+				t.Errorf("unexpected number of terminating pods. Expected %d, saw %d\n", pointer.Int32Deref(tc.wantStatusTerminating, 0), pointer.Int32Deref(actual.Status.Terminating, 0))
 			}
 		})
 	}
@@ -4602,10 +4676,11 @@ func TestJobApiBackoffReset(t *testing.T) {
 	if retries != 1 {
 		t.Fatalf("%s: expected exactly 1 retry, got %d", job.Name, retries)
 	}
+	// await for the actual requeue after processing of the pending queue is done
+	awaitForQueueLen(ctx, t, manager, 1)
 
 	// the queue is emptied on success
 	fakePodControl.Err = nil
-	manager.clock.Sleep(fastJobApiBackoff)
 	manager.processNextWorkItem(context.TODO())
 	verifyEmptyQueue(ctx, t, manager)
 }
@@ -5097,6 +5172,64 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	}
 }
 
+func TestFinalizerCleanup(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	clientset := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	manager := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+
+	// Initialize the controller with 0 workers to make sure the
+	// pod finalizers are not removed by the "syncJob" function.
+	go manager.Run(ctx, 0)
+
+	// Start the Pod and Job informers.
+	sharedInformers.Start(ctx.Done())
+	sharedInformers.WaitForCacheSync(ctx.Done())
+
+	// Create a simple Job
+	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
+	job, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Creating job: %v", err)
+	}
+
+	// Create a Pod with the job tracking finalizer
+	pod := newPod("test-pod", job)
+	pod.Finalizers = append(pod.Finalizers, batch.JobTrackingFinalizer)
+	pod, err = clientset.CoreV1().Pods(pod.GetNamespace()).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Creating pod: %v", err)
+	}
+
+	// Mark Job as complete.
+	job.Status.Conditions = append(job.Status.Conditions, batch.JobCondition{
+		Type:   batch.JobComplete,
+		Status: v1.ConditionTrue,
+	})
+	_, err = clientset.BatchV1().Jobs(job.GetNamespace()).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Updating job status: %v", err)
+	}
+
+	// Verify the pod finalizer is removed for a finished Job,
+	// even if the jobs pods are not tracked by the main reconciliation loop.
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		p, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return !hasJobTrackingFinalizer(p), nil
+	}); err != nil {
+		t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
+	}
+
+}
+
 func checkJobCompletionLabel(t *testing.T, p *v1.PodTemplateSpec) {
 	t.Helper()
 	labels := p.GetLabels()
@@ -5133,6 +5266,10 @@ func checkJobCompletionEnvVariable(t *testing.T, spec *v1.PodSpec, podIndexLabel
 			t.Errorf("Unexpected Env in container %s (-want,+got):\n%s", c.Name, diff)
 		}
 	}
+}
+
+func podReplacementPolicy(m batch.PodReplacementPolicy) *batch.PodReplacementPolicy {
+	return &m
 }
 
 func verifyEmptyQueueAndAwaitForQueueLen(ctx context.Context, t *testing.T, jm *Controller, wantQueueLen int) {

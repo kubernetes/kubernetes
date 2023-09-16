@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -438,7 +439,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
 					err := e2epod.DeletePodWithWait(ctx, c, pod)
-					framework.ExpectError(err)
+					gomega.Expect(err).To(gomega.HaveOccurred())
 					// pod object is now stale, but is intentionally not nil
 
 					ginkgo.By("Check if pod's host has been cleaned up -- expect not")
@@ -455,7 +456,7 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 
 	// Tests for NodeLogQuery feature
-	ginkgo.Describe("kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery]", func() {
+	ginkgo.Describe("kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] [LinuxOnly]", func() {
 		var (
 			numNodes  int
 			nodeNames sets.String
@@ -574,7 +575,7 @@ var _ = SIGDescribe("kubelet", func() {
 				queryCommand := "\"/api/v1/nodes/" + nodeName + "/proxy/logs/?query=kubelet&tailLines=3\""
 				cmd := tk.KubectlCmd("get", "--raw", queryCommand)
 				result := runKubectlCommand(cmd)
-				logs := journalctlCommand("-u", "kubelet", "-n 3 --utc")
+				logs := journalctlCommandOnNode(nodeName, "-u kubelet -n 3 --utc")
 				if result != logs {
 					framework.Failf("Failed to receive the correct kubelet logs or the correct amount of lines of logs")
 				}
@@ -593,7 +594,7 @@ var _ = SIGDescribe("kubelet", func() {
 				queryCommand := "\"/api/v1/nodes/" + nodeName + "/proxy/logs/?query=kubelet&tailLines=3&boot=0&pattern=kubelet\""
 				cmd := tk.KubectlCmd("get", "--raw", queryCommand)
 				result := runKubectlCommand(cmd)
-				logs := journalctlCommand("-u", "kubelet", "-n 3 --utc")
+				logs := journalctlCommandOnNode(nodeName, "-u kubelet -n 3 --utc")
 				if result != logs {
 					framework.Failf("Failed to receive the correct kubelet logs")
 				}
@@ -613,7 +614,7 @@ var _ = SIGDescribe("kubelet", func() {
 				queryCommand := "\"/api/v1/nodes/" + nodeName + "/proxy/logs/?query=kubelet&tailLines=3&sinceTime=" + start.Format(time.RFC3339) + "\""
 				cmd := tk.KubectlCmd("get", "--raw", queryCommand)
 				result := runKubectlCommand(cmd)
-				logs := journalctlCommand("-u", "kubelet", "-n 3 --utc")
+				logs := journalctlCommandOnNode(nodeName, "-u kubelet -n 3 --utc")
 				if result != logs {
 					framework.Failf("Failed to receive the correct kubelet logs or the correct amount of lines of logs")
 				}
@@ -634,7 +635,7 @@ var _ = SIGDescribe("kubelet", func() {
 				queryCommand := "\"/api/v1/nodes/" + nodeName + "/proxy/logs/?query=kubelet&tailLines=3&sinceTime=" + start.Format(time.RFC3339) + "\""
 				cmd := tk.KubectlCmd("get", "--raw", queryCommand)
 				result := runKubectlCommand(cmd)
-				logs := journalctlCommand("-u", "kubelet", "--utc")
+				logs := journalctlCommandOnNode(nodeName, "-u kubelet --utc")
 				assertContains(result, logs)
 			}
 		})
@@ -672,13 +673,9 @@ func assertContains(expectedString string, result string) {
 	return
 }
 
-func journalctlCommand(arg ...string) string {
-	command := exec.Command("journalctl", arg...)
-	out, err := command.Output()
-	if err != nil {
-		framework.Logf("Command: %v\nError: %v", command, err)
-		framework.Failf("Error at running journalctl command")
-	}
-	framework.Logf("Journalctl output: %s", out)
-	return string(out)
+func journalctlCommandOnNode(nodeName string, args string) string {
+	result, err := e2essh.NodeExec(context.Background(), nodeName, "journalctl "+args, framework.TestContext.Provider)
+	framework.ExpectNoError(err)
+	e2essh.LogResult(result)
+	return result.Stdout
 }

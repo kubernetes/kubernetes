@@ -210,6 +210,16 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
+	apiserverCurrentInqueueSeats = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "current_inqueue_seats",
+			Help:           "Number of seats currently pending in queues of the API Priority and Fairness subsystem",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, flowSchema},
+	)
 	apiserverRequestQueueLength = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
@@ -455,6 +465,7 @@ var (
 		apiserverNextSBounds,
 		apiserverNextDiscountedSBounds,
 		apiserverCurrentInqueueRequests,
+		apiserverCurrentInqueueSeats,
 		apiserverRequestQueueLength,
 		apiserverRequestConcurrencyLimit,
 		apiserverRequestConcurrencyInUse,
@@ -516,6 +527,11 @@ var GetExecutingMutatingConcurrency = executingMutating.getGauge
 // AddRequestsInQueues adds the given delta to the gauge of the # of requests in the queues of the specified flowSchema and priorityLevel
 func AddRequestsInQueues(ctx context.Context, priorityLevel, flowSchema string, delta int) {
 	apiserverCurrentInqueueRequests.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
+}
+
+// AddSeatsInQueues adds the given delta to the gauge of the # of seats in the queues of the specified flowSchema and priorityLevel
+func AddSeatsInQueues(ctx context.Context, priorityLevel, flowSchema string, delta int) {
+	apiserverCurrentInqueueSeats.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 
 // AddRequestsExecuting adds the given delta to the gauge of executing requests of the given flowSchema and priorityLevel

@@ -469,6 +469,12 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		filters = append(filters, alpha.Name())
 	}
 
+	// Add plugin command group to the list of command groups.
+	// The commands are only injected for the scope of showing help and completion, they are not
+	// invoked directly.
+	pluginCommandGroup := plugin.GetPluginCommandGroup(cmds)
+	groups = append(groups, pluginCommandGroup)
+
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
 	utilcomp.SetFactoryForCompletion(f)

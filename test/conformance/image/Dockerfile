@@ -12,18 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASEIMAGE
 ARG RUNNERIMAGE
-
-FROM ${BASEIMAGE} as debbase
-
 FROM ${RUNNERIMAGE}
-
-# This is a dependency for `kubectl diff` tests
-COPY --from=debbase /usr/bin/diff /usr/local/bin/
-COPY --from=debbase /lib/x86_64-linux-gnu/libc.so.6 /lib/x86_64-linux-gnu
-COPY --from=debbase /lib/x86_64-linux-gnu/libpthread.so.0 /lib/x86_64-linux-gnu
-COPY --from=debbase /lib64/ld-linux-x86-64.so.2 /lib64
 
 COPY cluster /kubernetes/cluster
 COPY ginkgo /usr/local/bin/

@@ -25,7 +25,7 @@ set -o pipefail
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-PROTOC_VERSION=3.19.4
+PROTOC_VERSION=23.4
 
 # Generates $1/api.pb.go from the protobuf file $1/api.proto
 # and formats it correctly

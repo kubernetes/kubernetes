@@ -53,6 +53,13 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 		warnings = append(warnings, getWarningsForCIDR(field.NewPath("spec").Child("loadBalancerSourceRanges").Index(i), cidr)...)
 	}
 
+	if service.Spec.Type == api.ServiceTypeExternalName && len(service.Spec.ExternalIPs) > 0 {
+		warnings = append(warnings, fmt.Sprintf("spec.externalIPs is ignored when spec.type is %q", api.ServiceTypeExternalName))
+	}
+	if service.Spec.Type != api.ServiceTypeExternalName && service.Spec.ExternalName != "" {
+		warnings = append(warnings, fmt.Sprintf("spec.externalName is ignored when spec.type is not %q", api.ServiceTypeExternalName))
+	}
+
 	return warnings
 }
 

@@ -1151,9 +1151,38 @@ func validateParamRef(pr *admissionregistration.ParamRef, fldPath *field.Path) f
 	if pr == nil {
 		return allErrors
 	}
-	for _, msg := range path.ValidatePathSegmentName(pr.Name, false) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), pr.Name, msg))
+
+	if len(pr.Name) > 0 {
+		for _, msg := range path.ValidatePathSegmentName(pr.Name, false) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), pr.Name, msg))
+		}
+
+		if pr.Selector != nil {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("name"), `name and selector are mutually exclusive`))
+		}
 	}
+
+	if pr.Selector != nil {
+		labelSelectorValidationOpts := metav1validation.LabelSelectorValidationOptions{}
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(pr.Selector, labelSelectorValidationOpts, fldPath.Child("selector"))...)
+
+		if len(pr.Name) > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("selector"), `name and selector are mutually exclusive`))
+		}
+	}
+
+	if len(pr.Name) == 0 && pr.Selector == nil {
+		allErrors = append(allErrors, field.Required(fldPath, `one of name or selector must be specified`))
+	}
+
+	if pr.ParameterNotFoundAction == nil || len(*pr.ParameterNotFoundAction) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("parameterNotFoundAction"), ""))
+	} else {
+		if *pr.ParameterNotFoundAction != admissionregistration.DenyAction && *pr.ParameterNotFoundAction != admissionregistration.AllowAction {
+			allErrors = append(allErrors, field.NotSupported(fldPath.Child("parameterNotFoundAction"), pr.ParameterNotFoundAction, []string{string(admissionregistration.DenyAction), string(admissionregistration.AllowAction)}))
+		}
+	}
+
 	return allErrors
 }
 

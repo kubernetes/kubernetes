@@ -893,7 +893,7 @@ func TestValidate(t *testing.T) {
 			if tc.costBudget != 0 {
 				budget = tc.costBudget
 			}
-			validateResult := v.Validate(ctx, fakeVersionedAttr, nil, nil, budget, nil)
+			validateResult := v.Validate(ctx, fakeVersionedAttr.GetResource(), fakeVersionedAttr, nil, nil, budget, nil)
 
 			require.Equal(t, len(validateResult.Decisions), len(tc.policyDecision))
 
@@ -945,7 +945,7 @@ func TestContextCanceled(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.TODO())
 	cancel()
-	validationResult := v.Validate(ctx, fakeVersionedAttr, nil, nil, celconfig.RuntimeCELCostBudget, nil)
+	validationResult := v.Validate(ctx, fakeVersionedAttr.GetResource(), fakeVersionedAttr, nil, nil, celconfig.RuntimeCELCostBudget, nil)
 	if len(validationResult.Decisions) != 1 || !strings.Contains(validationResult.Decisions[0].Message, "operation interrupted") {
 		t.Errorf("Expected 'operation interrupted' but got %v", validationResult.Decisions)
 	}

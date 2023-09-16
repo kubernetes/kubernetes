@@ -958,10 +958,35 @@ func FilterActivePods(logger klog.Logger, pods []*v1.Pod) []*v1.Pod {
 	return result
 }
 
+func FilterTerminatingPods(pods []*v1.Pod) []*v1.Pod {
+	var result []*v1.Pod
+	for _, p := range pods {
+		if IsPodTerminating(p) {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+func CountTerminatingPods(pods []*v1.Pod) int32 {
+	numberOfTerminatingPods := 0
+	for _, p := range pods {
+		if IsPodTerminating(p) {
+			numberOfTerminatingPods += 1
+		}
+	}
+	return int32(numberOfTerminatingPods)
+}
+
 func IsPodActive(p *v1.Pod) bool {
 	return v1.PodSucceeded != p.Status.Phase &&
 		v1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
+}
+
+func IsPodTerminating(p *v1.Pod) bool {
+	return !podutil.IsPodTerminal(p) &&
+		p.DeletionTimestamp != nil
 }
 
 // FilterActiveReplicaSets returns replica sets that have (or at least ought to have) pods.

@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -351,7 +352,7 @@ func TestWaitingForGatesCondition(t *testing.T) {
 			want: api.PodCondition{
 				Type:    api.PodScheduled,
 				Status:  api.ConditionFalse,
-				Reason:  api.PodReasonSchedulingGated,
+				Reason:  apiv1.PodReasonSchedulingGated,
 				Message: "Scheduling is blocked due to non-empty scheduling gates",
 			},
 		},

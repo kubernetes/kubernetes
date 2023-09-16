@@ -182,7 +182,7 @@ func waitForPodsGone(ctx context.Context, ps *testutils.PodStore, interval, time
 		return false, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		for _, pod := range pods {
 			framework.Logf("ERROR: Pod %q still exists. Node: %q", pod.Name, pod.Spec.NodeName)
 		}
@@ -206,7 +206,7 @@ func waitForPodsInactive(ctx context.Context, ps *testutils.PodStore, interval, 
 		return true, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		for _, pod := range activePods {
 			framework.Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
 		}

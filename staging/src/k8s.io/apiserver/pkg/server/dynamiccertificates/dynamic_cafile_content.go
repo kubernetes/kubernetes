@@ -21,7 +21,7 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -98,7 +98,7 @@ func (c *DynamicFileCAContent) AddListener(listener Listener) {
 
 // loadCABundle determines the next set of content for the file.
 func (c *DynamicFileCAContent) loadCABundle() error {
-	caBundle, err := ioutil.ReadFile(c.filename)
+	caBundle, err := os.ReadFile(c.filename)
 	if err != nil {
 		return err
 	}

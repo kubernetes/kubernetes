@@ -65,7 +65,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			// get all internal ips for node
 			internalIPs := e2enode.GetAddresses(&node, v1.NodeInternalIP)
 
-			framework.ExpectEqual(len(internalIPs), 2)
+			gomega.Expect(internalIPs).To(gomega.HaveLen(2))
 			// assert 2 ips belong to different families
 			if netutils.IsIPv4String(internalIPs[0]) == netutils.IsIPv4String(internalIPs[1]) {
 				framework.Failf("both internalIPs %s and %s belong to the same families", internalIPs[0], internalIPs[1])
@@ -98,9 +98,9 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		gomega.Expect(p.Status.PodIPs).ShouldNot(gomega.BeNil())
 
 		// validate there are 2 ips in podIPs
-		framework.ExpectEqual(len(p.Status.PodIPs), 2)
+		gomega.Expect(p.Status.PodIPs).To(gomega.HaveLen(2))
 		// validate first ip in PodIPs is same as PodIP
-		framework.ExpectEqual(p.Status.PodIP, p.Status.PodIPs[0].IP)
+		gomega.Expect(p.Status.PodIP).To(gomega.Equal(p.Status.PodIPs[0].IP))
 		// assert 2 pod ips belong to different families
 		if netutils.IsIPv4String(p.Status.PodIPs[0].IP) == netutils.IsIPv4String(p.Status.PodIPs[1].IP) {
 			framework.Failf("both internalIPs %s and %s belong to the same families", p.Status.PodIPs[0].IP, p.Status.PodIPs[1].IP)

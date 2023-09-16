@@ -100,7 +100,7 @@ func tweakAddLBIngress(ip string) serviceTweak {
 func makeServicePort(protocol v1.Protocol, targetPort int) []v1.ServicePort {
 	sp := v1.ServicePort{Port: 80, Protocol: protocol}
 	if targetPort > 0 {
-		sp.TargetPort = intstr.FromInt(targetPort)
+		sp.TargetPort = intstr.FromInt32(int32(targetPort))
 	}
 	return []v1.ServicePort{sp}
 }
@@ -894,6 +894,65 @@ func compareUpdateCalls(t *testing.T, left, right []fakecloud.UpdateBalancerCall
 	}
 	if mismatch {
 		t.Errorf("expected update calls to match, expected %+v, got %+v", left, right)
+	}
+}
+
+func TestNodesNotEqual(t *testing.T) {
+	controller, cloud, _ := newController()
+
+	services := []*v1.Service{
+		newService("s0", v1.ServiceTypeLoadBalancer),
+		newService("s1", v1.ServiceTypeLoadBalancer),
+	}
+
+	node1 := makeNode(tweakName("node1"))
+	node2 := makeNode(tweakName("node2"))
+	node3 := makeNode(tweakName("node3"))
+	node1WithProviderID := makeNode(tweakName("node1"), tweakProviderID("cumulus/1"))
+	node2WithProviderID := makeNode(tweakName("node2"), tweakProviderID("cumulus/2"))
+
+	testCases := []struct {
+		desc                string
+		lastSyncNodes       []*v1.Node
+		newNodes            []*v1.Node
+		expectedUpdateCalls []fakecloud.UpdateBalancerCall
+	}{
+		{
+			desc:          "Nodes with updated providerID",
+			lastSyncNodes: []*v1.Node{node1, node2},
+			newNodes:      []*v1.Node{node1WithProviderID, node2WithProviderID},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1WithProviderID, node2WithProviderID}},
+				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1WithProviderID, node2WithProviderID}},
+			},
+		},
+		{
+			desc:                "Nodes unchanged",
+			lastSyncNodes:       []*v1.Node{node1WithProviderID, node2},
+			newNodes:            []*v1.Node{node1WithProviderID, node2},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+		},
+		{
+			desc:          "Change node with empty providerID",
+			lastSyncNodes: []*v1.Node{node1WithProviderID, node2},
+			newNodes:      []*v1.Node{node1WithProviderID, node3},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1WithProviderID, node3}},
+				{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1WithProviderID, node3}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			controller.nodeLister = newFakeNodeLister(nil, tc.newNodes...)
+			controller.lastSyncedNodes = tc.lastSyncNodes
+			controller.updateLoadBalancerHosts(ctx, services, 5)
+			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
+			cloud.UpdateCalls = []fakecloud.UpdateBalancerCall{}
+		})
 	}
 }
 

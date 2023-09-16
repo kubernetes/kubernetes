@@ -75,15 +75,13 @@ func decDisableShortcircuits() InterpretableDecorator {
 		switch expr := i.(type) {
 		case *evalOr:
 			return &evalExhaustiveOr{
-				id:  expr.id,
-				lhs: expr.lhs,
-				rhs: expr.rhs,
+				id:    expr.id,
+				terms: expr.terms,
 			}, nil
 		case *evalAnd:
 			return &evalExhaustiveAnd{
-				id:  expr.id,
-				lhs: expr.lhs,
-				rhs: expr.rhs,
+				id:    expr.id,
+				terms: expr.terms,
 			}, nil
 		case *evalFold:
 			expr.exhaustive = true

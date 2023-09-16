@@ -253,10 +253,13 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 }
 
 // TODO: to reuse https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request/admissionreview.go#L154
-func CreateAdmissionRequest(attr admission.Attributes) *admissionv1.AdmissionRequest {
-	// FIXME: how to get resource GVK, GVR and subresource?
-	gvk := attr.GetKind()
-	gvr := attr.GetResource()
+func CreateAdmissionRequest(attr admission.Attributes, equivalentGVR metav1.GroupVersionResource, equivalentKind metav1.GroupVersionKind) *admissionv1.AdmissionRequest {
+	// Attempting to use same logic as webhook for constructing resource
+	// GVK, GVR, subresource
+	// Use the GVK, GVR that the matcher decided was equivalent to that of the request
+	// https://github.com/kubernetes/kubernetes/blob/90c362b3430bcbbf8f245fadbcd521dab39f1d7c/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go#L182-L210
+	gvk := equivalentKind
+	gvr := equivalentGVR
 	subresource := attr.GetSubresource()
 
 	requestGVK := attr.GetKind()

@@ -745,7 +745,7 @@ function yaml-map-string-string {
 # Returns kubelet flags used on both Linux and Windows nodes.
 function construct-common-kubelet-flags {
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
-  flags+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}"
+  flags+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-external}"
   # TODO(mtaufen): ROTATE_CERTIFICATES seems unused; delete it?
   if [[ -n "${ROTATE_CERTIFICATES:-}" ]]; then
     flags+=" --rotate-certificates=true"
@@ -770,7 +770,7 @@ function construct-linux-kubelet-flags {
   # If ENABLE_AUTH_PROVIDER_GCP is set to true, kubelet is enabled to use out-of-tree auth 
   # credential provider instead of in-tree auth credential provider.
   # https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider
-  if [[ "${ENABLE_AUTH_PROVIDER_GCP:-false}" == "true" ]]; then
+  if [[ "${ENABLE_AUTH_PROVIDER_GCP:-true}" == "true" ]]; then
     # Keep the values of --image-credential-provider-config and --image-credential-provider-bin-dir
     # in sync with value of auth_config_file and auth_provider_dir set in install-auth-provider-gcp function
     # in gci/configure.sh.
@@ -882,7 +882,7 @@ function construct-windows-kubelet-flags {
 
   # If ENABLE_AUTH_PROVIDER_GCP is set to true, kubelet is enabled to use out-of-tree auth
   # credential provider. https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider
-  if [[ "${ENABLE_AUTH_PROVIDER_GCP:-false}" == "true" ]]; then
+  if [[ "${ENABLE_AUTH_PROVIDER_GCP:-true}" == "true" ]]; then
     flags+="  --image-credential-provider-config=${AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE}"
     flags+="  --image-credential-provider-bin-dir=${AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR}"
   fi
@@ -1127,7 +1127,7 @@ METADATA_AGENT_CLUSTER_LEVEL_MEMORY_REQUEST: $(yaml-quote "${METADATA_AGENT_CLUS
 DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote "${DOCKER_REGISTRY_MIRROR_URL:-}")
 ENABLE_L7_LOADBALANCING: $(yaml-quote "${ENABLE_L7_LOADBALANCING:-none}")
 ENABLE_CLUSTER_LOGGING: $(yaml-quote "${ENABLE_CLUSTER_LOGGING:-false}")
-ENABLE_AUTH_PROVIDER_GCP: $(yaml-quote "${ENABLE_AUTH_PROVIDER_GCP:-false}")
+ENABLE_AUTH_PROVIDER_GCP: $(yaml-quote "${ENABLE_AUTH_PROVIDER_GCP:-true}")
 ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote "${ENABLE_NODE_PROBLEM_DETECTOR:-none}")
 NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote "${NODE_PROBLEM_DETECTOR_VERSION:-}")
 NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TAR_HASH:-}")
@@ -1438,6 +1438,11 @@ EOF
     if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
       cat >>"$file" <<EOF
 CONTROLLER_MANAGER_TEST_ARGS: $(yaml-quote "${CONTROLLER_MANAGER_TEST_ARGS}")
+EOF
+    fi
+    if [ -n "${KUBE_CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
+      cat >>"$file" <<EOF
+KUBE_CONTROLLER_MANAGER_TEST_ARGS: $(yaml-quote "${KUBE_CONTROLLER_MANAGER_TEST_ARGS}")
 EOF
     fi
     if [ -n "${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-}" ]; then

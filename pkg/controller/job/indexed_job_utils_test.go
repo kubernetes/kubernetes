@@ -758,6 +758,7 @@ func TestFirstPendingIndexes(t *testing.T) {
 				activePods:       hollowPodsWithIndexPhase(tc.activePods),
 				succeededIndexes: tc.succeededIndexes,
 				failedIndexes:    tc.failedIndexes,
+				job:              newJob(1, 1, 1, batch.IndexedCompletion),
 			}
 			got := firstPendingIndexes(jobCtx, tc.cnt, tc.completions)
 			if diff := cmp.Diff(tc.want, got); diff != "" {

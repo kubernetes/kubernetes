@@ -4195,7 +4195,7 @@
           "resources": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeResourceRequirements"
               }
             ],
             "default": {},
@@ -4621,6 +4621,14 @@
       "io.k8s.api.core.v1.PersistentVolumeStatus": {
         "description": "PersistentVolumeStatus is the current status of a persistent volume.",
         "properties": {
+          "lastPhaseTransitionTime": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
+            "description": "lastPhaseTransitionTime is the time the phase transitioned from one to another and automatically resets to current time everytime a volume phase transitions. This is an alpha field and requires enabling PersistentVolumeLastPhaseTransitionTime feature."
+          },
           "message": {
             "description": "message is a human-readable message indicating details about why the volume is in this state.",
             "type": "string"
@@ -7973,6 +7981,36 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.VolumeResourceRequirements": {
+        "description": "VolumeResourceRequirements describes the storage resource requirements for a volume.",
+        "properties": {
+          "limits": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+            "type": "object"
+          },
+          "requests": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource": {
         "description": "Represents a vSphere volume resource.",
         "properties": {
@@ -8465,11 +8503,6 @@
             "group": "extensions",
             "kind": "DeleteOptions",
             "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
           },
           {
             "group": "flowcontrol.apiserver.k8s.io",
@@ -9198,11 +9231,6 @@
             "group": "extensions",
             "kind": "WatchEvent",
             "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
           },
           {
             "group": "flowcontrol.apiserver.k8s.io",

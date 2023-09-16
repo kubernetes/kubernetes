@@ -127,7 +127,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := testVol.pvc.Status.Conditions
-			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 		})
 
 	})
@@ -154,7 +154,7 @@ func UpdatePVSize(ctx context.Context, pv *v1.PersistentVolume, size resource.Qu
 		}
 		return true, nil
 	})
-	if waitErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(waitErr) {
 		return nil, fmt.Errorf("timed out attempting to update PV size. last update error: %v", lastError)
 	}
 	if waitErr != nil {

@@ -141,7 +141,7 @@ func allNodesReady(ctx context.Context, c clientset.Interface, timeout time.Dura
 		return len(notReady) <= framework.TestContext.AllowedNotReadyNodes, nil
 	})
 
-	if err != nil && err != wait.ErrWaitTimeout {
+	if err != nil && !wait.Interrupted(err) {
 		return err
 	}
 

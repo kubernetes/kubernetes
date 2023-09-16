@@ -32,6 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
+func ptr[T any](v T) *T { return &v }
+
 func strPtr(s string) *string { return &s }
 
 func int32Ptr(i int32) *int32 { return &i }
@@ -3517,7 +3519,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
@@ -3537,7 +3540,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -3591,7 +3595,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				}, MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -3616,7 +3621,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				}, MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -3641,7 +3647,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3668,7 +3675,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3704,7 +3712,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3731,7 +3740,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3758,7 +3768,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3794,7 +3805,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3821,7 +3833,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3848,7 +3861,8 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny, admissionregistration.Deny},
 			},
@@ -3863,12 +3877,80 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.ValidationAction("illegal")},
 			},
 		},
 		expectedError: `Unsupported value: "illegal": supported values: "Audit", "Deny", "Warn"`,
+	}, {
+		name: "paramRef selector must not be set when name is set",
+		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName:        "xyzlimit-scale.example.com",
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+				ParamRef: &admissionregistration.ParamRef{
+					Name: "xyzlimit-scale-setting.example.com",
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"label": "value",
+						},
+					},
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+				},
+			},
+		},
+		expectedError: `spec.paramRef.name: Forbidden: name and selector are mutually exclusive, spec.paramRef.selector: Forbidden: name and selector are mutually exclusive`,
+	}, {
+		name: "paramRef parameterNotFoundAction must be set",
+		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName:        "xyzlimit-scale.example.com",
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+				ParamRef: &admissionregistration.ParamRef{
+					Name: "xyzlimit-scale-setting.example.com",
+				},
+			},
+		},
+		expectedError: "spec.paramRef.parameterNotFoundAction: Required value",
+	}, {
+		name: "paramRef parameterNotFoundAction must be an valid value",
+		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName:        "xyzlimit-scale.example.com",
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.ParameterNotFoundActionType("invalid")),
+				},
+			},
+		},
+		expectedError: `spec.paramRef.parameterNotFoundAction: Unsupported value: "invalid": supported values: "Deny", "Allow"`,
+	}, {
+		name: "paramRef one of name or selector",
+		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName:        "xyzlimit-scale.example.com",
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+				ParamRef: &admissionregistration.ParamRef{
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
+				},
+			},
+		},
+		expectedError: `one of name or selector must be specified`,
 	}}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -3903,7 +3985,8 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3937,7 +4020,8 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3973,7 +4057,8 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
 				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+					Name:                    "xyzlimit-scale-setting.example.com",
+					ParameterNotFoundAction: ptr(admissionregistration.DenyAction),
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{

@@ -116,3 +116,58 @@ func TestDefaultAdmissionPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultAdmissionPolicyBinding(t *testing.T) {
+	denyAction := v1alpha1.DenyAction
+	equivalent := v1alpha1.Equivalent
+
+	tests := []struct {
+		name     string
+		original runtime.Object
+		expected runtime.Object
+	}{
+		{
+			name: "ValidatingAdmissionPolicyBinding.ParamRef.ParameterNotFoundAction",
+			original: &v1alpha1.ValidatingAdmissionPolicyBinding{
+				Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+					ParamRef: &v1alpha1.ParamRef{},
+				},
+			},
+			expected: &v1alpha1.ValidatingAdmissionPolicyBinding{
+				Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+					ParamRef: &v1alpha1.ParamRef{
+						ParameterNotFoundAction: &denyAction,
+					},
+				},
+			},
+		},
+		{
+			name: "ValidatingAdmissionPolicyBinding.MatchResources",
+			original: &v1alpha1.ValidatingAdmissionPolicyBinding{
+				Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+					MatchResources: &v1alpha1.MatchResources{},
+				},
+			},
+			expected: &v1alpha1.ValidatingAdmissionPolicyBinding{
+				Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+					MatchResources: &v1alpha1.MatchResources{
+						NamespaceSelector: &metav1.LabelSelector{},
+						ObjectSelector:    &metav1.LabelSelector{},
+						MatchPolicy:       &equivalent,
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			original := test.original
+			expected := test.expected
+			legacyscheme.Scheme.Default(original)
+			if !apiequality.Semantic.DeepEqual(original, expected) {
+				t.Error(cmp.Diff(expected, original))
+			}
+		})
+	}
+}

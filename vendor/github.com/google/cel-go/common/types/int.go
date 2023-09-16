@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -41,16 +40,6 @@ const (
 )
 
 var (
-	// IntType singleton.
-	IntType = NewTypeValue("int",
-		traits.AdderType,
-		traits.ComparerType,
-		traits.DividerType,
-		traits.ModderType,
-		traits.MultiplierType,
-		traits.NegatorType,
-		traits.SubtractorType)
-
 	// int32WrapperType reflected type for protobuf int32 wrapper type.
 	int32WrapperType = reflect.TypeOf(&wrapperspb.Int32Value{})
 

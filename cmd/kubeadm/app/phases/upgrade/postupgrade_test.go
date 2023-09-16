@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -205,4 +206,27 @@ func (cc *componentConfig) IsUserSupplied() bool {
 }
 func (cc *componentConfig) SetUserSupplied(userSupplied bool) {
 	cc.userSupplied = userSupplied
+}
+
+// moveFiles moves files from one directory to another.
+func moveFiles(files map[string]string) error {
+	filesToRecover := make(map[string]string, len(files))
+	for from, to := range files {
+		if err := os.Rename(from, to); err != nil {
+			return rollbackFiles(filesToRecover, err)
+		}
+		filesToRecover[to] = from
+	}
+	return nil
+}
+
+// rollbackFiles moves the files back to the original directory.
+func rollbackFiles(files map[string]string, originalErr error) error {
+	errs := []error{originalErr}
+	for from, to := range files {
+		if err := os.Rename(from, to); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
 }

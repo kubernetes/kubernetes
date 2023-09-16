@@ -117,8 +117,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	}
 
 	limit := numStored
-	if utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking) && listOptions.Limit > 0 &&
-		listOptions.Limit < numStored {
+	if listOptions.Limit > 0 && listOptions.Limit < numStored {
 		limit = listOptions.Limit
 	}
 
@@ -165,15 +164,14 @@ func key(requestInfo *apirequest.RequestInfo) string {
 func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
 
 	// Serve consistent reads from storage if ConsistentListFromCache is disabled
 	consistentReadFromStorage := resourceVersion == "" && !consistentListFromCacheEnabled
 	// Watch cache doesn't support continuations, so serve them from etcd.
-	hasContinuation := pagingEnabled && len(opts.Continue) > 0
+	hasContinuation := len(opts.Continue) > 0
 	// Serve paginated requests about revision "0" from watch cache to avoid overwhelming etcd.
-	hasLimit := pagingEnabled && opts.Limit > 0 && resourceVersion != "0"
+	hasLimit := opts.Limit > 0 && resourceVersion != "0"
 	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
 	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
 

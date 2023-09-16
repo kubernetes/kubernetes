@@ -181,5 +181,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			// JSON only supports 53 bits because everything is a float
 			*obj = int64(c.Uint64()) & ((int64(1) << 53) - 1)
 		},
+		func(obj *apiextensions.ValidationRule, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			if obj.Reason != nil && *(obj.Reason) == "" {
+				obj.Reason = nil
+			}
+		},
 	}
 }

@@ -118,14 +118,14 @@ while true; do sleep 1; done
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'Ready' condition", testContainer.Name))
 					isReady, err := terminateContainer.IsReady(ctx)
-					framework.ExpectEqual(isReady, testCase.Ready)
+					gomega.Expect(isReady).To(gomega.Equal(testCase.Ready))
 					framework.ExpectNoError(err)
 
 					status, err := terminateContainer.GetStatus(ctx)
 					framework.ExpectNoError(err)
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'State'", testContainer.Name))
-					framework.ExpectEqual(GetContainerState(status.State), testCase.State)
+					gomega.Expect(GetContainerState(status.State)).To(gomega.Equal(testCase.State))
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should be possible to delete [NodeConformance]", testContainer.Name))
 					gomega.Expect(terminateContainer.Delete(ctx)).To(gomega.Succeed())
@@ -161,7 +161,7 @@ while true; do sleep 1; done
 				framework.ExpectNoError(err)
 
 				ginkgo.By("the container should be terminated")
-				framework.ExpectEqual(GetContainerState(status.State), ContainerStateTerminated)
+				gomega.Expect(GetContainerState(status.State)).To(gomega.Equal(ContainerStateTerminated))
 
 				ginkgo.By("the termination message should be set")
 				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)

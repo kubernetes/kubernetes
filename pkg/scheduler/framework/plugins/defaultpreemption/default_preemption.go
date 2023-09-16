@@ -97,8 +97,9 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 	}
 
 	result, status := pe.Preempt(ctx, pod, m)
-	if status.Message() != "" {
-		return result, framework.NewStatus(status.Code(), "preemption: "+status.Message())
+	msg := status.Message()
+	if len(msg) > 0 {
+		return result, framework.NewStatus(status.Code(), "preemption: "+msg)
 	}
 	return result, status
 }
