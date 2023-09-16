@@ -19,7 +19,6 @@ package framework
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -31,6 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestNewResource(t *testing.T) {
@@ -210,49 +210,30 @@ func TestSetMaxResource(t *testing.T) {
 	}
 }
 
-type testingMode interface {
-	Fatalf(format string, args ...interface{})
-}
-
-func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, ports []v1.ContainerPort, volumes []v1.Volume) *v1.Pod {
-	req := v1.ResourceList{}
-	if cpu != "" {
-		req = v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse(cpu),
-			v1.ResourceMemory: resource.MustParse(mem),
-		}
-		if extended != "" {
-			parts := strings.Split(extended, ":")
-			if len(parts) != 2 {
-				t.Fatalf("Invalid extended resource string: \"%s\"", extended)
-			}
-			req[v1.ResourceName(parts[0])] = resource.MustParse(parts[1])
-		}
-	}
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       types.UID(objName),
-			Namespace: "node_info_cache_test",
-			Name:      objName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Resources: v1.ResourceRequirements{
-					Requests: req,
-				},
-				Ports: ports,
-			}},
-			NodeName: nodeName,
-			Volumes:  volumes,
-		},
-	}
-}
-
 func TestNewNodeInfo(t *testing.T) {
 	nodeName := "test-node"
 	pods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}, nil),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}, nil),
+		st.MakePod().UID("test-1").Namespace("node_info_cache_test").Name("test-1").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "100m",
+				v1.ResourceMemory: "500",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 80,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Obj(),
+
+		st.MakePod().UID("test-2").Namespace("node_info_cache_test").Name("test-2").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "200m",
+				v1.ResourceMemory: "1Ki",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 8080,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Obj(),
 	}
 
 	expected := &NodeInfo{
@@ -841,10 +822,28 @@ func TestNodeInfoAddPod(t *testing.T) {
 func TestNodeInfoRemovePod(t *testing.T) {
 	nodeName := "test-node"
 	pods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "",
-			[]v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}},
-			[]v1.Volume{{VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-1"}}}}),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}, nil),
+		st.MakePod().UID("test-1").Namespace("node_info_cache_test").Name("test-1").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "100m",
+				v1.ResourceMemory: "500",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 80,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Volumes([]v1.Volume{{VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-1"}}}}).
+			Obj(),
+
+		st.MakePod().UID("test-2").Namespace("node_info_cache_test").Name("test-2").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "200m",
+				v1.ResourceMemory: "1Ki",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 8080,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Obj(),
 	}
 
 	// add pod Overhead
@@ -861,7 +860,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 		expectedNodeInfo *NodeInfo
 	}{
 		{
-			pod:         makeBasePod(t, nodeName, "non-exist", "0", "0", "", []v1.ContainerPort{{}}, []v1.Volume{}),
+			pod:         st.MakePod().UID("non-exist").Namespace("node_info_cache_test").Node(nodeName).Obj(),
 			errExpected: true,
 			expectedNodeInfo: &NodeInfo{
 				node: &v1.Node{
