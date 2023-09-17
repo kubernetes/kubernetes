@@ -165,6 +165,7 @@ var args = []string{
 	"--concurrent-ttl-after-finished-syncs=8",
 }
 
+// TestAddFlags tests the addition of flags to the KubeControllerManagerOptions.
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
@@ -460,6 +461,7 @@ func TestAddFlags(t *testing.T) {
 	}
 }
 
+// TestApplyTo tests the application of flags to the KubeControllerManagerOptions.
 func TestApplyTo(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
@@ -665,6 +667,8 @@ func TestApplyTo(t *testing.T) {
 	}
 }
 
+// This function validates various controller configuration options for correctness
+// and reports any validation errors.
 func TestValidateControllersOptions(t *testing.T) {
 	testCases := []struct {
 		name                   string
@@ -1274,6 +1278,7 @@ func TestValidateControllersOptions(t *testing.T) {
 	}
 }
 
+// Tests the controller manager options for exceeding `MaxEndpointsPerSlice` limit.
 func TestValidateControllerManagerOptions(t *testing.T) {
 	opts, err := NewKubeControllerManagerOptions()
 	if err != nil {
@@ -1287,6 +1292,7 @@ func TestValidateControllerManagerOptions(t *testing.T) {
 	}
 }
 
+// Tests controller manager options and aliases for controller names.
 func TestControllerManagerAliases(t *testing.T) {
 	opts, err := NewKubeControllerManagerOptions()
 	if err != nil {
@@ -1333,10 +1339,12 @@ func TestControllerManagerAliases(t *testing.T) {
 
 type sortedGCIgnoredResources []garbagecollectorconfig.GroupResource
 
+// Returns the length of a sorted collection of ignored garbage collection resources.
 func (r sortedGCIgnoredResources) Len() int {
 	return len(r)
 }
 
+// Orders ignored garbage collection resources based on group and resource names.
 func (r sortedGCIgnoredResources) Less(i, j int) bool {
 	if r[i].Group < r[j].Group {
 		return true
@@ -1346,6 +1354,7 @@ func (r sortedGCIgnoredResources) Less(i, j int) bool {
 	return r[i].Resource < r[j].Resource
 }
 
+// Swaps two elements in a sorted slice of ignored garbage collection resources.
 func (r sortedGCIgnoredResources) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
