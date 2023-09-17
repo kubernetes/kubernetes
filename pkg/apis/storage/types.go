@@ -303,7 +303,7 @@ type CSIDriverSpec struct {
 	// NodePublishVolume() calls.
 	// The CSI driver is responsible for parsing and validating the information
 	// passed in as VolumeContext.
-	// The following VolumeConext will be passed if podInfoOnMount is set to true.
+	// The following VolumeContext will be passed if podInfoOnMount is set to true.
 	// This list might grow, but the prefix will be used.
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
