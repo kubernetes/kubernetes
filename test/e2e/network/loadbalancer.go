@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2ekubesystem "k8s.io/kubernetes/test/e2e/framework/kubesystem"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -55,7 +54,6 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	gcecloud "k8s.io/legacy-cloud-providers/gce"
 	admissionapi "k8s.io/pod-security-admission/api"
 	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
@@ -736,81 +734,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 			}
 			// should have the given static internal IP.
 			gomega.Expect(e2eservice.GetIngressPoint(lbIngress)).To(gomega.Equal(internalStaticIP))
-		}
-	})
-
-	// This test creates a load balancer, make sure its health check interval
-	// equals to gceHcCheckIntervalSeconds. Then the interval is manipulated
-	// to be something else, see if the interval will be reconciled.
-	ginkgo.It("should reconcile LB health check interval [Slow][Serial][Disruptive]", func(ctx context.Context) {
-		const gceHcCheckIntervalSeconds = int64(8)
-		// This test is for clusters on GCE.
-		// (It restarts kube-controller-manager, which we don't support on GKE)
-		e2eskipper.SkipUnlessProviderIs("gce")
-		e2eskipper.SkipUnlessSSHKeyPresent()
-
-		clusterID, err := gce.GetClusterID(ctx, cs)
-		if err != nil {
-			framework.Failf("framework.GetClusterID(cs) = _, %v; want nil", err)
-		}
-		gceCloud, err := gce.GetGCECloud()
-		if err != nil {
-			framework.Failf("framework.GetGCECloud() = _, %v; want nil", err)
-		}
-
-		namespace := f.Namespace.Name
-		serviceName := "lb-hc-int"
-		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
-
-		ginkgo.By("create load balancer service")
-		// Create loadbalancer service with source range from node[0] and podAccept
-		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		})
-		framework.ExpectNoError(err)
-
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			ginkgo.By("Clean up loadbalancer service")
-			e2eservice.WaitForServiceDeletedWithFinalizer(ctx, cs, svc.Namespace, svc.Name)
-		})
-
-		svc, err = jig.WaitForLoadBalancer(ctx, e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs))
-		framework.ExpectNoError(err)
-
-		hcName := gcecloud.MakeNodesHealthCheckName(clusterID)
-		hc, err := gceCloud.GetHTTPHealthCheck(hcName)
-		if err != nil {
-			framework.Failf("gceCloud.GetHttpHealthCheck(%q) = _, %v; want nil", hcName, err)
-		}
-		gomega.Expect(hc.CheckIntervalSec).To(gomega.Equal(gceHcCheckIntervalSeconds))
-
-		ginkgo.By("modify the health check interval")
-		hc.CheckIntervalSec = gceHcCheckIntervalSeconds - 1
-		if err = gceCloud.UpdateHTTPHealthCheck(hc); err != nil {
-			framework.Failf("gcecloud.UpdateHttpHealthCheck(%#v) = %v; want nil", hc, err)
-		}
-
-		ginkgo.By("restart kube-controller-manager")
-		if err := e2ekubesystem.RestartControllerManager(ctx); err != nil {
-			framework.Failf("e2ekubesystem.RestartControllerManager() = %v; want nil", err)
-		}
-		if err := e2ekubesystem.WaitForControllerManagerUp(ctx); err != nil {
-			framework.Failf("e2ekubesystem.WaitForControllerManagerUp() = %v; want nil", err)
-		}
-
-		ginkgo.By("health check should be reconciled")
-		pollInterval := framework.Poll * 10
-		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs)
-		if pollErr := wait.PollImmediate(pollInterval, loadBalancerPropagationTimeout, func() (bool, error) {
-			hc, err := gceCloud.GetHTTPHealthCheck(hcName)
-			if err != nil {
-				framework.Logf("ginkgo.Failed to get HttpHealthCheck(%q): %v", hcName, err)
-				return false, err
-			}
-			framework.Logf("hc.CheckIntervalSec = %v", hc.CheckIntervalSec)
-			return hc.CheckIntervalSec == gceHcCheckIntervalSeconds, nil
-		}); pollErr != nil {
-			framework.Failf("Health check %q does not reconcile its check interval to %d.", hcName, gceHcCheckIntervalSeconds)
 		}
 	})
 
