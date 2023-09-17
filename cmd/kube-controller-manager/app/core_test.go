@@ -36,19 +36,28 @@ type TestClientBuilder struct {
 	clientset clientset.Interface
 }
 
+// Returns a nil config and error for the given client name.
 func (TestClientBuilder) Config(name string) (*restclient.Config, error) { return nil, nil }
+
+// Returns an empty config for the given client name without error handling.
 func (TestClientBuilder) ConfigOrDie(name string) *restclient.Config {
 	return &restclient.Config{}
 }
 
+// Returns a nil client interface for the given name without error handling.
 func (TestClientBuilder) Client(name string) (clientset.Interface, error) { return nil, nil }
+
+// Returns a clientset for the given name or panics if unavailable.
 func (m TestClientBuilder) ClientOrDie(name string) clientset.Interface {
 	return m.clientset
 }
 
+// Returns the discovery client for the given name from the test clientset.
 func (m TestClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
 	return m.clientset.Discovery(), nil
 }
+
+// Returns the discovery client for the given name or panics if there's an error.
 func (m TestClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
 	ret, err := m.DiscoveryClient(name)
 	if err != nil {
@@ -64,6 +73,7 @@ type FakeDiscoveryWithError struct {
 	Err               error
 }
 
+// Returns the server's preferred namespaced resources or an error if present.
 func (d FakeDiscoveryWithError) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return d.PossibleResources, d.Err
 }
@@ -74,10 +84,12 @@ type FakeClientSet struct {
 	DiscoveryObj *FakeDiscoveryWithError
 }
 
+// Returns the discovery interface of the fake client set.
 func (c *FakeClientSet) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryObj
 }
 
+// Returns the list of possible API resources from the fake discovery object.
 func (c *FakeClientSet) GetPossibleResources() []*metav1.APIResourceList {
 	return c.DiscoveryObj.PossibleResources
 }
@@ -89,6 +101,7 @@ func NewFakeClientset(fakeDiscovery FakeDiscoveryWithError) *FakeClientSet {
 	return cs
 }
 
+// Provides a mock list of API resources for discovery purposes.
 func possibleDiscoveryResource() []*metav1.APIResourceList {
 	return []*metav1.APIResourceList{
 		{
@@ -107,6 +120,7 @@ func possibleDiscoveryResource() []*metav1.APIResourceList {
 
 type controllerInitFunc func(context.Context, ControllerContext) (controller.Interface, bool, error)
 
+// Tests the behavior of multiple controllers when facing discovery errors.
 func TestController_DiscoveryError(t *testing.T) {
 	controllerInitFuncMap := map[string]controllerInitFunc{
 		"ResourceQuotaController":          startResourceQuotaController,
