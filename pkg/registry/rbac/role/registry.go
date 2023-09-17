@@ -62,6 +62,6 @@ type AuthorizerAdapter struct {
 }
 
 // GetRole returns the corresponding Role by name in specified namespace
-func (a AuthorizerAdapter) GetRole(namespace, name string) (*rbacv1.Role, error) {
-	return a.Registry.GetRole(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), name, &metav1.GetOptions{})
+func (a AuthorizerAdapter) GetRole(ctx context.Context, namespace, name string) (*rbacv1.Role, error) {
+	return a.Registry.GetRole(genericapirequest.WithNamespace(ctx, namespace), name, &metav1.GetOptions{})
 }

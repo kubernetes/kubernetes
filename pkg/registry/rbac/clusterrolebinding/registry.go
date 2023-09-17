@@ -21,7 +21,6 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
@@ -61,8 +60,8 @@ type AuthorizerAdapter struct {
 	Registry Registry
 }
 
-func (a AuthorizerAdapter) ListClusterRoleBindings() ([]*rbacv1.ClusterRoleBinding, error) {
-	list, err := a.Registry.ListClusterRoleBindings(genericapirequest.NewContext(), &metainternalversion.ListOptions{})
+func (a AuthorizerAdapter) ListClusterRoleBindings(ctx context.Context) ([]*rbacv1.ClusterRoleBinding, error) {
+	list, err := a.Registry.ListClusterRoleBindings(ctx, &metainternalversion.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
