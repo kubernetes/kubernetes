@@ -34,6 +34,7 @@ import (
 
 type probeFn func() []volume.VolumePlugin
 
+// Appends a volume plugin based on feature flags and handles CSI migration checks.
 func appendPluginBasedOnFeatureFlags(logger klog.Logger, plugins []volume.VolumePlugin, inTreePluginName string, featureGate featuregate.FeatureGate, pluginInfo pluginInfo) ([]volume.VolumePlugin, error) {
 
 	_, err := csimigration.CheckMigrationFeatureFlags(featureGate, pluginInfo.pluginMigrationFeature, pluginInfo.pluginUnregisterFeature)
@@ -59,6 +60,7 @@ type pluginInfo struct {
 	pluginProbeFunction     probeFn
 }
 
+// Appends legacy attachable provider volume plugins based on feature flags and CSI migration status.
 func appendAttachableLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	pluginMigrationStatus := make(map[string]pluginInfo)
 	pluginMigrationStatus[plugins.VSphereInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationvSphere, pluginUnregisterFeature: features.InTreePluginvSphereUnregister, pluginProbeFunction: vsphere_volume.ProbeVolumePlugins}
@@ -74,10 +76,12 @@ func appendAttachableLegacyProviderVolumes(logger klog.Logger, allPlugins []volu
 	return allPlugins, nil
 }
 
+// Appends legacy expandable provider volume plugins based on feature flags and CSI migration status.
 func appendExpandableLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	return appendLegacyProviderVolumes(logger, allPlugins, featureGate)
 }
 
+// Appends legacy provider volume plugins based on feature flags and CSI migration status.
 func appendLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	var err error
 	// First append attachable volumes
