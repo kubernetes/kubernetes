@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/disruption"
 )
 
+// Starts the PodDisruptionBudget controller to manage disruptions in the cluster.
 func startDisruptionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	client := controllerContext.ClientBuilder.ClientOrDie("disruption-controller")
 	config := controllerContext.ClientBuilder.ConfigOrDie("disruption-controller")
