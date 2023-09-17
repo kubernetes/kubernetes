@@ -24,6 +24,7 @@ import (
 	"k8s.io/component-base/cli/globalflag"
 )
 
+// Registers and marks the 'cloud-provider-gce-lb-src-cidrs' flag as deprecated.
 func registerLegacyGlobalFlags(namedFlagSets cliflag.NamedFlagSets) {
 	// hoist this flag from the global flagset to preserve the commandline until
 	// the gce cloudprovider is removed.
