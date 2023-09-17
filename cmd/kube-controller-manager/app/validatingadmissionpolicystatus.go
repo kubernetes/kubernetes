@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
+// Starts the ValidatingAdmissionPolicyStatus controller to monitor and manage the status of validating admission policies.
 func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	// KCM won't start the controller without the feature gate set.
 	typeChecker := &pluginvalidatingadmissionpolicy.TypeChecker{
