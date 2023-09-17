@@ -80,6 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
+// Initializes and registers feature gates for logs and other features.
 func init() {
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
@@ -624,6 +625,7 @@ type serviceAccountTokenControllerStarter struct {
 	rootClientBuilder clientbuilder.ControllerClientBuilder
 }
 
+// Starts the ServiceAccountTokenController if enabled, setting up token generation and syncing.
 func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
 	if !controllerContext.IsControllerEnabled(names.ServiceAccountTokenController) {
@@ -673,6 +675,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	return nil, true, nil
 }
 
+// Reads and validates the provided CA certificate file.
 func readCA(file string) ([]byte, error) {
 	rootCA, err := os.ReadFile(file)
 	if err != nil {
