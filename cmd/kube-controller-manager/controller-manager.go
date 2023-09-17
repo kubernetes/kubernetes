@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 )
 
+// Entry point to initialize and run the controller manager command.
 func main() {
 	command := app.NewControllerManagerCommand()
 	code := cli.Run(command)
