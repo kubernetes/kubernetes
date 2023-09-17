@@ -27,6 +27,7 @@ import (
 	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
 )
 
+// Starts the Endpoint Slice Controller for managing endpoint slices.
 func startEndpointSliceController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go endpointslicecontroller.NewController(
 		ctx,
@@ -41,6 +42,7 @@ func startEndpointSliceController(ctx context.Context, controllerContext Control
 	return nil, true, nil
 }
 
+// Starts the Endpoint Slice Mirroring Controller for mirroring endpoint slices.
 func startEndpointSliceMirroringController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go endpointslicemirroringcontroller.NewController(
 		ctx,
