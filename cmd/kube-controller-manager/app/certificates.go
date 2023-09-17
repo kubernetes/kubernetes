@@ -32,6 +32,7 @@ import (
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 )
 
+// startCSRSigningController initializes and starts the appropriate CSR signing controllers based on config.
 func startCSRSigningController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
 	missingSingleSigningFile := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || controllerContext.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == ""
@@ -90,25 +91,31 @@ func startCSRSigningController(ctx context.Context, controllerContext Controller
 	return nil, true, nil
 }
 
+// Checks if either cert or key files for the KubeletServingSigner are specified in the config.
 func areKubeletServingSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
 	// if only one is specified, it will error later during construction
 	return len(config.KubeletServingSignerConfiguration.CertFile) > 0 || len(config.KubeletServingSignerConfiguration.KeyFile) > 0
 }
+
+// Checks if either cert or key files for the KubeletClientSigner are specified in the config.
 func areKubeletClientSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
 	// if only one is specified, it will error later during construction
 	return len(config.KubeletClientSignerConfiguration.CertFile) > 0 || len(config.KubeletClientSignerConfiguration.KeyFile) > 0
 }
 
+// Determines if KubeAPIServerClientSigner files are set.
 func areKubeAPIServerClientSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
 	// if only one is specified, it will error later during construction
 	return len(config.KubeAPIServerClientSignerConfiguration.CertFile) > 0 || len(config.KubeAPIServerClientSignerConfiguration.KeyFile) > 0
 }
 
+// Checks if LegacyUnknownSigner files are provided.
 func areLegacyUnknownSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
 	// if only one is specified, it will error later during construction
 	return len(config.LegacyUnknownSignerConfiguration.CertFile) > 0 || len(config.LegacyUnknownSignerConfiguration.KeyFile) > 0
 }
 
+// Determines if any signer-specific files are set.
 func anySpecificFilesSet(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
 	return areKubeletServingSignerFilesSpecified(config) ||
 		areKubeletClientSignerFilesSpecified(config) ||
@@ -116,6 +123,7 @@ func anySpecificFilesSet(config csrsigningconfig.CSRSigningControllerConfigurati
 		areLegacyUnknownSignerFilesSpecified(config)
 }
 
+// Returns the Kubelet serving signer files; defaults to cluster signing files if none are set.
 func getKubeletServingSignerFiles(config csrsigningconfig.CSRSigningControllerConfiguration) (string, string) {
 	// if any cert/key is set for specific CSR signing loops, then the --cluster-signing-{cert,key}-file are not used for any CSR signing loop.
 	if anySpecificFilesSet(config) {
@@ -124,6 +132,7 @@ func getKubeletServingSignerFiles(config csrsigningconfig.CSRSigningControllerCo
 	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
 }
 
+// Returns the Kubelet client signer files; defaults to cluster signing files if specific ones aren't set.
 func getKubeletClientSignerFiles(config csrsigningconfig.CSRSigningControllerConfiguration) (string, string) {
 	// if any cert/key is set for specific CSR signing loops, then the --cluster-signing-{cert,key}-file are not used for any CSR signing loop.
 	if anySpecificFilesSet(config) {
@@ -132,6 +141,7 @@ func getKubeletClientSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
 }
 
+// Returns the KubeAPI server client signer files; defaults to cluster signing files if specifics aren't set.
 func getKubeAPIServerClientSignerFiles(config csrsigningconfig.CSRSigningControllerConfiguration) (string, string) {
 	// if any cert/key is set for specific CSR signing loops, then the --cluster-signing-{cert,key}-file are not used for any CSR signing loop.
 	if anySpecificFilesSet(config) {
@@ -140,6 +150,7 @@ func getKubeAPIServerClientSignerFiles(config csrsigningconfig.CSRSigningControl
 	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
 }
 
+// Gets LegacyUnknown signer files, or defaults if unset.
 func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerConfiguration) (string, string) {
 	// if any cert/key is set for specific CSR signing loops, then the --cluster-signing-{cert,key}-file are not used for any CSR signing loop.
 	if anySpecificFilesSet(config) {
@@ -148,6 +159,7 @@ func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
 }
 
+// Starts the CSR approving controller.
 func startCSRApprovingController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	approver := approver.NewCSRApprovingController(
 		ctx,
@@ -159,6 +171,7 @@ func startCSRApprovingController(ctx context.Context, controllerContext Controll
 	return nil, true, nil
 }
 
+// startCSRCleanerController starts the CSR cleaner controller.
 func startCSRCleanerController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	cleaner := cleaner.NewCSRCleanerController(
 		controllerContext.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
@@ -168,6 +181,7 @@ func startCSRCleanerController(ctx context.Context, controllerContext Controller
 	return nil, true, nil
 }
 
+// Starts the root CA certificate publisher controller.
 func startRootCACertPublisher(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	var (
 		rootCA []byte
