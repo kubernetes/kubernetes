@@ -1765,9 +1765,11 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	now := time.Now()
 	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	snapshotAPIGroup := "snapshot.storage.k8s.io"
+	defaultDescriberSettings := &DescriberSettings{ShowEvents: true}
 	testCases := []struct {
 		name               string
 		pvc                *corev1.PersistentVolumeClaim
+		describerSettings  *DescriberSettings
 		expectedElements   []string
 		unexpectedElements []string
 	}{
@@ -1783,6 +1785,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 					Phase: corev1.ClaimBound,
 				},
 			},
+			expectedElements:   []string{"Events"},
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
@@ -1967,13 +1970,36 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 			},
 			expectedElements: []string{"DataSource:\n  APIGroup:  snapshot.storage.k8s.io\n  Kind:      VolumeSnapshot\n  Name:      src-snapshot\n"},
 		},
+		{
+			name: "no-show-events",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			unexpectedElements: []string{"Events"},
+			describerSettings:  &DescriberSettings{ShowEvents: false},
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			fake := fake.NewSimpleClientset(test.pvc)
 			c := PersistentVolumeClaimDescriber{fake}
-			str, err := c.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+
+			var describerSettings DescriberSettings
+			if test.describerSettings != nil {
+				describerSettings = *test.describerSettings
+			} else {
+				describerSettings = *defaultDescriberSettings
+			}
+
+			str, err := c.Describe("foo", "bar", describerSettings)
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", test.name, err)
 			}
