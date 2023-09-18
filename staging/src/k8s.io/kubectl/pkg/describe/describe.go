@@ -1650,7 +1650,10 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		return "", err
 	}
 
-	events, _ := searchEvents(d.CoreV1(), pvc, describerSettings.ChunkSize)
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(d.CoreV1(), pvc, describerSettings.ChunkSize)
+	}
 
 	return describePersistentVolumeClaim(pvc, events, pods)
 }
