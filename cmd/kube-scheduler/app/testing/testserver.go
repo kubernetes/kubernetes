@@ -170,6 +170,7 @@ func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
 	panic(fmt.Errorf("failed to launch server: %v", err))
 }
 
+// Creates a network listener on a dynamically allocated free port.
 func createListenerOnFreePort() (net.Listener, int, error) {
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
