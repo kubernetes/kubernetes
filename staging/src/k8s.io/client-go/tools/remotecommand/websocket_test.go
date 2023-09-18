@@ -36,7 +36,7 @@ import (
 
 	gwebsocket "github.com/gorilla/websocket"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
@@ -1054,7 +1054,13 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 			t.Fatalf("unable to upgrade to create websocket connection: %v", err)
 		}
 		defer conn.Close()
-		conn.ReadMessage() //nolint:errcheck
+		for {
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				t.Logf("server err reading message: %v", err)
+				return
+			}
+		}
 	}))
 	defer websocketServer.Close()
 	// Create a raw websocket client, connecting to the websocket server.
@@ -1067,8 +1073,8 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 	// Create a heartbeat using the client websocket connection, and start it.
 	// "period" is less than "deadline", so ping/pong heartbeat will succceed.
 	var expectedMsg = "test heartbeat message"
-	var period = 10 * time.Millisecond
-	var deadline = 20 * time.Millisecond
+	var period = 100 * time.Millisecond
+	var deadline = 200 * time.Millisecond
 	heartbeat := newHeartbeat(client, period, deadline)
 	heartbeat.setMessage(expectedMsg)
 	// Add a channel to the handler to retrieve the "pong" message.
@@ -1079,7 +1085,16 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 		return pongHandler(msg)
 	})
 	go heartbeat.start()
-	go client.ReadMessage() //nolint:errcheck
+	go func() {
+		for {
+			_, _, err := client.ReadMessage()
+			if err != nil {
+				t.Logf("client err reading message: %v", err)
+				return
+			}
+		}
+	}()
+
 	select {
 	case actualMsg := <-pongMsgCh:
 		close(heartbeat.closer)
