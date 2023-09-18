@@ -27,6 +27,8 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -43,6 +45,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 )
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
@@ -646,6 +649,122 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			}))
 			framework.ExpectNoError(err, "Timeout while waiting to confirm PV %q deletion", retrievedPV.Name)
 		})
+
+		ginkgo.It("should apply changes to a pv/pvc status", func(ctx context.Context) {
+
+			pvClient := c.CoreV1().PersistentVolumes()
+			pvcClient := c.CoreV1().PersistentVolumeClaims(ns)
+
+			ginkgo.By("Creating initial PV and PVC")
+
+			pvHostPathConfig := e2epv.PersistentVolumeConfig{
+				NamePrefix:       ns + "-",
+				Labels:           volLabel,
+				StorageClassName: ns,
+				PVSource: v1.PersistentVolumeSource{
+					CSI: &v1.CSIPersistentVolumeSource{
+						Driver:       "e2e-driver-" + string(uuid.NewUUID()),
+						VolumeHandle: "e2e-status-conformance",
+					},
+				},
+			}
+
+			numPVs, numPVCs := 1, 1
+			pvols, claims, err = e2epv.CreatePVsPVCs(ctx, numPVs, numPVCs, c, f.Timeouts, ns, pvHostPathConfig, pvcConfig)
+			framework.ExpectNoError(err, "Failed to create the requested storage resources")
+
+			ginkgo.By(fmt.Sprintf("Listing all PVs with the labelSelector: %q", volLabel.AsSelector().String()))
+			pvList, err := pvClient.List(ctx, metav1.ListOptions{LabelSelector: volLabel.AsSelector().String()})
+			framework.ExpectNoError(err, "Failed to list PVs with the labelSelector: %q", volLabel.AsSelector().String())
+			gomega.Expect(pvList.Items).To(gomega.HaveLen(1))
+			initialPV := pvList.Items[0]
+
+			ginkgo.By(fmt.Sprintf("Listing PVCs in namespace %q", ns))
+			pvcList, err := pvcClient.List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err, "Failed to list PVCs with the labelSelector: %q", volLabel.AsSelector().String())
+			gomega.Expect(pvcList.Items).To(gomega.HaveLen(1))
+			initialPVC := pvcList.Items[0]
+
+			ginkgo.By(fmt.Sprintf("Reading %q Status", initialPVC.Name))
+			pvcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
+			pvcUnstructured, err := f.DynamicClient.Resource(pvcResource).Namespace(ns).Get(ctx, initialPVC.Name, metav1.GetOptions{}, "status")
+			framework.ExpectNoError(err, "Failed to fetch the status of PVC %s in namespace %s", initialPVC.Name, ns)
+			retrievedPVC := &v1.PersistentVolumeClaim{}
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(pvcUnstructured.UnstructuredContent(), &retrievedPVC)
+			framework.ExpectNoError(err, "Failed to retrieve %q status.", initialPV.Name)
+			gomega.Expect(string(retrievedPVC.Status.Phase)).To(gomega.Equal("Pending"), "Checking that the PVC status has been read")
+
+			ginkgo.By(fmt.Sprintf("Reading %q Status", initialPV.Name))
+			pvResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumes"}
+			pvUnstructured, err := f.DynamicClient.Resource(pvResource).Get(ctx, initialPV.Name, metav1.GetOptions{}, "status")
+			framework.ExpectNoError(err, "Failed to fetch the status of PV %s in namespace %s", initialPV.Name, ns)
+			retrievedPV := &v1.PersistentVolume{}
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(pvUnstructured.UnstructuredContent(), &retrievedPV)
+			framework.ExpectNoError(err, "Failed to retrieve %q status.", initialPV.Name)
+			gomega.Expect(string(retrievedPV.Status.Phase)).To(gomega.Or(gomega.Equal("Available"), gomega.Equal("Bound"), gomega.Equal("Pending")), "Checking that the PV status has been read")
+
+			ginkgo.By(fmt.Sprintf("Patching %q Status", initialPVC.Name))
+			payload := []byte(`{"status":{"conditions":[{"type":"StatusPatched","status":"True", "reason":"E2E patchedStatus", "message":"Set from e2e test"}]}}`)
+
+			patchedPVC, err := pvcClient.Patch(ctx, initialPVC.Name, types.MergePatchType, payload, metav1.PatchOptions{}, "status")
+			framework.ExpectNoError(err, "Failed to patch status.")
+
+			gomega.Expect(patchedPVC.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{
+				"StatusPatched": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Message": gomega.ContainSubstring("Set from e2e test"),
+					"Reason":  gomega.ContainSubstring("E2E patchedStatus"),
+				}),
+			}), "Checking that patched status has been applied")
+
+			ginkgo.By(fmt.Sprintf("Patching %q Status", retrievedPV.Name))
+			payload = []byte(`{"status":{"message": "StatusPatched", "reason": "E2E patchStatus"}}`)
+
+			patchedPV, err := pvClient.Patch(ctx, retrievedPV.Name, types.MergePatchType, payload, metav1.PatchOptions{}, "status")
+			framework.ExpectNoError(err, "Failed to patch %q status.", retrievedPV.Name)
+			gomega.Expect(patchedPV.Status.Reason).To(gomega.Equal("E2E patchStatus"), "Checking that patched status has been applied")
+			gomega.Expect(patchedPV.Status.Message).To(gomega.Equal("StatusPatched"), "Checking that patched status has been applied")
+
+			ginkgo.By(fmt.Sprintf("Updating %q Status", patchedPVC.Name))
+			var statusToUpdate, updatedPVC *v1.PersistentVolumeClaim
+
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				statusToUpdate, err = pvcClient.Get(ctx, patchedPVC.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Unable to retrieve pvc %s", patchedPVC.Name)
+
+				statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, v1.PersistentVolumeClaimCondition{
+					Type:    "StatusUpdated",
+					Status:  "True",
+					Reason:  "E2E updateStatus",
+					Message: "Set from e2e test",
+				})
+
+				updatedPVC, err = pvcClient.UpdateStatus(ctx, statusToUpdate, metav1.UpdateOptions{})
+				return err
+			})
+			framework.ExpectNoError(err, "Failed to update status.")
+			gomega.Expect(updatedPVC.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{
+				"StatusUpdated": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Message": gomega.ContainSubstring("Set from e2e test"),
+					"Reason":  gomega.ContainSubstring("E2E updateStatus"),
+				}),
+			}), "Checking that updated status has been applied")
+
+			ginkgo.By(fmt.Sprintf("Updating %q Status", patchedPV.Name))
+			var pvToUpdate, updatedPV *v1.PersistentVolume
+
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				pvToUpdate, err = pvClient.Get(ctx, patchedPV.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Unable to retrieve pv %s", patchedPV.Name)
+
+				pvToUpdate.Status.Reason = "E2E updateStatus"
+				pvToUpdate.Status.Message = "StatusUpdated"
+				updatedPV, err = pvClient.UpdateStatus(ctx, pvToUpdate, metav1.UpdateOptions{})
+				return err
+			})
+			framework.ExpectNoError(err, "Failed to update status.")
+			gomega.Expect(updatedPV.Status.Reason).To(gomega.Equal("E2E updateStatus"), "Checking that updated status has been applied")
+			gomega.Expect(updatedPV.Status.Message).To(gomega.Equal("StatusUpdated"), "Checking that updated status has been applied")
+		})
 	})
 
 	// testsuites/multivolume tests can now run with windows nodes
@@ -803,4 +922,8 @@ func testPodSuccessOrFail(ctx context.Context, c clientset.Interface, t *framewo
 	}
 	framework.Logf("Pod %v succeeded ", pod.Name)
 	return nil
+}
+
+func conditionType(condition interface{}) string {
+	return string(condition.(v1.PersistentVolumeClaimCondition).Type)
 }
