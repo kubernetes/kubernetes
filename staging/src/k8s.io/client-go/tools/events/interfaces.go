@@ -67,9 +67,9 @@ type EventBroadcaster interface {
 // It is assumed that EventSink will return the same sorts of errors as
 // client-go's REST client.
 type EventSink interface {
-	Create(event *eventsv1.Event) (*eventsv1.Event, error)
-	Update(event *eventsv1.Event) (*eventsv1.Event, error)
-	Patch(oldEvent *eventsv1.Event, data []byte) (*eventsv1.Event, error)
+	Create(ctx context.Context, event *eventsv1.Event) (*eventsv1.Event, error)
+	Update(ctx context.Context, event *eventsv1.Event) (*eventsv1.Event, error)
+	Patch(ctx context.Context, oldEvent *eventsv1.Event, data []byte) (*eventsv1.Event, error)
 }
 
 // EventBroadcasterAdapter is a auxiliary interface to simplify migration to

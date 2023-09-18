@@ -44,7 +44,7 @@ type testEventSeriesSink struct {
 }
 
 // Create records the event for testing.
-func (t *testEventSeriesSink) Create(e *eventsv1.Event) (*eventsv1.Event, error) {
+func (t *testEventSeriesSink) Create(ctx context.Context, e *eventsv1.Event) (*eventsv1.Event, error) {
 	if t.OnCreate != nil {
 		return t.OnCreate(e)
 	}
@@ -52,7 +52,7 @@ func (t *testEventSeriesSink) Create(e *eventsv1.Event) (*eventsv1.Event, error)
 }
 
 // Update records the event for testing.
-func (t *testEventSeriesSink) Update(e *eventsv1.Event) (*eventsv1.Event, error) {
+func (t *testEventSeriesSink) Update(ctx context.Context, e *eventsv1.Event) (*eventsv1.Event, error) {
 	if t.OnUpdate != nil {
 		return t.OnUpdate(e)
 	}
@@ -60,7 +60,7 @@ func (t *testEventSeriesSink) Update(e *eventsv1.Event) (*eventsv1.Event, error)
 }
 
 // Patch records the event for testing.
-func (t *testEventSeriesSink) Patch(e *eventsv1.Event, p []byte) (*eventsv1.Event, error) {
+func (t *testEventSeriesSink) Patch(ctx context.Context, e *eventsv1.Event, p []byte) (*eventsv1.Event, error) {
 	if t.OnPatch != nil {
 		return t.OnPatch(e, p)
 	}
