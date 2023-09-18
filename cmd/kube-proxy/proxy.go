@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
 )
 
+// main function for executing a proxy command and exiting with its code.
 func main() {
 	command := app.NewProxyCommand()
 	code := cli.Run(command)
