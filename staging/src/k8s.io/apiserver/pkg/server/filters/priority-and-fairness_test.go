@@ -83,6 +83,8 @@ type fakeApfFilter struct {
 	utilflowcontrol.MaxSeatsTracker
 }
 
+var _ utilflowcontrol.Interface = &fakeApfFilter{}
+
 func (t fakeApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
 	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
@@ -153,23 +155,23 @@ func newApfServerWithHooks(t *testing.T, decision mockDecision, onExecute, postE
 		WatchTracker:    utilflowcontrol.NewWatchTracker(),
 		MaxSeatsTracker: utilflowcontrol.NewMaxSeatsTracker(),
 	}
-	return newApfServerWithFilter(t, fakeFilter, onExecute, postExecute)
+	return newApfServerWithFilter(t, fakeFilter, time.Minute/4, onExecute, postExecute)
 }
 
-func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func()) *httptest.Server {
+func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, defaultWaitLimit time.Duration, onExecute, postExecute func()) *httptest.Server {
 	epmetrics.Register()
 	fcmetrics.Register()
-	apfServer := httptest.NewServer(newApfHandlerWithFilter(t, flowControlFilter, onExecute, postExecute))
+	apfServer := httptest.NewServer(newApfHandlerWithFilter(t, flowControlFilter, defaultWaitLimit, onExecute, postExecute))
 	return apfServer
 }
 
-func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func()) http.Handler {
+func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, defaultWaitLimit time.Duration, onExecute, postExecute func()) http.Handler {
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	apfHandler := WithPriorityAndFairness(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		onExecute()
-	}), longRunningRequestCheck, flowControlFilter, defaultRequestWorkEstimator)
+	}), longRunningRequestCheck, flowControlFilter, defaultRequestWorkEstimator, defaultWaitLimit)
 
 	handler := apifilters.WithRequestInfo(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
@@ -354,6 +356,8 @@ type fakeWatchApfFilter struct {
 	utilflowcontrol.MaxSeatsTracker
 }
 
+var _ utilflowcontrol.Interface = &fakeWatchApfFilter{}
+
 func newFakeWatchApfFilter(capacity int) *fakeWatchApfFilter {
 	return &fakeWatchApfFilter{
 		capacity:        capacity,
@@ -458,7 +462,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 
 	postExecuteFunc := func() {}
 
-	server := newApfServerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc)
+	server := newApfServerWithFilter(t, fakeFilter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 	defer server.Close()
 
 	var wg sync.WaitGroup
@@ -498,7 +502,7 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 	}
 	postExecuteFunc := func() {}
 
-	server := newApfServerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc)
+	server := newApfServerWithFilter(t, fakeFilter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 	defer server.Close()
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusTooManyRequests); err != nil {
@@ -517,7 +521,7 @@ func TestApfWatchPanic(t *testing.T) {
 	}
 	postExecuteFunc := func() {}
 
-	apfHandler := newApfHandlerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc)
+	apfHandler := newApfHandlerWithFilter(t, fakeFilter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err == nil {
@@ -564,7 +568,7 @@ func TestApfWatchHandlePanic(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			apfHandler := newApfHandlerWithFilter(t, test.filter, onExecuteFunc, postExecuteFunc)
+			apfHandler := newApfHandlerWithFilter(t, test.filter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 			handler := func(w http.ResponseWriter, r *http.Request) {
 				defer func() {
 					if err := recover(); err == nil {
@@ -649,6 +653,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 		longRunningFunc,
 		fakeFilter,
 		func(_ *http.Request, _, _ string) fcrequest.WorkEstimate { return workExpected },
+		time.Minute/4,
 	)
 
 	w := httptest.NewRecorder()
@@ -685,7 +690,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var executed bool
@@ -699,7 +704,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 				panic(fmt.Errorf("request handler panic'd as designed - %#v", r.RequestURI))
 			}
 		})
-		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout)
+		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout/4, requestTimeout)
 
 		server, requestGetter := newHTTP2ServerWithClient(handler, requestTimeout*2)
 		defer server.Close()
@@ -755,7 +760,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var executed bool
@@ -772,7 +777,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 				<-callerRoundTripDoneCh
 			}
 		})
-		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout)
+		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout/4, requestTimeout)
 
 		server, requestGetter := newHTTP2ServerWithClient(handler, requestTimeout*2)
 		defer server.Close()
@@ -831,7 +836,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var innerHandlerWriteErr error
@@ -851,7 +856,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 				panic(http.ErrAbortHandler)
 			}
 		})
-		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout)
+		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout/4, requestTimeout)
 
 		server, requestGetter := newHTTP2ServerWithClient(handler, requestTimeout*2)
 		defer server.Close()
@@ -909,7 +914,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var innerHandlerWriteErr error
@@ -930,7 +935,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 				_, innerHandlerWriteErr = w.Write([]byte("foo"))
 			}
 		})
-		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout)
+		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout/4, requestTimeout)
 
 		server, requestGetter := newHTTP2ServerWithClient(handler, requestTimeout*2)
 		defer server.Close()
@@ -984,7 +989,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var firstRequestInnerHandlerWriteErr error
@@ -1017,7 +1022,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 				secondRequestExecuted = true
 			}
 		})
-		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout)
+		handler := newHandlerChain(t, requestHandler, controller, userName, requestTimeout/4, requestTimeout)
 
 		server, requestGetter := newHTTP2ServerWithClient(handler, requestTimeout*2)
 		defer server.Close()
@@ -1116,11 +1121,11 @@ func fmtError(err error) string {
 }
 
 func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration []runtime.Object, serverConcurrency int,
-	requestWaitLimit time.Duration, plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
+	plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta3(), serverConcurrency, requestWaitLimit)
+	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta3(), serverConcurrency)
 
 	factory.Start(stopCh)
 
@@ -1227,11 +1232,11 @@ func newClientset(t *testing.T, objects ...runtime.Object) clientset.Interface {
 // builds a chain of handlers that include the panic recovery and timeout filter, so we can simulate the behavior of
 // a real apiserver.
 // the specified user is added as the authenticated user to the request context.
-func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.Interface, userName string, requestTimeout time.Duration) http.Handler {
+func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.Interface, userName string, defaultWaitLimit, requestTimeout time.Duration) http.Handler {
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator)
+	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator, defaultWaitLimit)
 
 	// add the handler in the chain that adds the specified user to the request context
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

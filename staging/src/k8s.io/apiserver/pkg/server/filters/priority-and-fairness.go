@@ -73,6 +73,7 @@ type priorityAndFairnessHandler struct {
 	longRunningRequestCheck apirequest.LongRunningRequestCheck
 	fcIfc                   utilflowcontrol.Interface
 	workEstimator           flowcontrolrequest.WorkEstimatorFunc
+	defaultRequestWaitLimit time.Duration
 
 	// droppedRequests tracks the history of dropped requests for
 	// the purpose of computing RetryAfter header to avoid system
@@ -240,8 +241,9 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 				resultCh <- err
 			}()
 
-			// We create handleCtx with explicit cancelation function.
-			// The reason for it is that Handle() underneath may start additional goroutine
+			// We create handleCtx with an adjusted deadline, for two reasons.
+			// One is to limit the time the request waits before its execution starts.
+			// The other reason for it is that Handle() underneath may start additional goroutine
 			// that is blocked on context cancellation. However, from APF point of view,
 			// we don't want to wait until the whole watch request is processed (which is
 			// when it context is actually cancelled) - we want to unblock the goroutine as
@@ -249,7 +251,8 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 			//
 			// Note that we explicitly do NOT call the actuall handler using that context
 			// to avoid cancelling request too early.
-			handleCtx, handleCtxCancel := context.WithCancel(ctx)
+
+			handleCtx, handleCtxCancel := context.WithDeadline(ctx, time.Now().Add(h.defaultRequestWaitLimit))
 			defer handleCtxCancel()
 
 			// Note that Handle will return irrespective of whether the request
@@ -285,8 +288,15 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 
 			h.handler.ServeHTTP(w, r)
 		}
+		rem := h.defaultRequestWaitLimit
+		now := time.Now()
+		if originalDeadline, hadDeadline := ctx.Deadline(); hadDeadline {
+			rem = originalDeadline.Sub(now) / 4
+		}
+		handleCtx, cancelFunc := context.WithDeadline(ctx, now.Add(rem))
+		defer cancelFunc()
 
-		h.fcIfc.Handle(ctx, digest, noteFn, estimateWork, queueNote, execute)
+		h.fcIfc.Handle(handleCtx, digest, noteFn, estimateWork, queueNote, execute)
 	}
 
 	if !served {
@@ -309,6 +319,8 @@ func WithPriorityAndFairness(
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 	fcIfc utilflowcontrol.Interface,
 	workEstimator flowcontrolrequest.WorkEstimatorFunc,
+	// the wait limited used for (a) initialization of a watch or (b) a request whose context has no deadline
+	defaultRequestWaitLimit time.Duration,
 ) http.Handler {
 	if fcIfc == nil {
 		klog.Warningf("priority and fairness support not found, skipping")
@@ -327,6 +339,7 @@ func WithPriorityAndFairness(
 		longRunningRequestCheck: longRunningRequestCheck,
 		fcIfc:                   fcIfc,
 		workEstimator:           workEstimator,
+		defaultRequestWaitLimit: defaultRequestWaitLimit,
 		droppedRequests:         utilflowcontrol.NewDroppedRequestsTracker(),
 	}
 	return http.HandlerFunc(priorityAndFairnessHandler.Handle)
