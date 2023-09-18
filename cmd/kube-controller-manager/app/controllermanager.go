@@ -623,20 +623,18 @@ func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, root
 // StartControllers starts a set of controllers with a specified ControllerContext
 func StartControllers(ctx context.Context, controllerCtx ControllerContext, controllerDescriptors map[string]*ControllerDescriptor,
 	unsecuredMux *mux.PathRecorderMux, healthzHandler *controllerhealthz.MutableHealthzHandler) error {
-	logger := klog.FromContext(ctx)
+	var controllerChecks []healthz.HealthChecker
 
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.
 	if serviceAccountTokenControllerDescriptor, ok := controllerDescriptors[names.ServiceAccountTokenController]; ok {
-		controllerName := serviceAccountTokenControllerDescriptor.Name()
-		if !controllerCtx.IsControllerEnabled(serviceAccountTokenControllerDescriptor) {
-			logger.Info("Warning: controller is disabled", "controller", controllerName)
-		} else {
-			logger.V(1).Info("Starting controller", "controller", controllerName)
-			initFunc := serviceAccountTokenControllerDescriptor.GetInitFunc()
-			if _, _, err := initFunc(klog.NewContext(ctx, klog.LoggerWithName(logger, controllerName)), controllerCtx, controllerName); err != nil {
-				return err
-			}
+		check, err := StartController(ctx, controllerCtx, serviceAccountTokenControllerDescriptor, unsecuredMux)
+		if err != nil {
+			return err
+		}
+		if check != nil {
+			// HealthChecker should be present when controller has started
+			controllerChecks = append(controllerChecks, check)
 		}
 	}
 
@@ -646,83 +644,94 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, cont
 		controllerCtx.Cloud.Initialize(controllerCtx.ClientBuilder, ctx.Done())
 	}
 
-	var controllerChecks []healthz.HealthChecker
-
 	// Each controller is passed a context where the logger has the name of
 	// the controller set through WithName. That name then becomes the prefix of
 	// of all log messages emitted by that controller.
 	//
-	// In this loop, an explicit "controller" key is used instead, for two reasons:
+	// In StartController, an explicit "controller" key is used instead, for two reasons:
 	// - while contextual logging is alpha, klog.LoggerWithName is still a no-op,
 	//   so we cannot rely on it yet to add the name
 	// - it allows distinguishing between log entries emitted by the controller
 	//   and those emitted for it - this is a bit debatable and could be revised.
-	for controllerName, controllerDesc := range controllerDescriptors {
+	for _, controllerDesc := range controllerDescriptors {
 		if controllerDesc.RequiresSpecialHandling() {
 			continue
 		}
 
-		disabledByFeatureGate := false
-		for _, featureGate := range controllerDesc.GetRequiredFeatureGates() {
-			if !utilfeature.DefaultFeatureGate.Enabled(featureGate) {
-				disabledByFeatureGate = true
-				break
-			}
-		}
-		if disabledByFeatureGate {
-			logger.Info("Controller is disabled by a feature gate", "controller", controllerName, "requiredFeatureGates", controllerDesc.GetRequiredFeatureGates())
-			continue
-		}
-
-		if controllerDesc.IsCloudProviderController() && controllerCtx.LoopMode != IncludeCloudLoops {
-			logger.Info("Skipping a cloud provider controller", "controller", controllerName, "loopMode", controllerCtx.LoopMode)
-			continue
-		}
-
-		if !controllerCtx.IsControllerEnabled(controllerDesc) {
-			logger.Info("Warning: controller is disabled", "controller", controllerName)
-			continue
-		}
-
-		time.Sleep(wait.Jitter(controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
-
-		logger.V(1).Info("Starting controller", "controller", controllerName)
-
-		initFunc := controllerDesc.GetInitFunc()
-		ctrl, started, err := initFunc(klog.NewContext(ctx, klog.LoggerWithName(logger, controllerName)), controllerCtx, controllerName)
+		check, err := StartController(ctx, controllerCtx, controllerDesc, unsecuredMux)
 		if err != nil {
-			logger.Error(err, "Error starting controller", "controller", controllerName)
 			return err
 		}
-		if !started {
-			logger.Info("Warning: skipping controller", "controller", controllerName)
-			continue
+		if check != nil {
+			// HealthChecker should be present when controller has started
+			controllerChecks = append(controllerChecks, check)
 		}
-		check := controllerhealthz.NamedPingChecker(controllerName)
-		if ctrl != nil {
-			// check if the controller supports and requests a debugHandler
-			// and it needs the unsecuredMux to mount the handler onto.
-			if debuggable, ok := ctrl.(controller.Debuggable); ok && unsecuredMux != nil {
-				if debugHandler := debuggable.DebuggingHandler(); debugHandler != nil {
-					basePath := "/debug/controllers/" + controllerName
-					unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
-					unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
-				}
-			}
-			if healthCheckable, ok := ctrl.(controller.HealthCheckable); ok {
-				if realCheck := healthCheckable.HealthChecker(); realCheck != nil {
-					check = controllerhealthz.NamedHealthChecker(controllerName, realCheck)
-				}
-			}
-		}
-		controllerChecks = append(controllerChecks, check)
-
-		logger.Info("Started controller", "controller", controllerName)
 	}
 
 	healthzHandler.AddHealthChecker(controllerChecks...)
 
 	return nil
+}
+
+// StartController starts a controller with a specified ControllerContext
+// and performs required pre- and post- checks/actions
+func StartController(ctx context.Context, controllerCtx ControllerContext, controllerDescriptor *ControllerDescriptor,
+	unsecuredMux *mux.PathRecorderMux) (healthz.HealthChecker, error) {
+	logger := klog.FromContext(ctx)
+	controllerName := controllerDescriptor.Name()
+
+	for _, featureGate := range controllerDescriptor.GetRequiredFeatureGates() {
+		if !utilfeature.DefaultFeatureGate.Enabled(featureGate) {
+			logger.Info("Controller is disabled by a feature gate", "controller", controllerName, "requiredFeatureGates", controllerDescriptor.GetRequiredFeatureGates())
+			return nil, nil
+		}
+	}
+
+	if controllerDescriptor.IsCloudProviderController() && controllerCtx.LoopMode != IncludeCloudLoops {
+		logger.Info("Skipping a cloud provider controller", "controller", controllerName, "loopMode", controllerCtx.LoopMode)
+		return nil, nil
+	}
+
+	if !controllerCtx.IsControllerEnabled(controllerDescriptor) {
+		logger.Info("Warning: controller is disabled", "controller", controllerName)
+		return nil, nil
+	}
+
+	time.Sleep(wait.Jitter(controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	logger.V(1).Info("Starting controller", "controller", controllerName)
+
+	initFunc := controllerDescriptor.GetInitFunc()
+	ctrl, started, err := initFunc(klog.NewContext(ctx, klog.LoggerWithName(logger, controllerName)), controllerCtx, controllerName)
+	if err != nil {
+		logger.Error(err, "Error starting controller", "controller", controllerName)
+		return nil, err
+	}
+	if !started {
+		logger.Info("Warning: skipping controller", "controller", controllerName)
+		return nil, nil
+	}
+
+	check := controllerhealthz.NamedPingChecker(controllerName)
+	if ctrl != nil {
+		// check if the controller supports and requests a debugHandler
+		// and it needs the unsecuredMux to mount the handler onto.
+		if debuggable, ok := ctrl.(controller.Debuggable); ok && unsecuredMux != nil {
+			if debugHandler := debuggable.DebuggingHandler(); debugHandler != nil {
+				basePath := "/debug/controllers/" + controllerName
+				unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
+				unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
+			}
+		}
+		if healthCheckable, ok := ctrl.(controller.HealthCheckable); ok {
+			if realCheck := healthCheckable.HealthChecker(); realCheck != nil {
+				check = controllerhealthz.NamedHealthChecker(controllerName, realCheck)
+			}
+		}
+	}
+
+	logger.Info("Started controller", "controller", controllerName)
+	return check, nil
 }
 
 // serviceAccountTokenControllerStarter is special because it must run first to set up permissions for other controllers.
