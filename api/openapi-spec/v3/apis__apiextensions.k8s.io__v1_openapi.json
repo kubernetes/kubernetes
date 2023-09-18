@@ -2347,7 +2347,8 @@
                 "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2653,7 +2654,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2749,7 +2751,8 @@
                 "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2930,7 +2933,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3026,7 +3030,8 @@
                 "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

@@ -1798,7 +1798,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.coordination.v1.Lease"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2114,7 +2115,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2210,7 +2212,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.coordination.v1.Lease"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

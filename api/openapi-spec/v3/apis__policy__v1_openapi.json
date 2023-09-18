@@ -1835,7 +1835,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.policy.v1.PodDisruptionBudget"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2151,7 +2152,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2247,7 +2249,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.policy.v1.PodDisruptionBudget"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2438,7 +2441,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2534,7 +2538,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.policy.v1.PodDisruptionBudget"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

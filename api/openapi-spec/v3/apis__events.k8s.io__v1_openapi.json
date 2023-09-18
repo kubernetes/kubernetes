@@ -1920,7 +1920,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.events.v1.Event"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2236,7 +2237,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2332,7 +2334,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.events.v1.Event"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

@@ -2220,7 +2220,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicy"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2526,7 +2527,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2622,7 +2624,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicy"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2803,7 +2806,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2899,7 +2903,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicy"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3305,7 +3310,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicyBinding"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3611,7 +3617,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3707,7 +3714,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.ValidatingAdmissionPolicyBinding"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

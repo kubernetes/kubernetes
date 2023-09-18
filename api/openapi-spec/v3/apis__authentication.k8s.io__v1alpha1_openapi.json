@@ -498,7 +498,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.authentication.v1alpha1.SelfSubjectReview"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
