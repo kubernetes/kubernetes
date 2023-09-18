@@ -54,6 +54,7 @@ kind: KubeSchedulerConfiguration
 `
 )
 
+// testLoadConfigFromFile is a test function for loading scheduler configurations from files.
 func TestLoadConfigFromFile(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "scheduler-configs")
 	if err != nil {
