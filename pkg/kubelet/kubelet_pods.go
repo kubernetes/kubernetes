@@ -1974,6 +1974,13 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			} else {
 				determineResource(v1.ResourceCPU, container.Resources.Limits, oldStatus.Resources.Limits, limits)
 			}
+			// 10m is the minimum cpu limit
+			// so setting it back the limit to user provided value to avoid confusion for user
+			// More info: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r662552642
+			if container.Resources.Limits.Cpu().MilliValue() <= 10 {
+				limits[v1.ResourceCPU] = container.Resources.Limits.Cpu().DeepCopy()
+			}
+
 			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
 				limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
 			} else {
@@ -1991,6 +1998,13 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			} else {
 				determineResource(v1.ResourceCPU, status.AllocatedResources, oldStatus.Resources.Requests, requests)
 			}
+			// 2m is the minimum cpu request
+			// so setting it back to user provided value to avoid confusion for user
+			// More info: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r662552642
+			if container.Resources.Requests != nil && container.Resources.Requests.Cpu().MilliValue() <= 2 {
+				requests[v1.ResourceCPU] = status.AllocatedResources.Cpu().DeepCopy()
+			}
+
 			if memory, found := status.AllocatedResources[v1.ResourceMemory]; found {
 				requests[v1.ResourceMemory] = memory.DeepCopy()
 			}
