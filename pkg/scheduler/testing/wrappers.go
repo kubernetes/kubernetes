@@ -416,6 +416,12 @@ func (p *PodWrapper) Volume(volume v1.Volume) *PodWrapper {
 	return p
 }
 
+// Volumes set the volumes and inject into the inner pod.
+func (p *PodWrapper) Volumes(volumes []v1.Volume) *PodWrapper {
+	p.Spec.Volumes = volumes
+	return p
+}
+
 // SchedulingGates sets `gates` as additional SchedulerGates of the inner pod.
 func (p *PodWrapper) SchedulingGates(gates []string) *PodWrapper {
 	for _, gate := range gates {
