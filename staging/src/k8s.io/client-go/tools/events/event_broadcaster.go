@@ -81,27 +81,27 @@ type EventSinkImpl struct {
 }
 
 // Create takes the representation of a event and creates it. Returns the server's representation of the event, and an error, if there is any.
-func (e *EventSinkImpl) Create(event *eventsv1.Event) (*eventsv1.Event, error) {
+func (e *EventSinkImpl) Create(ctx context.Context, event *eventsv1.Event) (*eventsv1.Event, error) {
 	if event.Namespace == "" {
 		return nil, fmt.Errorf("can't create an event with empty namespace")
 	}
-	return e.Interface.Events(event.Namespace).Create(context.TODO(), event, metav1.CreateOptions{})
+	return e.Interface.Events(event.Namespace).Create(ctx, event, metav1.CreateOptions{})
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
-func (e *EventSinkImpl) Update(event *eventsv1.Event) (*eventsv1.Event, error) {
+func (e *EventSinkImpl) Update(ctx context.Context, event *eventsv1.Event) (*eventsv1.Event, error) {
 	if event.Namespace == "" {
 		return nil, fmt.Errorf("can't update an event with empty namespace")
 	}
-	return e.Interface.Events(event.Namespace).Update(context.TODO(), event, metav1.UpdateOptions{})
+	return e.Interface.Events(event.Namespace).Update(ctx, event, metav1.UpdateOptions{})
 }
 
 // Patch applies the patch and returns the patched event, and an error, if there is any.
-func (e *EventSinkImpl) Patch(event *eventsv1.Event, data []byte) (*eventsv1.Event, error) {
+func (e *EventSinkImpl) Patch(ctx context.Context, event *eventsv1.Event, data []byte) (*eventsv1.Event, error) {
 	if event.Namespace == "" {
 		return nil, fmt.Errorf("can't patch an event with empty namespace")
 	}
-	return e.Interface.Events(event.Namespace).Patch(context.TODO(), event.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+	return e.Interface.Events(event.Namespace).Patch(ctx, event.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 }
 
 // NewBroadcaster Creates a new event broadcaster.
@@ -237,13 +237,13 @@ func recordEvent(ctx context.Context, sink EventSink, event *eventsv1.Event) (*e
 			klog.FromContext(ctx).Error(patchBytesErr, "Unable to calculate diff, no merge is possible")
 			return nil, false
 		}
-		newEvent, err = sink.Patch(event, patch)
+		newEvent, err = sink.Patch(ctx, event, patch)
 	}
 	// Update can fail because the event may have been removed and it no longer exists.
 	if !isEventSeries || (isEventSeries && util.IsKeyNotFoundError(err)) {
 		// Making sure that ResourceVersion is empty on creation
 		event.ResourceVersion = ""
-		newEvent, err = sink.Create(event)
+		newEvent, err = sink.Create(ctx, event)
 	}
 	if err == nil {
 		return newEvent, false
