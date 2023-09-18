@@ -1866,7 +1866,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2182,7 +2183,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2278,7 +2280,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2469,7 +2472,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2565,7 +2569,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

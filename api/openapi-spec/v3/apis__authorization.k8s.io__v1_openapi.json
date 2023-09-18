@@ -890,7 +890,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -1017,7 +1018,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -1144,7 +1146,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -1271,7 +1274,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

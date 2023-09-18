@@ -2244,7 +2244,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2550,7 +2551,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2646,7 +2648,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2827,7 +2830,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2923,7 +2927,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3329,7 +3334,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3635,7 +3641,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3731,7 +3738,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3912,7 +3920,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4008,7 +4017,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

@@ -1733,7 +1733,8 @@
                 "$ref": "#/components/schemas/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2039,7 +2040,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2135,7 +2137,8 @@
                 "$ref": "#/components/schemas/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2316,7 +2319,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2412,7 +2416,8 @@
                 "$ref": "#/components/schemas/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {

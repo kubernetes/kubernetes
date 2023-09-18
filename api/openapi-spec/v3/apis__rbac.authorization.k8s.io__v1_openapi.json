@@ -2070,7 +2070,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.rbac.v1.ClusterRoleBinding"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2376,7 +2377,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2472,7 +2474,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.rbac.v1.ClusterRoleBinding"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2878,7 +2881,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.rbac.v1.ClusterRole"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3184,7 +3188,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3280,7 +3285,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.rbac.v1.ClusterRole"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -3696,7 +3702,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.rbac.v1.RoleBinding"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4012,7 +4019,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4108,7 +4116,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.rbac.v1.RoleBinding"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4524,7 +4533,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.rbac.v1.Role"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4840,7 +4850,8 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4936,7 +4947,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.rbac.v1.Role"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
