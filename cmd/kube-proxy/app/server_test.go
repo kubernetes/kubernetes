@@ -517,6 +517,7 @@ func (s *fakeProxyServerError) CleanupAndExit() error {
 	return errors.New("mocking error from ProxyServer.CleanupAndExit()")
 }
 
+// Tests the conversion of deprecated flags to address format for healthz and metrics endpoints.
 func TestAddressFromDeprecatedFlags(t *testing.T) {
 	testCases := []struct {
 		name               string
@@ -593,6 +594,7 @@ func TestAddressFromDeprecatedFlags(t *testing.T) {
 	}
 }
 
+// Creates a Node object with specified name, internal, and external IP addresses.
 func makeNodeWithAddresses(name, internal, external string) *v1.Node {
 	if name == "" {
 		return &v1.Node{}
@@ -622,6 +624,7 @@ func makeNodeWithAddresses(name, internal, external string) *v1.Node {
 	return node
 }
 
+// Tests the detection of node IPs based on various configurations and scenarios.s
 func Test_detectNodeIPs(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -815,6 +818,7 @@ func Test_detectNodeIPs(t *testing.T) {
 	}
 }
 
+// Tests IP configuration validation in various proxy setups.
 func Test_checkIPConfig(t *testing.T) {
 	cases := []struct {
 		name  string
