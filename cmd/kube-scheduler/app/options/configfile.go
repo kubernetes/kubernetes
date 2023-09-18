@@ -39,6 +39,7 @@ func LoadConfigFromFile(logger klog.Logger, file string) (*config.KubeSchedulerC
 	return loadConfig(logger, data)
 }
 
+// Function for decoding KubeSchedulerConfiguration from data bytes.
 func loadConfig(logger klog.Logger, data []byte) (*config.KubeSchedulerConfiguration, error) {
 	// The UniversalDecoder runs defaulting and returns the internal type by default.
 	obj, gvk, err := scheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
@@ -56,6 +57,7 @@ func loadConfig(logger klog.Logger, data []byte) (*config.KubeSchedulerConfigura
 	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
 }
 
+// Function for encoding a KubeSchedulerConfiguration into YAML format.
 func encodeConfig(cfg *config.KubeSchedulerConfiguration) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	const mediaType = runtime.ContentTypeYAML
