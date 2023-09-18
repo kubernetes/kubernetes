@@ -64,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
+// init initializes and registers feature gates during package initialization.
 func init() {
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
@@ -275,6 +276,7 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 	return handler
 }
 
+// installMetricHandler sets up metric-related handlers on the given mux based on leadership status.
 func installMetricHandler(pathRecorderMux *mux.PathRecorderMux, informers informers.SharedInformerFactory, isLeader func() bool) {
 	configz.InstallHandler(pathRecorderMux)
 	pathRecorderMux.Handle("/metrics", legacyregistry.HandlerWithReset())
@@ -307,6 +309,7 @@ func newHealthzAndMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfig
 	return pathRecorderMux
 }
 
+// getRecorderFactory returns a function that creates event recorders based on the provided CompletedConfig.
 func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.RecorderFactory {
 	return func(name string) events.EventRecorder {
 		return cc.EventBroadcaster.NewRecorder(name)
