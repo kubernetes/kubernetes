@@ -678,8 +678,8 @@ github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.4
 ## explicit; go 1.17
 github.com/vishvananda/netns
-# github.com/vmware/govmomi v0.30.0
-## explicit; go 1.17
+# github.com/vmware/govmomi v0.30.6
+## explicit; go 1.19
 github.com/vmware/govmomi
 github.com/vmware/govmomi/find
 github.com/vmware/govmomi/history
