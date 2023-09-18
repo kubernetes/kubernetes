@@ -191,15 +191,6 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			})
 		}
 
-		// Ignore changes that only affect managed fields
-		// timestamps. FieldManager can't know about changes
-		// like normalized fields, defaulted fields and other
-		// mutations.
-		// Only makes sense when SSA field manager is being used
-		if scope.FieldManager != nil {
-			transformers = append(transformers, fieldmanager.IgnoreManagedFieldsTimestampsTransformer)
-		}
-
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,
 			ResourceRequest: true,
