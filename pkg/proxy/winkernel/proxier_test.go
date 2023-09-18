@@ -237,16 +237,16 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
 
 	} else {
-		if epInfo.hnsID != endpointGuid1 {
+		if epInfo.hnsID != "EPID-3" {
 			t.Errorf("%v does not match %v", epInfo.hnsID, endpointGuid1)
 		}
 	}
 
-	if *proxier.endPointsRefCount[endpointGuid1] <= 0 {
+	if *proxier.endPointsRefCount["EPID-3"] <= 0 {
 		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[endpointGuid1])
 	}
 
-	if *proxier.endPointsRefCount[endpointGuid1] != *epInfo.refCount {
+	if *proxier.endPointsRefCount["EPID-3"] != *epInfo.refCount {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
 	}
 }
@@ -530,6 +530,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 			}}
 		}),
 	)
+
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 	ep := proxier.endpointsMap[svcPortName1][0]
@@ -759,7 +760,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 		}
 		if len(svcInfo.loadBalancerIngressIPs) == 0 {
 			t.Errorf("svcInfo does not have any loadBalancerIngressIPs, %+v", svcInfo)
-		} else if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != loadbalancerGuid1 {
+		} else if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != "LBID-4" {
 			t.Errorf("The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, loadbalancerGuid1, svcPortName.String())
 		}
 	}
@@ -917,7 +918,7 @@ func TestEndpointSlice(t *testing.T) {
 		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
 
 	} else {
-		if epInfo.hnsID != endpointGuid1 {
+		if epInfo.hnsID != "EPID-3" {
 			t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, endpointGuid1, svcPortName.String())
 		}
 	}
