@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 )
 
 // FakeRecorder is used as a fake during tests. It is thread safe. It is usable
@@ -29,11 +30,17 @@ type FakeRecorder struct {
 	Events chan string
 }
 
+var _ EventRecorderLogger = &FakeRecorder{}
+
 // Eventf emits an event
 func (f *FakeRecorder) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
 	if f.Events != nil {
 		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+note, args...)
 	}
+}
+
+func (f *FakeRecorder) WithLogger(logger klog.Logger) EventRecorderLogger {
+	return f
 }
 
 // NewFakeRecorder creates new fake event recorder with event channel with
