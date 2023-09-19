@@ -36,6 +36,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	}
 }
 
+// Fuzzes the `BootstrapToken` object with specific values for testing.
 func fuzzBootstrapToken(obj *output.BootstrapToken, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
