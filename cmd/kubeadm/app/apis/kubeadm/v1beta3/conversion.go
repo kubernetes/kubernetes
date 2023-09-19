@@ -24,14 +24,17 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
+// Converts an internal InitConfiguration to its v1beta3 variant.
 func Convert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	return autoConvert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in, out, s)
 }
 
+// Converts an internal JoinConfiguration to its v1beta3 variant.
 func Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
 	return autoConvert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in, out, s)
 }
 
+// Converts a v1beta3 InitConfiguration to its internal representation and handles nested ClusterConfiguration conversion.
 func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
 	err := autoConvert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s)
 	if err != nil {
@@ -48,6 +51,7 @@ func Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *
 	return autoConvert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in, out, s)
 }
 
+// Converts ControlPlaneComponent to v1beta3, managing ExtraArgs conversion.
 func Convert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in *kubeadm.ControlPlaneComponent, out *ControlPlaneComponent, s conversion.Scope) error {
 	out.ExtraArgs = convertFromArgs(in.ExtraArgs)
 	return autoConvert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in, out, s)
@@ -60,16 +64,19 @@ func Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kubeadm.
 	return autoConvert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(in, out, s)
 }
 
+// Converts LocalEtcd to v1beta3, managing ExtraArgs conversion.
 func Convert_kubeadm_LocalEtcd_To_v1beta3_LocalEtcd(in *kubeadm.LocalEtcd, out *LocalEtcd, s conversion.Scope) error {
 	out.ExtraArgs = convertFromArgs(in.ExtraArgs)
 	return autoConvert_kubeadm_LocalEtcd_To_v1beta3_LocalEtcd(in, out, s)
 }
 
+// Converts v1beta3 NodeRegistrationOptions to internal type, handling KubeletExtraArgs.
 func Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in *NodeRegistrationOptions, out *kubeadm.NodeRegistrationOptions, s conversion.Scope) error {
 	out.KubeletExtraArgs = convertToArgs(in.KubeletExtraArgs)
 	return autoConvert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in, out, s)
 }
 
+// Converts internal NodeRegistrationOptions to v1beta3, handling KubeletExtraArgs.
 func Convert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
 	out.KubeletExtraArgs = convertFromArgs(in.KubeletExtraArgs)
 	return autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(in, out, s)
