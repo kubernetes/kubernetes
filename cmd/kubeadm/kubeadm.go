@@ -21,6 +21,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
+// Executes the main application and handle any errors using kubeadm utilities.
 func main() {
 	kubeadmutil.CheckErr(app.Run())
 }
