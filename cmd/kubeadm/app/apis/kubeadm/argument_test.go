@@ -21,6 +21,7 @@ import (
 	"testing"
 )
 
+// Tests the GetArgValue function for various argument scenarios.
 func TestGetArgValue(t *testing.T) {
 	var tests = []struct {
 		testName      string
@@ -77,6 +78,7 @@ func TestGetArgValue(t *testing.T) {
 	}
 }
 
+// Tests the SetArgValues function for updating or adding argument values.
 func TestSetArgValues(t *testing.T) {
 	var tests = []struct {
 		testName     string
