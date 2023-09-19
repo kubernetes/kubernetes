@@ -36,6 +36,7 @@ var (
 	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
+// It registers custom types to the local scheme builder during initialization.
 func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
@@ -43,6 +44,7 @@ func init() {
 	localSchemeBuilder.Register(addKnownTypes)
 }
 
+// addKnownTypes adds known types and group versions to the runtime scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&BootstrapToken{},
