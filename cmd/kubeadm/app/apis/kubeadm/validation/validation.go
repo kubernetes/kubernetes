@@ -579,6 +579,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	return nil
 }
 
+// It determines if a flag is allowed based on a predefined set and a specific naming pattern.
 func isAllowedFlag(flagName string) bool {
 	allowedFlags := sets.New(kubeadmcmdoptions.CfgPath,
 		kubeadmcmdoptions.IgnorePreflightErrors,
