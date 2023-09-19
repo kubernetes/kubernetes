@@ -32,6 +32,7 @@ import (
 	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
+// Registers conversions using the `RegisterConversions` function during initialization.
 func init() {
 	localSchemeBuilder.Register(RegisterConversions)
 }
@@ -273,6 +274,7 @@ func Convert_v1beta4_APIEndpoint_To_kubeadm_APIEndpoint(in *APIEndpoint, out *ku
 	return autoConvert_v1beta4_APIEndpoint_To_kubeadm_APIEndpoint(in, out, s)
 }
 
+// Copies data from a `kubeadm.APIEndpoint` to a `v1beta4.APIEndpoint` struct.
 func autoConvert_kubeadm_APIEndpoint_To_v1beta4_APIEndpoint(in *kubeadm.APIEndpoint, out *APIEndpoint, s conversion.Scope) error {
 	out.AdvertiseAddress = in.AdvertiseAddress
 	out.BindPort = in.BindPort
@@ -284,6 +286,7 @@ func Convert_kubeadm_APIEndpoint_To_v1beta4_APIEndpoint(in *kubeadm.APIEndpoint,
 	return autoConvert_kubeadm_APIEndpoint_To_v1beta4_APIEndpoint(in, out, s)
 }
 
+// Converts a `v1beta4.APIServer` to a `kubeadm.APIServer` while handling specific field conversions.
 func autoConvert_v1beta4_APIServer_To_kubeadm_APIServer(in *APIServer, out *kubeadm.APIServer, s conversion.Scope) error {
 	if err := Convert_v1beta4_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(&in.ControlPlaneComponent, &out.ControlPlaneComponent, s); err != nil {
 		return err
@@ -298,6 +301,7 @@ func Convert_v1beta4_APIServer_To_kubeadm_APIServer(in *APIServer, out *kubeadm.
 	return autoConvert_v1beta4_APIServer_To_kubeadm_APIServer(in, out, s)
 }
 
+// Converts a `kubeadm.APIServer` to a `v1beta4.APIServer` while handling specific field conversions.
 func autoConvert_kubeadm_APIServer_To_v1beta4_APIServer(in *kubeadm.APIServer, out *APIServer, s conversion.Scope) error {
 	if err := Convert_kubeadm_ControlPlaneComponent_To_v1beta4_ControlPlaneComponent(&in.ControlPlaneComponent, &out.ControlPlaneComponent, s); err != nil {
 		return err
@@ -312,6 +316,7 @@ func Convert_kubeadm_APIServer_To_v1beta4_APIServer(in *kubeadm.APIServer, out *
 	return autoConvert_kubeadm_APIServer_To_v1beta4_APIServer(in, out, s)
 }
 
+// Converts a `v1beta4.Arg` to a `kubeadm.Arg` by copying the name and value fields.
 func autoConvert_v1beta4_Arg_To_kubeadm_Arg(in *Arg, out *kubeadm.Arg, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Value = in.Value
@@ -323,6 +328,7 @@ func Convert_v1beta4_Arg_To_kubeadm_Arg(in *Arg, out *kubeadm.Arg, s conversion.
 	return autoConvert_v1beta4_Arg_To_kubeadm_Arg(in, out, s)
 }
 
+// Converts a `kubeadm.Arg` to a `v1beta4.Arg` by copying the name and value fields.
 func autoConvert_kubeadm_Arg_To_v1beta4_Arg(in *kubeadm.Arg, out *Arg, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Value = in.Value
@@ -334,6 +340,7 @@ func Convert_kubeadm_Arg_To_v1beta4_Arg(in *kubeadm.Arg, out *Arg, s conversion.
 	return autoConvert_kubeadm_Arg_To_v1beta4_Arg(in, out, s)
 }
 
+// Converts `v1beta4` BootstrapTokenDiscovery to `kubeadm` BootstrapTokenDiscovery, handling field conversions.
 func autoConvert_v1beta4_BootstrapTokenDiscovery_To_kubeadm_BootstrapTokenDiscovery(in *BootstrapTokenDiscovery, out *kubeadm.BootstrapTokenDiscovery, s conversion.Scope) error {
 	out.Token = in.Token
 	out.APIServerEndpoint = in.APIServerEndpoint
@@ -347,6 +354,7 @@ func Convert_v1beta4_BootstrapTokenDiscovery_To_kubeadm_BootstrapTokenDiscovery(
 	return autoConvert_v1beta4_BootstrapTokenDiscovery_To_kubeadm_BootstrapTokenDiscovery(in, out, s)
 }
 
+// Converts `kubeadm` BootstrapTokenDiscovery to `v1beta4` with field conversions.
 func autoConvert_kubeadm_BootstrapTokenDiscovery_To_v1beta4_BootstrapTokenDiscovery(in *kubeadm.BootstrapTokenDiscovery, out *BootstrapTokenDiscovery, s conversion.Scope) error {
 	out.Token = in.Token
 	out.APIServerEndpoint = in.APIServerEndpoint
@@ -360,6 +368,7 @@ func Convert_kubeadm_BootstrapTokenDiscovery_To_v1beta4_BootstrapTokenDiscovery(
 	return autoConvert_kubeadm_BootstrapTokenDiscovery_To_v1beta4_BootstrapTokenDiscovery(in, out, s)
 }
 
+// Converts `v1beta4` to `kubeadm` ClusterConfiguration with field mapping.
 func autoConvert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
 	if err := Convert_v1beta4_Etcd_To_kubeadm_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
 		return err
@@ -393,6 +402,7 @@ func Convert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *Cl
 	return autoConvert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
 
+// Converts `kubeadm` ClusterConfiguration to `v1beta4` ClusterConfiguration with field mappings.
 func autoConvert_kubeadm_ClusterConfiguration_To_v1beta4_ClusterConfiguration(in *kubeadm.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
 	// INFO: in.ComponentConfigs opted out of conversion generation
 	if err := Convert_kubeadm_Etcd_To_v1beta4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
@@ -429,6 +439,7 @@ func Convert_kubeadm_ClusterConfiguration_To_v1beta4_ClusterConfiguration(in *ku
 	return autoConvert_kubeadm_ClusterConfiguration_To_v1beta4_ClusterConfiguration(in, out, s)
 }
 
+// Converts `v1beta4` to `kubeadm` ControlPlaneComponent with field mapping.
 func autoConvert_v1beta4_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *ControlPlaneComponent, out *kubeadm.ControlPlaneComponent, s conversion.Scope) error {
 	out.ExtraArgs = *(*[]kubeadm.Arg)(unsafe.Pointer(&in.ExtraArgs))
 	out.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
@@ -441,6 +452,7 @@ func Convert_v1beta4_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *
 	return autoConvert_v1beta4_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in, out, s)
 }
 
+// Converts `kubeadm` to `v1beta4` ControlPlaneComponent with field mapping.
 func autoConvert_kubeadm_ControlPlaneComponent_To_v1beta4_ControlPlaneComponent(in *kubeadm.ControlPlaneComponent, out *ControlPlaneComponent, s conversion.Scope) error {
 	out.ExtraArgs = *(*[]Arg)(unsafe.Pointer(&in.ExtraArgs))
 	out.ExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
@@ -453,6 +465,7 @@ func Convert_kubeadm_ControlPlaneComponent_To_v1beta4_ControlPlaneComponent(in *
 	return autoConvert_kubeadm_ControlPlaneComponent_To_v1beta4_ControlPlaneComponent(in, out, s)
 }
 
+// Converts `v1beta4` DNS to `kubeadm` DNS with field conversions for ImageMeta.
 func autoConvert_v1beta4_DNS_To_kubeadm_DNS(in *DNS, out *kubeadm.DNS, s conversion.Scope) error {
 	if err := Convert_v1beta4_ImageMeta_To_kubeadm_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
 		return err
@@ -465,6 +478,7 @@ func Convert_v1beta4_DNS_To_kubeadm_DNS(in *DNS, out *kubeadm.DNS, s conversion.
 	return autoConvert_v1beta4_DNS_To_kubeadm_DNS(in, out, s)
 }
 
+// Converts `kubeadm` DNS to `v1beta4` DNS with field conversions for ImageMeta.
 func autoConvert_kubeadm_DNS_To_v1beta4_DNS(in *kubeadm.DNS, out *DNS, s conversion.Scope) error {
 	if err := Convert_kubeadm_ImageMeta_To_v1beta4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
 		return err
@@ -477,6 +491,7 @@ func Convert_kubeadm_DNS_To_v1beta4_DNS(in *kubeadm.DNS, out *DNS, s conversion.
 	return autoConvert_kubeadm_DNS_To_v1beta4_DNS(in, out, s)
 }
 
+// Converts `v1beta4` Discovery to `kubeadm` Discovery with field conversions for various discovery methods.
 func autoConvert_v1beta4_Discovery_To_kubeadm_Discovery(in *Discovery, out *kubeadm.Discovery, s conversion.Scope) error {
 	out.BootstrapToken = (*kubeadm.BootstrapTokenDiscovery)(unsafe.Pointer(in.BootstrapToken))
 	out.File = (*kubeadm.FileDiscovery)(unsafe.Pointer(in.File))
@@ -490,6 +505,7 @@ func Convert_v1beta4_Discovery_To_kubeadm_Discovery(in *Discovery, out *kubeadm.
 	return autoConvert_v1beta4_Discovery_To_kubeadm_Discovery(in, out, s)
 }
 
+// Converts `kubeadm` to `v1beta4` Discovery with field mapping for different discovery methods.
 func autoConvert_kubeadm_Discovery_To_v1beta4_Discovery(in *kubeadm.Discovery, out *Discovery, s conversion.Scope) error {
 	out.BootstrapToken = (*BootstrapTokenDiscovery)(unsafe.Pointer(in.BootstrapToken))
 	out.File = (*FileDiscovery)(unsafe.Pointer(in.File))
@@ -503,6 +519,7 @@ func Convert_kubeadm_Discovery_To_v1beta4_Discovery(in *kubeadm.Discovery, out *
 	return autoConvert_kubeadm_Discovery_To_v1beta4_Discovery(in, out, s)
 }
 
+// Copies the EnvVar field from v1beta4 to kubeadm EnvVar.
 func autoConvert_v1beta4_EnvVar_To_kubeadm_EnvVar(in *EnvVar, out *kubeadm.EnvVar, s conversion.Scope) error {
 	out.EnvVar = in.EnvVar
 	return nil
@@ -513,6 +530,7 @@ func Convert_v1beta4_EnvVar_To_kubeadm_EnvVar(in *EnvVar, out *kubeadm.EnvVar, s
 	return autoConvert_v1beta4_EnvVar_To_kubeadm_EnvVar(in, out, s)
 }
 
+// Copies the EnvVar field from kubeadm to v1beta4 EnvVar.
 func autoConvert_kubeadm_EnvVar_To_v1beta4_EnvVar(in *kubeadm.EnvVar, out *EnvVar, s conversion.Scope) error {
 	out.EnvVar = in.EnvVar
 	return nil
@@ -523,6 +541,7 @@ func Convert_kubeadm_EnvVar_To_v1beta4_EnvVar(in *kubeadm.EnvVar, out *EnvVar, s
 	return autoConvert_kubeadm_EnvVar_To_v1beta4_EnvVar(in, out, s)
 }
 
+// Converts v1beta4 Etcd to kubeadm Etcd with field conversions for Local and External Etcd configurations.
 func autoConvert_v1beta4_Etcd_To_kubeadm_Etcd(in *Etcd, out *kubeadm.Etcd, s conversion.Scope) error {
 	out.Local = (*kubeadm.LocalEtcd)(unsafe.Pointer(in.Local))
 	out.External = (*kubeadm.ExternalEtcd)(unsafe.Pointer(in.External))
@@ -534,6 +553,7 @@ func Convert_v1beta4_Etcd_To_kubeadm_Etcd(in *Etcd, out *kubeadm.Etcd, s convers
 	return autoConvert_v1beta4_Etcd_To_kubeadm_Etcd(in, out, s)
 }
 
+// Converts kubeadm Etcd to v1beta4 Etcd with field conversions for Local and External Etcd configurations.
 func autoConvert_kubeadm_Etcd_To_v1beta4_Etcd(in *kubeadm.Etcd, out *Etcd, s conversion.Scope) error {
 	out.Local = (*LocalEtcd)(unsafe.Pointer(in.Local))
 	out.External = (*ExternalEtcd)(unsafe.Pointer(in.External))
@@ -545,6 +565,7 @@ func Convert_kubeadm_Etcd_To_v1beta4_Etcd(in *kubeadm.Etcd, out *Etcd, s convers
 	return autoConvert_kubeadm_Etcd_To_v1beta4_Etcd(in, out, s)
 }
 
+// Converts `v1beta4` to `kubeadm` ExternalEtcd with field mapping for endpoints and certificates.
 func autoConvert_v1beta4_ExternalEtcd_To_kubeadm_ExternalEtcd(in *ExternalEtcd, out *kubeadm.ExternalEtcd, s conversion.Scope) error {
 	out.Endpoints = *(*[]string)(unsafe.Pointer(&in.Endpoints))
 	out.CAFile = in.CAFile
@@ -558,6 +579,7 @@ func Convert_v1beta4_ExternalEtcd_To_kubeadm_ExternalEtcd(in *ExternalEtcd, out 
 	return autoConvert_v1beta4_ExternalEtcd_To_kubeadm_ExternalEtcd(in, out, s)
 }
 
+// Converts kubeadm ExternalEtcd to v1beta4 ExternalEtcd with field mapping for endpoints and certificate-related files.
 func autoConvert_kubeadm_ExternalEtcd_To_v1beta4_ExternalEtcd(in *kubeadm.ExternalEtcd, out *ExternalEtcd, s conversion.Scope) error {
 	out.Endpoints = *(*[]string)(unsafe.Pointer(&in.Endpoints))
 	out.CAFile = in.CAFile
@@ -571,6 +593,7 @@ func Convert_kubeadm_ExternalEtcd_To_v1beta4_ExternalEtcd(in *kubeadm.ExternalEt
 	return autoConvert_kubeadm_ExternalEtcd_To_v1beta4_ExternalEtcd(in, out, s)
 }
 
+// Converts v1beta4 FileDiscovery to kubeadm FileDiscovery with field mapping for the KubeConfigPath.
 func autoConvert_v1beta4_FileDiscovery_To_kubeadm_FileDiscovery(in *FileDiscovery, out *kubeadm.FileDiscovery, s conversion.Scope) error {
 	out.KubeConfigPath = in.KubeConfigPath
 	return nil
@@ -581,6 +604,7 @@ func Convert_v1beta4_FileDiscovery_To_kubeadm_FileDiscovery(in *FileDiscovery, o
 	return autoConvert_v1beta4_FileDiscovery_To_kubeadm_FileDiscovery(in, out, s)
 }
 
+// Converts `kubeadm` to `v1beta4` FileDiscovery with KubeConfigPath field mapping.
 func autoConvert_kubeadm_FileDiscovery_To_v1beta4_FileDiscovery(in *kubeadm.FileDiscovery, out *FileDiscovery, s conversion.Scope) error {
 	out.KubeConfigPath = in.KubeConfigPath
 	return nil
@@ -591,6 +615,7 @@ func Convert_kubeadm_FileDiscovery_To_v1beta4_FileDiscovery(in *kubeadm.FileDisc
 	return autoConvert_kubeadm_FileDiscovery_To_v1beta4_FileDiscovery(in, out, s)
 }
 
+// Converts `v1beta4` to `kubeadm` HostPathMount with field mapping.
 func autoConvert_v1beta4_HostPathMount_To_kubeadm_HostPathMount(in *HostPathMount, out *kubeadm.HostPathMount, s conversion.Scope) error {
 	out.Name = in.Name
 	out.HostPath = in.HostPath
@@ -605,6 +630,7 @@ func Convert_v1beta4_HostPathMount_To_kubeadm_HostPathMount(in *HostPathMount, o
 	return autoConvert_v1beta4_HostPathMount_To_kubeadm_HostPathMount(in, out, s)
 }
 
+// Converts kubeadm HostPathMount to v1beta4 with field mapping.
 func autoConvert_kubeadm_HostPathMount_To_v1beta4_HostPathMount(in *kubeadm.HostPathMount, out *HostPathMount, s conversion.Scope) error {
 	out.Name = in.Name
 	out.HostPath = in.HostPath
@@ -619,6 +645,7 @@ func Convert_kubeadm_HostPathMount_To_v1beta4_HostPathMount(in *kubeadm.HostPath
 	return autoConvert_kubeadm_HostPathMount_To_v1beta4_HostPathMount(in, out, s)
 }
 
+// Converts v1beta4 ImageMeta to kubeadm ImageMeta with field mapping.
 func autoConvert_v1beta4_ImageMeta_To_kubeadm_ImageMeta(in *ImageMeta, out *kubeadm.ImageMeta, s conversion.Scope) error {
 	out.ImageRepository = in.ImageRepository
 	out.ImageTag = in.ImageTag
@@ -630,6 +657,7 @@ func Convert_v1beta4_ImageMeta_To_kubeadm_ImageMeta(in *ImageMeta, out *kubeadm.
 	return autoConvert_v1beta4_ImageMeta_To_kubeadm_ImageMeta(in, out, s)
 }
 
+// Converts `kubeadm` to `v1beta4` ImageMeta with field mapping for repository and tag.
 func autoConvert_kubeadm_ImageMeta_To_v1beta4_ImageMeta(in *kubeadm.ImageMeta, out *ImageMeta, s conversion.Scope) error {
 	out.ImageRepository = in.ImageRepository
 	out.ImageTag = in.ImageTag
@@ -641,6 +669,7 @@ func Convert_kubeadm_ImageMeta_To_v1beta4_ImageMeta(in *kubeadm.ImageMeta, out *
 	return autoConvert_kubeadm_ImageMeta_To_v1beta4_ImageMeta(in, out, s)
 }
 
+// Converts v1beta4 InitConfiguration to kubeadm InitConfiguration.
 func autoConvert_v1beta4_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
 	out.BootstrapTokens = *(*[]bootstraptokenv1.BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
 	out.DryRun = in.DryRun
@@ -656,6 +685,7 @@ func autoConvert_v1beta4_InitConfiguration_To_kubeadm_InitConfiguration(in *Init
 	return nil
 }
 
+// Converts kubeadm InitConfiguration to v1beta4 InitConfiguration.
 func autoConvert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	// WARNING: in.ClusterConfiguration requires manual conversion: does not exist in peer-type
 	out.BootstrapTokens = *(*[]bootstraptokenv1.BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
@@ -672,6 +702,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration(in *kube
 	return nil
 }
 
+// Converts v1beta4 JoinConfiguration to kubeadm JoinConfiguration.
 func autoConvert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
 	out.DryRun = in.DryRun
 	if err := Convert_v1beta4_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
@@ -692,6 +723,7 @@ func Convert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConf
 	return autoConvert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
 }
 
+// Converts kubeadm to v1beta4 JoinConfiguration with field mapping.
 func autoConvert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
 	out.DryRun = in.DryRun
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
@@ -712,6 +744,7 @@ func Convert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration(in *kubeadm.
 	return autoConvert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration(in, out, s)
 }
 
+// Converts v1beta4 to kubeadm JoinControlPlane with field mapping.
 func autoConvert_v1beta4_JoinControlPlane_To_kubeadm_JoinControlPlane(in *JoinControlPlane, out *kubeadm.JoinControlPlane, s conversion.Scope) error {
 	if err := Convert_v1beta4_APIEndpoint_To_kubeadm_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
@@ -725,6 +758,7 @@ func Convert_v1beta4_JoinControlPlane_To_kubeadm_JoinControlPlane(in *JoinContro
 	return autoConvert_v1beta4_JoinControlPlane_To_kubeadm_JoinControlPlane(in, out, s)
 }
 
+// Converts `kubeadm` to `v1beta4` JoinControlPlane with field mapping.
 func autoConvert_kubeadm_JoinControlPlane_To_v1beta4_JoinControlPlane(in *kubeadm.JoinControlPlane, out *JoinControlPlane, s conversion.Scope) error {
 	if err := Convert_kubeadm_APIEndpoint_To_v1beta4_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
@@ -738,6 +772,7 @@ func Convert_kubeadm_JoinControlPlane_To_v1beta4_JoinControlPlane(in *kubeadm.Jo
 	return autoConvert_kubeadm_JoinControlPlane_To_v1beta4_JoinControlPlane(in, out, s)
 }
 
+// Converts `v1beta4` to `kubeadm` LocalEtcd with field mapping for various configurations.
 func autoConvert_v1beta4_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kubeadm.LocalEtcd, s conversion.Scope) error {
 	if err := Convert_v1beta4_ImageMeta_To_kubeadm_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
 		return err
@@ -755,6 +790,7 @@ func Convert_v1beta4_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kubeadm.
 	return autoConvert_v1beta4_LocalEtcd_To_kubeadm_LocalEtcd(in, out, s)
 }
 
+// Converts `kubeadm` to `v1beta4` LocalEtcd with field mapping for various configurations.
 func autoConvert_kubeadm_LocalEtcd_To_v1beta4_LocalEtcd(in *kubeadm.LocalEtcd, out *LocalEtcd, s conversion.Scope) error {
 	if err := Convert_kubeadm_ImageMeta_To_v1beta4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
 		return err
@@ -772,6 +808,7 @@ func Convert_kubeadm_LocalEtcd_To_v1beta4_LocalEtcd(in *kubeadm.LocalEtcd, out *
 	return autoConvert_kubeadm_LocalEtcd_To_v1beta4_LocalEtcd(in, out, s)
 }
 
+// Converts `v1beta4` to `kubeadm` Networking with field mapping for subnets and DNS domain.
 func autoConvert_v1beta4_Networking_To_kubeadm_Networking(in *Networking, out *kubeadm.Networking, s conversion.Scope) error {
 	out.ServiceSubnet = in.ServiceSubnet
 	out.PodSubnet = in.PodSubnet
@@ -784,6 +821,7 @@ func Convert_v1beta4_Networking_To_kubeadm_Networking(in *Networking, out *kubea
 	return autoConvert_v1beta4_Networking_To_kubeadm_Networking(in, out, s)
 }
 
+// Converts `kubeadm` to `v1beta4` Networking with field mapping for subnets and DNS domain.
 func autoConvert_kubeadm_Networking_To_v1beta4_Networking(in *kubeadm.Networking, out *Networking, s conversion.Scope) error {
 	out.ServiceSubnet = in.ServiceSubnet
 	out.PodSubnet = in.PodSubnet
@@ -796,6 +834,7 @@ func Convert_kubeadm_Networking_To_v1beta4_Networking(in *kubeadm.Networking, ou
 	return autoConvert_kubeadm_Networking_To_v1beta4_Networking(in, out, s)
 }
 
+// Converts `v1beta4` to `kubeadm` NodeRegistrationOptions with field mapping for various configurations.
 func autoConvert_v1beta4_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in *NodeRegistrationOptions, out *kubeadm.NodeRegistrationOptions, s conversion.Scope) error {
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
@@ -811,6 +850,7 @@ func Convert_v1beta4_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(
 	return autoConvert_v1beta4_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in, out, s)
 }
 
+// Converts kubeadm to v1beta4 NodeRegistrationOptions with field mapping.
 func autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta4_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
@@ -826,6 +866,7 @@ func Convert_kubeadm_NodeRegistrationOptions_To_v1beta4_NodeRegistrationOptions(
 	return autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta4_NodeRegistrationOptions(in, out, s)
 }
 
+// Converts v1beta4 to kubeadm Patches with field mapping for the directory.
 func autoConvert_v1beta4_Patches_To_kubeadm_Patches(in *Patches, out *kubeadm.Patches, s conversion.Scope) error {
 	out.Directory = in.Directory
 	return nil
@@ -836,6 +877,7 @@ func Convert_v1beta4_Patches_To_kubeadm_Patches(in *Patches, out *kubeadm.Patche
 	return autoConvert_v1beta4_Patches_To_kubeadm_Patches(in, out, s)
 }
 
+// Converts `kubeadm` Patches to `v1beta4` Patches with field mapping for the directory.
 func autoConvert_kubeadm_Patches_To_v1beta4_Patches(in *kubeadm.Patches, out *Patches, s conversion.Scope) error {
 	out.Directory = in.Directory
 	return nil
@@ -846,6 +888,7 @@ func Convert_kubeadm_Patches_To_v1beta4_Patches(in *kubeadm.Patches, out *Patche
 	return autoConvert_kubeadm_Patches_To_v1beta4_Patches(in, out, s)
 }
 
+// Converts v1beta4 to kubeadm ResetConfiguration with field mapping.
 func autoConvert_v1beta4_ResetConfiguration_To_kubeadm_ResetConfiguration(in *ResetConfiguration, out *kubeadm.ResetConfiguration, s conversion.Scope) error {
 	out.CleanupTmpDir = in.CleanupTmpDir
 	out.CertificatesDir = in.CertificatesDir
@@ -862,6 +905,7 @@ func Convert_v1beta4_ResetConfiguration_To_kubeadm_ResetConfiguration(in *ResetC
 	return autoConvert_v1beta4_ResetConfiguration_To_kubeadm_ResetConfiguration(in, out, s)
 }
 
+// Converts kubeadm to v1beta4 ResetConfiguration with field mapping.
 func autoConvert_kubeadm_ResetConfiguration_To_v1beta4_ResetConfiguration(in *kubeadm.ResetConfiguration, out *ResetConfiguration, s conversion.Scope) error {
 	out.CertificatesDir = in.CertificatesDir
 	out.CleanupTmpDir = in.CleanupTmpDir
