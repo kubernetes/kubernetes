@@ -21,6 +21,7 @@ import (
 	"testing"
 )
 
+// Tests the conversion of string representations into APIEndpoint structures.
 func TestAPIEndpointFromString(t *testing.T) {
 	var tests = []struct {
 		apiEndpoint      string
@@ -51,6 +52,7 @@ func TestAPIEndpointFromString(t *testing.T) {
 	}
 }
 
+// Tests the string representation of APIEndpoint structures.
 func TestString(t *testing.T) {
 	var tests = []struct {
 		name        string
