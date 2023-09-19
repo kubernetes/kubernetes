@@ -427,7 +427,7 @@ func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 		aliases:  []string{"resource-claim-controller"},
 		initFunc: startResourceClaimController,
 		requiredFeatureGates: []featuregate.Feature{
-			features.DynamicResourceAllocation,
+			features.DynamicResourceAllocation, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
 		},
 	}
 }
@@ -738,7 +738,7 @@ func newLegacyServiceAccountTokenCleanerControllerDescriptor() *ControllerDescri
 		aliases:  []string{"legacy-service-account-token-cleaner"},
 		initFunc: startLegacyServiceAccountTokenCleanerController,
 		requiredFeatureGates: []featuregate.Feature{
-			features.LegacyServiceAccountTokenCleanUp,
+			features.LegacyServiceAccountTokenCleanUp, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
 		},
 	}
 }
