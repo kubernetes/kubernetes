@@ -187,6 +187,29 @@ func testCheckStop(t *testing.T, w watch.Interface) {
 	}
 }
 
+func testCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
+	for _, expectedEvent := range expectedEvents {
+		testCheckResult(t, w, expectedEvent)
+	}
+}
+
+func testCheckResultsInRandomOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
+	for range expectedEvents {
+		testCheckResultFunc(t, w, func(actualEvent watch.Event) {
+			ExpectContains(t, "unexpected event", toInterfaceSlice(expectedEvents), actualEvent)
+		})
+	}
+}
+
+func testCheckNoMoreResults(t *testing.T, w watch.Interface) {
+	select {
+	case e := <-w.ResultChan():
+		t.Errorf("Unexpected: %#v event received, expected no events", e)
+	case <-time.After(time.Second):
+		return
+	}
+}
+
 func toInterfaceSlice[T any](s []T) []interface{} {
 	result := make([]interface{}, len(s))
 	for i, v := range s {
