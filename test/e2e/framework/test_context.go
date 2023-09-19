@@ -100,7 +100,7 @@ type TestContextType struct {
 	// Provider identifies the infrastructure provider (gce, gke, aws)
 	Provider string
 
-	// Tooling is the tooling in use (e.g. kops, gke).  Provider is the cloud provider and might not uniquely identify the tooling.
+	// Tooling identifies the tool used to create the cluster (e.g. kind, kops, gke, kube-up, capg). Multiple tools can create a K8s cluster on the same cloud provider .
 	Tooling string
 
 	// timeouts contains user-configurable timeouts for various operations.
@@ -398,7 +398,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	// If this becomes true as well, they should be refactored into RegisterCommonFlags.
 	flags.BoolVar(&TestContext.PrepullImages, "prepull-images", false, "If true, prepull images so image pull failures do not cause test failures.")
 	flags.StringVar(&TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, skeleton (the fallback if not set), etc.)")
-	flags.StringVar(&TestContext.Tooling, "tooling", "", "The tooling in use (kops, gke, etc.)")
+	flags.StringVar(&TestContext.Tooling, "tooling", "kube-up", "The tooling used to create the cluster (kops, gke, kube-up).")
 	flags.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
 	flags.StringVar(&TestContext.Prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
 	flags.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, ubuntu, gci, coreos, or custom).")

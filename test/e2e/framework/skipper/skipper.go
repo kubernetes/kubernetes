@@ -141,6 +141,13 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 	}
 }
 
+// SkipUnlessToolingIs skips if the tooling is not included in the supportedTooling.
+func SkipUnlessToolingIs(supportedTooling ...string) {
+	if !framework.ToolingIs(supportedTooling...) {
+		skipInternalf(1, "Only supported for clusters created by %v (not %s)", supportedTooling, framework.TestContext.Tooling)
+	}
+}
+
 // SkipUnlessMultizone skips if the cluster does not have multizone.
 func SkipUnlessMultizone(ctx context.Context, c clientset.Interface) {
 	zones, err := e2enode.GetClusterZones(ctx, c)

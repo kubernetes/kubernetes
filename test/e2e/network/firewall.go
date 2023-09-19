@@ -62,6 +62,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessToolingIs("kube-up")
 
 		var err error
 		cs = f.ClientSet

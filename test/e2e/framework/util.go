@@ -166,6 +166,16 @@ func ProviderIs(providers ...string) bool {
 	return false
 }
 
+// ToolingIs returns true if the tool is included is the tooling. Otherwise false.
+func ToolingIs(tooling ...string) bool {
+	for _, tool := range tooling {
+		if strings.EqualFold(tool, TestContext.Tooling) {
+			return true
+		}
+	}
+	return false
+}
+
 // MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
 func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 	for _, distro := range supportedMasterOsDistros {
