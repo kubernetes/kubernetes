@@ -371,6 +371,9 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
 				return tc.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			})),
+			v1listers.NewNodeLister(newIndexer(func(_, name string) (interface{}, error) {
+				return tc.Client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+			})),
 		)
 		var secretsWriter typedv1core.SecretsGetter
 		if tc.Client != nil {
@@ -443,6 +446,11 @@ func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
 	parts := strings.SplitN(key, "/", 2)
 	namespace := parts[0]
 	name := ""
+	// implies the key does not contain a / (this is a cluster-scoped object)
+	if len(parts) == 1 {
+		name = parts[0]
+		namespace = ""
+	}
 	if len(parts) == 2 {
 		name = parts[1]
 	}
