@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 )
 
+// Tests round-trip encoding and decoding of API group types using a scheme and functions.
 func TestRoundTripTypes(t *testing.T) {
 	roundtrip.RoundTripTestForAPIGroup(t, scheme.AddToScheme, Funcs)
 }
