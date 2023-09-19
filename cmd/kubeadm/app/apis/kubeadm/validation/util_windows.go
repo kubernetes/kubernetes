@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 )
 
+// Checks if a path is absolute, including handling Windows-specific slash prefixes.
 func isAbs(path string) bool {
 	// on Windows, filepath.IsAbs will not return True for paths prefixed with a slash, even
 	// though they can be used as absolute paths (https://docs.microsoft.com/en-us/dotnet/standard/io/file-path-formats).
