@@ -23,6 +23,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
+// Tests the conversion of a map to a sorted slice of kubeadmapi.Arg objects.
 func TestConvertToArgs(t *testing.T) {
 	var tests = []struct {
 		name         string
@@ -54,6 +55,7 @@ func TestConvertToArgs(t *testing.T) {
 	}
 }
 
+// Tests the conversion of a slice of kubeadmapi.Arg objects to a map, handling duplicates.
 func TestConvertFromArgs(t *testing.T) {
 	var tests = []struct {
 		name         string
