@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 )
 
+// Checks if a given path is an absolute path.
 func isAbs(path string) bool {
 	return filepath.IsAbs(path)
 }
