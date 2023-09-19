@@ -31,6 +31,7 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 )
 
+// Tests token validation for various cases.
 func TestValidateToken(t *testing.T) {
 	var tests = []struct {
 		token    string
@@ -54,6 +55,7 @@ func TestValidateToken(t *testing.T) {
 	}
 }
 
+// Tests token usage validation.
 func TestValidateValidateTokenUsages(t *testing.T) {
 	var tests = []struct {
 		u        []string
@@ -76,6 +78,7 @@ func TestValidateValidateTokenUsages(t *testing.T) {
 	}
 }
 
+// Tests token group validation.
 func TestValidateTokenGroups(t *testing.T) {
 	var tests = []struct {
 		u        []string
@@ -99,6 +102,7 @@ func TestValidateTokenGroups(t *testing.T) {
 	}
 }
 
+// Tests node registration options validation.
 func TestValidateNodeRegistrationOptions(t *testing.T) {
 	var tests = []struct {
 		nodeName       string
@@ -127,6 +131,7 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 	}
 }
 
+// Tests certificate Subject Alternative Names (SANs) validation.
 func TestValidateCertSANs(t *testing.T) {
 	var tests = []struct {
 		sans     []string
@@ -157,6 +162,7 @@ func TestValidateCertSANs(t *testing.T) {
 	}
 }
 
+// Tests IP address validation from a string.
 func TestValidateIPFromString(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -186,6 +192,7 @@ func TestValidateIPFromString(t *testing.T) {
 	}
 }
 
+// Tests port validation for various cases.
 func TestValidatePort(t *testing.T) {
 	var tests = []struct {
 		name        string
@@ -214,6 +221,7 @@ func TestValidatePort(t *testing.T) {
 	}
 }
 
+// Tests IP subnet validation from a string.
 func TestValidateIPNetFromString(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -250,6 +258,7 @@ func TestValidateIPNetFromString(t *testing.T) {
 	}
 }
 
+// Tests pod subnet node mask validation.
 func TestValidatePodSubnetNodeMask(t *testing.T) {
 	var tests = []struct {
 		name        string
@@ -294,6 +303,7 @@ func TestValidatePodSubnetNodeMask(t *testing.T) {
 	}
 }
 
+// Tests service subnet size validation.
 func TestValidateServiceSubnetSize(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -325,6 +335,7 @@ func TestValidateServiceSubnetSize(t *testing.T) {
 	}
 }
 
+// Tests host and port validation for various cases.
 func TestValidateHostPort(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -395,6 +406,7 @@ func TestValidateHostPort(t *testing.T) {
 	}
 }
 
+// TestValidateAPIEndpoint tests API endpoint validation.
 func TestValidateAPIEndpoint(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -455,6 +467,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 	}
 }
 
+// TestValidateCertificateKey tests certificate key validation.
 func TestValidateCertificateKey(t *testing.T) {
 	var tests = []struct {
 		name           string
@@ -619,6 +632,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 	}
 }
 
+// Tests join configuration validation.
 func TestValidateJoinConfiguration(t *testing.T) {
 	criPath := fmt.Sprintf("%s:///var/run/containerd/containerd.sock", kubeadmapiv1.DefaultContainerRuntimeURLScheme)
 	var tests = []struct {
@@ -728,6 +742,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 	}
 }
 
+// Tests mixed arguments validation.
 func TestValidateMixedArguments(t *testing.T) {
 	var tests = []struct {
 		args     []string
@@ -771,6 +786,7 @@ func TestValidateMixedArguments(t *testing.T) {
 	}
 }
 
+// Tests feature gates validation.
 func TestValidateFeatureGates(t *testing.T) {
 	type featureFlag map[string]bool
 	var tests = []struct {
@@ -793,6 +809,7 @@ func TestValidateFeatureGates(t *testing.T) {
 	}
 }
 
+// Tests ignore preflight errors validation.
 func TestValidateIgnorePreflightErrors(t *testing.T) {
 	var tests = []struct {
 		ignorePreflightErrorsFromCLI        []string
@@ -886,6 +903,7 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 	}
 }
 
+// Tests discovery configuration validation
 func TestValidateDiscovery(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -924,6 +942,7 @@ func TestValidateDiscovery(t *testing.T) {
 	}
 }
 
+// Tests bootstrap token discovery validation.
 func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -981,6 +1000,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 	}
 }
 
+// Tests API server endpoint validation for token-based discovery.
 func TestValidateDiscoveryTokenAPIServer(t *testing.T) {
 	var tests = []struct {
 		apiServerEndpoint string
@@ -1007,6 +1027,7 @@ func TestValidateDiscoveryTokenAPIServer(t *testing.T) {
 	}
 }
 
+// Tests kubeconfig path validation for file-based discovery.
 func TestValidateDiscoveryKubeConfigPath(t *testing.T) {
 	tmpfile, err := os.CreateTemp("/tmp", "test_discovery_file")
 	if err != nil {
@@ -1039,6 +1060,7 @@ func TestValidateDiscoveryKubeConfigPath(t *testing.T) {
 	}
 }
 
+// Tests validation for container runtime socket paths.
 func TestValidateSocketPath(t *testing.T) {
 	var tests = []struct {
 		name           string
@@ -1060,6 +1082,7 @@ func TestValidateSocketPath(t *testing.T) {
 	}
 }
 
+// Tests URL validation, including HTTPS requirement.
 func TestValidateURLs(t *testing.T) {
 	var tests = []struct {
 		name           string
@@ -1107,6 +1130,7 @@ func TestValidateURLs(t *testing.T) {
 	}
 }
 
+// Tests etcd configuration validation.
 func TestValidateEtcd(t *testing.T) {
 	var tests = []struct {
 		name           string
@@ -1187,6 +1211,7 @@ func TestValidateEtcd(t *testing.T) {
 	}
 }
 
+// Tests the retrieval of the cluster node mask for IPv4 and IPv6.
 func TestGetClusterNodeMask(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1308,6 +1333,7 @@ func TestGetClusterNodeMask(t *testing.T) {
 	}
 }
 
+// Tests image repository URL validation.
 func TestValidateImageRepository(t *testing.T) {
 	var tests = []struct {
 		imageRepository string
@@ -1389,6 +1415,7 @@ func TestValidateImageRepository(t *testing.T) {
 	}
 }
 
+// Tests validation of an absolute file path.
 func TestValidateAbsolutePath(t *testing.T) {
 	var tests = []struct {
 		name           string
@@ -1408,6 +1435,7 @@ func TestValidateAbsolutePath(t *testing.T) {
 	}
 }
 
+// Tests validation of extra arguments.
 func TestValidateExtraArgs(t *testing.T) {
 	var tests = []struct {
 		name           string
