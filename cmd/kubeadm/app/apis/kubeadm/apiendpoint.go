@@ -44,6 +44,7 @@ func APIEndpointFromString(apiEndpoint string) (APIEndpoint, error) {
 	}, nil
 }
 
+// Returns the string representation of the APIEndpoint.
 func (endpoint *APIEndpoint) String() string {
 	return net.JoinHostPort(endpoint.AdvertiseAddress, strconv.FormatInt(int64(endpoint.BindPort), 10))
 }
