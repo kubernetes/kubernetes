@@ -62,6 +62,7 @@ const (
 	DefaultImagePullPolicy = corev1.PullIfNotPresent
 )
 
+// Registers the default values for the given scheme.
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
@@ -135,6 +136,7 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	SetDefaults_NodeRegistration(&obj.NodeRegistration)
 }
 
+// Sets default values for JoinControlPlane's API endpoint if the object is not nil.
 func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
 	if obj != nil {
 		SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
