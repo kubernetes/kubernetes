@@ -40,7 +40,17 @@ var _ = utils.SIGDescribe("StorageClasses", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("CSI Conformance", func() {
-		ginkgo.It("should run through the lifecycle of a StorageClass", func(ctx context.Context) {
+
+		/*
+			Release: v1.29
+			Testname: StorageClass, lifecycle
+			Description: Creating a StorageClass MUST succeed. Reading the StorageClass MUST
+			succeed. Patching the StorageClass MUST succeed with its new label found. Deleting
+			the StorageClass MUST succeed and it MUST be confirmed. Replacement StorageClass
+			MUST be created. Updating the StorageClass MUST succeed with its new label found.
+			Deleting the StorageClass via deleteCollection MUST succeed and it MUST be confirmed.
+		*/
+		framework.ConformanceIt("should run through the lifecycle of a StorageClass", func(ctx context.Context) {
 
 			scClient := f.ClientSet.StorageV1().StorageClasses()
 			var initialSC, replacementSC *storagev1.StorageClass
