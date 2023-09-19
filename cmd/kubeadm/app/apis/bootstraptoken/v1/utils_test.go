@@ -29,6 +29,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 )
 
+// Tests the JSON marshaling of BootstrapTokenString values.
 func TestMarshalJSON(t *testing.T) {
 	var tests = []struct {
 		bts      BootstrapTokenString
@@ -55,6 +56,7 @@ func TestMarshalJSON(t *testing.T) {
 	}
 }
 
+// Tests the JSON unmarshaling of BootstrapTokenString values.
 func TestUnmarshalJSON(t *testing.T) {
 	var tests = []struct {
 		input         string
@@ -87,6 +89,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 }
 
+// Tests the JSON serialization and deserialization roundtrip for BootstrapTokenString values.
 func TestJSONRoundtrip(t *testing.T) {
 	var tests = []struct {
 		input string
@@ -104,6 +107,7 @@ func TestJSONRoundtrip(t *testing.T) {
 	}
 }
 
+// Performs a JSON roundtrip test for BootstrapTokenString values.
 func roundtrip(input string, bts *BootstrapTokenString) error {
 	var b []byte
 	var err error
@@ -141,6 +145,7 @@ func roundtrip(input string, bts *BootstrapTokenString) error {
 	return nil
 }
 
+// Tests constructing token strings from ID and Secret of BootstrapTokenString.
 func TestTokenFromIDAndSecret(t *testing.T) {
 	var tests = []struct {
 		bts      BootstrapTokenString
@@ -164,6 +169,7 @@ func TestTokenFromIDAndSecret(t *testing.T) {
 	}
 }
 
+// Tests the creation of BootstrapTokenString from given token strings.
 func TestNewBootstrapTokenString(t *testing.T) {
 	var tests = []struct {
 		token         string
@@ -209,6 +215,7 @@ func TestNewBootstrapTokenString(t *testing.T) {
 	}
 }
 
+// Tests the creation of BootstrapTokenString from given ID and Secret pairs.
 func TestNewBootstrapTokenStringFromIDAndSecret(t *testing.T) {
 	var tests = []struct {
 		id, secret    string
@@ -256,6 +263,7 @@ func TestNewBootstrapTokenStringFromIDAndSecret(t *testing.T) {
 // This timestamp is used as the reference value when computing expiration dates based on TTLs in these unit tests
 var refTime = time.Date(1970, time.January, 1, 1, 1, 1, 0, time.UTC)
 
+// Tests the conversion of BootstrapToken to a Kubernetes Secret.
 func TestBootstrapTokenToSecret(t *testing.T) {
 	var tests = []struct {
 		bt     *BootstrapToken
@@ -303,6 +311,7 @@ func TestBootstrapTokenToSecret(t *testing.T) {
 	}
 }
 
+// Tests the roundtrip conversion of BootstrapToken to Secret and back to BootstrapToken.
 func TestBootstrapTokenToSecretRoundtrip(t *testing.T) {
 	var tests = []struct {
 		bt *BootstrapToken
@@ -336,6 +345,7 @@ func TestBootstrapTokenToSecretRoundtrip(t *testing.T) {
 	}
 }
 
+// Tests encoding a BootstrapToken into a Secret's data representation.
 func TestEncodeTokenSecretData(t *testing.T) {
 	var tests = []struct {
 		name string
@@ -473,6 +483,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 	}
 }
 
+// Parses a duration string and fail the test if there's an error.
 func mustParseDuration(durationStr string, t *testing.T) time.Duration {
 	d, err := time.ParseDuration(durationStr)
 	if err != nil {
@@ -481,6 +492,8 @@ func mustParseDuration(durationStr string, t *testing.T) time.Duration {
 	return d
 }
 
+// Tests the creation of a BootstrapToken object from a Secret
+// and checks for expected results and errors.
 func TestBootstrapTokenFromSecret(t *testing.T) {
 	var tests = []struct {
 		desc          string
@@ -676,6 +689,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 	}
 }
 
+// Converts a BootstrapToken to its JSON string representation.
 func jsonMarshal(bt *BootstrapToken) string {
 	b, _ := json.Marshal(*bt)
 	return string(b)
