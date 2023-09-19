@@ -334,6 +334,16 @@ const (
 	// deletion ordering.
 	HonorPVReclaimPolicy featuregate.Feature = "HonorPVReclaimPolicy"
 
+	// owner: @aojea
+	// Deprecated: v1.29
+	//
+	// Changes when the Node addresses are assigned to the Node when using
+	// external cloud provider. The default is for only the external cloud provider
+	// to set the Node addresses. Enabling this means that the kubelet, if not address
+	// has been configured, will assign addresses to the Node based on the --node-ip
+	// flag parameters.
+	InitializeNodeAddressesCloudProviderExternal featuregate.Feature = "InitializeNodeAddressesCloudProviderExternal"
+
 	// owner: @leakingtapan
 	// alpha: v1.21
 	//
@@ -1041,6 +1051,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics: {Default: true, PreRelease: featuregate.Beta},
 
 	HonorPVReclaimPolicy: {Default: false, PreRelease: featuregate.Alpha},
+
+	InitializeNodeAddressesCloudProviderExternal: {Default: false, PreRelease: featuregate.Deprecated},
 
 	InTreePluginAWSUnregister: {Default: false, PreRelease: featuregate.Alpha},
 

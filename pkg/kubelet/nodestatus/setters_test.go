@@ -35,9 +35,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -65,17 +68,18 @@ func TestNodeAddress(t *testing.T) {
 	)
 	existingNodeAddress := v1.NodeAddress{Address: "10.1.1.2"}
 	cases := []struct {
-		name                           string
-		hostnameOverride               bool
-		nodeIP                         net.IP
-		secondaryNodeIP                net.IP
-		cloudProviderType              cloudProviderType
-		nodeAddresses                  []v1.NodeAddress
-		expectedAddresses              []v1.NodeAddress
-		existingAnnotations            map[string]string
-		expectedAnnotations            map[string]string
-		shouldError                    bool
-		shouldSetNodeAddressBeforeTest bool
+		name                                         string
+		hostnameOverride                             bool
+		nodeIP                                       net.IP
+		secondaryNodeIP                              net.IP
+		cloudProviderType                            cloudProviderType
+		nodeAddresses                                []v1.NodeAddress
+		expectedAddresses                            []v1.NodeAddress
+		existingAnnotations                          map[string]string
+		expectedAnnotations                          map[string]string
+		shouldError                                  bool
+		shouldSetNodeAddressBeforeTest               bool
+		initializeNodeAddressesCloudProviderExternal bool
 	}{
 		{
 			name:   "A single InternalIP",
@@ -227,11 +231,20 @@ func TestNodeAddress(t *testing.T) {
 			nodeIP:            netutils.ParseIPSloppy("10.0.0.1"),
 			nodeAddresses:     []v1.NodeAddress{},
 			cloudProviderType: cloudProviderExternal,
+			expectedAddresses: []v1.NodeAddress{},
+			shouldError:       false,
+		},
+		{
+			name:              "cloud provider is external and initializeNodeAddressesCloudProviderExternal set",
+			nodeIP:            netutils.ParseIPSloppy("10.0.0.1"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderExternal,
 			expectedAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
 			shouldError: false,
+			initializeNodeAddressesCloudProviderExternal: true,
 		},
 		{
 			name: "cloud doesn't report hostname, no override, detected hostname mismatch",
@@ -426,7 +439,7 @@ func TestNodeAddress(t *testing.T) {
 			shouldError: false,
 		},
 		{
-			name:              "External cloud provider gets nodeIP annotation",
+			name:              "External cloud provider gets nodeIP annotation and initializeNodeAddressesCloudProviderExternal set",
 			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
 			cloudProviderType: cloudProviderExternal,
 			nodeAddresses: []v1.NodeAddress{
@@ -437,6 +450,31 @@ func TestNodeAddress(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
+			expectedAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
+			},
+			shouldError: false,
+			initializeNodeAddressesCloudProviderExternal: true,
+		},
+		{
+			name:                           "External cloud provider, node address is already set and initializeNodeAddressesCloudProviderExternal set",
+			nodeIP:                         netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType:              cloudProviderExternal,
+			nodeAddresses:                  []v1.NodeAddress{existingNodeAddress},
+			expectedAddresses:              []v1.NodeAddress{existingNodeAddress},
+			shouldError:                    true,
+			shouldSetNodeAddressBeforeTest: true,
+			initializeNodeAddressesCloudProviderExternal: true,
+		},
+		{
+			name:              "External cloud provider gets nodeIP annotation",
+			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType: cloudProviderExternal,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{},
 			expectedAnnotations: map[string]string{
 				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
 			},
@@ -510,10 +548,7 @@ func TestNodeAddress(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
-			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
+			expectedAddresses: []v1.NodeAddress{},
 			existingAnnotations: map[string]string{
 				"alpha.kubernetes.io/provided-node-ip": "10.1.1.3",
 			},
@@ -536,6 +571,84 @@ func TestNodeAddress(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "2600:1f14:1d4:d101::ba3d"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
+			expectedAddresses: []v1.NodeAddress{},
+			expectedAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "2600:1f14:1d4:d101::ba3d,10.1.1.2",
+			},
+			shouldError: false,
+		},
+		{
+			name:              "Upgrade to cloud dual-stack nodeIPs",
+			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
+			secondaryNodeIP:   netutils.ParseIPSloppy("2600:1f14:1d4:d101::ba3d"),
+			cloudProviderType: cloudProviderExternal,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "2600:1f14:1d4:d101::ba3d"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{},
+			existingAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
+			},
+			expectedAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1,2600:1f14:1d4:d101::ba3d",
+			},
+			shouldError: false,
+		},
+		{
+			name:              "Downgrade from cloud dual-stack nodeIPs",
+			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType: cloudProviderExternal,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "2600:1f14:1d4:d101::ba3d"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{},
+			existingAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1,2600:1f14:1d4:d101::ba3d",
+			},
+			expectedAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
+			},
+			shouldError: false,
+		},
+		{
+			name:              "Incorrect nodeIP annotation is fixed and initializeNodeAddressesCloudProviderExternal set",
+			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType: cloudProviderExternal,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			existingAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.3",
+			},
+			expectedAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
+			},
+			shouldError: false,
+			initializeNodeAddressesCloudProviderExternal: true,
+		},
+		{
+			// We don't have to test "legacy cloud provider with dual-stack
+			// IPs" etc because we won't have gotten this far with an invalid
+			// config like that.
+			name:              "Dual-stack cloud, with dual-stack nodeIPs and initializeNodeAddressesCloudProviderExternal set",
+			nodeIP:            netutils.ParseIPSloppy("2600:1f14:1d4:d101::ba3d"),
+			secondaryNodeIP:   netutils.ParseIPSloppy("10.1.1.2"),
+			cloudProviderType: cloudProviderExternal,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "10.1.1.2"},
+				{Type: v1.NodeInternalIP, Address: "2600:1f14:1d4:d101::ba3d"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
 			expectedAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "2600:1f14:1d4:d101::ba3d"},
 				{Type: v1.NodeInternalIP, Address: "10.1.1.2"},
@@ -545,9 +658,10 @@ func TestNodeAddress(t *testing.T) {
 				"alpha.kubernetes.io/provided-node-ip": "2600:1f14:1d4:d101::ba3d,10.1.1.2",
 			},
 			shouldError: false,
+			initializeNodeAddressesCloudProviderExternal: true,
 		},
 		{
-			name:              "Upgrade to cloud dual-stack nodeIPs",
+			name:              "Upgrade to cloud dual-stack nodeIPs and initializeNodeAddressesCloudProviderExternal set",
 			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
 			secondaryNodeIP:   netutils.ParseIPSloppy("2600:1f14:1d4:d101::ba3d"),
 			cloudProviderType: cloudProviderExternal,
@@ -568,9 +682,10 @@ func TestNodeAddress(t *testing.T) {
 				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1,2600:1f14:1d4:d101::ba3d",
 			},
 			shouldError: false,
+			initializeNodeAddressesCloudProviderExternal: true,
 		},
 		{
-			name:              "Downgrade from cloud dual-stack nodeIPs",
+			name:              "Downgrade from cloud dual-stack nodeIPs and initializeNodeAddressesCloudProviderExternal set",
 			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
 			cloudProviderType: cloudProviderExternal,
 			nodeAddresses: []v1.NodeAddress{
@@ -589,10 +704,13 @@ func TestNodeAddress(t *testing.T) {
 				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
 			},
 			shouldError: false,
+			initializeNodeAddressesCloudProviderExternal: true,
 		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InitializeNodeAddressesCloudProviderExternal, testCase.initializeNodeAddressesCloudProviderExternal)()
+
 			ctx := context.Background()
 			// testCase setup
 			existingNode := &v1.Node{

@@ -32,11 +32,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudprovidernodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -121,6 +123,10 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 		}
 
 		if externalCloudProvider {
+			// If --cloud-provider=external delegate the node address configuration to the cloud provider.
+			if !utilfeature.DefaultFeatureGate.Enabled(features.InitializeNodeAddressesCloudProviderExternal) {
+				return nil
+			}
 			// If --cloud-provider=external and node address is already set,
 			// then we return early because provider set addresses should take precedence.
 			// Otherwise, we try to look up the node IP and let the cloud provider override it later
