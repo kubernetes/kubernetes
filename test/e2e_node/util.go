@@ -288,12 +288,22 @@ func getLocalNode(ctx context.Context, f *framework.Framework) *v1.Node {
 // the caller decide. The check is intentionally done like `getLocalNode` does.
 // Note `getLocalNode` aborts (as in ginkgo.Expect) the test implicitly if the worker node is not ready.
 func getLocalTestNode(ctx context.Context, f *framework.Framework) (*v1.Node, bool) {
-	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
+	node, ok, err := fetchLocalTestNode(ctx, f)
 	framework.ExpectNoError(err)
+	return node, ok
+}
+
+// fetchLocalTestNode is like getLocalTestNode, but returns error instead of setting expectations internally.
+// use it when you want or need to manage the test expectations in your calling site.
+func fetchLocalTestNode(ctx context.Context, f *framework.Framework) (*v1.Node, bool, error) {
+	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return node, false, err
+	}
 	ready := e2enode.IsNodeReady(node)
 	schedulable := e2enode.IsNodeSchedulable(node)
 	framework.Logf("node %q ready=%v schedulable=%v", node.Name, ready, schedulable)
-	return node, ready && schedulable
+	return node, ready && schedulable, nil
 }
 
 // logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus

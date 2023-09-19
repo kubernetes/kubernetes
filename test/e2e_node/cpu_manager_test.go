@@ -17,9 +17,11 @@ limitations under the License.
 package e2enode
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os/exec"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -47,27 +49,130 @@ type ctnAttribute struct {
 	ctnName    string
 	cpuRequest string
 	cpuLimit   string
+	memRequest string
+	memLimit   string
+	command    string
+}
+
+func (ca ctnAttribute) Clone() ctnAttribute {
+	return ctnAttribute{
+		ctnName:    ca.ctnName,
+		cpuRequest: ca.cpuRequest,
+		cpuLimit:   ca.cpuLimit,
+		memRequest: ca.memRequest,
+		memLimit:   ca.memLimit,
+		command:    ca.command,
+	}
+}
+
+func (ca ctnAttribute) WithDefaults() ctnAttribute {
+	cmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+	memRequest := "100Mi"
+	memLimit := "100Mi"
+
+	ret := ca.Clone()
+
+	if ret.command == "" {
+		ret.command = cmd
+	}
+	if ret.memRequest == "" {
+		ret.memRequest = memRequest
+	}
+	if ret.memLimit == "" {
+		ret.memLimit = memLimit
+	}
+
+	return ret
+}
+
+// xref: https://kubernetes.io/docs/concepts/architecture/cgroups/#check-cgroup-version
+const cgroupGetFSTypeCmd = `/bin/stat -fc %T /sys/fs/cgroup/`
+
+func cgroupVersionFromMountInfo(minfo string) (string, error) {
+	scanner := bufio.NewScanner(strings.NewReader(minfo))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if err := scanner.Err(); err != nil {
+			return "", err
+		}
+		// intentional catchall for both v1 and v2
+		if !strings.HasPrefix(line, "cgroup") {
+			continue
+		}
+
+		line = strings.TrimSpace(line)
+		framework.Logf("matched cgroup mountinfo line: [%s]", line)
+
+		items := strings.Fields(line)
+		// man 5 fstab: "The third field (fs_vfstype). This field describes the type of the filesystem [...]"
+		return cgroupVersionFromMountVFSType(items[2])
+	}
+	return "", fmt.Errorf("unrecognized cgroup FS type from mountInfo")
+}
+
+func cgroupVersionFromMountVFSType(fsVFSType string) (string, error) {
+	switch fsVFSType {
+	case "cgroup":
+		return "v1", nil
+	case "cgroup2":
+		return "v2", nil
+	default:
+		return "", fmt.Errorf("unsupported type: %s", fsVFSType)
+	}
+}
+
+func cgroupVersionFromCgroupFSType(fsType string) (string, error) {
+	switch fsType {
+	case "tmpfs":
+		return "v1", nil
+	case "cgroup2fs":
+		return "v2", nil
+	default:
+		return "", fmt.Errorf("unsupported type: %s", fsType)
+	}
+}
+
+func cgroupVersionFromHostData(fsType, mountInfo string) (string, error) {
+	// preferred because recommended in the docs
+	ver, err := cgroupVersionFromCgroupFSType(fsType)
+	if err == nil {
+		return ver, nil
+	}
+	framework.Logf("failed to detect cgroup version from fsType, trying from mountInfo (err=%v)", err)
+	return cgroupVersionFromMountInfo(mountInfo)
+}
+
+func cgroupCpusetPathFromCgroupVersion(ver string) (string, error) {
+	switch ver {
+	case "v1":
+		return "/sys/fs/cgroup/cpuset/cpuset.effective_cpus", nil
+	case "v2":
+		return "/sys/fs/cgroup/cpuset.cpus.effective", nil
+	default:
+		return "", fmt.Errorf("unsupported version: %v", ver)
+	}
 }
 
 // makeCPUMangerPod returns a pod with the provided ctnAttributes.
 func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 	var containers []v1.Container
-	for _, ctnAttr := range ctnAttributes {
-		cpusetCmd := fmt.Sprintf("grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d")
+	for idx := range ctnAttributes {
+		ctnAttr := ctnAttributes[idx].WithDefaults()
+
 		ctn := v1.Container{
 			Name:  ctnAttr.ctnName,
 			Image: busyboxImage,
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuRequest),
-					v1.ResourceMemory: resource.MustParse("100Mi"),
+					v1.ResourceMemory: resource.MustParse(ctnAttr.memRequest),
 				},
 				Limits: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuLimit),
-					v1.ResourceMemory: resource.MustParse("100Mi"),
+					v1.ResourceMemory: resource.MustParse(ctnAttr.memLimit),
 				},
 			},
-			Command: []string{"sh", "-c", cpusetCmd},
+			Command: []string{"sh", "-c", ctnAttr.command},
 		}
 		containers = append(containers, ctn)
 	}
@@ -751,7 +856,48 @@ func isSMTAlignmentError(pod *v1.Pod) bool {
 	return re.MatchString(pod.Status.Reason)
 }
 
-// Serial because the test updates kubelet configuration.
+func updateKubeletConfigIfNeeded(ctx context.Context, f *framework.Framework, desiredCfg *kubeletconfig.KubeletConfiguration) {
+	curCfg, err := getCurrentKubeletConfig(ctx)
+	framework.ExpectNoError(err)
+
+	if equalKubeletConfiguration(curCfg, desiredCfg) {
+		framework.Logf("Kubelet configuration already compliant, nothing to do")
+		return // nothing to do!
+	}
+	framework.Logf("Updating Kubelet configuration")
+	updateKubeletConfig(ctx, f, desiredCfg, true)
+}
+
+func equalKubeletConfiguration(cfgA, cfgB *kubeletconfig.KubeletConfiguration) bool {
+	cfgA = cfgA.DeepCopy()
+	cfgB = cfgB.DeepCopy()
+	// we care only about the payload, force metadata to be uniform
+	cfgA.TypeMeta = metav1.TypeMeta{}
+	cfgB.TypeMeta = metav1.TypeMeta{}
+	return reflect.DeepEqual(cfgA, cfgB)
+}
+
+/*
+   - Serial:
+   because the test updates kubelet configuration.
+
+   - Ordered:
+   Each spec (It block) need to run with a kubelet configuration in place. At minimum, we need
+   the non-default cpumanager static policy, then we have the cpumanager options and so forth.
+   The simplest solution is to set the kubelet explicitly each time, but this will cause a kubelet restart
+   each time, which takes longer and makes the flow intrinsically more fragile (so more flakes are more likely).
+   Using Ordered allows us to use BeforeAll/AfterAll, and most notably to reuse the kubelet config in a batch
+   of specs (It blocks). Each it block will still set its kubelet config preconditions, but with a sensible
+   test arrangement, many of these preconditions will devolve into noop.
+   Arguably, this decision increases the coupling among specs, leaving room for subtle ordering bugs.
+   There's no argue the ginkgo spec randomization would help, but the tradeoff here is between
+   lane complexity/fragility (reconfiguring the kubelet is not bulletproof yet) and accepting this risk.
+   If in the future we decide to pivot to full spec independency, little changes will be needed.
+   Finally, worth pointing out that the previous cpumanager e2e test incarnation implemented the same
+   concept in a more convoluted way with function helpers, so arguably using Ordered and making it
+   explicit is already an improvement.
+*/
+
 var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpu-manager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -759,4 +905,202 @@ var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager]", func() {
 	ginkgo.Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {
 		runCPUManagerTests(f)
 	})
+
+	ginkgo.Context("With kubeconfig lazily updated with the CPU Manager static policy", ginkgo.Ordered, func() {
+		var refPod *v1.Pod
+		// original kubeletconfig before the context start, to be restored
+		var oldCfg *kubeletconfig.KubeletConfiguration
+
+		var mountInfo string
+		var cgroupFSType string
+		var cgroupVersion string
+		var cgroupCpusetPath string
+
+		ginkgo.BeforeAll(func(ctx context.Context) {
+			var err error
+			oldCfg, err = getCurrentKubeletConfig(ctx)
+			framework.ExpectNoError(err)
+
+			refPod = &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ref-be-pod",
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:    "ref-be-cnt",
+							Image:   busyboxImage,
+							Command: []string{"/bin/sleep", "1d"},
+						},
+					},
+				},
+			}
+
+			refPod = e2epod.NewPodClient(f).CreateSync(ctx, refPod)
+			cnt := &refPod.Spec.Containers[0] // shortcut
+
+			// discover node settings.
+			// we don't expect this data to change without node reboots, so we assume it's stable during the whole e2e run
+
+			stdout, _, err := execCommandInContainer(f, refPod.Name, cnt.Name, "/bin/sh", "-c", cgroupGetFSTypeCmd)
+			framework.ExpectNoError(err)
+			cgroupFSType = strings.TrimSpace(stdout)
+
+			stdout, _, err = execCommandInContainer(f, refPod.Name, cnt.Name, "/bin/cat", "/proc/self/mounts")
+			framework.ExpectNoError(err)
+			mountInfo = strings.TrimSpace(stdout)
+
+			cgroupVersion, err = cgroupVersionFromHostData(cgroupFSType, mountInfo)
+			framework.ExpectNoError(err)
+
+			cgroupCpusetPath, err = cgroupCpusetPathFromCgroupVersion(cgroupVersion)
+			framework.ExpectNoError(err)
+
+			framework.Logf("detected cgroup version %q path %q for node %q", cgroupVersion, cgroupCpusetPath, refPod.Spec.NodeName)
+		})
+
+		ginkgo.AfterAll(func(ctx context.Context) {
+			updateKubeletConfig(ctx, f, oldCfg, true)
+
+			if refPod != nil {
+				deletePodSyncByName(ctx, f, refPod.Name)
+			}
+		})
+
+		// TODO: check sidecar containers
+		ginkgo.Context("run the CPUManager tests", func() {
+			var podMap map[string]*v1.Pod
+			var allocatableCPU int64
+
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				// track all pods created by a It() block
+				podMap = make(map[string]*v1.Pod)
+
+				_, allocatableCPU, _ = getLocalNodeCPUDetails(ctx, f)
+				if allocatableCPU < 4 {
+					e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable < 4")
+				}
+			})
+
+			ginkgo.AfterEach(func(ctx context.Context) {
+				deletePodsAsync(ctx, f, podMap)
+			})
+
+			ginkgo.It("should allocate exclusive CPUs for each container", func(ctx context.Context) {
+				reservedCPUs := cpuset.New(0)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:         string(cpumanager.PolicyStatic),
+					reservedSystemCPUs: reservedCPUs,
+				}))
+
+				cpuCount := 1
+				ctnAttrs := []ctnAttribute{
+					{
+						ctnName:    "gu-container-1cpu-1",
+						cpuRequest: fmt.Sprintf("%dm", 1000*cpuCount),
+						cpuLimit:   fmt.Sprintf("%dm", 1000*cpuCount),
+						command:    "/bin/sleep 1d", // 1d is functionally forever for this test
+					},
+					{
+						ctnName:    "gu-container-1cpu-2",
+						cpuRequest: fmt.Sprintf("%dm", 1000*cpuCount),
+						cpuLimit:   fmt.Sprintf("%dm", 1000*cpuCount),
+						command:    "/bin/sleep 1d", // 1d is functionally forever for this test
+					},
+				}
+				pod := makeCPUManagerPod("gu-pod-multicnt-1", ctnAttrs)
+				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+				podMap[pod.Name] = pod
+
+				ginkgo.By("checking if the expected cpuset was assigned")
+
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					for _, cnt := range pod.Spec.Containers {
+						ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
+
+						stdout, _, err := execCommandInContainer(f, pod.Name, cnt.Name, "/bin/cat", cgroupCpusetPath)
+						if err != nil {
+							return fmt.Errorf("failed to get command output from container [%s] of pod [%s]: %w", cnt.Name, pod.Name, err)
+						}
+
+						cpus, err := cpuset.Parse(strings.TrimSpace(stdout))
+						if err != nil {
+							return fmt.Errorf("parsing cpuset from logs for [%s] of pod [%s]: %w", cnt.Name, pod.Name, err)
+						}
+
+						if cpus.Size() != cpuCount {
+							return fmt.Errorf("expected cpu set size == %d, got %q", cpuCount, cpus.String())
+						}
+					}
+					return nil
+				}).WithPolling(5 * time.Second).WithTimeout(30 * time.Second).ShouldNot(gomega.HaveOccurred())
+
+				ginkgo.By("checking if the shared pool changed as expected")
+				// TODO: check the actual set composition in addition to the size?
+
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					node, ok, err := fetchLocalTestNode(ctx, f)
+					if err != nil {
+						return err
+					}
+					if !ok {
+						return fmt.Errorf("local node not ready yet")
+					}
+					allocatableCPUQty := node.Status.Allocatable[v1.ResourceCPU]
+					allocatableCPU := allocatableCPUQty.Value()
+					framework.Logf("node allocatable cpus: %v", allocatableCPU)
+
+					cnt := &refPod.Spec.Containers[0] // shortcut
+					stdout, _, err := execCommandInContainer(f, refPod.Name, cnt.Name, "/bin/cat", cgroupCpusetPath)
+					if err != nil {
+						return fmt.Errorf("failed to get command output from container [%s] of pod [%s]: %w", cnt.Name, refPod.Name, err)
+					}
+
+					cpus, err := cpuset.Parse(strings.TrimSpace(stdout))
+					if err != nil {
+						return err
+					}
+					framework.Logf("BE container shared cpus: %v [%v]", cpus, stdout)
+
+					totalCPU, err := computeTotalCPULimit(ctnAttrs)
+					framework.ExpectNoError(err)
+
+					sharedCPUCount := allocatableCPU - totalCPU
+					framework.Logf("computed shared cpus count: %v", sharedCPUCount)
+
+					// as in kube 1.28.1, BE pods can run on reserved cpus, only GU pods cannot.
+					detectedSharedCPUCount := int64(cpus.Size() - reservedCPUs.Size())
+
+					if sharedCPUCount != detectedSharedCPUCount {
+						return fmt.Errorf("inconsistent accounting, expected %d shared cpus, found %d", sharedCPUCount, detectedSharedCPUCount)
+					}
+					return nil
+				}).WithPolling(5 * time.Second).WithTimeout(30 * time.Second).ShouldNot(gomega.HaveOccurred())
+			})
+		})
+	})
 })
+
+func computeTotalCPULimit(ctnAttrs []ctnAttribute) (int64, error) {
+	tot, err := resource.ParseQuantity("0")
+	if err != nil {
+		return 0, err
+	}
+	for _, ctnAttr := range ctnAttrs {
+		val, err := resource.ParseQuantity(ctnAttr.cpuLimit)
+		if err != nil {
+			return 0, err
+		}
+		tot.Add(val)
+	}
+	return tot.Value(), nil
+}
+
+func execCommandInContainer(f *framework.Framework, podName, containerName string, cmd ...string) (string, string, error) {
+	stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, containerName, cmd...)
+	framework.Logf("pod %s container %s stdout=[%s]", podName, containerName, stdout)
+	framework.Logf("pod %s container %s stderr=[%s]", podName, containerName, stderr)
+	return stdout, stderr, err
+}
