@@ -58,7 +58,7 @@ const (
 type Setter func(ctx context.Context, node *v1.Node) error
 
 // NodeAddress returns a Setter that updates address-related information on the node.
-func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
+func NodeAddress(nodeIPs *NodeIPsState, // typically Kubelet.nodeIPs
 	validateNodeIPFunc func(net.IP) error, // typically Kubelet.nodeIPValidator
 	hostname string, // typically Kubelet.hostname
 	hostnameOverridden bool, // was the hostname force set?
@@ -66,33 +66,14 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 	cloud cloudprovider.Interface, // typically Kubelet.cloud
 	nodeAddressesFunc func() ([]v1.NodeAddress, error), // typically Kubelet.cloudResourceSyncManager.NodeAddresses
 ) Setter {
-	var nodeIP, secondaryNodeIP net.IP
-	if len(nodeIPs) > 0 {
-		nodeIP = nodeIPs[0]
-	}
+	nodeIPSpecified := nodeIPs.NodeIPSpecified
+	secondaryNodeIPSpecified := nodeIPs.SecondaryNodeIPSpecified
+	nodeIP, secondaryNodeIP := nodeIPs.NodeIP, nodeIPs.SecondaryNodeIP
+
 	preferIPv4 := nodeIP == nil || nodeIP.To4() != nil
 	isPreferredIPFamily := func(ip net.IP) bool { return (ip.To4() != nil) == preferIPv4 }
-	nodeIPSpecified := nodeIP != nil && !nodeIP.IsUnspecified()
-
-	if len(nodeIPs) > 1 {
-		secondaryNodeIP = nodeIPs[1]
-	}
-	secondaryNodeIPSpecified := secondaryNodeIP != nil && !secondaryNodeIP.IsUnspecified()
 
 	return func(ctx context.Context, node *v1.Node) error {
-		if nodeIPSpecified {
-			if err := validateNodeIPFunc(nodeIP); err != nil {
-				return fmt.Errorf("failed to validate nodeIP: %v", err)
-			}
-			klog.V(4).InfoS("Using node IP", "IP", nodeIP.String())
-		}
-		if secondaryNodeIPSpecified {
-			if err := validateNodeIPFunc(secondaryNodeIP); err != nil {
-				return fmt.Errorf("failed to validate secondaryNodeIP: %v", err)
-			}
-			klog.V(4).InfoS("Using secondary node IP", "IP", secondaryNodeIP.String())
-		}
-
 		if (externalCloudProvider || cloud != nil) && nodeIPSpecified {
 			// Annotate the Node object with nodeIP for external cloud provider.
 			//
@@ -197,7 +178,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 				ipAddr = addr
 			} else {
 				var addrs []net.IP
-				addrs, _ = net.LookupIP(node.Name)
+				addrs, _ = nodeIPs.NetLookupIP(node.Name)
 				for _, addr := range addrs {
 					if err = validateNodeIPFunc(addr); err == nil {
 						if isPreferredIPFamily(addr) {
@@ -473,6 +454,7 @@ func ReadyCondition(
 	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
 	nodeShutdownManagerErrorsFunc func() error, // typically kubelet.shutdownManager.errors.
+	hostErrorsFunc func() error, // typically Kubelet.hostErrors
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
 	localStorageCapacityIsolation bool,
 ) Setter {
@@ -488,7 +470,7 @@ func ReadyCondition(
 			Message:           "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
 		}
-		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc(), nodeShutdownManagerErrorsFunc()}
+		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc(), nodeShutdownManagerErrorsFunc(), hostErrorsFunc()}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
 		if localStorageCapacityIsolation {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
@@ -776,5 +758,42 @@ func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLim
 			}
 		}
 		return nil
+	}
+}
+
+// NodeIPsState returns a Setter that updates the node addresses on the node.
+type NodeIPsState struct {
+	NodeIP                                    net.IP
+	SecondaryNodeIP                           net.IP
+	NodeIPSpecified, SecondaryNodeIPSpecified bool
+
+	NetLookupIP func(host string) ([]net.IP, error)
+}
+
+// NewNodeIPsState returns a new NodeIPsState.
+func NewNodeIPsState(nodeIPs []net.IP) *NodeIPsState {
+	var nodeIP, secondaryNodeIP net.IP
+	if len(nodeIPs) > 0 {
+		nodeIP = nodeIPs[0]
+	}
+
+	if len(nodeIPs) > 1 {
+		secondaryNodeIP = nodeIPs[1]
+	}
+
+	n := &NodeIPsState{
+		NodeIP:                   nodeIP,
+		SecondaryNodeIP:          secondaryNodeIP,
+		NodeIPSpecified:          nodeIP != nil && !nodeIP.IsUnspecified(),
+		SecondaryNodeIPSpecified: secondaryNodeIP != nil && !secondaryNodeIP.IsUnspecified(),
+	}
+
+	n.setLookupIP(net.LookupIP)
+	return n
+}
+
+func (n *NodeIPsState) setLookupIP(fn func(host string) ([]net.IP, error)) {
+	n.NetLookupIP = func(host string) ([]net.IP, error) {
+		return fn(host)
 	}
 }

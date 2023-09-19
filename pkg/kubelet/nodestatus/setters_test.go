@@ -632,9 +632,9 @@ func TestNodeAddress(t *testing.T) {
 			if testCase.secondaryNodeIP != nil {
 				nodeIPs = append(nodeIPs, testCase.secondaryNodeIP)
 			}
-
+			nodeIPsState := NewNodeIPsState(nodeIPs)
 			// construct setter
-			setter := NodeAddress(nodeIPs,
+			setter := NodeAddress(nodeIPsState,
 				nodeIPValidator,
 				hostname,
 				testCase.hostnameOverride,
@@ -663,6 +663,8 @@ func TestNodeAddress(t *testing.T) {
 
 // We can't test failure or autodetection cases here because the relevant code isn't mockable
 func TestNodeAddress_NoCloudProvider(t *testing.T) {
+	testKubeletAddr := net.ParseIP("0.0.0.0")
+
 	cases := []struct {
 		name              string
 		nodeIPs           []net.IP
@@ -678,9 +680,13 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 			},
 		},
 		{
-			name:        "Invalid single --node-ip (using loopback)",
-			nodeIPs:     []net.IP{netutils.ParseIPSloppy("127.0.0.1")},
-			shouldError: true,
+			name:    "Invalid single --node-ip (using loopback)",
+			nodeIPs: []net.IP{netutils.ParseIPSloppy("127.0.0.1")},
+			// nodeIP validator error should be caught from setter of ReadyCondition other than NodeAddress
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
 		},
 		{
 			name:    "Dual --node-ips",
@@ -692,11 +698,23 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 			},
 		},
 		{
-			name:        "Dual --node-ips but with invalid secondary IP (using multicast IP)",
-			nodeIPs:     []net.IP{netutils.ParseIPSloppy("10.1.1.1"), netutils.ParseIPSloppy("224.0.0.0")},
-			shouldError: true,
+			name:    "Dual --node-ips but with invalid secondary IP (using multicast IP)",
+			nodeIPs: []net.IP{netutils.ParseIPSloppy("10.1.1.1"), netutils.ParseIPSloppy("224.0.0.0")},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "224.0.0.0"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			name: "No --node-ips",
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: testKubeletAddr.String()},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
 		},
 	}
+
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -721,8 +739,12 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 				return nil, fmt.Errorf("not reached")
 			}
 
+			nodeIPsState := NewNodeIPsState(testCase.nodeIPs)
+			nodeIPsState.setLookupIP(func(host string) ([]net.IP, error) {
+				return []net.IP{testKubeletAddr}, nil
+			})
 			// construct setter
-			setter := NodeAddress(testCase.nodeIPs,
+			setter := NodeAddress(nodeIPsState,
 				nodeIPValidator,
 				testKubeletHostname,
 				false, // hostnameOverridden
@@ -1436,6 +1458,7 @@ func TestReadyCondition(t *testing.T) {
 		expectConditions                     []v1.NodeCondition
 		expectEvents                         []testEvent
 		disableLocalStorageCapacityIsolation bool
+		hostErrors                           error
 	}{
 		{
 			desc:             "new, ready",
@@ -1484,6 +1507,12 @@ func TestReadyCondition(t *testing.T) {
 			runtimeErrors:    errors.New("runtime"),
 			networkErrors:    errors.New("network"),
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "[runtime, network]", now, now)},
+		},
+		{
+			desc:             "new, not ready: host errors",
+			node:             withCapacity.DeepCopy(),
+			hostErrors:       errors.New("host nodeIPs validate error"),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "host nodeIPs validate error", now, now)},
 		},
 		{
 			desc:             "new, not ready: missing capacities",
@@ -1568,6 +1597,9 @@ func TestReadyCondition(t *testing.T) {
 			nodeShutdownErrorsFunc := func() error {
 				return tc.nodeShutdownManagerErrors
 			}
+			hostErrorsFunc := func() error {
+				return tc.hostErrors
+			}
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1576,7 +1608,7 @@ func TestReadyCondition(t *testing.T) {
 				})
 			}
 			// construct setter
-			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, nodeShutdownErrorsFunc, recordEventFunc, !tc.disableLocalStorageCapacityIsolation)
+			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, nodeShutdownErrorsFunc, hostErrorsFunc, recordEventFunc, !tc.disableLocalStorageCapacityIsolation)
 			// call setter on node
 			if err := setter(ctx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)

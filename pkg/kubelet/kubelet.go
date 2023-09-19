@@ -736,6 +736,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
 		klet.runtimeState.addHealthCheck("EventedPLEG", klet.eventedPleg.Healthy)
 	}
+
+	klet.hostState = newHostState()
+
 	if _, err := klet.updatePodCIDR(ctx, kubeCfg.PodCIDR); err != nil {
 		klog.ErrorS(err, "Pod CIDR update failed")
 	}
@@ -1062,6 +1065,9 @@ type Kubelet struct {
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
 	runtimeState *runtimeState
+
+	// The kubelet validates against the host when posting node status.
+	hostState *hostState
 
 	// Volume plugins.
 	volumePluginMgr *volume.VolumePluginMgr
