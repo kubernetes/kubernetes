@@ -17,11 +17,14 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -463,6 +466,64 @@ func TestRecordDroppedRequests(t *testing.T) {
 				t.Fatal(err)
 			}
 
+		})
+	}
+}
+
+func TestCleanListScope(t *testing.T) {
+	scenarios := []struct {
+		name          string
+		ctx           context.Context
+		opts          *metainternalversion.ListOptions
+		expectedScope string
+	}{
+		{
+			name: "empty scope",
+		},
+		{
+			name: "empty scope with empty request info",
+			ctx:  request.WithRequestInfo(context.TODO(), &request.RequestInfo{}),
+		},
+		{
+			name:          "namespace from ctx",
+			ctx:           request.WithNamespace(context.TODO(), "foo"),
+			expectedScope: "namespace",
+		},
+		{
+			name: "namespace from field selector",
+			opts: &metainternalversion.ListOptions{
+				FieldSelector: fields.ParseSelectorOrDie("metadata.namespace=foo"),
+			},
+			expectedScope: "namespace",
+		},
+		{
+			name:          "name from request info",
+			ctx:           request.WithRequestInfo(context.TODO(), &request.RequestInfo{Name: "bar"}),
+			expectedScope: "resource",
+		},
+		{
+			name: "name from field selector",
+			opts: &metainternalversion.ListOptions{
+				FieldSelector: fields.ParseSelectorOrDie("metadata.name=bar"),
+			},
+			expectedScope: "resource",
+		},
+		{
+			name:          "cluster scope request",
+			ctx:           request.WithRequestInfo(context.TODO(), &request.RequestInfo{IsResourceRequest: true}),
+			expectedScope: "cluster",
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			if scenario.ctx == nil {
+				scenario.ctx = context.TODO()
+			}
+			actualScope := CleanListScope(scenario.ctx, scenario.opts)
+			if actualScope != scenario.expectedScope {
+				t.Errorf("unexpected scope = %s, expected = %s", actualScope, scenario.expectedScope)
+			}
 		})
 	}
 }
