@@ -34,6 +34,7 @@ var (
 	AddToScheme = SchemeBuilder.AddToScheme
 )
 
+// Registers the known types with the provided scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&InitConfiguration{},
