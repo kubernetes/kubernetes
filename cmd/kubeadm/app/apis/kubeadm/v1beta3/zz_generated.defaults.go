@@ -35,16 +35,19 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Sets default values for ClusterConfiguration and APIServer.
 func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 	SetDefaults_ClusterConfiguration(in)
 	SetDefaults_APIServer(&in.APIServer)
 }
 
+// Sets default values for InitConfiguration and LocalAPIEndpoint.
 func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 	SetDefaults_InitConfiguration(in)
 	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
 }
 
+// Sets default values for JoinConfiguration, Discovery, FileDiscovery, and JoinControlPlane.
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
 	SetDefaults_JoinConfiguration(in)
 	SetDefaults_Discovery(&in.Discovery)
