@@ -19,6 +19,9 @@ package volume
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,8 +46,6 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
-	"testing"
-	"time"
 )
 
 func fakePodWithVol(namespace string) *v1.Pod {
@@ -223,6 +224,8 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error in deleting pod: %v", err)
 	}
+
+	// Verify that pod.ObjectMeta.DeletionTimestamp is not nil. This means pod is in ‘Terminating’ state”.
 	waitForPodDeletionTimeStampToSet(t, testClient, pod.Name, namespaceName)
 
 	// taint the node `out-of-service`
@@ -236,7 +239,8 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	}
 	waitForNodeToBeTainted(t, testClient, nodeName, v1.TaintNodeOutOfService)
 
-	// verify is the pod was force deleted
+	// Verify is the pod was force deleted.
+	// When the node has out-of-service taint, and only if node is NotReady and pod is Terminating force delete will happen.
 	waitForMetric(t, podgcmetrics.DeletingPodsTotal.WithLabelValues(namespaceName, podgcmetrics.PodGCReasonTerminatingOutOfService), 1, "terminating-pod-metric")
 	// verify the volume was force detached
 	// Note: Metrics are accumulating
