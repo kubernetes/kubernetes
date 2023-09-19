@@ -350,6 +350,27 @@ func TestWatchList(t *testing.T) {
 			expectedStoreContent: []v1.Pod{*makePod("p1", "1"), *makePod("p3", "3")},
 			expectedError:        apierrors.NewResourceExpired("rv already expired"),
 		},
+		{
+			name:                  "prove that the reflector is checking the value of the initialEventsEnd annotation",
+			closeAfterWatchEvents: 3,
+			watchEvents: []watch.Event{
+				{Type: watch.Added, Object: makePod("p1", "1")},
+				{Type: watch.Added, Object: makePod("p2", "2")},
+				{Type: watch.Bookmark, Object: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						ResourceVersion: "2",
+						Annotations:     map[string]string{"k8s.io/initial-events-end": "false"},
+					},
+				}},
+			},
+			expectedWatchRequests: 1,
+			expectedRequestOptions: []metav1.ListOptions{{
+				SendInitialEvents:    pointer.Bool(true),
+				AllowWatchBookmarks:  true,
+				ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+				TimeoutSeconds:       pointer.Int64(1),
+			}},
+		},
 	}
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
