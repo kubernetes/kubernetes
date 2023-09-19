@@ -34,6 +34,7 @@ var (
 	AddToScheme = SchemeBuilder.AddToScheme
 )
 
+// This function registers known types with a Kubernetes API scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&BootstrapToken{},
