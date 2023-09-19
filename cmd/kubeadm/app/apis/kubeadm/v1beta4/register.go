@@ -36,6 +36,7 @@ var (
 	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
+// Initializes manual function registration.
 func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
@@ -43,6 +44,7 @@ func init() {
 	localSchemeBuilder.Register(addKnownTypes, addDefaultingFuncs)
 }
 
+// Adds known types to the provided scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&InitConfiguration{},
