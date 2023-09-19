@@ -375,27 +375,13 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	replicas []*v1.Pod,
 	i int) (bool, error) {
 	logger := klog.FromContext(ctx)
-	// Delete and recreate pods which finished running.
-	//
-	// Note that pods with phase Succeeded will also trigger this event. This is
-	// because final pod phase of evicted or otherwise forcibly stopped pods
-	// (e.g. terminated on node reboot) is determined by the exit code of the
-	// container, not by the reason for pod termination. We should restart the pod
-	// regardless of the exit code.
-	if isFailed(replicas[i]) || isSucceeded(replicas[i]) {
-		if isFailed(replicas[i]) {
-			ssc.recorder.Eventf(set, v1.EventTypeWarning, "RecreatingFailedPod",
-				"StatefulSet %s/%s is recreating failed Pod %s",
-				set.Namespace,
-				set.Name,
-				replicas[i].Name)
-		} else {
-			ssc.recorder.Eventf(set, v1.EventTypeNormal, "RecreatingTerminatedPod",
-				"StatefulSet %s/%s is recreating terminated Pod %s",
-				set.Namespace,
-				set.Name,
-				replicas[i].Name)
-		}
+	// delete and recreate failed pods
+	if isFailed(replicas[i]) {
+		ssc.recorder.Eventf(set, v1.EventTypeWarning, "RecreatingFailedPod",
+			"StatefulSet %s/%s is recreating failed Pod %s",
+			set.Namespace,
+			set.Name,
+			replicas[i].Name)
 		if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
 			return true, err
 		}

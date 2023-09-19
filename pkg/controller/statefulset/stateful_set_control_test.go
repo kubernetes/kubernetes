@@ -170,7 +170,6 @@ func TestStatefulSetControl(t *testing.T) {
 		{ScalesDown, simpleSetFn},
 		{ReplacesPods, largeSetFn},
 		{RecreatesFailedPod, simpleSetFn},
-		{RecreatesSucceededPod, simpleSetFn},
 		{CreatePodFailure, simpleSetFn},
 		{UpdatePodFailure, simpleSetFn},
 		{UpdateSetStatusFailure, simpleSetFn},
@@ -433,44 +432,6 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 	}
 	if isCreated(pods[0]) {
 		t.Error("StatefulSet did not recreate failed Pod")
-	}
-}
-
-func RecreatesSucceededPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
-	client := fake.NewSimpleClientset()
-	om, _, ssc := setupController(client)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err := invariants(set, om); err != nil {
-		t.Error(err)
-	}
-	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods[0].Status.Phase = v1.PodSucceeded
-	_ = om.podsIndexer.Update(pods[0])
-	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err := invariants(set, om); err != nil {
-		t.Error(err)
-	}
-	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if isCreated(pods[0]) {
-		t.Error("StatefulSet did not recreate succeeded Pod")
 	}
 }
 
