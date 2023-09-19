@@ -36,6 +36,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Sets default values for a ClusterConfiguration object, including defaults for Etcd 
+// and various components' extra environment variables.
 func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 	SetDefaults_ClusterConfiguration(in)
 	if in.Etcd.Local != nil {
@@ -59,11 +61,13 @@ func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 	}
 }
 
+// Sets default values for an InitConfiguration object, including the default LocalAPIEndpoint.
 func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 	SetDefaults_InitConfiguration(in)
 	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
 }
 
+// Sets default values for a JoinConfiguration object, including defaults for Discovery, FileDiscovery, and JoinControlPlane components.
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
 	SetDefaults_JoinConfiguration(in)
 	SetDefaults_Discovery(&in.Discovery)
@@ -76,6 +80,7 @@ func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
 	}
 }
 
+// Sets default values for a ResetConfiguration object
 func SetObjectDefaults_ResetConfiguration(in *ResetConfiguration) {
 	SetDefaults_ResetConfiguration(in)
 }
