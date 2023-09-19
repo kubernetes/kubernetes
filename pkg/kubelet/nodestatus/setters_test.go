@@ -1411,6 +1411,11 @@ func TestReadyCondition(t *testing.T) {
 				v1.ResourcePods:             *resource.NewQuantity(100, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
 		},
 	}
 
@@ -1420,6 +1425,11 @@ func TestReadyCondition(t *testing.T) {
 				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(10e9, resource.BinarySI),
 				v1.ResourcePods:   *resource.NewQuantity(100, resource.DecimalSI),
+			},
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
 		},
 	}
@@ -1486,9 +1496,31 @@ func TestReadyCondition(t *testing.T) {
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "[runtime, network]", now, now)},
 		},
 		{
-			desc:             "new, not ready: missing capacities",
-			node:             &v1.Node{},
+			desc: "new, not ready: missing capacities",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+						{Type: v1.NodeInternalIP, Address: "fd01::1234"},
+						{Type: v1.NodeHostName, Address: testKubeletHostname},
+					},
+				},
+			},
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "missing node capacity for resources: cpu, memory, pods, ephemeral-storage", now, now)},
+		},
+		{
+			desc: "new, not ready: missing addresses",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourcePods:             *resource.NewQuantity(100, resource.DecimalSI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "missing node addresses", now, now)},
 		},
 		{
 			desc:                                 "new, ready: localStorageCapacityIsolation is not supported",

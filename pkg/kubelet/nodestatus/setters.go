@@ -502,6 +502,9 @@ func ReadyCondition(
 		if len(missingCapacities) > 0 {
 			errs = append(errs, fmt.Errorf("missing node capacity for resources: %s", strings.Join(missingCapacities, ", ")))
 		}
+		if len(node.Status.Addresses) == 0 {
+			errs = append(errs, fmt.Errorf("missing node addresses"))
+		}
 		if aggregatedErr := errors.NewAggregate(errs); aggregatedErr != nil {
 			newNodeReadyCondition = v1.NodeCondition{
 				Type:              v1.NodeReady,
