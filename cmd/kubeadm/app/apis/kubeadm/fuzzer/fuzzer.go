@@ -44,6 +44,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	}
 }
 
+// Fuzzes the InitConfiguration while ensuring specific fields are set to prevent round trip test failures.
 func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
@@ -67,6 +68,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	obj.DryRun = false
 }
 
+// Fuzzes the NodeRegistrationOptions while ensuring certain fields are set to prevent round trip test failures.
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
@@ -74,6 +76,7 @@ func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue)
 	obj.IgnorePreflightErrors = nil
 }
 
+// Fuzzes the ClusterConfiguration while setting specific fields to ensure round trip test consistency.
 func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
@@ -93,15 +96,18 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.Etcd.Local.ExtraEnvs = []kubeadm.EnvVar{}
 }
 
+// Fuzzes the DNS object without customizing specific fields.
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 }
 
+// Intentionally leaves ComponentConfigMap empty for round trip test consistency.
 func fuzzComponentConfigMap(obj *kubeadm.ComponentConfigMap, c fuzz.Continue) {
 	// This is intentionally empty because component config does not exists in the public api
 	// (empty mean all ComponentConfigs fields nil, and this is necessary for getting roundtrip passing)
 }
 
+// Fuzzes LocalEtcd and pins DataDir for test stability.
 func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
@@ -109,6 +115,7 @@ func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c fuzz.Continue) {
 	obj.DataDir = "foo"
 }
 
+// Fuzzes Networking and pins DNSDomain and ServiceSubnet for test consistency.
 func fuzzNetworking(obj *kubeadm.Networking, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
@@ -117,6 +124,7 @@ func fuzzNetworking(obj *kubeadm.Networking, c fuzz.Continue) {
 	obj.ServiceSubnet = "bar"
 }
 
+// Fuzzes JoinConfiguration and sets specific fields to ensure test consistency.
 func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
@@ -133,10 +141,12 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	obj.DryRun = false
 }
 
+// Fuzzes JoinControlPlane without custom modifications.
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 }
 
+// Fuzzes ResetConfiguration and pins CertificatesDir for test stability.
 func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
