@@ -29,6 +29,7 @@ import (
 	output "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
 )
 
+// init registers type conversion functions during initialization.
 func init() {
 	localSchemeBuilder.Register(RegisterConversions)
 }
@@ -89,6 +90,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 	return nil
 }
 
+// Converts v1alpha2 BootstrapToken to output BootstrapToken.
 func autoConvert_v1alpha2_BootstrapToken_To_output_BootstrapToken(in *BootstrapToken, out *output.BootstrapToken, s conversion.Scope) error {
 	out.BootstrapToken = in.BootstrapToken
 	return nil
@@ -99,6 +101,7 @@ func Convert_v1alpha2_BootstrapToken_To_output_BootstrapToken(in *BootstrapToken
 	return autoConvert_v1alpha2_BootstrapToken_To_output_BootstrapToken(in, out, s)
 }
 
+// Converts the output BootstrapToken to v1alpha2 BootstrapToken.
 func autoConvert_output_BootstrapToken_To_v1alpha2_BootstrapToken(in *output.BootstrapToken, out *BootstrapToken, s conversion.Scope) error {
 	out.BootstrapToken = in.BootstrapToken
 	return nil
@@ -109,6 +112,7 @@ func Convert_output_BootstrapToken_To_v1alpha2_BootstrapToken(in *output.Bootstr
 	return autoConvert_output_BootstrapToken_To_v1alpha2_BootstrapToken(in, out, s)
 }
 
+// Converts the v1alpha2 ComponentConfigVersionState to output ComponentConfigVersionState.
 func autoConvert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState(in *ComponentConfigVersionState, out *output.ComponentConfigVersionState, s conversion.Scope) error {
 	out.Group = in.Group
 	out.CurrentVersion = in.CurrentVersion
@@ -122,6 +126,7 @@ func Convert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersi
 	return autoConvert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState(in, out, s)
 }
 
+// Converts the output ComponentConfigVersionState to v1alpha2 ComponentConfigVersionState.
 func autoConvert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState(in *output.ComponentConfigVersionState, out *ComponentConfigVersionState, s conversion.Scope) error {
 	out.Group = in.Group
 	out.CurrentVersion = in.CurrentVersion
@@ -135,6 +140,7 @@ func Convert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersi
 	return autoConvert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState(in, out, s)
 }
 
+// Converts the v1alpha2 ComponentUpgradePlan to output ComponentUpgradePlan.
 func autoConvert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in *ComponentUpgradePlan, out *output.ComponentUpgradePlan, s conversion.Scope) error {
 	out.Name = in.Name
 	out.CurrentVersion = in.CurrentVersion
@@ -147,6 +153,7 @@ func Convert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in *Co
 	return autoConvert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in, out, s)
 }
 
+// Converts the output ComponentUpgradePlan to v1alpha2 ComponentUpgradePlan.
 func autoConvert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in *output.ComponentUpgradePlan, out *ComponentUpgradePlan, s conversion.Scope) error {
 	out.Name = in.Name
 	out.CurrentVersion = in.CurrentVersion
@@ -159,6 +166,7 @@ func Convert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in *ou
 	return autoConvert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in, out, s)
 }
 
+// Converts the v1alpha2 Images to output Images.
 func autoConvert_v1alpha2_Images_To_output_Images(in *Images, out *output.Images, s conversion.Scope) error {
 	out.Images = *(*[]string)(unsafe.Pointer(&in.Images))
 	return nil
@@ -169,6 +177,7 @@ func Convert_v1alpha2_Images_To_output_Images(in *Images, out *output.Images, s 
 	return autoConvert_v1alpha2_Images_To_output_Images(in, out, s)
 }
 
+// Converts output Images to v1alpha2 Images.
 func autoConvert_output_Images_To_v1alpha2_Images(in *output.Images, out *Images, s conversion.Scope) error {
 	out.Images = *(*[]string)(unsafe.Pointer(&in.Images))
 	return nil
@@ -179,6 +188,7 @@ func Convert_output_Images_To_v1alpha2_Images(in *output.Images, out *Images, s 
 	return autoConvert_output_Images_To_v1alpha2_Images(in, out, s)
 }
 
+// Converts the v1alpha2 UpgradePlan to output UpgradePlan.
 func autoConvert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in *UpgradePlan, out *output.UpgradePlan, s conversion.Scope) error {
 	out.Components = *(*[]output.ComponentUpgradePlan)(unsafe.Pointer(&in.Components))
 	out.ConfigVersions = *(*[]output.ComponentConfigVersionState)(unsafe.Pointer(&in.ConfigVersions))
@@ -190,6 +200,7 @@ func Convert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in *UpgradePlan, out *ou
 	return autoConvert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in, out, s)
 }
 
+// Converts the output UpgradePlan to v1alpha2 UpgradePlan.
 func autoConvert_output_UpgradePlan_To_v1alpha2_UpgradePlan(in *output.UpgradePlan, out *UpgradePlan, s conversion.Scope) error {
 	out.Components = *(*[]ComponentUpgradePlan)(unsafe.Pointer(&in.Components))
 	out.ConfigVersions = *(*[]ComponentConfigVersionState)(unsafe.Pointer(&in.ConfigVersions))
