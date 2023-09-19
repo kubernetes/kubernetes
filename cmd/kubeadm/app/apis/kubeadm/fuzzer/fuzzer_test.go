@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 )
 
+// Tests the serialization and deserialization consistency for API group types.
 func TestRoundTripTypes(t *testing.T) {
 	roundtrip.RoundTripTestForAPIGroup(t, scheme.AddToScheme, Funcs)
 }
