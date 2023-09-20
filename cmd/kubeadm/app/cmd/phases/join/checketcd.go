@@ -35,6 +35,7 @@ func NewCheckEtcdPhase() workflow.Phase {
 	}
 }
 
+// runCheckEtcdPhase runs the check-etcd phase to ensure the local etcd cluster is healthy.
 func runCheckEtcdPhase(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
