@@ -296,6 +296,7 @@ func RunGenerateToken(out io.Writer) error {
 	return nil
 }
 
+// formatBootstrapToken formats a BootstrapToken object into a string for tabular output.
 func formatBootstrapToken(obj *outputapiv1alpha2.BootstrapToken) string {
 	ttl := "<forever>"
 	expires := "<never>"
