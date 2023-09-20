@@ -29,6 +29,7 @@ type myWorkflowData struct {
 	data string
 }
 
+// Data returns the data stored in the myWorkflowData struct.
 func (c *myWorkflowData) Data() string {
 	return c.data
 }
@@ -37,6 +38,7 @@ type myPhaseData interface {
 	Data() string
 }
 
+// ExamplePhase demonstrates how to create and add phases to a kubeadm composable workflow.
 func ExamplePhase() {
 	// Create a phase
 	var myPhase1 = Phase{
@@ -78,6 +80,7 @@ func ExamplePhase() {
 	myWorkflowRunner.AppendPhase(myPhase2)
 }
 
+// Example of creating a workflow runner, adding a phase, and running the workflow with arguments.
 func ExampleRunner_Run() {
 	// Create a phase
 	var myPhase = Phase{
