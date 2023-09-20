@@ -57,6 +57,7 @@ var (
 	}
 )
 
+// getPhaseDescription returns a description for generating a static Pod manifest for a component.
 func getPhaseDescription(component string) string {
 	return fmt.Sprintf("Generates the %s static Pod manifest", component)
 }
@@ -84,6 +85,7 @@ func NewControlPlanePhase() workflow.Phase {
 	return phase
 }
 
+// newControlPlaneSubphase creates a new control plane subphase with specific properties.
 func newControlPlaneSubphase(component string) workflow.Phase {
 	phase := workflow.Phase{
 		Name:         controlPlanePhaseProperties[component].name,
@@ -94,6 +96,7 @@ func newControlPlaneSubphase(component string) workflow.Phase {
 	return phase
 }
 
+// getControlPlanePhaseFlags gets the flags for the control plane phase based on the component name.
 func getControlPlanePhaseFlags(name string) []string {
 	flags := []string{
 		options.CfgPath,
@@ -127,6 +130,7 @@ func getControlPlanePhaseFlags(name string) []string {
 	return flags
 }
 
+// runControlPlanePhase runs the control plane phase, displaying the manifest folder path.
 func runControlPlanePhase(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
@@ -137,6 +141,7 @@ func runControlPlanePhase(c workflow.RunData) error {
 	return nil
 }
 
+// runControlPlaneSubphase returns a function to generate static Pod manifests for a control plane component.
 func runControlPlaneSubphase(component string) func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
 		data, ok := c.(InitData)
