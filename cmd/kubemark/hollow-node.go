@@ -67,7 +67,7 @@ type hollowNodeConfig struct {
 }
 
 const (
-	maxPods     = 110
+	maxPods     = 300
 	podsPerCore = 0
 )
 
