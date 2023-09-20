@@ -114,12 +114,14 @@ type genCSRConfig struct {
 	kubeadmConfig     *kubeadmapi.InitConfiguration
 }
 
+// newGenCSRConfig initializes and returns a default genCSRConfig instance.
 func newGenCSRConfig() *genCSRConfig {
 	return &genCSRConfig{
 		kubeConfigDir: kubeadmconstants.KubernetesDir,
 	}
 }
 
+// addFlagSet adds command line flags related to genCSRConfig to the provided flag set.
 func (o *genCSRConfig) addFlagSet(flagSet *pflag.FlagSet) {
 	options.AddConfigFlag(flagSet, &o.kubeadmConfigPath)
 	options.AddCertificateDirFlag(flagSet, &o.certDir)
@@ -218,6 +220,7 @@ type renewFlags struct {
 	cfg            kubeadmapiv1.ClusterConfiguration
 }
 
+// getRenewSubCommands generates cobra.Commands for certificate renewal based on cluster configuration.
 func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 	flags := &renewFlags{
 		cfg: kubeadmapiv1.ClusterConfiguration{
@@ -297,12 +300,14 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 	return cmdList
 }
 
+// addRenewFlags adds flags related to certificate renewal to the provided cobra command.
 func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
 	options.AddCertificateDirFlag(cmd.Flags(), &flags.cfg.CertificatesDir)
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeconfigPath)
 }
 
+// renewCert handles the certificate renewal process based on the provided cluster configuration and renewal handler.
 func renewCert(kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {
 	// Get a renewal manager for the given cluster configuration
 	rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
@@ -329,6 +334,7 @@ func renewCert(kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *
 	return nil
 }
 
+// getInternalCfg retrieves the cluster's current or default configuration.
 func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1.ClusterConfiguration, out io.Writer, logPrefix string) (*kubeadmapi.InitConfiguration, error) {
 	// In case the user is not providing a custom config, try to get current config from the cluster.
 	// NB. this operation should not block, because we want to allow certificate renewal also in case of not-working clusters
@@ -461,6 +467,7 @@ type expirationFlags struct {
 	cfg            kubeadmapiv1.ClusterConfiguration
 }
 
+// addExpirationFlags adds command line flags related to certificate expiration to the given command.
 func addExpirationFlags(cmd *cobra.Command, flags *expirationFlags) {
 	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
 	options.AddCertificateDirFlag(cmd.Flags(), &flags.cfg.CertificatesDir)
