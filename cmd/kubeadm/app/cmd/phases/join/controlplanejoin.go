@@ -36,6 +36,7 @@ var controlPlaneJoinExample = cmdutil.Examples(`
 	kubeadm join phase control-plane-join all
 `)
 
+// getControlPlaneJoinPhaseFlags returns the flags required for various control-plane join phases.
 func getControlPlaneJoinPhaseFlags(name string) []string {
 	flags := []string{
 		options.CfgPath,
@@ -54,7 +55,7 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	return flags
 }
 
-// NewControlPlaneJoinPhase creates a kubeadm workflow phase that implements joining a machine as a control plane instance
+// NewControlPlaneJoinPhase creates a kubeadm workflow phase that implements joining a machine as a control plane instance.
 func NewControlPlaneJoinPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "control-plane-join",
@@ -75,6 +76,7 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 	}
 }
 
+// newEtcdLocalSubphase creates a new control-plane join phase for adding a local etcd member.
 func newEtcdLocalSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:          "etcd",
@@ -85,6 +87,7 @@ func newEtcdLocalSubphase() workflow.Phase {
 	}
 }
 
+// newUpdateStatusSubphase creates a new control-plane join phase for updating the node status (deprecated).
 func newUpdateStatusSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name: "update-status",
@@ -98,6 +101,7 @@ func newUpdateStatusSubphase() workflow.Phase {
 	}
 }
 
+// newMarkControlPlaneSubphase creates a new control-plane join phase for marking a node as a control-plane.
 func newMarkControlPlaneSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:          "mark-control-plane",
@@ -108,6 +112,7 @@ func newMarkControlPlaneSubphase() workflow.Phase {
 	}
 }
 
+// runEtcdPhase runs the control-plane-join phase for adding a new etcd member to the control plane.
 func runEtcdPhase(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
@@ -159,6 +164,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	return nil
 }
 
+// runUpdateStatusPhase runs the update-status phase (deprecated) for registering the new control-plane node into the ClusterStatus.
 func runUpdateStatusPhase(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
@@ -172,6 +178,7 @@ func runUpdateStatusPhase(c workflow.RunData) error {
 	return nil
 }
 
+// runMarkControlPlanePhase runs the mark-control-plane phase to label and taint a node as a control-plane (master).
 func runMarkControlPlanePhase(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
