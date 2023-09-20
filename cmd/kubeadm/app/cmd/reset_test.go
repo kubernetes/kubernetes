@@ -46,7 +46,7 @@ ignorePreflightErrors:
 - b
 `, kubeadmapiv1.SchemeGroupVersion.String())
 
-// Tests the initialization of resetData with various flags and configuration options.
+// TestNewResetData tests the initialization of resetData with various flags and configuration options.
 func TestNewResetData(t *testing.T) {
 	// create temp directory
 	tmpDir, err := os.MkdirTemp("", "kubeadm-reset-test")
@@ -246,7 +246,7 @@ func TestNewResetData(t *testing.T) {
 	}
 }
 
-// Returns a function to validate if the given resetData contains the expected preflight ignore errors.
+// expectedResetIgnorePreflightErrors returns a function to validate if the given resetData contains the expected preflight ignore errors.
 func expectedResetIgnorePreflightErrors(expected sets.Set[string]) func(t *testing.T, data *resetData) {
 	return func(t *testing.T, data *resetData) {
 		if !expected.Equal(data.ignorePreflightErrors) {
