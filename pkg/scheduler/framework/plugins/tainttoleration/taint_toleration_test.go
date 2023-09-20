@@ -237,7 +237,10 @@ func TestTaintTolerationScore(t *testing.T) {
 			snapshot := cache.NewSnapshot(nil, test.nodes)
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
-			p, _ := New(nil, fh)
+			p, err := New(ctx, nil, fh)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
 			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
@@ -335,10 +338,14 @@ func TestTaintTolerationFilter(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
-			p, _ := New(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
+			p, err := New(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
+			gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}

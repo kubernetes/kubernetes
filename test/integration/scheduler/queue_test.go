@@ -340,7 +340,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	registry := frameworkruntime.Registry{
-		"fakeCRPlugin": func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+		"fakeCRPlugin": func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return &fakeCRPlugin{}, nil
 		},
 	}
@@ -447,8 +447,8 @@ func TestCustomResourceEnqueue(t *testing.T) {
 func TestRequeueByBindFailure(t *testing.T) {
 	fakeBind := &firstFailBindPlugin{}
 	registry := frameworkruntime.Registry{
-		"firstFailBindPlugin": func(o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-			binder, err := defaultbinder.New(nil, fh)
+		"firstFailBindPlugin": func(ctx context.Context, o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			binder, err := defaultbinder.New(ctx, nil, fh)
 			if err != nil {
 				return nil, err
 			}
@@ -539,7 +539,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 	queueingHintCalledCounter := 0
 	fakePermit := &fakePermitPlugin{}
 	registry := frameworkruntime.Registry{
-		fakePermitPluginName: func(o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+		fakePermitPluginName: func(ctx context.Context, o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			fakePermit = &fakePermitPlugin{
 				frameworkHandler: fh,
 				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {

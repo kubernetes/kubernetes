@@ -290,7 +290,7 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()

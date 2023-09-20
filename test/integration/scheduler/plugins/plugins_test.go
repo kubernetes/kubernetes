@@ -62,7 +62,7 @@ var (
 
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		switch pl := plugin.(type) {
 		case *PermitPlugin:
 			pl.fh = fh
@@ -2518,7 +2518,7 @@ func (j *JobPlugin) PostBind(_ context.Context, state *framework.CycleState, p *
 func TestActivatePods(t *testing.T) {
 	var jobPlugin *JobPlugin
 	// Create a plugin registry for testing. Register a Job plugin.
-	registry := frameworkruntime.Registry{jobPluginName: func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+	registry := frameworkruntime.Registry{jobPluginName: func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		jobPlugin = &JobPlugin{podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister()}
 		return jobPlugin, nil
 	}}

@@ -348,7 +348,7 @@ func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHin
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	sharedLister := handle.SnapshotSharedLister()
