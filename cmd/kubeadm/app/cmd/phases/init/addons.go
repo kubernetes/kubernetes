@@ -84,6 +84,7 @@ func NewAddonPhase() workflow.Phase {
 	}
 }
 
+// getInitData retrieves initialization data from workflow.RunData.
 func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, io.Writer, error) {
 	data, ok := c.(InitData)
 	if !ok {
@@ -121,6 +122,7 @@ func runKubeProxyAddon(c workflow.RunData) error {
 	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, printManifest)
 }
 
+// getAddonPhaseFlags returns a slice of command-line flags required for a specific addon phase.
 func getAddonPhaseFlags(name string) []string {
 	flags := []string{
 		options.CfgPath,
