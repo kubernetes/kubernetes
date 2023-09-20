@@ -54,6 +54,7 @@ func NewCleanupNodePhase() workflow.Phase {
 	}
 }
 
+// runCleanupNode cleans up various directories and services on a node during a reset operation.
 func runCleanupNode(c workflow.RunData) error {
 	dirsToClean := []string{filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)}
 	r, ok := c.(resetData)
@@ -128,6 +129,7 @@ func runCleanupNode(c workflow.RunData) error {
 	return nil
 }
 
+// absoluteKubeletRunDirectory gets the absolute path of the kubelet run directory after evaluating symlinks.
 func absoluteKubeletRunDirectory() (string, error) {
 	absoluteKubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
 	if err != nil {
@@ -142,6 +144,7 @@ func absoluteKubeletRunDirectory() (string, error) {
 	return absoluteKubeletRunDirectory, nil
 }
 
+// removeContainer removes Kubernetes-managed containers using the specified container runtime.
 func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
 	containerRuntime, err := utilruntime.NewContainerRuntime(execer, criSocketPath)
 	if err != nil {
@@ -212,6 +215,7 @@ func CleanDir(filePath string) error {
 	return nil
 }
 
+// IsDirEmpty checks if a directory is empty.
 func IsDirEmpty(dir string) (bool, error) {
 	d, err := os.Open(dir)
 	if err != nil {
