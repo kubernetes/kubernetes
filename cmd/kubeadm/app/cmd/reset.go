@@ -301,6 +301,7 @@ func (r *resetData) CRISocketPath() string {
 	return r.criSocketPath
 }
 
+// Determines the CRI socket using reset config, init config, or auto-detection.
 func resetDetectCRISocket(resetCfg *kubeadmapi.ResetConfiguration, initCfg *kubeadmapi.InitConfiguration) (string, error) {
 	if resetCfg != nil && len(resetCfg.CRISocket) > 0 {
 		return resetCfg.CRISocket, nil
