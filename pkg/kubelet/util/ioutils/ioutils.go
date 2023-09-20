@@ -16,7 +16,10 @@ limitations under the License.
 
 package ioutils
 
-import "io"
+import (
+	"fmt"
+	"io"
+)
 
 // LimitWriter is a copy of the standard library ioutils.LimitReader,
 // applied to the writer interface.
@@ -34,9 +37,12 @@ type LimitedWriter struct {
 	N int64     // max bytes remaining
 }
 
+// ErrLimitedWriter is returned by write when the limit has been exceeded.
+var ErrLimitedWriter = fmt.Errorf("write limit exceeded: %w", io.ErrShortWrite)
+
 func (l *LimitedWriter) Write(p []byte) (n int, err error) {
 	if l.N <= 0 {
-		return 0, io.ErrShortWrite
+		return 0, ErrLimitedWriter
 	}
 	truncated := false
 	if int64(len(p)) > l.N {
@@ -46,7 +52,7 @@ func (l *LimitedWriter) Write(p []byte) (n int, err error) {
 	n, err = l.W.Write(p)
 	l.N -= int64(n)
 	if err == nil && truncated {
-		err = io.ErrShortWrite
+		err = ErrLimitedWriter
 	}
 	return
 }
