@@ -1909,7 +1909,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedDeletions:       1,
 			expectedFailed:          1,
 			expectedCondition:       batch.JobFailed,
-			expectedConditionReason: "DeadlineExceeded",
+			expectedConditionReason: batch.JobReasonDeadlineExceeded,
 		},
 		"activeDeadlineSeconds bigger than single pod execution": {
 			parallelism:             1,
@@ -1923,7 +1923,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedSucceeded:       1,
 			expectedFailed:          1,
 			expectedCondition:       batch.JobFailed,
-			expectedConditionReason: "DeadlineExceeded",
+			expectedConditionReason: batch.JobReasonDeadlineExceeded,
 		},
 		"activeDeadlineSeconds times-out before any pod starts": {
 			parallelism:             1,
@@ -1932,7 +1932,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			startTime:               10,
 			backoffLimit:            6,
 			expectedCondition:       batch.JobFailed,
-			expectedConditionReason: "DeadlineExceeded",
+			expectedConditionReason: batch.JobReasonDeadlineExceeded,
 		},
 		"activeDeadlineSeconds with backofflimit reach": {
 			parallelism:             1,
@@ -1942,7 +1942,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			failedPods:              1,
 			expectedFailed:          1,
 			expectedCondition:       batch.JobFailed,
-			expectedConditionReason: "BackoffLimitExceeded",
+			expectedConditionReason: batch.JobReasonBackoffLimitExceeded,
 		},
 		"activeDeadlineSeconds is not triggered when Job is suspended": {
 			suspend:                 true,
@@ -2098,7 +2098,7 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 				if err != nil {
 					return false, nil
 				}
-				if getCondition(j, batch.JobFailed, v1.ConditionTrue, "DeadlineExceeded") {
+				if getCondition(j, batch.JobFailed, v1.ConditionTrue, batch.JobReasonDeadlineExceeded) {
 					if manager.clock.Since(j.Status.StartTime.Time) < time.Duration(*j.Spec.ActiveDeadlineSeconds)*time.Second {
 						return true, errors.New("Job contains DeadlineExceeded condition earlier than expected")
 					}
@@ -2397,7 +2397,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  "PodFailurePolicy",
+					Reason:  batch.JobReasonPodFailurePolicy,
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -2425,7 +2425,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 						{
 							Type:    batch.JobFailureTarget,
 							Status:  v1.ConditionTrue,
-							Reason:  "PodFailurePolicy",
+							Reason:  batch.JobReasonPodFailurePolicy,
 							Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 						},
 					},
@@ -2452,7 +2452,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  "PodFailurePolicy",
+					Reason:  batch.JobReasonPodFailurePolicy,
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -2480,7 +2480,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 						{
 							Type:    batch.JobFailureTarget,
 							Status:  v1.ConditionTrue,
-							Reason:  "PodFailurePolicy",
+							Reason:  batch.JobReasonPodFailurePolicy,
 							Message: "Container main-container for pod default/already-deleted-pod failed with exit code 5 matching FailJob rule at index 1",
 						},
 					},
@@ -2507,7 +2507,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  "PodFailurePolicy",
+					Reason:  batch.JobReasonPodFailurePolicy,
 					Message: "Container main-container for pod default/already-deleted-pod failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -2596,7 +2596,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  "PodFailurePolicy",
+					Reason:  batch.JobReasonPodFailurePolicy,
 					Message: "Container main-container for pod default/mypod-1 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -2642,7 +2642,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  "PodFailurePolicy",
+					Reason:  batch.JobReasonPodFailurePolicy,
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -2695,7 +2695,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  "PodFailurePolicy",
+					Reason:  batch.JobReasonPodFailurePolicy,
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 42 matching FailJob rule at index 0",
 				},
 			},
@@ -2797,7 +2797,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  "PodFailurePolicy",
+					Reason:  batch.JobReasonPodFailurePolicy,
 					Message: "Container init-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -2924,7 +2924,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  "BackoffLimitExceeded",
+					Reason:  batch.JobReasonBackoffLimitExceeded,
 					Message: "Job has reached the specified backoff limit",
 				},
 			},
@@ -3185,7 +3185,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  "PodFailurePolicy",
+					Reason:  batch.JobReasonPodFailurePolicy,
 					Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
 				},
 			},
@@ -3571,13 +3571,13 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					{
 						Type:    batch.JobFailureTarget,
 						Status:  v1.ConditionTrue,
-						Reason:  "PodFailurePolicy",
+						Reason:  batch.JobReasonPodFailurePolicy,
 						Message: "Container x for pod default/mypod-0 failed with exit code 3 matching FailJob rule at index 0",
 					},
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
-						Reason:  "PodFailurePolicy",
+						Reason:  batch.JobReasonPodFailurePolicy,
 						Message: "Container x for pod default/mypod-0 failed with exit code 3 matching FailJob rule at index 0",
 					},
 				},
@@ -3660,7 +3660,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
-						Reason:  "BackoffLimitExceeded",
+						Reason:  batch.JobReasonBackoffLimitExceeded,
 						Message: "Job has reached the specified backoff limit",
 					},
 				},
@@ -3695,7 +3695,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
-						Reason:  "FailedIndexes",
+						Reason:  jobReasonFailedIndexes,
 						Message: "Job has failed indexes",
 					},
 				},
@@ -3733,7 +3733,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
-						Reason:  "MaxFailedIndexesExceeded",
+						Reason:  jobReasonMaxFailedIndexesExceeded,
 						Message: "Job has exceeded the specified maximal number of failed indexes",
 					},
 				},
