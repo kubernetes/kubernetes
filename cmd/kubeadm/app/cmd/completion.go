@@ -134,11 +134,13 @@ func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args [
 	return run(out, cmd.Parent())
 }
 
+// runCompletionBash generates bash completion code for the kubeadm command.
 func runCompletionBash(out io.Writer, kubeadm *cobra.Command) error {
 	klog.V(1).Infoln("[completion] writing completion code for Bash")
 	return kubeadm.GenBashCompletion(out)
 }
 
+// runCompletionZsh generates zsh completion code by converting the bash completion code of the kubeadm command.
 func runCompletionZsh(out io.Writer, kubeadm *cobra.Command) error {
 	zshInitialization := `
 __kubeadm_bash_source() {
