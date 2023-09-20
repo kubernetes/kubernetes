@@ -82,6 +82,7 @@ func NewKubeletStartPhase() workflow.Phase {
 	}
 }
 
+// Retrieves the join and init configurations, along with the TLS bootstrap configuration, for starting the kubelet.
 func getKubeletStartJoinData(c workflow.RunData) (*kubeadmapi.JoinConfiguration, *kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
 	data, ok := c.(JoinData)
 	if !ok {
