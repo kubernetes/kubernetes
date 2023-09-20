@@ -71,7 +71,7 @@ func newDNSTestCommon() dnsTestCommon {
 
 func (t *dnsTestCommon) init(ctx context.Context) {
 	ginkgo.By("Finding a DNS pod")
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "KubeDNS"}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
 
 	namespace := "kube-system"
@@ -244,7 +244,7 @@ func (t *dnsTestCommon) deleteUtilPod(ctx context.Context) {
 // deleteCoreDNSPods manually deletes the CoreDNS pods to apply the changes to the ConfigMap.
 func (t *dnsTestCommon) deleteCoreDNSPods(ctx context.Context) {
 
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "KubeDNS"}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
 
 	pods, err := t.f.ClientSet.CoreV1().Pods("kube-system").List(ctx, options)
