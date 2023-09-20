@@ -34,13 +34,12 @@ archives:
   - id: govcbuild
     builds:
       - govc
-    name_template: "govc_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
-    replacements: &replacements
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      freebsd: FreeBSD
-      amd64: x86_64
+    name_template: >-
+      govc_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
     format_overrides: &overrides
       - goos: windows
         format: zip
@@ -52,8 +51,12 @@ archives:
   - id: vcsimbuild
     builds:
       - vcsim
-    name_template: "vcsim_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
-    replacements: *replacements
+    name_template: >-
+      vcsim_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
     format_overrides: *overrides
     files: *extrafiles
 
