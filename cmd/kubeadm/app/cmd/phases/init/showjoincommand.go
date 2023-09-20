@@ -96,6 +96,7 @@ func showJoinCommand(c workflow.RunData) error {
 	return nil
 }
 
+// printJoinCommand prints join commands for control plane and worker nodes.
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i InitData) error {
 	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.CertificateKey(), i.SkipTokenPrint(), i.SkipCertificateKeyPrint())
 	if err != nil {
