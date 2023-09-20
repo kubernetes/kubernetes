@@ -362,6 +362,7 @@ func TestNewJoinData(t *testing.T) {
 	}
 }
 
+// expectedJoinIgnorePreflightErrors validates if joinData's preflight errors match the expected set.
 func expectedJoinIgnorePreflightErrors(expected sets.Set[string]) func(t *testing.T, data *joinData) {
 	return func(t *testing.T, data *joinData) {
 		if !expected.Equal(data.ignorePreflightErrors) {
