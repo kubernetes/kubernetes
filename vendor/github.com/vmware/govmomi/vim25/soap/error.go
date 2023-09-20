@@ -17,9 +17,12 @@ limitations under the License.
 package soap
 
 import (
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/vmware/govmomi/vim25/types"
 )
@@ -126,4 +129,38 @@ func IsVimFault(err error) bool {
 
 func ToVimFault(err error) types.BaseMethodFault {
 	return err.(vimFaultError).fault
+}
+
+func IsCertificateUntrusted(err error) bool {
+	// golang 1.20 introduce a new type to wrap 509 errors. So instead of
+	// casting the type, now we check the error chain contains the
+	// x509 error or not.
+	x509UnknownAuthorityErr := &x509.UnknownAuthorityError{}
+	ok := errors.As(err, x509UnknownAuthorityErr)
+	if ok {
+		return true
+	}
+
+	x509HostNameErr := &x509.HostnameError{}
+	ok = errors.As(err, x509HostNameErr)
+	if ok {
+		return true
+	}
+
+	// The err variable may not be a special type of x509 or HTTP
+	// error that can be validated by a type assertion. The err variable is
+	// in fact be an *errors.errorString.
+
+	msgs := []string{
+		"certificate is not trusted",
+		"certificate signed by unknown authority",
+	}
+
+	for _, msg := range msgs {
+		if strings.HasSuffix(err.Error(), msg) {
+			return true
+		}
+	}
+
+	return false
 }
