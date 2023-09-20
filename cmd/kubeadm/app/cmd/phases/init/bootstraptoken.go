@@ -62,6 +62,7 @@ func NewBootstrapTokenPhase() workflow.Phase {
 	}
 }
 
+// runBootstrapToken configures bootstrap tokens, cluster-info ConfigMap, and RBAC roles for kubeadm.
 func runBootstrapToken(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
