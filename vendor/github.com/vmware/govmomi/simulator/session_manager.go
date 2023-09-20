@@ -1,11 +1,11 @@
 /*
-Copyright (c) 2017-2018 VMware, Inc. All Rights Reserved.
+Copyright (c) 2017-2023 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -41,6 +42,7 @@ type SessionManager struct {
 
 	ServiceHostName string
 	TLSCert         func() string
+	ValidLogin      func(*types.Login) bool
 
 	sessions map[string]Session
 }
@@ -106,22 +108,23 @@ func (m *SessionManager) putSession(s Session) {
 	m.sessions[s.Key] = s
 }
 
-func (s *SessionManager) validLogin(ctx *Context, req *types.Login) bool {
-	if ctx.Session != nil {
-		return false
-	}
-	user := ctx.svc.Listen.User
-	if user == nil || user == DefaultLogin {
+func (s *SessionManager) Authenticate(u url.URL, req *types.Login) bool {
+	if u.User == nil || u.User == DefaultLogin {
 		return req.UserName != "" && req.Password != ""
 	}
-	pass, _ := user.Password()
-	return req.UserName == user.Username() && req.Password == pass
+
+	if s.ValidLogin != nil {
+		return s.ValidLogin(req)
+	}
+
+	pass, _ := u.User.Password()
+	return req.UserName == u.User.Username() && req.Password == pass
 }
 
 func (s *SessionManager) Login(ctx *Context, req *types.Login) soap.HasFault {
 	body := new(methods.LoginBody)
 
-	if s.validLogin(ctx, req) {
+	if ctx.Session == nil && s.Authenticate(*ctx.svc.Listen, req) {
 		body.Res = &types.LoginResponse{
 			Returnval: createSession(ctx, req.UserName, req.Locale),
 		}
