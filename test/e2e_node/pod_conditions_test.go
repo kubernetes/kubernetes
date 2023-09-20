@@ -125,7 +125,9 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 			// Verify PodInitialized is set if init containers are not present (since without init containers, it gets set very early)
 			initializedTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodInitialized, true)
 			framework.ExpectNoError(err)
-			framework.ExpectNotEqual(initializedTime.Before(scheduledTime), true, fmt.Sprintf("pod without init containers is initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
+			if initializedTime.Before(scheduledTime) {
+				framework.Failf("pod without init containers is initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime)
+			}
 		}
 
 		// Verify ContainersReady is not set (since sandboxcreation is blocked)
@@ -165,28 +167,42 @@ func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkP
 
 			if hasInitContainers {
 				// With init containers, verify the sequence of conditions is: Scheduled => PodReadyToStartContainers => Initialized
-				framework.ExpectNotEqual(readyToStartContainersTime.Before(scheduledTime), true, fmt.Sprintf("pod with init containers is initialized at: %v which is before pod has ready to start at: %v", initializedTime, readyToStartContainersTime))
-				framework.ExpectNotEqual(initializedTime.Before(readyToStartContainersTime), true, fmt.Sprintf("pod with init containers is initialized at: %v which is before pod has ready to start at: %v", initializedTime, readyToStartContainersTime))
+				if readyToStartContainersTime.Before(scheduledTime) {
+					framework.Failf("pod with init containers is initialized at: %v which is before pod has ready to start at: %v", initializedTime, readyToStartContainersTime)
+				}
+				if initializedTime.Before(readyToStartContainersTime) {
+					framework.Failf("pod with init containers is initialized at: %v which is before pod has ready to start at: %v", initializedTime, readyToStartContainersTime)
+				}
 			} else {
 				// Without init containers, verify the sequence of conditions is: Scheduled => Initialized => PodReadyToStartContainers
 				condBeforeContainersReadyTransitionTime = readyToStartContainersTime
 				errSubstrIfContainersReadyTooEarly = "ready to start"
-				framework.ExpectNotEqual(initializedTime.Before(scheduledTime), true, fmt.Sprintf("pod without init containers initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
-				framework.ExpectNotEqual(readyToStartContainersTime.Before(initializedTime), true, fmt.Sprintf("pod without init containers has ready to start at: %v which is before pod is initialized at: %v", readyToStartContainersTime, initializedTime))
+				if initializedTime.Before(scheduledTime) {
+					framework.Failf("pod without init containers initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime)
+				}
+				if readyToStartContainersTime.Before(initializedTime) {
+					framework.Failf("pod without init containers has ready to start at: %v which is before pod is initialized at: %v", readyToStartContainersTime, initializedTime)
+				}
 			}
 		} else {
 			// In the absence of PodHasReadyToStartContainers feature disabled, verify the sequence is: Scheduled => Initialized
-			framework.ExpectNotEqual(initializedTime.Before(scheduledTime), true, fmt.Sprintf("pod initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
+			if initializedTime.Before(scheduledTime) {
+				framework.Failf("pod initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime)
+			}
 		}
 		// Verify the next condition to get set is ContainersReady
 		containersReadyTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.ContainersReady, true)
 		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(containersReadyTime.Before(condBeforeContainersReadyTransitionTime), true, fmt.Sprintf("containers ready at: %v which is before pod %s: %v", containersReadyTime, errSubstrIfContainersReadyTooEarly, initializedTime))
+		if containersReadyTime.Before(condBeforeContainersReadyTransitionTime) {
+			framework.Failf("containers ready at: %v which is before pod %s: %v", containersReadyTime, errSubstrIfContainersReadyTooEarly, initializedTime)
+		}
 
 		// Verify ContainersReady => PodReady
 		podReadyTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodReady, true)
 		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(podReadyTime.Before(containersReadyTime), true, fmt.Sprintf("pod ready at: %v which is before pod containers ready at: %v", podReadyTime, containersReadyTime))
+		if podReadyTime.Before(containersReadyTime) {
+			framework.Failf("pod ready at: %v which is before pod containers ready at: %v", podReadyTime, containersReadyTime)
+		}
 	}
 }
 
