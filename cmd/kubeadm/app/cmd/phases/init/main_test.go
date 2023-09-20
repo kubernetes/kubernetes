@@ -22,6 +22,7 @@ import (
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 )
 
+// TestMain runs tests with fixtures containing private keys.
 func TestMain(m *testing.M) {
 	pkiutiltesting.RunWithPrivateKeyFixtureDirectory(m)
 }
