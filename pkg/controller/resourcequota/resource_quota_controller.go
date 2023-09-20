@@ -151,16 +151,15 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 	)
 
 	if options.DiscoveryFunc != nil {
-		qm := &QuotaMonitor{
-			informersStarted:  options.InformersStarted,
-			informerFactory:   options.InformerFactory,
-			ignoredResources:  options.IgnoredResourcesFunc(),
-			resourceChanges:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
-			resyncPeriod:      options.ReplenishmentResyncPeriod,
-			replenishmentFunc: rq.replenishQuota,
-			registry:          rq.registry,
-			updateFilter:      options.UpdateFilter,
-		}
+		qm := NewMonitor(
+			options.InformersStarted,
+			options.InformerFactory,
+			options.IgnoredResourcesFunc(),
+			options.ReplenishmentResyncPeriod,
+			rq.replenishQuota,
+			rq.registry,
+			options.UpdateFilter,
+		)
 
 		rq.quotaMonitor = qm
 
