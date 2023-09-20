@@ -96,6 +96,7 @@ func NewKubeConfigFilePhase(kubeConfigFileName string) workflow.Phase {
 	}
 }
 
+// getKubeConfigPhaseFlags returns the flags needed for the kubeconfig phase based on the specified name.
 func getKubeConfigPhaseFlags(name string) []string {
 	flags := []string{
 		options.APIServerAdvertiseAddress,
@@ -115,6 +116,7 @@ func getKubeConfigPhaseFlags(name string) []string {
 	return flags
 }
 
+// runKubeConfig prints the kubeconfig folder path.
 func runKubeConfig(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
