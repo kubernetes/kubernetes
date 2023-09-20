@@ -39,6 +39,7 @@ func (t *testCertsData) ExternalCA() bool                   { return false }
 func (t *testCertsData) CertificateDir() string             { return t.cfg.CertificatesDir }
 func (t *testCertsData) CertificateWriteDir() string        { return t.cfg.CertificatesDir }
 
+// TestCreateSparseCerts tests the creation of sparse certificates.
 func TestCreateSparseCerts(t *testing.T) {
 	for _, test := range certstestutil.GetSparseCertTestCases(t) {
 		t.Run(test.Name, func(t *testing.T) {
