@@ -65,6 +65,7 @@ users:
 `
 )
 
+// Tests the token generation and its format against an expected regex.
 func TestRunGenerateToken(t *testing.T) {
 	var buf bytes.Buffer
 
@@ -84,6 +85,7 @@ func TestRunGenerateToken(t *testing.T) {
 	}
 }
 
+// Tests the token creation with various configurations to validate expected behavior.
 func TestRunCreateToken(t *testing.T) {
 	var buf bytes.Buffer
 	fakeClient := &fake.Clientset{}
@@ -188,6 +190,7 @@ func TestRunCreateToken(t *testing.T) {
 	}
 }
 
+// Tests the token generation command execution.
 func TestNewCmdTokenGenerate(t *testing.T) {
 	var buf bytes.Buffer
 	args := []string{}
@@ -200,6 +203,7 @@ func TestNewCmdTokenGenerate(t *testing.T) {
 	}
 }
 
+// Tests the token command execution and subcommands.
 func TestNewCmdToken(t *testing.T) {
 	var buf, bufErr bytes.Buffer
 	testConfigTokenFile := "test-config-file"
@@ -265,6 +269,7 @@ func TestNewCmdToken(t *testing.T) {
 	}
 }
 
+// Tests the GetClientSet function to ensure it handles different scenarios of kubeconfig files.
 func TestGetClientSet(t *testing.T) {
 	testConfigTokenFile := "test-config-file"
 
@@ -301,6 +306,7 @@ func TestGetClientSet(t *testing.T) {
 	}
 }
 
+// Tests the RunDeleteTokens function to ensure it handles token deletion with different scenarios.
 func TestRunDeleteTokens(t *testing.T) {
 	var buf bytes.Buffer
 
@@ -338,6 +344,7 @@ func TestRunDeleteTokens(t *testing.T) {
 	}
 }
 
+// Tests token output formatting for different output formats.
 func TestTokenOutput(t *testing.T) {
 	testCases := []struct {
 		name         string
