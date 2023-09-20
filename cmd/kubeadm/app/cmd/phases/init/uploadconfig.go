@@ -93,6 +93,7 @@ func NewUploadConfigPhase() workflow.Phase {
 	}
 }
 
+// getUploadConfigPhaseFlags returns the flags relevant to the upload-configs phase.
 func getUploadConfigPhaseFlags() []string {
 	return []string{
 		options.CfgPath,
@@ -135,6 +136,7 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 	return nil
 }
 
+// getUploadConfigData retrieves the data needed for the upload-config phase.
 func getUploadConfigData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, string, error) {
 	data, ok := c.(InitData)
 	if !ok {
