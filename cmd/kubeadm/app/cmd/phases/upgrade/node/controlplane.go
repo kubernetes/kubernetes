@@ -46,6 +46,7 @@ func NewControlPlane() workflow.Phase {
 	return phase
 }
 
+// runControlPlane returns a function for executing the control-plane upgrade phase.
 func runControlPlane() func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
 		data, ok := c.(Data)
