@@ -102,6 +102,7 @@ func newCertSubPhases() []workflow.Phase {
 	return subPhases
 }
 
+// newCertSubPhase creates a new certificate sub-phase.
 func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunData) error) workflow.Phase {
 	phase := workflow.Phase{
 		Name:  certSpec.Name,
@@ -118,6 +119,7 @@ func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunDa
 	return phase
 }
 
+// getCertPhaseFlags returns flags required for the certificate phase based on the provided name.
 func getCertPhaseFlags(name string) []string {
 	flags := []string{
 		options.CertificatesDir,
@@ -137,6 +139,7 @@ func getCertPhaseFlags(name string) []string {
 	return flags
 }
 
+// getSANDescription generates a description of Subject Alternative Names (SANs) for a certificate.
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
 	defaultConfig := cmdutil.DefaultInitConfiguration()
@@ -175,6 +178,7 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	return fmt.Sprintf("\n\nDefault SANs are %s", strings.Join(sans, ", "))
 }
 
+// runCertsSa generates service account keys and public keys for the certificates.
 func runCertsSa(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
@@ -191,6 +195,7 @@ func runCertsSa(c workflow.RunData) error {
 	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir(), data.Cfg().ClusterConfiguration.PublicKeyAlgorithm())
 }
 
+// runCerts prints the certificate directory path.
 func runCerts(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
@@ -201,6 +206,7 @@ func runCerts(c workflow.RunData) error {
 	return nil
 }
 
+// runCAPhase returns a function that runs the certificate authority phase for the given CA certificate type.
 func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
 		data, ok := c.(InitData)
@@ -249,6 +255,7 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 	}
 }
 
+// runCertPhase returns a function to run certificate phase for a specific type and its CA.
 func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
 		data, ok := c.(InitData)
