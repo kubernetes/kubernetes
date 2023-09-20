@@ -22,6 +22,7 @@ import (
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 )
 
+// TestMain sets up the test environment with a mock private key directory and runs tests.
 func TestMain(m *testing.M) {
 	pkiutiltesting.RunWithPrivateKeyFixtureDirectory(m)
 }
