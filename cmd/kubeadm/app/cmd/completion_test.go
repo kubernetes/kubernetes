@@ -25,6 +25,7 @@ import (
 
 const shellsError = "Unexpected empty completion shells list"
 
+// TestNewCmdCompletion verifies the completion command with valid shell arguments.
 func TestNewCmdCompletion(t *testing.T) {
 	var out bytes.Buffer
 	shells := GetSupportedShells()
@@ -43,6 +44,7 @@ func TestNewCmdCompletion(t *testing.T) {
 	}
 }
 
+// TestRunCompletion verifies the behavior of RunCompletion for various shell arguments.
 func TestRunCompletion(t *testing.T) {
 	var out bytes.Buffer
 	type TestCase struct {
