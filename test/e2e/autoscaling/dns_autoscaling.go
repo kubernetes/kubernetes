@@ -41,8 +41,8 @@ import (
 // Constants used in dns-autoscaling test.
 const (
 	DNSdefaultTimeout      = 5 * time.Minute
-	ClusterAddonLabelKey   = "kubernetes.io/name"
-	DNSLabelName           = "KubeDNS"
+	ClusterAddonLabelKey   = "k8s-app"
+	DNSLabelName           = "kube-dns"
 	DNSAutoscalerLabelName = "kube-dns-autoscaler"
 )
 
@@ -57,19 +57,16 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	var DNSParams3 DNSParamsLinear
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		c = f.ClientSet
+
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)
 		nodeCount := len(nodes.Items)
 
 		ginkgo.By("Collecting original replicas count and DNS scaling params")
 		originDNSReplicasCount, err = getDNSReplicas(ctx, c)
-		if err != nil {
-			if strings.Contains(err.Error(), "expected 1 DNS deployment") && originDNSReplicasCount == 0 {
-				e2eskipper.Skipf(err.Error())
-			}
-			framework.Failf("unexpected error: %v", err)
-		}
+		framework.ExpectNoError(err)
 
 		pcm, err := fetchDNSScalingConfigMap(ctx, c)
 		framework.ExpectNoError(err)
@@ -314,7 +311,7 @@ func getDNSReplicas(ctx context.Context, c clientset.Interface) (int, error) {
 		return 0, err
 	}
 	if len(deployments.Items) != 1 {
-		return len(deployments.Items), fmt.Errorf("expected 1 DNS deployment, got %v", len(deployments.Items))
+		return 0, fmt.Errorf("expected 1 DNS deployment, got %v", len(deployments.Items))
 	}
 
 	deployment := deployments.Items[0]
