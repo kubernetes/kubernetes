@@ -371,6 +371,10 @@ func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxConta
 }
 
 func (m swapConfigurationHelper) ConfigureNoSwap(lcr *runtimeapi.LinuxContainerResources) {
+	if !swapControllerAvailable() {
+		return
+	}
+
 	if !isCgroup2UnifiedMode() {
 		if swapControllerAvailable() {
 			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
