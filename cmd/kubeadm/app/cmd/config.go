@@ -113,6 +113,7 @@ func newCmdConfigPrintResetDefaults(out io.Writer) *cobra.Command {
 	return newCmdConfigPrintActionDefaults(out, "reset", getDefaultResetConfigBytes)
 }
 
+// Returns a command to print default kubeadm configurations for a specified action.
 func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesProc func() ([]byte, error)) *cobra.Command {
 	kinds := []string{}
 	cmd := &cobra.Command{
@@ -140,6 +141,7 @@ func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesPr
 	return cmd
 }
 
+// Prints default kubeadm configurations, including component configs, to the provided writer.
 func runConfigPrintActionDefaults(out io.Writer, componentConfigs []string, configBytesProc func() ([]byte, error)) error {
 	initialConfig, err := configBytesProc()
 	if err != nil {
@@ -159,6 +161,7 @@ func runConfigPrintActionDefaults(out io.Writer, componentConfigs []string, conf
 	return nil
 }
 
+// Retrieves the default configuration bytes for a specified component group.
 func getDefaultComponentConfigBytes(group string) ([]byte, error) {
 	defaultedInitConfig, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
@@ -189,6 +192,7 @@ func getSupportedComponentConfigKinds() []string {
 	return objects
 }
 
+// Converts legacy component kinds to their corresponding group names.
 func mapLegacyKindsToGroups(kinds []string) ([]string, error) {
 	groups := []string{}
 	for _, kind := range kinds {
@@ -202,6 +206,7 @@ func mapLegacyKindsToGroups(kinds []string) ([]string, error) {
 	return groups, nil
 }
 
+// Retrieves and marshals the default initialization configuration for kubeadm.
 func getDefaultInitConfigBytes() ([]byte, error) {
 	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
@@ -211,6 +216,7 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1old.SchemeGroupVersion)
 }
 
+// Retrieves and marshals the default node join configuration for kubeadm.
 func getDefaultNodeConfigBytes() ([]byte, error) {
 	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1old.JoinConfiguration{
 		Discovery: kubeadmapiv1old.Discovery{
@@ -231,6 +237,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1old.SchemeGroupVersion)
 }
 
+// Generates the default kubeadm reset configuration as bytes.
 func getDefaultResetConfigBytes() ([]byte, error) {
 	internalcfg, err := configutil.DefaultedResetConfiguration(&kubeadmapiv1.ResetConfiguration{
 		CRISocket: constants.DefaultCRISocket, // avoid CRI detection
