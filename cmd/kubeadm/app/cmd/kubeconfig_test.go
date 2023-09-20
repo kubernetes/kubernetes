@@ -34,6 +34,7 @@ import (
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
 )
 
+// generateTestKubeadmConfig generates a test kubeadm configuration YAML and saves it to the specified.
 func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, error) {
 	cfgPath := filepath.Join(dir, id)
 	initCfg := kubeadmapiv1.InitConfiguration{
@@ -76,6 +77,7 @@ func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, er
 	return cfgPath, err
 }
 
+// TestKubeConfigSubCommandsThatWritesToOut tests various subcommands that generate kubeconfig and writes the output to a buffer.
 func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 
 	// Temporary folders for the test case
