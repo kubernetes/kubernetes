@@ -192,11 +192,12 @@ func newTestRequestInfoResolver() *RequestInfoFactory {
 
 func TestFieldSelectorParsing(t *testing.T) {
 	tests := []struct {
-		name         string
-		url          string
-		expectedName string
-		expectedErr  error
-		expectedVerb string
+		name              string
+		url               string
+		expectedName      string
+		expectedNamespace string
+		expectedErr       error
+		expectedVerb      string
 	}{
 		{
 			name:         "no selector",
@@ -210,10 +211,48 @@ func TestFieldSelectorParsing(t *testing.T) {
 			expectedVerb: "list",
 		},
 		{
+			name:              "metadata.namespace selector",
+			url:               "/apis/group/version/resource?fieldSelector=metadata.namespace=namespace1",
+			expectedNamespace: "namespace1",
+			expectedVerb:      "list",
+		},
+		{
+			name:              "metadata.namespace selector is by the namespace provided in the url parts",
+			url:               "/apis/group/version/namespaces/foo/resource?fieldSelector=metadata.namespace=namespace1",
+			expectedNamespace: "foo",
+			expectedVerb:      "list",
+		},
+		{
+			name:              "metadata.namespace and metadata.name selector",
+			url:               "/apis/group/version/resource?fieldSelector=metadata.namespace=namespace1,metadata.name=name1",
+			expectedNamespace: "namespace1",
+			expectedName:      "name1",
+			expectedVerb:      "list",
+		},
+		{
 			name:         "metadata.name selector with watch",
 			url:          "/apis/group/version/resource?watch=true&fieldSelector=metadata.name=name1",
 			expectedName: "name1",
 			expectedVerb: "watch",
+		},
+		{
+			name:              "metadata.namespace selector with watch",
+			url:               "/apis/group/version/resource?watch=true&fieldSelector=metadata.namespace=namespace1",
+			expectedNamespace: "namespace1",
+			expectedVerb:      "watch",
+		},
+		{
+			name:              "metadata.namespace selector is by the namespace provided in the url parts",
+			url:               "/apis/group/version/namespaces/foo/resource?watch=true&fieldSelector=metadata.namespace=namespace1",
+			expectedNamespace: "foo",
+			expectedVerb:      "watch",
+		},
+		{
+			name:              "metadata.namespace and metadata.namespace selector with watch",
+			url:               "/apis/group/version/resource?watch=true&fieldSelector=metadata.namespace=namespace1,metadata.name=name1",
+			expectedNamespace: "namespace1",
+			expectedName:      "name1",
+			expectedVerb:      "watch",
 		},
 		{
 			name:         "random selector",
@@ -256,6 +295,9 @@ func TestFieldSelectorParsing(t *testing.T) {
 			}
 		}
 		if e, a := tc.expectedName, apiRequestInfo.Name; e != a {
+			t.Errorf("%s: expected %v, actual %v", tc.name, e, a)
+		}
+		if e, a := tc.expectedNamespace, apiRequestInfo.Namespace; e != a {
 			t.Errorf("%s: expected %v, actual %v", tc.name, e, a)
 		}
 		if e, a := tc.expectedVerb, apiRequestInfo.Verb; e != a {

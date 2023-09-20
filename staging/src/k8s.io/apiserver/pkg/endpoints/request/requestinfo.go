@@ -206,8 +206,8 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 		requestInfo.Resource = requestInfo.Parts[0]
 	}
 
-	// if there's no name on the request and we thought it was a get before, then the actual verb is a list or a watch
-	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
+	// if there's either no name nor no namespace on the request and we thought it was a get before, then the actual verb is a list or a watch
+	if (len(requestInfo.Name) == 0 || len(requestInfo.Namespace) == 0) && requestInfo.Verb == "get" {
 		opts := metainternalversion.ListOptions{}
 		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, &opts); err != nil {
 			// An error in parsing request will result in default to "list" and not setting "name" field.
@@ -231,9 +231,16 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 		}
 
 		if opts.FieldSelector != nil {
-			if name, ok := opts.FieldSelector.RequiresExactMatch("metadata.name"); ok {
-				if len(path.IsValidPathSegmentName(name)) == 0 {
-					requestInfo.Name = name
+			if len(requestInfo.Name) == 0 {
+				if name, ok := opts.FieldSelector.RequiresExactMatch("metadata.name"); ok {
+					if len(path.IsValidPathSegmentName(name)) == 0 {
+						requestInfo.Name = name
+					}
+				}
+			}
+			if len(requestInfo.Namespace) == 0 {
+				if namespace, ok := opts.FieldSelector.RequiresExactMatch("metadata.namespace"); ok {
+					requestInfo.Namespace = namespace
 				}
 			}
 		}
