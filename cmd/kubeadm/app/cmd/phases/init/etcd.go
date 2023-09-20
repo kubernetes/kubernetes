@@ -55,6 +55,7 @@ func NewEtcdPhase() workflow.Phase {
 	return phase
 }
 
+// newEtcdLocalSubPhase returns a phase to generate static Pod manifest for a local, single-node etcd instance.
 func newEtcdLocalSubPhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:         "local",
@@ -66,6 +67,7 @@ func newEtcdLocalSubPhase() workflow.Phase {
 	return phase
 }
 
+// getEtcdPhaseFlags returns flags relevant to the etcd phase.
 func getEtcdPhaseFlags() []string {
 	flags := []string{
 		options.CertificatesDir,
@@ -77,6 +79,7 @@ func getEtcdPhaseFlags() []string {
 	return flags
 }
 
+// runEtcdPhaseLocal returns a function to run the etcd local sub-phase.
 func runEtcdPhaseLocal() func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
 		data, ok := c.(InitData)
