@@ -422,6 +422,7 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 	cmd.Flags().StringSliceVar(&e.Options.SkipPhases, "skip-phases", nil, "List of phases to be skipped")
 }
 
+// Inherits specified flags from the source flag set to the target flag set.
 func inheritsFlags(sourceFlags, targetFlags *pflag.FlagSet, cmdFlags []string) {
 	// If the list of flag to be inherited from the parent command is not defined, no flag is added
 	if cmdFlags == nil {
