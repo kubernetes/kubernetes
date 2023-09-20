@@ -53,6 +53,7 @@ kind: ClusterConfiguration
 controlPlaneEndpoint: "3.4.5.6"
 `, kubeadmapiv1.SchemeGroupVersion.String(), expectedCRISocket)
 
+// TestNewInitData tests the newInitData function with various input scenarios.
 func TestNewInitData(t *testing.T) {
 	// create temp directory
 	tmpDir, err := os.MkdirTemp("", "kubeadm-init-test")
@@ -220,6 +221,7 @@ func TestNewInitData(t *testing.T) {
 	}
 }
 
+// expectedInitIgnorePreflightErrors checks if the provided initData contains the expected preflight errors.
 func expectedInitIgnorePreflightErrors(expectedItems ...string) func(t *testing.T, data *initData) {
 	expected := sets.New(expectedItems...)
 	return func(t *testing.T, data *initData) {
