@@ -49,6 +49,7 @@ func NewRemoveETCDMemberPhase() workflow.Phase {
 	}
 }
 
+// runRemoveETCDMemberPhase removes an etcd member and its data directory if local etcd is used.
 func runRemoveETCDMemberPhase(c workflow.RunData) error {
 	r, ok := c.(resetData)
 	if !ok {
@@ -96,6 +97,7 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 	return nil
 }
 
+// getEtcdDataDir retrieves the data directory for etcd based on the manifestPath and kubeadm configuration.
 func getEtcdDataDir(manifestPath string, cfg *kubeadmapi.InitConfiguration) (string, error) {
 	const etcdVolumeName = "etcd-data"
 	var dataDir string
