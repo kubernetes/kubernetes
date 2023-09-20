@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// phaseBuilder creates a phase with the specified name and child phases.
 func phaseBuilder(name string, phases ...Phase) Phase {
 	return Phase{
 		Name:   name,
@@ -35,6 +36,7 @@ func phaseBuilder(name string, phases ...Phase) Phase {
 	}
 }
 
+// TestComputePhaseRunFlags tests phase filtering and skipping options.
 func TestComputePhaseRunFlags(t *testing.T) {
 
 	var usecases = []struct {
@@ -115,6 +117,7 @@ func TestComputePhaseRunFlags(t *testing.T) {
 	}
 }
 
+// phaseBuilder1 creates a phase with run conditions and child phases.
 func phaseBuilder1(name string, runIf func(data RunData) (bool, error), phases ...Phase) Phase {
 	return Phase{
 		Name:   name,
@@ -127,6 +130,7 @@ func phaseBuilder1(name string, runIf func(data RunData) (bool, error), phases .
 
 var callstack []string
 
+// runBuilder creates a run function that appends the name to a callstack.
 func runBuilder(name string) func(data RunData) error {
 	return func(data RunData) error {
 		callstack = append(callstack, name)
@@ -134,14 +138,17 @@ func runBuilder(name string) func(data RunData) error {
 	}
 }
 
+// runConditionTrue returns true without errors.
 func runConditionTrue(data RunData) (bool, error) {
 	return true, nil
 }
 
+// runConditionFalse returns false without errors.
 func runConditionFalse(data RunData) (bool, error) {
 	return false, nil
 }
 
+// TestRunOrderAndConditions tests the order of phase execution and run conditions.
 func TestRunOrderAndConditions(t *testing.T) {
 	var w = Runner{
 		Phases: []Phase{
@@ -183,6 +190,7 @@ func TestRunOrderAndConditions(t *testing.T) {
 	}
 }
 
+// phaseBuilder2 creates a phase with run conditions and run functions.
 func phaseBuilder2(name string, runIf func(data RunData) (bool, error), run func(data RunData) error, phases ...Phase) Phase {
 	return Phase{
 		Name:   name,
@@ -193,22 +201,27 @@ func phaseBuilder2(name string, runIf func(data RunData) (bool, error), run func
 	}
 }
 
+// runPass returns no error.
 func runPass(data RunData) error {
 	return nil
 }
 
+// runFails returns an error.
 func runFails(data RunData) error {
 	return errors.New("run fails")
 }
 
+// runConditionPass returns true without errors.
 func runConditionPass(data RunData) (bool, error) {
 	return true, nil
 }
 
+// runConditionFails returns false with an error.
 func runConditionFails(data RunData) (bool, error) {
 	return false, errors.New("run condition fails")
 }
 
+// TestRunHandleErrors tests error handling during phase execution.
 func TestRunHandleErrors(t *testing.T) {
 	var w = Runner{
 		Phases: []Phase{
@@ -249,6 +262,7 @@ func TestRunHandleErrors(t *testing.T) {
 	}
 }
 
+// phaseBuilder3 creates a phase with the specified name and hidden status.
 func phaseBuilder3(name string, hidden bool, phases ...Phase) Phase {
 	return Phase{
 		Name:   name,
@@ -258,6 +272,7 @@ func phaseBuilder3(name string, hidden bool, phases ...Phase) Phase {
 	}
 }
 
+// TestHelp tests the generation of help text for a composable workflow runner.
 func TestHelp(t *testing.T) {
 	var w = Runner{
 		Phases: []Phase{
@@ -282,6 +297,7 @@ func TestHelp(t *testing.T) {
 	}
 }
 
+// phaseBuilder4 creates a phase with specified command flags.
 func phaseBuilder4(name string, cmdFlags []string, phases ...Phase) Phase {
 	return Phase{
 		Name:         name,
@@ -290,6 +306,7 @@ func phaseBuilder4(name string, cmdFlags []string, phases ...Phase) Phase {
 	}
 }
 
+// phaseBuilder5 creates a phase with specified local flags.
 func phaseBuilder5(name string, flags *pflag.FlagSet) Phase {
 	return Phase{
 		Name:       name,
@@ -303,6 +320,7 @@ type argTest struct {
 	fail []string
 }
 
+// phaseBuilder6 creates a phase with a custom argument validator function.
 func phaseBuilder6(name string, args cobra.PositionalArgs, phases ...Phase) Phase {
 	return Phase{
 		Name:          name,
@@ -322,6 +340,7 @@ func customArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// TestBindToCommandArgRequirements tests the argument requirements for various phases and commands.
 func TestBindToCommandArgRequirements(t *testing.T) {
 
 	// because cobra.ExactArgs(1) == cobra.ExactArgs(3), it is needed
@@ -419,6 +438,7 @@ func TestBindToCommandArgRequirements(t *testing.T) {
 	}
 }
 
+// TestBindToCommand tests the binding of workflow phases to a Cobra command.
 func TestBindToCommand(t *testing.T) {
 
 	var dummy string
@@ -577,6 +597,7 @@ func TestBindToCommand(t *testing.T) {
 	}
 }
 
+// getCmd retrieves a nested subcommand within a Cobra command.
 func getCmd(parent *cobra.Command, nestedName string) *cobra.Command {
 	names := strings.Split(nestedName, " ")
 	for i, n := range names {
@@ -593,6 +614,7 @@ func getCmd(parent *cobra.Command, nestedName string) *cobra.Command {
 	return nil
 }
 
+// cmdHasFlags checks if a Cobra command has expected flags.
 func cmdHasFlags(cmd *cobra.Command, expectedFlags ...string) error {
 	flags := []string{}
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
