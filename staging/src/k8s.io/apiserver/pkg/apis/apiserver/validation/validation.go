@@ -31,6 +31,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
+	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -75,26 +76,32 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration) fie
 	// check and add validation for duplicate issuers.
 	for i, a := range c.JWT {
 		fldPath := root.Index(i)
-		allErrs = append(allErrs, validateJWTAuthenticator(a, fldPath)...)
+		_, errs := validateJWTAuthenticator(a, fldPath, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
+		allErrs = append(allErrs, errs...)
 	}
 
 	return allErrs
 }
 
-// ValidateJWTAuthenticator validates a given JWTAuthenticator.
+// CompileAndValidateJWTAuthenticator validates a given JWTAuthenticator and returns a CELMapper with the compiled
+// CEL expressions for claim mappings and validation rules.
 // This is exported for use in oidc package.
-func ValidateJWTAuthenticator(authenticator api.JWTAuthenticator) field.ErrorList {
-	return validateJWTAuthenticator(authenticator, nil)
+func CompileAndValidateJWTAuthenticator(authenticator api.JWTAuthenticator) (authenticationcel.CELMapper, field.ErrorList) {
+	return validateJWTAuthenticator(authenticator, nil, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
 }
 
-func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field.Path) field.ErrorList {
+func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field.Path, structuredAuthnFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, fldPath.Child("issuer"))...)
-	allErrs = append(allErrs, validateClaimValidationRules(authenticator.ClaimValidationRules, fldPath.Child("claimValidationRules"))...)
-	allErrs = append(allErrs, validateClaimMappings(authenticator.ClaimMappings, fldPath.Child("claimMappings"))...)
+	compiler := authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	mapper := &authenticationcel.CELMapper{}
 
-	return allErrs
+	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, fldPath.Child("issuer"))...)
+	allErrs = append(allErrs, validateClaimValidationRules(compiler, mapper, authenticator.ClaimValidationRules, fldPath.Child("claimValidationRules"), structuredAuthnFeatureEnabled)...)
+	allErrs = append(allErrs, validateClaimMappings(compiler, mapper, authenticator.ClaimMappings, fldPath.Child("claimMappings"), structuredAuthnFeatureEnabled)...)
+	allErrs = append(allErrs, validateUserValidationRules(compiler, mapper, authenticator.UserValidationRules, fldPath.Child("userValidationRules"), structuredAuthnFeatureEnabled)...)
+
+	return *mapper, allErrs
 }
 
 func validateIssuer(issuer api.Issuer, fldPath *field.Path) field.ErrorList {
@@ -174,46 +181,248 @@ func validateCertificateAuthority(certificateAuthority string, fldPath *field.Pa
 	return allErrs
 }
 
-func validateClaimValidationRules(rules []api.ClaimValidationRule, fldPath *field.Path) field.ErrorList {
+func validateClaimValidationRules(compiler authenticationcel.Compiler, celMapper *authenticationcel.CELMapper, rules []api.ClaimValidationRule, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	seenClaims := sets.NewString()
+	seenExpressions := sets.NewString()
+	var compilationResults []authenticationcel.CompilationResult
+
 	for i, rule := range rules {
 		fldPath := fldPath.Index(i)
 
-		if len(rule.Claim) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("claim"), "claim name is required"))
-			continue
+		if len(rule.Expression) > 0 && !structuredAuthnFeatureEnabled {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("expression"), rule.Expression, "expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 		}
 
-		if seenClaims.Has(rule.Claim) {
-			allErrs = append(allErrs, field.Duplicate(fldPath.Child("claim"), rule.Claim))
-			continue
+		switch {
+		case len(rule.Claim) > 0 && len(rule.Expression) > 0:
+			allErrs = append(allErrs, field.Invalid(fldPath, rule.Claim, "claim and expression can't both be set"))
+		case len(rule.Claim) == 0 && len(rule.Expression) == 0:
+			allErrs = append(allErrs, field.Required(fldPath, "claim or expression is required"))
+		case len(rule.Claim) > 0:
+			if len(rule.Message) > 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("message"), rule.Message, "message can't be set when claim is set"))
+			}
+			if seenClaims.Has(rule.Claim) {
+				allErrs = append(allErrs, field.Duplicate(fldPath.Child("claim"), rule.Claim))
+			}
+			seenClaims.Insert(rule.Claim)
+		case len(rule.Expression) > 0:
+			if len(rule.RequiredValue) > 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("requiredValue"), rule.RequiredValue, "requiredValue can't be set when expression is set"))
+			}
+			if seenExpressions.Has(rule.Expression) {
+				allErrs = append(allErrs, field.Duplicate(fldPath.Child("expression"), rule.Expression))
+				continue
+			}
+			seenExpressions.Insert(rule.Expression)
+
+			compilationResult, err := compileClaimsCELExpression(compiler, &authenticationcel.ClaimValidationCondition{
+				Expression: rule.Expression,
+			}, fldPath.Child("expression"))
+
+			if err != nil {
+				allErrs = append(allErrs, err)
+				continue
+			}
+			if compilationResult != nil {
+				compilationResults = append(compilationResults, *compilationResult)
+			}
 		}
-		seenClaims.Insert(rule.Claim)
+	}
+
+	if structuredAuthnFeatureEnabled && len(compilationResults) > 0 {
+		celMapper.ClaimValidationRules = authenticationcel.NewClaimsMapper(compilationResults)
 	}
 
 	return allErrs
 }
 
-func validateClaimMappings(m api.ClaimMappings, fldPath *field.Path) field.ErrorList {
+func validateClaimMappings(compiler authenticationcel.Compiler, celMapper *authenticationcel.CELMapper, m api.ClaimMappings, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 
-	if len(m.Username.Claim) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("username", "claim"), "claim name is required"))
+	if !structuredAuthnFeatureEnabled {
+		if len(m.Username.Expression) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("username").Child("expression"), m.Username.Expression, "expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+		}
+		if len(m.Groups.Expression) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("groups").Child("expression"), m.Groups.Expression, "expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+		}
+		if len(m.UID.Claim) > 0 || len(m.UID.Expression) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), "", "uid claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+		}
+		if len(m.Extra) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("extra"), "", "extra claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+		}
 	}
-	// TODO(aramase): when Expression is added to PrefixedClaimOrExpression, check prefix and expression are not both set.
-	if m.Username.Prefix == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("username", "prefix"), "prefix is required"))
+
+	compilationResult, err := validatePrefixClaimOrExpression(compiler, m.Username, fldPath.Child("username"), true, structuredAuthnFeatureEnabled)
+	if err != nil {
+		allErrs = append(allErrs, err...)
+	} else if compilationResult != nil && structuredAuthnFeatureEnabled {
+		celMapper.Username = authenticationcel.NewClaimsMapper([]authenticationcel.CompilationResult{*compilationResult})
 	}
-	if len(m.Groups.Claim) > 0 && m.Groups.Prefix == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("groups", "prefix"), "prefix is required when claim is set"))
+
+	compilationResult, err = validatePrefixClaimOrExpression(compiler, m.Groups, fldPath.Child("groups"), false, structuredAuthnFeatureEnabled)
+	if err != nil {
+		allErrs = append(allErrs, err...)
+	} else if compilationResult != nil && structuredAuthnFeatureEnabled {
+		celMapper.Groups = authenticationcel.NewClaimsMapper([]authenticationcel.CompilationResult{*compilationResult})
 	}
-	if m.Groups.Prefix != nil && len(m.Groups.Claim) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("groups", "claim"), "non-empty claim name is required when prefix is set"))
+
+	switch {
+	case len(m.UID.Claim) > 0 && len(m.UID.Expression) > 0:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), "", "claim and expression can't both be set"))
+	case len(m.UID.Expression) > 0:
+		compilationResult, err := compileClaimsCELExpression(compiler, &authenticationcel.ClaimMappingExpression{
+			Expression: m.UID.Expression,
+		}, fldPath.Child("uid").Child("expression"))
+
+		if err != nil {
+			allErrs = append(allErrs, err)
+		} else if structuredAuthnFeatureEnabled && compilationResult != nil {
+			celMapper.UID = authenticationcel.NewClaimsMapper([]authenticationcel.CompilationResult{*compilationResult})
+		}
+	}
+
+	var extraCompilationResults []authenticationcel.CompilationResult
+	seenExtraKeys := sets.NewString()
+
+	for i, mapping := range m.Extra {
+		fldPath := fldPath.Child("extra").Index(i)
+		// Key should be namespaced to the authenticator or authenticator/authorizer pair making use of them.
+		// For instance: "example.org/foo" instead of "foo".
+		// xref: https://github.com/kubernetes/kubernetes/blob/3825e206cb162a7ad7431a5bdf6a065ae8422cf7/staging/src/k8s.io/apiserver/pkg/authentication/user/user.go#L31-L41
+		// IsDomainPrefixedPath checks for non-empty key and that the key is prefixed with a domain name.
+		allErrs = append(allErrs, utilvalidation.IsDomainPrefixedPath(fldPath.Child("key"), mapping.Key)...)
+		if mapping.Key != strings.ToLower(mapping.Key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), mapping.Key, "key must be lowercase"))
+		}
+		if seenExtraKeys.Has(mapping.Key) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("key"), mapping.Key))
+			continue
+		}
+		seenExtraKeys.Insert(mapping.Key)
+
+		if len(mapping.ValueExpression) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("valueExpression"), "valueExpression is required"))
+			continue
+		}
+
+		compilationResult, err := compileClaimsCELExpression(compiler, &authenticationcel.ExtraMappingExpression{
+			Key:        mapping.Key,
+			Expression: mapping.ValueExpression,
+		}, fldPath.Child("valueExpression"))
+
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
+
+		if compilationResult != nil {
+			extraCompilationResults = append(extraCompilationResults, *compilationResult)
+		}
+	}
+
+	if structuredAuthnFeatureEnabled && len(extraCompilationResults) > 0 {
+		celMapper.Extra = authenticationcel.NewClaimsMapper(extraCompilationResults)
 	}
 
 	return allErrs
+}
+
+func validatePrefixClaimOrExpression(compiler authenticationcel.Compiler, mapping api.PrefixedClaimOrExpression, fldPath *field.Path, claimOrExpressionRequired, structuredAuthnFeatureEnabled bool) (*authenticationcel.CompilationResult, field.ErrorList) {
+	var allErrs field.ErrorList
+
+	var compilationResult *authenticationcel.CompilationResult
+	switch {
+	case len(mapping.Expression) > 0 && len(mapping.Claim) > 0:
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "claim and expression can't both be set"))
+	case len(mapping.Expression) == 0 && len(mapping.Claim) == 0 && claimOrExpressionRequired:
+		allErrs = append(allErrs, field.Required(fldPath, "claim or expression is required"))
+	case len(mapping.Expression) > 0:
+		var err *field.Error
+
+		if mapping.Prefix != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("prefix"), *mapping.Prefix, "prefix can't be set when expression is set"))
+		}
+		compilationResult, err = compileClaimsCELExpression(compiler, &authenticationcel.ClaimMappingExpression{
+			Expression: mapping.Expression,
+		}, fldPath.Child("expression"))
+
+		if err != nil {
+			allErrs = append(allErrs, err)
+		}
+
+	case len(mapping.Claim) > 0:
+		if mapping.Prefix == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("prefix"), "prefix is required when claim is set. It can be set to an empty string to disable prefixing"))
+		}
+	}
+
+	return compilationResult, allErrs
+}
+
+func validateUserValidationRules(compiler authenticationcel.Compiler, celMapper *authenticationcel.CELMapper, rules []api.UserValidationRule, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
+	var allErrs field.ErrorList
+	var compilationResults []authenticationcel.CompilationResult
+
+	if len(rules) > 0 && !structuredAuthnFeatureEnabled {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "user validation rules are not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+	}
+
+	seenExpressions := sets.NewString()
+	for i, rule := range rules {
+		fldPath := fldPath.Index(i)
+
+		if len(rule.Expression) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("expression"), "expression is required"))
+			continue
+		}
+
+		if seenExpressions.Has(rule.Expression) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("expression"), rule.Expression))
+			continue
+		}
+		seenExpressions.Insert(rule.Expression)
+
+		compilationResult, err := compileUserCELExpression(compiler, &authenticationcel.UserValidationCondition{
+			Expression: rule.Expression,
+			Message:    rule.Message,
+		}, fldPath.Child("expression"))
+
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
+
+		if compilationResult != nil {
+			compilationResults = append(compilationResults, *compilationResult)
+		}
+	}
+
+	if structuredAuthnFeatureEnabled && len(compilationResults) > 0 {
+		celMapper.UserValidationRules = authenticationcel.NewUserMapper(compilationResults)
+	}
+
+	return allErrs
+}
+
+func compileClaimsCELExpression(compiler authenticationcel.Compiler, expression authenticationcel.ExpressionAccessor, fldPath *field.Path) (*authenticationcel.CompilationResult, *field.Error) {
+	compilationResult, err := compiler.CompileClaimsExpression(expression)
+	if err != nil {
+		return nil, convertCELErrorToValidationError(fldPath, expression, err)
+	}
+	return &compilationResult, nil
+}
+
+func compileUserCELExpression(compiler authenticationcel.Compiler, expression authenticationcel.ExpressionAccessor, fldPath *field.Path) (*authenticationcel.CompilationResult, *field.Error) {
+	compilationResult, err := compiler.CompileUserExpression(expression)
+	if err != nil {
+		return nil, convertCELErrorToValidationError(fldPath, expression, err)
+	}
+	return &compilationResult, nil
 }
 
 // ValidateAuthorizationConfiguration validates a given AuthorizationConfiguration.
