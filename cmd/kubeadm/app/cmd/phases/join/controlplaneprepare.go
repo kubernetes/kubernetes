@@ -63,6 +63,7 @@ func NewControlPlanePreparePhase() workflow.Phase {
 	}
 }
 
+// getControlPlanePreparePhaseFlags returns the flags associated with the specified control-plane prepare phase.
 func getControlPlanePreparePhaseFlags(name string) []string {
 	var flags []string
 	switch name {
@@ -138,6 +139,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 	return flags
 }
 
+// newControlPlanePrepareDownloadCertsSubphase creates a control-plane prepare phase for downloading shared certificates.
 func newControlPlanePrepareDownloadCertsSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "download-certs [api-server-endpoint]",
@@ -147,6 +149,7 @@ func newControlPlanePrepareDownloadCertsSubphase() workflow.Phase {
 	}
 }
 
+// newControlPlanePrepareCertsSubphase creates a control-plane prepare phase for generating certificates.
 func newControlPlanePrepareCertsSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "certs [api-server-endpoint]",
@@ -156,6 +159,7 @@ func newControlPlanePrepareCertsSubphase() workflow.Phase {
 	}
 }
 
+// newControlPlanePrepareKubeconfigSubphase creates a control-plane prepare phase for generating kubeconfigs.
 func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "kubeconfig [api-server-endpoint]",
@@ -165,6 +169,7 @@ func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 	}
 }
 
+// newControlPlanePrepareControlPlaneSubphase creates a control-plane prepare phase for generating control plane manifests.
 func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:          "control-plane",
@@ -175,6 +180,7 @@ func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	}
 }
 
+// runControlPlanePrepareControlPlaneSubphase generates control plane manifests for various components.
 func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
@@ -215,6 +221,7 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 	return nil
 }
 
+// runControlPlanePrepareDownloadCertsPhaseLocal downloads certificates shared among control-plane nodes.
 func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
@@ -247,6 +254,7 @@ func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData) error {
 	return nil
 }
 
+// runControlPlanePrepareCertsPhaseLocal generates control-plane certificates and stores them in the specified directory.
 func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
@@ -273,6 +281,7 @@ func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
 	return certsphase.CreatePKIAssets(cfg)
 }
 
+// runControlPlanePrepareKubeconfigPhaseLocal generates kubeconfig files for control-plane components and admin/kubeadm and stores them in the specified directory.
 func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
@@ -302,6 +311,7 @@ func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
 	return nil
 }
 
+// bootstrapClient creates a Kubernetes client using TLS bootstrap configuration.
 func bootstrapClient(data JoinData) (clientset.Interface, error) {
 	tlsBootstrapCfg, err := data.TLSBootstrapCfg()
 	if err != nil {
