@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// TestNewCmdVersion tests the execution of the version command.
 func TestNewCmdVersion(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := newCmdVersion(&buf)
@@ -34,6 +35,7 @@ func TestNewCmdVersion(t *testing.T) {
 	}
 }
 
+// TestRunVersion tests the execution of the version command with different flags.
 func TestRunVersion(t *testing.T) {
 	var buf bytes.Buffer
 	iface := make(map[string]interface{})
