@@ -3365,6 +3365,16 @@
     to delete the secret, the deletion must succeed.
   release: v1.21
   file: test/e2e/common/storage/secrets_volume.go
+- testname: StorageClass, lifecycle
+  codename: '[sig-storage] StorageClasses CSI Conformance should run through the lifecycle
+    of a StorageClass [Conformance]'
+  description: Creating a StorageClass MUST succeed. Reading the StorageClass MUST
+    succeed. Patching the StorageClass MUST succeed with its new label found. Deleting
+    the StorageClass MUST succeed and it MUST be confirmed. Replacement StorageClass
+    MUST be created. Updating the StorageClass MUST succeed with its new label found.
+    Deleting the StorageClass via deleteCollection MUST succeed and it MUST be confirmed.
+  release: v1.29
+  file: test/e2e/storage/storageclass.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
     configmap pod [Conformance]'
