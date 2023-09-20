@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 )
 
+// TestGetAddonPhaseFlags validates flag sets for different addon names.
 func TestGetAddonPhaseFlags(t *testing.T) {
 	tests := []struct {
 		name string
