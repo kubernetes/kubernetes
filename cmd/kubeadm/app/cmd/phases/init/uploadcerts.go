@@ -45,6 +45,7 @@ func NewUploadCertsPhase() workflow.Phase {
 	}
 }
 
+// runUploadCerts runs the upload-certs phase, uploading certificates to the control plane if enabled.
 func runUploadCerts(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
