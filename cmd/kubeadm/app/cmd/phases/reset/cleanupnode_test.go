@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
+// assertExists asserts that a file or directory exists in a test.
 func assertExists(t *testing.T, path string) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Errorf("file/directory does not exist; error: %s", err)
@@ -35,6 +36,7 @@ func assertExists(t *testing.T, path string) {
 	}
 }
 
+// assertNotExists asserts that a file or directory does not exist in a test.
 func assertNotExists(t *testing.T, path string) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("file/dir exists: %s", path)
@@ -50,6 +52,7 @@ func assertDirEmpty(t *testing.T, path string) {
 	}
 }
 
+// TestConfigDirCleaner tests for the config directory cleaner utility function.
 func TestConfigDirCleaner(t *testing.T) {
 	tests := map[string]struct {
 		resetDir        string
@@ -212,6 +215,7 @@ func TestConfigDirCleaner(t *testing.T) {
 	}
 }
 
+// TestRemoveContainers tests for the function that removes containers using cri-o's crictl.
 func TestRemoveContainers(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
