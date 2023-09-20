@@ -53,6 +53,7 @@ var (
 	dummyKubernetesVersionStr = dummyKubernetesVersion.String()
 )
 
+// TestNewCmdConfigImagesList tests if "images" command returns the expected number of default images.
 func TestNewCmdConfigImagesList(t *testing.T) {
 	var output bytes.Buffer
 	mockK8sVersion := dummyKubernetesVersionStr
@@ -66,6 +67,7 @@ func TestNewCmdConfigImagesList(t *testing.T) {
 	}
 }
 
+// TestImagesListRunWithCustomConfigPath tests image list command with different configurations and checks for expected images.
 func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 	testcases := []struct {
 		name               string
@@ -151,6 +153,7 @@ kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.U
 	}
 }
 
+// TestConfigImagesListRunWithoutPath tests image list command with various configurations when no config path is provided.
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
@@ -211,6 +214,7 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	}
 }
 
+// TestConfigImagesListOutput tests the images list command output for various formats and configurations.
 func TestConfigImagesListOutput(t *testing.T) {
 
 	etcdVersion, _, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, dummyKubernetesVersionStr)
@@ -349,6 +353,7 @@ registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 	}
 }
 
+// TestImagesPull tests the image pulling functionality of the container runtime.
 func TestImagesPull(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
@@ -389,6 +394,8 @@ func TestImagesPull(t *testing.T) {
 	}
 }
 
+// TestNewCmdConfigPrintActionDefaults tests the default configurations printed for various kubeadm commands
+// and their expected component kinds.
 func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 	tests := []struct {
 		name             string
