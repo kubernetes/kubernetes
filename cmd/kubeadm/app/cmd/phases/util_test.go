@@ -24,6 +24,7 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 )
 
+// TestSetKubernetesVersion checks if the SetKubernetesVersion function sets the Kubernetes version correctly.
 func TestSetKubernetesVersion(t *testing.T) {
 
 	ver := version.Get().String()
