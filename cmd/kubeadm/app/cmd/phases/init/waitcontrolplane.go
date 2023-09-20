@@ -65,6 +65,8 @@ func NewWaitControlPlanePhase() workflow.Phase {
 	return phase
 }
 
+// Runs the wait-control-plane phase to ensure the API server and
+// control plane components are healthy and ready.
 func runWaitControlPlanePhase(c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
