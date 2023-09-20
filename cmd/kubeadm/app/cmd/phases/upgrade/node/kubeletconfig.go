@@ -49,6 +49,7 @@ func NewKubeletConfigPhase() workflow.Phase {
 	return phase
 }
 
+// runKubeletConfigPhase returns a function for executing the kubelet configuration upgrade phase.
 func runKubeletConfigPhase() func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
 		data, ok := c.(Data)
