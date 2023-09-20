@@ -46,6 +46,7 @@ import (
 	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 )
 
+// TestCommandsGenerated verifies that the expected flags are present for each renew command.
 func TestCommandsGenerated(t *testing.T) {
 	expectedFlags := []string{
 		"cert-dir",
@@ -91,6 +92,7 @@ func TestCommandsGenerated(t *testing.T) {
 	}
 }
 
+// TestRunRenewCommands ensures that the renew commands correctly renew certificates and kubeconfig files.
 func TestRunRenewCommands(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
@@ -291,6 +293,7 @@ func TestRunRenewCommands(t *testing.T) {
 	}
 }
 
+// TestRunGenCSR checks that the genCSR command generates the expected keys, CSRs, and kubeconfig files.
 func TestRunGenCSR(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
@@ -354,6 +357,7 @@ func TestRunGenCSR(t *testing.T) {
 	}
 }
 
+// TestGenCSRConfig validates the behavior of the genCSRConfig under various flag configurations.
 func TestGenCSRConfig(t *testing.T) {
 	type assertion func(*testing.T, *genCSRConfig)
 
