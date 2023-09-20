@@ -93,7 +93,18 @@ func (s SearchIndex) FindByInventoryPath(ctx context.Context, path string) (Refe
 	if res.Returnval == nil {
 		return nil, nil
 	}
-	return NewReference(s.c, *res.Returnval), nil
+
+	r := NewReference(s.c, *res.Returnval)
+
+	type common interface {
+		SetInventoryPath(string)
+	}
+
+	if c, ok := r.(common); ok {
+		c.SetInventoryPath(path)
+	}
+
+	return r, nil
 }
 
 // FindByIp finds a virtual machine or host by IP address.

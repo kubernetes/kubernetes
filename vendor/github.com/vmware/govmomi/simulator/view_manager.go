@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2017-2023 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -153,6 +153,8 @@ func walk(root mo.Reference, f func(child types.ManagedObjectReference)) {
 	case *mo.Datacenter:
 		children = []types.ManagedObjectReference{e.VmFolder, e.HostFolder, e.DatastoreFolder, e.NetworkFolder}
 	case *mo.Folder:
+		children = e.ChildEntity
+	case *mo.StoragePod:
 		children = e.ChildEntity
 	case *mo.ComputeResource:
 		children = e.Host
