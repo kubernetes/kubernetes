@@ -55,6 +55,7 @@ spec:
 	etcdPodInvalid = `invalid pod`
 )
 
+// TestGetEtcdDataDir tests the function getEtcdDataDir with various scenarios.
 func TestGetEtcdDataDir(t *testing.T) {
 	tests := map[string]struct {
 		dataDir       string
