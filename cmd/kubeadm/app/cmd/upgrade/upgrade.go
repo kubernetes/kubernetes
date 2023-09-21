@@ -64,6 +64,7 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// Adds command line flags related to the upgrade plan application to the provided flag set.
 func addApplyPlanFlags(fs *pflag.FlagSet, flags *applyPlanFlags) {
 	options.AddKubeConfigFlag(fs, &flags.kubeConfigPath)
 	options.AddConfigFlag(fs, &flags.cfgPath)
