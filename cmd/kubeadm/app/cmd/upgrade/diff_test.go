@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
+// createTestRunDiffFile creates a temporary test file with the given contents and returns its path.
 func createTestRunDiffFile(contents []byte) (string, error) {
 	file, err := os.CreateTemp("", "kubeadm-upgrade-diff-config-*.yaml")
 	if err != nil {
@@ -42,6 +43,7 @@ func createTestRunDiffFile(contents []byte) (string, error) {
 	return file.Name(), nil
 }
 
+// TestRunDiff tests the runDiff function for various configurations and manifest scenarios.
 func TestRunDiff(t *testing.T) {
 	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
 
@@ -132,6 +134,7 @@ kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.U
 	}
 }
 
+// Checks the validateManifestsPath function with various manifest path scenarios.
 func TestValidateManifests(t *testing.T) {
 	// Create valid manifest paths
 	apiServerManifest, err := createTestRunDiffFile([]byte{})
