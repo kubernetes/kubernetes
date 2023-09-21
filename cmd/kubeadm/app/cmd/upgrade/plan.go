@@ -100,6 +100,7 @@ type upgradePlanPrintFlags struct {
 	OutputFormat string
 }
 
+// Initializes and returns print flags based on the given output format.
 func newUpgradePlanPrintFlags(outputFormat string) *upgradePlanPrintFlags {
 	return &upgradePlanPrintFlags{
 		JSONYamlPrintFlags: &upgradePlanJSONYamlPrintFlags{},
@@ -352,6 +353,7 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapiv1alpha
 	return &outputapiv1alpha2.UpgradePlan{Components: components}, unstableVersionFlag, nil
 }
 
+// Retrieves the version states of component configurations either from a cluster or a provided config file.
 func getComponentConfigVersionStates(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, cfgPath string) ([]outputapiv1alpha2.ComponentConfigVersionState, error) {
 	docmap := kubeadmapi.DocumentMap{}
 
@@ -426,6 +428,7 @@ func sortedSliceFromStringIntMap(strMap map[string]uint16) []string {
 	return strSlice
 }
 
+// Returns the given string, or "-" if the string is empty.
 func strOrDash(s string) string {
 	if s != "" {
 		return s
@@ -433,6 +436,7 @@ func strOrDash(s string) string {
 	return "-"
 }
 
+// Converts a boolean to a "yes" or "no" string representation.
 func yesOrNo(b bool) string {
 	if b {
 		return "yes"
@@ -440,10 +444,12 @@ func yesOrNo(b bool) string {
 	return "no"
 }
 
+// Prints a line separator to the provided writer.
 func printLineSeparator(w io.Writer, printer output.Printer) {
 	printer.Fprintf(w, "_____________________________________________________________________\n\n")
 }
 
+// Outputs the version states of component configs in a formatted table.
 func printComponentConfigVersionStates(versionStates []outputapiv1alpha2.ComponentConfigVersionState, w io.Writer, printer output.Printer) {
 	if len(versionStates) == 0 {
 		printer.Fprintln(w, "No information available on component configs.")
