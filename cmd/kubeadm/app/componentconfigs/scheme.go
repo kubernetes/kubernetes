@@ -30,6 +30,7 @@ var Scheme = runtime.NewScheme()
 // Codecs provides access to encoding and decoding for the scheme.
 var Codecs = serializer.NewCodecFactory(Scheme)
 
+// Registers API types and adds them to the Kubernetes scheme during initialization.
 func init() {
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
 	AddToScheme(Scheme)
