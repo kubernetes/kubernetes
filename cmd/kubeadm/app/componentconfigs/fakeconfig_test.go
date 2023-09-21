@@ -73,6 +73,7 @@ var clusterConfigHandler = handler{
 	fromCluster: clusterConfigFromCluster,
 }
 
+// clusterConfigFromCluster retrieves the cluster config from a ConfigMap.
 func clusterConfigFromCluster(h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
 	return h.fromConfigMap(clientset, constants.KubeadmConfigConfigMap, constants.ClusterConfigurationConfigMapKey, true)
 }
@@ -82,6 +83,7 @@ type clusterConfig struct {
 	config kubeadmapiv1.ClusterConfiguration
 }
 
+// DeepCopy creates a deep copy of the clusterConfig.
 func (cc *clusterConfig) DeepCopy() kubeadmapi.ComponentConfig {
 	result := &clusterConfig{}
 	cc.configBase.DeepCopyInto(&result.configBase)
@@ -89,27 +91,33 @@ func (cc *clusterConfig) DeepCopy() kubeadmapi.ComponentConfig {
 	return result
 }
 
+// Marshal serializes the clusterConfig.
 func (cc *clusterConfig) Marshal() ([]byte, error) {
 	return cc.configBase.Marshal(&cc.config)
 }
 
+// Unmarshal deserializes data into the clusterConfig.
 func (cc *clusterConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
 	return cc.configBase.Unmarshal(docmap, &cc.config)
 }
 
+// Get returns the configuration data.
 func (cc *clusterConfig) Get() interface{} {
 	return &cc.config
 }
 
+// Set updates the internal configuration data.
 func (cc *clusterConfig) Set(cfg interface{}) {
 	cc.config = *cfg.(*kubeadmapiv1.ClusterConfiguration)
 }
 
+// Default sets default values for clusterConfig.
 func (cc *clusterConfig) Default(_ *kubeadmapi.ClusterConfiguration, _ *kubeadmapi.APIEndpoint, _ *kubeadmapi.NodeRegistrationOptions) {
 	cc.config.ClusterName = "foo"
 	cc.config.KubernetesVersion = "bar"
 }
 
+// Mutate performs mutations on the clusterConfig, currently a noop.
 func (cc *clusterConfig) Mutate() error {
 	return nil
 }
@@ -253,6 +261,7 @@ var (
 	}
 )
 
+// TestConfigBaseMarshal validates the marshaling of a clusterConfig to its YAML representation.
 func TestConfigBaseMarshal(t *testing.T) {
 	fakeKnownContext(func() {
 		cfg := &clusterConfig{
@@ -294,6 +303,7 @@ func TestConfigBaseMarshal(t *testing.T) {
 	})
 }
 
+// TestConfigBaseUnmarshal validates the unmarshaling of YAML data into a clusterConfig object.
 func TestConfigBaseUnmarshal(t *testing.T) {
 	fakeKnownContext(func() {
 		expected := &clusterConfig{
@@ -323,6 +333,7 @@ func TestConfigBaseUnmarshal(t *testing.T) {
 	})
 }
 
+// Tests if cluster configuration is user-supplied based on its hash.
 func TestGeneratedConfigFromCluster(t *testing.T) {
 	fakeKnownContext(func() {
 		testYAML := dedent.Dedent(fmt.Sprintf(`
@@ -469,6 +480,7 @@ func runClusterConfigFromTest(t *testing.T, perform func(t *testing.T, in string
 	})
 }
 
+// Tests loading cluster configuration from a document map.
 func TestLoadingFromDocumentMap(t *testing.T) {
 	runClusterConfigFromTest(t, func(t *testing.T, in string) (kubeadmapi.ComponentConfig, error) {
 		gvkmap, err := kubeadmutil.SplitYAMLDocuments([]byte(in))
@@ -480,6 +492,7 @@ func TestLoadingFromDocumentMap(t *testing.T) {
 	})
 }
 
+// Tests loading cluster configuration directly from a fake cluster.
 func TestLoadingFromCluster(t *testing.T) {
 	runClusterConfigFromTest(t, func(t *testing.T, in string) (kubeadmapi.ComponentConfig, error) {
 		client := clientsetfake.NewSimpleClientset(
@@ -490,6 +503,7 @@ func TestLoadingFromCluster(t *testing.T) {
 	})
 }
 
+// Tests fetching cluster config considering local overwrites under various scenarios.
 func TestFetchFromClusterWithLocalOverwrites(t *testing.T) {
 	fakeKnownContext(func() {
 		cases := []struct {
@@ -610,6 +624,7 @@ func TestFetchFromClusterWithLocalOverwrites(t *testing.T) {
 	})
 }
 
+// Tests getting the version states of cluster config under various scenarios.
 func TestGetVersionStates(t *testing.T) {
 	fakeKnownContext(func() {
 		versionStateCurrent := outputapiv1alpha2.ComponentConfigVersionState{
