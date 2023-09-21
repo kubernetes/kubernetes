@@ -14,6 +14,8 @@ conntrack:
   min: 131072
   tcpCloseWaitTimeout: 1h0m0s
   tcpEstablishedTimeout: 24h0m0s
+  udpStreamTimeout: 0s
+  udpTimeout: 0s
 detectLocal:
   bridgeInterface: ""
   interfaceNamePrefix: ""
