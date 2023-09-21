@@ -22,10 +22,14 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	v1 "k8s.io/api/admissionregistration/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -42,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
+	cloudproviderconfig "k8s.io/cloud-provider/config"
 	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -162,6 +167,46 @@ the cloud specific control loops shipped with Kubernetes.`,
 	return cmd
 }
 
+func createOrUpdateWebhookConfiguration(ctx context.Context, webhooks map[string]WebhookHandler, webhooksConfig cloudproviderconfig.WebhookConfiguration, clientBuilder clientbuilder.SimpleControllerClientBuilder) error {
+	for i, webhook := range webhooksConfig.ValidationWebhookConfiguration.Webhooks {
+		webhookconfig, ok := webhooks[webhook.Name]
+		if !ok {
+			return fmt.Errorf("webhook configuration not found for webhook %s", webhook.Name)
+		}
+		url := fmt.Sprintf("https://%s:%d/%s", webhooksConfig.WebhookAddress, webhooksConfig.WebhookPort, strings.TrimPrefix(webhookconfig.Path, "/"))
+
+		webhooksConfig.ValidationWebhookConfiguration.Webhooks[i].ClientConfig = v1.WebhookClientConfig{
+			URL:      &url,
+			CABundle: []byte(webhooksConfig.CaBundle),
+		}
+	}
+	kubeClient := clientBuilder.ClientOrDie("ccm")
+	_, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(ctx, webhooksConfig.ValidationWebhookConfiguration, metav1.CreateOptions{})
+	if err == nil {
+		klog.Infoln("webhook configuration successfully created")
+		return nil
+	}
+
+	if !apierrors.IsAlreadyExists(err) {
+		klog.ErrorS(err, "Unable to create webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.ValidationWebhookConfiguration))
+		return fmt.Errorf("unable to create webhook configuration with API server %v", err)
+	}
+
+	currentConfiguration, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, webhooksConfig.ValidationWebhookConfiguration.Name, metav1.GetOptions{})
+	if err != nil {
+		klog.ErrorS(err, "Unable to create webhook configuration with API server, error getting existing webhook configuration", "webhookconfiguration", webhooksConfig.ValidationWebhookConfiguration.Name)
+		return fmt.Errorf("unable to get webhook configuration from API server %v", err)
+	}
+	currentConfiguration.Webhooks = webhooksConfig.ValidationWebhookConfiguration.Webhooks
+
+	_, err = kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, currentConfiguration, metav1.UpdateOptions{})
+	if err != nil {
+		klog.ErrorS(err, "Unable to update webhook configuration with API server", "webhookconfiguration", klog.KObj(webhooksConfig.ValidationWebhookConfiguration))
+		return fmt.Errorf("unable to update webhook configuration with API server %v", err)
+	}
+	return nil
+}
+
 // Run runs the ExternalCMServer.  This should never exit.
 func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, controllerInitializers map[string]InitFunc, webhooks map[string]WebhookHandler,
 	stopCh <-chan struct{}) error {
@@ -219,6 +264,14 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		controllerContext, err := CreateControllerContext(c, clientBuilder, ctx.Done())
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.CloudControllerManagerWebhook) {
+			if len(webhooks) > 0 {
+				klog.Info("creating/updating webhook configuration: ", webhooks)
+				if err := createOrUpdateWebhookConfiguration(ctx, webhooks, c.ComponentConfig.Webhook, clientBuilder); err != nil {
+					klog.Fatalf("error creating/updating webhook configuration: %v", err)
+				}
+			}
 		}
 		if err := startControllers(ctx, cloud, controllerContext, c, ctx.Done(), controllerInitializers, healthzHandler); err != nil {
 			klog.Fatalf("error running controllers: %v", err)

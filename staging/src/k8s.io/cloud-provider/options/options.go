@@ -200,7 +200,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, allControllers
 		}
 	}
 	if o.WebhookServing != nil {
-		if err = o.WebhookServing.ApplyTo(&c.WebhookSecureServing); err != nil {
+		if err = o.WebhookServing.ApplyTo(&c.ComponentConfig.Webhook, &c.WebhookSecureServing); err != nil {
 			return err
 		}
 	}
@@ -290,12 +290,6 @@ func (o *CloudControllerManagerOptions) Config(allControllers []string, disabled
 
 	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
-	}
-
-	if o.WebhookServing != nil {
-		if err := o.WebhookServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
-			return nil, fmt.Errorf("error creating self-signed certificates for webhook: %v", err)
-		}
 	}
 
 	c := &config.Config{}
