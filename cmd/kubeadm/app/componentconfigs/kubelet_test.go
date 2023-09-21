@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
+// Helper function for creating a Kubernetes ConfigMap for Kubelet configuration with the specified contents.
 func testKubeletConfigMap(contents string) *v1.ConfigMap {
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -48,6 +49,7 @@ func testKubeletConfigMap(contents string) *v1.ConfigMap {
 	}
 }
 
+// Tests the defaulting behavior of Kubelet configuration based on various input scenarios.
 func TestKubeletDefault(t *testing.T) {
 	var resolverConfig *string
 	if isSystemdResolvedActive, _ := isServiceActive("systemd-resolved"); isSystemdResolvedActive {
@@ -272,6 +274,7 @@ func runKubeletFromTest(t *testing.T, perform func(gvk schema.GroupVersionKind, 
 	}
 }
 
+// Tests creating Kubelet configuration from a YAML document map.
 func TestKubeletFromDocumentMap(t *testing.T) {
 	runKubeletFromTest(t, func(gvk schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
 		return kubeletHandler.FromDocumentMap(kubeadmapi.DocumentMap{
@@ -280,6 +283,7 @@ func TestKubeletFromDocumentMap(t *testing.T) {
 	})
 }
 
+// Tests creating Kubelet configuration from a ConfigMap in a cluster.
 func TestKubeletFromCluster(t *testing.T) {
 	runKubeletFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
 		client := clientsetfake.NewSimpleClientset(
