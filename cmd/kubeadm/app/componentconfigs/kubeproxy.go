@@ -48,6 +48,7 @@ var kubeProxyHandler = handler{
 	fromCluster: kubeProxyConfigFromCluster,
 }
 
+// Retrieves kube-proxy configuration from a cluster using a handler and clientset.
 func kubeProxyConfigFromCluster(h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
 	return h.fromConfigMap(clientset, kubeadmconstants.KubeProxyConfigMap, kubeadmconstants.KubeProxyConfigMapKey, false)
 }
@@ -58,6 +59,7 @@ type kubeProxyConfig struct {
 	config kubeproxyconfig.KubeProxyConfiguration
 }
 
+// Creates a deep copy of kube-proxy configuration.
 func (kp *kubeProxyConfig) DeepCopy() kubeadmapi.ComponentConfig {
 	result := &kubeProxyConfig{}
 	kp.configBase.DeepCopyInto(&result.configBase)
@@ -65,14 +67,17 @@ func (kp *kubeProxyConfig) DeepCopy() kubeadmapi.ComponentConfig {
 	return result
 }
 
+// Marshals kube-proxy configuration to bytes.
 func (kp *kubeProxyConfig) Marshal() ([]byte, error) {
 	return kp.configBase.Marshal(&kp.config)
 }
 
+// Unmarshals kube-proxy configuration from a document map.
 func (kp *kubeProxyConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
 	return kp.configBase.Unmarshal(docmap, &kp.config)
 }
 
+// Determines the default bind address based on the local advertise address.
 func kubeProxyDefaultBindAddress(localAdvertiseAddress string) string {
 	ip := netutils.ParseIPSloppy(localAdvertiseAddress)
 	if ip.To4() != nil {
@@ -81,14 +86,17 @@ func kubeProxyDefaultBindAddress(localAdvertiseAddress string) string {
 	return kubeadmapiv1.DefaultProxyBindAddressv6
 }
 
+// Returns the kube-proxy configuration.
 func (kp *kubeProxyConfig) Get() interface{} {
 	return &kp.config
 }
 
+// Sets the kube-proxy configuration.
 func (kp *kubeProxyConfig) Set(cfg interface{}) {
 	kp.config = *cfg.(*kubeproxyconfig.KubeProxyConfiguration)
 }
 
+// Applies default settings to kube-proxy configuration based on the cluster and local API endpoint.
 func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kubeadmapi.APIEndpoint, _ *kubeadmapi.NodeRegistrationOptions) {
 	const kind = "KubeProxyConfiguration"
 
