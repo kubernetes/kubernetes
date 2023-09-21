@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
+// Tests the function that returns a sorted string slice from a string-to-uint16 map.
 func TestSortedSliceFromStringIntMap(t *testing.T) {
 	var tests = []struct {
 		name          string
@@ -468,6 +469,7 @@ _____________________________________________________________________
 	}
 }
 
+// Tests the structured output of available Kubernetes upgrades.
 func TestPrintAvailableUpgradesStructured(t *testing.T) {
 	upgrades := []upgrade.Upgrade{
 		{
