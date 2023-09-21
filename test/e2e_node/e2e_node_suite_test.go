@@ -27,7 +27,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -133,12 +133,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
-	initFeatureGates(featureGates)
 
-	if err := services.SetFeatureGatesForInProcessComponents(serviceFeatureGates); err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: initialize process feature gates for API service: %v", err)
-		os.Exit(1)
-	}
+	initFeatureGates(utilfeature.DefaultMutableFeatureGate, featureGates)
+	initFeatureGates(defaultMutableServiceGate, serviceFeatureGates)
 
 	setExtraEnvs()
 	os.Exit(m.Run())

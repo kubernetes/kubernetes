@@ -75,6 +75,9 @@ var startServices = flag.Bool("start-services", true, "If true, start local node
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
+// defaultMutableServiceGate is similar to DefaultMutableFeatureGate, but is intended for API server feature gates.
+var defaultMutableServiceGate featuregate.MutableFeatureGate = featuregate.NewFeatureGate()
+
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.
 	defaultNodeAllocatableCgroup = "kubepods"
@@ -94,8 +97,8 @@ var (
 	kubeletCfg *kubeletconfig.KubeletConfiguration
 )
 
-func initFeatureGates(featureGates map[string]bool) {
-	err := utilfeature.DefaultMutableFeatureGate.SetFromMap(featureGates)
+func initFeatureGates(featureGateObj featuregate.MutableFeatureGate, featureGatesToSet map[string]bool) {
+	err := featureGateObj.SetFromMap(featureGatesToSet)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
