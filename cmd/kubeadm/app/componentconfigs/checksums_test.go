@@ -98,6 +98,7 @@ var checksumTestCases = []struct {
 	},
 }
 
+// Tests the checksum generation for a given ConfigMap.
 func TestChecksumForConfigMap(t *testing.T) {
 	for _, test := range checksumTestCases {
 		t.Run(test.desc, func(t *testing.T) {
@@ -109,6 +110,7 @@ func TestChecksumForConfigMap(t *testing.T) {
 	}
 }
 
+// Tests signing a ConfigMap and verifying its annotations and checksum.
 func TestSignConfigMap(t *testing.T) {
 	for _, test := range checksumTestCases {
 		t.Run(test.desc, func(t *testing.T) {
@@ -134,6 +136,7 @@ func TestSignConfigMap(t *testing.T) {
 	}
 }
 
+// Tests the verification of ConfigMap signatures for correctness and handling errors.
 func TestVerifyConfigMapSignature(t *testing.T) {
 	tests := []struct {
 		desc      string
