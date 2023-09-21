@@ -37,8 +37,12 @@ type Conntracker interface {
 	SetMax(max int) error
 	// SetTCPEstablishedTimeout adjusts nf_conntrack_tcp_timeout_established.
 	SetTCPEstablishedTimeout(seconds int) error
-	// SetTCPCloseWaitTimeout nf_conntrack_tcp_timeout_close_wait.
+	// SetTCPCloseWaitTimeout adjusts nf_conntrack_tcp_timeout_close_wait.
 	SetTCPCloseWaitTimeout(seconds int) error
+	// SetUDPTimeout adjusts nf_conntrack_udp_timeout.
+	SetUDPTimeout(seconds int) error
+	// SetUDPStreamTimeout adjusts nf_conntrack_udp_timeout_stream.
+	SetUDPStreamTimeout(seconds int) error
 }
 
 type realConntracker struct{}
@@ -90,6 +94,14 @@ func (rct realConntracker) SetTCPEstablishedTimeout(seconds int) error {
 
 func (rct realConntracker) SetTCPCloseWaitTimeout(seconds int) error {
 	return rct.setIntSysCtl("nf_conntrack_tcp_timeout_close_wait", seconds)
+}
+
+func (rct realConntracker) SetUDPTimeout(seconds int) error {
+	return rct.setIntSysCtl("nf_conntrack_udp_timeout", seconds)
+}
+
+func (rct realConntracker) SetUDPStreamTimeout(seconds int) error {
+	return rct.setIntSysCtl("nf_conntrack_udp_timeout_stream", seconds)
 }
 
 func (realConntracker) setIntSysCtl(name string, value int) error {

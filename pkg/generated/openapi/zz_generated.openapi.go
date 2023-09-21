@@ -53539,8 +53539,22 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConntrackConfiguration(ref
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
+					"udpTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "udpTimeout is how long an idle UDP conntrack entry in UNREPLIED state will remain in the conntrack table (e.g. '30s'). Must be greater than 0 to set.",
+							Default:     0,
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"udpStreamTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "udpStreamTimeout is how long an idle UDP conntrack entry in ASSURED state will remain in the conntrack table (e.g. '300s'). Must be greater than 0 to set.",
+							Default:     0,
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 				},
-				Required: []string{"maxPerCore", "min", "tcpEstablishedTimeout", "tcpCloseWaitTimeout"},
+				Required: []string{"maxPerCore", "min", "tcpEstablishedTimeout", "tcpCloseWaitTimeout", "udpTimeout", "udpStreamTimeout"},
 			},
 		},
 		Dependencies: []string{
