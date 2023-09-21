@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -152,6 +153,49 @@ func TestPriorityQueue_AddWithReversePriorityLessFunc(t *testing.T) {
 	}
 	if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
+	}
+}
+
+func popPod(t *testing.T, q *PriorityQueue, pod *v1.Pod) *framework.QueuedPodInfo {
+	p, err := q.Pop()
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	if p.Pod.UID != pod.UID {
+		t.Errorf("Unexpected popped pod: %v", p)
+	}
+	return p
+}
+
+func TestPop(t *testing.T) {
+	pod := st.MakePod().Name("targetpod").UID("pod1").Obj()
+	plugin := "fooPlugin1"
+	m := map[framework.ClusterEvent]sets.String{PvAdd: sets.NewString(plugin)}
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod}, WithClusterEventMap(m))
+
+	// Disable backoff. Otherwise MoveAllToActiveOrBackoffQueue below will pick the backoff queue
+	// when running this test quickly.
+	q.podInitialBackoffDuration = 0
+
+	q.Add(pod)
+
+	// Simulate failed attempt that makes the pod unschedulable.
+	poppedPod := popPod(t, q, pod)
+	poppedPod.UnschedulablePlugins = sets.NewString(plugin)
+	if err := q.AddUnschedulableIfNotPresent(poppedPod, q.SchedulingCycle()); err != nil {
+		t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+	}
+
+	// Activate it again.
+	q.MoveAllToActiveOrBackoffQueue(PvAdd, nil)
+
+	// Now check result of Pop.
+	poppedPod = popPod(t, q, pod)
+	if len(poppedPod.UnschedulablePlugins) > 0 {
+		t.Errorf("QueuedPodInfo from Pop should have empty UnschedulablePlugins, got instead: %+v", poppedPod)
 	}
 }
 
