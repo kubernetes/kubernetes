@@ -24,6 +24,7 @@ import (
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
+// Tests if it returns the expected directory path.
 func TestGetStaticPodDirectory(t *testing.T) {
 	expected := filepath.FromSlash("/etc/kubernetes/manifests")
 	actual := GetStaticPodDirectory()
@@ -37,6 +38,7 @@ func TestGetStaticPodDirectory(t *testing.T) {
 	}
 }
 
+// Checks if this function returns the correct admin Kube config file path.
 func TestGetAdminKubeConfigPath(t *testing.T) {
 	expected := filepath.Join(KubernetesDir, AdminKubeConfigFileName)
 	actual := GetAdminKubeConfigPath()
@@ -50,6 +52,7 @@ func TestGetAdminKubeConfigPath(t *testing.T) {
 	}
 }
 
+// Validates the path for the bootstrap kubelet configuration file.
 func TestGetBootstrapKubeletKubeConfigPath(t *testing.T) {
 	expected := filepath.FromSlash("/etc/kubernetes/bootstrap-kubelet.conf")
 	actual := GetBootstrapKubeletKubeConfigPath()
@@ -63,6 +66,7 @@ func TestGetBootstrapKubeletKubeConfigPath(t *testing.T) {
 	}
 }
 
+// GetKubeletKubeConfigPath returns the correct path for the kubelet configuration file.
 func TestGetKubeletKubeConfigPath(t *testing.T) {
 	expected := filepath.FromSlash("/etc/kubernetes/kubelet.conf")
 	actual := GetKubeletKubeConfigPath()
@@ -76,6 +80,7 @@ func TestGetKubeletKubeConfigPath(t *testing.T) {
 	}
 }
 
+// Validates "GetStaticPodFilepath" for various component names and manifest directories.
 func TestGetStaticPodFilepath(t *testing.T) {
 	var tests = []struct {
 		componentName, manifestsDir, expected string
@@ -111,6 +116,7 @@ func TestGetStaticPodFilepath(t *testing.T) {
 	}
 }
 
+// Tests for various Kubernetes versions, checking expected versions, errors, and warnings.
 func TestEtcdSupportedVersion(t *testing.T) {
 	var supportedEtcdVersion = map[uint8]string{
 		13: "3.2.24",
@@ -173,6 +179,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 	}
 }
 
+// Tests Kubernetes service CIDR parsing for valid and invalid cases, including dual-stack scenarios.
 func TestGetKubernetesServiceCIDR(t *testing.T) {
 	var tests = []struct {
 		svcSubnetList string
@@ -235,6 +242,7 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 	}
 }
 
+// Tests version skew calculation using Kubernetes version information.
 func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -277,6 +285,7 @@ func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
 	}
 }
 
+// Tests API server virtual IP calculation for various service subnet configurations.
 func TestGetAPIServerVirtualIP(t *testing.T) {
 	var tests = []struct {
 		name, svcSubnet, expectedIP string
@@ -351,6 +360,7 @@ func TestGetAPIServerVirtualIP(t *testing.T) {
 	}
 }
 
+// Tests DNS IP address determination from service subnets, including dual-stack scenarios.
 func TestGetDNSIP(t *testing.T) {
 	tests := []struct {
 		name          string
