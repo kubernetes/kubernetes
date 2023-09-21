@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// Tests argument count validation against expected counts.
 func TestValidateExactArgNumber(t *testing.T) {
 	var tests = []struct {
 		name                string
@@ -75,6 +76,7 @@ func TestValidateExactArgNumber(t *testing.T) {
 	}
 }
 
+// Tests retrieval of the kubeconfig path based on provided input.
 func TestGetKubeConfigPath(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -106,6 +108,7 @@ func TestGetKubeConfigPath(t *testing.T) {
 	}
 }
 
+// Tests whether the function returns the correct value priority between flag input and config.
 func TestValueFromFlagsOrConfig(t *testing.T) {
 	var tests = []struct {
 		name      string
