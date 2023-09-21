@@ -69,6 +69,7 @@ var kubeletHandler = handler{
 	fromCluster: kubeletConfigFromCluster,
 }
 
+// Retrieves KubeletConfiguration from a ConfigMap in the cluster using the handler and clientset.
 func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
 	configMapName := constants.KubeletBaseConfigurationConfigMap
 	klog.V(1).Infof("attempting to download the KubeletConfiguration from ConfigMap %q", configMapName)
@@ -86,6 +87,7 @@ type kubeletConfig struct {
 	config kubeletconfig.KubeletConfiguration
 }
 
+// DeepCopy creates a deep copy of the kubeletConfig object.
 func (kc *kubeletConfig) DeepCopy() kubeadmapi.ComponentConfig {
 	result := &kubeletConfig{}
 	kc.configBase.DeepCopyInto(&result.configBase)
@@ -93,22 +95,27 @@ func (kc *kubeletConfig) DeepCopy() kubeadmapi.ComponentConfig {
 	return result
 }
 
+// Marshal serializes the kubeletConfig to bytes.
 func (kc *kubeletConfig) Marshal() ([]byte, error) {
 	return kc.configBase.Marshal(&kc.config)
 }
 
+// Unmarshal deserializes the kubeletConfig from DocumentMap.
 func (kc *kubeletConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
 	return kc.configBase.Unmarshal(docmap, &kc.config)
 }
 
+// Get returns the kubeletConfig object.
 func (kc *kubeletConfig) Get() interface{} {
 	return &kc.config
 }
 
+// Set updates the kubeletConfig with a provided configuration.
 func (kc *kubeletConfig) Set(cfg interface{}) {
 	kc.config = *cfg.(*kubeletconfig.KubeletConfiguration)
 }
 
+// Default sets default values for kubelet configuration fields based on provided cluster configuration.
 func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubeadmapi.APIEndpoint, nodeRegOpts *kubeadmapi.NodeRegistrationOptions) {
 	const kind = "KubeletConfiguration"
 
