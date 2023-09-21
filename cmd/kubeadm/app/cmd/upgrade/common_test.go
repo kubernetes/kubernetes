@@ -53,10 +53,12 @@ users:
     client-certificate-data:
 `
 
+// fakeLoadConfig is a mock function to load a configuration without actual processing or side effects.
 func fakeLoadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs bool, printer output.Printer) (*kubeadmapi.InitConfiguration, bool, error) {
 	return &kubeadmapi.InitConfiguration{}, false, nil
 }
 
+// TestEnforceRequirements validates the enforceRequirements function with different scenarios.
 func TestEnforceRequirements(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
@@ -128,6 +130,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 }
 
+// TestPrintConfiguration validates the output of printConfiguration for given configs.
 func TestPrintConfiguration(t *testing.T) {
 	var tests = []struct {
 		name          string
@@ -213,6 +216,7 @@ func TestPrintConfiguration(t *testing.T) {
 	}
 }
 
+// TestIsKubeadmConfigPresent verifies if a given configuration belongs to the kubeadm group.
 func TestIsKubeadmConfigPresent(t *testing.T) {
 	var tcases = []struct {
 		name     string
