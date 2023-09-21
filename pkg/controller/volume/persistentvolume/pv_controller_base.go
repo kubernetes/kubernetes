@@ -33,6 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
+	storagev1alpha1informers "k8s.io/client-go/informers/storage/v1alpha1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -70,6 +71,7 @@ type ControllerParameters struct {
 	VolumeInformer            coreinformers.PersistentVolumeInformer
 	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
 	ClassInformer             storageinformers.StorageClassInformer
+	VACInformer               storagev1alpha1informers.VolumeAttributesClassInformer
 	PodInformer               coreinformers.PodInformer
 	NodeInformer              coreinformers.NodeInformer
 	EventRecorder             record.EventRecorder
@@ -130,6 +132,10 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 
 	controller.classLister = p.ClassInformer.Lister()
 	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		controller.vacLister = p.VACInformer.Lister()
+		controller.vacListerSynced = p.VACInformer.Informer().HasSynced
+	}
 	controller.podLister = p.PodInformer.Lister()
 	controller.podIndexer = p.PodInformer.Informer().GetIndexer()
 	controller.podListerSynced = p.PodInformer.Informer().HasSynced
@@ -319,8 +325,16 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	logger.Info("Starting persistent volume controller")
 	defer logger.Info("Shutting down persistent volume controller")
 
-	if !cache.WaitForNamedCacheSync("persistent volume", ctx.Done(), ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
-		return
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		if !cache.WaitForNamedCacheSync("persistent volume", ctx.Done(),
+			ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.vacListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
+			return
+		}
+	} else {
+		if !cache.WaitForNamedCacheSync("persistent volume", ctx.Done(),
+			ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
+			return
+		}
 	}
 
 	ctrl.initializeCaches(logger, ctrl.volumeLister, ctrl.claimLister)

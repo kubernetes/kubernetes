@@ -268,6 +268,11 @@ func startPersistentVolumeBinderController(ctx context.Context, controllerContex
 		NodeInformer:              controllerContext.InformerFactory.Core().V1().Nodes(),
 		EnableDynamicProvisioning: controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration.EnableDynamicProvisioning,
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		params.VACInformer = controllerContext.InformerFactory.Storage().V1alpha1().VolumeAttributesClasses()
+	}
+
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(ctx, params)
 	if volumeControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)

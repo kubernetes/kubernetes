@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	storagev1alpha1listers "k8s.io/client-go/listers/storage/v1alpha1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
@@ -158,6 +159,8 @@ type PersistentVolumeController struct {
 	claimListerSynced  cache.InformerSynced
 	classLister        storagelisters.StorageClassLister
 	classListerSynced  cache.InformerSynced
+	vacLister          storagev1alpha1listers.VolumeAttributesClassLister
+	vacListerSynced    cache.InformerSynced
 	podLister          corelisters.PodLister
 	podListerSynced    cache.InformerSynced
 	podIndexer         cache.Indexer
@@ -260,6 +263,13 @@ func (ctrl *PersistentVolumeController) syncClaim(ctx context.Context, claim *v1
 		return err
 	}
 	claim = newClaim
+
+	if utilfeature.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass) {
+		_, err := ctrl.assignDefaultVolumeAttributesClass(ctx, claim)
+		if err != nil {
+			return err
+		}
+	}
 
 	if !metav1.HasAnnotation(claim.ObjectMeta, storagehelpers.AnnBindCompleted) {
 		return ctrl.syncUnboundClaim(ctx, claim)
@@ -957,12 +967,52 @@ func (ctrl *PersistentVolumeController) assignDefaultStorageClass(ctx context.Co
 
 	logger.V(4).Info("Assigning StorageClass to PersistentVolumeClaim", "PVC", klog.KObj(claim), "storageClassName", class.Name)
 	claim.Spec.StorageClassName = &class.Name
+
 	_, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.GetNamespace()).Update(ctx, claim, metav1.UpdateOptions{})
 	if err != nil {
 		return false, err
 	}
 
 	logger.V(4).Info("Successfully assigned StorageClass to PersistentVolumeClaim", "PVC", klog.KObj(claim), "storageClassName", class.Name)
+	return true, nil
+}
+
+// assignDefaultVolumeAttributesClass updates the claim volume attributes class if there is any, the claim is updated to the API server.
+// Ignores claims that already have a volume attributes class.
+// TODO: if resync is ever changed to a larger period, we might need to change how we set the default volume attributes class on existing claims
+func (ctrl *PersistentVolumeController) assignDefaultVolumeAttributesClass(ctx context.Context, claim *v1.PersistentVolumeClaim) (bool, error) {
+	logger := klog.FromContext(ctx)
+
+	if claim.Spec.VolumeAttributesClassName != nil {
+		return false, nil
+	}
+
+	className := storagehelpers.GetPersistentVolumeClaimClass(claim)
+	if className == "" {
+		return false, nil
+	}
+	sc, err := ctrl.classLister.Get(className)
+	if err != nil {
+		return false, err
+	}
+
+	vac, err := util.GetDefaultVolumeAttributesClass(ctrl.vacLister, sc.Provisioner)
+	if err != nil {
+		return false, err
+	} else if vac == nil {
+		logger.V(4).Info("Can not assign volume attributes class to PersistentVolumeClaim: default volume attributes class not found", "driverName", sc.Provisioner, "PVC", klog.KObj(claim))
+		return false, nil
+	}
+
+	logger.V(4).Info("Assigning VolumeAttributesClass to PersistentVolumeClaim", "PVC", klog.KObj(claim), "volumeAttributesClassName", vac.Name)
+	claim.Spec.VolumeAttributesClassName = &vac.Name
+
+	_, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.GetNamespace()).Update(ctx, claim, metav1.UpdateOptions{})
+	if err != nil {
+		return false, err
+	}
+
+	logger.V(4).Info("Successfully assigned VolumeAttributesClass to PersistentVolumeClaim", "PVC", klog.KObj(claim), "volumeAttributesClassName", vac.Name)
 	return true, nil
 }
 
