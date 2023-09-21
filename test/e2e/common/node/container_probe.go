@@ -857,6 +857,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers][Feature:SidecarContain
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        httpGetHandler("/healthz", 8080),
 			InitialDelaySeconds: 15,
+			TimeoutSeconds:      5,
 			FailureThreshold:    1,
 		}
 		pod := livenessSidecarPodSpec(f.Namespace.Name, nil, livenessProbe)
@@ -875,6 +876,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers][Feature:SidecarContain
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        tcpSocketHandler(8080),
 			InitialDelaySeconds: 15,
+			TimeoutSeconds:      5,
 			FailureThreshold:    1,
 		}
 		pod := livenessSidecarPodSpec(f.Namespace.Name, nil, livenessProbe)
