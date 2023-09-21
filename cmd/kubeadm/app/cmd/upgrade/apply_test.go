@@ -20,6 +20,7 @@ import (
 	"testing"
 )
 
+// TestSessionIsInteractive tests if a session is correctly identified as interactive based on given flags.
 func TestSessionIsInteractive(t *testing.T) {
 	var tcases = []struct {
 		name     string
