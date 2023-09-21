@@ -29,12 +29,14 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
+// Returns a default ClusterConfiguration with the current Kubernetes version set.
 func testClusterCfg() *kubeadmapi.ClusterConfiguration {
 	return &kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: constants.CurrentKubernetesVersion.String(),
 	}
 }
 
+// Tests if the default function sets the correct number of component configs.
 func TestDefault(t *testing.T) {
 	clusterCfg := testClusterCfg()
 	localAPIEndpoint := &kubeadmapi.APIEndpoint{}
@@ -47,6 +49,7 @@ func TestDefault(t *testing.T) {
 	}
 }
 
+// Tests if FetchFromCluster correctly loads component configs from a mock cluster.
 func TestFromCluster(t *testing.T) {
 	objects := []runtime.Object{
 		testKubeProxyConfigMap(`
@@ -70,6 +73,7 @@ func TestFromCluster(t *testing.T) {
 	}
 }
 
+// Tests loading component configs from a YAML document map.
 func TestFetchFromDocumentMap(t *testing.T) {
 	test := dedent.Dedent(`
 	apiVersion: kubeproxy.config.k8s.io/v1alpha1
