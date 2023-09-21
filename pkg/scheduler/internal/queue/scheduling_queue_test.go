@@ -201,17 +201,6 @@ func Test_InFlightPods(t *testing.T) {
 		callback     func(t *testing.T, q *PriorityQueue)
 	}
 
-	popPod := func(t *testing.T, q *PriorityQueue, pod *v1.Pod) *framework.QueuedPodInfo {
-		p, err := q.Pop()
-		if err != nil {
-			t.Fatalf("Pop failed: %v", err)
-		}
-		if p.Pod.UID != pod.UID {
-			t.Errorf("Unexpected popped pod: %v", p)
-		}
-		return p
-	}
-
 	tests := []struct {
 		name            string
 		queueingHintMap QueueingHintMapPerProfile
@@ -542,6 +531,47 @@ func Test_InFlightPods(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                         "popped pod must have empty UnschedulablePlugins",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod},
+			actions: []action{
+				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod = popPod(t, q, pod) }},
+				{callback: func(t *testing.T, q *PriorityQueue) {
+					logger, _ := ktesting.NewTestContext(t)
+					// Unschedulable.
+					poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
+					if err := q.AddUnschedulableIfNotPresent(logger, poppedPod, q.SchedulingCycle()); err != nil {
+						t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+					}
+				}},
+				{eventHappens: &PvAdd}, // Active again.
+				{callback: func(t *testing.T, q *PriorityQueue) {
+					poppedPod = popPod(t, q, pod)
+					if len(poppedPod.UnschedulablePlugins) > 0 {
+						t.Errorf("QueuedPodInfo from Pop should have empty UnschedulablePlugins, got instead: %+v", poppedPod)
+					}
+				}},
+				{callback: func(t *testing.T, q *PriorityQueue) {
+					logger, _ := ktesting.NewTestContext(t)
+					// Failed (i.e. no UnschedulablePlugins). Should go to backoff.
+					if err := q.AddUnschedulableIfNotPresent(logger, poppedPod, q.SchedulingCycle()); err != nil {
+						t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+					}
+				}},
+			},
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					PvAdd: {
+						{
+							// The hint fn tells that this event makes a Pod scheudlable immediately.
+							PluginName:     "fooPlugin1",
+							QueueingHintFn: queueHintReturnQueueImmediately,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -637,6 +667,59 @@ func Test_InFlightPods(t *testing.T) {
 				if p == nil {
 					t.Fatalf("Pod %v was not found in the unschedulablePods.", podName)
 				}
+			}
+		})
+	}
+}
+
+func popPod(t *testing.T, q *PriorityQueue, pod *v1.Pod) *framework.QueuedPodInfo {
+	p, err := q.Pop()
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	if p.Pod.UID != pod.UID {
+		t.Errorf("Unexpected popped pod: %v", p)
+	}
+	return p
+}
+
+func TestPop(t *testing.T) {
+	pod := st.MakePod().Name("targetpod").UID("pod1").Obj()
+	queueingHintMap := QueueingHintMapPerProfile{
+		"": {
+			PvAdd: {
+				{
+					// The hint fn tells that this event makes a Pod scheudlable immediately.
+					PluginName:     "fooPlugin1",
+					QueueingHintFn: queueHintReturnQueueImmediately,
+				},
+			},
+		},
+	}
+
+	for name, isSchedulingQueueHintEnabled := range map[string]bool{"with-hints": true, "without-hints": false} {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, isSchedulingQueueHintEnabled)()
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod}, WithQueueingHintMapPerProfile(queueingHintMap))
+			q.Add(logger, pod)
+
+			// Simulate failed attempt that makes the pod unschedulable.
+			poppedPod := popPod(t, q, pod)
+			poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
+			if err := q.AddUnschedulableIfNotPresent(logger, poppedPod, q.SchedulingCycle()); err != nil {
+				t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+			}
+
+			// Activate it again.
+			q.MoveAllToActiveOrBackoffQueue(logger, PvAdd, nil, nil, nil)
+
+			// Now check result of Pop.
+			poppedPod = popPod(t, q, pod)
+			if len(poppedPod.UnschedulablePlugins) > 0 {
+				t.Errorf("QueuedPodInfo from Pop should have empty UnschedulablePlugins, got instead: %+v", poppedPod)
 			}
 		})
 	}
