@@ -20,6 +20,7 @@ import (
 	"testing"
 )
 
+// Tests the proper formatting of long descriptions.
 func TestLongDesc(t *testing.T) {
 	tests := []struct {
 		desc string
@@ -83,6 +84,7 @@ func TestLongDesc(t *testing.T) {
 	}
 }
 
+// Tests the formatting of example texts.
 func TestExamples(t *testing.T) {
 	tests := []struct {
 		desc string
