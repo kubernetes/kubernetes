@@ -131,18 +131,22 @@ type configBase struct {
 	userSupplied bool
 }
 
+// IsUserSupplied checks if the config was provided by the user.
 func (cb *configBase) IsUserSupplied() bool {
 	return cb.userSupplied
 }
 
+// SetUserSupplied sets the userSupplied flag for the config.
 func (cb *configBase) SetUserSupplied(userSupplied bool) {
 	cb.userSupplied = userSupplied
 }
 
+// DeepCopyInto copies the receiver into the passed-in configBase.
 func (cb *configBase) DeepCopyInto(other *configBase) {
 	*other = *cb
 }
 
+// cloneBytes creates a deep copy of the provided byte slice.
 func cloneBytes(in []byte) []byte {
 	out := make([]byte, len(in))
 	copy(out, in)
