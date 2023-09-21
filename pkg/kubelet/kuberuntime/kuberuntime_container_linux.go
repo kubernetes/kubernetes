@@ -320,7 +320,7 @@ func swapControllerAvailable() bool {
 	swapControllerAvailabilityOnce.Do(func() {
 		const warn = "Failed to detect the availability of the swap controller, assuming not available"
 		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if isCgroup2UnifiedMode() {
 			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
 			_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
 			if err != nil {
