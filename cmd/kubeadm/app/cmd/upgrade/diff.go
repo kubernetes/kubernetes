@@ -88,6 +88,7 @@ func newCmdDiff(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// Validates provided manifest paths ensuring they exist and are not directories.
 func validateManifestsPath(manifests ...string) (err error) {
 	for _, manifestPath := range manifests {
 		if len(manifestPath) == 0 {
@@ -107,6 +108,7 @@ func validateManifestsPath(manifests ...string) (err error) {
 	return nil
 }
 
+// Compares and outputs the differences between current and new Kubernetes static pod configurations.
 func runDiff(flags *diffFlags, args []string) error {
 	var err error
 	var cfg *kubeadmapi.InitConfiguration
