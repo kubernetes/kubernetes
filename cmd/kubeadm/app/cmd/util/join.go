@@ -49,6 +49,7 @@ func GetJoinControlPlaneCommand(kubeConfigFile, token, key string, skipTokenPrin
 	return getJoinCommand(kubeConfigFile, token, key, true, skipTokenPrint, skipCertificateKeyPrint)
 }
 
+// Generates a command string for joining a node to a Kubernetes cluster using provided parameters.
 func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
 	// load the kubeconfig file to get the CA certificate and endpoint
 	config, err := clientcmd.LoadFromFile(kubeConfigFile)
