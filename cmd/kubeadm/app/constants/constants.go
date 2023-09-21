@@ -497,6 +497,7 @@ func getSkewedKubernetesVersion(n int) *version.Version {
 	return getSkewedKubernetesVersionImpl(&versionInfo, n)
 }
 
+// Calculates a skewed Kubernetes version based on the provided version information and skew value 'n'.
 func getSkewedKubernetesVersionImpl(versionInfo *apimachineryversion.Info, n int) *version.Version {
 	// TODO: update if the kubeadm version gets decoupled from the Kubernetes version.
 	// This would require keeping track of the supported skew in a table.
