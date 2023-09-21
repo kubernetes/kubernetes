@@ -52,6 +52,7 @@ func SubCmdRun() func(c *cobra.Command, args []string) {
 	}
 }
 
+// Generates a formatted usage error message and suggests viewing command help.
 func usageErrorf(c *cobra.Command, format string, args ...interface{}) error {
 	msg := fmt.Sprintf(format, args...)
 	return errors.Errorf("%s\nSee '%s -h' for help and examples", msg, c.CommandPath())
