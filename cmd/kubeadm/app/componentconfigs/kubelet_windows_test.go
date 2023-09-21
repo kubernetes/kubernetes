@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// Tests mutating paths in a Kubelet configuration to ensure all paths are absolute.
 func TestMutatePaths(t *testing.T) {
 	const drive = "C:"
 	var fooResolverConfig string = "/foo/resolver"
