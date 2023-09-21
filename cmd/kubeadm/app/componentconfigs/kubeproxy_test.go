@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
+// Creates a KubeProxy test ConfigMap.
 func testKubeProxyConfigMap(contents string) *v1.ConfigMap {
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -47,6 +48,7 @@ func testKubeProxyConfigMap(contents string) *v1.ConfigMap {
 	}
 }
 
+// Tests defaulting of kube-proxy configuration based on different scenarios.
 func TestKubeProxyDefault(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -149,6 +151,7 @@ func runKubeProxyFromTest(t *testing.T, perform func(gvk schema.GroupVersionKind
 	}
 }
 
+// Tests the creation of kube-proxy configuration from a YAML document map.
 func TestKubeProxyFromDocumentMap(t *testing.T) {
 	runKubeProxyFromTest(t, func(gvk schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
 		return kubeProxyHandler.FromDocumentMap(kubeadmapi.DocumentMap{
@@ -157,6 +160,7 @@ func TestKubeProxyFromDocumentMap(t *testing.T) {
 	})
 }
 
+// Tests the creation of kube-proxy configuration from a cluster using a fake clientset.
 func TestKubeProxyFromCluster(t *testing.T) {
 	runKubeProxyFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
 		client := clientsetfake.NewSimpleClientset(
