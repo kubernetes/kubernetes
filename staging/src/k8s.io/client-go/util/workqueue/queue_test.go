@@ -197,6 +197,72 @@ func TestReinsert(t *testing.T) {
 	}
 }
 
+func TestCollapse(t *testing.T) {
+	q := workqueue.New()
+	// Add a new one twice
+	q.Add("bar")
+	q.Add("bar")
+
+	// It should get the new one
+	i, _ := q.Get()
+	if i != "bar" {
+		t.Errorf("Expected %v, got %v", "bar", i)
+	}
+
+	// Finish that one up
+	q.Done(i)
+
+	// There should be no more objects in the queue
+	if a := q.Len(); a != 0 {
+		t.Errorf("Expected queue to be empty. Has %v items", a)
+	}
+}
+
+func TestCollapseWhileProcessing(t *testing.T) {
+	q := workqueue.New()
+	q.Add("foo")
+
+	// Start processing
+	i, _ := q.Get()
+	if i != "foo" {
+		t.Errorf("Expected %v, got %v", "foo", i)
+	}
+
+	// Add the same one twice
+	q.Add("foo")
+	q.Add("foo")
+
+	waitCh := make(chan struct{})
+	// simulate another worker consuming the queue
+	go func() {
+		defer close(waitCh)
+		i, _ := q.Get()
+		if i != "foo" {
+			t.Errorf("Expected %v, got %v", "foo", i)
+		}
+		// Finish that one up
+		q.Done(i)
+	}()
+
+	// give the worker some head start to avoid races
+	// on the select statement that cause flakiness
+	time.Sleep(100 * time.Millisecond)
+	// Finish the first one to unblock the other worker
+	select {
+	case <-waitCh:
+		t.Errorf("worker should be blocked until we are done")
+	default:
+		q.Done("foo")
+	}
+
+	// wait for the worker to consume the new object
+	// There should be no more objects in the queue
+	<-waitCh
+	if a := q.Len(); a != 0 {
+		t.Errorf("Expected queue to be empty. Has %v items", a)
+	}
+}
+
 func TestQueueDrainageUsingShutDownWithDrain(t *testing.T) {
 
 	q := workqueue.New()
