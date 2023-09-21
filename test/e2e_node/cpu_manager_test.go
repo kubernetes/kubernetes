@@ -713,119 +713,9 @@ func runCPUManagerTests(f *framework.Framework) {
 		waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 	})
 
-	ginkgo.It("should assign CPUs as expected with enhanced policy based on strict SMT alignment", func(ctx context.Context) {
-		fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
-		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
-		smtLevel := getSMTLevel()
-
-		// strict SMT alignment is trivially verified and granted on non-SMT systems
-		if smtLevel < 2 {
-			e2eskipper.Skipf("Skipping CPU Manager %s tests since SMT disabled", fullCPUsOnlyOpt)
-		}
-
-		// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
-		if cpuAlloc < int64(smtLevel*2) {
-			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < 4", fullCPUsOnlyOpt)
-		}
-
-		framework.Logf("SMT level %d", smtLevel)
-
-		// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
-		// check what we do have in the node.
-		cpuPolicyOptions := map[string]string{
-			cpumanager.FullPCPUsOnlyOption: "true",
-		}
-		newCfg := configureCPUManagerInKubelet(oldCfg,
-			&cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:      cpuset.New(0),
-				enableCPUManagerOptions: true,
-				options:                 cpuPolicyOptions,
-			},
-		)
-		updateKubeletConfig(ctx, f, newCfg, true)
-
-		// the order between negative and positive doesn't really matter
-		runSMTAlignmentNegativeTests(ctx, f)
-		runSMTAlignmentPositiveTests(ctx, f, smtLevel)
-	})
-
 	ginkgo.AfterEach(func(ctx context.Context) {
 		updateKubeletConfig(ctx, f, oldCfg, true)
 	})
-}
-
-func runSMTAlignmentNegativeTests(ctx context.Context, f *framework.Framework) {
-	// negative test: try to run a container whose requests aren't a multiple of SMT level, expect a rejection
-	ctnAttrs := []ctnAttribute{
-		{
-			ctnName:    "gu-container-neg",
-			cpuRequest: "1000m",
-			cpuLimit:   "1000m",
-		},
-	}
-	pod := makeCPUManagerPod("gu-pod", ctnAttrs)
-	// CreateSync would wait for pod to become Ready - which will never happen if production code works as intended!
-	pod = e2epod.NewPodClient(f).Create(ctx, pod)
-
-	err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
-		if pod.Status.Phase != v1.PodPending {
-			return true, nil
-		}
-		return false, nil
-	})
-	framework.ExpectNoError(err)
-	pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-
-	if pod.Status.Phase != v1.PodFailed {
-		framework.Failf("pod %s not failed: %v", pod.Name, pod.Status)
-	}
-	if !isSMTAlignmentError(pod) {
-		framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
-	}
-
-	deletePodSyncByName(ctx, f, pod.Name)
-	// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
-	// this is in turn needed because we will have an unavoidable (in the current framework) race with th
-	// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
-	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
-}
-
-func runSMTAlignmentPositiveTests(ctx context.Context, f *framework.Framework, smtLevel int) {
-	// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
-	// 1. are core siblings
-	// 2. take a full core
-	// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
-	//          this means on more-than-2-way SMT systems this test will prove nothing
-	ctnAttrs := []ctnAttribute{
-		{
-			ctnName:    "gu-container-pos",
-			cpuRequest: "2000m",
-			cpuLimit:   "2000m",
-		},
-	}
-	pod := makeCPUManagerPod("gu-pod", ctnAttrs)
-	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-
-	for _, cnt := range pod.Spec.Containers {
-		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
-
-		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
-
-		framework.Logf("got pod logs: %v", logs)
-		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
-		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
-
-		validateSMTAlignment(cpus, smtLevel, pod, &cnt)
-	}
-
-	deletePodSyncByName(ctx, f, pod.Name)
-	// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
-	// this is in turn needed because we will have an unavoidable (in the current framework) race with th
-	// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
-	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 }
 
 func validateSMTAlignment(cpus cpuset.CPUSet, smtLevel int, pod *v1.Pod, cnt *v1.Container) {
@@ -904,6 +794,149 @@ var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager]", func() {
 
 	ginkgo.Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {
 		runCPUManagerTests(f)
+	})
+
+	ginkgo.Context("With kubeconfig updated with the CPU Manager static policy and options", ginkgo.Ordered, func() {
+		// original kubeletconfig before the context start, to be restored
+		var oldCfg *kubeletconfig.KubeletConfiguration
+		var smtLevel int
+		var fullCPUsOnlyOpt string
+
+		ginkgo.BeforeAll(func(ctx context.Context) {
+			var err error
+			oldCfg, err = getCurrentKubeletConfig(ctx)
+			framework.ExpectNoError(err)
+
+			smtLevel = getSMTLevel()
+			framework.Logf("SMT level %d", smtLevel)
+
+			fullCPUsOnlyOpt = fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
+		})
+
+		ginkgo.AfterAll(func(ctx context.Context) {
+			updateKubeletConfig(ctx, f, oldCfg, true)
+		})
+
+		ginkgo.Context("run the SMT Alignment tests", func() {
+			var podMap map[string]*v1.Pod
+			var allocatableCPU int64
+
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				// track all pods created by a It() block
+				podMap = make(map[string]*v1.Pod)
+				_, allocatableCPU, _ = getLocalNodeCPUDetails(ctx, f)
+
+				// strict SMT alignment is trivially verified and granted on non-SMT systems
+				if smtLevel < 2 {
+					e2eskipper.Skipf("Skipping CPU Manager %s tests since SMT disabled", fullCPUsOnlyOpt)
+				}
+
+				// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
+				if allocatableCPU < int64(smtLevel*2) {
+					e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < 4", fullCPUsOnlyOpt)
+				}
+
+			})
+
+			ginkgo.AfterEach(func(ctx context.Context) {
+				deletePodsAsync(ctx, f, podMap)
+			})
+
+			ginkgo.It("should reject workload asking non-SMT-multiple of cpus", func(ctx context.Context) {
+				reservedCPUs := cpuset.New(0)
+
+				// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
+				// check what we do have in the node.
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption: "true",
+					},
+				}))
+
+				ginkgo.By("creating the testing pod")
+				// negative test: try to run a container whose requests aren't a multiple of SMT level, expect a rejection
+				ctnAttrs := []ctnAttribute{
+					{
+						ctnName:    "gu-container-neg",
+						cpuRequest: "1000m",
+						cpuLimit:   "1000m",
+					},
+				}
+				pod := makeCPUManagerPod("gu-pod", ctnAttrs)
+				// CreateSync would wait for pod to become Ready - which will never happen if production code works as intended!
+				pod = e2epod.NewPodClient(f).Create(ctx, pod)
+				podMap[pod.Name] = pod
+
+				ginkgo.By("ensuring the testing pod is in failed state")
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+					if pod.Status.Phase != v1.PodPending {
+						return true, nil
+					}
+					return false, nil
+				})
+				framework.ExpectNoError(err)
+
+				ginkgo.By("ensuring the testing pod is failed for the expected reason")
+				pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+
+				if pod.Status.Phase != v1.PodFailed {
+					framework.Failf("pod %s not failed: %v", pod.Name, pod.Status)
+				}
+				if !isSMTAlignmentError(pod) {
+					framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
+				}
+			})
+
+			ginkgo.It("should admit workload asking SMT-multiple of cpus", func(ctx context.Context) {
+				// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
+				// 1. are core siblings
+				// 2. take a full core
+				// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
+				//          this means on more-than-2-way SMT systems this test will prove nothing
+				reservedCPUs := cpuset.New(0)
+
+				// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
+				// check what we do have in the node.
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption: "true",
+					},
+				}))
+
+				ginkgo.By("creating the testing pod")
+				ctnAttrs := []ctnAttribute{
+					{
+						ctnName:    "gu-container-pos",
+						cpuRequest: "2000m",
+						cpuLimit:   "2000m",
+					},
+				}
+				pod := makeCPUManagerPod("gu-pod", ctnAttrs)
+				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+				podMap[pod.Name] = pod
+
+				ginkgo.By("validating each container in the testing pod")
+				for _, cnt := range pod.Spec.Containers {
+					ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
+
+					logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+					framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+					framework.Logf("got pod logs: %v", logs)
+					cpus, err := cpuset.Parse(strings.TrimSpace(logs))
+					framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+
+					validateSMTAlignment(cpus, smtLevel, pod, &cnt)
+				}
+			})
+		})
 	})
 
 	ginkgo.Context("With kubeconfig lazily updated with the CPU Manager static policy", ginkgo.Ordered, func() {
