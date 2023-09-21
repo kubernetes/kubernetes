@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -554,7 +555,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 		quantity := resource.MustParse("2")
 		return (&podQuota).Cmp(quantity) == 0, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("resource quota %q never synced", name)
 	}
 	framework.ExpectNoError(err)
@@ -581,7 +582,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 		cond := replication.GetCondition(rc.Status, v1.ReplicationControllerReplicaFailure)
 		return cond != nil, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("rc manager never added the failure condition for rc %q: %#v", name, conditions)
 	}
 	framework.ExpectNoError(err)
@@ -610,7 +611,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 		cond := replication.GetCondition(rc.Status, v1.ReplicationControllerReplicaFailure)
 		return cond == nil, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("rc manager never removed the failure condition for rc %q: %#v", name, conditions)
 	}
 	framework.ExpectNoError(err)
@@ -732,7 +733,7 @@ func updateReplicationControllerWithRetries(ctx context.Context, c clientset.Int
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("couldn't apply the provided updated to rc %q: %v", name, updateErr)
 	}
 	return rc, pollErr
@@ -778,7 +779,7 @@ func watchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, condit
 				}
 
 			case <-ctx.Done():
-				return lastEvent, wait.ErrWaitTimeout
+				return lastEvent, wait.ErrorInterrupted(errors.New("timed out waiting for the condition"))
 			}
 		}
 	}
