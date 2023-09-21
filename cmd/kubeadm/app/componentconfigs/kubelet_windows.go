@@ -55,6 +55,7 @@ func (kc *kubeletConfig) Mutate() error {
 	return nil
 }
 
+// Mutates certain fields in a Kubelet configuration to ensure they have absolute paths, especially on Windows.
 func mutatePaths(cfg *kubeletconfig.KubeletConfiguration, drive string) {
 	mutateStringField := func(name string, field *string) {
 		// filepath.IsAbs() is not reliable here in the Windows runtime, so check if the
