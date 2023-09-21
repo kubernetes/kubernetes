@@ -129,6 +129,7 @@ func newNodeOptions() *nodeOptions {
 	}
 }
 
+// Adds flags related to node upgrade options to the provided flag set.
 func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 	options.AddKubeConfigFlag(flagSet, &nodeOptions.kubeConfigPath)
 	flagSet.BoolVar(&nodeOptions.dryRun, options.DryRun, nodeOptions.dryRun, "Do not change any state, just output the actions that would be performed.")
@@ -218,6 +219,7 @@ func (d *nodeData) KubeConfigPath() string {
 	return d.kubeConfigPath
 }
 
+// Returns the output writer for the node data.
 func (d *nodeData) OutputWriter() io.Writer {
 	return d.outputWriter
 }
