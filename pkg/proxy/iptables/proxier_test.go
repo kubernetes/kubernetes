@@ -1733,11 +1733,9 @@ func TestTracePackets(t *testing.T) {
 	})
 }
 
-// TestOverallIPTablesRulesWithMultipleServices creates 4 types of services: ClusterIP,
-// LoadBalancer, ExternalIP and NodePort and verifies if the NAT table rules created
-// are exactly the same as what is expected. This test provides an overall view of how
-// the NAT table rules look like with the different jumps.
-func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
+// TestOverallIPTablesRules creates a variety of services and verifies that the generated
+// rules are exactly as expected.
+func TestOverallIPTablesRules(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	metrics.RegisterMetrics()
@@ -1792,7 +1790,8 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 				TargetPort: intstr.FromInt32(80),
 			}}
 		}),
-		// create LoadBalancer service with Cluster traffic policy and source ranges
+		// create LoadBalancer service with Cluster traffic policy, source ranges,
+		// and session affinity
 		makeTestService("ns5", "svc5", func(svc *v1.Service) {
 			svc.Spec.Type = "LoadBalancer"
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
@@ -1810,6 +1809,12 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 			// Extra whitespace to ensure that invalid value will not result
 			// in a crash, for backward compatibility.
 			svc.Spec.LoadBalancerSourceRanges = []string{" 203.0.113.0/25"}
+
+			svcSessionAffinityTimeout := int32(10800)
+			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
+				ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
+			}
 		}),
 		// create ClusterIP service with no endpoints
 		makeTestService("ns6", "svc6", func(svc *v1.Service) {
@@ -1963,7 +1968,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -s 10.180.0.5 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.5:80
 		-A KUBE-SEP-I77PXRDZVX7PMWMN -m comment --comment ns5/svc5:p80 -s 10.180.0.3 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-I77PXRDZVX7PMWMN -m comment --comment ns5/svc5:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
+		-A KUBE-SEP-I77PXRDZVX7PMWMN -m comment --comment ns5/svc5:p80 -m recent --name KUBE-SEP-I77PXRDZVX7PMWMN --set -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
 		-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -s 10.180.0.3 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
 		-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -s 10.180.0.2 -j KUBE-MARK-MASQ
@@ -1978,6 +1983,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 -> 10.180.0.2:80" -j KUBE-SEP-RS4RBKLTHTF2IUXJ
 		-A KUBE-SVC-NUKIZ6OKUXPJNT4C -m comment --comment "ns5/svc5:p80 cluster IP" -m tcp -p tcp -d 172.30.0.45 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+		-A KUBE-SVC-NUKIZ6OKUXPJNT4C -m comment --comment "ns5/svc5:p80 -> 10.180.0.3:80" -m recent --name KUBE-SEP-I77PXRDZVX7PMWMN --rcheck --seconds 10800 --reap -j KUBE-SEP-I77PXRDZVX7PMWMN
 		-A KUBE-SVC-NUKIZ6OKUXPJNT4C -m comment --comment "ns5/svc5:p80 -> 10.180.0.3:80" -j KUBE-SEP-I77PXRDZVX7PMWMN
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.180.0.3:80" -j KUBE-SEP-OYPFS5VJICHGATKP
