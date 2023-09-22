@@ -1312,34 +1312,6 @@ func assertIPTablesRulesEqual(t *testing.T, line int, checkConsistency bool, exp
 	}
 }
 
-// assertIPTablesRulesNotEqual asserts that the generated rules in result DON'T match the
-// rules in expected, ignoring irrelevant ordering differences.
-func assertIPTablesRulesNotEqual(t *testing.T, line int, expected, result string) {
-	expected = strings.TrimLeft(expected, " \t\n")
-
-	result, err := sortIPTablesRules(strings.TrimLeft(result, " \t\n"))
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-
-	lineStr := ""
-	if line != 0 {
-		lineStr = fmt.Sprintf(" (from line %d)", line)
-	}
-	if cmp.Equal(expected, result) {
-		t.Errorf("rules do not differ%s:\nfull result:\n```\n%s```", lineStr, result)
-	}
-
-	err = checkIPTablesRuleJumps(expected)
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-	err = checkIPTablesRuleJumps(result)
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-}
-
 // addressMatches helps test whether an iptables rule such as "! -s 192.168.0.0/16" matches
 // ipStr. address.Value is either an IP address ("1.2.3.4") or a CIDR string
 // ("1.2.3.0/24").
