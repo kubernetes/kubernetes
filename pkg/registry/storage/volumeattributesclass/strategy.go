@@ -34,7 +34,7 @@ type volumeAttributesClassStrategy struct {
 }
 
 // Strategy is the default logic that applies when creating and updating
-// StorageClass objects via the REST API.
+// VolumeAttributesClass objects via the REST API.
 var Strategy = volumeAttributesClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 func (volumeAttributesClassStrategy) NamespaceScoped() bool {

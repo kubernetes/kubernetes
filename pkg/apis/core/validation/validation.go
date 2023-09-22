@@ -2246,6 +2246,8 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("volumeAttributesClassName"), *spec.VolumeAttributesClassName, msg))
 				}
 			}
+		} else {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("volumeAttributesClassName"), "cannot be specified unless the VolumeAttributesClass feature gate is enabled"))
 		}
 	}
 
@@ -2318,6 +2320,9 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
 	if !apiequality.Semantic.DeepEqual(oldPvc.Spec.VolumeAttributesClassName, newPvc.Spec.VolumeAttributesClassName) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update is forbidden when the VolumeAttributesClass feature gate is disabled"))
+		}
 		if opts.EnableVolumeAttributesClass {
 			if oldPvc.Spec.VolumeAttributesClassName != nil && newPvc.Spec.VolumeAttributesClassName == nil {
 				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update from non-nil value to nil is forbidden"))

@@ -1602,9 +1602,8 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
-		StorageClassName:          &validClassName,
-		VolumeAttributesClassName: &validClassName,
-		VolumeMode:                &validMode,
+		StorageClassName: &validClassName,
+		VolumeMode:       &validMode,
 	}
 	now := metav1.Now()
 	ten := int64(10)
@@ -2832,9 +2831,15 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			enableVolumeArributesClass: true,
 			isExpectedFailure:          true,
 		},
-		"invalid-update-volume-attributes-class-without-featuregate-enabled": {
+		"invalid-update-volume-attributes-class-to-nil-without-featuregate-enabled": {
 			oldClaim:                   validClaimVolumeAttributesClass1,
 			newClaim:                   validClaimNilVolumeAttributesClass,
+			enableVolumeArributesClass: false,
+			isExpectedFailure:          true,
+		},
+		"invalid-update-volume-attributes-class-without-featuregate-enabled": {
+			oldClaim:                   validClaimVolumeAttributesClass1,
+			newClaim:                   validClaimVolumeAttributesClass2,
 			enableVolumeArributesClass: false,
 			isExpectedFailure:          true,
 		},
@@ -21688,8 +21693,8 @@ func TestVolumeAttributesClass(t *testing.T) {
 		},
 		{
 			testName:                    "Feature gate disabled and valid volumeAttributesClassName specified",
-			expectedFail:                false,
-			enableVolumeAttributesClass: true,
+			expectedFail:                true,
+			enableVolumeAttributesClass: false,
 			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("foo")),
 		},
 	}
