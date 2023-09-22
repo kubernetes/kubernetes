@@ -4860,6 +4860,7 @@ type ServiceSpec struct {
 	// Several other fields do not apply to ExternalName services.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.ServiceTypeClusterIP)
 	Type ServiceType `json:"type,omitempty" protobuf:"bytes,4,opt,name=type,casttype=ServiceType"`
 
 	// externalIPs is a list of IP addresses for which nodes in the cluster
@@ -4876,6 +4877,7 @@ type ServiceSpec struct {
 	// Defaults to None.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.ServiceAffinityNone)
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty" protobuf:"bytes,7,opt,name=sessionAffinity,casttype=ServiceAffinity"`
 
 	// Only applies to Service Type: LoadBalancer.
@@ -4940,6 +4942,7 @@ type ServiceSpec struct {
 	// Pods themselves are not. Agents which consume only Kubernetes generated endpoints
 	// through the Endpoints or EndpointSlice resources can safely assume this behavior.
 	// +optional
+	// +default=false
 	PublishNotReadyAddresses bool `json:"publishNotReadyAddresses,omitempty" protobuf:"varint,13,opt,name=publishNotReadyAddresses"`
 
 	// sessionAffinityConfig contains the configurations of session affinity.
@@ -5028,8 +5031,8 @@ type ServicePort struct {
 
 	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
 	// Default is TCP.
-	// +default="TCP"
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.ProtocolTCP)
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
 	// The application protocol for this port.

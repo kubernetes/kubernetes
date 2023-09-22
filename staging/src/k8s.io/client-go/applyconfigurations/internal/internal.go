@@ -7535,6 +7535,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: publishNotReadyAddresses
       type:
         scalar: boolean
+      default: false
     - name: selector
       type:
         map:
@@ -7544,12 +7545,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: sessionAffinity
       type:
         scalar: string
+      default: None
     - name: sessionAffinityConfig
       type:
         namedType: io.k8s.api.core.v1.SessionAffinityConfig
     - name: type
       type:
         scalar: string
+      default: ClusterIP
 - name: io.k8s.api.core.v1.ServiceStatus
   map:
     fields:

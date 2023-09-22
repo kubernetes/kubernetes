@@ -1104,14 +1104,8 @@ func TestSetDefaultService(t *testing.T) {
 	svc := &v1.Service{}
 	obj2 := roundTrip(t, runtime.Object(svc))
 	svc2 := obj2.(*v1.Service)
-	if svc2.Spec.SessionAffinity != v1.ServiceAffinityNone {
-		t.Errorf("Expected default session affinity type:%s, got: %s", v1.ServiceAffinityNone, svc2.Spec.SessionAffinity)
-	}
 	if svc2.Spec.SessionAffinityConfig != nil {
 		t.Errorf("Expected empty session affinity config when session affinity type: %s, got: %v", v1.ServiceAffinityNone, svc2.Spec.SessionAffinityConfig)
-	}
-	if svc2.Spec.Type != v1.ServiceTypeClusterIP {
-		t.Errorf("Expected default type:%s, got: %s", v1.ServiceTypeClusterIP, svc2.Spec.Type)
 	}
 }
 

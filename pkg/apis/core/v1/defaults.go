@@ -85,9 +85,6 @@ func SetDefaults_EphemeralContainer(obj *v1.EphemeralContainer) {
 }
 
 func SetDefaults_Service(obj *v1.Service) {
-	if obj.Spec.SessionAffinity == "" {
-		obj.Spec.SessionAffinity = v1.ServiceAffinityNone
-	}
 	if obj.Spec.SessionAffinity == v1.ServiceAffinityNone {
 		obj.Spec.SessionAffinityConfig = nil
 	}
@@ -101,14 +98,8 @@ func SetDefaults_Service(obj *v1.Service) {
 			}
 		}
 	}
-	if obj.Spec.Type == "" {
-		obj.Spec.Type = v1.ServiceTypeClusterIP
-	}
 	for i := range obj.Spec.Ports {
 		sp := &obj.Spec.Ports[i]
-		if sp.Protocol == "" {
-			sp.Protocol = v1.ProtocolTCP
-		}
 		if sp.TargetPort == intstr.FromInt32(0) || sp.TargetPort == intstr.FromString("") {
 			sp.TargetPort = intstr.FromInt32(sp.Port)
 		}
@@ -143,8 +134,8 @@ func SetDefaults_Service(obj *v1.Service) {
 			}
 		}
 	}
-
 }
+
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements

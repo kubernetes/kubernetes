@@ -1137,8 +1137,14 @@ func SetObjectDefaults_Service(in *v1.Service) {
 	for i := range in.Spec.Ports {
 		a := &in.Spec.Ports[i]
 		if a.Protocol == "" {
-			a.Protocol = "TCP"
+			a.Protocol = v1.Protocol(v1.ProtocolTCP)
 		}
+	}
+	if in.Spec.Type == "" {
+		in.Spec.Type = v1.ServiceType(v1.ServiceTypeClusterIP)
+	}
+	if in.Spec.SessionAffinity == "" {
+		in.Spec.SessionAffinity = v1.ServiceAffinity(v1.ServiceAffinityNone)
 	}
 }
 
