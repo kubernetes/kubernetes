@@ -58,10 +58,6 @@ func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 			obj.Labels = labels
 		}
 	}
-	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = new(int32)
-		*obj.Spec.Replicas = 1
-	}
 }
 func SetDefaults_Volume(obj *v1.Volume) {
 	if pointer.AllPtrFieldsNil(&obj.VolumeSource) {
