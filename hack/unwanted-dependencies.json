@@ -238,8 +238,7 @@
         "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
         "google.golang.org/api",
         "google.golang.org/genproto/googleapis/api",
-        "google.golang.org/grpc",
-        "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
+        "google.golang.org/grpc"
       ]
     },
     "unwantedVendored": [
