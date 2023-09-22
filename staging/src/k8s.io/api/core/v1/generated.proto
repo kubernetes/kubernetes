@@ -792,6 +792,7 @@ message Container {
   // Defaults to /dev/termination-log.
   // Cannot be updated.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.TerminationMessagePathDefault)
   optional string terminationMessagePath = 13;
 
   // Indicate how the termination message should be populated. File will use the contents of
@@ -802,6 +803,7 @@ message Container {
   // Defaults to File.
   // Cannot be updated.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.TerminationMessageReadFile)
   optional string terminationMessagePolicy = 20;
 
   // Image pull policy.
@@ -1446,6 +1448,7 @@ message EphemeralContainerCommon {
   // Defaults to /dev/termination-log.
   // Cannot be updated.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.TerminationMessagePathDefault)
   optional string terminationMessagePath = 13;
 
   // Indicate how the termination message should be populated. File will use the contents of
@@ -1456,6 +1459,7 @@ message EphemeralContainerCommon {
   // Defaults to File.
   // Cannot be updated.
   // +optional
+  // +default=ref(k8s.io/api/core/v1.TerminationMessageReadFile)
   optional string terminationMessagePolicy = 20;
 
   // Image pull policy.

@@ -78,12 +78,6 @@ func SetDefaults_Container(obj *v1.Container) {
 			obj.ImagePullPolicy = v1.PullIfNotPresent
 		}
 	}
-	if obj.TerminationMessagePath == "" {
-		obj.TerminationMessagePath = v1.TerminationMessagePathDefault
-	}
-	if obj.TerminationMessagePolicy == "" {
-		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
-	}
 }
 
 func SetDefaults_EphemeralContainer(obj *v1.EphemeralContainer) {

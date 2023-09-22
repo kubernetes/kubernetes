@@ -301,6 +301,12 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 				}
 			}
 		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
 	for i := range in.Spec.Containers {
 		a := &in.Spec.Containers[i]
@@ -369,6 +375,12 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 				}
 			}
 		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
 	for i := range in.Spec.EphemeralContainers {
 		a := &in.Spec.EphemeralContainers[i]
@@ -436,6 +448,12 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePath == "" {
+			a.EphemeralContainerCommon.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePolicy == "" {
+			a.EphemeralContainerCommon.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	SetDefaults_ResourceList(&in.Spec.Overhead)
@@ -626,6 +644,12 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 				}
 			}
 		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
 	for i := range in.Template.Spec.Containers {
 		a := &in.Template.Spec.Containers[i]
@@ -694,6 +718,12 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 				}
 			}
 		}
+		if a.TerminationMessagePath == "" {
+			a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.TerminationMessagePolicy == "" {
+			a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+		}
 	}
 	for i := range in.Template.Spec.EphemeralContainers {
 		a := &in.Template.Spec.EphemeralContainers[i]
@@ -761,6 +791,12 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePath == "" {
+			a.EphemeralContainerCommon.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+		}
+		if a.EphemeralContainerCommon.TerminationMessagePolicy == "" {
+			a.EphemeralContainerCommon.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 		}
 	}
 	SetDefaults_ResourceList(&in.Template.Spec.Overhead)
@@ -906,6 +942,12 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 					}
 				}
 			}
+			if a.TerminationMessagePath == "" {
+				a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+			}
+			if a.TerminationMessagePolicy == "" {
+				a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+			}
 		}
 		for i := range in.Spec.Template.Spec.Containers {
 			a := &in.Spec.Template.Spec.Containers[i]
@@ -974,6 +1016,12 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 					}
 				}
 			}
+			if a.TerminationMessagePath == "" {
+				a.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+			}
+			if a.TerminationMessagePolicy == "" {
+				a.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
+			}
 		}
 		for i := range in.Spec.Template.Spec.EphemeralContainers {
 			a := &in.Spec.Template.Spec.EphemeralContainers[i]
@@ -1041,6 +1089,12 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 						SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
 					}
 				}
+			}
+			if a.EphemeralContainerCommon.TerminationMessagePath == "" {
+				a.EphemeralContainerCommon.TerminationMessagePath = string(v1.TerminationMessagePathDefault)
+			}
+			if a.EphemeralContainerCommon.TerminationMessagePolicy == "" {
+				a.EphemeralContainerCommon.TerminationMessagePolicy = v1.TerminationMessagePolicy(v1.TerminationMessageReadFile)
 			}
 		}
 		SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)

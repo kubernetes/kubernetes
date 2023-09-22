@@ -4630,9 +4630,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: terminationMessagePath
       type:
         scalar: string
+      default: /dev/termination-log
     - name: terminationMessagePolicy
       type:
         scalar: string
+      default: File
     - name: tty
       type:
         scalar: boolean
@@ -5053,9 +5055,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: terminationMessagePath
       type:
         scalar: string
+      default: /dev/termination-log
     - name: terminationMessagePolicy
       type:
         scalar: string
+      default: File
     - name: tty
       type:
         scalar: boolean
