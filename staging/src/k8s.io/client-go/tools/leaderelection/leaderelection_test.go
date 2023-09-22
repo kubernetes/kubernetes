@@ -83,6 +83,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 	tests := []struct {
 		name           string
 		observedRecord rl.LeaderElectionRecord
+		observedTime   time.Time
 		retryAfter     time.Duration
 		reactors       []Reactor
 		expectedEvents []string
@@ -179,12 +180,12 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			outHolder:        "baz",
 		},
 		{
-			name: "acquire from led, unacked object",
+			name: "acquire from led, unacked, expired object",
 			reactors: []Reactor{
 				{
 					verb: "get",
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past.Add(time.Second))}), nil
 					},
 				},
 				{
@@ -194,19 +195,20 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past)},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)},
+			observedTime:   past,
 
 			expectSuccess:    true,
 			transitionLeader: true,
 			outHolder:        "baz",
 		},
 		{
-			name: "acquire from empty led, acked object",
+			name: "acquire from empty led, acked, non expired object",
 			reactors: []Reactor{
 				{
 					verb: "get",
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: ""}), nil
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(future)}), nil
 					},
 				},
 				{
@@ -216,14 +218,38 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(future)},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(future)},
+			observedTime:   future,
 
 			expectSuccess:    true,
 			transitionLeader: true,
 			outHolder:        "baz",
 		},
 		{
-			name: "don't acquire from led, acked object",
+			name: "acquire from empty led, acked, expired object",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)}), nil
+					},
+				},
+				{
+					verb: "update",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)},
+			observedTime:   future,
+
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
+		},
+		{
+			name: "don't acquire from led, acked, non expired object",
 			reactors: []Reactor{
 				{
 					verb: "get",
@@ -232,7 +258,8 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(future)},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(future)},
+			observedTime:   future,
 
 			expectSuccess: false,
 			outHolder:     "bing",
@@ -243,7 +270,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				{
 					verb: "get",
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)}), nil
 					},
 				},
 				{
@@ -253,7 +280,8 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(future)},
+			observedTime:   future,
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)},
 
 			expectSuccess: true,
 			outHolder:     "baz",
@@ -310,6 +338,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				config:            lec,
 				observedRecord:    test.observedRecord,
 				observedRawRecord: observedRawRecord,
+				observedTime:      test.observedTime,
 				clock:             clock,
 			}
 			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
@@ -397,6 +426,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 	tests := []struct {
 		name           string
 		observedRecord rl.LeaderElectionRecord
+		observedTime   time.Time
 		reactors       []Reactor
 		expectedEvents []string
 
@@ -484,6 +514,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 				config:            lec,
 				observedRecord:    test.observedRecord,
 				observedRawRecord: observedRawRecord,
+				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
 			}
 			if !le.tryAcquireOrRenew(context.Background()) {
