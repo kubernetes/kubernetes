@@ -67,6 +67,7 @@ type resetOptions struct {
 	cfgPath               string
 	ignorePreflightErrors []string
 	externalcfg           *v1beta4.ResetConfiguration
+	skipCRIDetect         bool
 }
 
 // resetData defines all the runtime information used when running the kubeadm reset workflow;
@@ -107,7 +108,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 	var initCfg *kubeadmapi.InitConfiguration
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal ResetConfiguration and validates cfg.
-	resetCfg, err := configutil.LoadOrDefaultResetConfiguration(opts.cfgPath, opts.externalcfg, allowExperimental)
+	resetCfg, err := configutil.LoadOrDefaultResetConfiguration(opts.cfgPath, opts.externalcfg, allowExperimental, opts.skipCRIDetect)
 	if err != nil {
 		return nil, err
 	}
@@ -229,9 +230,9 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 	// both when running the entire workflow or single phases
 	resetRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
 		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
-			// avoid CRI detection
+			// skip CRI detection
 			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
-			resetOptions.externalcfg.CRISocket = kubeadmconstants.UnknownCRISocket
+			resetOptions.skipCRIDetect = true
 		}
 		data, err := newResetData(cmd, resetOptions, in, out, true)
 		if err != nil {

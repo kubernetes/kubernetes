@@ -63,6 +63,7 @@ type initOptions struct {
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
 	patchesDir              string
+	skipCRIDetect           bool
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -150,9 +151,9 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	// both when running the entire workflow or single phases
 	initRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
 		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
-			// avoid CRI detection
+			// skip CRI detection
 			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
-			initOptions.externalInitCfg.NodeRegistration.CRISocket = kubeadmconstants.UnknownCRISocket
+			initOptions.skipCRIDetect = true
 		}
 		data, err := newInitData(cmd, args, initOptions, out)
 		if err != nil {
@@ -301,7 +302,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
 	// and validates InitConfiguration
-	cfg, err := configutil.LoadOrDefaultInitConfiguration(initOptions.cfgPath, initOptions.externalInitCfg, initOptions.externalClusterCfg)
+	cfg, err := configutil.LoadOrDefaultInitConfiguration(initOptions.cfgPath, initOptions.externalInitCfg, initOptions.externalClusterCfg, initOptions.skipCRIDetect)
 	if err != nil {
 		return nil, err
 	}

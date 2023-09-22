@@ -92,7 +92,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	// The resulting configs overwrite the existing cluster ones at the end of a successful upgrade apply operation.
 	if isKubeadmConfigPresent(docmap) {
 		klog.Warning("WARNING: Usage of the --config flag with kubeadm config types for reconfiguring the cluster during upgrade is not recommended!")
-		cfg, err := configutil.BytesToInitConfiguration(configBytes)
+		cfg, err := configutil.BytesToInitConfiguration(configBytes, false)
 		return cfg, true, err
 	}
 
