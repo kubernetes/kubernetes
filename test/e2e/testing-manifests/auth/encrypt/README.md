@@ -1,6 +1,6 @@
 # Encryption at rest testing manifests
 
-This directory contains manifests for testing encryption at rest with a [mock KMS provider](../../../../../staging/src/k8s.io/kms/internal/plugins/mock). The mock KMS provider is a fake KMS provider that does not communicate with any external KMS. It is used for testing purposes only.
+This directory contains manifests for testing encryption at rest with a [mock KMS provider](../../../../../staging/src/k8s.io/kms/internal/plugins/_mock). The mock KMS provider is a fake KMS provider that does not communicate with any external KMS. It is used for testing purposes only.
 
 ## run-e2e.sh
 

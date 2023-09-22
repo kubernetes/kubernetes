@@ -26,7 +26,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 MODULES=(
     hack/tools
     staging/src/k8s.io/code-generator/examples
-    staging/src/k8s.io/kms/internal/plugins/mock
+    staging/src/k8s.io/kms/internal/plugins/_mock
 )
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory

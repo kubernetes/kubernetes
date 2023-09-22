@@ -20,17 +20,17 @@ WORKDIR /workspace
 COPY apimachinery/ apimachinery/
 COPY client-go/ client-go/
 COPY kms/ kms/
-WORKDIR /workspace/kms/internal/plugins/mock
+WORKDIR /workspace/kms/internal/plugins/_mock
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} GO111MODULE=on go build -a -o mock-kms-plugin plugin.go
-RUN chmod +x mock-kms-plugin
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} GO111MODULE=on go build -a -o mock-kms-plugin plugin.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM --platform=${TARGETPLATFORM:-linux/amd64} gcr.io/distroless/static:nonroot
-WORKDIR /
-COPY --from=builder /workspace/kms/internal/plugins/mock/mock-kms-plugin .
+FROM alpine:latest
 
-ENTRYPOINT [ "/mock-kms-plugin" ]
+RUN apk add --update --no-cache ca-certificates gcompat
+RUN apk add --no-cache softhsm
+
+COPY --from=builder /workspace/kms/internal/plugins/_mock/mock-kms-plugin /usr/local/bin/mock-kms-plugin
+
+ENTRYPOINT [ "mock-kms-plugin" ]
