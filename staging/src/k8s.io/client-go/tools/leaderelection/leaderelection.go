@@ -349,7 +349,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 		le.observedRawRecord = oldLeaderElectionRawRecord
 	}
 	if len(oldLeaderElectionRecord.HolderIdentity) > 0 &&
-		le.observedTime.Add(time.Second*time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).After(now.Time) &&
+		oldLeaderElectionRecord.AcquireTime.Add(time.Second*time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).After(now.Time) &&
 		!le.IsLeader() {
 		klog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
 		return false

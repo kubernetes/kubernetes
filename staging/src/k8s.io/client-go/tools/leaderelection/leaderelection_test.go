@@ -83,7 +83,6 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 	tests := []struct {
 		name           string
 		observedRecord rl.LeaderElectionRecord
-		observedTime   time.Time
 		retryAfter     time.Duration
 		reactors       []Reactor
 		expectedEvents []string
@@ -195,8 +194,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing"},
-			observedTime:   past,
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past)},
 
 			expectSuccess:    true,
 			transitionLeader: true,
@@ -218,7 +216,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedTime: future,
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(future)},
 
 			expectSuccess:    true,
 			transitionLeader: true,
@@ -234,7 +232,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedTime: future,
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(future)},
 
 			expectSuccess: false,
 			outHolder:     "bing",
@@ -255,8 +253,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedTime:   future,
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz"},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(future)},
 
 			expectSuccess: true,
 			outHolder:     "baz",
@@ -313,7 +310,6 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				config:            lec,
 				observedRecord:    test.observedRecord,
 				observedRawRecord: observedRawRecord,
-				observedTime:      test.observedTime,
 				clock:             clock,
 			}
 			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
@@ -401,7 +397,6 @@ func testReleaseLease(t *testing.T, objectType string) {
 	tests := []struct {
 		name           string
 		observedRecord rl.LeaderElectionRecord
-		observedTime   time.Time
 		reactors       []Reactor
 		expectedEvents []string
 
@@ -489,7 +484,6 @@ func testReleaseLease(t *testing.T, objectType string) {
 				config:            lec,
 				observedRecord:    test.observedRecord,
 				observedRawRecord: observedRawRecord,
-				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
 			}
 			if !le.tryAcquireOrRenew(context.Background()) {
