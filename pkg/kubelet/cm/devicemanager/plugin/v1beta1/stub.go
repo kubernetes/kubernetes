@@ -217,11 +217,22 @@ func (m *Stub) Watch(kubeletEndpoint, resourceName, pluginSockDir string) {
 		case event := <-m.kubeletRestartWatcher.Events:
 			if event.Name == kubeletEndpoint && event.Op&fsnotify.Create == fsnotify.Create {
 				klog.InfoS("inotify: file created, restarting", "kubeletEndpoint", kubeletEndpoint)
-				if err := m.Restart(); err != nil {
-					klog.ErrorS(err, "Unable to restart server")
-					panic(err)
+				var lastErr error
 
+				err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 2*time.Minute, false, func(context.Context) (done bool, err error) {
+					restartErr := m.Restart()
+					if restartErr == nil {
+						return true, nil
+					}
+					klog.ErrorS(restartErr, "Retrying after error")
+					lastErr = restartErr
+					return false, nil
+				})
+				if err != nil {
+					klog.ErrorS(err, "Unable to restart server: wait timed out", "lastErr", lastErr.Error())
+					panic(err)
 				}
+
 				if ok := m.registerControlFunc(); ok {
 					if err := m.Register(kubeletEndpoint, resourceName, pluginSockDir); err != nil {
 						klog.ErrorS(err, "Unable to register to kubelet")
