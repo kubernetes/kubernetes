@@ -87,14 +87,14 @@ var (
 		cmpopts.IgnoreFields(nominator{}, "podLister", "lock"),
 	}
 
-	queueHintReturnQueueAfterBackoff = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
-		return framework.QueueAfterBackoff
+	queueHintReturnQueueAfterBackoff = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+		return framework.QueueAfterBackoff, nil
 	}
-	queueHintReturnQueueImmediately = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
-		return framework.QueueImmediately
+	queueHintReturnQueueImmediately = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+		return framework.QueueImmediately, nil
 	}
-	queueHintReturnQueueSkip = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
-		return framework.QueueSkip
+	queueHintReturnQueueSkip = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+		return framework.QueueSkip, nil
 	}
 )
 
@@ -3180,17 +3180,21 @@ func mustNewPodInfo(pod *v1.Pod) *framework.PodInfo {
 // Test_isPodWorthRequeuing tests isPodWorthRequeuing function.
 func Test_isPodWorthRequeuing(t *testing.T) {
 	count := 0
-	queueHintReturnQueueImmediately := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+	queueHintReturnQueueImmediately := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 		count++
-		return framework.QueueImmediately
+		return framework.QueueImmediately, nil
 	}
-	queueHintReturnQueueSkip := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+	queueHintReturnQueueSkip := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 		count++
-		return framework.QueueSkip
+		return framework.QueueSkip, nil
 	}
-	queueHintReturnQueueAfterBackoff := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+	queueHintReturnQueueAfterBackoff := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 		count++
-		return framework.QueueAfterBackoff
+		return framework.QueueAfterBackoff, nil
+	}
+	queueHintReturnErr := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+		count++
+		return framework.QueueSkip, fmt.Errorf("unexpected error")
 	}
 
 	tests := []struct {
@@ -3211,7 +3215,7 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 			},
 			event:                  NodeAdd,
 			oldObj:                 nil,
-			newObj:                 st.MakeNode().Node,
+			newObj:                 st.MakeNode().Obj(),
 			expected:               framework.QueueSkip,
 			expectedExecutionCount: 0,
 			queueingHintMap: QueueingHintMapPerProfile{
@@ -3228,6 +3232,28 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 			},
 		},
 		{
+			name: "Treat the event as QueueAfterBackoff when QueueHintFn returns error",
+			podInfo: &framework.QueuedPodInfo{
+				UnschedulablePlugins: sets.New("fooPlugin1"),
+				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()),
+			},
+			event:                  NodeAdd,
+			oldObj:                 nil,
+			newObj:                 st.MakeNode().Obj(),
+			expected:               framework.QueueAfterBackoff,
+			expectedExecutionCount: 1,
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					NodeAdd: {
+						{
+							PluginName:     "fooPlugin1",
+							QueueingHintFn: queueHintReturnErr,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "return QueueAfterBackoff when the event is wildcard",
 			podInfo: &framework.QueuedPodInfo{
 				UnschedulablePlugins: sets.New("fooPlugin1"),
@@ -3235,7 +3261,7 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 			},
 			event:                  WildCardEvent,
 			oldObj:                 nil,
-			newObj:                 st.MakeNode().Node,
+			newObj:                 st.MakeNode().Obj(),
 			expected:               framework.QueueAfterBackoff,
 			expectedExecutionCount: 0,
 			queueingHintMap:        QueueingHintMapPerProfile{},
@@ -3243,14 +3269,14 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 		{
 			name: "QueueImmediately is the highest priority",
 			podInfo: &framework.QueuedPodInfo{
-				UnschedulablePlugins: sets.New("fooPlugin1", "fooPlugin2", "fooPlugin3", "fooPlugin4"),
+				UnschedulablePlugins: sets.New("fooPlugin1", "fooPlugin2", "fooPlugin3", "fooPlugin4", "fooPlugin5"),
 				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()),
 			},
 			event:                  NodeAdd,
 			oldObj:                 nil,
-			newObj:                 st.MakeNode().Node,
+			newObj:                 st.MakeNode().Obj(),
 			expected:               framework.QueueImmediately,
-			expectedExecutionCount: 2,
+			expectedExecutionCount: 3,
 			queueingHintMap: QueueingHintMapPerProfile{
 				"": {
 					NodeAdd: {
@@ -3261,17 +3287,22 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 						},
 						{
 							// executed
+							PluginName:     "fooPlugin2",
+							QueueingHintFn: queueHintReturnErr,
+						},
+						{
+							// executed
 							// But, no more queueing hint function is executed
 							// because the highest priority is QueueImmediately.
-							PluginName:     "fooPlugin2",
+							PluginName:     "fooPlugin3",
 							QueueingHintFn: queueHintReturnQueueImmediately,
 						},
 						{
-							PluginName:     "fooPlugin3",
+							PluginName:     "fooPlugin4",
 							QueueingHintFn: queueHintReturnQueueAfterBackoff,
 						},
 						{
-							PluginName:     "fooPlugin4",
+							PluginName:     "fooPlugin5",
 							QueueingHintFn: queueHintReturnQueueSkip,
 						},
 					},
@@ -3281,14 +3312,14 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 		{
 			name: "QueueSkip is the lowest priority",
 			podInfo: &framework.QueuedPodInfo{
-				UnschedulablePlugins: sets.New("fooPlugin1", "fooPlugin2", "fooPlugin3"),
+				UnschedulablePlugins: sets.New("fooPlugin1", "fooPlugin2", "fooPlugin3", "fooPlugin4"),
 				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()),
 			},
 			event:                  NodeAdd,
 			oldObj:                 nil,
-			newObj:                 st.MakeNode().Node,
+			newObj:                 st.MakeNode().Obj(),
 			expected:               framework.QueueAfterBackoff,
-			expectedExecutionCount: 3,
+			expectedExecutionCount: 4,
 			queueingHintMap: QueueingHintMapPerProfile{
 				"": {
 					NodeAdd: {
@@ -3303,6 +3334,10 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 						{
 							PluginName:     "fooPlugin3",
 							QueueingHintFn: queueHintReturnQueueAfterBackoff,
+						},
+						{
+							PluginName:     "fooPlugin4",
+							QueueingHintFn: queueHintReturnErr,
 						},
 					},
 				},
@@ -3316,7 +3351,7 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 			},
 			event:                  NodeAdd,
 			oldObj:                 nil,
-			newObj:                 st.MakeNode().Node,
+			newObj:                 st.MakeNode().Obj(),
 			expected:               framework.QueueAfterBackoff,
 			expectedExecutionCount: 2,
 			queueingHintMap: QueueingHintMapPerProfile{
@@ -3346,7 +3381,7 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 			},
 			event:                  framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeLabel},
 			oldObj:                 nil,
-			newObj:                 st.MakeNode().Node,
+			newObj:                 st.MakeNode().Obj(),
 			expected:               framework.QueueAfterBackoff,
 			expectedExecutionCount: 3,
 			queueingHintMap: QueueingHintMapPerProfile{

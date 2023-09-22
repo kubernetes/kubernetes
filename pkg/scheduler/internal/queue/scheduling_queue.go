@@ -433,7 +433,20 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				continue
 			}
 
-			switch h := hintfn.QueueingHintFn(logger, pod, oldObj, newObj); h {
+			h, err := hintfn.QueueingHintFn(logger, pod, oldObj, newObj)
+			if err != nil {
+				// If the QueueingHintFn returned an error, we should treat the event as QueueAfterBackoff so that we can prevent
+				// the Pod from stucking in the unschedulable pod pool.
+				oldObjMeta, newObjMeta, asErr := util.As[klog.KMetadata](oldObj, newObj)
+				if asErr != nil {
+					logger.Error(err, "QueueingHintFn returns error", "event", event, "plugin", hintfn.PluginName, "pod", klog.KObj(pod))
+				} else {
+					logger.Error(err, "QueueingHintFn returns error", "event", event, "plugin", hintfn.PluginName, "pod", klog.KObj(pod), "oldObj", klog.KObj(oldObjMeta), "newObj", klog.KObj(newObjMeta))
+				}
+				h = framework.QueueAfterBackoff
+			}
+
+			switch h {
 			case framework.QueueSkip:
 				continue
 			case framework.QueueImmediately:
