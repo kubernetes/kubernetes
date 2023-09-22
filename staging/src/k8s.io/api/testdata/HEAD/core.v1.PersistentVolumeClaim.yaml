@@ -77,6 +77,6 @@ status:
     reason: reasonValue
     status: statusValue
     type: typeValue
-  modifyVolumeStatus: modifyVolumeStatusValue
   phase: phaseValue
   volumeAttributesClassName: volumeAttributesClassNameValue
+  volumeAttributesModifyStatus: volumeAttributesModifyStatusValue

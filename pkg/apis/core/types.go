@@ -565,7 +565,7 @@ const (
 	// State set when modify volume controller starts modifying the volume in control-plane
 	PersistentVolumeClaimControllerModifyVolumeInProgress VolumeAttributesClassStatus = "ControllerModifyVolumeInProgress"
 	// State set when modify volume has failed in modify volume controller with a terminal error.
-	// Transient errors such as timeout should not set this status and should leave ModifyVolumeStatus
+	// Transient errors such as timeout should not set this status and should leave VolumeAttributesModifyStatus
 	// unmodified, so as modify volume controller can resume the volume modification.
 	PersistentVolumeClaimControllerModifyVolumeFailed VolumeAttributesClassStatus = "ControllerModifyVolumeFailed"
 )
@@ -668,13 +668,13 @@ type PersistentVolumeClaimStatus struct {
 	// +featureGate=VolumeAttributesClassName
 	// +optional
 	VolumeAttributesClassName *string
-	// modifyVolumeStatus stores status of modification operation.
-	// ModifyVolumeStatus is not set by default but when modification is complete, modifyVolumeStatus
+	// volumeAttributesModifyStatus stores status of modification operation.
+	// VolumeAttributesModifyStatus is not set by default but when modification is complete, volumeAttributesModifyStatus
 	// is set to empty string by the modify volume controller.
 	// This is an alpha field and requires enabling VolumeAttributesClass feature.
 	// +featureGate=VolumeAttributesClass
 	// +optional
-	ModifyVolumeStatus *VolumeAttributesClassStatus
+	VolumeAttributesModifyStatus *VolumeAttributesClassStatus
 }
 
 // PersistentVolumeAccessMode defines various access modes for PV.

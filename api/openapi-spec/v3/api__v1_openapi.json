@@ -4286,16 +4286,16 @@
             "x-kubernetes-patch-merge-key": "type",
             "x-kubernetes-patch-strategy": "merge"
           },
-          "modifyVolumeStatus": {
-            "description": "modifyVolumeStatus stores status of modification operation. ModifyVolumeStatus is not set by default but when modification is complete, modifyVolumeStatus is set to empty string by the modify volume controller. This is an alpha field and requires enabling VolumeAttributesClass feature.",
-            "type": "string"
-          },
           "phase": {
             "description": "phase represents the current phase of PersistentVolumeClaim.",
             "type": "string"
           },
           "volumeAttributesClassName": {
             "description": "volumeAttributesClassName is the name of VolumeAttributesClass which is latest applied by the external-provisioner or external-resizer. This field is not set by default but when modification is complete, it's set same as VolumeAttributesClassName in spec. This is an alpha field and requires enabling VolumeAttributesClass feature.",
+            "type": "string"
+          },
+          "volumeAttributesModifyStatus": {
+            "description": "volumeAttributesModifyStatus stores status of modification operation. VolumeAttributesModifyStatus is not set by default but when modification is complete, volumeAttributesModifyStatus is set to empty string by the modify volume controller. This is an alpha field and requires enabling VolumeAttributesClass feature.",
             "type": "string"
           }
         },

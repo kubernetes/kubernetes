@@ -110,6 +110,6 @@
       "allocatedResourceStatusesKey": "allocatedResourceStatusesValue"
     },
     "volumeAttributesClassName": "volumeAttributesClassNameValue",
-    "modifyVolumeStatus": "modifyVolumeStatusValue"
+    "volumeAttributesModifyStatus": "volumeAttributesModifyStatusValue"
   }
 }

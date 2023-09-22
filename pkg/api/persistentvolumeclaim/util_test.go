@@ -559,36 +559,36 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 			expected:                            withVolumeAttributesClassName("foo"),
 		},
 		{
-			name:                                "for:newPVC=hasModifyVolumeStatus,oldPVC=nil, featuregate=false should drop field",
+			name:                                "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=nil, featuregate=false should drop field",
 			enableRecoverVolumeExpansionFailure: false,
 			enableVolumeAttributesClass:         false,
-			pvc:                                 withModifyVolumeStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
+			pvc:                                 withVolumeAttributesModifyStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
 			oldPVC:                              nil,
 			expected:                            getPVC(),
 		},
 		{
-			name:                                "for:newPVC=hasModifyVolumeStatus,oldPVC=doesnot,featuregate=true; should keep field",
+			name:                                "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=doesnot,featuregate=true; should keep field",
 			enableRecoverVolumeExpansionFailure: false,
 			enableVolumeAttributesClass:         true,
-			pvc:                                 withModifyVolumeStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
+			pvc:                                 withVolumeAttributesModifyStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
 			oldPVC:                              getPVC(),
-			expected:                            withModifyVolumeStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
+			expected:                            withVolumeAttributesModifyStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
 		},
 		{
-			name:                                "for:newPVC=hasModifyVolumeStatus,oldPVC=hasModifyVolumeStatus,featuregate=true; should keep field",
+			name:                                "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=hasVolumeAttributesModifyStatus,featuregate=true; should keep field",
 			enableRecoverVolumeExpansionFailure: false,
 			enableVolumeAttributesClass:         true,
-			pvc:                                 withModifyVolumeStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
-			oldPVC:                              withModifyVolumeStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
-			expected:                            withModifyVolumeStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
+			pvc:                                 withVolumeAttributesModifyStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
+			oldPVC:                              withVolumeAttributesModifyStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
+			expected:                            withVolumeAttributesModifyStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
 		},
 		{
-			name:                                "for:newPVC=hasModifyVolumeStatus,oldPVC=hasModifyVolumeStatus,featuregate=false; should keep field",
+			name:                                "for:newPVC=hasVolumeAttributesModifyStatus,oldPVC=hasVolumeAttributesModifyStatus,featuregate=false; should keep field",
 			enableRecoverVolumeExpansionFailure: false,
 			enableVolumeAttributesClass:         false,
-			pvc:                                 withModifyVolumeStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
-			oldPVC:                              withModifyVolumeStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
-			expected:                            withModifyVolumeStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
+			pvc:                                 withVolumeAttributesModifyStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
+			oldPVC:                              withVolumeAttributesModifyStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
+			expected:                            withVolumeAttributesModifyStatus(core.PersistentVolumeClaimControllerModifyVolumeFailed),
 		},
 	}
 
@@ -638,10 +638,10 @@ func withVolumeAttributesClassName(vacName string) *core.PersistentVolumeClaim {
 	}
 }
 
-func withModifyVolumeStatus(status core.VolumeAttributesClassStatus) *core.PersistentVolumeClaim {
+func withVolumeAttributesModifyStatus(status core.VolumeAttributesClassStatus) *core.PersistentVolumeClaim {
 	return &core.PersistentVolumeClaim{
 		Status: core.PersistentVolumeClaimStatus{
-			ModifyVolumeStatus: &status,
+			VolumeAttributesModifyStatus: &status,
 		},
 	}
 }

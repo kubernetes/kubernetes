@@ -3120,8 +3120,8 @@ func (in *PersistentVolumeClaimStatus) DeepCopyInto(out *PersistentVolumeClaimSt
 		*out = new(string)
 		**out = **in
 	}
-	if in.ModifyVolumeStatus != nil {
-		in, out := &in.ModifyVolumeStatus, &out.ModifyVolumeStatus
+	if in.VolumeAttributesModifyStatus != nil {
+		in, out := &in.VolumeAttributesModifyStatus, &out.VolumeAttributesModifyStatus
 		*out = new(VolumeAttributesClassStatus)
 		**out = **in
 	}

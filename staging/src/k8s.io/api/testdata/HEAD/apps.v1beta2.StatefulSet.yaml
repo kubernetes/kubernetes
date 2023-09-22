@@ -1243,9 +1243,9 @@ spec:
         reason: reasonValue
         status: statusValue
         type: typeValue
-      modifyVolumeStatus: modifyVolumeStatusValue
       phase: phaseValue
       volumeAttributesClassName: volumeAttributesClassNameValue
+      volumeAttributesModifyStatus: volumeAttributesModifyStatusValue
 status:
   availableReplicas: 11
   collisionCount: 9

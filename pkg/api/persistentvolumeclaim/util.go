@@ -103,8 +103,8 @@ func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
 		if oldPVC == nil || oldPVC.Status.VolumeAttributesClassName == nil {
 			pvc.Status.VolumeAttributesClassName = nil
 		}
-		if oldPVC == nil || oldPVC.Status.ModifyVolumeStatus == nil {
-			pvc.Status.ModifyVolumeStatus = nil
+		if oldPVC == nil || oldPVC.Status.VolumeAttributesModifyStatus == nil {
+			pvc.Status.VolumeAttributesModifyStatus = nil
 		}
 	}
 
