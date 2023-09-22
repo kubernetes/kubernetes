@@ -19,9 +19,11 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -272,9 +274,7 @@ func validateDaemonSetPodsAndMarkReady(
 ) {
 	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
-		if len(objects) != numberPods {
-			return false, nil
-		}
+		nonTerminatedPods := 0
 
 		for _, object := range objects {
 			pod := object.(*v1.Pod)
@@ -291,6 +291,10 @@ func validateDaemonSetPodsAndMarkReady(
 				t.Errorf("controllerRef.Controller is not set to true")
 			}
 
+			if podutil.IsPodPhaseTerminal(pod.Status.Phase) {
+				continue
+			}
+			nonTerminatedPods++
 			if !podutil.IsPodReady(pod) && len(pod.Spec.NodeName) != 0 {
 				podCopy := pod.DeepCopy()
 				podCopy.Status = v1.PodStatus{
@@ -304,9 +308,77 @@ func validateDaemonSetPodsAndMarkReady(
 			}
 		}
 
-		return true, nil
+		return nonTerminatedPods == numberPods, nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func validateDaemonSetPodsActive(
+	podClient corev1client.PodInterface,
+	podInformer cache.SharedIndexInformer,
+	numberPods int,
+	t *testing.T,
+) {
+	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
+		objects := podInformer.GetIndexer().List()
+		if len(objects) < numberPods {
+			return false, nil
+		}
+		podsActiveCount := 0
+		for _, object := range objects {
+			pod := object.(*v1.Pod)
+			ownerReferences := pod.ObjectMeta.OwnerReferences
+			if len(ownerReferences) != 1 {
+				return false, fmt.Errorf("Pod %s has %d OwnerReferences, expected only 1", pod.Name, len(ownerReferences))
+			}
+			controllerRef := ownerReferences[0]
+			if got, want := controllerRef.Kind, "DaemonSet"; got != want {
+				t.Errorf("controllerRef.Kind = %q, want %q", got, want)
+			}
+			if controllerRef.Controller == nil || *controllerRef.Controller != true {
+				t.Errorf("controllerRef.Controller is not set to true")
+			}
+			if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodPending {
+				podsActiveCount += 1
+			}
+		}
+		return podsActiveCount == numberPods, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func validateDaemonSetPodsTolerations(
+	podClient corev1client.PodInterface,
+	podInformer cache.SharedIndexInformer,
+	expectedTolerations []v1.Toleration,
+	prefix string,
+	t *testing.T,
+) {
+	objects := podInformer.GetIndexer().List()
+	for _, object := range objects {
+		var prefixedPodToleration []v1.Toleration
+		pod := object.(*v1.Pod)
+		ownerReferences := pod.ObjectMeta.OwnerReferences
+		if len(ownerReferences) != 1 {
+			t.Errorf("Pod %s has %d OwnerReferences, expected only 1", pod.Name, len(ownerReferences))
+		}
+		controllerRef := ownerReferences[0]
+		if got, want := controllerRef.Kind, "DaemonSet"; got != want {
+			t.Errorf("controllerRef.Kind = %q, want %q", got, want)
+		}
+		if controllerRef.Controller == nil || *controllerRef.Controller != true {
+			t.Errorf("controllerRef.Controller is not set to true")
+		}
+		for _, podToleration := range pod.Spec.Tolerations {
+			if strings.HasPrefix(podToleration.Key, prefix) {
+				prefixedPodToleration = append(prefixedPodToleration, podToleration)
+			}
+		}
+		if diff := cmp.Diff(expectedTolerations, prefixedPodToleration); diff != "" {
+			t.Fatalf("Unexpected tolerations (-want,+got):\n%s", diff)
+		}
 	}
 }
 
@@ -405,6 +477,23 @@ func validateDaemonSetStatus(
 			return false, err
 		}
 		return ds.Status.NumberReady == expectedNumberReady, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func validateUpdatedNumberScheduled(
+	ctx context.Context,
+	dsClient appstyped.DaemonSetInterface,
+	dsName string,
+	expectedUpdatedNumberScheduled int32,
+	t *testing.T) {
+	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
+		ds, err := dsClient.Get(context.TODO(), dsName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return ds.Status.UpdatedNumberScheduled == expectedUpdatedNumberScheduled, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -1042,4 +1131,122 @@ func TestUpdateStatusDespitePodCreationFailure(t *testing.T) {
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, limitedPodNumber, t)
 		validateDaemonSetStatus(dsClient, ds.Name, int32(limitedPodNumber), t)
 	})
+}
+
+func TestDaemonSetRollingUpdateWithTolerations(t *testing.T) {
+	var taints []v1.Taint
+	var node *v1.Node
+	var tolerations []v1.Toleration
+	ctx, closeFn, dc, informers, clientset := setup(t)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(clientset, "daemonset-rollingupdate-with-tolerations-test", t)
+	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
+
+	dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+	podClient := clientset.CoreV1().Pods(ns.Name)
+	nodeClient := clientset.CoreV1().Nodes()
+	podInformer := informers.Core().V1().Pods().Informer()
+	informers.Start(ctx.Done())
+	go dc.Run(ctx, 2)
+
+	zero := intstr.IntOrString{Type: intstr.Int, IntVal: 0}
+	maxSurge := intstr.IntOrString{Type: intstr.Int, IntVal: 1}
+	ds := newDaemonSet("foo", ns.Name)
+	ds.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
+		Type: apps.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &apps.RollingUpdateDaemonSet{
+			MaxUnavailable: &zero,
+			MaxSurge:       &maxSurge,
+		},
+	}
+
+	// Add six nodes with zone-y, zone-z or common taint
+	for i := 0; i < 6; i++ {
+		if i < 2 {
+			taints = []v1.Taint{
+				{Key: "zone-y", Effect: v1.TaintEffectNoSchedule},
+			}
+		} else if i < 4 {
+			taints = []v1.Taint{
+				{Key: "zone-z", Effect: v1.TaintEffectNoSchedule},
+			}
+		} else {
+			taints = []v1.Taint{
+				{Key: "zone-common", Effect: v1.TaintEffectNoSchedule},
+			}
+		}
+		node = newNode(fmt.Sprintf("node-%d", i), nil)
+		node.Spec.Taints = taints
+		_, err := nodeClient.Create(context.TODO(), node, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+	}
+
+	// Create DaemonSet with zone-y toleration
+	tolerations = []v1.Toleration{
+		{Key: "zone-y", Operator: v1.TolerationOpExists},
+		{Key: "zone-common", Operator: v1.TolerationOpExists},
+	}
+	ds.Spec.Template.Spec.Tolerations = tolerations
+	_, err := dsClient.Create(ctx, ds, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create DaemonSet: %v", err)
+	}
+	defer cleanupDaemonSets(t, clientset, ds)
+	validateDaemonSetPodsActive(podClient, podInformer, 4, t)
+	validateDaemonSetPodsAndMarkReady(podClient, podInformer, 4, t)
+	validateDaemonSetStatus(dsClient, ds.Name, 4, t)
+	validateUpdatedNumberScheduled(ctx, dsClient, ds.Name, 4, t)
+	validateDaemonSetPodsTolerations(podClient, podInformer, tolerations, "zone-", t)
+
+	// Update DaemonSet with zone-z toleration
+	tolerations = []v1.Toleration{
+		{Key: "zone-z", Operator: v1.TolerationOpExists},
+		{Key: "zone-common", Operator: v1.TolerationOpExists},
+	}
+	ds.Spec.Template.Spec.Tolerations = tolerations
+	_, err = dsClient.Update(ctx, ds, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update DaemonSet: %v", err)
+	}
+
+	// Expected numberPods of validateDaemonSetPodsActive is 7 when update DaemonSet
+	// and before updated pods become ready because:
+	//   - New 2 pods are created and Pending on Zone Z nodes
+	//   - New 1 pod are created as surge and Pending on Zone Common node
+	//   - Old 2 pods that violate scheduling constraints on Zone Y nodes will remain existing and Running
+	//     until other new pods become available
+	validateDaemonSetPodsActive(podClient, podInformer, 7, t)
+	validateDaemonSetPodsAndMarkReady(podClient, podInformer, 4, t)
+	validateDaemonSetStatus(dsClient, ds.Name, 4, t)
+	validateUpdatedNumberScheduled(ctx, dsClient, ds.Name, 4, t)
+	validateDaemonSetPodsTolerations(podClient, podInformer, tolerations, "zone-", t)
+
+	// Update DaemonSet with zone-y and zone-z toleration
+	tolerations = []v1.Toleration{
+		{Key: "zone-y", Operator: v1.TolerationOpExists},
+		{Key: "zone-z", Operator: v1.TolerationOpExists},
+		{Key: "zone-common", Operator: v1.TolerationOpExists},
+	}
+	ds.Spec.Template.Spec.Tolerations = tolerations
+	_, err = dsClient.Update(ctx, ds, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update DaemonSet: %v", err)
+	}
+	validateDaemonSetPodsActive(podClient, podInformer, 7, t)
+	validateDaemonSetPodsAndMarkReady(podClient, podInformer, 6, t)
+	validateDaemonSetStatus(dsClient, ds.Name, 6, t)
+	validateUpdatedNumberScheduled(ctx, dsClient, ds.Name, 6, t)
+	validateDaemonSetPodsTolerations(podClient, podInformer, tolerations, "zone-", t)
+
+	// Update DaemonSet with no toleration
+	ds.Spec.Template.Spec.Tolerations = nil
+	_, err = dsClient.Update(ctx, ds, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update DaemonSet: %v", err)
+	}
+	validateDaemonSetPodsActive(podClient, podInformer, 0, t)
+	validateDaemonSetStatus(dsClient, ds.Name, 0, t)
+	validateUpdatedNumberScheduled(ctx, dsClient, ds.Name, 0, t)
 }
