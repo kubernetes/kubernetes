@@ -97,13 +97,18 @@ var (
 	kubeletCfg *kubeletconfig.KubeletConfiguration
 )
 
-func initFeatureGates(featureGateObj featuregate.MutableFeatureGate, featureGatesToSet map[string]bool) {
+func initFeatureGate(featureGateObj featuregate.MutableFeatureGate, featureGatesToSet map[string]bool) {
 	err := featureGateObj.SetFromMap(featureGatesToSet)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
 		os.Exit(1)
 	}
+}
+
+func initFeatureGates(featureGates, serviceFeatureGates map[string]bool) {
+	initFeatureGate(utilfeature.DefaultMutableFeatureGate, featureGates)
+	initFeatureGate(defaultMutableServiceGate, serviceFeatureGates)
 }
 
 func getNodeSummary(ctx context.Context) (*stats.Summary, error) {

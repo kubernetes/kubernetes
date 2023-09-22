@@ -27,7 +27,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -134,8 +133,7 @@ func TestMain(m *testing.M) {
 	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
 
-	initFeatureGates(utilfeature.DefaultMutableFeatureGate, featureGates)
-	initFeatureGates(defaultMutableServiceGate, serviceFeatureGates)
+	initFeatureGates(featureGates, serviceFeatureGates)
 
 	setExtraEnvs()
 	os.Exit(m.Run())
