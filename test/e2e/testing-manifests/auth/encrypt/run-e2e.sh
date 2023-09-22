@@ -36,7 +36,7 @@ build_and_push_mock_plugin() {
         --platform linux/amd64 \
         --output=type=docker \
         -t localhost:5000/mock-kms-provider:e2e \
-        -f staging/src/k8s.io/kms/internal/plugins/mock/Dockerfile staging/src/k8s.io/ \
+        -f staging/src/k8s.io/kms/internal/plugins/_mock/Dockerfile staging/src/k8s.io/ \
         --progress=plain;
 
     docker push localhost:5000/mock-kms-provider:e2e
