@@ -136,6 +136,7 @@ func (o *genCSRConfig) load() (err error) {
 		o.kubeadmConfigPath,
 		cmdutil.DefaultInitConfiguration(),
 		&kubeadmapiv1.ClusterConfiguration{},
+		true, /* skipCRIDetect */
 	)
 	if err != nil {
 		return err
@@ -353,7 +354,7 @@ func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1.Clus
 	}
 
 	// Read config from --config if provided. Otherwise, use the default configuration
-	return configutil.LoadOrDefaultInitConfiguration(cfgPath, cmdutil.DefaultInitConfiguration(), &cfg)
+	return configutil.LoadOrDefaultInitConfiguration(cfgPath, cmdutil.DefaultInitConfiguration(), &cfg, true /* skipCRIDetect */)
 }
 
 // newCmdCertsExpiration creates a new `cert check-expiration` command.
