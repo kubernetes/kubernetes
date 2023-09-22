@@ -603,7 +603,7 @@ function codegen::openapi() {
     local APIEXTENSIONS_tag_files=()
     kube::util::read-array APIEXTENSIONS_tag_files < <(
         k8s_tag_files_matching \
-            vendor/k8s.io/apiextensions \
+            vendor/k8s.io/apiextensions-apiserver \
             vendor/k8s.io/api/autoscaling/v1 \
             "${apimachinery_dirs[@]}"
         )
