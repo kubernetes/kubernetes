@@ -384,7 +384,9 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Checking an instance of the pod is running")
 			gomega.Eventually(ctx, getPodByName).
 				WithArguments(f, pod1.Name).
-				WithTimeout(time.Minute).
+				// The kubelet restarts pod with an exponential back-off delay, with a maximum cap of 5 minutes.
+				// Allow 5 minutes and 10 seconds for the pod to start in a slow environment.
+				WithTimeout(5*time.Minute+10*time.Second).
 				Should(gomega.And(
 					BeAPodInPhase(v1.PodRunning),
 					BeAPodReady(),
