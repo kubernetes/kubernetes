@@ -142,11 +142,6 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 	return s
 }
 
-// Versioner implements storage.Interface.Versioner.
-func (s *store) Versioner() storage.Versioner {
-	return s.versioner
-}
-
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, out runtime.Object) error {
 	preparedKey, err := s.prepareKey(key)

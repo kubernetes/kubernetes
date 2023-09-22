@@ -470,11 +470,6 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	}
 }
 
-// Versioner implements storage.Interface.
-func (c *Cacher) Versioner() storage.Versioner {
-	return c.storage.Versioner()
-}
-
 // Create implements storage.Interface.
 func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
 	return c.storage.Create(ctx, key, obj, out, ttl)

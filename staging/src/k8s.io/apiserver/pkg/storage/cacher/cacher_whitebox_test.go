@@ -108,7 +108,6 @@ func newDummyWatch() watch.Interface {
 	}
 }
 
-func (d *dummyStorage) Versioner() storage.Versioner { return nil }
 func (d *dummyStorage) Create(_ context.Context, _ string, _, _ runtime.Object, _ uint64) error {
 	return fmt.Errorf("unimplemented")
 }
