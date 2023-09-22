@@ -288,8 +288,14 @@ func TestDeleteEndpointConnections(t *testing.T) {
 
 const testHostname = "test-hostname"
 const testNodeIP = "192.168.0.2"
+const testNodeIPAlt = "192.168.1.2"
+const testExternalIP = "192.168.99.11"
+const testNodeIPv6 = "2001:db8::1"
+const testNodeIPv6Alt = "2001:db8:1::2"
 const testExternalClient = "203.0.113.2"
 const testExternalClientBlocked = "203.0.113.130"
+
+var testNodeIPs = []string{testNodeIP, testNodeIPAlt, testExternalIP, testNodeIPv6, testNodeIPv6Alt}
 
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
@@ -312,9 +318,10 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
 	addrs1 := []net.Addr{
 		&net.IPNet{IP: netutils.ParseIPSloppy(testNodeIP), Mask: net.CIDRMask(24, 32)},
-		// (This IP never actually gets used; it's only here to test that it gets
-		// filtered out correctly in the IPv4 nodeport tests.)
-		&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(64, 128)},
+		&net.IPNet{IP: netutils.ParseIPSloppy(testNodeIPAlt), Mask: net.CIDRMask(24, 32)},
+		&net.IPNet{IP: netutils.ParseIPSloppy(testExternalIP), Mask: net.CIDRMask(24, 32)},
+		&net.IPNet{IP: netutils.ParseIPSloppy(testNodeIPv6), Mask: net.CIDRMask(64, 128)},
+		&net.IPNet{IP: netutils.ParseIPSloppy(testNodeIPv6Alt), Mask: net.CIDRMask(64, 128)},
 	}
 	networkInterfacer.AddInterfaceAddr(&itf1, addrs1)
 
@@ -1367,9 +1374,9 @@ func addressMatches(t *testing.T, address *iptablestest.IPTablesValue, ipStr str
 // iptablesTracer holds data used while virtually tracing a packet through a set of
 // iptables rules
 type iptablesTracer struct {
-	ipt    *iptablestest.FakeIPTables
-	nodeIP string
-	t      *testing.T
+	ipt      *iptablestest.FakeIPTables
+	localIPs sets.Set[string]
+	t        *testing.T
 
 	// matches accumulates the list of rules that were matched, for debugging purposes.
 	matches []string
@@ -1383,14 +1390,17 @@ type iptablesTracer struct {
 	markMasq bool
 }
 
-// newIPTablesTracer creates an iptablesTracer. nodeIP is the IP to treat as the local
-// node IP (for determining whether rules with "--src-type LOCAL" or "--dst-type LOCAL"
+// newIPTablesTracer creates an iptablesTracer. nodeIPs are the IPs to treat as local
+// node IPs (for determining whether rules with "--src-type LOCAL" or "--dst-type LOCAL"
 // match).
-func newIPTablesTracer(t *testing.T, ipt *iptablestest.FakeIPTables, nodeIP string) *iptablesTracer {
+func newIPTablesTracer(t *testing.T, ipt *iptablestest.FakeIPTables, nodeIPs []string) *iptablesTracer {
+	localIPs := sets.New("127.0.0.1", "::1")
+	localIPs.Insert(nodeIPs...)
+
 	return &iptablesTracer{
-		ipt:    ipt,
-		nodeIP: nodeIP,
-		t:      t,
+		ipt:      ipt,
+		localIPs: localIPs,
+		t:        t,
 	}
 }
 
@@ -1406,7 +1416,7 @@ func (tracer *iptablesTracer) ruleMatches(rule *iptablestest.Rule, sourceIP, pro
 	}
 	if rule.SourceType != nil {
 		addrtype := "not-matched"
-		if sourceIP == tracer.nodeIP || sourceIP == "127.0.0.1" {
+		if tracer.localIPs.Has(sourceIP) {
 			addrtype = "LOCAL"
 		}
 		if !rule.SourceType.Matches(addrtype) {
@@ -1423,7 +1433,7 @@ func (tracer *iptablesTracer) ruleMatches(rule *iptablestest.Rule, sourceIP, pro
 	}
 	if rule.DestinationType != nil {
 		addrtype := "not-matched"
-		if destIP == tracer.nodeIP || destIP == "127.0.0.1" {
+		if tracer.localIPs.Has(destIP) {
 			addrtype = "LOCAL"
 		}
 		if !rule.DestinationType.Matches(addrtype) {
@@ -1503,8 +1513,8 @@ func (tracer *iptablesTracer) runChain(table utiliptables.Table, chain utiliptab
 // The return values are: an array of matched rules (for debugging), the final packet
 // destinations (a comma-separated list of IPs, or one of the special targets "ACCEPT",
 // "DROP", or "REJECT"), and whether the packet would be masqueraded.
-func tracePacket(t *testing.T, ipt *iptablestest.FakeIPTables, sourceIP, protocol, destIP, destPort, nodeIP string) ([]string, string, bool) {
-	tracer := newIPTablesTracer(t, ipt, nodeIP)
+func tracePacket(t *testing.T, ipt *iptablestest.FakeIPTables, sourceIP, protocol, destIP, destPort string, nodeIPs []string) ([]string, string, bool) {
+	tracer := newIPTablesTracer(t, ipt, nodeIPs)
 
 	// nat:PREROUTING goes first
 	tracer.runChain(utiliptables.TableNAT, utiliptables.ChainPrerouting, sourceIP, protocol, destIP, destPort)
@@ -1540,7 +1550,7 @@ type packetFlowTest struct {
 	masq     bool
 }
 
-func runPacketFlowTests(t *testing.T, line int, ipt *iptablestest.FakeIPTables, nodeIP string, testCases []packetFlowTest) {
+func runPacketFlowTests(t *testing.T, line int, ipt *iptablestest.FakeIPTables, nodeIPs []string, testCases []packetFlowTest) {
 	lineStr := ""
 	if line != 0 {
 		lineStr = fmt.Sprintf(" (from line %d)", line)
@@ -1551,7 +1561,7 @@ func runPacketFlowTests(t *testing.T, line int, ipt *iptablestest.FakeIPTables, 
 			if protocol == "" {
 				protocol = "tcp"
 			}
-			matches, output, masq := tracePacket(t, ipt, tc.sourceIP, protocol, tc.destIP, fmt.Sprintf("%d", tc.destPort), nodeIP)
+			matches, output, masq := tracePacket(t, ipt, tc.sourceIP, protocol, tc.destIP, fmt.Sprintf("%d", tc.destPort), nodeIPs)
 			var errors []string
 			if output != tc.output {
 				errors = append(errors, fmt.Sprintf("wrong output: expected %q got %q", tc.output, output))
@@ -1686,7 +1696,7 @@ func TestTracePackets(t *testing.T) {
 		t.Fatalf("Restore of test data failed: %v", err)
 	}
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "no match",
 			sourceIP: "10.0.0.2",
@@ -2060,7 +2070,7 @@ func TestClusterIPReject(t *testing.T) {
 
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "cluster IP rejected",
 			sourceIP: "10.0.0.2",
@@ -2144,7 +2154,7 @@ func TestClusterIPEndpointsMore(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "cluster IP accepted",
 			sourceIP: "10.180.0.2",
@@ -2269,7 +2279,7 @@ func TestLoadBalancer(t *testing.T) {
 
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "pod to cluster IP",
 			sourceIP: "10.0.0.2",
@@ -2458,7 +2468,7 @@ func TestNodePort(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "pod to cluster IP",
 			sourceIP: "10.0.0.2",
@@ -2471,6 +2481,14 @@ func TestNodePort(t *testing.T) {
 			name:     "external to nodePort",
 			sourceIP: testExternalClient,
 			destIP:   testNodeIP,
+			destPort: svcNodePort,
+			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
+			masq:     true,
+		},
+		{
+			name:     "external to nodePort on secondary IP",
+			sourceIP: testExternalClient,
+			destIP:   testNodeIPAlt,
 			destPort: svcNodePort,
 			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
 			masq:     true,
@@ -2555,7 +2573,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "firewall accepts HealthCheckNodePort",
 			sourceIP: "1.2.3.4",
@@ -2569,7 +2587,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 	fp.OnServiceDelete(svc)
 	fp.syncProxyRules()
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "HealthCheckNodePort no longer has any rule",
 			sourceIP: "1.2.3.4",
@@ -2681,7 +2699,7 @@ func TestExternalIPsReject(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "cluster IP with no endpoints",
 			sourceIP: "10.0.0.2",
@@ -2791,7 +2809,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "cluster IP hits both endpoints",
 			sourceIP: "10.0.0.2",
@@ -2900,7 +2918,7 @@ func TestNonLocalExternalIPs(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "pod to cluster IP",
 			sourceIP: "10.0.0.2",
@@ -2975,7 +2993,7 @@ func TestNodePortReject(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "pod to cluster IP",
 			sourceIP: "10.0.0.2",
@@ -3069,7 +3087,7 @@ func TestLoadBalancerReject(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "pod to cluster IP",
 			sourceIP: "10.0.0.2",
@@ -3203,7 +3221,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "pod to cluster IP hits both endpoints",
 			sourceIP: "10.0.0.2",
@@ -3848,7 +3866,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 
 	assertIPTablesRulesEqual(t, line, true, expected, fp.iptablesData.String())
 
-	runPacketFlowTests(t, line, ipt, testNodeIP, []packetFlowTest{
+	runPacketFlowTests(t, line, ipt, testNodeIPs, []packetFlowTest{
 		{
 			name:     "pod to cluster IP hit both endpoints",
 			sourceIP: "10.0.0.2",
@@ -3876,7 +3894,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 
 	if fp.localDetector.IsImplemented() {
 		// pod-to-NodePort is treated as internal traffic, so we see both endpoints
-		runPacketFlowTests(t, line, ipt, testNodeIP, []packetFlowTest{
+		runPacketFlowTests(t, line, ipt, testNodeIPs, []packetFlowTest{
 			{
 				name:     "pod to NodePort hits both endpoints",
 				sourceIP: "10.0.0.2",
@@ -3889,7 +3907,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	} else {
 		// pod-to-NodePort is (incorrectly) treated as external traffic
 		// when there is no LocalTrafficDetector.
-		runPacketFlowTests(t, line, ipt, testNodeIP, []packetFlowTest{
+		runPacketFlowTests(t, line, ipt, testNodeIPs, []packetFlowTest{
 			{
 				name:     "pod to NodePort hits only local endpoint",
 				sourceIP: "10.0.0.2",
@@ -5580,11 +5598,11 @@ func TestInternalTrafficPolicy(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(endpointSlice)
 			fp.syncProxyRules()
-			runPacketFlowTests(t, tc.line, ipt, testNodeIP, tc.flowTests)
+			runPacketFlowTests(t, tc.line, ipt, testNodeIPs, tc.flowTests)
 
 			fp.OnEndpointSliceDelete(endpointSlice)
 			fp.syncProxyRules()
-			runPacketFlowTests(t, tc.line, ipt, testNodeIP, []packetFlowTest{
+			runPacketFlowTests(t, tc.line, ipt, testNodeIPs, []packetFlowTest{
 				{
 					name:     "endpoints deleted",
 					sourceIP: "10.0.0.2",
@@ -5907,11 +5925,11 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(testcase.endpointslice)
 			fp.syncProxyRules()
-			runPacketFlowTests(t, testcase.line, ipt, testNodeIP, testcase.flowTests)
+			runPacketFlowTests(t, testcase.line, ipt, testNodeIPs, testcase.flowTests)
 
 			fp.OnEndpointSliceDelete(testcase.endpointslice)
 			fp.syncProxyRules()
-			runPacketFlowTests(t, testcase.line, ipt, testNodeIP, []packetFlowTest{
+			runPacketFlowTests(t, testcase.line, ipt, testNodeIPs, []packetFlowTest{
 				{
 					name:     "pod to clusterIP after endpoints deleted",
 					sourceIP: "10.0.0.2",
@@ -6241,11 +6259,11 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(testcase.endpointslice)
 			fp.syncProxyRules()
-			runPacketFlowTests(t, testcase.line, ipt, testNodeIP, testcase.flowTests)
+			runPacketFlowTests(t, testcase.line, ipt, testNodeIPs, testcase.flowTests)
 
 			fp.OnEndpointSliceDelete(testcase.endpointslice)
 			fp.syncProxyRules()
-			runPacketFlowTests(t, testcase.line, ipt, testNodeIP, []packetFlowTest{
+			runPacketFlowTests(t, testcase.line, ipt, testNodeIPs, []packetFlowTest{
 				{
 					name:     "pod to clusterIP after endpoints deleted",
 					sourceIP: "10.0.0.2",
@@ -6832,7 +6850,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 			if overridesApplied != len(tc.overrides) {
 				t.Errorf("%d overrides did not match any test case name!", len(tc.overrides)-overridesApplied)
 			}
-			runPacketFlowTests(t, tc.line, ipt, testNodeIP, tcFlowTests)
+			runPacketFlowTests(t, tc.line, ipt, testNodeIPs, tcFlowTests)
 		})
 	}
 }
