@@ -513,29 +513,6 @@ func getNestedDefault(t *types.Type) string {
 	return ""
 }
 
-func mustEnforceDefault(t *types.Type, depth int, omitEmpty bool) (interface{}, error) {
-	if depth > 0 {
-		return nil, nil
-	}
-	switch t.Kind {
-	case types.Pointer, types.Map, types.Slice, types.Array, types.Interface:
-		return nil, nil
-	case types.Struct:
-		return map[string]interface{}{}, nil
-	case types.Builtin:
-		if !omitEmpty {
-			if zero, ok := typeZeroValue[t.String()]; ok {
-				return zero, nil
-			} else {
-				return nil, fmt.Errorf("please add type %v to typeZeroValue struct", t)
-			}
-		}
-		return nil, nil
-	default:
-		return nil, fmt.Errorf("not sure how to enforce default for %v", t.Kind)
-	}
-}
-
 var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
 var refREIdentIndex = refRE.SubexpIndex("reference")
 
@@ -585,19 +562,12 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 		klog.Fatalf("Failed to unmarshal default: %v", err)
 	}
 
-	omitEmpty := strings.Contains(reflect.StructTag(tags).Get("json"), "omitempty")
-	if enforced, err := mustEnforceDefault(baseT, depth, omitEmpty); err != nil {
-		klog.Fatal(err)
-	} else if enforced != nil {
-		if defaultValue != nil {
-			if reflect.DeepEqual(defaultValue, enforced) {
-				// If the default value annotation matches the default value for the type,
-				// do not generate any defaulting function
-				return node
-			} else {
-				enforcedJSON, _ := json.Marshal(enforced)
-				klog.Fatalf("Invalid default value (%#v) for non-pointer/non-omitempty. If specified, must be: %v", defaultValue, string(enforcedJSON))
-			}
+	if defaultValue != nil {
+		zero := typeZeroValue[t.String()]
+		if reflect.DeepEqual(defaultValue, zero) {
+			// If the default value annotation matches the default value for the type,
+			// do not generate any defaulting function
+			return node
 		}
 	}
 
