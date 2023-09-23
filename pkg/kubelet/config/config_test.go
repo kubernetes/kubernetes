@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -466,7 +466,7 @@ func TestPodUpdateLabels(t *testing.T) {
 func TestPodConfigRace(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	config := NewPodConfig(PodConfigNotificationIncremental, eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
-	seenSources := sets.NewString(TestSource)
+	seenSources := sets.New[string](TestSource)
 	var wg sync.WaitGroup
 	const iterations = 100
 	wg.Add(2)

@@ -43,7 +43,7 @@ import (
 )
 
 var (
-	supportedFeatures = sets.NewString("layering")
+	supportedFeatures = sets.New[string]("layering")
 	pathSeparator     = string(os.PathSeparator)
 )
 
