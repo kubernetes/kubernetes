@@ -298,7 +298,7 @@ func enableMigrationOnNode(csiNode *storagev1.CSINode, pluginName string) {
 
 	newAnnotationSet := sets.New[string]()
 	newAnnotationSet.Insert(pluginName)
-	nas := strings.Join(sets.List(newAnnotationSet), ",")
+	nas := strings.Join(sets.List[string](newAnnotationSet), ",")
 	nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey] = nas
 
 	csiNode.Annotations = nodeInfoAnnotations
