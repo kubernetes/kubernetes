@@ -1169,10 +1169,10 @@ func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode,
 		}
 	default:
 		n.writeDefaulter(varName, index, isPointer, sw)
-		n.writeCalls(varName, isPointer, sw)
 		for i := range n.children {
 			n.children[i].WriteMethod(varName, depth, append(ancestors, n), sw)
 		}
+		n.writeCalls(varName, isPointer, sw)
 	}
 
 	if isPointer && len(ancestors) > 0 {

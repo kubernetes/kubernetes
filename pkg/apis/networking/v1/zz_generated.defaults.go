@@ -49,7 +49,6 @@ func SetObjectDefaults_IngressClassList(in *v1.IngressClassList) {
 }
 
 func SetObjectDefaults_NetworkPolicy(in *v1.NetworkPolicy) {
-	SetDefaults_NetworkPolicy(in)
 	for i := range in.Spec.Ingress {
 		a := &in.Spec.Ingress[i]
 		for j := range a.Ports {
@@ -64,6 +63,7 @@ func SetObjectDefaults_NetworkPolicy(in *v1.NetworkPolicy) {
 			SetDefaults_NetworkPolicyPort(b)
 		}
 	}
+	SetDefaults_NetworkPolicy(in)
 }
 
 func SetObjectDefaults_NetworkPolicyList(in *v1.NetworkPolicyList) {

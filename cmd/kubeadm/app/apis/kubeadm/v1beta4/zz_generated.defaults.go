@@ -37,18 +37,17 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
-	SetDefaults_ClusterConfiguration(in)
 	if in.Etcd.Local != nil {
 		for i := range in.Etcd.Local.ExtraEnvs {
 			a := &in.Etcd.Local.ExtraEnvs[i]
 			SetDefaults_EnvVar(a)
 		}
 	}
-	SetDefaults_APIServer(&in.APIServer)
 	for i := range in.APIServer.ControlPlaneComponent.ExtraEnvs {
 		a := &in.APIServer.ControlPlaneComponent.ExtraEnvs[i]
 		SetDefaults_EnvVar(a)
 	}
+	SetDefaults_APIServer(&in.APIServer)
 	for i := range in.ControllerManager.ExtraEnvs {
 		a := &in.ControllerManager.ExtraEnvs[i]
 		SetDefaults_EnvVar(a)
@@ -57,23 +56,24 @@ func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 		a := &in.Scheduler.ExtraEnvs[i]
 		SetDefaults_EnvVar(a)
 	}
+	SetDefaults_ClusterConfiguration(in)
 }
 
 func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
-	SetDefaults_InitConfiguration(in)
 	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
+	SetDefaults_InitConfiguration(in)
 }
 
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
-	SetDefaults_JoinConfiguration(in)
-	SetDefaults_Discovery(&in.Discovery)
 	if in.Discovery.File != nil {
 		SetDefaults_FileDiscovery(in.Discovery.File)
 	}
+	SetDefaults_Discovery(&in.Discovery)
 	if in.ControlPlane != nil {
-		SetDefaults_JoinControlPlane(in.ControlPlane)
 		SetDefaults_APIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
+		SetDefaults_JoinControlPlane(in.ControlPlane)
 	}
+	SetDefaults_JoinConfiguration(in)
 }
 
 func SetObjectDefaults_ResetConfiguration(in *ResetConfiguration) {

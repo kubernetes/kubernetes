@@ -40,11 +40,11 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_ClusterRoleBinding(in *v1alpha1.ClusterRoleBinding) {
-	SetDefaults_ClusterRoleBinding(in)
 	for i := range in.Subjects {
 		a := &in.Subjects[i]
 		SetDefaults_Subject(a)
 	}
+	SetDefaults_ClusterRoleBinding(in)
 }
 
 func SetObjectDefaults_ClusterRoleBindingList(in *v1alpha1.ClusterRoleBindingList) {
@@ -55,11 +55,11 @@ func SetObjectDefaults_ClusterRoleBindingList(in *v1alpha1.ClusterRoleBindingLis
 }
 
 func SetObjectDefaults_RoleBinding(in *v1alpha1.RoleBinding) {
-	SetDefaults_RoleBinding(in)
 	for i := range in.Subjects {
 		a := &in.Subjects[i]
 		SetDefaults_Subject(a)
 	}
+	SetDefaults_RoleBinding(in)
 }
 
 func SetObjectDefaults_RoleBindingList(in *v1alpha1.RoleBindingList) {
