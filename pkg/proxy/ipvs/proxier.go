@@ -201,7 +201,6 @@ var ipsetWithIptablesChain = []struct {
 
 // In IPVS proxy mode, the following flags need to be set
 const (
-	sysctlBridgeCallIPTables      = "net/bridge/bridge-nf-call-iptables"
 	sysctlVSConnTrack             = "net/ipv4/vs/conntrack"
 	sysctlConnReuse               = "net/ipv4/vs/conn_reuse_mode"
 	sysctlExpireNoDestConn        = "net/ipv4/vs/expire_nodest_conn"
@@ -330,13 +329,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	nodePortAddressStrings []string,
 	kernelHandler KernelHandler,
 ) (*Proxier, error) {
-	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
-	// are connected to a Linux bridge (but not SDN bridges).  Until most
-	// plugins handle this, log when config is missing
-	if val, err := sysctl.GetSysctl(sysctlBridgeCallIPTables); err == nil && val != 1 {
-		klog.InfoS("Missing br-netfilter module or unset sysctl br-nf-call-iptables, proxy may not work as intended")
-	}
-
 	// Set the conntrack sysctl we need for
 	if err := proxyutil.EnsureSysctl(sysctl, sysctlVSConnTrack, 1); err != nil {
 		return nil, err
