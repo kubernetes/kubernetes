@@ -27,7 +27,7 @@ import (
 )
 
 func TestResourceAttributesFrom(t *testing.T) {
-	knownResourceAttributesNames := sets.NewString(
+	knownResourceAttributesNames := sets.New[string](
 		// Fields we copy in ResourceAttributesFrom
 		"Verb",
 		"Namespace",
@@ -48,7 +48,7 @@ func TestResourceAttributesFrom(t *testing.T) {
 		return false
 	})
 
-	knownAttributesRecordFieldNames := sets.NewString(
+	knownAttributesRecordFieldNames := sets.New[string](
 		// Fields we set in ResourceAttributesFrom
 		"User",
 		"Verb",

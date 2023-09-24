@@ -933,7 +933,7 @@ func Test_getDeprecatedTopologyNodeNames(t *testing.T) {
 	testcases := []struct {
 		name              string
 		endpointSlice     *discovery.EndpointSlice
-		expectedNodeNames sets.String
+		expectedNodeNames sets.Set[string]
 	}{
 		{
 			name: "2 nodes",
@@ -943,7 +943,7 @@ func Test_getDeprecatedTopologyNodeNames(t *testing.T) {
 					{DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-2"}},
 				},
 			},
-			expectedNodeNames: sets.NewString("node-1", "node-2"),
+			expectedNodeNames: sets.New[string]("node-1", "node-2"),
 		},
 		{
 			name: "duplicate values",
@@ -954,7 +954,7 @@ func Test_getDeprecatedTopologyNodeNames(t *testing.T) {
 					{DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-3"}},
 				},
 			},
-			expectedNodeNames: sets.NewString("node-1", "node-3"),
+			expectedNodeNames: sets.New[string]("node-1", "node-3"),
 		},
 		{
 			name: "unset",
@@ -965,7 +965,7 @@ func Test_getDeprecatedTopologyNodeNames(t *testing.T) {
 					{DeprecatedTopology: nil},
 				},
 			},
-			expectedNodeNames: sets.NewString(),
+			expectedNodeNames: sets.New[string](),
 		},
 	}
 

@@ -73,12 +73,12 @@ func ConfirmNoEscalation(ctx context.Context, ruleResolver AuthorizationRuleReso
 			compactMissingRights = compact
 		}
 
-		missingDescriptions := sets.NewString()
+		missingDescriptions := sets.New[string]()
 		for _, missing := range compactMissingRights {
 			missingDescriptions.Insert(rbacv1helpers.CompactString(missing))
 		}
 
-		msg := fmt.Sprintf("user %q (groups=%q) is attempting to grant RBAC permissions not currently held:\n%s", user.GetName(), user.GetGroups(), strings.Join(missingDescriptions.List(), "\n"))
+		msg := fmt.Sprintf("user %q (groups=%q) is attempting to grant RBAC permissions not currently held:\n%s", user.GetName(), user.GetGroups(), strings.Join(sets.List[string](missingDescriptions), "\n"))
 		if len(ruleResolutionErrors) > 0 {
 			msg = msg + fmt.Sprintf("; resolution errors: %v", ruleResolutionErrors)
 		}

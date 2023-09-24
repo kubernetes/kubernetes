@@ -353,8 +353,8 @@ func RemoveUnwantedObjects[ObjectType configurationObjectType](ctx context.Conte
 	return nil
 }
 
-func namesOfBootstrapObjects[ObjectType configurationObjectType](bos []ObjectType) sets.String {
-	names := sets.NewString()
+func namesOfBootstrapObjects[ObjectType configurationObjectType](bos []ObjectType) sets.Set[string] {
+	names := sets.New[string]()
 	for _, bo := range bos {
 		names.Insert(bo.GetName())
 	}

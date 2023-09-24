@@ -597,8 +597,8 @@ func patchAllocatedValues(after After, before Before) {
 	}
 
 	if needsNodePort(oldSvc) && needsNodePort(newSvc) {
-		nodePortsUsed := func(svc *api.Service) sets.Int32 {
-			used := sets.NewInt32()
+		nodePortsUsed := func(svc *api.Service) sets.Set[int32] {
+			used := sets.New[int32]()
 			for _, p := range svc.Spec.Ports {
 				if p.NodePort != 0 {
 					used.Insert(p.NodePort)

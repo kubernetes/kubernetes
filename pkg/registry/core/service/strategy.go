@@ -330,8 +330,8 @@ func needsNodePort(svc *api.Service) bool {
 
 func sameNodePorts(oldSvc, newSvc *api.Service) bool {
 	// Helper to make a set of NodePort values.
-	allNodePorts := func(svc *api.Service) sets.Int {
-		out := sets.NewInt()
+	allNodePorts := func(svc *api.Service) sets.Set[int] {
+		out := sets.New[int]()
 		for i := range svc.Spec.Ports {
 			if svc.Spec.Ports[i].NodePort != 0 {
 				out.Insert(int(svc.Spec.Ports[i].NodePort))

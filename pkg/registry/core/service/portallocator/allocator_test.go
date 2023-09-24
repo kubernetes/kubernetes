@@ -44,7 +44,7 @@ func TestAllocate(t *testing.T) {
 	if f := r.Used(); f != 0 {
 		t.Errorf("unexpected used %d", f)
 	}
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		p, err := r.AllocateNext()
@@ -179,11 +179,11 @@ func TestForEach(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testCases := []sets.Int{
-		sets.NewInt(),
-		sets.NewInt(10000),
-		sets.NewInt(10000, 10200),
-		sets.NewInt(10000, 10099, 10200),
+	testCases := []sets.Set[int]{
+		sets.New[int](),
+		sets.New[int](10000),
+		sets.New[int](10000, 10200),
+		sets.New[int](10000, 10099, 10200),
 	}
 
 	for i, tc := range testCases {
@@ -201,7 +201,7 @@ func TestForEach(t *testing.T) {
 			}
 		}
 
-		calls := sets.NewInt()
+		calls := sets.New[int]()
 		r.ForEach(func(port int) {
 			calls.Insert(port)
 		})
@@ -209,7 +209,7 @@ func TestForEach(t *testing.T) {
 			t.Errorf("[%d] expected %d calls, got %d", i, len(tc), len(calls))
 		}
 		if !calls.Equal(tc) {
-			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), tc.List())
+			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, sets.List[int](calls), sets.List[int](tc))
 		}
 	}
 }
@@ -432,7 +432,7 @@ func TestNodePortMetrics(t *testing.T) {
 	expectMetrics(t, em)
 
 	// allocate 2 ports
-	found := sets.NewInt()
+	found := sets.New[int]()
 	for i := 0; i < 2; i++ {
 		port, err := a.AllocateNext()
 		if err != nil {
@@ -525,7 +525,7 @@ func TestNodePortAllocatedMetrics(t *testing.T) {
 	expectMetrics(t, em)
 
 	// allocate 2 dynamic port
-	found := sets.NewInt()
+	found := sets.New[int]()
 	for i := 0; i < 2; i++ {
 		port, err := a.AllocateNext()
 		if err != nil {

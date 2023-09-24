@@ -218,7 +218,7 @@ func (c *Repair) doRunOnce() error {
 func collectServiceNodePorts(service *corev1.Service) []int {
 	var servicePorts []int
 	// map from nodePort to set of protocols
-	seen := make(map[int]sets.String)
+	seen := make(map[int]sets.Set[string])
 	for _, port := range service.Spec.Ports {
 		nodePort := int(port.NodePort)
 		if nodePort == 0 {
@@ -227,7 +227,7 @@ func collectServiceNodePorts(service *corev1.Service) []int {
 		proto := string(port.Protocol)
 		s := seen[nodePort]
 		if s == nil { // have not seen this nodePort before
-			s = sets.NewString(proto)
+			s = sets.New[string](proto)
 			servicePorts = append(servicePorts, nodePort)
 		} else if s.Has(proto) { // same nodePort with same protocol
 			servicePorts = append(servicePorts, nodePort)
