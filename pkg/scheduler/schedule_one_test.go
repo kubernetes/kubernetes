@@ -598,7 +598,7 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 	go wait.Until(createPodsOneRound, 9*time.Millisecond, ctx.Done())
 
 	// Capture the events to wait all pods to be scheduled at least once.
-	allWaitSchedulingPods := sets.NewString()
+	allWaitSchedulingPods := sets.New[string]()
 	for i := 0; i < waitSchedulingPodNumber; i++ {
 		allWaitSchedulingPods.Insert(fmt.Sprintf("pod%d", i))
 	}
