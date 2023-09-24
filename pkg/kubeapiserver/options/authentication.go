@@ -210,6 +210,10 @@ func (o *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptio
 
 // Validate checks invalid config combination
 func (o *BuiltInAuthenticationOptions) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
 	var allErrors []error
 
 	allErrors = append(allErrors, o.validateOIDCOptions()...)
@@ -270,6 +274,10 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 
 // AddFlags returns flags of authentication for a API Server
 func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+
 	fs.StringSliceVar(&o.APIAudiences, "api-audiences", o.APIAudiences, ""+
 		"Identifiers of the API. The service account token authenticator will validate that "+
 		"tokens used against the API are bound to at least one of these audiences. If the "+
@@ -416,8 +424,13 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-// ToAuthenticationConfig convert BuiltInAuthenticationOptions to kubeauthenticator.Config
+// ToAuthenticationConfig convert BuiltInAuthenticationOptions to kubeauthenticator.Config. Returns
+// an empty config if o is nil.
 func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticator.Config, error) {
+	if o == nil {
+		return kubeauthenticator.Config{}, nil
+	}
+
 	ret := kubeauthenticator.Config{
 		TokenSuccessCacheTTL: o.TokenSuccessCacheTTL,
 		TokenFailureCacheTTL: o.TokenFailureCacheTTL,
