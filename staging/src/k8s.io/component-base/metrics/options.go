@@ -40,6 +40,10 @@ func NewOptions() *Options {
 
 // Validate validates metrics flags options.
 func (o *Options) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
 	var errs []error
 	err := validateShowHiddenMetricsVersion(parseVersion(version.Get()), o.ShowHiddenMetricsForVersion)
 	if err != nil {
