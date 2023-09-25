@@ -224,6 +224,7 @@ func (s *specAggregator) AddUpdateAPIService(apiService *v1.APIService, handler 
 			apiService: *apiService,
 			downloader: decorateError(apiService.Name, NewCacheableDownloader(s.downloader, handler)),
 		}
+		s.specByAPIServiceName[apiService.Name].spec.Store(cached.Result[*spec.Swagger]{Err: fmt.Errorf("spec for apiservice %s is not yet available", apiService.Name)})
 		s.openAPIVersionedService.UpdateSpecLazy(s.buildMergeSpecLocked())
 	}
 
