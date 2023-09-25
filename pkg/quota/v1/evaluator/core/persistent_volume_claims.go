@@ -64,6 +64,24 @@ func V1ResourceByStorageClass(storageClass string, resourceName corev1.ResourceN
 	return corev1.ResourceName(string(storageClass + storageClassSuffix + string(resourceName)))
 }
 
+// pvcVACResources are the set of static resources managed by quota associated with pvcs.
+// for each resource in this list, it may be refined dynamically based on volume attributes class.
+var pvcVACResources = []corev1.ResourceName{
+	corev1.ResourcePersistentVolumeClaims,
+}
+
+// volumeAttributesClassSuffix is the suffix to the qualified portion of volume attributes class resource name.
+// For example, if you want to quota storage by a volume attributes class, you would have a declaration
+// that follows <volume-attributes-class>.volumeattributesclass.storage.k8s.io/<resource>.
+// For example:
+// * bronze.volumeattributesclass.storage.k8s.io/persistentvolumeclaims: "5"
+const volumeAttributesClassSuffix string = ".volumeattributesclass.storage.k8s.io/"
+
+// V1ResourceByVolumeAttributesClass returns a quota resource name by a volume attributes class.
+func V1ResourceByVolumeAttributesClass(vacName string, resourceName corev1.ResourceName) corev1.ResourceName {
+	return corev1.ResourceName(string(vacName + volumeAttributesClassSuffix + string(resourceName)))
+}
+
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
 func NewPersistentVolumeClaimEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
 	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims"))
@@ -126,7 +144,7 @@ func (p *pvcEvaluator) MatchingResources(items []corev1.ResourceName) []corev1.R
 			continue
 		}
 		// match pvc resources
-		if quota.Contains(pvcResources, item) {
+		if quota.Contains(pvcResources, item) || quota.Contains(pvcVACResources, item) {
 			result = append(result, item)
 			continue
 		}
@@ -136,6 +154,17 @@ func (p *pvcEvaluator) MatchingResources(items []corev1.ResourceName) []corev1.R
 			if strings.HasSuffix(string(item), byStorageClass) {
 				result = append(result, item)
 				break
+			}
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) {
+			// match pvc resources scoped by volume attributes class (<volume-attributes-class-name>.volumeattributesclass.storage.k8s.io/<resource>)
+			for _, resource := range pvcVACResources {
+				byVolumeAttributesClass := volumeAttributesClassSuffix + string(resource)
+				if strings.HasSuffix(string(item), byVolumeAttributesClass) {
+					result = append(result, item)
+					break
+				}
 			}
 		}
 	}
@@ -167,6 +196,11 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 			storageClassStorage := corev1.ResourceName(storageClassRef + storageClassSuffix + string(corev1.ResourceRequestsStorage))
 			result[storageClassStorage] = *requestedStorage
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) && pvc.Spec.VolumeAttributesClassName != nil {
+		volumeAttributesClassClaim := corev1.ResourceName(*pvc.Spec.VolumeAttributesClassName + volumeAttributesClassSuffix + string(corev1.ResourcePersistentVolumeClaims))
+		result[volumeAttributesClassClaim] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 
 	return result, nil
