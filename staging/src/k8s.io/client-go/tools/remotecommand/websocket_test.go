@@ -1057,8 +1057,7 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 		for {
 			_, _, err := conn.ReadMessage()
 			if err != nil {
-				t.Logf("server err reading message: %v", err)
-				return
+				break
 			}
 		}
 	}))
@@ -1085,7 +1084,11 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 		return pongHandler(msg)
 	})
 	go heartbeat.start()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			_, _, err := client.ReadMessage()
 			if err != nil {
@@ -1107,6 +1110,7 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 		close(heartbeat.closer)
 		t.Errorf("unexpected heartbeat timeout")
 	}
+	wg.Wait()
 }
 
 func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
