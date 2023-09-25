@@ -499,7 +499,7 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.Sh
 	tweakListOptions := func(options *metav1.ListOptions) {
 		options.FieldSelector = selector
 	}
-	informer := coreinformers.NewFilteredPodInformer(cs, metav1.NamespaceAll, resyncPeriod, cache.Indexers{}, tweakListOptions)
+	informer := coreinformers.NewFilteredPodInformer(cs, metav1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, tweakListOptions)
 
 	// Dropping `.metadata.managedFields` to improve memory usage.
 	// The Extract workflow (i.e. `ExtractPod`) should be unused.
