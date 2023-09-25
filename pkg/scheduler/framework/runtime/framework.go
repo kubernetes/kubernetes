@@ -47,23 +47,24 @@ const (
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
 type frameworkImpl struct {
-	registry             Registry
-	snapshotSharedLister framework.SharedLister
-	waitingPods          *waitingPodsMap
-	scorePluginWeight    map[string]int
-	preEnqueuePlugins    []framework.PreEnqueuePlugin
-	enqueueExtensions    []framework.EnqueueExtensions
-	queueSortPlugins     []framework.QueueSortPlugin
-	preFilterPlugins     []framework.PreFilterPlugin
-	filterPlugins        []framework.FilterPlugin
-	postFilterPlugins    []framework.PostFilterPlugin
-	preScorePlugins      []framework.PreScorePlugin
-	scorePlugins         []framework.ScorePlugin
-	reservePlugins       []framework.ReservePlugin
-	preBindPlugins       []framework.PreBindPlugin
-	bindPlugins          []framework.BindPlugin
-	postBindPlugins      []framework.PostBindPlugin
-	permitPlugins        []framework.PermitPlugin
+	registry                 Registry
+	snapshotSharedLister     framework.SharedLister
+	waitingPods              *waitingPodsMap
+	scorePluginWeight        map[string]int
+	clusterAutoScalerPlugins []framework.ClusterAutoScalerPlugin
+	preEnqueuePlugins        []framework.PreEnqueuePlugin
+	enqueueExtensions        []framework.EnqueueExtensions
+	queueSortPlugins         []framework.QueueSortPlugin
+	preFilterPlugins         []framework.PreFilterPlugin
+	filterPlugins            []framework.FilterPlugin
+	postFilterPlugins        []framework.PostFilterPlugin
+	preScorePlugins          []framework.PreScorePlugin
+	scorePlugins             []framework.ScorePlugin
+	reservePlugins           []framework.ReservePlugin
+	preBindPlugins           []framework.PreBindPlugin
+	bindPlugins              []framework.BindPlugin
+	postBindPlugins          []framework.PostBindPlugin
+	permitPlugins            []framework.PermitPlugin
 
 	clientSet       clientset.Interface
 	kubeConfig      *restclient.Config
@@ -324,6 +325,21 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 			return nil, err
 		}
 	}
+
+	// ClusterAutoscaler plugins are not configured separately. Any PreFilter or Filter plugin
+	// may implement that additional interface.
+	clusterAutoScalerPlugins := sets.New[framework.ClusterAutoScalerPlugin]()
+	for _, plugin := range f.preFilterPlugins {
+		if plugin, ok := plugin.(framework.ClusterAutoScalerPlugin); ok {
+			clusterAutoScalerPlugins.Insert(plugin)
+		}
+	}
+	for _, plugin := range f.filterPlugins {
+		if plugin, ok := plugin.(framework.ClusterAutoScalerPlugin); ok {
+			clusterAutoScalerPlugins.Insert(plugin)
+		}
+	}
+	f.clusterAutoScalerPlugins = clusterAutoScalerPlugins.UnsortedList()
 
 	if len(f.queueSortPlugins) != 1 {
 		return nil, fmt.Errorf("only one queue sort plugin required for profile with scheduler name %q, but got %d", profile.SchedulerName, len(f.queueSortPlugins))
@@ -596,6 +612,11 @@ func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, plugin
 		plugins.Set(newPlugins)
 	}
 	return nil
+}
+
+// ClusterAutoscalerPlugins returns the registered ClusterAutoscaler plugins.
+func (f *frameworkImpl) ClusterAutoscalerPlugins() []framework.ClusterAutoScalerPlugin {
+	return f.clusterAutoScalerPlugins
 }
 
 // PreEnqueuePlugins returns the registered preEnqueue plugins.

@@ -296,6 +296,59 @@ type Plugin interface {
 	Name() string
 }
 
+// ClusterAutoScalerPlugin is an interface that is used only by the cluster autoscaler.
+// It enables plugins to store state across different scheduling cycles.
+//
+// The usual call sequence of a plugin when used in the scheduler is:
+// - at program startup:
+//   - instantiate plugin
+//   - EventsToRegister
+// - for each new pod:
+//   - PreEnqueue
+// - for each pod that is ready to be scheduled, one pod at a time:
+//   - PreFilter, Filter, etc.
+//
+// Cluster autoscaler works a bit differently. It identifies all pending pods,
+// takes a snapshot of the current cluster state, and then simulates the effect
+// of scheduling those pods with additional nodes added to the cluster. To
+// determine whether a pod fits into one of these simulated nodes, it
+// uses the same PreFilter and Filter plugins as the scheduler. Other extension
+// points (Reserve, Bind) are not used. Plugins which modify the cluster state
+// therefore need a different way of recording the result of scheduling
+// a pod onto a node. This is done through ClusterAutoScalerPlugin.
+//
+// Cluster autoscaler will:
+// - at program startup:
+//   - instantiate plugin, with real informer factory and no Kubernetes client
+//   - start informers
+// - at the start of a simulation:
+//   - call StartSimulation with a clean cycle state
+// - for each pending pod:
+//   - call PreFilter and Filter with the same cycle state that
+//     was passed to StartSimulation
+//   - call SimulateBindPod with the same cycle state that
+//     was passed to StartSimulation (i.e. *not* the one which was modified
+//     by PreFilter or Filter) to indicate that a pod is being scheduled onto a node
+//     as part of the simulation
+//
+// A plugin may:
+// - Take a snapshot of all relevant cluster state as part of StartSimulation
+//   and store it in the cycle state. This signals to the other extension
+//   points that the plugin is being used as part of the cluster autoscaler.
+// . In PreFilter and Filter use the cluster snapshot to make decisions
+//   instead of the normal "live" cluster state.
+// - In SimulateBindPod update the snapshot in the cycle state.
+type ClusterAutoScalerPlugin interface {
+	Plugin
+	// StartSimulation is called when the cluster autoscaler begins
+	// a simulation.
+	StartSimulation(ctx context.Context, state *CycleState) *Status
+	// SimulateBindPod is called when the cluster autoscaler decided to schedule
+	// a pod onto a certain node.
+	SimulateBindPod(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *Status
+	// TODO(?): ClusterAutoScalerPluginExtensions
+}
+
 // PreEnqueuePlugin is an interface that must be implemented by "PreEnqueue" plugins.
 // These plugins are called prior to adding Pods to activeQ.
 // Note: an preEnqueue plugin is expected to be lightweight and efficient, so it's not expected to
@@ -511,6 +564,9 @@ type BindPlugin interface {
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	Handle
+
+	// ClusterAutoscalerPlugins returns the registered ClusterAutoscaler plugins.
+	ClusterAutoscalerPlugins() []ClusterAutoScalerPlugin
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.
 	PreEnqueuePlugins() []PreEnqueuePlugin
