@@ -741,15 +741,6 @@ const (
 	// Allow users to recover from volume expansion failure
 	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
 
-	// owner: @RomanBednar
-	// kep: https://kep.k8s.io/3333
-	// alpha: v1.25
-	// beta: 1.26
-	// stable: v1.28
-	//
-	// Allow assigning StorageClass to unbound PVCs retroactively
-	RetroactiveDefaultStorageClass featuregate.Feature = "RetroactiveDefaultStorageClass"
-
 	// owner: @mikedanese
 	// alpha: v1.7
 	// beta: v1.12
@@ -1149,8 +1140,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ReadWriteOncePod: {Default: true, PreRelease: featuregate.Beta},
 
 	RecoverVolumeExpansionFailure: {Default: false, PreRelease: featuregate.Alpha},
-
-	RetroactiveDefaultStorageClass: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
 
