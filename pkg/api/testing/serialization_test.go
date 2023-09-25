@@ -149,7 +149,7 @@ func TestSpecificKind(t *testing.T) {
 	roundtrip.RoundTripSpecificKind(t, internalGVK, legacyscheme.Scheme, legacyscheme.Codecs, fuzzer, nil)
 }
 
-var nonRoundTrippableTypes = sets.NewString(
+var nonRoundTrippableTypes = sets.New[string](
 	"ExportOptions",
 	"GetOptions",
 	// WatchEvent does not include kind and version and can only be deserialized
