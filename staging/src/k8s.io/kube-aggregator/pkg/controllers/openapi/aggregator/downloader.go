@@ -21,32 +21,53 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
+
+type CacheableDownloader interface {
+	UpdateHandler(http.Handler)
+	Get() (*spec.Swagger, string, error)
+}
 
 // cacheableDownloader is a downloader that will always return the data
 // and the etag.
 type cacheableDownloader struct {
+	name       string
 	downloader *Downloader
-	handler    http.Handler
-	etag       string
-	spec       *spec.Swagger
+	// handler is the http Handler for the apiservice that can be replaced
+	handler atomic.Pointer[http.Handler]
+	etag    string
+	spec    *spec.Swagger
 }
 
 // NewCacheableDownloader creates a downloader that also returns the etag, making it useful to use as a cached dependency.
-func NewCacheableDownloader(downloader *Downloader, handler http.Handler) cached.Value[*spec.Swagger] {
-	return &cacheableDownloader{
+func NewCacheableDownloader(apiServiceName string, downloader *Downloader, handler http.Handler) CacheableDownloader {
+	c := &cacheableDownloader{
+		name:       apiServiceName,
 		downloader: downloader,
-		handler:    handler,
 	}
+	c.handler.Store(&handler)
+	return c
+}
+func (d *cacheableDownloader) UpdateHandler(handler http.Handler) {
+	d.handler.Store(&handler)
 }
 
 func (d *cacheableDownloader) Get() (*spec.Swagger, string, error) {
-	swagger, etag, status, err := d.downloader.Download(d.handler, d.etag)
+	spec, etag, err := d.get()
+	if err != nil {
+		return spec, etag, fmt.Errorf("failed to download %v: %v", d.name, err)
+	}
+	return spec, etag, err
+}
+
+func (d *cacheableDownloader) get() (*spec.Swagger, string, error) {
+	h := *d.handler.Load()
+	swagger, etag, status, err := d.downloader.Download(h, d.etag)
 	if err != nil {
 		return nil, "", err
 	}
