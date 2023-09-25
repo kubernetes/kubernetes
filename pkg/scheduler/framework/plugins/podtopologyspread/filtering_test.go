@@ -19,6 +19,7 @@ package podtopologyspread
 import (
 	"context"
 	"fmt"
+	"k8s.io/component-helpers/storage/volume"
 	"math"
 	"reflect"
 	"testing"
@@ -68,19 +69,30 @@ func (p *criticalPaths) sort() {
 }
 
 func TestPreFilterState(t *testing.T) {
-
+	podInfo := &framework.PodInfo{}
+	_ = podInfo.Update(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sts-p-2",
+			Namespace: "bar",
+			Labels: map[string]string{
+				"foo": "a",
+			},
+		},
+		Spec: v1.PodSpec{},
+	})
 	tests := []struct {
-		name                      string
-		pod                       *v1.Pod
-		nodes                     []*v1.Node
-		existingPods              []*v1.Pod
-		objs                      []runtime.Object
-		defaultConstraints        []v1.TopologySpreadConstraint
-		want                      *preFilterState
-		wantPrefilterStatus       *framework.Status
-		enableMinDomains          bool
-		enableNodeInclusionPolicy bool
-		enableMatchLabelKeys      bool
+		name                                                string
+		pod                                                 *v1.Pod
+		nodes                                               []*v1.Node
+		existingPods                                        []*v1.Pod
+		objs                                                []runtime.Object
+		defaultConstraints                                  []v1.TopologySpreadConstraint
+		want                                                *preFilterState
+		wantPrefilterStatus                                 *framework.Status
+		enableMinDomains                                    bool
+		enableNodeInclusionPolicy                           bool
+		enableMatchLabelKeys                                bool
+		enablePodNotExistInclusionPolicyInPodTopologySpread bool
 	}{
 		{
 			name: "clean cluster with one spreadConstraint",
@@ -111,6 +123,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 0,
 					{key: "zone", value: "zone2"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -149,6 +162,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 3,
 					{key: "zone", value: "zone2"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -187,6 +201,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 0,
 					{key: "zone", value: "zone2"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -228,6 +243,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone2"}: 2,
 					{key: "zone", value: "zone3"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -266,6 +282,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 2,
 					{key: "zone", value: "zone2"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -320,6 +337,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-x"}: 0,
 					{key: "node", value: "node-y"}: 4,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -374,6 +392,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 1,
 					{key: "node", value: "node-y"}: 4,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -421,6 +440,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 1,
 					{key: "node", value: "node-y"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -473,6 +493,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 0,
 					{key: "node", value: "node-y"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -527,6 +548,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 1,
 					{key: "node", value: "node-y"}: 4,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -564,6 +586,7 @@ func TestPreFilterState(t *testing.T) {
 					"rack": newCriticalPaths(),
 				},
 				TpPairToMatchNum: make(map[topologyPair]int),
+				PodNotExist:      make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -604,6 +627,7 @@ func TestPreFilterState(t *testing.T) {
 					"zone": newCriticalPaths(),
 				},
 				TpPairToMatchNum: make(map[topologyPair]int),
+				PodNotExist:      make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -674,6 +698,7 @@ func TestPreFilterState(t *testing.T) {
 					"zone": 2,
 					"node": 4,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -711,6 +736,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-a"}: 1,
 					{key: "node", value: "node-b"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: false,
 		},
@@ -749,6 +775,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-a"}: 1,
 					{key: "node", value: "node-b"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -788,6 +815,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 					{key: "node", value: "node-c"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -826,6 +854,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-a"}: 1,
 					{key: "node", value: "node-b"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -865,6 +894,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 					{key: "node", value: "node-c"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -903,6 +933,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 					{key: "node", value: "node-c"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: false,
 		},
@@ -941,6 +972,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 					{key: "node", value: "node-c"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -978,6 +1010,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-a"}: 1,
 					{key: "node", value: "node-b"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -1017,6 +1050,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 					{key: "node", value: "node-c"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -1067,6 +1101,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 					{key: "node", value: "node-x"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -1116,6 +1151,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 					{key: "node", value: "node-x"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -1167,6 +1203,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-b"}: 0,
 					{key: "node", value: "node-x"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -1219,6 +1256,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "node", value: "node-x"}: 2,
 					{key: "node", value: "node-y"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -1258,6 +1296,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 3,
 					{key: "zone", value: "zone2"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableMatchLabelKeys: false,
 		},
@@ -1297,6 +1336,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 					{key: "zone", value: "zone2"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableMatchLabelKeys: true,
 		},
@@ -1336,6 +1376,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 3,
 					{key: "zone", value: "zone2"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableMatchLabelKeys: true,
 		},
@@ -1375,6 +1416,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 0,
 					{key: "zone", value: "zone2"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableMatchLabelKeys: true,
 		},
@@ -1414,6 +1456,7 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 0,
 					{key: "zone", value: "zone2"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1452,8 +1495,142 @@ func TestPreFilterState(t *testing.T) {
 					{key: "zone", value: "zone1"}: 3,
 					{key: "zone", value: "zone2"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableMatchLabelKeys: true,
+		},
+		{
+			name: "pod not exist inclusion in PodTopologySpread when feature gate enable",
+			pod: st.MakePod().Name("sts-p-5").Namespace("bar").Label("foo", "a").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Label("foo", "a").Obj(), nil, nil, nil, []string{"bar"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("sts-p-0").UID("sts-p-0").Namespace("bar").Node("node-a").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-1").UID("sts-p-1").Namespace("bar").Node("node-x").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-3").UID("sts-p-3").Namespace("bar").Node("node-b").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-4").UID("sts-p-4").Namespace("bar").Node("node-y").Label("foo", "a").Obj(),
+			},
+			objs: []runtime.Object{
+				st.MakePersistentVolumeClaim().Name("sts-p-0-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-0", UID: "sts-p-0"}).Annotation(volume.AnnSelectedNode, "node-a").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-1-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-1", UID: "sts-p-1"}).Annotation(volume.AnnSelectedNode, "node-x").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-2-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-2", UID: "sts-p-2"}).Annotation(volume.AnnSelectedNode, "node-b").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-3-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-3", UID: "sts-p-3"}).Annotation(volume.AnnSelectedNode, "node-b").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-4-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-4", UID: "sts-p-4"}).Annotation(volume.AnnSelectedNode, "node-y").Obj(),
+				st.MakeStatefulSet().Name("sts-p").Namespace("bar").UID("sts-uid").PodTemplate(
+					v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "a",
+							},
+						},
+					}).Label("foo", "a").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "zone",
+						Selector:           mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Label("foo", "a").Obj()),
+						MinDomains:         1,
+						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
+						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
+					},
+				},
+				TpKeyToCriticalPaths: map[string]*criticalPaths{
+					"zone": {{"zone2", 2}, {"zone1", 3}},
+				},
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 3,
+					{key: "zone", value: "zone2"}: 2,
+				},
+				PodNotExist: map[string][]*framework.PodInfo{
+					"node-b": {
+						podInfo,
+					},
+				},
+			},
+			enablePodNotExistInclusionPolicyInPodTopologySpread: true,
+			enableNodeInclusionPolicy:                           true,
+		},
+		{
+			name: "pod not exist inclusion in PodTopologySpread when feature gate disable",
+			pod: st.MakePod().Name("sts-p-5").Namespace("bar").Label("foo", "a").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Label("foo", "a").Obj(), nil, nil, nil, []string{"bar"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("sts-p-0").UID("sts-p-0").Namespace("bar").Node("node-a").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-1").UID("sts-p-1").Namespace("bar").Node("node-x").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-3").UID("sts-p-3").Namespace("bar").Node("node-b").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-4").UID("sts-p-4").Namespace("bar").Node("node-y").Label("foo", "a").Obj(),
+			},
+			objs: []runtime.Object{
+				st.MakePersistentVolumeClaim().Name("sts-p-0-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-0", UID: "sts-p-0"}).Annotation(volume.AnnSelectedNode, "node-a").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-1-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-1", UID: "sts-p-1"}).Annotation(volume.AnnSelectedNode, "node-x").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-2-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-2", UID: "sts-p-2"}).Annotation(volume.AnnSelectedNode, "node-b").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-3-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-3", UID: "sts-p-3"}).Annotation(volume.AnnSelectedNode, "node-b").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-4-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-4", UID: "sts-p-4"}).Annotation(volume.AnnSelectedNode, "node-y").Obj(),
+				st.MakeStatefulSet().Name("sts-p").Namespace("bar").UID("sts-uid").PodTemplate(
+					v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "a",
+							},
+						},
+					}).Label("foo", "a").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "zone",
+						Selector:           mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Label("foo", "a").Obj()),
+						MinDomains:         1,
+						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
+						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
+					},
+				},
+				TpKeyToCriticalPaths: map[string]*criticalPaths{
+					"zone": {{"zone2", 2}, {"zone1", 2}},
+				},
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 2,
+					{key: "zone", value: "zone2"}: 2,
+				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
+			},
+			enablePodNotExistInclusionPolicyInPodTopologySpread: false,
 		},
 		{
 			name: "skip if not specified",
@@ -1473,12 +1650,16 @@ func TestPreFilterState(t *testing.T) {
 				DefaultConstraints: tt.defaultConstraints,
 				DefaultingType:     config.ListDefaulting,
 			}
-
 			p := plugintesting.SetupPluginWithInformers(ctx, t, topologySpreadFunc, args, cache.NewSnapshot(tt.existingPods, tt.nodes), tt.objs)
+			if tt.enablePodNotExistInclusionPolicyInPodTopologySpread {
+				args.DefaultingType = config.SystemDefaulting
+				p = plugintesting.SetupPluginWithInformers(ctx, t,
+					frameworkruntime.FactoryAdapter(feature.Features{EnablePodNotExistInclusionPolicyInPodTopologySpread: true},
+						New), args, cache.NewSnapshot(tt.existingPods, tt.nodes), tt.objs)
+			}
 			p.(*PodTopologySpread).enableMinDomainsInPodTopologySpread = tt.enableMinDomains
 			p.(*PodTopologySpread).enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			p.(*PodTopologySpread).enableMatchLabelKeysInPodTopologySpread = tt.enableMatchLabelKeys
-
 			cs := framework.NewCycleState()
 			_, s := p.(*PodTopologySpread).PreFilter(ctx, cs, tt.pod)
 			if !tt.wantPrefilterStatus.Equal(s) {
@@ -1542,6 +1723,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-a"}: 1,
 					{key: "node", value: "node-b"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1567,6 +1749,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-a"}: 1,
 					{key: "node", value: "node-b"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1592,6 +1775,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-a"}: 0,
 					{key: "node", value: "node-b"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1617,6 +1801,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-a"}: 0,
 					{key: "node", value: "node-b"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1644,6 +1829,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-a"}: 1,
 					{key: "node", value: "node-x"}: 0,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1673,6 +1859,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-a"}: 1,
 					{key: "node", value: "node-x"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1706,6 +1893,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-b"}: 2,
 					{key: "node", value: "node-x"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1749,6 +1937,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-b"}: 1,
 					{key: "node", value: "node-x"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1792,6 +1981,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-b"}: 1,
 					{key: "node", value: "node-x"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -1817,6 +2007,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpPairToMatchNum: map[topologyPair]int{
 					{key: "zone", value: "zone2"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: false,
 		},
@@ -1843,6 +2034,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpPairToMatchNum: map[topologyPair]int{
 					{key: "zone", value: "zone2"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -1870,6 +2062,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 					{key: "zone", value: "zone2"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: false,
 		},
@@ -1897,6 +2090,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 					{key: "zone", value: "zone2"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -1924,6 +2118,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 					{key: "zone", value: "zone2"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -1951,6 +2146,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 2,
 					{key: "zone", value: "zone1"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: false,
 		},
@@ -1978,6 +2174,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 2,
 					{key: "zone", value: "zone1"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -2062,6 +2259,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 					{key: "zone", value: "zone2"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -2092,6 +2290,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 1,
 					{key: "zone", value: "zone2"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -2123,6 +2322,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 2,
 					{key: "zone", value: "zone2"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -2154,6 +2354,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone1"}: 2,
 					{key: "zone", value: "zone2"}: 2,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -2189,6 +2390,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "node", value: "node-b"}: 1,
 					{key: "node", value: "node-x"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -2214,6 +2416,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpPairToMatchNum: map[topologyPair]int{
 					{key: "zone", value: "zone2"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: false,
 		},
@@ -2240,6 +2443,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpPairToMatchNum: map[topologyPair]int{
 					{key: "zone", value: "zone2"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -2267,6 +2471,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 0,
 					{key: "zone", value: "zone1"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: false,
 		},
@@ -2294,6 +2499,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					{key: "zone", value: "zone2"}: 0,
 					{key: "zone", value: "zone1"}: 1,
 				},
+				PodNotExist: make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},

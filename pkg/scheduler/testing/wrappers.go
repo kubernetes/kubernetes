@@ -19,6 +19,7 @@ package testing
 import (
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -688,6 +689,53 @@ func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
 	return p
 }
 
+// StatefulSetWrapper wraps a StatefulSet inside.
+type StatefulSetWrapper struct{ appsv1.StatefulSet }
+
+// MakeStatefulSet creates a StatefulSet wrapper.
+func MakeStatefulSet() *StatefulSetWrapper {
+	w := &StatefulSetWrapper{appsv1.StatefulSet{}}
+	return w
+}
+
+// Obj returns the inner Node.
+func (sts *StatefulSetWrapper) Obj() *appsv1.StatefulSet {
+	return &sts.StatefulSet
+}
+
+// Name sets `s` as the name of the inner pod.
+func (sts *StatefulSetWrapper) Name(s string) *StatefulSetWrapper {
+	sts.SetName(s)
+	return sts
+}
+
+// Namespace sets `s` as the namespace of the inner StatefulSet.
+func (sts *StatefulSetWrapper) Namespace(s string) *StatefulSetWrapper {
+	sts.SetNamespace(s)
+	return sts
+}
+
+// UID sets `s` as the UID of the inner StatefulSet.
+func (sts *StatefulSetWrapper) UID(s string) *StatefulSetWrapper {
+	sts.SetUID(types.UID(s))
+	return sts
+}
+
+// Label applies a {k,v} label pair to the inner StatefulSet.
+func (sts *StatefulSetWrapper) Label(k, v string) *StatefulSetWrapper {
+	if sts.Labels == nil {
+		sts.Labels = make(map[string]string)
+	}
+	sts.Labels[k] = v
+	return sts
+}
+
+// PodTemplate applies PodTemplateSpec to the inner StatefulSet.
+func (sts *StatefulSetWrapper) PodTemplate(spec v1.PodTemplateSpec) *StatefulSetWrapper {
+	sts.Spec.Template = spec
+	return sts
+}
+
 // NodeWrapper wraps a Node inside.
 type NodeWrapper struct{ v1.Node }
 
@@ -803,6 +851,13 @@ func (p *PersistentVolumeClaimWrapper) AccessModes(accessModes []v1.PersistentVo
 // PersistentVolumeClaim.
 func (p *PersistentVolumeClaimWrapper) Resources(resources v1.VolumeResourceRequirements) *PersistentVolumeClaimWrapper {
 	p.PersistentVolumeClaim.Spec.Resources = resources
+	return p
+}
+
+// OwnerReference sets `OwnerReferences` as of the inner
+// PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) OwnerReference(reference metav1.OwnerReference) *PersistentVolumeClaimWrapper {
+	p.PersistentVolumeClaim.OwnerReferences = append(p.PersistentVolumeClaim.OwnerReferences, reference)
 	return p
 }
 

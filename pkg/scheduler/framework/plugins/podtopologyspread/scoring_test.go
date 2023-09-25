@@ -18,6 +18,7 @@ package podtopologyspread
 
 import (
 	"context"
+	"k8s.io/component-helpers/storage/volume"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -111,14 +112,26 @@ func TestPreScoreSkip(t *testing.T) {
 }
 
 func TestPreScoreStateEmptyNodes(t *testing.T) {
+	podInfo := &framework.PodInfo{}
+	_ = podInfo.Update(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sts-p-2",
+			Namespace: "bar",
+			Labels: map[string]string{
+				"foo": "a",
+			},
+		},
+		Spec: v1.PodSpec{},
+	})
 	tests := []struct {
-		name                      string
-		pod                       *v1.Pod
-		nodes                     []*v1.Node
-		objs                      []runtime.Object
-		config                    config.PodTopologySpreadArgs
-		want                      *preScoreState
-		enableNodeInclusionPolicy bool
+		name                                                string
+		pod                                                 *v1.Pod
+		nodes                                               []*v1.Node
+		objs                                                []runtime.Object
+		config                                              config.PodTopologySpreadArgs
+		want                                                *preScoreState
+		enableNodeInclusionPolicy                           bool
+		enablePodNotExistInclusionPolicyInPodTopologySpread bool
 	}{
 		{
 			name: "normal case",
@@ -159,6 +172,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2), topologyNormalizingWeight(3)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -191,6 +205,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -231,6 +246,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone1"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(2)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -274,6 +290,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: v1.LabelTopologyZone, value: ""}:     ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(4), topologyNormalizingWeight(2)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -324,6 +341,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "planet", value: "mars"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -365,6 +383,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{"planet", "mars"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 		},
 		{
@@ -398,6 +417,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -432,6 +452,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -466,6 +487,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -500,6 +522,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -533,6 +556,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -566,6 +590,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone2"}: ptr.To[int64](0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
+				PodNotExist:               make(map[string][]*framework.PodInfo),
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -607,15 +632,16 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 
 func TestPodTopologySpreadScore(t *testing.T) {
 	tests := []struct {
-		name                      string
-		pod                       *v1.Pod
-		existingPods              []*v1.Pod
-		nodes                     []*v1.Node
-		failedNodes               []*v1.Node // nodes + failedNodes = all nodes
-		objs                      []runtime.Object
-		want                      framework.NodeScoreList
-		enableNodeInclusionPolicy bool
-		enableMatchLabelKeys      bool
+		name                                                string
+		pod                                                 *v1.Pod
+		existingPods                                        []*v1.Pod
+		nodes                                               []*v1.Node
+		failedNodes                                         []*v1.Node // nodes + failedNodes = all nodes
+		objs                                                []runtime.Object
+		want                                                framework.NodeScoreList
+		enableNodeInclusionPolicy                           bool
+		enableMatchLabelKeys                                bool
+		enablePodNotExistInclusionPolicyInPodTopologySpread bool
 	}{
 		// Explanation on the Legend:
 		// a) X/Y means there are X matching pods on node1 and Y on node2, both nodes are candidates
@@ -1333,6 +1359,107 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			enableMatchLabelKeys: true,
 		},
+		{
+			name: "PodNotExistInclusion honored",
+			pod: st.MakePod().Name("sts-p-5").Namespace("bar").Label("foo", "a").
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Label("foo", "a").Obj(), nil, nil, nil, []string{"bar"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("sts-p-0").UID("sts-p-0").Namespace("bar").Node("node-a").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-1").UID("sts-p-1").Namespace("bar").Node("node-x").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-3").UID("sts-p-3").Namespace("bar").Node("node-b").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-4").UID("sts-p-4").Namespace("bar").Node("node-y").Label("foo", "a").Obj(),
+			},
+			objs: []runtime.Object{
+				st.MakePersistentVolumeClaim().Name("sts-p-0-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-0", UID: "sts-p-0"}).Annotation(volume.AnnSelectedNode, "node-a").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-1-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-1", UID: "sts-p-1"}).Annotation(volume.AnnSelectedNode, "node-x").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-2-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-2", UID: "sts-p-2"}).Annotation(volume.AnnSelectedNode, "node-b").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-3-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-3", UID: "sts-p-3"}).Annotation(volume.AnnSelectedNode, "node-b").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-4-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-4", UID: "sts-p-4"}).Annotation(volume.AnnSelectedNode, "node-y").Obj(),
+				st.MakeStatefulSet().Name("sts-p").Namespace("bar").UID("sts-uid").PodTemplate(
+					v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "a",
+							},
+						},
+					}).Label("foo", "a").Obj(),
+			},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 75},
+				{Name: "node-b", Score: 75},
+				{Name: "node-x", Score: 100},
+				{Name: "node-y", Score: 100},
+			},
+			enableNodeInclusionPolicy:                           true,
+			enablePodNotExistInclusionPolicyInPodTopologySpread: true,
+		},
+		{
+			name: "PodNotExistInclusion ignored",
+			pod: st.MakePod().Name("sts-p-5").Namespace("bar").Label("foo", "a").
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Label("foo", "a").Obj(), nil, nil, nil, []string{"bar"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("sts-p-0").UID("sts-p-0").Namespace("bar").Node("node-a").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-1").UID("sts-p-1").Namespace("bar").Node("node-x").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-3").UID("sts-p-3").Namespace("bar").Node("node-b").Label("foo", "a").Obj(),
+				st.MakePod().Name("sts-p-4").UID("sts-p-4").Namespace("bar").Node("node-y").Label("foo", "a").Obj(),
+			},
+			objs: []runtime.Object{
+				st.MakePersistentVolumeClaim().Name("sts-p-0-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-0", UID: "sts-p-0"}).Annotation(volume.AnnSelectedNode, "node-a").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-1-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-1", UID: "sts-p-1"}).Annotation(volume.AnnSelectedNode, "node-x").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-2-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-2", UID: "sts-p-2"}).Annotation(volume.AnnSelectedNode, "node-b").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-3-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-3", UID: "sts-p-3"}).Annotation(volume.AnnSelectedNode, "node-b").Obj(),
+				st.MakePersistentVolumeClaim().Name("sts-p-4-data").Namespace("bar").OwnerReference(
+					metav1.OwnerReference{Kind: "StatefulSet", Name: "sts-p", UID: "sts-uid"}).OwnerReference(
+					metav1.OwnerReference{Kind: "Pod", Name: "sts-p-4", UID: "sts-p-4"}).Annotation(volume.AnnSelectedNode, "node-y").Obj(),
+				st.MakeStatefulSet().Name("sts-p").Namespace("bar").UID("sts-uid").PodTemplate(
+					v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "a",
+							},
+						},
+					}).Label("foo", "a").Obj(),
+			},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 100},
+				{Name: "node-b", Score: 100},
+				{Name: "node-x", Score: 100},
+				{Name: "node-y", Score: 100},
+			},
+			enableNodeInclusionPolicy: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1342,7 +1469,13 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
 			pl := plugintesting.SetupPluginWithInformers(ctx, t, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes), tt.objs)
+			if tt.enablePodNotExistInclusionPolicyInPodTopologySpread {
+				pl = plugintesting.SetupPluginWithInformers(ctx, t,
+					frameworkruntime.FactoryAdapter(feature.Features{EnablePodNotExistInclusionPolicyInPodTopologySpread: true},
+						New), &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, cache.NewSnapshot(tt.existingPods, tt.nodes), tt.objs)
+			}
 			p := pl.(*PodTopologySpread)
+
 			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclusionPolicy
 			p.enableMatchLabelKeysInPodTopologySpread = tt.enableMatchLabelKeys
 

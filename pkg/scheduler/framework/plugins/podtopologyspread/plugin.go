@@ -114,10 +114,6 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 		}
 		pl.setListers(h.SharedInformerFactory())
 	}
-	if pl.enablePodNotExistInclusionPolicyInPodTopologySpread {
-		pl.statefulSets = h.SharedInformerFactory().Apps().V1().StatefulSets().Lister()
-		pl.pvcs = h.SharedInformerFactory().Core().V1().PersistentVolumeClaims().Lister()
-	}
 	return pl, nil
 }
 
@@ -133,6 +129,8 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 	pl.services = factory.Core().V1().Services().Lister()
 	pl.replicationCtrls = factory.Core().V1().ReplicationControllers().Lister()
 	pl.replicaSets = factory.Apps().V1().ReplicaSets().Lister()
+	pl.statefulSets = factory.Apps().V1().StatefulSets().Lister()
+	pl.pvcs = factory.Core().V1().PersistentVolumeClaims().Lister()
 }
 
 // EventsToRegister returns the possible events that may make a Pod
