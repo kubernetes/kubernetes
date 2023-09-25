@@ -145,7 +145,7 @@ type Column struct {
 	FieldSpec string
 }
 
-// CustomColumnPrinter is a printer that knows how to print arbitrary columns
+// CustomColumnsPrinter is a printer that knows how to print arbitrary columns
 // of data from templates specified in the `Columns` array
 type CustomColumnsPrinter struct {
 	Columns   []Column
