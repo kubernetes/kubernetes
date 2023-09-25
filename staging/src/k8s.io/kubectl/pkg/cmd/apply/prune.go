@@ -71,7 +71,7 @@ func newPruner(o *ApplyOptions) pruner {
 
 func (p *pruner) pruneAll(o *ApplyOptions) error {
 
-	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(o.Mapper, o.PruneResources, o.Namespace != "")
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(o.Mapper, o.PruneResources, o.Namespace != "default")
 	if err != nil {
 		return fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}
