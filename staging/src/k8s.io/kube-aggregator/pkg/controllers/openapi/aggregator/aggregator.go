@@ -228,7 +228,7 @@ func (s *specAggregator) AddUpdateAPIService(apiService *v1.APIService, handler 
 		s.openAPIVersionedService.UpdateSpecLazy(s.buildMergeSpecLocked())
 	}
 
-	return s.updateServiceLocked(apiService.Name)
+	return nil
 }
 
 // RemoveAPIService removes an api service from OpenAPI aggregation. If it does not exist, no error is returned.

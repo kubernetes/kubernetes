@@ -139,7 +139,10 @@ func (c *AggregationController) AddAPIService(handler http.Handler, apiService *
 
 // UpdateAPIService updates API Service's info and handler.
 func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *v1.APIService) {
-	if err := c.openAPIAggregationManager.AddUpdateAPIService(apiService, handler); err != nil {
+	if apiService.Spec.Service == nil {
+		return
+	}
+	if err := c.openAPIAggregationManager.UpdateAPIServiceSpec(apiService.Name); err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error updating APIService %q with err: %v", apiService.Name, err))
 	}
 	key := apiService.Name
