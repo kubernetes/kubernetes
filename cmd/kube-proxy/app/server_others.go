@@ -125,7 +125,7 @@ func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, du
 }
 
 // createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStack bool) (proxy.Provider, error) {
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStack, initOnly bool) (proxy.Provider, error) {
 	var proxier proxy.Provider
 	var err error
 
@@ -175,6 +175,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				s.Recorder,
 				s.HealthzServer,
 				config.NodePortAddresses,
+				initOnly,
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
@@ -201,6 +202,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				s.Recorder,
 				s.HealthzServer,
 				config.NodePortAddresses,
+				initOnly,
 			)
 		}
 
@@ -247,6 +249,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				config.IPVS.Scheduler,
 				config.NodePortAddresses,
 				kernelHandler,
+				initOnly,
 			)
 		} else {
 			var localDetector proxyutiliptables.LocalTrafficDetector
@@ -279,6 +282,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				config.IPVS.Scheduler,
 				config.NodePortAddresses,
 				kernelHandler,
+				initOnly,
 			)
 		}
 		if err != nil {
