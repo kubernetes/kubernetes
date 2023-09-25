@@ -26,10 +26,14 @@ package resourceclaim
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -59,9 +63,7 @@ var (
 //     In this case the boolean determines whether IsForPod must be called
 //     after retrieving the ResourceClaim and before using it.
 //
-// If podClaim.Template is not nil, the caller must check that the
-// ResourceClaim is indeed the one that was created for the Pod by calling
-// IsUsable.
+// Determining the name depends on Kubernetes >= 1.28.
 func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOwner bool, err error) {
 	switch {
 	case podClaim.Source.ResourceClaimName != nil:
@@ -73,6 +75,73 @@ func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOw
 			}
 		}
 		return nil, false, fmt.Errorf(`pod "%s/%s": %w`, pod.Namespace, pod.Name, ErrClaimNotFound)
+	default:
+		return nil, false, fmt.Errorf(`pod "%s/%s", spec.resourceClaim %q: %w`, pod.Namespace, pod.Name, podClaim.Name, ErrAPIUnsupported)
+	}
+}
+
+// NewNameLookup returns an object which handles determining the name of
+// a ResourceClaim. In contrast to the stand-alone Name it is compatible
+// also with Kubernetes < 1.28.
+//
+// Providing a client is optional. If none is available, then code can pass nil
+// and users can set the DRA_WITH_DETERMINISTIC_RESOURCE_CLAIM_NAMES env
+// variable to an arbitrary non-empty value to use the naming from Kubernetes <
+// 1.28.
+func NewNameLookup(client kubernetes.Interface) *Lookup {
+	return &Lookup{client: client}
+}
+
+// Lookup stores the state which is necessary to look up ResourceClaim names.
+type Lookup struct {
+	client       kubernetes.Interface
+	usePodStatus *bool
+}
+
+// Name is a variant of the stand-alone Name with support also for Kubernetes < 1.28.
+func (l *Lookup) Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOwner bool, err error) {
+	if l.usePodStatus == nil {
+		if value, _ := os.LookupEnv("DRA_WITH_DETERMINISTIC_RESOURCE_CLAIM_NAMES"); value != "" {
+			l.usePodStatus = ptr.To(false)
+		} else if l.client != nil {
+			// Check once. This does not detect upgrades or
+			// downgrades, but that is good enough for the simple
+			// test scenarios that the Kubernetes < 1.28 support is
+			// meant for.
+			info, err := l.client.Discovery().ServerVersion()
+			if err != nil {
+				return nil, false, fmt.Errorf("look up server version: %v", err)
+			}
+			if info.Major == "" {
+				// Fake client...
+				l.usePodStatus = ptr.To(true)
+			} else {
+				switch strings.Compare(info.Major, "1") {
+				case -1:
+					// Huh?
+					l.usePodStatus = ptr.To(false)
+				case 0:
+					// info.Minor may have a suffix which makes it larger than 28.
+					// We don't care about pre-releases here.
+					l.usePodStatus = ptr.To(strings.Compare("28", info.Minor) <= 0)
+				case 1:
+					// Kubernetes 2? Yeah!
+					l.usePodStatus = ptr.To(true)
+				}
+			}
+		}
+	}
+
+	if *l.usePodStatus {
+		return Name(pod, podClaim)
+	}
+
+	switch {
+	case podClaim.Source.ResourceClaimName != nil:
+		return podClaim.Source.ResourceClaimName, false, nil
+	case podClaim.Source.ResourceClaimTemplateName != nil:
+		name := pod.Name + "-" + podClaim.Name
+		return &name, true, nil
 	default:
 		return nil, false, fmt.Errorf(`pod "%s/%s", spec.resourceClaim %q: %w`, pod.Namespace, pod.Name, podClaim.Name, ErrAPIUnsupported)
 	}
