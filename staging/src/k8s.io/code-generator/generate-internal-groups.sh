@@ -120,6 +120,9 @@ for GVs in ${GROUPS_WITH_VERSIONS}; do
   done
 done
 
+CLIENTSET_PKG="${CLIENTSET_PKG_NAME:-clientset}"
+CLIENTSET_NAME="${CLIENTSET_NAME_VERSIONED:-versioned}"
+
 if grep -qw "deepcopy" <<<"${GENS}"; then
   # Nuke existing files
   for dir in $(GO111MODULE=on go list -f '{{.Dir}}' "${ALL_FQ_APIS[@]}"); do
@@ -187,9 +190,6 @@ if grep -qw "applyconfiguration" <<<"${GENS}"; then
 fi
 
 if grep -qw "client" <<<"${GENS}"; then
-  CLIENTSET_PKG="${CLIENTSET_PKG_NAME:-clientset}"
-  CLIENTSET_NAME="${CLIENTSET_NAME_VERSIONED:-versioned}"
-
   # Nuke existing files
   root="$(GO111MODULE=on go list -f '{{.Dir}}' "${OUTPUT_PKG}/${CLIENTSET_PKG}/${CLIENTSET_NAME}" 2>/dev/null || true)"
   if [ -n "${root}" ]; then
