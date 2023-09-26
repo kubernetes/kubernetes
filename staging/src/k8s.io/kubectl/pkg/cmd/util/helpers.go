@@ -430,6 +430,7 @@ const (
 	InteractiveDelete       FeatureGate = "KUBECTL_INTERACTIVE_DELETE"
 	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
+	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
 )
 
 // IsEnabled returns true iff environment variable is set to true.

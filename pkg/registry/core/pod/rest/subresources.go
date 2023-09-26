@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	translator "k8s.io/apiserver/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/util/proxy/portforward"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -242,7 +243,13 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PortForwardWebsockets) {
+		maxBytesPerSec := capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
+		streamtranslator := portforward.NewStreamTranslatorHandler(location, transport, maxBytesPerSec)
+		handler = translator.NewTranslatingHandler(handler, streamtranslator, wsstream.IsWebSocketRequestWithPortForwardProtocol)
+	}
+	return handler, nil
 }
 
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) http.Handler {

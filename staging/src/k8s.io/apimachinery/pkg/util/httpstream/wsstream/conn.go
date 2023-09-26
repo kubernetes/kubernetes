@@ -27,6 +27,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/portforward"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -99,6 +100,23 @@ func IsWebSocketRequestWithStreamCloseProtocol(req *http.Request) bool {
 	requestedProtocols := strings.TrimSpace(req.Header.Get(WebSocketProtocolHeader))
 	for _, requestedProtocol := range strings.Split(requestedProtocols, ",") {
 		if protocolSupportsStreamClose(strings.TrimSpace(requestedProtocol)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsWebSocketRequestWithPortForwardProtocol returns true if the request contains headers
+// identifying that it is requesting a websocket upgrade with a portforward protocol;
+// false otherwise.
+func IsWebSocketRequestWithPortForwardProtocol(req *http.Request) bool {
+	if !IsWebSocketRequest(req) {
+		return false
+	}
+	requestedProtocols := strings.TrimSpace(req.Header.Get(WebSocketProtocolHeader))
+	for _, requestedProtocol := range strings.Split(requestedProtocols, ",") {
+		if protocolSupportsWebsocketPortForward(strings.TrimSpace(requestedProtocol)) {
 			return true
 		}
 	}
@@ -299,6 +317,13 @@ func (conn *Conn) Close() error {
 // false otherwise.
 func protocolSupportsStreamClose(protocol string) bool {
 	return protocol == remotecommand.StreamProtocolV5Name
+}
+
+// protocolSupportsWebsocketPortForward returns true if the passed protocol
+// supports the portforward stream functionality for websockets
+// (currently only V2 portforward); false otherwise.
+func protocolSupportsWebsocketPortForward(protocol string) bool {
+	return protocol == portforward.PortForwardV2Name
 }
 
 // handle implements a websocket handler.

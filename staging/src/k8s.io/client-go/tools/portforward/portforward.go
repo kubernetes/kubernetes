@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
 
@@ -305,6 +306,7 @@ func (pf *PortForwarder) waitForConnection(listener net.Listener, port Forwarded
 		case <-pf.streamConn.CloseChan():
 			return
 		default:
+			klog.V(4).Infoln("Before listener.Accept()...")
 			conn, err := listener.Accept()
 			if err != nil {
 				// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
@@ -313,6 +315,7 @@ func (pf *PortForwarder) waitForConnection(listener net.Listener, port Forwarded
 				}
 				return
 			}
+			klog.V(4).Infof("Accepted; handling connection on %d", port)
 			go pf.handleConnection(conn, port)
 		}
 	}
@@ -382,12 +385,16 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 		}
 
 		// inform the select below that the remote copy is done
+		klog.V(2).Infoln("Datastream Reading Complete...Closing remoteDone channel")
 		close(remoteDone)
 	}()
 
 	go func() {
 		// inform server we're not sending any more data after copy unblocks
-		defer dataStream.Close()
+		defer func() {
+			klog.V(2).Infoln("Closing DataStream...Writing Complete")
+			dataStream.Close() //nolint:errcheck
+		}()
 
 		// Copy from the local port to the remote side.
 		if _, err := io.Copy(dataStream, conn); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
@@ -407,8 +414,10 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	err = <-errorChan
 	if err != nil {
 		runtime.HandleError(err)
+		klog.V(4).Infof("Error handling connection: %v", err)
 		pf.streamConn.Close()
 	}
+	klog.V(2).Infoln("handle FINISHED...")
 }
 
 // Close stops all listeners of PortForwarder.
