@@ -1654,7 +1654,11 @@ func TestCheckoutChanges(t *testing.T) {
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{},
 				current: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1", true, true, false), newTestEp("10.0.1.2:80", "host1", false, true, true), newTestEp("10.0.1.3:80", "host1", false, false, false)},
+					svcPortName0: []Endpoint{
+						&BaseEndpointInfo{Endpoint: "10.0.1.1:80", Ready: true, Serving: true, Terminating: false},
+						&BaseEndpointInfo{Endpoint: "10.0.1.2:80", Ready: false, Serving: true, Terminating: true},
+						&BaseEndpointInfo{Endpoint: "10.0.1.3:80", Ready: false, Serving: false, Terminating: false},
+					},
 				},
 			}},
 			appliedSlices: []*discovery.EndpointSlice{},
@@ -1666,11 +1670,23 @@ func TestCheckoutChanges(t *testing.T) {
 			endpointsChangeTracker: NewEndpointsChangeTracker("", nil, v1.IPv4Protocol, nil, nil),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1", true, true, false), newTestEp("10.0.1.2:80", "host1", true, true, false), newTestEp("10.0.1.3:80", "host1", false, false, false)},
-					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", "host1", true, true, false), newTestEp("10.0.1.2:443", "host1", true, true, false), newTestEp("10.0.1.3:443", "host1", false, false, false)},
+					svcPortName0: []Endpoint{
+						&BaseEndpointInfo{Endpoint: "10.0.1.1:80", Ready: true, Serving: true, Terminating: false},
+						&BaseEndpointInfo{Endpoint: "10.0.1.2:80", Ready: true, Serving: true, Terminating: false},
+						&BaseEndpointInfo{Endpoint: "10.0.1.3:80", Ready: false, Serving: false, Terminating: false},
+					},
+					svcPortName1: []Endpoint{
+						&BaseEndpointInfo{Endpoint: "10.0.1.1:443", Ready: true, Serving: true, Terminating: false},
+						&BaseEndpointInfo{Endpoint: "10.0.1.2:443", Ready: true, Serving: true, Terminating: false},
+						&BaseEndpointInfo{Endpoint: "10.0.1.3:443", Ready: false, Serving: false, Terminating: false},
+					},
 				},
 				current: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1", true, true, false), newTestEp("10.0.1.2:80", "host1", true, true, false), newTestEp("10.0.1.3:80", "host1", false, false, false)},
+					svcPortName0: []Endpoint{
+						&BaseEndpointInfo{Endpoint: "10.0.1.1:80", Ready: true, Serving: true, Terminating: false},
+						&BaseEndpointInfo{Endpoint: "10.0.1.2:80", Ready: true, Serving: true, Terminating: false},
+						&BaseEndpointInfo{Endpoint: "10.0.1.3:80", Ready: false, Serving: false, Terminating: false},
+					},
 				},
 			}},
 			appliedSlices: []*discovery.EndpointSlice{
@@ -1741,14 +1757,6 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 			}
 		}
 	}
-}
-
-func newTestEp(ep, host string, ready, serving, terminating bool) *BaseEndpointInfo {
-	endpointInfo := &BaseEndpointInfo{Endpoint: ep, Ready: ready, Serving: serving, Terminating: terminating}
-	if host != "" {
-		endpointInfo.NodeName = host
-	}
-	return endpointInfo
 }
 
 func initializeCache(endpointSliceCache *EndpointSliceCache, endpointSlices []*discovery.EndpointSlice) {

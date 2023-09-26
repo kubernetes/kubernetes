@@ -235,7 +235,6 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.1:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.1:80",
 						IsLocal:     false,
-						NodeName:    "host2",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -243,7 +242,6 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.2:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.2:80",
 						IsLocal:     true,
-						NodeName:    "host1",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -251,7 +249,6 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.3:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.3:80",
 						IsLocal:     false,
-						NodeName:    "host2",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -271,7 +268,6 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.1:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.1:80",
 						IsLocal:     false,
-						NodeName:    "host2",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -279,7 +275,6 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.2:80": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.2:80",
 						IsLocal:     true,
-						NodeName:    "host1",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -287,7 +282,6 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.1:8080": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.1:8080",
 						IsLocal:     false,
-						NodeName:    "host2",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,
@@ -295,7 +289,6 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 					"10.0.1.2:8080": &BaseEndpointInfo{
 						Endpoint:    "10.0.1.2:8080",
 						IsLocal:     true,
-						NodeName:    "host1",
 						Ready:       true,
 						Serving:     true,
 						Terminating: false,

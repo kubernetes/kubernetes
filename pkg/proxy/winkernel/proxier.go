@@ -329,21 +329,6 @@ func (info *endpointInfo) Port() (int, error) {
 	return int(info.port), nil
 }
 
-// Equal is part of proxy.Endpoint interface.
-func (info *endpointInfo) Equal(other proxy.Endpoint) bool {
-	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
-}
-
-// GetNodeName returns the NodeName for this endpoint.
-func (info *endpointInfo) GetNodeName() string {
-	return ""
-}
-
-// GetZone returns the Zone for this endpoint.
-func (info *endpointInfo) GetZone() string {
-	return ""
-}
-
 // Uses mac prefix and IPv4 address to return a mac address
 // This ensures mac addresses are unique for proper load balancing
 // There is a possibility of MAC collisions but this Mac address is used for remote endpoints only
