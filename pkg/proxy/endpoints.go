@@ -50,27 +50,16 @@ type BaseEndpointInfo struct {
 	// ZoneHints represent the zone hints for the endpoint. This is based on
 	// endpoint.hints.forZones[*].name in the EndpointSlice API.
 	ZoneHints sets.Set[string]
-	// Ready indicates whether this endpoint is ready and NOT terminating.
-	// For pods, this is true if a pod has a ready status and a nil deletion timestamp.
-	// This is only set when watching EndpointSlices. If using Endpoints, this is always
-	// true since only ready endpoints are read from Endpoints.
-	// TODO: Ready can be inferred from Serving and Terminating below when enabled by default.
+	// Ready indicates whether this endpoint is ready and NOT terminating, unless
+	// PublishNotReadyAddresses is set on the service, in which case it will just
+	// always be true.
 	Ready bool
-	// Serving indiciates whether this endpoint is ready regardless of its terminating state.
+	// Serving indicates whether this endpoint is ready regardless of its terminating state.
 	// For pods this is true if it has a ready status regardless of its deletion timestamp.
-	// This is only set when watching EndpointSlices. If using Endpoints, this is always
-	// true since only ready endpoints are read from Endpoints.
 	Serving bool
 	// Terminating indicates whether this endpoint is terminating.
 	// For pods this is true if it has a non-nil deletion timestamp.
-	// This is only set when watching EndpointSlices. If using Endpoints, this is always
-	// false since terminating endpoints are always excluded from Endpoints.
 	Terminating bool
-
-	// NodeName is the name of the node this endpoint belongs to
-	NodeName string
-	// Zone is the name of the zone this endpoint belongs to
-	Zone string
 }
 
 var _ Endpoint = &BaseEndpointInfo{}
@@ -117,18 +106,7 @@ func (info *BaseEndpointInfo) Port() (int, error) {
 	return proxyutil.PortPart(info.Endpoint)
 }
 
-// GetNodeName returns the NodeName for this endpoint.
-func (info *BaseEndpointInfo) GetNodeName() string {
-	return info.NodeName
-}
-
-// GetZone returns the Zone for this endpoint.
-func (info *BaseEndpointInfo) GetZone() string {
-	return info.Zone
-}
-
-func newBaseEndpointInfo(IP, nodeName, zone string, port int, isLocal bool,
-	ready, serving, terminating bool, zoneHints sets.Set[string]) *BaseEndpointInfo {
+func newBaseEndpointInfo(IP string, port int, isLocal, ready, serving, terminating bool, zoneHints sets.Set[string]) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
 		Endpoint:    net.JoinHostPort(IP, strconv.Itoa(port)),
 		IsLocal:     isLocal,
@@ -136,8 +114,6 @@ func newBaseEndpointInfo(IP, nodeName, zone string, port int, isLocal bool,
 		Serving:     serving,
 		Terminating: terminating,
 		ZoneHints:   zoneHints,
-		NodeName:    nodeName,
-		Zone:        zone,
 	}
 }
 

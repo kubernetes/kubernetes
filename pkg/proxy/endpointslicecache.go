@@ -294,19 +294,9 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 			continue
 		}
 
-		isLocal := false
-		nodeName := ""
-		if endpoint.NodeName != nil {
-			isLocal = cache.isLocal(*endpoint.NodeName)
-			nodeName = *endpoint.NodeName
-		}
+		isLocal := endpoint.NodeName != nil && cache.isLocal(*endpoint.NodeName)
 
-		zone := ""
-		if endpoint.Zone != nil {
-			zone = *endpoint.Zone
-		}
-
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], nodeName, zone, portNum, isLocal,
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal,
 			endpoint.Ready, endpoint.Serving, endpoint.Terminating, endpoint.ZoneHints)
 
 		// This logic ensures we're deduplicating potential overlapping endpoints
