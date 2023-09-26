@@ -2139,15 +2139,15 @@ var _ = common.SIGDescribe("Services", func() {
 		for i := 0; i < 5; i++ {
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress0)
 			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to NodePort address")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to NodePort address")
 
 			time.Sleep(5 * time.Second)
 		}
@@ -2529,7 +2529,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 	})
 
@@ -2599,7 +2599,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 	})
 
@@ -2672,7 +2672,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 
 		ginkgo.By("Creating 2 pause hostNetwork pods that will try to connect to the webserver")
@@ -2701,7 +2701,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod3.Namespace, pausePod3.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 	})
 
@@ -2943,7 +2943,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 
 			time.Sleep(5 * time.Second)
 		}
@@ -3099,7 +3099,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// connections are neither internal nor external and always get Cluster traffic policy.
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to node port for pausePod0")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to node port for pausePod0")
 
 			execHostnameTest(*pausePod0, nodePortAddress0, webserverPod0.Name)
 			execHostnameTest(*pausePod1, nodePortAddress0, webserverPod0.Name)
@@ -3311,7 +3311,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("fetching the Endpoint")
 		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
-		framework.ExpectError(err, "should not be able to fetch Endpoint")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "should not be able to fetch Endpoint")
 	})
 
 	/*
