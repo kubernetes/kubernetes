@@ -1583,6 +1583,11 @@ message WindowsFilesystemUsage {
 message ImageFsInfoResponse {
     // Information of image filesystem(s).
     repeated FilesystemUsage image_filesystems = 1;
+    // Information of container filesystem(s).
+    // This is an optional field, may be used for example if container and image
+    // storage are separated.
+    // Default will be to return this as empty.
+    repeated FilesystemUsage container_filesystems = 2;
 }
 
 message ContainerStatsRequest{
