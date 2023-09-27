@@ -257,10 +257,10 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 		return obj, nil
 
 	case target.Kind == "PartialObjectMetadata":
-		return asPartialObjectMetadata(obj, target.GroupVersion())
+		return asPartialObjectMetadata(ctx, obj, target.GroupVersion())
 
 	case target.Kind == "PartialObjectMetadataList":
-		return asPartialObjectMetadataList(obj, target.GroupVersion())
+		return asPartialObjectMetadataList(ctx, obj, target.GroupVersion())
 
 	case target.Kind == "Table":
 		options, ok := opts.(*metav1.TableOptions)
@@ -408,7 +408,7 @@ func asTable(ctx context.Context, result runtime.Object, opts *metav1.TableOptio
 	return table, nil
 }
 
-func asPartialObjectMetadata(result runtime.Object, groupVersion schema.GroupVersion) (runtime.Object, error) {
+func asPartialObjectMetadata(ctx context.Context, result runtime.Object, groupVersion schema.GroupVersion) (runtime.Object, error) {
 	if meta.IsListType(result) {
 		err := newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadata, but the requested object is a list (%T)", result))
 		return nil, err
@@ -424,10 +424,11 @@ func asPartialObjectMetadata(result runtime.Object, groupVersion schema.GroupVer
 	}
 	partial := meta.AsPartialObjectMetadata(m)
 	partial.GetObjectKind().SetGroupVersionKind(groupVersion.WithKind("PartialObjectMetadata"))
+	setKCPOriginalAPIVersionAnnotation(ctx, result, partial)
 	return partial, nil
 }
 
-func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.GroupVersion) (runtime.Object, error) {
+func asPartialObjectMetadataList(ctx context.Context, result runtime.Object, groupVersion schema.GroupVersion) (runtime.Object, error) {
 	li, ok := result.(metav1.ListInterface)
 	if !ok {
 		return nil, newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadataList, but the requested object is not a list (%T)", result))
@@ -444,6 +445,7 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 			}
 			partial := meta.AsPartialObjectMetadata(m)
 			partial.GetObjectKind().SetGroupVersionKind(gvk)
+			setKCPOriginalAPIVersionAnnotation(ctx, obj, partial)
 			list.Items = append(list.Items, *partial)
 			return nil
 		})
@@ -464,6 +466,7 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 			}
 			partial := meta.AsPartialObjectMetadata(m)
 			partial.GetObjectKind().SetGroupVersionKind(gvk)
+			setKCPOriginalAPIVersionAnnotation(ctx, obj, partial)
 			list.Items = append(list.Items, *partial)
 			return nil
 		})
