@@ -992,16 +992,25 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 func BuildHandlerChainWithStorageVersionPrecondition(apiHandler http.Handler, c *Config) http.Handler {
 	// WithStorageVersionPrecondition needs the WithRequestInfo to run first
 	handler := genericapifilters.WithStorageVersionPrecondition(apiHandler, c.StorageVersionManager, c.Serializer)
-	return DefaultBuildHandlerChain(handler, c)
+	return DefaultBuildHandlerChainFromAuthz(handler, c)
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
-	handler := apiHandler
+	handler := DefaultBuildHandlerChainFromAuthz(apiHandler, c)
+	handler = DefaultBuildHandlerChainBeforeAuthz(handler, c)
+	return handler
+}
 
+func DefaultBuildHandlerChainFromAuthz(apiHandler http.Handler, c *Config) http.Handler {
+	handler := apiHandler
 	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authorization")
+	return handler
+}
 
+func DefaultBuildHandlerChainBeforeAuthz(apiHandler http.Handler, c *Config) http.Handler {
+	handler := apiHandler
 	if c.FlowControl != nil {
 		workEstimatorCfg := flowcontrolrequest.DefaultWorkEstimatorConfig()
 		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(
