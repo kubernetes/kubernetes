@@ -27,9 +27,11 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/kcp-dev/logicalcluster/v3"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 	"google.golang.org/grpc/grpclog"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -425,6 +427,7 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 		ReuseDurationSeconds: defaultLeaseReuseDurationSeconds,
 		MaxObjectCount:       2,
 	}))
+	ctx = genericapirequest.WithCluster(ctx, genericapirequest.Cluster{Name: logicalcluster.Name("root")})
 
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	out := &example.Pod{}
