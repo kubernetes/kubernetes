@@ -301,7 +301,7 @@ type DelegationTarget interface {
 	HealthzChecks() []healthz.HealthChecker
 
 	// ListedPaths returns the paths for supporting an index
-	ListedPaths() []string
+	ListedPaths(cluster *genericrequest.Cluster) []string
 
 	// NextDelegate returns the next delegationTarget in the chain of delegations
 	NextDelegate() DelegationTarget
@@ -331,8 +331,8 @@ func (s *GenericAPIServer) PreShutdownHooks() map[string]preShutdownHookEntry {
 func (s *GenericAPIServer) HealthzChecks() []healthz.HealthChecker {
 	return s.healthzRegistry.checks
 }
-func (s *GenericAPIServer) ListedPaths() []string {
-	return s.listedPathProvider.ListedPaths()
+func (s *GenericAPIServer) ListedPaths(cluster *genericrequest.Cluster) []string {
+	return s.listedPathProvider.ListedPaths(cluster)
 }
 
 func (s *GenericAPIServer) NextDelegate() DelegationTarget {
@@ -398,7 +398,7 @@ func (s emptyDelegate) PreShutdownHooks() map[string]preShutdownHookEntry {
 func (s emptyDelegate) HealthzChecks() []healthz.HealthChecker {
 	return []healthz.HealthChecker{}
 }
-func (s emptyDelegate) ListedPaths() []string {
+func (s emptyDelegate) ListedPaths(cluster *genericrequest.Cluster) []string {
 	return []string{}
 }
 func (s emptyDelegate) NextDelegate() DelegationTarget {

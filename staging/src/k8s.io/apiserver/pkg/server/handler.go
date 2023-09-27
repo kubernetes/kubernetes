@@ -25,12 +25,14 @@ import (
 	"strings"
 
 	"github.com/emicklei/go-restful/v3"
+	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/klog/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	genericrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/mux"
 )
 
@@ -64,6 +66,8 @@ type APIServerHandler struct {
 	// we should consider completely removing gorestful.
 	// Other servers should only use this opaquely to delegate to an API server.
 	Director http.Handler
+
+	PathValidForCluster func(path string, clusterName logicalcluster.Name) bool
 }
 
 // HandlerChainBuilderFn is used to wrap the GoRestfulContainer handler using the provided handler chain.
@@ -101,13 +105,18 @@ func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerCha
 }
 
 // ListedPaths returns the paths that should be shown under /
-func (a *APIServerHandler) ListedPaths() []string {
+func (a *APIServerHandler) ListedPaths(cluster *genericrequest.Cluster) []string {
 	var handledPaths []string
 	// Extract the paths handled using restful.WebService
 	for _, ws := range a.GoRestfulContainer.RegisteredWebServices() {
 		handledPaths = append(handledPaths, ws.RootPath())
 	}
-	handledPaths = append(handledPaths, a.NonGoRestfulMux.ListedPaths()...)
+
+	for _, path := range a.NonGoRestfulMux.ListedPaths(logicalcluster.Name("")) {
+		if a.PathValidForCluster == nil || a.PathValidForCluster(path, cluster.Name) {
+			handledPaths = append(handledPaths, path)
+		}
+	}
 	sort.Strings(handledPaths)
 
 	return handledPaths

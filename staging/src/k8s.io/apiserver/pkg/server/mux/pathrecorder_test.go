@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kcp-dev/logicalcluster/v3"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,8 +29,8 @@ func TestSecretHandlers(t *testing.T) {
 	c := NewPathRecorderMux("test")
 	c.UnlistedHandleFunc("/secret", func(http.ResponseWriter, *http.Request) {})
 	c.HandleFunc("/nonswagger", func(http.ResponseWriter, *http.Request) {})
-	assert.NotContains(t, c.ListedPaths(), "/secret")
-	assert.Contains(t, c.ListedPaths(), "/nonswagger")
+	assert.NotContains(t, c.ListedPaths(logicalcluster.New("")), "/secret")
+	assert.Contains(t, c.ListedPaths(logicalcluster.New("")), "/nonswagger")
 }
 
 func TestUnregisterHandlers(t *testing.T) {
@@ -44,15 +45,15 @@ func TestUnregisterHandlers(t *testing.T) {
 	c.HandleFunc("/nonswagger", func(http.ResponseWriter, *http.Request) {
 		first = first + 1
 	})
-	assert.NotContains(t, c.ListedPaths(), "/secret")
-	assert.Contains(t, c.ListedPaths(), "/nonswagger")
+	assert.NotContains(t, c.ListedPaths(logicalcluster.New("")), "/secret")
+	assert.Contains(t, c.ListedPaths(logicalcluster.New("")), "/nonswagger")
 
 	resp, _ := http.Get(s.URL + "/nonswagger")
 	assert.Equal(t, first, 1)
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 
 	c.Unregister("/nonswagger")
-	assert.NotContains(t, c.ListedPaths(), "/nonswagger")
+	assert.NotContains(t, c.ListedPaths(logicalcluster.New("")), "/nonswagger")
 
 	resp, _ = http.Get(s.URL + "/nonswagger")
 	assert.Equal(t, first, 1)
@@ -61,7 +62,7 @@ func TestUnregisterHandlers(t *testing.T) {
 	c.HandleFunc("/nonswagger", func(http.ResponseWriter, *http.Request) {
 		second = second + 1
 	})
-	assert.Contains(t, c.ListedPaths(), "/nonswagger")
+	assert.Contains(t, c.ListedPaths(logicalcluster.New("")), "/nonswagger")
 	resp, _ = http.Get(s.URL + "/nonswagger")
 	assert.Equal(t, first, 1)
 	assert.Equal(t, second, 1)
@@ -98,8 +99,8 @@ func TestPrefixHandlers(t *testing.T) {
 		fallThroughCount = fallThroughCount + 1
 	}))
 
-	assert.NotContains(t, c.ListedPaths(), "/secretPrefix/")
-	assert.Contains(t, c.ListedPaths(), "/publicPrefix/")
+	assert.NotContains(t, c.ListedPaths(logicalcluster.New("")), "/secretPrefix/")
+	assert.Contains(t, c.ListedPaths(logicalcluster.New("")), "/publicPrefix/")
 
 	resp, _ := http.Get(s.URL + "/fallthrough")
 	assert.Equal(t, 1, fallThroughCount)
