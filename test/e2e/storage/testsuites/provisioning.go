@@ -965,7 +965,7 @@ func PVMultiNodeCheck(ctx context.Context, client clientset.Interface, timeouts 
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, client, pod.Name, pod.Namespace, timeouts.PodStartSlow))
 	runningPod, err = client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
-	framework.ExpectNotEqual(runningPod.Spec.NodeName, actualNodeName, "second pod should have run on a different node")
+	gomega.Expect(runningPod.Spec.NodeName).ToNot(gomega.Equal(actualNodeName), "second pod should have run on a different node")
 	StopPod(ctx, client, pod)
 	pod = nil
 }
@@ -973,7 +973,7 @@ func PVMultiNodeCheck(ctx context.Context, client clientset.Interface, timeouts 
 // TestBindingWaitForFirstConsumerMultiPVC tests the binding with WaitForFirstConsumer mode
 func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(ctx context.Context, claims []*v1.PersistentVolumeClaim, nodeSelector map[string]string, expectUnschedulable bool) ([]*v1.PersistentVolume, *v1.Node) {
 	var err error
-	framework.ExpectNotEqual(len(claims), 0)
+	gomega.Expect(claims).ToNot(gomega.BeEmpty())
 	namespace := claims[0].Namespace
 
 	ginkgo.By("creating claims")
