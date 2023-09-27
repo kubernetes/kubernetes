@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	kcpinformers "github.com/kcp-dev/client-go/informers"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +49,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
@@ -642,8 +643,8 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 	egressSelector *egressselector.EgressSelector,
 	openAPIConfig *openapicommon.Config,
 	openAPIV3Config *openapicommon.OpenAPIV3Config,
-	extclient kubernetes.Interface,
-	versionedInformer informers.SharedInformerFactory,
+	extclient kcpkubernetesclientset.ClusterInterface,
+	versionedInformer kcpinformers.SharedInformerFactory,
 	apiServerID string) error {
 	if o == nil {
 		return nil
@@ -679,7 +680,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 	if o.ServiceAccounts != nil && o.ServiceAccounts.OptionalTokenGetter != nil {
 		authenticatorConfig.ServiceAccountTokenGetter = o.ServiceAccounts.OptionalTokenGetter(versionedInformer)
 	} else {
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewClusterGetterFromClient(
 			extclient,
 			versionedInformer.Core().V1().Secrets().Lister(),
 			versionedInformer.Core().V1().ServiceAccounts().Lister(),
@@ -689,7 +690,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 
 	if authenticatorConfig.BootstrapToken {
 		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-			versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem),
+			versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem), //TODO(kcp): This should be a cluster scoped lister?
 		)
 	}
 
