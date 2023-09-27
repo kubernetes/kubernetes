@@ -169,6 +169,21 @@ var OpenAPIV3FuzzFuncs []interface{} = []interface{}{
 		c.Fuzz(&v.ResponseProps)
 		c.Fuzz(&v.VendorExtensible)
 	},
+	func(v *Operation, c fuzz.Continue) {
+		c.FuzzNoCustom(v)
+		// Do not fuzz null values into the array.
+		for i, val := range v.SecurityRequirement {
+			if val == nil {
+				v.SecurityRequirement[i] = make(map[string][]string)
+			}
+
+			for k, v := range val {
+				if v == nil {
+					val[k] = make([]string, 0)
+				}
+			}
+		}
+	},
 	func(v *spec.Extensions, c fuzz.Continue) {
 		numChildren := c.Intn(5)
 		for i := 0; i < numChildren; i++ {
