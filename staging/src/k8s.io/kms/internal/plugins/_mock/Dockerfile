@@ -18,7 +18,6 @@ WORKDIR /workspace
 
 # Copy the source
 COPY apimachinery/ apimachinery/
-COPY client-go/ client-go/
 COPY kms/ kms/
 WORKDIR /workspace/kms/internal/plugins/_mock
 
