@@ -395,10 +395,10 @@ func (p *criStatsProvider) ImageFsStats(ctx context.Context) (*statsapi.FsStats,
 	// return the first one.
 	//
 	// TODO(yguo0905): Support returning stats of multiple image filesystems.
-	if len(resp) == 0 {
+	if len(resp.GetImageFilesystems()) == 0 {
 		return nil, fmt.Errorf("imageFs information is unavailable")
 	}
-	fs := resp[0]
+	fs := resp.GetImageFilesystems()[0]
 	s := &statsapi.FsStats{
 		Time:      metav1.NewTime(time.Unix(0, fs.Timestamp)),
 		UsedBytes: &fs.UsedBytes.Value,
@@ -430,7 +430,7 @@ func (p *criStatsProvider) ImageFsDevice(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, fs := range resp {
+	for _, fs := range resp.GetImageFilesystems() {
 		fsInfo, err := p.getFsInfo(fs.GetFsId())
 		if err != nil {
 			return "", fmt.Errorf("get filesystem info: %w", err)
