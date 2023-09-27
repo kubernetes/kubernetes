@@ -42,6 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
+// Options define the flags and validation for a generic controlplane. If the
+// structs are nil, the options are not added to the command line and not validated.
 type Options struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
