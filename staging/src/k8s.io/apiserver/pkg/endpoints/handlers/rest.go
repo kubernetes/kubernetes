@@ -44,6 +44,7 @@ import (
 	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/warning"
@@ -107,6 +108,8 @@ type RequestScope struct {
 	HubGroupVersion schema.GroupVersion
 
 	MaxRequestBodyBytes int64
+
+	OpenapiModels openapi.ModelsByGKV
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
