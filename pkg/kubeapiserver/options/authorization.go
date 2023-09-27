@@ -177,7 +177,7 @@ func (o *BuiltInAuthorizationOptions) buildAuthorizationConfiguration() (*authzc
 					FailurePolicy:              authzconfig.FailurePolicyNoOpinion,
 					SubjectAccessReviewVersion: o.WebhookVersion,
 					ConnectionInfo: authzconfig.WebhookConnectionInfo{
-						Type:           authzconfig.AuthorizationWebhookConnectionInfoTypeKubeConfig,
+						Type:           authzconfig.AuthorizationWebhookConnectionInfoTypeKubeConfigFile,
 						KubeConfigFile: &o.WebhookConfigFile,
 					},
 				},

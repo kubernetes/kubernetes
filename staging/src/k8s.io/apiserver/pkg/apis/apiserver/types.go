@@ -212,11 +212,11 @@ type AuthorizationConfiguration struct {
 }
 
 const (
-	TypeWebhook                                      AuthorizerType = "Webhook"
-	FailurePolicyNoOpinion                           string         = "NoOpinion"
-	FailurePolicyDeny                                string         = "Deny"
-	AuthorizationWebhookConnectionInfoTypeKubeConfig string         = "KubeConfigFile"
-	AuthorizationWebhookConnectionInfoTypeInCluster  string         = "InClusterConfig"
+	TypeWebhook                                          AuthorizerType = "Webhook"
+	FailurePolicyNoOpinion                               string         = "NoOpinion"
+	FailurePolicyDeny                                    string         = "Deny"
+	AuthorizationWebhookConnectionInfoTypeKubeConfigFile string         = "KubeConfigFile"
+	AuthorizationWebhookConnectionInfoTypeInCluster      string         = "InClusterConfig"
 )
 
 type AuthorizerType string
@@ -295,7 +295,7 @@ type WebhookConfiguration struct {
 type WebhookConnectionInfo struct {
 	// Controls how the webhook should communicate with the server.
 	// Valid values:
-	// - KubeConfig: use the file specified in kubeConfigFile to locate the
+	// - KubeConfigFile: use the file specified in kubeConfigFile to locate the
 	//   server.
 	// - InClusterConfig: use the in-cluster configuration to call the
 	//   SubjectAccessReview API hosted by kube-apiserver. This mode is not
