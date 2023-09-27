@@ -19,14 +19,19 @@ package discovery
 import (
 	"crypto/sha256"
 	"encoding/base64"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 // StorageVersionHash calculates the storage version hash for a
 // <group/version/kind> tuple.
 // WARNING: this function is subject to change. Clients shouldn't depend on
 // this function.
-func StorageVersionHash(group, version, kind string) string {
-	gvk := group + "/" + version + "/" + kind
+func StorageVersionHash(clusterName logicalcluster.Name, group, version, kind string) string {
+	gvk := clusterName.String() + "/" + group + "/" + version + "/" + kind
+	if gvk == "" {
+		return ""
+	}
 	bytes := sha256.Sum256([]byte(gvk))
 	// Assuming there are N kinds in the cluster, and the hash is X-byte long,
 	// the chance of colliding hash P(N,X) approximates to 1-e^(-(N^2)/2^(8X+1)).
