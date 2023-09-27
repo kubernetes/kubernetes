@@ -59,7 +59,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, 
 	}
 
 	var trest *TokenREST
-	if issuer != nil && podStorage != nil && secretStorage != nil {
+	if issuer != nil && (podStorage != nil || secretStorage != nil) {
 		trest = &TokenREST{
 			svcaccts:             store,
 			pods:                 podStorage,
