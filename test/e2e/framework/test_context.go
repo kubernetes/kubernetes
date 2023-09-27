@@ -507,8 +507,16 @@ func AfterReadingAllFlags(t *TestContextType) {
 	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
 	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
 
+	// ginkgo.PreviewSpecs will expand all nodes and thus may find new bugs.
+	report := ginkgo.PreviewSpecs("Kubernetes e2e test statistics")
+	if err := FormatBugs(); err != nil {
+		// Refuse to do anything if the E2E suite is buggy.
+		fmt.Fprint(Output, "ERROR: E2E suite initialization was faulty, these errors must be fixed:")
+		fmt.Fprint(Output, "\n"+err.Error())
+		os.Exit(1)
+	}
 	if t.listLabels || t.listTests {
-		listTestInformation(ginkgo.PreviewSpecs("Kubernetes e2e test statistics"))
+		listTestInformation(report)
 		os.Exit(0)
 	}
 
