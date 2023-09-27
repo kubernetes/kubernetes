@@ -76,7 +76,7 @@ func BuildTargets(cgo bool) error {
 	if IsDockerizedBuild() {
 		klog.Infof("Building dockerized k8s binaries targets %s for architecture %s", targets, GetTargetBuildArch())
 		// Multi-architecture build is only supported in dockerized build
-		cmd = exec.Command(filepath.Join(k8sRoot, "build/run.sh"), "make", fmt.Sprintf("WHAT=%s", targets), fmt.Sprintf("KUBE_BUILD_PLATFORMS=%s", GetTargetBuildArch()))
+		cmd = exec.Command(filepath.Join(k8sRoot, "build/run.sh"), "make", fmt.Sprintf("WHAT=%s", what), fmt.Sprintf("KUBE_BUILD_PLATFORMS=%s", GetTargetBuildArch()))
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
