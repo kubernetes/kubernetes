@@ -95,7 +95,9 @@ type watchChan struct {
 	resultChan        chan watch.Event
 	errChan           chan error
 
+	// kcp
 	cluster    *genericapirequest.Cluster
+	shard      genericapirequest.Shard
 	crdRequest bool
 }
 
@@ -111,6 +113,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if err != nil {
 		return nil, err
 	}
+	shard := genericapirequest.ShardFrom(ctx)
 
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
@@ -122,7 +125,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if err != nil {
 		return nil, err
 	}
-	wc := w.createWatchChan(ctx, key, startWatchRV, cluster, opts.Recursive, opts.ProgressNotify, opts.Predicate, transformer)
+	wc := w.createWatchChan(ctx, key, startWatchRV, shard, cluster, opts.Recursive, opts.ProgressNotify, opts.Predicate, transformer)
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -135,7 +138,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, cluster *genericapirequest.Cluster, recursive, progressNotify bool, pred storage.SelectionPredicate, transformer value.Transformer) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, shard genericapirequest.Shard, cluster *genericapirequest.Cluster, recursive, progressNotify bool, pred storage.SelectionPredicate, transformer value.Transformer) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
@@ -147,7 +150,9 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, cl
 		resultChan:        make(chan watch.Event, outgoingBufSize),
 		errChan:           make(chan error, 1),
 
+		// kcp
 		cluster:    cluster,
+		shard:      shard,
 		crdRequest: kcp.CustomResourceIndicatorFrom(ctx),
 	}
 	if pred.Empty() {
@@ -693,6 +698,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 
 		// kcp: apply clusterName to the decoded object, as the name is not persisted in storage.
 		clusterName := adjustClusterNameIfWildcard(wc.shard, wc.cluster, wc.crdRequest, wc.key, e.key)
+		shardName := adjustShardNameIfWildcard(wc.shard, wc.key, e.key)
 		annotateDecodedObjectWith(curObj, clusterName, shardName)
 	}
 	// We need to decode prevValue, only if this is deletion event or
@@ -714,6 +720,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 
 		// kcp: apply clusterName to the decoded object, as the name is not persisted in storage.
 		clusterName := adjustClusterNameIfWildcard(wc.shard, wc.cluster, wc.crdRequest, wc.key, e.key)
+		shardName := adjustShardNameIfWildcard(wc.shard, wc.key, e.key)
 		annotateDecodedObjectWith(oldObj, clusterName, shardName)
 	}
 	return curObj, oldObj, nil

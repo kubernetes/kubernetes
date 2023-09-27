@@ -156,7 +156,7 @@ func TestEtcdWatchSemanticInitialEventsExtended(t *testing.T) {
 func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, &genericapirequest.Cluster{}, false, false, storage.Everything, newTestnewTestTransformer())
+	w := store.watcher.createWatchChan(ctx, "/abc", 0, genericapirequest.Shard(""), &genericapirequest.Cluster{}, false, false, storage.Everything, newTestTransformer())
 	// make resultChan and errChan blocking to ensure ordering.
 	w.resultChan = make(chan watch.Event)
 	w.errChan = make(chan error)

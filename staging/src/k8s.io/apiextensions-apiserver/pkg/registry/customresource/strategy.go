@@ -156,7 +156,7 @@ func (a customResourceStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	}
 
 	accessor, _ := meta.Accessor(obj)
-	if _, found := accessor.GetAnnotations()[genericapirequest.AnnotationKey]; found {
+	if _, found := accessor.GetAnnotations()[genericapirequest.ShardAnnotationKey]; found {
 		// to avoid an additional UPDATE request (mismatch on the generation field) replicated objects have the generation field already set
 		return
 	}
@@ -190,7 +190,7 @@ func (a customResourceStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	if !apiequality.Semantic.DeepEqual(newCopyContent, oldCopyContent) {
 		oldAccessor, _ := meta.Accessor(oldCustomResourceObject)
 		newAccessor, _ := meta.Accessor(newCustomResourceObject)
-		if _, found := oldAccessor.GetAnnotations()[genericapirequest.AnnotationKey]; found {
+		if _, found := oldAccessor.GetAnnotations()[genericapirequest.ShardAnnotationKey]; found {
 			// the presence of the annotation indicates the object is from the cache server.
 			// since the objects from the cache should not be modified in any way, just return early.
 			return

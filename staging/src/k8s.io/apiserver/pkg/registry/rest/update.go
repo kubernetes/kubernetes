@@ -124,7 +124,12 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	if err != nil {
 		return err
 	}
-	objectMeta.SetGeneration(oldMeta.GetGeneration())
+	if len(oldMeta.GetAnnotations()[genericapirequest.ShardAnnotationKey]) == 0 || objectMeta.GetGeneration() == 0 {
+		// the absence of the annotation indicates the object is NOT from the cache server,
+		// if the new object doesn't have its generation set, just rewrite it from the old object
+		// otherwise  we are dealing with an object from the cache server that wants its generation to be updated
+		objectMeta.SetGeneration(oldMeta.GetGeneration())
+	}
 
 	strategy.PrepareForUpdate(ctx, obj, old)
 

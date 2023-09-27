@@ -28,9 +28,10 @@ import (
 
 // adjustClusterNameIfWildcard determines the logical cluster name. If this is not a cluster-wildcard list/watch request,
 // the cluster name is returned unmodified. Otherwise, the cluster name is extracted from the key based on whether it is
+// - a shard-wildcard request: <prefix>/shardName/clusterName/<remainder>
 // - CR partial metadata request: <prefix>/identity/clusterName/<remainder>
 // - any other request: <prefix>/clusterName/<remainder>.
-func adjustClusterNameIfWildcard(cluster *genericapirequest.Cluster, crdRequest bool, keyPrefix, key string) logicalcluster.Name {
+func adjustClusterNameIfWildcard(shard genericapirequest.Shard, cluster *genericapirequest.Cluster, crdRequest bool, keyPrefix, key string) logicalcluster.Name {
 	if !cluster.Wildcard {
 		return cluster.Name
 	}
@@ -50,6 +51,9 @@ func adjustClusterNameIfWildcard(cluster *genericapirequest.Cluster, crdRequest 
 	case cluster.PartialMetadataRequest && crdRequest:
 		// expecting 2699f4d273d342adccdc8a32663408226ecf66de7d191113ed3d4dc9bccec2f2/root:org:ws/<remainder>
 		// OR customresources/root:org:ws/<remainder>
+		return extract(3, 1)
+	case shard.Wildcard():
+		// expecting shardName/clusterName/<remainder>
 		return extract(3, 1)
 	default:
 		// expecting root:org:ws/<remainder>
@@ -101,7 +105,7 @@ func annotateDecodedObjectWith(obj interface{}, clusterName logicalcluster.Name,
 	}
 	annotations[logicalcluster.AnnotationKey] = clusterName.String()
 	if !shardName.Empty() {
-		annotations[genericapirequest.AnnotationKey] = shardName.String()
+		annotations[genericapirequest.ShardAnnotationKey] = shardName.String()
 	}
 	s.SetAnnotations(annotations)
 }
