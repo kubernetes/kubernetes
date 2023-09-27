@@ -23,8 +23,16 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
+	kcpapiextensionsv1client "github.com/kcp-dev/client-go/apiextensions/client/typed/apiextensions/v1"
+	kcpapiextensionsv1informers "github.com/kcp-dev/client-go/apiextensions/informers/apiextensions/v1"
+	kcpapiextensionsv1listers "github.com/kcp-dev/client-go/apiextensions/listers/apiextensions/v1"
+	kcpthirdpartycache "github.com/kcp-dev/client-go/third_party/k8s.io/client-go/tools/cache"
+	"github.com/kcp-dev/logicalcluster/v3"
 
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/kcp"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,25 +43,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-
-	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
+	"k8s.io/klog/v2"
 )
 
 // This controller is reserving names. To avoid conflicts, be sure to run only one instance of the worker at a time.
 // This could eventually be lifted, but starting simple.
 type NamingConditionController struct {
-	crdClient client.CustomResourceDefinitionsGetter
+	crdClient kcpapiextensionsv1client.CustomResourceDefinitionsClusterGetter
 
-	crdLister listers.CustomResourceDefinitionLister
-	crdSynced cache.InformerSynced
+	crdLister             kcpapiextensionsv1listers.CustomResourceDefinitionClusterLister
+	clusterAwareCRDLister kcp.ClusterAwareCRDClusterLister
+	crdSynced             cache.InformerSynced
 	// crdMutationCache backs our lister and keeps track of committed updates to avoid racy
 	// write/lookup cycles.  It's got 100 slots by default, so it unlikely to overrun
 	// TODO to revisit this if naming conflicts are found to occur in the wild
-	crdMutationCache cache.MutationCache
+	crdMutationCache kcpthirdpartycache.MutationCache
 
 	// To allow injection for testing.
 	syncFn func(key string) error
@@ -61,14 +65,12 @@ type NamingConditionController struct {
 	queue workqueue.TypedRateLimitingInterface[string]
 }
 
-func NewNamingConditionController(
-	crdInformer informers.CustomResourceDefinitionInformer,
-	crdClient client.CustomResourceDefinitionsGetter,
-) *NamingConditionController {
+func NewNamingConditionController(crdInformer kcpapiextensionsv1informers.CustomResourceDefinitionClusterInformer, crdClient kcpapiextensionsv1client.ApiextensionsV1ClusterInterface, clusterAwareCRDLister kcp.ClusterAwareCRDClusterLister) *NamingConditionController {
 	c := &NamingConditionController{
-		crdClient: crdClient,
-		crdLister: crdInformer.Lister(),
-		crdSynced: crdInformer.Informer().HasSynced,
+		crdClient:             crdClient,
+		crdLister:             crdInformer.Lister(),
+		clusterAwareCRDLister: clusterAwareCRDLister,
+		crdSynced:             crdInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "crd_naming_condition_controller"},
@@ -89,11 +91,11 @@ func NewNamingConditionController(
 	return c
 }
 
-func (c *NamingConditionController) getAcceptedNamesForGroup(group string) (allResources sets.String, allKinds sets.String) {
+func (c *NamingConditionController) getAcceptedNamesForGroup(clusterName logicalcluster.Name, group string) (allResources sets.String, allKinds sets.String) {
 	allResources = sets.String{}
 	allKinds = sets.String{}
 
-	list, err := c.crdLister.List(labels.Everything())
+	list, err := c.clusterAwareCRDLister.Cluster(clusterName).List(context.TODO(), labels.Everything())
 	if err != nil {
 		panic(err)
 	}
@@ -107,7 +109,12 @@ func (c *NamingConditionController) getAcceptedNamesForGroup(group string) (allR
 		// this makes sure that if we tight loop on update and run, our mutation cache will show
 		// us the version of the objects we just updated to.
 		item := curr
-		obj, exists, err := c.crdMutationCache.GetByKey(curr.Name)
+		key, err := kcpcache.DeletionHandlingMetaClusterNamespaceKeyFunc(item)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", item, err))
+			continue
+		}
+		obj, exists, err := c.crdMutationCache.GetByKey(key)
 		if exists && err == nil {
 			item = obj.(*apiextensionsv1.CustomResourceDefinition)
 		}
@@ -125,7 +132,15 @@ func (c *NamingConditionController) getAcceptedNamesForGroup(group string) (allR
 
 func (c *NamingConditionController) calculateNamesAndConditions(in *apiextensionsv1.CustomResourceDefinition) (apiextensionsv1.CustomResourceDefinitionNames, apiextensionsv1.CustomResourceDefinitionCondition, apiextensionsv1.CustomResourceDefinitionCondition) {
 	// Get the names that have already been claimed
-	allResources, allKinds := c.getAcceptedNamesForGroup(in.Spec.Group)
+	allResources, allKinds := c.getAcceptedNamesForGroup(logicalcluster.From(in), in.Spec.Group)
+
+	// HACK(kcp): if it's a bound CRD, reset already claimed resources and kinds to empty, because we need to support
+	// multiple bound CRDs with overlapping names. KCP admission will ensure that a workspace does not have any
+	// naming conflicts.
+	if _, kcpBoundCRD := in.Annotations["apis.kcp.io/bound-crd"]; kcpBoundCRD {
+		allResources = sets.NewString()
+		allKinds = sets.NewString()
+	}
 
 	namesAcceptedCondition := apiextensionsv1.CustomResourceDefinitionCondition{
 		Type:   apiextensionsv1.NamesAccepted,
@@ -235,11 +250,16 @@ func equalToAcceptedOrFresh(requestedName, acceptedName string, usedNames sets.S
 }
 
 func (c *NamingConditionController) sync(key string) error {
-	inCustomResourceDefinition, err := c.crdLister.Get(key)
+	clusterName, _, name, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return nil
+	}
+	inCustomResourceDefinition, err := c.crdLister.Cluster(clusterName).Get(name)
 	if apierrors.IsNotFound(err) {
 		// CRD was deleted and has freed its names.
 		// Reconsider all other CRDs in the same group.
-		if err := c.requeueAllOtherGroupCRDs(key); err != nil {
+		if err := c.requeueAllOtherGroupCRDs(clusterName, name); err != nil {
 			return err
 		}
 		return nil
@@ -266,7 +286,7 @@ func (c *NamingConditionController) sync(key string) error {
 	apiextensionshelpers.SetCRDCondition(crd, namingCondition)
 	apiextensionshelpers.SetCRDCondition(crd, establishedCondition)
 
-	updatedObj, err := c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
+	updatedObj, err := c.crdClient.CustomResourceDefinitions().Cluster(clusterName.Path()).UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
@@ -280,7 +300,7 @@ func (c *NamingConditionController) sync(key string) error {
 
 	// we updated our status, so we may be releasing a name.  When this happens, we need to rekick everything in our group
 	// if we fail to rekick, just return as normal.  We'll get everything on a resync
-	if err := c.requeueAllOtherGroupCRDs(key); err != nil {
+	if err := c.requeueAllOtherGroupCRDs(clusterName, name); err != nil {
 		return err
 	}
 
@@ -330,7 +350,7 @@ func (c *NamingConditionController) processNextWorkItem() bool {
 }
 
 func (c *NamingConditionController) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
-	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	key, err := kcpcache.DeletionHandlingMetaClusterNamespaceKeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
@@ -369,15 +389,28 @@ func (c *NamingConditionController) deleteCustomResourceDefinition(obj interface
 	c.enqueue(castObj)
 }
 
-func (c *NamingConditionController) requeueAllOtherGroupCRDs(name string) error {
+func (c *NamingConditionController) requeueAllOtherGroupCRDs(clusterName logicalcluster.Name, name string) error {
 	pluralGroup := strings.SplitN(name, ".", 2)
-	list, err := c.crdLister.List(labels.Everything())
+	var groupForName string
+
+	// In case the group is empty because we're adding core resources as CRDs in KCP
+	if len(pluralGroup) == 1 {
+		groupForName = ""
+	} else {
+		// Given name = widgets.example.com
+		// pluralGroup[0] is the name, such as widgets
+		// pluarlGroup[1] is the API group, such as example.com
+		groupForName = pluralGroup[1]
+	}
+
+	list, err := c.clusterAwareCRDLister.Cluster(clusterName).List(context.TODO(), labels.Everything())
 	if err != nil {
 		return err
 	}
+
 	for _, curr := range list {
-		if curr.Spec.Group == pluralGroup[1] && curr.Name != name {
-			c.queue.Add(curr.Name)
+		if curr.Spec.Group == groupForName && curr.Name != name {
+			c.enqueue(curr)
 		}
 	}
 	return nil

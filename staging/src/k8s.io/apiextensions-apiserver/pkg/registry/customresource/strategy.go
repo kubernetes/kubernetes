@@ -34,6 +34,7 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/common"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -73,7 +75,7 @@ type selectableField struct {
 	err       error
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator validation.SchemaValidator, structuralSchema *structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale, selectableFields []v1.SelectableField) customResourceStrategy {
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, kcpValidateName apivalidation.ValidateNameFunc, schemaValidator, statusSchemaValidator validation.SchemaValidator, structuralSchema *structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale, selectableFields []v1.SelectableField) customResourceStrategy {
 	var celValidator *cel.Validator
 	celValidator = cel.NewValidator(structuralSchema, true, celconfig.PerCallLimit) // CEL programs are compiled and cached here
 
@@ -84,6 +86,8 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 		status:          status,
 		scale:           scale,
 		validator: customResourceValidator{
+			kcpValidateName: kcpValidateName,
+
 			namespaceScoped:       namespaceScoped,
 			kind:                  kind,
 			schemaValidator:       schemaValidator,
@@ -152,6 +156,10 @@ func (a customResourceStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	}
 
 	accessor, _ := meta.Accessor(obj)
+	if _, found := accessor.GetAnnotations()[genericapirequest.AnnotationKey]; found {
+		// to avoid an additional UPDATE request (mismatch on the generation field) replicated objects have the generation field already set
+		return
+	}
 	accessor.SetGeneration(1)
 }
 
@@ -182,6 +190,11 @@ func (a customResourceStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	if !apiequality.Semantic.DeepEqual(newCopyContent, oldCopyContent) {
 		oldAccessor, _ := meta.Accessor(oldCustomResourceObject)
 		newAccessor, _ := meta.Accessor(newCustomResourceObject)
+		if _, found := oldAccessor.GetAnnotations()[genericapirequest.AnnotationKey]; found {
+			// the presence of the annotation indicates the object is from the cache server.
+			// since the objects from the cache should not be modified in any way, just return early.
+			return
+		}
 		newAccessor.SetGeneration(oldAccessor.GetGeneration() + 1)
 	}
 }

@@ -155,11 +155,17 @@ func generateBuilder(crd *apiextensionsv1.CustomResourceDefinition, version stri
 	scale := &v1.Scale{}
 
 	routes := make([]*restful.RouteBuilder, 0)
-	root := fmt.Sprintf("/apis/%s/%s/%s", b.group, b.version, b.plural)
+	// HACK: support the case when we add core resources through CRDs (KCP scenario)
+	rootPrefix := fmt.Sprintf("/apis/%s/%s", b.group, b.version)
+	if b.group == "" {
+		rootPrefix = fmt.Sprintf("/api/%s", b.version)
+	}
+
+	root := fmt.Sprintf("%s/%s", rootPrefix, b.plural)
 
 	if b.namespaced {
 		routes = append(routes, b.buildRoute(root, "", "GET", "list", "list", sampleList).Operation("list"+b.kind+"ForAllNamespaces"))
-		root = fmt.Sprintf("/apis/%s/%s/namespaces/{namespace}/%s", b.group, b.version, b.plural)
+		root = fmt.Sprintf("%s/namespaces/{namespace}/%s", rootPrefix, b.plural)
 	}
 	routes = append(routes, b.buildRoute(root, "", "GET", "list", "list", sampleList))
 	routes = append(routes, b.buildRoute(root, "", "POST", "post", "create", sample).Reads(sample))
@@ -223,7 +229,7 @@ type CRDCanonicalTypeNamer struct {
 
 // OpenAPICanonicalTypeName returns canonical type name for given CRD
 func (c *CRDCanonicalTypeNamer) OpenAPICanonicalTypeName() string {
-	return fmt.Sprintf("%s/%s.%s", c.group, c.version, c.kind)
+	return fmt.Sprintf("%s/%s.%s", packagePrefix(c.group), c.version, c.kind)
 }
 
 // builder contains validation schema and basic naming information for a CRD in
@@ -495,7 +501,7 @@ func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 
 // buildListSchema builds the list kind schema for the CRD
 func (b *builder) buildListSchema(crd *apiextensionsv1.CustomResourceDefinition, opts Options) *spec.Schema {
-	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", b.group, b.version, b.kind))
+	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", packagePrefix(b.group), b.version, b.kind))
 	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
 	s := new(spec.Schema).
 		Typed("object", "").
@@ -544,11 +550,11 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 		},
 		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 			def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
+			def[fmt.Sprintf("%s/%s.%s", packagePrefix(b.group), b.version, b.kind)] = common.OpenAPIDefinition{
 				Schema:       *b.schema,
 				Dependencies: []string{objectMetaType},
 			}
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
+			def[fmt.Sprintf("%s/%s.%s", packagePrefix(b.group), b.version, b.listKind)] = common.OpenAPIDefinition{
 				Schema: *b.listSchema,
 			}
 			return def
@@ -591,6 +597,8 @@ func (b *builder) getOpenAPIV3Config() *common.OpenAPIV3Config {
 }
 
 func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, schema *structuralschema.Structural, opts Options) *builder {
+	group := crd.Spec.Group
+	// HACK: support the case when we add core resources through CRDs (KCP scenario)
 	b := &builder{
 		schema: &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
@@ -598,7 +606,7 @@ func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, s
 		listSchema: &spec.Schema{},
 		ws:         &restful.WebService{},
 
-		group:    crd.Spec.Group,
+		group:    group,
 		version:  version,
 		kind:     crd.Spec.Names.Kind,
 		listKind: crd.Spec.Names.ListKind,

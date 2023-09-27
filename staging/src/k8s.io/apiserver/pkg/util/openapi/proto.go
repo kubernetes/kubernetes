@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	openapi_v3 "github.com/google/gnostic-models/openapiv3"
+	"k8s.io/kube-openapi/pkg/spec3"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -38,6 +40,26 @@ func ToProtoModels(openAPISpec *spec.Swagger) (proto.Models, error) {
 	}
 
 	models, err := proto.NewOpenAPIData(doc)
+	if err != nil {
+		return nil, err
+	}
+
+	return models, nil
+}
+
+// ToProtoModelsV3 builds the proto formatted models from OpenAPI spec
+func ToProtoModelsV3(openAPISpec *spec3.OpenAPI) (proto.Models, error) {
+	specBytes, err := json.MarshalIndent(openAPISpec, " ", " ")
+	if err != nil {
+		return nil, err
+	}
+
+	doc, err := openapi_v3.ParseDocument(specBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	models, err := proto.NewOpenAPIV3Data(doc)
 	if err != nil {
 		return nil, err
 	}

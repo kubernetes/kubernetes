@@ -17,7 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"sort"
 	"strings"
@@ -25,7 +27,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"github.com/davecgh/go-spew/spew"
+	kcpapiextensionsv1informers "github.com/kcp-dev/client-go/apiextensions/informers/apiextensions/v1"
+	kcpapiextensionsv1listers "github.com/kcp-dev/client-go/apiextensions/listers/apiextensions/v1"
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -36,18 +41,18 @@ import (
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	structuralpruning "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
+	"k8s.io/apiextensions-apiserver/pkg/kcp"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,6 +64,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
@@ -68,17 +74,28 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	kcpapi "k8s.io/apiserver/pkg/kcp"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/warning"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
+
+// KcpValidateNameAnnotationKey is the annotation key used to indicate that a CRD should be validated
+// not as the default DNS subdomain.
+const KcpValidateNameAnnotationKey = "internal.kcp.io/validate-name"
 
 // crdHandler serves the `/apis` endpoint.
 // This is registered as a filter so that it never collides with any explicitly registered endpoints
@@ -93,7 +110,9 @@ type crdHandler struct {
 	// which is suited for most read and rarely write cases
 	customStorage atomic.Value
 
-	crdLister listers.CustomResourceDefinitionLister
+	crdLister             kcpapiextensionsv1listers.CustomResourceDefinitionClusterLister
+	clusterAwareCRDLister kcp.ClusterAwareCRDClusterLister
+	crdIndexer            cache.Indexer
 
 	delegate          http.Handler
 	restOptionsGetter generic.RESTOptionsGetter
@@ -124,6 +143,12 @@ type crdHandler struct {
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
 	maxRequestBodyBytes int64
+
+	tableConverterProvider TableConverterProvider
+
+	// disableServerSideApply allows to deactivate Server Side Apply for a specific API server instead of globally through the feature gate
+	// used for embedded cache server with kcp
+	disableServerSideApply bool
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -160,10 +185,12 @@ type crdInfo struct {
 // crdStorageMap goes from customresourcedefinition to its storage
 type crdStorageMap map[types.UID]*crdInfo
 
+const byGroupResource = "byGroupResource"
+
 func NewCustomResourceDefinitionHandler(
 	versionDiscoveryHandler *versionDiscoveryHandler,
 	groupDiscoveryHandler *groupDiscoveryHandler,
-	crdInformer informers.CustomResourceDefinitionInformer,
+	crdInformer kcpapiextensionsv1informers.CustomResourceDefinitionClusterInformer,
 	delegate http.Handler,
 	restOptionsGetter generic.RESTOptionsGetter,
 	admission admission.Interface,
@@ -174,8 +201,9 @@ func NewCustomResourceDefinitionHandler(
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
 	staticOpenAPISpec map[string]*spec.Schema,
-	maxRequestBodyBytes int64) (*crdHandler, error) {
-
+	maxRequestBodyBytes int64,
+	disableServerSideApply bool,
+) (*crdHandler, error) {
 	if converterFactory == nil {
 		return nil, fmt.Errorf("converterFactory is required")
 	}
@@ -185,6 +213,7 @@ func NewCustomResourceDefinitionHandler(
 		groupDiscoveryHandler:   groupDiscoveryHandler,
 		customStorage:           atomic.Value{},
 		crdLister:               crdInformer.Lister(),
+		crdIndexer:              crdInformer.Informer().GetIndexer(),
 		delegate:                delegate,
 		restOptionsGetter:       restOptionsGetter,
 		admission:               admission,
@@ -196,6 +225,7 @@ func NewCustomResourceDefinitionHandler(
 		minRequestTimeout:       minRequestTimeout,
 		staticOpenAPISpec:       staticOpenAPISpec,
 		maxRequestBodyBytes:     maxRequestBodyBytes,
+		disableServerSideApply:  disableServerSideApply,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    ret.createCustomResourceDefinition,
@@ -204,6 +234,27 @@ func NewCustomResourceDefinitionHandler(
 			ret.removeDeadStorage()
 		},
 	})
+
+	// kcp: needed to be able to accurately preserve/remove storage for wildcard partial metadata requests
+	if _, exists := crdInformer.Informer().GetIndexer().GetIndexers()[byGroupResource]; !exists {
+		if err := crdInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+			byGroupResource: func(obj interface{}) ([]string, error) {
+				crd, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
+				if !ok {
+					return nil, fmt.Errorf("unable to process obj in byName index: unexpected type %T", obj)
+				}
+
+				group := crd.Spec.Group
+				if group == "" {
+					group = "core"
+				}
+
+				return []string{crd.Spec.Names.Plural + "." + group}, nil
+			},
+		}); err != nil {
+			return nil, fmt.Errorf("error adding byName index to CRD lister: %v", err)
+		}
+	}
 
 	ret.customStorage.Store(crdStorageMap{})
 
@@ -247,8 +298,24 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	crdName := requestInfo.Resource + "." + requestInfo.APIGroup
-	crd, err := r.crdLister.Get(crdName)
+	clusterName, wildcard, err := apirequest.ClusterNameOrWildcardFrom(req.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if wildcard {
+		// this is the only case where wildcard works for a list because this is our special CRD lister that handles it.
+		clusterName = "*"
+	}
+
+	group := requestInfo.APIGroup
+	if group == "" {
+		group = "core"
+	}
+
+	crdName := requestInfo.Resource + "." + group
+
+	crd, err := r.clusterAwareCRDLister.Cluster(clusterName).Get(req.Context(), crdName)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -256,7 +323,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		utilruntime.HandleError(err)
 		responsewriters.ErrorNegotiated(
-			apierrors.NewInternalError(fmt.Errorf("error resolving resource")),
+			apierrors.NewInternalError(fmt.Errorf("error resolving resource: %v", err)),
 			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
 		)
 		return
@@ -274,7 +341,9 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !apiextensionshelpers.HasServedCRDVersion(crd, requestInfo.APIVersion) {
+	wildcardPartialMetadata := strings.HasSuffix(string(crd.UID), ".wildcard.partial-metadata")
+	// For wildcard partial metadata requests, we don't care if the CRD serves the version being requested or not.
+	if !wildcardPartialMetadata && !apiextensionshelpers.HasServedCRDVersion(crd, requestInfo.APIVersion) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
@@ -289,9 +358,15 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// kcp: wrap the context with a custom resource indicator. This is required for the storage code to handle
+	// partial metadata wildcard requests correctly (the number of path segments varies whether the resource is
+	// a built-in type (e.g. configmaps) or a custom resource.
+	req = utilnet.CloneRequest(req)
+	req = req.WithContext(kcpapi.WithCustomResourceIndicator(req.Context()))
+
 	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
-	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	crdInfo, err := r.getOrCreateServingInfoFor(crd)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -304,7 +379,9 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		)
 		return
 	}
-	if !hasServedCRDVersion(crdInfo.spec, requestInfo.APIVersion) {
+
+	// For wildcard partial metadata requests, we don't care if the CRD serves the version being requested or not.
+	if !wildcardPartialMetadata && !hasServedCRDVersion(crdInfo.spec, requestInfo.APIVersion) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
@@ -321,18 +398,47 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	supportedTypes := []string{
 		string(types.JSONPatchType),
 		string(types.MergePatchType),
-		string(types.ApplyPatchType),
+	}
+
+	// HACK: Support resources of the client-go scheme the way existing clients expect it:
+	//   - Support Strategic Merge Patch (used by default on these resources by kubectl)
+	//   - Support the Protobuf content type on Create / Update resources
+	//     (by simply converting the request to the json content type),
+	//     since protobuf content type is expected to be supported in a number of client
+	//     contexts (like controller-runtime for example)
+	if clientgoscheme.Scheme.IsGroupRegistered(requestInfo.APIGroup) {
+		supportedTypes = append(supportedTypes, string(types.StrategicMergePatchType))
+		req, err := ConvertProtobufRequestsToJson(verb, req, schema.GroupVersionKind{
+			Group:   requestInfo.APIGroup,
+			Version: requestInfo.APIVersion,
+			Kind:    crd.Spec.Names.Kind,
+		})
+		if err != nil {
+			responsewriters.ErrorNegotiated(
+				apierrors.NewInternalError(err),
+				Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+			)
+			return
+		}
+	}
+
+	if !r.disableServerSideApply {
+		supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 	}
 
 	var handlerFunc http.HandlerFunc
-	subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, requestInfo.APIVersion)
-	if err != nil {
-		utilruntime.HandleError(err)
-		responsewriters.ErrorNegotiated(
-			apierrors.NewInternalError(fmt.Errorf("could not properly serve the subresource")),
-			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
-		)
-		return
+	var subresources *apiextensionsv1.CustomResourceSubresources
+	// Subresources (scale, status) are not applicable for wildcard partial metadata requests
+	if !wildcardPartialMetadata {
+		subresources, err = apiextensionshelpers.GetSubresourcesForVersion(crd, requestInfo.APIVersion)
+		if err != nil {
+			utilruntime.HandleError(err)
+			responsewriters.ErrorNegotiated(
+				apierrors.NewInternalError(fmt.Errorf("could not properly serve the subresource")),
+				Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+			)
+			return
+		}
 	}
 	switch {
 	case subresource == "status" && subresources != nil && subresources.Status != nil:
@@ -356,9 +462,77 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// HACK: In some contexts, like the controller-runtime library used by the Operator SDK, all the resources of the
+// client-go scheme are created / updated using the protobuf content type.
+// However when these resources are in fact added as CRDs, in the KCP minimal API server scenario, these resources cannot
+// be created / updated since the protobuf (de)serialization is not supported for CRDs.
+// So in this case we just convert the protobuf request to a Json one (using the `client-go` scheme decoder/encoder),
+// before letting the CRD handler serve it.
+//
+// A real, long-term and non-hacky, fix for this problem would be as follows:
+// When a request for an unsupported serialization is returned, the server should reject it with a 406
+// and provide a list of supported content types.
+// client-go should then examine whether it can satisfy such a request by encoding the object with a different scheme.
+// This would require a KEP but is in keeping with content negotiation on GET / WATCH in Kube
+func ConvertProtobufRequestsToJson(verb string, req *http.Request, gvk schema.GroupVersionKind) (*http.Request, error) {
+	if (verb == "CREATE" || verb == "UPDATE") &&
+		req.Header.Get("Content-Type") == runtime.ContentTypeProtobuf {
+		resource, err := clientgoscheme.Scheme.New(gvk)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("Error when converting a protobuf request to a json request on a client-go resource added as a CRD")
+		}
+		reader, err := req.Body, nil
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("Error when converting a protobuf request to a json request on a client-go resource added as a CRD")
+		}
+		defer reader.Close()
+		buf := new(bytes.Buffer)
+		_, err = buf.ReadFrom(reader)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("Error when converting a protobuf request to a json request on a client-go resource added as a CRD")
+		}
+
+		// get bytes through IO operations
+		protobuf.NewSerializer(clientgoscheme.Scheme, clientgoscheme.Scheme).Decode(buf.Bytes(), &gvk, resource)
+		buf = new(bytes.Buffer)
+		json.NewSerializerWithOptions(json.DefaultMetaFactory, clientgoscheme.Scheme, clientgoscheme.Scheme, json.SerializerOptions{Yaml: false, Pretty: false, Strict: true}).
+			Encode(resource, buf)
+		req.Body = ioutil.NopCloser(buf)
+		req.ContentLength = int64(buf.Len())
+		req.Header.Set("Content-Type", runtime.ContentTypeJSON)
+	}
+	return req, nil
+}
+
 func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, crd *apiextensionsv1.CustomResourceDefinition, terminating bool, supportedTypes []string) http.HandlerFunc {
+	wildcardPartialMetadata := strings.HasSuffix(string(crd.UID), ".wildcard.partial-metadata")
+
 	requestScope := crdInfo.requestScopes[requestInfo.APIVersion]
+	if requestScope == nil && wildcardPartialMetadata {
+		// If requestScope is nil and this is a wildcard partial metadata request, it means the request was for e.g.
+		// v1 but the initial CRD used to create the wildcard partial metadata variant doesn't have v1. This is ok!
+		// Because this is a wildcard partial metadata request, we need *any* requestScope for *any* valid version
+		// from this CRD. Iterate through the valid requestScopes and pick the first one.
+		for _, s := range crdInfo.requestScopes {
+			requestScope = s
+			break
+		}
+	}
+
 	storage := crdInfo.storages[requestInfo.APIVersion].CustomResource
+	if storage == nil && wildcardPartialMetadata {
+		// If storage is nil and this is a wildcard partial metadata request, it means the request was for e.g.
+		// v1 but the initial CRD used to create the wildcard partial metadata variant doesn't have v1. This is ok!
+		// Because this is a wildcard partial metadata request, we need *any* storage for *any* valid version
+		// from this CRD. Iterate through the valid storages and pick the first one.
+		for _, s := range crdInfo.storages {
+			storage = s.CustomResource
+			break
+		}
+	}
 
 	switch requestInfo.Verb {
 	case "get":
@@ -383,6 +557,7 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
 			return nil
 		}
+
 		return handlers.CreateResource(storage, requestScope, r.admission)
 	case "update":
 		return handlers.UpdateResource(storage, requestScope, r.admission)
@@ -477,9 +652,9 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	if !apiextensionshelpers.IsCRDConditionTrue(newCRD, apiextensionsv1.Established) &&
 		apiextensionshelpers.IsCRDConditionTrue(newCRD, apiextensionsv1.NamesAccepted) {
 		if r.masterCount > 1 {
-			r.establishingController.QueueCRD(newCRD.Name, 5*time.Second)
+			r.establishingController.QueueCRD(newCRD.Name, logicalcluster.From(newCRD), 5*time.Second)
 		} else {
-			r.establishingController.QueueCRD(newCRD.Name, 0)
+			r.establishingController.QueueCRD(newCRD.Name, logicalcluster.From(newCRD), 0)
 		}
 	}
 
@@ -539,6 +714,26 @@ func (r *crdHandler) removeDeadStorage() {
 			storageMap2[crd.UID] = storageMap[crd.UID]
 		}
 	}
+
+	// kcp: preserve partial metadata, one per GroupResource (randomly) that has at least one CRD
+	for uid, crdInfo := range storageMap {
+		if strings.HasSuffix(string(uid), ".wildcard.partial-metadata") {
+			groupResource := strings.TrimSuffix(string(uid), ".wildcard.partial-metadata")
+
+			crdsForGroupResource, err := r.crdIndexer.ByIndex(byGroupResource, groupResource)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("error retrieving CRDs for %q from index: %v", groupResource, err))
+			}
+
+			if len(crdsForGroupResource) > 0 {
+				storageMap2[uid] = crdInfo
+				klog.V(6).InfoS("Preserving wildcard partial metadata storage because at least 1 CRD for this group resource still exists", "crd", groupResource)
+			} else {
+				klog.V(4).InfoS("Removing wildcard partial metadata storage because no CRDs for this group resource still exist", "crd", groupResource)
+			}
+		}
+	}
+
 	r.customStorage.Store(storageMap2)
 
 	for uid, crdInfo := range storageMap {
@@ -568,7 +763,7 @@ func (r *crdHandler) tearDown(oldInfo *crdInfo) {
 
 	for _, storage := range oldInfo.storages {
 		// destroy only the main storage. Those for the subresources share cacher and etcd clients.
-		storage.CustomResource.DestroyFunc()
+		storage.CustomResource.Store.(*genericregistry.Store).DestroyFunc()
 	}
 }
 
@@ -584,7 +779,7 @@ func (r *crdHandler) destroy() {
 			// DestroyFunc have to be implemented in idempotent way,
 			// so the potential race with r.tearDown() (being called
 			// from a goroutine) is safe.
-			storage.CustomResource.DestroyFunc()
+			storage.CustomResource.Destroy()
 		}
 	}
 }
@@ -592,18 +787,18 @@ func (r *crdHandler) destroy() {
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
 func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensionsv1.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
-	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	info, err := r.getOrCreateServingInfoFor(crd)
 	if err != nil {
 		return nil, err
 	}
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
-// getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
-// Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
-func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crdInfo, error) {
+// getOrCreateServingInfoFor gets the CRD serving info for the given CRD (by its UID) if the key exists in the storage map.
+// Otherwise the function creates CRD serving info.
+func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensionsv1.CustomResourceDefinition) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
-	if ret, ok := storageMap[uid]; ok {
+	if ret, ok := storageMap[crd.UID]; ok {
 		return ret, nil
 	}
 
@@ -614,10 +809,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	// If updateCustomResourceDefinition sees an update and happens later, the storage will be deleted and
 	// we will re-create the updated storage on demand. If updateCustomResourceDefinition happens before,
 	// we make sure that we observe the same up-to-date CRD.
-	crd, err := r.crdLister.Get(name)
+	crd, err := r.clusterAwareCRDLister.Cluster(logicalcluster.From(crd)).Refresh(crd)
 	if err != nil {
 		return nil, err
 	}
+
 	storageMap = r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[crd.UID]; ok {
 		return ret, nil
@@ -672,10 +868,39 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		structuralSchemas[v.Name] = s
 	}
 
-	openAPIModels, err := buildOpenAPIModelsForApply(r.staticOpenAPISpec, crd)
+	openAPIModels, err := buildOpenAPIModelsForApply(r.staticOpenAPISpec, crd, r.disableServerSideApply)
+	var modelsByGKV openapi.ModelsByGKV
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error building openapi models for %s: %v", crd.Name, err))
 		openAPIModels = nil
+	} else if openAPIModels != nil {
+		specV3 := &spec3.OpenAPI{
+			Version: "3.0.0",
+			Info: &spec.Info{
+				InfoProps: spec.InfoProps{
+					Title:   "Kubernetes CRD Swagger",
+					Version: "v0.1.0",
+				},
+			},
+			Components: &spec3.Components{
+				Schemas: map[string]*spec.Schema{},
+			},
+			Paths: &spec3.Paths{},
+		}
+		for name, model := range openAPIModels {
+			specV3.Components.Schemas[name] = model
+		}
+		protoModels, err := utilopenapi.ToProtoModelsV3(specV3)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("error gathering openapi models by GKV for %s: %v", crd.Name, err))
+			modelsByGKV = nil
+		} else {
+			modelsByGKV, err = openapi.GetModelsByGKV(protoModels)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("error gathering openapi models by GKV for %s: %v", crd.Name, err))
+				modelsByGKV = nil
+			}
+		}
 	}
 
 	var typeConverter managedfields.TypeConverter = managedfields.NewDeducedTypeConverter()
@@ -689,6 +914,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	converter, err := r.converterFactory.NewConverter(crd)
 	if err != nil {
 		return nil, fmt.Errorf("error creating converter for %s: %w", crd.Name, err)
+	}
+
+	if strings.HasSuffix(string(crd.UID), ".wildcard.partial-metadata") {
+		converter = conversion.NewKCPWildcardPartialMetadataConverter()
 	}
 
 	safeConverter, unsafeConverter, err := conversion.NewDelegatingConverter(crd, converter)
@@ -715,6 +944,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			path = append(path, fieldpath.PathElement{FieldName: &s})
 		}
 		replicasPathInCustomResource[schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name}.String()] = path
+	}
+
+	kcpValidateName := apivalidation.NameIsDNSSubdomain
+	if crd.Annotations[KcpValidateNameAnnotationKey] == "path-segment" {
+		kcpValidateName = path.ValidatePathSegmentName
 	}
 
 	for _, v := range crd.Spec.Versions {
@@ -800,14 +1034,21 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			}
 		}
 
-		columns, err := getColumnsForVersion(crd, v.Name)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return nil, fmt.Errorf("the server could not properly serve the CR columns")
+		var table rest.TableConvertor
+		if r.tableConverterProvider != nil {
+			table = r.tableConverterProvider.GetTableConverter(crd.Spec.Group, crd.Status.AcceptedNames.Kind, crd.Status.AcceptedNames.ListKind)
 		}
-		table, err := tableconvertor.New(columns)
-		if err != nil {
-			klog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
+
+		if table == nil {
+			columns, err := getColumnsForVersion(crd, v.Name)
+			if err != nil {
+				utilruntime.HandleError(err)
+				return nil, fmt.Errorf("the server could not properly serve the CR columns")
+			}
+			table, err = tableconvertor.New(columns)
+			if err != nil {
+				klog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
+			}
 		}
 
 		listKind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.ListKind}
@@ -825,6 +1066,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				typer,
 				crd.Spec.Scope == apiextensionsv1.NamespaceScoped,
 				kind,
+				kcpValidateName,
 				validator,
 				statusValidator,
 				structuralSchemas[v.Name],
@@ -832,14 +1074,17 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				scaleSpec,
 				v.SelectableFields,
 			),
-			crdConversionRESTOptionsGetter{
-				RESTOptionsGetter:     r.restOptionsGetter,
-				converter:             safeConverter,
-				decoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
-				encoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
-				structuralSchemas:     structuralSchemas,
-				structuralSchemaGK:    kind.GroupKind(),
-				preserveUnknownFields: crd.Spec.PreserveUnknownFields,
+			apiBindingAwareCRDRESTOptionsGetter{
+				delegate: crdConversionRESTOptionsGetter{
+					RESTOptionsGetter:     r.restOptionsGetter,
+					converter:             safeConverter,
+					decoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
+					encoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
+					structuralSchemas:     structuralSchemas,
+					structuralSchemaGK:    kind.GroupKind(),
+					preserveUnknownFields: crd.Spec.PreserveUnknownFields,
+				},
+				crd: crd,
 			},
 			crd.Status.AcceptedNames.Categories,
 			table,
@@ -934,17 +1179,21 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			Authorizer: r.authorizer,
 
 			MaxRequestBodyBytes: r.maxRequestBodyBytes,
+
+			OpenapiModels: modelsByGKV,
 		}
 
-		resetFields := storages[v.Name].CustomResource.GetResetFields()
-		reqScope, err = scopeWithFieldManager(
-			typeConverter,
-			reqScope,
-			resetFields,
-			"",
-		)
-		if err != nil {
-			return nil, err
+		if !r.disableServerSideApply {
+			resetFields := storages[v.Name].CustomResource.GetResetFields()
+			reqScope, err = scopeWithFieldManager(
+				typeConverter,
+				reqScope,
+				resetFields,
+				"",
+			)
+			if err != nil {
+				return nil, err
+			}
 		}
 		requestScopes[v.Name] = &reqScope
 
@@ -967,7 +1216,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 		scaleScope.TableConvertor = scaleTable
 
-		if subresources != nil && subresources.Scale != nil {
+		if subresources != nil && subresources.Scale != nil && !r.disableServerSideApply {
 			scaleScope, err = scopeWithFieldManager(
 				typeConverter,
 				scaleScope,
@@ -990,7 +1239,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			ClusterScoped: clusterScoped,
 		}
 
-		if subresources != nil && subresources.Status != nil {
+		if subresources != nil && subresources.Status != nil && !r.disableServerSideApply {
 			resetFields := storages[v.Name].Status.GetResetFields()
 			statusScope, err = scopeWithFieldManager(
 				typeConverter,
@@ -1346,6 +1595,14 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) (unknown
 			}
 			unknownFieldPaths = append(unknownFieldPaths, structuralpruning.PruneWithOptions(u.Object, v.structuralSchemas[gv.Version], true, pruneOpts)...)
 			structuraldefaulting.PruneNonNullableNullsWithoutDefaults(u.Object, v.structuralSchemas[gv.Version])
+
+			// kcp 2278 debugging
+			if objectMeta != nil && objectMeta.Name == "syncer-test" {
+				if _, found := u.Object["spec"]; !found {
+					klog.InfoS("kcp 2278: syncer-test is missing spec", "v.structrualSchemas", spew.Sdump(v.structuralSchemas))
+				}
+			}
+			// kcp 2278 debugging
 		}
 
 		err, paths := schemaobjectmeta.CoerceWithOptions(nil, u.Object, v.structuralSchemas[gv.Version], false, schemaobjectmeta.CoerceOptions{
@@ -1392,7 +1649,10 @@ func hasServedCRDVersion(spec *apiextensionsv1.CustomResourceDefinitionSpec, ver
 // buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
 // and merges it with the models defined in the static OpenAPI spec.
 // Returns nil models ifthe static spec is nil, or an error is encountered.
-func buildOpenAPIModelsForApply(staticOpenAPISpec map[string]*spec.Schema, crd *apiextensionsv1.CustomResourceDefinition) (map[string]*spec.Schema, error) {
+func buildOpenAPIModelsForApply(staticOpenAPISpec map[string]*spec.Schema, crd *apiextensionsv1.CustomResourceDefinition, disableServerSideApply bool) (map[string]*spec.Schema, error) {
+	if disableServerSideApply {
+		return nil, nil
+	}
 	if staticOpenAPISpec == nil {
 		return nil, nil
 	}

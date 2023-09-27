@@ -67,6 +67,13 @@ func (a statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 	// track changed fields in the status update.
 	managedFields := newCustomResourceObject.GetManagedFields()
 
+	// KCP PATCH START
+	// Get the syncer view diff internal annotations
+	// before overriding the new object with the old,
+	// because we want to update them.
+	newObjectSyncerViewDiffAnnotations := getSyncerViewDiffAnnotations(newCustomResourceObject)
+	// KCP PATCH END
+
 	// copy old object into new object
 	oldCustomResourceObject := old.(*unstructured.Unstructured)
 	// overridding the resourceVersion in metadata is safe here, we have already checked that
@@ -75,6 +82,12 @@ func (a statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 
 	// set status
 	newCustomResourceObject.SetManagedFields(managedFields)
+
+	// KCP PATCH START
+	// Update the the syncer view diff annotations even on status update
+	updateSyncerViewDiffAnnotations(newCustomResourceObject, newObjectSyncerViewDiffAnnotations)
+	// KCP PATCH END
+
 	newCustomResource = newCustomResourceObject.UnstructuredContent()
 	if ok {
 		newCustomResource["status"] = status

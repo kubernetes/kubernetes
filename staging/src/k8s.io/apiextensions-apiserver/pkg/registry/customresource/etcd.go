@@ -42,6 +42,10 @@ type CustomResourceStorage struct {
 }
 
 func NewStorage(resource schema.GroupResource, singularResource schema.GroupResource, kind, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor, replicasPathMapping managedfields.ResourcePathMappings) CustomResourceStorage {
+	return NewStorageWithCustomStore(resource, singularResource, kind, listKind, strategy, optsGetter, categories, tableConvertor, replicasPathMapping, nil)
+}
+
+func NewStorageWithCustomStore(resource schema.GroupResource, singularResource schema.GroupResource, kind, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor, replicasPathMapping managedfields.ResourcePathMappings, newStores NewStores) CustomResourceStorage {
 	var storage CustomResourceStorage
 	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object {
@@ -102,7 +106,7 @@ func NewStorage(resource schema.GroupResource, singularResource schema.GroupReso
 
 // REST implements a RESTStorage for API services against etcd
 type REST struct {
-	*genericregistry.Store
+	Store
 	categories []string
 }
 

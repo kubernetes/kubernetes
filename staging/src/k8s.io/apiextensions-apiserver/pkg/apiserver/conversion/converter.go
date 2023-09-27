@@ -118,6 +118,9 @@ func NewDelegatingConverter(crd *apiextensionsv1.CustomResourceDefinition, deleg
 		clusterScoped:    crd.Spec.Scope == apiextensionsv1.ClusterScoped,
 		converter:        delegate,
 		selectableFields: selectableFields,
+		// If this is a wildcard partial metadata CRD variant, we don't require that the CRD serves the appropriate
+		// version, because the schema does not matter.
+		requireValidVersion: !strings.HasSuffix(string(crd.UID), ".wildcard.partial-metadata"),
 	}
 
 	return &safeConverterWrapper{unsafe}, unsafe, nil
@@ -146,6 +149,9 @@ type delegatingCRConverter struct {
 	validVersions    map[schema.GroupVersion]bool
 	clusterScoped    bool
 	selectableFields map[schema.GroupVersion]sets.Set[string]
+
+	// If true, require that the CRD serves the appropriate version
+	requireValidVersion bool
 }
 
 func (c *delegatingCRConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
@@ -232,17 +238,17 @@ func (c *delegatingCRConverter) ConvertToVersion(in runtime.Object, target runti
 	}
 
 	desiredAPIVersion := toGVK.GroupVersion().String()
-	if !c.validVersions[toGVK.GroupVersion()] {
+	if c.requireValidVersion && !c.validVersions[toGVK.GroupVersion()] {
 		return nil, fmt.Errorf("request to convert CR to an invalid group/version: %s", desiredAPIVersion)
 	}
 	// Note that even if the request is for a list, the GV of the request UnstructuredList is what
 	// is expected to convert to. As mentioned in the function's document, it is not expected to
 	// get a v1.List.
-	if !c.validVersions[fromGVK.GroupVersion()] {
+	if c.requireValidVersion && !c.validVersions[fromGVK.GroupVersion()] {
 		return nil, fmt.Errorf("request to convert CR from an invalid group/version: %s", fromGVK.GroupVersion().String())
 	}
 
-	objectsToConvert, err := getObjectsToConvert(list, desiredAPIVersion, c.validVersions)
+	objectsToConvert, err := getObjectsToConvert(list, desiredAPIVersion, c.validVersions, c.requireValidVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -337,11 +343,12 @@ func getObjectsToConvert(
 	list *unstructured.UnstructuredList,
 	desiredAPIVersion string,
 	validVersions map[schema.GroupVersion]bool,
+	requireValidVersion bool,
 ) ([]unstructured.Unstructured, error) {
 	var objectsToConvert []unstructured.Unstructured
 	for i := range list.Items {
 		expectedGV := list.Items[i].GroupVersionKind().GroupVersion()
-		if !validVersions[expectedGV] {
+		if requireValidVersion && !validVersions[expectedGV] {
 			return nil, fmt.Errorf("request to convert CR list failed, list index %d has invalid group/version: %s", i, expectedGV.String())
 		}
 

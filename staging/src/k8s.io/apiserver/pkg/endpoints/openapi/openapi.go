@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 var verbs = util.NewTrie([]string{"get", "log", "read", "replace", "patch", "delete", "deletecollection", "watch", "connect", "proxy", "list", "create", "patch"})
@@ -194,7 +194,7 @@ func (d *DefinitionNamer) GetDefinitionName(name string) (string, spec.Extension
 
 type ModelsByGKV map[schema.GroupVersionKind]proto.Schema
 
-// NewOpenAPIData creates a new `Resources` out of the openapi models
+// GetModelsByGKV creates a new `Resources` out of the openapi models
 func GetModelsByGKV(models proto.Models) (ModelsByGKV, error) {
 	result := map[schema.GroupVersionKind]proto.Schema{}
 	for _, modelName := range models.ListModels() {
@@ -240,8 +240,18 @@ func parseGroupVersionKind(s proto.Schema) []schema.GroupVersionKind {
 		// kind fields
 		gvkMap, ok := gvk.(map[interface{}]interface{})
 		if !ok {
-			continue
+			// OpenAPI v3 seems to place string maps there
+			gvkStringMap, ok := gvk.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			gvkMap = map[interface{}]interface{}{}
+			for k, v := range gvkStringMap {
+				gvkMap[k] = v
+			}
+
 		}
+
 		group, ok := gvkMap["group"].(string)
 		if !ok {
 			continue

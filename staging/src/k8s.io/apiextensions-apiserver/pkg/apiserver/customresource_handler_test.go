@@ -168,20 +168,24 @@ func TestRouting(t *testing.T) {
 		crdLister: crdLister,
 		delegate:  delegate,
 		versionDiscoveryHandler: &versionDiscoveryHandler{
-			discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{
-				customV1: discovery.NewAPIVersionHandler(Codecs, customV1, discovery.APIResourceListerFunc(func() []metav1.APIResource {
-					return nil
-				})),
+			discovery: map[string]map[schema.GroupVersion]*discovery.APIVersionHandler{
+				"": {
+					customV1: discovery.NewAPIVersionHandler(Codecs, customV1, discovery.APIResourceListerFunc(func() []metav1.APIResource {
+						return nil
+					})),
+				},
 			},
 			delegate: delegate,
 		},
 		groupDiscoveryHandler: &groupDiscoveryHandler{
-			discovery: map[string]*discovery.APIGroupHandler{
-				"custom": discovery.NewAPIGroupHandler(Codecs, metav1.APIGroup{
-					Name:             customV1.Group,
-					Versions:         []metav1.GroupVersionForDiscovery{{GroupVersion: customV1.String(), Version: customV1.Version}},
-					PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: customV1.String(), Version: customV1.Version},
-				}),
+			discovery: map[string]map[string]*discovery.APIGroupHandler{
+				"": {
+					"custom": discovery.NewAPIGroupHandler(Codecs, metav1.APIGroup{
+						Name:             customV1.Group,
+						Versions:         []metav1.GroupVersionForDiscovery{{GroupVersion: customV1.String(), Version: customV1.Version}},
+						PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: customV1.String(), Version: customV1.Version},
+					}),
+				},
 			},
 			delegate: delegate,
 		},
@@ -511,7 +515,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		t.Fatal(err)
 	}
 
-	crdInfo, err := handler.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	crdInfo, err := handler.getOrCreateServingInfoFor(crd)
 	if err != nil {
 		t.Fatal(err)
 	}

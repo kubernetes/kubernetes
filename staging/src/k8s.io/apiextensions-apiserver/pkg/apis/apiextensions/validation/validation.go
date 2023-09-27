@@ -74,27 +74,39 @@ var supportedValidationReason = sets.NewString(
 func ValidateCustomResourceDefinition(ctx context.Context, obj *apiextensions.CustomResourceDefinition) field.ErrorList {
 	nameValidationFn := func(name string, prefix bool) []string {
 		ret := genericvalidation.NameIsDNSSubdomain(name, prefix)
-		requiredName := obj.Spec.Names.Plural + "." + obj.Spec.Group
+
+		// KCP: loosen naming restriction for CRDs created by the apibindings controller.
+		// TODO(ncdc): a user could potentially set this annotation in one of their own normal CRDs. Is there any
+		// mechanism that is restricted to the system so users can't bypass the standard plural.group requirement?
+		if _, bound := obj.Annotations["apis.kcp.io/bound-crd"]; bound {
+			return ret
+		}
+
+		group := obj.Spec.Group
+		if group == "" {
+			group = "core"
+		}
+		requiredName := obj.Spec.Names.Plural + "." + group
 		if name != requiredName {
 			ret = append(ret, fmt.Sprintf(`must be spec.names.plural+"."+spec.group`))
 		}
 		return ret
 	}
 
-	opts := validationOptions{
-		allowDefaults:                            true,
-		requireRecognizedConversionReviewVersion: true,
-		requireImmutableNames:                    false,
-		requireOpenAPISchema:                     true,
-		requireValidPropertyType:                 true,
-		requireStructuralSchema:                  true,
-		requirePrunedDefaults:                    true,
-		requireAtomicSetType:                     true,
-		requireMapListKeysMapSetValidation:       true,
+	opts := ValidationOptions{
+		AllowDefaults:                            true,
+		RequireRecognizedConversionReviewVersion: true,
+		RequireImmutableNames:                    false,
+		RequireOpenAPISchema:                     true,
+		RequireValidPropertyType:                 true,
+		RequireStructuralSchema:                  true,
+		RequirePrunedDefaults:                    true,
+		RequireAtomicSetType:                     true,
+		RequireMapListKeysMapSetValidation:       true,
 		// strictCost is always true to enforce cost limits.
-		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
+		CELEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
 		// allowInvalidCABundle is set to true since the CRD is not established yet.
-		allowInvalidCABundle: true,
+		AllowInvalidCABundle: true,
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -106,44 +118,44 @@ func ValidateCustomResourceDefinition(ctx context.Context, obj *apiextensions.Cu
 	return allErrs
 }
 
-// validationOptions groups several validation options, to avoid passing multiple bool parameters to methods
-type validationOptions struct {
-	// allowDefaults permits the validation schema to contain default attributes
-	allowDefaults bool
-	// disallowDefaultsReason gives a reason as to why allowDefaults is false (for better user feedback)
-	disallowDefaultsReason string
-	// requireRecognizedConversionReviewVersion requires accepted webhook conversion versions to contain a recognized version
-	requireRecognizedConversionReviewVersion bool
-	// requireImmutableNames disables changing spec.names
-	requireImmutableNames bool
-	// requireOpenAPISchema requires an openapi V3 schema be specified
-	requireOpenAPISchema bool
-	// requireValidPropertyType requires property types specified in the validation schema to be valid openapi v3 types
-	requireValidPropertyType bool
-	// requireStructuralSchema indicates that any schemas present must be structural
-	requireStructuralSchema bool
-	// requirePrunedDefaults indicates that defaults must be pruned
-	requirePrunedDefaults bool
-	// requireAtomicSetType indicates that the items type for a x-kubernetes-list-type=set list must be atomic.
-	requireAtomicSetType bool
-	// requireMapListKeysMapSetValidation indicates that:
+// ValidationOptions groups several validation options, to avoid passing multiple bool parameters to methods
+type ValidationOptions struct {
+	// AllowDefaults permits the validation schema to contain default attributes
+	AllowDefaults bool
+	// DisallowDefaultsReason gives a reason as to why AllowDefaults is false (for better user feedback)
+	DisallowDefaultsReason string
+	// RequireRecognizedConversionReviewVersion requires accepted webhook conversion versions to contain a recognized version
+	RequireRecognizedConversionReviewVersion bool
+	// RequireImmutableNames disables changing spec.names
+	RequireImmutableNames bool
+	// RequireOpenAPISchema requires an openapi V3 schema be specified
+	RequireOpenAPISchema bool
+	// RequireValidPropertyType requires property types specified in the validation schema to be valid openapi v3 types
+	RequireValidPropertyType bool
+	// RequireStructuralSchema indicates that any schemas present must be structural
+	RequireStructuralSchema bool
+	// RequirePrunedDefaults indicates that defaults must be pruned
+	RequirePrunedDefaults bool
+	// RequireAtomicSetType indicates that the items type for a x-kubernetes-list-type=set list must be atomic.
+	RequireAtomicSetType bool
+	// RequireMapListKeysMapSetValidation indicates that:
 	// 1. For x-kubernetes-list-type=map list, key fields are not nullable, and are required or have a default
 	// 2. For x-kubernetes-list-type=map or x-kubernetes-list-type=set list, the whole item must not be nullable.
-	requireMapListKeysMapSetValidation bool
-	// preexistingExpressions tracks which CEL expressions existed in an object before an update. May be nil for create.
-	preexistingExpressions preexistingExpressions
-	// versionsWithUnchangedSchemas tracks schemas of which versions are unchanged when updating a CRD.
+	RequireMapListKeysMapSetValidation bool
+	// PreexistingExpressions tracks which CEL expressions existed in an object before an update. May be nil for create.
+	PreexistingExpressions preexistingExpressions
+	// VersionsWithUnchangedSchemas tracks schemas of which versions are unchanged when updating a CRD.
 	// Does not apply to creation or deletion.
 	// Some checks use this to avoid rejecting previously accepted versions due to a control plane upgrade/downgrade.
-	versionsWithUnchangedSchemas sets.Set[string]
-	// suppressPerExpressionCost indicates whether CEL per-expression cost limit should be suppressed.
+	VersionsWithUnchangedSchemas sets.Set[string]
+	// SuppressPerExpressionCost indicates whether CEL per-expression cost limit should be suppressed.
 	// It will be automatically set during Versions validation if the version is in versionsWithUnchangedSchemas.
-	suppressPerExpressionCost bool
+	SuppressPerExpressionCost bool
 
-	celEnvironmentSet *environment.EnvSet
+	CELEnvironmentSet *environment.EnvSet
 	// allowInvalidCABundle allows an invalid conversion webhook CABundle on update only if the existing CABundle is invalid.
 	// An invalid CABundle is also permitted on create and before a CRD is in an Established=True condition.
-	allowInvalidCABundle bool
+	AllowInvalidCABundle bool
 }
 
 type preexistingExpressions struct {
@@ -214,9 +226,9 @@ func findVersionsWithUnchangedSchemas(obj, oldObject *apiextensions.CustomResour
 
 // suppressExpressionCostForUnchangedSchema returns a copy of opts with suppressPerExpressionCost set to true if
 // the specified version's schema is unchanged.
-func suppressExpressionCostForUnchangedSchema(opts validationOptions, version string) validationOptions {
-	if opts.versionsWithUnchangedSchemas.Has(version) {
-		opts.suppressPerExpressionCost = true
+func suppressExpressionCostForUnchangedSchema(opts ValidationOptions, version string) ValidationOptions {
+	if opts.VersionsWithUnchangedSchemas.Has(version) {
+		opts.SuppressPerExpressionCost = true
 	}
 	return opts
 }
@@ -224,28 +236,28 @@ func suppressExpressionCostForUnchangedSchema(opts validationOptions, version st
 // ValidateCustomResourceDefinitionUpdate statically validates
 // context is passed for supporting context cancellation during cel validation when validating defaults
 func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *apiextensions.CustomResourceDefinition) field.ErrorList {
-	opts := validationOptions{
-		allowDefaults:                            true,
-		requireRecognizedConversionReviewVersion: oldObj.Spec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldObj.Spec.Conversion.ConversionReviewVersions),
-		requireImmutableNames:                    apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established),
-		requireOpenAPISchema:                     requireOpenAPISchema(&oldObj.Spec),
-		requireValidPropertyType:                 requireValidPropertyType(&oldObj.Spec),
-		requireStructuralSchema:                  requireStructuralSchema(&oldObj.Spec),
-		requirePrunedDefaults:                    requirePrunedDefaults(&oldObj.Spec),
-		requireAtomicSetType:                     requireAtomicSetType(&oldObj.Spec),
-		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
-		preexistingExpressions:                   findPreexistingExpressions(&oldObj.Spec),
-		versionsWithUnchangedSchemas:             findVersionsWithUnchangedSchemas(obj, oldObj),
+	opts := ValidationOptions{
+		AllowDefaults:                            true,
+		RequireRecognizedConversionReviewVersion: oldObj.Spec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldObj.Spec.Conversion.ConversionReviewVersions),
+		RequireImmutableNames:                    apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established),
+		RequireOpenAPISchema:                     requireOpenAPISchema(&oldObj.Spec),
+		RequireValidPropertyType:                 requireValidPropertyType(&oldObj.Spec),
+		RequireStructuralSchema:                  requireStructuralSchema(&oldObj.Spec),
+		RequirePrunedDefaults:                    requirePrunedDefaults(&oldObj.Spec),
+		RequireAtomicSetType:                     requireAtomicSetType(&oldObj.Spec),
+		RequireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
+		PreexistingExpressions:                   findPreexistingExpressions(&oldObj.Spec),
+		VersionsWithUnchangedSchemas:             findVersionsWithUnchangedSchemas(obj, oldObj),
 		// strictCost is always true to enforce cost limits.
-		celEnvironmentSet:    environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
-		allowInvalidCABundle: allowInvalidCABundle(oldObj),
+		CELEnvironmentSet:    environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
+		AllowInvalidCABundle: allowInvalidCABundle(oldObj),
 	}
 	return validateCustomResourceDefinitionUpdate(ctx, obj, oldObj, opts)
 }
 
-func validateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *apiextensions.CustomResourceDefinition, opts validationOptions) field.ErrorList {
+func validateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *apiextensions.CustomResourceDefinition, opts ValidationOptions) field.ErrorList {
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateCustomResourceDefinitionSpecUpdate(ctx, &obj.Spec, &oldObj.Spec, opts, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpecUpdate(ctx, &obj.Spec, &oldObj.Spec, opts, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
 	allErrs = append(allErrs, validateAPIApproval(obj, oldObj)...)
@@ -289,13 +301,13 @@ func ValidateUpdateCustomResourceDefinitionStatus(obj, oldObj *apiextensions.Cus
 
 // validateCustomResourceDefinitionVersion statically validates.
 // context is passed for supporting context cancellation during cel validation when validating defaults
-func validateCustomResourceDefinitionVersion(ctx context.Context, version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, statusEnabled bool, opts validationOptions) field.ErrorList {
+func validateCustomResourceDefinitionVersion(ctx context.Context, version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, statusEnabled bool, opts ValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, err := range validateDeprecationWarning(version.Deprecated, version.DeprecationWarning) {
+	for _, err := range ValidateDeprecationWarning(version.Deprecated, version.DeprecationWarning) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("deprecationWarning"), version.DeprecationWarning, err))
 	}
 	opts = suppressExpressionCostForUnchangedSchema(opts, version.Name)
-	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(ctx, version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionValidation(ctx, version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(version.Subresources, fldPath.Child("subresources"))...)
 	for i := range version.AdditionalPrinterColumns {
 		allErrs = append(allErrs, ValidateCustomResourceColumnDefinition(&version.AdditionalPrinterColumns[i], fldPath.Child("additionalPrinterColumns").Index(i))...)
@@ -315,7 +327,7 @@ func validateCustomResourceDefinitionVersion(ctx context.Context, version *apiex
 	return allErrs
 }
 
-func validateDeprecationWarning(deprecated bool, deprecationWarning *string) []string {
+func ValidateDeprecationWarning(deprecated bool, deprecationWarning *string) []string {
 	if !deprecated && deprecationWarning != nil {
 		return []string{"can only be set for deprecated versions"}
 	}
@@ -346,11 +358,15 @@ func validateDeprecationWarning(deprecated bool, deprecationWarning *string) []s
 }
 
 // context is passed for supporting context cancellation during cel validation when validating defaults
-func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
+func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensions.CustomResourceDefinitionSpec, opts ValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(spec.Group) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("group"), ""))
+	// HACK: Relax naming constraints when registering legacy schema resources through CRDs
+	// for the KCP scenario
+	if isKubernetesAPIGroup(spec.Group) {
+		// No error: these are legacy schema kubernetes types
+		// that are not added in the controlplane schema
+		// and that we want to move up to the KCP as CRDs
 	} else if errs := utilvalidation.IsDNS1123Subdomain(spec.Group); len(errs) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), spec.Group, strings.Join(errs, ",")))
 	} else if len(strings.Split(spec.Group, ".")) < 2 {
@@ -361,10 +377,10 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 
 	// enabling pruning requires structural schemas
 	if spec.PreserveUnknownFields == nil || *spec.PreserveUnknownFields == false {
-		opts.requireStructuralSchema = true
+		opts.RequireStructuralSchema = true
 	}
 
-	if opts.requireOpenAPISchema {
+	if opts.RequireOpenAPISchema {
 		// check that either a global schema or versioned schemas are set in all versions
 		if spec.Validation == nil || spec.Validation.OpenAPIV3Schema == nil {
 			for i, v := range spec.Versions {
@@ -384,14 +400,14 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 			}
 		}
 	}
-	if opts.allowDefaults && specHasDefaults(spec) {
-		opts.requireStructuralSchema = true
+	if opts.AllowDefaults && specHasDefaults(spec) {
+		opts.RequireStructuralSchema = true
 		if spec.PreserveUnknownFields == nil || *spec.PreserveUnknownFields {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("preserveUnknownFields"), true, "must be false in order to use defaults in the schema"))
 		}
 	}
 	if specHasKubernetesExtensions(spec) {
-		opts.requireStructuralSchema = true
+		opts.RequireStructuralSchema = true
 	}
 
 	storageFlagCount := 0
@@ -465,7 +481,7 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 	}
 
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionNames(&spec.Names, fldPath.Child("names"))...)
-	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(ctx, spec.Validation, hasAnyStatusEnabled(spec), suppressExpressionCostForUnchangedSchema(opts, spec.Version), fldPath.Child("validation"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionValidation(ctx, spec.Validation, hasAnyStatusEnabled(spec), suppressExpressionCostForUnchangedSchema(opts, spec.Version), fldPath.Child("validation"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(spec.Subresources, fldPath.Child("subresources"))...)
 
 	for i := range spec.AdditionalPrinterColumns {
@@ -490,7 +506,7 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 	if (spec.Conversion != nil && spec.Conversion.Strategy != apiextensions.NoneConverter) && (spec.PreserveUnknownFields == nil || *spec.PreserveUnknownFields) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conversion").Child("strategy"), spec.Conversion.Strategy, "must be None if spec.preserveUnknownFields is true"))
 	}
-	allErrs = append(allErrs, validateCustomResourceConversion(spec.Conversion, opts.requireRecognizedConversionReviewVersion, fldPath.Child("conversion"), opts)...)
+	allErrs = append(allErrs, validateCustomResourceConversion(spec.Conversion, opts.RequireRecognizedConversionReviewVersion, fldPath.Child("conversion"), opts)...)
 
 	return allErrs
 }
@@ -614,10 +630,10 @@ func validateCustomResourceConversion(conversion *apiextensions.CustomResourceCo
 
 // validateCustomResourceDefinitionSpecUpdate statically validates
 // context is passed for supporting context cancellation during cel validation when validating defaults
-func validateCustomResourceDefinitionSpecUpdate(ctx context.Context, spec, oldSpec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
+func ValidateCustomResourceDefinitionSpecUpdate(ctx context.Context, spec, oldSpec *apiextensions.CustomResourceDefinitionSpec, opts ValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := validateCustomResourceDefinitionSpec(ctx, spec, opts, fldPath)
 
-	if opts.requireImmutableNames {
+	if opts.RequireImmutableNames {
 		// these effect the storage and cannot be changed therefore
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Scope, oldSpec.Scope, fldPath.Child("scope"))...)
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Names.Kind, oldSpec.Names.Kind, fldPath.Child("names", "kind"))...)
@@ -871,9 +887,9 @@ type specStandardValidator interface {
 	withForbidOldSelfValidations(path *field.Path) specStandardValidator
 }
 
-// validateCustomResourceDefinitionValidation statically validates
+// ValidateCustomResourceDefinitionValidation statically validates
 // context is passed for supporting context cancellation during cel validation when validating defaults
-func validateCustomResourceDefinitionValidation(ctx context.Context, customResourceValidation *apiextensions.CustomResourceValidation, statusSubresourceEnabled bool, opts validationOptions, fldPath *field.Path) field.ErrorList {
+func ValidateCustomResourceDefinitionValidation(ctx context.Context, customResourceValidation *apiextensions.CustomResourceValidation, statusSubresourceEnabled bool, opts ValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if customResourceValidation == nil {
@@ -914,21 +930,21 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 		}
 
 		openAPIV3Schema := &specStandardValidatorV3{
-			allowDefaults:            opts.allowDefaults,
-			disallowDefaultsReason:   opts.disallowDefaultsReason,
-			requireValidPropertyType: opts.requireValidPropertyType,
+			allowDefaults:            opts.AllowDefaults,
+			disallowDefaultsReason:   opts.DisallowDefaultsReason,
+			requireValidPropertyType: opts.RequireValidPropertyType,
 		}
 
 		var celContext *CELSchemaContext
 		var structuralSchemaInitErrs field.ErrorList
-		if opts.requireStructuralSchema {
+		if opts.RequireStructuralSchema {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
 				// These validation errors overlap with  OpenAPISchema validation errors so we keep track of them
 				// separately and only show them if OpenAPISchema validation does not report any errors.
 				structuralSchemaInitErrs = append(structuralSchemaInitErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), "", err.Error()))
 			} else if validationErrors := structuralschema.ValidateStructural(fldPath.Child("openAPIV3Schema"), ss); len(validationErrors) > 0 {
 				allErrs = append(allErrs, validationErrors...)
-			} else if validationErrors, err := structuraldefaulting.ValidateDefaults(ctx, fldPath.Child("openAPIV3Schema"), ss, true, opts.requirePrunedDefaults); err != nil {
+			} else if validationErrors, err := structuraldefaulting.ValidateDefaults(ctx, fldPath.Child("openAPIV3Schema"), ss, true, opts.RequirePrunedDefaults); err != nil {
 				// this should never happen
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), "", err.Error()))
 			} else if len(validationErrors) > 0 {
@@ -996,7 +1012,7 @@ func (o *OpenAPISchemaErrorList) AllErrors() field.ErrorList {
 }
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
-func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, celContext *CELSchemaContext) *OpenAPISchemaErrorList {
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *ValidationOptions, celContext *CELSchemaContext) *OpenAPISchemaErrorList {
 	allErrs := &OpenAPISchemaErrorList{SchemaErrors: field.ErrorList{}, CELErrors: field.ErrorList{}}
 
 	if schema == nil {
@@ -1130,7 +1146,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		} else {
 			allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("type"), schema.Type, "must be array if x-kubernetes-list-type is specified"))
 		}
-	} else if opts.requireAtomicSetType && schema.XListType != nil && *schema.XListType == "set" && schema.Items != nil && schema.Items.Schema != nil { // by structural schema items are present
+	} else if opts.RequireAtomicSetType && schema.XListType != nil && *schema.XListType == "set" && schema.Items != nil && schema.Items.Schema != nil { // by structural schema items are present
 		is := schema.Items.Schema
 		switch is.Type {
 		case "array":
@@ -1191,7 +1207,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 	}
 
-	if opts.requireMapListKeysMapSetValidation {
+	if opts.RequireMapListKeysMapSetValidation {
 		allErrs.SchemaErrors = append(allErrs.SchemaErrors, validateMapListKeysMapSet(schema, fldPath)...)
 	}
 	if len(schema.XValidations) > 0 {
@@ -1240,13 +1256,13 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			} else if typeInfo == nil {
 				allErrs.CELErrors = append(allErrs.CELErrors, field.InternalError(fldPath.Child("x-kubernetes-validations"), fmt.Errorf("internal error: failed to retrieve type information for x-kubernetes-validations")))
 			} else {
-				compResults, err := cel.Compile(typeInfo.Schema, typeInfo.DeclType, celconfig.PerCallLimit, opts.celEnvironmentSet, opts.preexistingExpressions)
+				compResults, err := cel.Compile(typeInfo.Schema, typeInfo.DeclType, celconfig.PerCallLimit, opts.CELEnvironmentSet, opts.PreexistingExpressions)
 				if err != nil {
 					allErrs.CELErrors = append(allErrs.CELErrors, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
 				} else {
 					for i, cr := range compResults {
 						expressionCost := getExpressionCost(cr, celContext)
-						if !opts.suppressPerExpressionCost && expressionCost > StaticEstimatedCostLimit {
+						if !opts.SuppressPerExpressionCost && expressionCost > StaticEstimatedCostLimit {
 							costErrorMsg := getCostErrorMessage("estimated rule cost", expressionCost, StaticEstimatedCostLimit)
 							allErrs.CELErrors = append(allErrs.CELErrors, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
 						}
@@ -1264,7 +1280,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 							allErrs.CELErrors = append(allErrs.CELErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("messageExpression"), schema.XValidations[i], cr.MessageExpressionError.Detail))
 						} else {
 							if cr.MessageExpression != nil {
-								if !opts.suppressPerExpressionCost && cr.MessageExpressionMaxCost > StaticEstimatedCostLimit {
+								if !opts.SuppressPerExpressionCost && cr.MessageExpressionMaxCost > StaticEstimatedCostLimit {
 									costErrorMsg := getCostErrorMessage("estimated messageExpression cost", cr.MessageExpressionMaxCost, StaticEstimatedCostLimit)
 									allErrs.CELErrors = append(allErrs.CELErrors, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("messageExpression"), costErrorMsg))
 								}

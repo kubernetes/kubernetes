@@ -80,12 +80,22 @@ func (x *Extensions) toKubeOpenAPI(ret *spec.Schema) {
 	}
 	if len(x.XListMapKeys) > 0 {
 		ret.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", x.XListMapKeys)
+		ret.VendorExtensible.AddExtension("x-kubernetes-patch-merge-key", x.XListMapKeys[0])
 	}
 	if x.XListType != nil {
 		ret.VendorExtensible.AddExtension("x-kubernetes-list-type", *x.XListType)
+		if *x.XListType == "map" || *x.XListType == "set" {
+			ret.VendorExtensible.AddExtension("x-kubernetes-patch-strategy", "merge")
+		}
+		if *x.XListType == "atomic" {
+			ret.VendorExtensible.AddExtension("x-kubernetes-patch-strategy", "replace")
+		}
 	}
 	if x.XMapType != nil {
 		ret.VendorExtensible.AddExtension("x-kubernetes-map-type", *x.XMapType)
+		if *x.XMapType == "atomic" {
+			ret.VendorExtensible.AddExtension("x-kubernetes-patch-strategy", "replace")
+		}
 	}
 }
 
