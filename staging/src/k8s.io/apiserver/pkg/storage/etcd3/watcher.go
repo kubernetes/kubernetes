@@ -35,7 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/kcp"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -92,6 +94,9 @@ type watchChan struct {
 	incomingEventChan chan *event
 	resultChan        chan watch.Event
 	errChan           chan error
+
+	cluster    *genericapirequest.Cluster
+	crdRequest bool
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
@@ -101,7 +106,12 @@ type watchChan struct {
 // If opts.Recursive is false, it watches on given key.
 // If opts.Recursive is true, it watches any children and directories under the key, excluding the root key itself.
 // pred must be non-nil. Only if opts.Predicate matches the change, it will be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage.ListOptions) (watch.Interface, error) {
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage.ListOptions, transformer value.Transformer) (watch.Interface, error) {
+	cluster, err := genericapirequest.ValidClusterFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
@@ -112,7 +122,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if err != nil {
 		return nil, err
 	}
-	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.Predicate)
+	wc := w.createWatchChan(ctx, key, startWatchRV, cluster, opts.Recursive, opts.ProgressNotify, opts.Predicate, transformer)
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -125,7 +135,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, cluster *genericapirequest.Cluster, recursive, progressNotify bool, pred storage.SelectionPredicate, transformer value.Transformer) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
@@ -136,6 +146,9 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		incomingEventChan: make(chan *event, incomingBufSize),
 		resultChan:        make(chan watch.Event, outgoingBufSize),
 		errChan:           make(chan error, 1),
+
+		cluster:    cluster,
+		crdRequest: kcp.CustomResourceIndicatorFrom(ctx),
 	}
 	if pred.Empty() {
 		// The filter doesn't filter out any object.
@@ -677,6 +690,10 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 		if err != nil {
 			return nil, nil, err
 		}
+
+		// kcp: apply clusterName to the decoded object, as the name is not persisted in storage.
+		clusterName := adjustClusterNameIfWildcard(wc.shard, wc.cluster, wc.crdRequest, wc.key, e.key)
+		annotateDecodedObjectWith(curObj, clusterName, shardName)
 	}
 	// We need to decode prevValue, only if this is deletion event or
 	// the underlying filter doesn't accept all objects (otherwise we
@@ -694,6 +711,10 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 		if err != nil {
 			return nil, nil, err
 		}
+
+		// kcp: apply clusterName to the decoded object, as the name is not persisted in storage.
+		clusterName := adjustClusterNameIfWildcard(wc.shard, wc.cluster, wc.crdRequest, wc.key, e.key)
+		annotateDecodedObjectWith(oldObj, clusterName, shardName)
 	}
 	return curObj, oldObj, nil
 }

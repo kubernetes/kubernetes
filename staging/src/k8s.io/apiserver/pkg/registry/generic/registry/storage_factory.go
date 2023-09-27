@@ -17,6 +17,7 @@ limitations under the License.
 package registry
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -37,7 +38,7 @@ func StorageWithCacher() generic.StorageDecorator {
 	return func(
 		storageConfig *storagebackend.ConfigForResource,
 		resourcePrefix string,
-		keyFunc func(obj runtime.Object) (string, error),
+		keyFunc func(ctx context.Context, obj runtime.Object) (string, error),
 		newFunc func() runtime.Object,
 		newListFunc func() runtime.Object,
 		getAttrsFunc storage.AttrFunc,
@@ -65,6 +66,8 @@ func StorageWithCacher() generic.StorageDecorator {
 			IndexerFuncs:   triggerFuncs,
 			Indexers:       indexers,
 			Codec:          storageConfig.Codec,
+
+			KcpExtraStorageMetadata: storageConfig.KcpExtraStorageMetadata,
 		}
 		cacher, err := cacherstorage.NewCacherFromConfig(cacherConfig)
 		if err != nil {

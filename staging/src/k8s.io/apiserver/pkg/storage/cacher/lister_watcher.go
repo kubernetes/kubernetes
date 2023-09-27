@@ -27,24 +27,27 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/tools/cache"
 )
 
 // listerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type listerWatcher struct {
-	storage         storage.Interface
-	resourcePrefix  string
-	newListFunc     func() runtime.Object
-	contextMetadata metadata.MD
+	storage                 storage.Interface
+	resourcePrefix          string
+	newListFunc             func() runtime.Object
+	contextMetadata         metadata.MD
+	kcpExtraStorageMetadata *storagebackend.KcpStorageMetadata
 }
 
 // NewListerWatcher returns a storage.Interface backed ListerWatcher.
-func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD) cache.ListerWatcher {
+func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD, kcpStorageMetadata *storagebackend.KcpStorageMetadata) cache.ListerWatcher {
 	return &listerWatcher{
-		storage:         storage,
-		resourcePrefix:  resourcePrefix,
-		newListFunc:     newListFunc,
-		contextMetadata: contextMetadata,
+		storage:                 storage,
+		resourcePrefix:          resourcePrefix,
+		newListFunc:             newListFunc,
+		contextMetadata:         contextMetadata,
+		kcpExtraStorageMetadata: kcpStorageMetadata,
 	}
 }
 
@@ -67,7 +70,10 @@ func (lw *listerWatcher) List(options metav1.ListOptions) (runtime.Object, error
 	if lw.contextMetadata != nil {
 		ctx = metadata.NewOutgoingContext(ctx, lw.contextMetadata)
 	}
-	if err := lw.storage.GetList(ctx, lw.resourcePrefix, storageOpts, list); err != nil {
+	if lw.kcpExtraStorageMetadata != nil {
+		ctx = createKCPClusterAwareContext(lw.kcpExtraStorageMetadata)
+	}
+	if err := lw.storage.GetList(ctx, lw.kcpAwareResourcePrefix(), storageOpts, list); err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -85,5 +91,8 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 	if lw.contextMetadata != nil {
 		ctx = metadata.NewOutgoingContext(ctx, lw.contextMetadata)
 	}
-	return lw.storage.Watch(ctx, lw.resourcePrefix, opts)
+	if lw.kcpExtraStorageMetadata != nil {
+		ctx = createKCPClusterAwareContext(lw.kcpExtraStorageMetadata)
+	}
+	return lw.storage.Watch(ctx, lw.kcpAwareResourcePrefix(), opts)
 }
