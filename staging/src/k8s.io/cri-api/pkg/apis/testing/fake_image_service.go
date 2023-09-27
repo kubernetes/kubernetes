@@ -242,6 +242,22 @@ func (r *FakeImageService) ImageFsInfo(_ context.Context) (*runtimeapi.ImageFsIn
 	}, nil
 }
 
+// ImageFsInfo returns information of the filesystem that is used to store images.
+func (r *FakeImageService) ImageFsInfoV2(_ context.Context) (*runtimeapi.ImageFsInfoResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ImageFsInfoV2")
+	if err := r.popError("ImageFsInfoV2"); err != nil {
+		return nil, err
+	}
+
+	return &runtimeapi.ImageFsInfoResponse{
+		ImageFilesystems:     r.FakeFilesystemUsage,
+		ContainerFilesystems: r.FakeContainerFilesystemUsage,
+	}, nil
+}
+
 // AssertImagePulledWithAuth validates whether the image was pulled with auth and asserts if it wasn't.
 func (r *FakeImageService) AssertImagePulledWithAuth(t *testing.T, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, failMsg string) {
 	r.Lock()

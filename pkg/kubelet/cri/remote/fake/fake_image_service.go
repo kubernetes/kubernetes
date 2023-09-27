@@ -79,3 +79,13 @@ func (f *RemoteRuntime) ImageFsInfo(ctx context.Context, req *kubeapi.ImageFsInf
 
 	return resp, nil
 }
+
+// ImageFsInfo returns information of the filesystem that is used to store images.
+func (f *RemoteRuntime) ImageFsInfoV2(ctx context.Context, req *kubeapi.ImageFsInfoRequest) (*kubeapi.ImageFsInfoResponse, error) {
+	resp, err := f.ImageService.ImageFsInfoV2(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
