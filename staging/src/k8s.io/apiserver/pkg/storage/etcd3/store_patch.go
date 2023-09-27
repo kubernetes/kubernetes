@@ -26,8 +26,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// adjustClusterNameIfWildcard determines the logical cluster name from the key: <prefix>/clusterName/<remainder>.
-func adjustClusterNameIfWildcard(cluster *genericapirequest.Cluster, keyPrefix, key string) logicalcluster.Name {
+// adjustClusterNameIfWildcard determines the logical cluster name. If this is not a cluster-wildcard list/watch request,
+// the cluster name is returned unmodified. Otherwise, the cluster name is extracted from the key based on whether it is
+// - CR partial metadata request: <prefix>/identity/clusterName/<remainder>
+// - any other request: <prefix>/clusterName/<remainder>.
+func adjustClusterNameIfWildcard(cluster *genericapirequest.Cluster, crdRequest bool, keyPrefix, key string) logicalcluster.Name {
 	if !cluster.Wildcard {
 		return cluster.Name
 	}
@@ -43,8 +46,15 @@ func adjustClusterNameIfWildcard(cluster *genericapirequest.Cluster, keyPrefix, 
 		return logicalcluster.Name(parts[i])
 	}
 
-	// expecting root:org:ws/<remainder>
-	return extract(2, 0)
+	switch {
+	case cluster.PartialMetadataRequest && crdRequest:
+		// expecting 2699f4d273d342adccdc8a32663408226ecf66de7d191113ed3d4dc9bccec2f2/root:org:ws/<remainder>
+		// OR customresources/root:org:ws/<remainder>
+		return extract(3, 1)
+	default:
+		// expecting root:org:ws/<remainder>
+		return extract(2, 0)
+	}
 }
 
 // adjustShardNameIfWildcard determines a shard name. If this is not a shard-wildcard request,
