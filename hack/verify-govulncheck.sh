@@ -13,17 +13,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -euo pipefail
+set -o errexit
+set -o nounset
+set -o pipefail
 
-export WORKDIR=${ARTIFACTS:-$TMPDIR}
-export PATH=$PATH:$GOPATH/bin
-mkdir -p "${WORKDIR}"
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
+
+# make sure everything is committed
+kube::util::ensure_clean_working_dir
+
+# This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
+kube::golang::setup_env
+# Opt into using go modules
+export GO111MODULE=on
+
 go install golang.org/x/vuln/cmd/govulncheck@v1.0.1
 
-govulncheck -scan module ./... > "${WORKDIR}/head.txt"
+# KUBE_VERIFY_GIT_BRANCH is populated in verify CI jobs
+BRANCH="${KUBE_VERIFY_GIT_BRANCH:-master}"
 
-git reset --hard HEAD
-git checkout -b base "${PULL_BASE_SHA}"
-govulncheck -scan module ./... > "${WORKDIR}/pr-base.txt"
+kube::util::ensure-temp-dir
+WORKTREE="${KUBE_TEMP}/worktree"
 
-diff -s -u --ignore-all-space "${WORKDIR}"/pr-base.txt "${WORKDIR}"/head.txt || true
+# Create a copy of the repo with $BRANCH checked out
+git worktree add -f "${WORKTREE}" "${BRANCH}"
+# Clean up the copy on exit
+kube::util::trap_add "git worktree remove -f ${WORKTREE}" EXIT
+
+govulncheck -scan module ./... > "${KUBE_TEMP}/head.txt"
+pushd "${WORKTREE}" >/dev/null
+  govulncheck -scan module ./... > "${KUBE_TEMP}/pr-base.txt"
+popd >/dev/null
+
+echo -e "\n HEAD: $(cat "${KUBE_TEMP}"/head.txt)" 
+echo -e "\n PR_BASE: $(cat "${KUBE_TEMP}/pr-base.txt")" 
+
+diff -s -u --ignore-all-space "${KUBE_TEMP}"/pr-base.txt "${KUBE_TEMP}"/head.txt || true
