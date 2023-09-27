@@ -249,10 +249,25 @@ const (
 	resourceCountPollPeriodJitter = 1.2
 )
 
+// NoNamespaceKeyRootFunc is the default function for constructing storage paths
+// to resource directories enforcing namespace rules.
+func NoNamespaceKeyRootFunc(ctx context.Context, prefix string) string {
+	key := prefix
+	cluster, err := genericapirequest.ValidClusterFrom(ctx)
+	if err != nil {
+		klog.Errorf("invalid context cluster value: %v", err)
+		return key
+	}
+	if !cluster.Wildcard {
+		key += "/" + cluster.Name.String()
+	}
+	return key
+}
+
 // NamespaceKeyRootFunc is the default function for constructing storage paths
 // to resource directories enforcing namespace rules.
 func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
-	key := prefix
+	key := NoNamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if ok && len(ns) > 0 {
 		key = key + "/" + ns
@@ -264,7 +279,6 @@ func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 // a resource relative to the given prefix enforcing namespace rules. If the
 // context does not contain a namespace, it errors.
 func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
-	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
 		return "", apierrors.NewBadRequest("Namespace parameter required.")
@@ -275,8 +289,7 @@ func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, 
 	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", apierrors.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
-	key = key + "/" + name
-	return key, nil
+	return NoNamespaceKeyRootFunc(ctx, prefix) + "/" + ns + "/" + name, nil
 }
 
 // NoNamespaceKeyFunc is the default function for constructing storage paths
@@ -288,8 +301,7 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", apierrors.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
-	key := prefix + "/" + name
-	return key, nil
+	return NoNamespaceKeyRootFunc(ctx, prefix) + "/" + name, nil
 }
 
 // New implements RESTStorage.New.
@@ -459,7 +471,8 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 	var finishCreate FinishFunc = finishNothing
 
 	// Init metadata as early as possible.
-	if objectMeta, err := meta.Accessor(obj); err != nil {
+	objectMeta, err := meta.Accessor(obj)
+	if err != nil {
 		return nil, err
 	} else {
 		rest.FillObjectMetaSystemFields(objectMeta)
@@ -1485,6 +1498,9 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if (e.KeyRootFunc == nil) != (e.KeyFunc == nil) {
 		return fmt.Errorf("store for %s must set both KeyRootFunc and KeyFunc or neither", e.DefaultQualifiedResource.String())
 	}
+	if e.KeyFunc != nil || e.KeyFunc != nil {
+		return fmt.Errorf("DEBUG: keyfunc must be non-nil for all resources", e.DefaultQualifiedResource.String())
+	}
 
 	if e.TableConvertor == nil {
 		return fmt.Errorf("store for %s must set TableConvertor; rest.NewDefaultTableConvertor(e.DefaultQualifiedResource) can be used to output just name/creation time", e.DefaultQualifiedResource.String())
@@ -1545,6 +1561,13 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		return fmt.Errorf("store for %s has an invalid prefix %q", e.DefaultQualifiedResource.String(), opts.ResourcePrefix)
 	}
 
+	if e.KeyFunc != nil {
+		panic(fmt.Sprintf("KeyFunc is illegal for %v: %T", e.DefaultQualifiedResource, e.KeyFunc))
+	}
+	if e.KeyRootFunc != nil {
+		panic(fmt.Sprintf("KeyRootFunc is illegal for %v: %T", e.DefaultQualifiedResource, e.KeyRootFunc))
+	}
+
 	// Set the default behavior for storage key generation
 	if e.KeyRootFunc == nil && e.KeyFunc == nil {
 		if isNamespaced {
@@ -1556,7 +1579,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			}
 		} else {
 			e.KeyRootFunc = func(ctx context.Context) string {
-				return prefix
+				return NoNamespaceKeyRootFunc(ctx, prefix)
 			}
 			e.KeyFunc = func(ctx context.Context, name string) (string, error) {
 				return NoNamespaceKeyFunc(ctx, prefix, name)
