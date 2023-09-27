@@ -160,6 +160,8 @@ type ImageService interface {
 	RemoveImage(ctx context.Context, image ImageSpec) error
 	// ImageStats returns Image statistics.
 	ImageStats(ctx context.Context) (*ImageStats, error)
+	// ImageFsInfo returns a list of file systems for containers/images
+	ImageFsInfo(ctx context.Context) (*runtimeapi.ImageFsInfoResponse, error)
 }
 
 // Attacher interface allows to attach a container.

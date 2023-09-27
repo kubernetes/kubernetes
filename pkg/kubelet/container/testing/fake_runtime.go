@@ -45,6 +45,8 @@ type FakeRuntime struct {
 	PodList           []*FakePod
 	AllPodList        []*FakePod
 	ImageList         []kubecontainer.Image
+	ImageFsStats      []*runtimeapi.FilesystemUsage
+	ContainerFsStats  []*runtimeapi.FilesystemUsage
 	APIPodStatus      v1.PodStatus
 	PodStatus         kubecontainer.PodStatus
 	StartedPods       []string
@@ -422,12 +424,36 @@ func (f *FakeRuntime) ListPodSandboxMetrics(_ context.Context) ([]*runtimeapi.Po
 	return nil, f.Err
 }
 
+// SetContainerFsStats sets the containerFsStats for dependency injection.
+func (f *FakeRuntime) SetContainerFsStats(val []*runtimeapi.FilesystemUsage) {
+	f.ContainerFsStats = val
+}
+
+// SetImageFsStats sets the ImageFsStats for dependency injection.
+func (f *FakeRuntime) SetImageFsStats(val []*runtimeapi.FilesystemUsage) {
+	f.ImageFsStats = val
+}
+
 func (f *FakeRuntime) ImageStats(_ context.Context) (*kubecontainer.ImageStats, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "ImageStats")
 	return nil, f.Err
+}
+
+// ImageFsInfo returns a ImageFsInfoResponse given the DI injected values of ImageFsStats
+// and ContainerFsStats.
+func (f *FakeRuntime) ImageFsInfo(_ context.Context) (*runtimeapi.ImageFsInfoResponse, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "ImageFsInfo")
+	resp := &runtimeapi.ImageFsInfoResponse{
+		ImageFilesystems:     f.ImageFsStats,
+		ContainerFilesystems: f.ContainerFsStats,
+	}
+	return resp, f.Err
 }
 
 func (f *FakeStreamingRuntime) GetExec(_ context.Context, id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {

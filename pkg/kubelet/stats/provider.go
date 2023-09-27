@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/utils/ptr"
 )
 
 // PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
@@ -99,7 +100,7 @@ type containerStatsProvider interface {
 	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
-	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
+	ImageFsStats(ctx context.Context) (*statsapi.FsStats, *statsapi.FsStats, error)
 	ImageFsDevice(ctx context.Context) (string, error)
 }
 
@@ -203,6 +204,7 @@ func (p *Provider) GetRawContainerInfo(containerName string, req *cadvisorapiv1.
 }
 
 // HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
+// KEP Issue Number 4191: Enhanced this to allow for the containers to be separate from images.
 func (p *Provider) HasDedicatedImageFs(ctx context.Context) (bool, error) {
 	device, err := p.containerStatsProvider.ImageFsDevice(ctx)
 	if err != nil {
@@ -212,5 +214,38 @@ func (p *Provider) HasDedicatedImageFs(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// KEP Enhancement: DedicatedImageFs can mean either container or image fs are separate from root
+	// CAdvisor reports this a bit differently than Container runtimes
+	if device == rootFsInfo.Device {
+		imageFs, containerFs, err := p.ImageFsStats(ctx)
+		if err != nil {
+			return false, err
+		}
+		if !equalFileSystems(imageFs, containerFs) {
+			return true, nil
+		}
+	}
 	return device != rootFsInfo.Device, nil
+}
+
+func equalFileSystems(a, b *statsapi.FsStats) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if !ptr.Equal(a.AvailableBytes, b.AvailableBytes) {
+		return false
+	}
+	if !ptr.Equal(a.CapacityBytes, b.CapacityBytes) {
+		return false
+	}
+	if !ptr.Equal(a.InodesUsed, b.InodesUsed) {
+		return false
+	}
+	if !ptr.Equal(a.InodesFree, b.InodesFree) {
+		return false
+	}
+	if !ptr.Equal(a.Inodes, b.Inodes) {
+		return false
+	}
+	return true
 }

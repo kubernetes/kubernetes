@@ -1326,7 +1326,7 @@ func (kl *Kubelet) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([
 }
 
 // ImageFsStats is delegated to StatsProvider, which implements stats.Provider interface
-func (kl *Kubelet) ImageFsStats(ctx context.Context) (*statsapi.FsStats, error) {
+func (kl *Kubelet) ImageFsStats(ctx context.Context) (*statsapi.FsStats, *statsapi.FsStats, error) {
 	return kl.StatsProvider.ImageFsStats(ctx)
 }
 

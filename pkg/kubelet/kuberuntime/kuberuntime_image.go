@@ -158,3 +158,12 @@ func (m *kubeGenericRuntimeManager) ImageStats(ctx context.Context) (*kubecontai
 	}
 	return stats, nil
 }
+
+func (m *kubeGenericRuntimeManager) ImageFsInfo(ctx context.Context) (*runtimeapi.ImageFsInfoResponse, error) {
+	allImages, err := m.imageService.ImageFsInfo(ctx)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get image filesystem")
+		return nil, err
+	}
+	return allImages, nil
+}
