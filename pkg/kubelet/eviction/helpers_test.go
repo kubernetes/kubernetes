@@ -90,6 +90,16 @@ func TestGetReclaimableThreshold(t *testing.T) {
 						Quantity: quantityMustParse("1Gi"),
 					},
 				},
+				{
+					Signal:   evictionapi.SignalContainerFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("100Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
 			},
 		},
 	}
@@ -196,10 +206,10 @@ func TestParseThresholdConfig(t *testing.T) {
 		},
 		"disk eviction values": {
 			allocatableConfig:       []string{},
-			evictionHard:            map[string]string{"imagefs.available": "150Mi", "nodefs.available": "100Mi"},
-			evictionSoft:            map[string]string{"imagefs.available": "300Mi", "nodefs.available": "200Mi"},
-			evictionSoftGracePeriod: map[string]string{"imagefs.available": "30s", "nodefs.available": "30s"},
-			evictionMinReclaim:      map[string]string{"imagefs.available": "2Gi", "nodefs.available": "1Gi"},
+			evictionHard:            map[string]string{"imagefs.available": "150Mi", "nodefs.available": "100Mi", "containerfs.available": "250Mi"},
+			evictionSoft:            map[string]string{"imagefs.available": "300Mi", "nodefs.available": "200Mi", "containerfs.available": "400Mi"},
+			evictionSoftGracePeriod: map[string]string{"imagefs.available": "30s", "nodefs.available": "30s", "containerfs.available": "30s"},
+			evictionMinReclaim:      map[string]string{"imagefs.available": "2Gi", "nodefs.available": "1Gi", "containerfs.available": "3Gi"},
 			expectErr:               false,
 			expectThresholds: []evictionapi.Threshold{
 				{
@@ -220,6 +230,16 @@ func TestParseThresholdConfig(t *testing.T) {
 					},
 					MinReclaim: &evictionapi.ThresholdValue{
 						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalContainerFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("250Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("3Gi"),
 					},
 				},
 				{
@@ -244,14 +264,25 @@ func TestParseThresholdConfig(t *testing.T) {
 						Quantity: quantityMustParse("1Gi"),
 					},
 				},
+				{
+					Signal:   evictionapi.SignalContainerFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("400Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("3Gi"),
+					},
+				},
 			},
 		},
 		"disk eviction values in percentages": {
 			allocatableConfig:       []string{},
-			evictionHard:            map[string]string{"imagefs.available": "15%", "nodefs.available": "10.5%"},
-			evictionSoft:            map[string]string{"imagefs.available": "30%", "nodefs.available": "20.5%"},
-			evictionSoftGracePeriod: map[string]string{"imagefs.available": "30s", "nodefs.available": "30s"},
-			evictionMinReclaim:      map[string]string{"imagefs.available": "10%", "nodefs.available": "5%"},
+			evictionHard:            map[string]string{"imagefs.available": "15%", "nodefs.available": "10.5%", "containerfs.available": "12.0%"},
+			evictionSoft:            map[string]string{"imagefs.available": "30%", "nodefs.available": "20.5%", "containerfs.available": "25.5%"},
+			evictionSoftGracePeriod: map[string]string{"imagefs.available": "30s", "nodefs.available": "30s", "containerfs.available": "30s"},
+			evictionMinReclaim:      map[string]string{"imagefs.available": "10%", "nodefs.available": "5%", "containerfs.available": "8%"},
 			expectErr:               false,
 			expectThresholds: []evictionapi.Threshold{
 				{
@@ -272,6 +303,16 @@ func TestParseThresholdConfig(t *testing.T) {
 					},
 					MinReclaim: &evictionapi.ThresholdValue{
 						Percentage: 0.05,
+					},
+				},
+				{
+					Signal:   evictionapi.SignalContainerFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Percentage: 0.120,
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Percentage: 0.08,
 					},
 				},
 				{
@@ -296,14 +337,25 @@ func TestParseThresholdConfig(t *testing.T) {
 						Percentage: 0.05,
 					},
 				},
+				{
+					Signal:   evictionapi.SignalContainerFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Percentage: 0.255,
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Percentage: 0.08,
+					},
+				},
 			},
 		},
 		"inode eviction values": {
 			allocatableConfig:       []string{},
-			evictionHard:            map[string]string{"imagefs.inodesFree": "150Mi", "nodefs.inodesFree": "100Mi"},
-			evictionSoft:            map[string]string{"imagefs.inodesFree": "300Mi", "nodefs.inodesFree": "200Mi"},
-			evictionSoftGracePeriod: map[string]string{"imagefs.inodesFree": "30s", "nodefs.inodesFree": "30s"},
-			evictionMinReclaim:      map[string]string{"imagefs.inodesFree": "2Gi", "nodefs.inodesFree": "1Gi"},
+			evictionHard:            map[string]string{"imagefs.inodesFree": "150Mi", "nodefs.inodesFree": "100Mi", "containerfs.inodesFree": "125Mi"},
+			evictionSoft:            map[string]string{"imagefs.inodesFree": "300Mi", "nodefs.inodesFree": "200Mi", "containerfs.inodesFree": "250Mi"},
+			evictionSoftGracePeriod: map[string]string{"imagefs.inodesFree": "30s", "nodefs.inodesFree": "30s", "containerfs.inodesFree": "30s"},
+			evictionMinReclaim:      map[string]string{"imagefs.inodesFree": "2Gi", "nodefs.inodesFree": "1Gi", "containerfs.inodesFree": "2Gi"},
 			expectErr:               false,
 			expectThresholds: []evictionapi.Threshold{
 				{
@@ -327,6 +379,16 @@ func TestParseThresholdConfig(t *testing.T) {
 					},
 				},
 				{
+					Signal:   evictionapi.SignalContainerFsInodesFree,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("125Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("2Gi"),
+					},
+				},
+				{
 					Signal:   evictionapi.SignalImageFsInodesFree,
 					Operator: evictionapi.OpLessThan,
 					Value: evictionapi.ThresholdValue{
@@ -346,6 +408,17 @@ func TestParseThresholdConfig(t *testing.T) {
 					GracePeriod: gracePeriod,
 					MinReclaim: &evictionapi.ThresholdValue{
 						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalContainerFsInodesFree,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("250Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("2Gi"),
 					},
 				},
 			},

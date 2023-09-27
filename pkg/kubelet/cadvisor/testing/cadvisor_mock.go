@@ -52,6 +52,21 @@ func (m *MockInterface) EXPECT() *MockInterfaceMockRecorder {
 	return m.recorder
 }
 
+// ContainerFsInfo mocks base method.
+func (m *MockInterface) ContainerFsInfo() (v2.FsInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ContainerFsInfo")
+	ret0, _ := ret[0].(v2.FsInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ContainerFsInfo indicates an expected call of ContainerFsInfo.
+func (mr *MockInterfaceMockRecorder) ContainerFsInfo() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContainerFsInfo", reflect.TypeOf((*MockInterface)(nil).ContainerFsInfo))
+}
+
 // ContainerInfo mocks base method.
 func (m *MockInterface) ContainerInfo(name string, req *v1.ContainerInfoRequest) (*v1.ContainerInfo, error) {
 	m.ctrl.T.Helper()
@@ -252,6 +267,21 @@ func NewMockImageFsInfoProvider(ctrl *gomock.Controller) *MockImageFsInfoProvide
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockImageFsInfoProvider) EXPECT() *MockImageFsInfoProviderMockRecorder {
 	return m.recorder
+}
+
+// ContainerFsInfoLabel mocks base method.
+func (m *MockImageFsInfoProvider) ContainerFsInfoLabel() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ContainerFsInfoLabel")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ContainerFsInfoLabel indicates an expected call of ContainerFsInfoLabel.
+func (mr *MockImageFsInfoProviderMockRecorder) ContainerFsInfoLabel() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContainerFsInfoLabel", reflect.TypeOf((*MockImageFsInfoProvider)(nil).ContainerFsInfoLabel))
 }
 
 // ImageFsInfoLabel mocks base method.

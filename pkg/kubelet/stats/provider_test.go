@@ -417,21 +417,34 @@ func TestHasDedicatedImageFs(t *testing.T) {
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
+	imageStatsExpected := &statsapi.FsStats{AvailableBytes: uint64Ptr(1)}
 
 	for desc, test := range map[string]struct {
-		rootfsDevice  string
-		imagefsDevice string
-		dedicated     bool
+		rootfsDevice     string
+		imagefsDevice    string
+		dedicated        bool
+		imageFsStats     *statsapi.FsStats
+		containerFsStats *statsapi.FsStats
 	}{
 		"dedicated device for image filesystem": {
 			rootfsDevice:  "root/device",
 			imagefsDevice: "image/device",
 			dedicated:     true,
+			imageFsStats:  imageStatsExpected,
 		},
 		"shared device for image filesystem": {
-			rootfsDevice:  "share/device",
-			imagefsDevice: "share/device",
-			dedicated:     false,
+			rootfsDevice:     "share/device",
+			imagefsDevice:    "share/device",
+			dedicated:        false,
+			imageFsStats:     imageStatsExpected,
+			containerFsStats: imageStatsExpected,
+		},
+		"split filesystem for images": {
+			rootfsDevice:     "root/device",
+			imagefsDevice:    "root/device",
+			dedicated:        true,
+			imageFsStats:     &statsapi.FsStats{AvailableBytes: uint64Ptr(1)},
+			containerFsStats: &statsapi.FsStats{AvailableBytes: uint64Ptr(2)},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
@@ -441,10 +454,12 @@ func TestHasDedicatedImageFs(t *testing.T) {
 			mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
 		)
 		mockCadvisor.EXPECT().RootFsInfo().Return(cadvisorapiv2.FsInfo{Device: test.rootfsDevice}, nil)
-
 		provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{
-			device: test.imagefsDevice,
+			device:      test.imagefsDevice,
+			imageFs:     test.imageFsStats,
+			containerFs: test.containerFsStats,
 		})
+
 		dedicated, err := provider.HasDedicatedImageFs(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, test.dedicated, dedicated)
@@ -760,7 +775,9 @@ func (o *fakeResourceAnalyzer) GetPodVolumeStats(uid types.UID) (serverstats.Pod
 }
 
 type fakeContainerStatsProvider struct {
-	device string
+	device      string
+	imageFs     *statsapi.FsStats
+	containerFs *statsapi.FsStats
 }
 
 func (p fakeContainerStatsProvider) ListPodStats(context.Context) ([]statsapi.PodStats, error) {
@@ -775,8 +792,8 @@ func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats(context.Context) ([
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (p fakeContainerStatsProvider) ImageFsStats(context.Context) (*statsapi.FsStats, error) {
-	return nil, fmt.Errorf("not implemented")
+func (p fakeContainerStatsProvider) ImageFsStats(context.Context) (*statsapi.FsStats, *statsapi.FsStats, error) {
+	return p.imageFs, p.containerFs, nil
 }
 
 func (p fakeContainerStatsProvider) ImageFsDevice(context.Context) (string, error) {

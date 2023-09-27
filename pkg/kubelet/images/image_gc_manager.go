@@ -46,7 +46,7 @@ const instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/images"
 // collection.
 type StatsProvider interface {
 	// ImageFsStats returns the stats of the image filesystem.
-	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
+	ImageFsStats(ctx context.Context) (*statsapi.FsStats, *statsapi.FsStats, error)
 }
 
 // ImageGCManager is an interface for managing lifecycle of all images.
@@ -281,7 +281,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 	ctx, otelSpan := im.tracer.Start(ctx, "Images/GarbageCollect")
 	defer otelSpan.End()
 	// Get disk usage on disk holding images.
-	fsStats, err := im.statsProvider.ImageFsStats(ctx)
+	fsStats, _, err := im.statsProvider.ImageFsStats(ctx)
 	if err != nil {
 		return err
 	}

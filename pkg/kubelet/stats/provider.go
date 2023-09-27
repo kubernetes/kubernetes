@@ -99,7 +99,7 @@ type containerStatsProvider interface {
 	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
-	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
+	ImageFsStats(ctx context.Context) (*statsapi.FsStats, *statsapi.FsStats, error)
 	ImageFsDevice(ctx context.Context) (string, error)
 }
 
@@ -203,6 +203,9 @@ func (p *Provider) GetRawContainerInfo(containerName string, req *cadvisorapiv1.
 }
 
 // HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
+// KEP Issue Number 4191: Enhance this to allow for container or image between separated.
+// Technically in this case (for CRIO) this would mean the root filesystem (GraphRoot) is separate from root.
+// But we want GraphRoot to be on same disk as root but images are separated.
 func (p *Provider) HasDedicatedImageFs(ctx context.Context) (bool, error) {
 	device, err := p.containerStatsProvider.ImageFsDevice(ctx)
 	if err != nil {
@@ -212,5 +215,27 @@ func (p *Provider) HasDedicatedImageFs(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// KEP Enhancement: DedicatedImageFs can mean either container or image fs are separate from root
+	// CAdvisor reports this a bit differently than Container runtimes
+	if device == rootFsInfo.Device {
+		imageFs, containerFs, err := p.ImageFsStats(ctx)
+		if err != nil {
+			return false, err
+		}
+		if !equalFileSystems(imageFs, containerFs) {
+			return true, nil
+		}
+	}
 	return device != rootFsInfo.Device, nil
+}
+
+func equalFileSystems(a, b *statsapi.FsStats) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if *a == *b {
+		return true
+	}
+
+	return false
 }

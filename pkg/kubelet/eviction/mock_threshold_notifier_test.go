@@ -218,6 +218,20 @@ func (mr *MockContainerGCMockRecorder) DeleteAllUnusedContainers(ctx interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllUnusedContainers", reflect.TypeOf((*MockContainerGC)(nil).DeleteAllUnusedContainers), ctx)
 }
 
+// IsWriteableLayerSeparateFromReadOnlyLayer mocks base method.
+func (m *MockContainerGC) IsWriteableLayerSeparateFromReadOnlyLayer(ctx context.Context) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsWriteableLayerSeparateFromReadOnlyLayer", ctx)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsWriteableLayerSeparateFromReadOnlyLayer indicates an expected call of IsWriteableLayerSeparateFromReadOnlyLayer.
+func (mr *MockContainerGCMockRecorder) IsWriteableLayerSeparateFromReadOnlyLayer(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsWriteableLayerSeparateFromReadOnlyLayer", reflect.TypeOf((*MockContainerGC)(nil).IsWriteableLayerSeparateFromReadOnlyLayer), ctx)
+}
+
 // MockCgroupNotifier is a mock of CgroupNotifier interface.
 type MockCgroupNotifier struct {
 	ctrl     *gomock.Controller

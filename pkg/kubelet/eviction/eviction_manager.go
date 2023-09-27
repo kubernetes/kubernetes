@@ -94,6 +94,8 @@ type managerImpl struct {
 	lastObservations signalObservations
 	// dedicatedImageFs indicates if imagefs is on a separate device from the rootfs
 	dedicatedImageFs *bool
+	// dedicatedContainerFs indicates if containerfs is on a separate device from rootfs
+	dedicatedContainerFs *bool
 	// thresholdNotifiers is a list of memory threshold notifiers which each notify for a memory eviction threshold
 	thresholdNotifiers []ThresholdNotifier
 	// thresholdsLastUpdated is the last time the thresholdNotifiers were updated.
@@ -129,6 +131,7 @@ func NewManager(
 		nodeConditionsLastObservedAt:  nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:     thresholdsObservedAt{},
 		dedicatedImageFs:              nil,
+		dedicatedContainerFs:          nil,
 		thresholdNotifiers:            []ThresholdNotifier{},
 		localStorageCapacityIsolation: localStorageCapacityIsolation,
 	}
@@ -242,15 +245,28 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// build the ranking functions (if not yet known)
 	// TODO: have a function in cadvisor that lets us know if global housekeeping has completed
 	if m.dedicatedImageFs == nil {
-		hasImageFs, ok := diskInfoProvider.HasDedicatedImageFs(ctx)
-		if ok != nil {
+		hasImageFs, splitDiskError := diskInfoProvider.HasDedicatedImageFs(ctx)
+		if splitDiskError != nil {
+			klog.ErrorS(splitDiskError, "Eviction manager: failed to get HasDedicatedImageFs")
 			return nil
 		}
 		m.dedicatedImageFs = &hasImageFs
-		m.signalToRankFunc = buildSignalToRankFunc(hasImageFs)
-		m.signalToNodeReclaimFuncs = buildSignalToNodeReclaimFuncs(m.imageGC, m.containerGC, hasImageFs)
+		hasSplitImageFs := m.containerGC.IsWriteableLayerSeparateFromReadOnlyLayer(ctx)
+
+		// If we are a split filesystem but the feature is turned off
+		// we should return an error.
+		// This is a bad state.
+		if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletSeparateDiskGC) && hasSplitImageFs {
+			splitDiskError := fmt.Errorf("KubeletSeparateDiskGC is turned off but we still have a split filesystem")
+			klog.ErrorS(splitDiskError, "Eviction manager: detect KubeletSeparateDiskGC is off but image is still split")
+			return nil
+		}
+		m.dedicatedContainerFs = &hasSplitImageFs
+		m.signalToRankFunc = buildSignalToRankFunc(hasImageFs, hasSplitImageFs)
+		m.signalToNodeReclaimFuncs = buildSignalToNodeReclaimFuncs(m.imageGC, m.containerGC, hasImageFs, hasSplitImageFs)
 	}
 
+	klog.V(3).InfoS("FileSystem detection", "DedicatedImageFs", m.dedicatedImageFs, "SplitImageFs", m.dedicatedContainerFs)
 	activePods := podFunc()
 	updateStats := true
 	summary, err := m.summaryProvider.Get(ctx, updateStats)

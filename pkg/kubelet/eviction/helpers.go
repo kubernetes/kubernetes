@@ -80,9 +80,11 @@ func init() {
 	signalToNodeCondition[evictionapi.SignalMemoryAvailable] = v1.NodeMemoryPressure
 	signalToNodeCondition[evictionapi.SignalAllocatableMemoryAvailable] = v1.NodeMemoryPressure
 	signalToNodeCondition[evictionapi.SignalImageFsAvailable] = v1.NodeDiskPressure
+	signalToNodeCondition[evictionapi.SignalContainerFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalImageFsInodesFree] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsInodesFree] = v1.NodeDiskPressure
+	signalToNodeCondition[evictionapi.SignalContainerFsInodesFree] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalPIDAvailable] = v1.NodePIDPressure
 
 	// map signals to resources (and vice-versa)
@@ -91,6 +93,8 @@ func init() {
 	signalToResource[evictionapi.SignalAllocatableMemoryAvailable] = v1.ResourceMemory
 	signalToResource[evictionapi.SignalImageFsAvailable] = v1.ResourceEphemeralStorage
 	signalToResource[evictionapi.SignalImageFsInodesFree] = resourceInodes
+	signalToResource[evictionapi.SignalContainerFsAvailable] = v1.ResourceEphemeralStorage
+	signalToResource[evictionapi.SignalContainerFsInodesFree] = resourceInodes
 	signalToResource[evictionapi.SignalNodeFsAvailable] = v1.ResourceEphemeralStorage
 	signalToResource[evictionapi.SignalNodeFsInodesFree] = resourceInodes
 	signalToResource[evictionapi.SignalPIDAvailable] = resourcePids
@@ -717,6 +721,22 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 				}
 			}
 		}
+		if containerFs := summary.Node.Runtime.ContainerFs; containerFs != nil {
+			if containerFs.AvailableBytes != nil && containerFs.CapacityBytes != nil {
+				result[evictionapi.SignalContainerFsAvailable] = signalObservation{
+					available: resource.NewQuantity(int64(*containerFs.AvailableBytes), resource.BinarySI),
+					capacity:  resource.NewQuantity(int64(*containerFs.CapacityBytes), resource.BinarySI),
+					time:      containerFs.Time,
+				}
+				if containerFs.InodesFree != nil && containerFs.Inodes != nil {
+					result[evictionapi.SignalContainerFsInodesFree] = signalObservation{
+						available: resource.NewQuantity(int64(*containerFs.InodesFree), resource.DecimalSI),
+						capacity:  resource.NewQuantity(int64(*containerFs.Inodes), resource.DecimalSI),
+						time:      containerFs.Time,
+					}
+				}
+			}
+		}
 	}
 	if rlimit := summary.Node.Rlimit; rlimit != nil {
 		if rlimit.NumOfRunningProcesses != nil && rlimit.MaxPID != nil {
@@ -951,27 +971,47 @@ func isAllocatableEvictionThreshold(threshold evictionapi.Threshold) bool {
 }
 
 // buildSignalToRankFunc returns ranking functions associated with resources
-func buildSignalToRankFunc(withImageFs bool) map[evictionapi.Signal]rankFunc {
+func buildSignalToRankFunc(withImageFs bool, imageContainerSplitFs bool) map[evictionapi.Signal]rankFunc {
 	signalToRankFunc := map[evictionapi.Signal]rankFunc{
 		evictionapi.SignalMemoryAvailable:            rankMemoryPressure,
 		evictionapi.SignalAllocatableMemoryAvailable: rankMemoryPressure,
 		evictionapi.SignalPIDAvailable:               rankPIDPressure,
 	}
 	// usage of an imagefs is optional
-	if withImageFs {
+	// We have a dedicated Image filesystem (images and containers are on same disk)
+	// then we assume it is just a separate imagefs
+	if withImageFs && !imageContainerSplitFs {
 		// with an imagefs, nodefs pod rank func for eviction only includes logs and local volumes
 		signalToRankFunc[evictionapi.SignalNodeFsAvailable] = rankDiskPressureFunc([]fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)
 		signalToRankFunc[evictionapi.SignalNodeFsInodesFree] = rankDiskPressureFunc([]fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}, resourceInodes)
 		// with an imagefs, imagefs pod rank func for eviction only includes rootfs
-		signalToRankFunc[evictionapi.SignalImageFsAvailable] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot}, v1.ResourceEphemeralStorage)
-		signalToRankFunc[evictionapi.SignalImageFsInodesFree] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot}, resourceInodes)
+		signalToRankFunc[evictionapi.SignalImageFsAvailable] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsImages}, v1.ResourceEphemeralStorage)
+		signalToRankFunc[evictionapi.SignalImageFsInodesFree] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsImages}, resourceInodes)
+		signalToRankFunc[evictionapi.SignalContainerFsAvailable] = signalToRankFunc[evictionapi.SignalImageFsAvailable]
+		signalToRankFunc[evictionapi.SignalContainerFsInodesFree] = signalToRankFunc[evictionapi.SignalImageFsInodesFree]
+
+		// If both imagefs and container fs are on separate disks
+		// we want to track the writeable layer in containerfs signals.
+	} else if withImageFs && imageContainerSplitFs {
+		// with an imagefs, nodefs pod rank func for eviction only includes logs and local volumes
+		signalToRankFunc[evictionapi.SignalNodeFsAvailable] = rankDiskPressureFunc([]fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource, fsStatsRoot}, v1.ResourceEphemeralStorage)
+		signalToRankFunc[evictionapi.SignalNodeFsInodesFree] = rankDiskPressureFunc([]fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource, fsStatsRoot}, resourceInodes)
+		signalToRankFunc[evictionapi.SignalContainerFsAvailable] = signalToRankFunc[evictionapi.SignalNodeFsAvailable]
+		signalToRankFunc[evictionapi.SignalContainerFsInodesFree] = signalToRankFunc[evictionapi.SignalNodeFsInodesFree]
+		// with an imagefs, containerfs pod rank func for eviction only includes rootfs
+
+		signalToRankFunc[evictionapi.SignalImageFsAvailable] = rankDiskPressureFunc([]fsStatsType{fsStatsImages}, v1.ResourceEphemeralStorage)
+		signalToRankFunc[evictionapi.SignalImageFsInodesFree] = rankDiskPressureFunc([]fsStatsType{fsStatsImages}, resourceInodes)
+		// If image fs is not on separate disk as root but container fs is
 	} else {
 		// without an imagefs, nodefs pod rank func for eviction looks at all fs stats.
 		// since imagefs and nodefs share a common device, they share common ranking functions.
-		signalToRankFunc[evictionapi.SignalNodeFsAvailable] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)
-		signalToRankFunc[evictionapi.SignalNodeFsInodesFree] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceInodes)
-		signalToRankFunc[evictionapi.SignalImageFsAvailable] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)
-		signalToRankFunc[evictionapi.SignalImageFsInodesFree] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceInodes)
+		signalToRankFunc[evictionapi.SignalNodeFsAvailable] = rankDiskPressureFunc([]fsStatsType{fsStatsImages, fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)
+		signalToRankFunc[evictionapi.SignalNodeFsInodesFree] = rankDiskPressureFunc([]fsStatsType{fsStatsImages, fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceInodes)
+		signalToRankFunc[evictionapi.SignalImageFsAvailable] = rankDiskPressureFunc([]fsStatsType{fsStatsImages, fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)
+		signalToRankFunc[evictionapi.SignalImageFsInodesFree] = rankDiskPressureFunc([]fsStatsType{fsStatsImages, fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceInodes)
+		signalToRankFunc[evictionapi.SignalContainerFsAvailable] = signalToRankFunc[evictionapi.SignalNodeFsAvailable]
+		signalToRankFunc[evictionapi.SignalContainerFsInodesFree] = signalToRankFunc[evictionapi.SignalNodeFsInodesFree]
 	}
 	return signalToRankFunc
 }
@@ -982,23 +1022,39 @@ func PodIsEvicted(podStatus v1.PodStatus) bool {
 }
 
 // buildSignalToNodeReclaimFuncs returns reclaim functions associated with resources.
-func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, withImageFs bool) map[evictionapi.Signal]nodeReclaimFuncs {
+func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, withImageFs bool, splitContainerImageFs bool) map[evictionapi.Signal]nodeReclaimFuncs {
 	signalToReclaimFunc := map[evictionapi.Signal]nodeReclaimFuncs{}
 	// usage of an imagefs is optional
-	if withImageFs {
+	if withImageFs && !splitContainerImageFs {
 		// with an imagefs, nodefs pressure should just delete logs
 		signalToReclaimFunc[evictionapi.SignalNodeFsAvailable] = nodeReclaimFuncs{}
 		signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree] = nodeReclaimFuncs{}
 		// with an imagefs, imagefs pressure should delete unused images
 		signalToReclaimFunc[evictionapi.SignalImageFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalImageFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		signalToReclaimFunc[evictionapi.SignalContainerFsAvailable] = signalToReclaimFunc[evictionapi.SignalImageFsAvailable]
+		signalToReclaimFunc[evictionapi.SignalContainerFsInodesFree] = signalToReclaimFunc[evictionapi.SignalImageFsInodesFree]
+		// usage of imagefs and container fs on separate disks
+		// containers gc on containerfs pressure
+		// image gc on imagefs pressure
+	} else if withImageFs && splitContainerImageFs {
+		// with an imagefs, imagefs pressure should delete unused images
+		signalToReclaimFunc[evictionapi.SignalImageFsAvailable] = nodeReclaimFuncs{imageGC.DeleteUnusedImages}
+		signalToReclaimFunc[evictionapi.SignalImageFsInodesFree] = nodeReclaimFuncs{imageGC.DeleteUnusedImages}
+		// with an split fs and imagefs, containerfs pressure should delete unused containers
+		signalToReclaimFunc[evictionapi.SignalNodeFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers}
+		signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers}
+		signalToReclaimFunc[evictionapi.SignalContainerFsAvailable] = signalToReclaimFunc[evictionapi.SignalNodeFsAvailable]
+		signalToReclaimFunc[evictionapi.SignalContainerFsInodesFree] = signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree]
 	} else {
 		// without an imagefs, nodefs pressure should delete logs, and unused images
-		// since imagefs and nodefs share a common device, they share common reclaim functions
+		// since imagefs, containerfs and nodefs share a common device, they share common reclaim functions
 		signalToReclaimFunc[evictionapi.SignalNodeFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalImageFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalImageFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		signalToReclaimFunc[evictionapi.SignalContainerFsAvailable] = signalToReclaimFunc[evictionapi.SignalImageFsAvailable]
+		signalToReclaimFunc[evictionapi.SignalContainerFsInodesFree] = signalToReclaimFunc[evictionapi.SignalImageFsInodesFree]
 	}
 	return signalToReclaimFunc
 }

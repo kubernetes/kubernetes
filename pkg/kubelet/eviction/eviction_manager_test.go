@@ -76,11 +76,12 @@ func (m *mockDiskInfoProvider) HasDedicatedImageFs(_ context.Context) (bool, err
 
 // mockDiskGC is used to simulate invoking image and container garbage collection.
 type mockDiskGC struct {
-	err                 error
-	imageGCInvoked      bool
-	containerGCInvoked  bool
-	fakeSummaryProvider *fakeSummaryProvider
-	summaryAfterGC      *statsapi.Summary
+	err                  error
+	imageGCInvoked       bool
+	containerGCInvoked   bool
+	readAndWriteSeparate bool
+	fakeSummaryProvider  *fakeSummaryProvider
+	summaryAfterGC       *statsapi.Summary
 }
 
 // DeleteUnusedImages returns the mocked values.
@@ -99,6 +100,10 @@ func (m *mockDiskGC) DeleteAllUnusedContainers(_ context.Context) error {
 		m.fakeSummaryProvider.result = m.summaryAfterGC
 	}
 	return m.err
+}
+
+func (m *mockDiskGC) IsWriteableLayerSeparateFromReadOnlyLayer(_ context.Context) bool {
+	return m.readAndWriteSeparate
 }
 
 func makePodWithMemoryStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
@@ -215,9 +220,19 @@ type podToMake struct {
 
 func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 	testCases := map[string]struct {
-		wantPodStatus v1.PodStatus
+		wantPodStatus    v1.PodStatus
+		dedicatedImageFs bool
 	}{
-		"eviction due to memory pressure": {
+		"eviction due to memory pressure; no image fs": {
+			dedicatedImageFs: false,
+			wantPodStatus: v1.PodStatus{
+				Phase:   v1.PodFailed,
+				Reason:  "Evicted",
+				Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
+			},
+		},
+		"eviction due to memory pressure; image fs": {
+			dedicatedImageFs: true,
 			wantPodStatus: v1.PodStatus{
 				Phase:   v1.PodFailed,
 				Reason:  "Evicted",
@@ -249,7 +264,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 
 				fakeClock := testingclock.NewFakeClock(time.Now())
 				podKiller := &mockPodKiller{}
-				diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+				diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs}
 				diskGC := &mockDiskGC{err: nil}
 				nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
@@ -314,9 +329,19 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 
 func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 	testCases := map[string]struct {
-		wantPodStatus v1.PodStatus
+		wantPodStatus    v1.PodStatus
+		dedicatedImageFs bool
 	}{
-		"eviction due to disk pressure": {
+		"eviction due to disk pressure; no image fs": {
+			dedicatedImageFs: false,
+			wantPodStatus: v1.PodStatus{
+				Phase:   v1.PodFailed,
+				Reason:  "Evicted",
+				Message: "The node was low on resource: ephemeral-storage. Threshold quantity: 2Gi, available: 1536Mi. ",
+			},
+		},
+		"eviction due to disk pressure; image fs": {
+			dedicatedImageFs: true,
 			wantPodStatus: v1.PodStatus{
 				Phase:   v1.PodFailed,
 				Reason:  "Evicted",
@@ -348,7 +373,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 
 				fakeClock := testingclock.NewFakeClock(time.Now())
 				podKiller := &mockPodKiller{}
-				diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+				diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs}
 				diskGC := &mockDiskGC{err: nil}
 				nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 

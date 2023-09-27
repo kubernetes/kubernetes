@@ -32,10 +32,17 @@ const (
 	SignalNodeFsAvailable Signal = "nodefs.available"
 	// SignalNodeFsInodesFree is amount of inodes available on filesystem that kubelet uses for volumes, daemon logs, etc.
 	SignalNodeFsInodesFree Signal = "nodefs.inodesFree"
-	// SignalImageFsAvailable is amount of storage available on filesystem that container runtime uses for storing images and container writable layers.
+	// ImageFs and ContainerFs can differ what is stored based on container runtime configuration
+	// In cases of ContainerFs being on root, then nodefs = containerfs
+	// ImageFs would then be the separate disk for image layers.
+	// SignalImageFsAvailable is amount of storage available on filesystem that container runtime uses for storing images layers.
 	SignalImageFsAvailable Signal = "imagefs.available"
-	// SignalImageFsInodesFree is amount of inodes available on filesystem that container runtime uses for storing images and container writable layers.
+	// SignalImageFsInodesFree is amount of inodes available on filesystem that container runtime uses for storing images layers.
 	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
+	// SignalContainerFsAvailable is amount of storage available on filesystem that container runtime uses for container writable layers.
+	SignalContainerFsAvailable Signal = "containerfs.available"
+	// SignalContainerFsInodesFree is amount of inodes available on filesystem that container runtime uses for container writable layers.
+	SignalContainerFsInodesFree Signal = "containerfs.inodesFree"
 	// SignalAllocatableMemoryAvailable is amount of memory available for pod allocation (i.e. allocatable - workingSet (of pods), in bytes.
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
 	// SignalPIDAvailable is amount of PID available for pod allocation
@@ -63,6 +70,8 @@ var OpForSignal = map[Signal]ThresholdOperator{
 	SignalNodeFsInodesFree:           OpLessThan,
 	SignalImageFsAvailable:           OpLessThan,
 	SignalImageFsInodesFree:          OpLessThan,
+	SignalContainerFsAvailable:       OpLessThan,
+	SignalContainerFsInodesFree:      OpLessThan,
 	SignalAllocatableMemoryAvailable: OpLessThan,
 	SignalPIDAvailable:               OpLessThan,
 }
