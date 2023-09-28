@@ -44,7 +44,7 @@ var (
 	image = imageutils.GetE2EImage(imageutils.Pause)
 )
 
-var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
+var _ = SIGDescribe("[Feature:Windows] Windows volume mounts", func() {
 	f := framework.NewDefaultFramework("windows-volumes")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (

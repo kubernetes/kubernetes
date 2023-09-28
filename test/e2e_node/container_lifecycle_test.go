@@ -44,7 +44,7 @@ func prefixedName(namePrefix string, name string) string {
 	return fmt.Sprintf("%s-%s", namePrefix, name)
 }
 
-var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
+var _ = SIGDescribe("[NodeConformance] Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -747,7 +747,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 	})
 })
 
-var _ = SIGDescribe("[Serial] Containers Lifecycle ", func() {
+var _ = SIGDescribe("[Serial] Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test-serial")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
@@ -887,7 +887,7 @@ var _ = SIGDescribe("[Serial] Containers Lifecycle ", func() {
 	})
 })
 
-var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle ", func() {
+var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
