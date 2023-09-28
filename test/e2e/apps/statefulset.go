@@ -321,6 +321,34 @@ var _ = SIGDescribe("StatefulSet", func() {
 			rollbackTest(ctx, c, ns, ss)
 		})
 
+		ginkgo.It("should perform rolling updates and roll backs of template modifications when the pod exits with Failed phase", func(ctx context.Context) {
+			ginkgo.By("Creating a new StatefulSet")
+			ss := e2estatefulset.NewStatefulSet("ss-failing-pods", ns, headlessSvcName, 3, nil, nil, labels)
+
+			// Add another container which handles SIGTERM and exits with 1, to make sure the phase of the pod is Failed
+			ss.Spec.Template.Spec.Containers = append(ss.Spec.Template.Spec.Containers, v1.Container{
+				Name:    "sleep-exit-with-1",
+				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+				Command: []string{"sh", "-c"},
+				Args: []string{`
+					sleep 9999999 &
+					PID=$!
+					_term () {
+						kill $PID
+						echo "Caught SIGTERM!"
+					}
+					trap _term SIGTERM
+					wait $PID
+					trap - TERM
+					# Wait for the long running sleep to exit
+					wait $PID
+					exit 1
+					`,
+				},
+			})
+			rollbackTest(ctx, c, ns, ss)
+		})
+
 		/*
 		   Release: v1.9
 		   Testname: StatefulSet, Rolling Update with Partition
