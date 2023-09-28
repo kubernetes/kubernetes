@@ -33,7 +33,7 @@ func NewNOPConverter() *nopConverter {
 
 var _ CRConverter = &nopConverter{}
 
-// ConvertToVersion converts in object to the given gv in place and returns the same `in` object.
+// Convert converts in object to the given gv in place and returns the same `in` object.
 func (c *nopConverter) Convert(list *unstructured.UnstructuredList, targetGV schema.GroupVersion) (*unstructured.UnstructuredList, error) {
 	for i := range list.Items {
 		list.Items[i].SetGroupVersionKind(targetGV.WithKind(list.Items[i].GroupVersionKind().Kind))

@@ -211,7 +211,7 @@ func TestGetObjectsToConvert(t *testing.T) {
 		APIVersion    string
 		ValidVersions map[schema.GroupVersion]bool
 
-		ExpectObjects []*unstructured.Unstructured
+		ExpectObjects []unstructured.Unstructured
 		ExpectError   bool
 	}{
 		{
@@ -244,7 +244,7 @@ func TestGetObjectsToConvert(t *testing.T) {
 				{Group: "foo", Version: "v2"}: true,
 			},
 			APIVersion:    "foo/v1",
-			ExpectObjects: []*unstructured.Unstructured{v2Object},
+			ExpectObjects: []unstructured.Unstructured{*v2Object},
 		},
 		{
 			Name: "multi-item list, in desired version",
@@ -269,7 +269,7 @@ func TestGetObjectsToConvert(t *testing.T) {
 				{Group: "foo", Version: "v3"}: true,
 			},
 			APIVersion:    "foo/v1",
-			ExpectObjects: []*unstructured.Unstructured{v2Object, v3Object},
+			ExpectObjects: []unstructured.Unstructured{*v2Object, *v3Object},
 		},
 		{
 			Name: "multi-item list, invalid versions",
