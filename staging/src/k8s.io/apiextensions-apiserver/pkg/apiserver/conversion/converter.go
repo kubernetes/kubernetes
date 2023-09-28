@@ -113,7 +113,7 @@ type CRConverter interface {
 	// Convert converts in object to the given gvk and returns the converted object.
 	// Note that the function may mutate in object and return it. A safe wrapper will make sure
 	// a safe converter will be returned.
-	Convert(in *unstructured.UnstructuredList, targetGVK schema.GroupVersion) (*unstructured.UnstructuredList, error)
+	Convert(in *unstructured.UnstructuredList, targetGV schema.GroupVersion) (*unstructured.UnstructuredList, error)
 }
 
 // CRConverterFunc wraps a CR conversion func into a CRConverter.
@@ -220,7 +220,6 @@ func (c *delegatingCRConverter) ConvertToVersion(in runtime.Object, target runti
 		return nil, fmt.Errorf("request to convert CR from an invalid group/version: %s", fromGVK.GroupVersion().String())
 	}
 
-	var objectsToConvert []*unstructured.Unstructured
 	objectsToConvert, err := getObjectsToConvert(list, desiredAPIVersion, c.validVersions)
 	if err != nil {
 		return nil, err
@@ -234,9 +233,8 @@ func (c *delegatingCRConverter) ConvertToVersion(in runtime.Object, target runti
 			return in, nil
 		}
 		// for a list, set the version of the top-level list object (all individual objects are already in the correct version)
-		out := list.DeepCopy()
-		out.SetAPIVersion(desiredAPIVersion)
-		return out, nil
+		list.SetAPIVersion(desiredAPIVersion)
+		return list, nil
 	}
 
 	// A smoke test in API machinery calls the converter on empty objects during startup. The test is initiated here:
@@ -252,7 +250,24 @@ func (c *delegatingCRConverter) ConvertToVersion(in runtime.Object, target runti
 		return converted, nil
 	}
 
-	convertedObjects, err := c.converter.Convert(list, toGVK.GroupVersion())
+	// Deepcopy ObjectMeta because the converter might mutate the objects, and we
+	// need the original ObjectMeta furthermore for validation and restoration.
+	for i := range objectsToConvert {
+		original := objectsToConvert[i].Object
+		objectsToConvert[i].Object = make(map[string]interface{}, len(original))
+		for k, v := range original {
+			if k == "metadata" {
+				v = runtime.DeepCopyJSONValue(v)
+			}
+			objectsToConvert[i].Object[k] = v
+		}
+	}
+
+	// Do the (potentially mutating) conversion.
+	convertedObjects, err := c.converter.Convert(&unstructured.UnstructuredList{
+		Object: list.Object,
+		Items:  objectsToConvert,
+	}, toGVK.GroupVersion())
 	if err != nil {
 		return nil, fmt.Errorf("conversion for %v failed: %w", in.GetObjectKind().GroupVersionKind(), err)
 	}
@@ -260,9 +275,9 @@ func (c *delegatingCRConverter) ConvertToVersion(in runtime.Object, target runti
 		return nil, fmt.Errorf("conversion for %v returned %d objects, expected %d", in.GetObjectKind().GroupVersionKind(), len(convertedObjects.Items), len(objectsToConvert))
 	}
 
-	// start a deepcopy of the input and fill in the converted objects from the response at the right spots.
+	// Fill back in the converted objects from the response at the right spots.
 	// The response list might be sparse because objects had the right version already.
-	convertedList := list.DeepCopy()
+	convertedList := list
 	convertedList.SetAPIVersion(desiredAPIVersion)
 	convertedIndex := 0
 	for i := range convertedList.Items {
@@ -300,8 +315,8 @@ func getObjectsToConvert(
 	list *unstructured.UnstructuredList,
 	desiredAPIVersion string,
 	validVersions map[schema.GroupVersion]bool,
-) ([]*unstructured.Unstructured, error) {
-	var objectsToConvert []*unstructured.Unstructured
+) ([]unstructured.Unstructured, error) {
+	var objectsToConvert []unstructured.Unstructured
 	for i := range list.Items {
 		expectedGV := list.Items[i].GroupVersionKind().GroupVersion()
 		if !validVersions[expectedGV] {
@@ -310,7 +325,7 @@ func getObjectsToConvert(
 
 		// Only sent item for conversion, if the apiVersion is different
 		if list.Items[i].GetAPIVersion() != desiredAPIVersion {
-			objectsToConvert = append(objectsToConvert, &list.Items[i])
+			objectsToConvert = append(objectsToConvert, list.Items[i])
 		}
 	}
 	return objectsToConvert, nil
@@ -379,7 +394,7 @@ func validateConvertedObject(in, out *unstructured.Unstructured) error {
 	return nil
 }
 
-// restoreObjectMeta deep-copies metadata from original into converted, while preserving labels and annotations from converted.
+// restoreObjectMeta copies metadata from original into converted, while preserving labels and annotations from converted.
 func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
 	obj, found := converted.Object["metadata"]
 	if !found {
@@ -395,7 +410,7 @@ func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
 		// with an empty object instead of nil, to be able to add labels and annotations below.
 		converted.Object["metadata"] = map[string]interface{}{}
 	} else {
-		converted.Object["metadata"] = runtime.DeepCopyJSONValue(original.Object["metadata"])
+		converted.Object["metadata"] = original.Object["metadata"]
 	}
 
 	obj = converted.Object["metadata"]
