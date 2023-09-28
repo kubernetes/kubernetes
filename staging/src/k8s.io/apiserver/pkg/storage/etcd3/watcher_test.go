@@ -33,12 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -173,11 +170,10 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 // initialised for watch requests
 func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 	scenarios := []struct {
-		name            string
-		setupFn         func(opts *setupOptions)
-		requestOpts     storage.ListOptions
-		enableWatchList bool
-		expectedErr     error
+		name        string
+		setupFn     func(opts *setupOptions)
+		requestOpts storage.ListOptions
+		expectedErr error
 	}{
 		{
 			name:        "no newFunc provided",
@@ -188,9 +184,6 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			if scenario.enableWatchList {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
-			}
 			origCtx, store, _ := testSetup(t, scenario.setupFn)
 			ctx, cancel := context.WithCancel(origCtx)
 			defer cancel()
@@ -210,7 +203,6 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 }
 
 func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
 	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
 	defer cancel()

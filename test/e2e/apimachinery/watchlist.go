@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = SIGDescribe("API Streaming (aka. WatchList) [Serial] [Feature:WatchList]", func() {
+var _ = SIGDescribe("API Streaming (aka. WatchList) [Serial]", func() {
 	f := framework.NewDefaultFramework("watchlist")
 	ginkgo.It("should be requested when ENABLE_CLIENT_GO_WATCH_LIST_ALPHA is set", func(ctx context.Context) {
 		prevWatchListEnvValue, wasWatchListEnvSet := os.LookupEnv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA")
