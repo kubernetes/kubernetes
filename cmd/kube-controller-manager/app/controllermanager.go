@@ -137,6 +137,24 @@ controller, and serviceaccounts controller.`,
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
+			// as soon as we have the feature gates computed
+			// and before creating any clients or/and informers
+			// check to see if we need to enable WatchList for client-go
+			//
+			// setting the env var is required separately because
+			// we want to control components for which this feature
+			// is enabled
+			//
+			// see: https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list
+			//
+			// note that we don't check if the env var was set when
+			// the FG wasn't enabled
+			if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.WatchList) {
+				if _, ok := os.LookupEnv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); !ok {
+					os.Setenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA", "true")
+				}
+			}
+
 			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List(), names.KCMControllerAliases())
 			if err != nil {
 				return err
