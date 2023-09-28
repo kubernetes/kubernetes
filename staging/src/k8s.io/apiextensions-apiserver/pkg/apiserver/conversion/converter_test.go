@@ -585,6 +585,50 @@ func TestDelegatingCRConverterConvertToVersion(t *testing.T) {
 			},
 		},
 		{
+			name:      "empty metadata",
+			converter: NewNOPConverter(),
+			args: args{
+				in: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "example.com/v1",
+						"kind":       "Foo",
+						"metadata":   map[string]interface{}{},
+						"spec":       map[string]interface{}{},
+					},
+				},
+				target: schema.GroupVersion{Group: "example.com", Version: "v2"},
+			},
+			want: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "example.com/v2",
+					"kind":       "Foo",
+					"metadata":   map[string]interface{}{},
+					"spec":       map[string]interface{}{},
+				},
+			},
+		},
+		{
+			name:      "missing metadata",
+			converter: NewNOPConverter(),
+			args: args{
+				in: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "example.com/v1",
+						"kind":       "Foo",
+						"spec":       map[string]interface{}{},
+					},
+				},
+				target: schema.GroupVersion{Group: "example.com", Version: "v2"},
+			},
+			want: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "example.com/v2",
+					"kind":       "Foo",
+					"spec":       map[string]interface{}{},
+				},
+			},
+		},
+		{
 			name: "convertor error",
 			converter: CRConverterFunc(func(in *unstructured.UnstructuredList, targetGV schema.GroupVersion) (*unstructured.UnstructuredList, error) {
 				return nil, fmt.Errorf("boom")

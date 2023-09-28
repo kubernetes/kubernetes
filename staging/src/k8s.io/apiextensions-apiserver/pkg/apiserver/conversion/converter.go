@@ -396,47 +396,52 @@ func validateConvertedObject(in, out *unstructured.Unstructured) error {
 
 // restoreObjectMeta copies metadata from original into converted, while preserving labels and annotations from converted.
 func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
-	obj, found := converted.Object["metadata"]
-	if !found {
+	cm, found := converted.Object["metadata"]
+	om, previouslyFound := original.Object["metadata"]
+	switch {
+	case !found && !previouslyFound:
+		return nil
+	case previouslyFound && !found:
 		return fmt.Errorf("missing metadata in converted object")
-	}
-	responseMetaData, ok := obj.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("invalid metadata of type %T in converted object", obj)
+	case !previouslyFound && found:
+		om = map[string]interface{}{}
 	}
 
-	if _, ok := original.Object["metadata"]; !ok {
-		// the original will always have metadata. But just to be safe, let's clear in converted
-		// with an empty object instead of nil, to be able to add labels and annotations below.
-		converted.Object["metadata"] = map[string]interface{}{}
+	convertedMeta, ok := cm.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid metadata of type %T in converted object", cm)
+	}
+	originalMeta, ok := om.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid metadata of type %T in input object", om)
+	}
+
+	result := converted
+	if previouslyFound {
+		result.Object["metadata"] = originalMeta
 	} else {
-		converted.Object["metadata"] = original.Object["metadata"]
+		result.Object["metadata"] = map[string]interface{}{}
 	}
-
-	obj = converted.Object["metadata"]
-	convertedMetaData, ok := obj.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("invalid metadata of type %T in input object", obj)
-	}
+	resultMeta := result.Object["metadata"].(map[string]interface{})
 
 	for _, fld := range []string{"labels", "annotations"} {
-		obj, found := responseMetaData[fld]
+		obj, found := convertedMeta[fld]
 		if !found || obj == nil {
-			delete(convertedMetaData, fld)
+			delete(resultMeta, fld)
 			continue
 		}
-		responseField, ok := obj.(map[string]interface{})
+
+		convertedField, ok := obj.(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("invalid metadata.%s of type %T in converted object", fld, obj)
 		}
-
-		originalField, ok := convertedMetaData[fld].(map[string]interface{})
-		if !ok && convertedMetaData[fld] != nil {
-			return fmt.Errorf("invalid metadata.%s of type %T in original object", fld, convertedMetaData[fld])
+		originalField, ok := originalMeta[fld].(map[string]interface{})
+		if !ok && originalField[fld] != nil {
+			return fmt.Errorf("invalid metadata.%s of type %T in original object", fld, originalMeta[fld])
 		}
 
-		somethingChanged := len(originalField) != len(responseField)
-		for k, v := range responseField {
+		somethingChanged := len(originalField) != len(convertedField)
+		for k, v := range convertedField {
 			if _, ok := v.(string); !ok {
 				return fmt.Errorf("metadata.%s[%s] must be a string, but is %T in converted object", fld, k, v)
 			}
@@ -446,8 +451,8 @@ func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
 		}
 
 		if somethingChanged {
-			stringMap := make(map[string]string, len(responseField))
-			for k, v := range responseField {
+			stringMap := make(map[string]string, len(convertedField))
+			for k, v := range convertedField {
 				stringMap[k] = v.(string)
 			}
 			var errs field.ErrorList
@@ -461,7 +466,7 @@ func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
 			}
 		}
 
-		convertedMetaData[fld] = responseField
+		resultMeta[fld] = convertedField
 	}
 
 	return nil
