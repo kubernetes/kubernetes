@@ -41,7 +41,8 @@ func (s *CloudProviderOptions) Validate() []error {
 func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider,
 		"The provider for cloud services. Empty string for no provider.")
-
+	fs.MarkDeprecated("cloud-provider", "will be removed in a future version") // nolint: errcheck
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile,
 		"The path to the cloud provider configuration file. Empty string for no configuration file.")
+	fs.MarkDeprecated("cloud-config", "will be removed in a future version") // nolint: errcheck
 }
