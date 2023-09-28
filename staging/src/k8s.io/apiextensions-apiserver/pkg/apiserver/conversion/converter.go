@@ -116,6 +116,13 @@ type CRConverter interface {
 	Convert(in *unstructured.UnstructuredList, targetGVK schema.GroupVersion) (*unstructured.UnstructuredList, error)
 }
 
+// CRConverterFunc wraps a CR conversion func into a CRConverter.
+type CRConverterFunc func(in *unstructured.UnstructuredList, targetGVK schema.GroupVersion) (*unstructured.UnstructuredList, error)
+
+func (fn CRConverterFunc) Convert(in *unstructured.UnstructuredList, targetGV schema.GroupVersion) (*unstructured.UnstructuredList, error) {
+	return fn(in, targetGV)
+}
+
 // delegatingCRConverter extends the delegate converter with generic CR conversion behaviour. The delegate will implement the
 // user defined conversion strategy given in the CustomResourceDefinition.
 type delegatingCRConverter struct {
