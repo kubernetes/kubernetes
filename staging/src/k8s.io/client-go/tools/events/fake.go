@@ -39,6 +39,9 @@ func (f *FakeRecorder) Eventf(regarding runtime.Object, related runtime.Object, 
 // NewFakeRecorder creates new fake event recorder with event channel with
 // buffer of given size.
 func NewFakeRecorder(bufferSize int) *FakeRecorder {
+	if bufferSize < 0 {
+		bufferSize = 0
+	}
 	return &FakeRecorder{
 		Events: make(chan string, bufferSize),
 	}
