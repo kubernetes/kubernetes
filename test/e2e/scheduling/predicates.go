@@ -330,7 +330,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Testname: Scheduler, resource limits
 		Description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
 	*/
-	framework.ConformanceIt("validates resource limits of pods that are allowed to run ", func(ctx context.Context) {
+	framework.ConformanceIt("validates resource limits of pods that are allowed to run", func(ctx context.Context) {
 		WaitForStableCluster(cs, workerNodes)
 		nodeMaxAllocatable := int64(0)
 		nodeToAllocatableMap := make(map[string]int64)
@@ -442,7 +442,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Testname: Scheduler, node selector not matching
 		Description: Create a Pod with a NodeSelector set to a value that does not match a node in the cluster. Since there are no nodes matching the criteria the Pod MUST not be scheduled.
 	*/
-	framework.ConformanceIt("validates that NodeSelector is respected if not matching ", func(ctx context.Context) {
+	framework.ConformanceIt("validates that NodeSelector is respected if not matching", func(ctx context.Context) {
 		ginkgo.By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
@@ -465,7 +465,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Testname: Scheduler, node selector matching
 		Description: Create a label on the node {k: v}. Then create a Pod with a NodeSelector set to {k: v}. Check to see if the Pod is scheduled. When the NodeSelector matches then Pod MUST be scheduled on that node.
 	*/
-	framework.ConformanceIt("validates that NodeSelector is respected if matching ", func(ctx context.Context) {
+	framework.ConformanceIt("validates that NodeSelector is respected if matching", func(ctx context.Context) {
 		nodeName := GetNodeThatCanRunPod(ctx, f)
 
 		ginkgo.By("Trying to apply a random label on the found node.")

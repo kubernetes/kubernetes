@@ -44,7 +44,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
+var _ = SIGDescribe("[Feature:StandaloneMode]", func() {
 	f := framework.NewDefaultFramework("static-pod")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when creating a static pod", func() {

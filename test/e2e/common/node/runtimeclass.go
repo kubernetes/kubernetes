@@ -187,7 +187,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery document.
 		The runtimeclasses resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.ConformanceIt(" should support RuntimeClasses API operations", func(ctx context.Context) {
+	framework.ConformanceIt("should support RuntimeClasses API operations", func(ctx context.Context) {
 		// Setup
 		rcVersion := "v1"
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
