@@ -75,7 +75,7 @@ type stateData struct {
 	//
 	// Set in parallel during Filter, so write access there must be
 	// protected by the mutex. Used by PostFilter.
-	unavailableClaims sets.Int
+	unavailableClaims sets.Set[int]
 
 	// podSchedulingState keeps track of the PodSchedulingContext
 	// (if one exists) and the changes made to it.
@@ -713,7 +713,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 		state.mutex.Lock()
 		defer state.mutex.Unlock()
 		if state.unavailableClaims == nil {
-			state.unavailableClaims = sets.NewInt()
+			state.unavailableClaims = sets.New[int]()
 		}
 
 		for index := range unavailableClaims {
