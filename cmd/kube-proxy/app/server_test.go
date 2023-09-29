@@ -36,7 +36,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // TestLoadConfig tests proper operation of loadConfig()
@@ -195,8 +195,8 @@ nodePortAddresses:
 			ClusterCIDR:      tc.clusterCIDR,
 			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            pointer.Int32(2),
-				Min:                   pointer.Int32(1),
+				MaxPerCore:            ptr.To[int32](2),
+				Min:                   ptr.To[int32](1),
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
 			},
@@ -205,8 +205,8 @@ nodePortAddresses:
 			HostnameOverride:   "foo",
 			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeAll:      true,
-				MasqueradeBit:      pointer.Int32(17),
-				LocalhostNodePorts: pointer.Bool(true),
+				MasqueradeBit:      ptr.To[int32](17),
+				LocalhostNodePorts: ptr.To(true),
 				MinSyncPeriod:      metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:         metav1.Duration{Duration: 60 * time.Second},
 			},
@@ -217,7 +217,7 @@ nodePortAddresses:
 			},
 			MetricsBindAddress: tc.metricsBindAddress,
 			Mode:               kubeproxyconfig.ProxyMode(tc.mode),
-			OOMScoreAdj:        pointer.Int32(17),
+			OOMScoreAdj:        ptr.To[int32](17),
 			PortRange:          "2-7",
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 			DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
