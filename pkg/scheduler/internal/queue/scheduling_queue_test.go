@@ -137,13 +137,13 @@ func TestPriorityQueue_Add(t *testing.T) {
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after adding pods (-want, +got):\n%s", diff)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != medPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != unschedulablePodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
 	}
 	if len(q.nominator.nominatedPods["node1"]) != 2 {
@@ -168,10 +168,10 @@ func TestPriorityQueue_AddWithReversePriorityLessFunc(t *testing.T) {
 	if err := q.Add(logger, highPriorityPodInfo.Pod); err != nil {
 		t.Errorf("add failed: %v", err)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != medPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 }
@@ -185,6 +185,7 @@ func listToValues(l *list.List) []interface{} {
 }
 
 func Test_InFlightPods(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	pod := st.MakePod().Name("targetpod").UID("pod1").Obj()
 	pod2 := st.MakePod().Name("targetpod2").UID("pod2").Obj()
 	pod3 := st.MakePod().Name("targetpod3").UID("pod3").Obj()
@@ -487,9 +488,9 @@ func Test_InFlightPods(t *testing.T) {
 			isSchedulingQueueHintEnabled: true,
 			initialPods:                  []*v1.Pod{pod, pod2},
 			actions: []action{
-				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod = popPod(t, q, pod) }},
+				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod = popPod(t, logger, q, pod) }},
 				{eventHappens: &NodeAdd},
-				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod2 = popPod(t, q, pod2) }},
+				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod2 = popPod(t, logger, q, pod2) }},
 				{eventHappens: &AssignedPodAdd},
 				{callback: func(t *testing.T, q *PriorityQueue) {
 					logger, _ := ktesting.NewTestContext(t)
@@ -539,7 +540,7 @@ func Test_InFlightPods(t *testing.T) {
 			isSchedulingQueueHintEnabled: true,
 			initialPods:                  []*v1.Pod{pod},
 			actions: []action{
-				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod = popPod(t, q, pod) }},
+				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod = popPod(t, logger, q, pod) }},
 				{callback: func(t *testing.T, q *PriorityQueue) {
 					logger, _ := ktesting.NewTestContext(t)
 					// Unschedulable due to PendingPlugins.
@@ -551,7 +552,7 @@ func Test_InFlightPods(t *testing.T) {
 				}},
 				{eventHappens: &PvAdd}, // Active again.
 				{callback: func(t *testing.T, q *PriorityQueue) {
-					poppedPod = popPod(t, q, pod)
+					poppedPod = popPod(t, logger, q, pod)
 					if len(poppedPod.UnschedulablePlugins) > 0 {
 						t.Errorf("QueuedPodInfo from Pop should have empty UnschedulablePlugins, got instead: %+v", poppedPod)
 					}
@@ -597,7 +598,7 @@ func Test_InFlightPods(t *testing.T) {
 			for _, action := range test.actions {
 				switch {
 				case action.podPopped != nil:
-					popPod(t, q, action.podPopped)
+					popPod(t, logger, q, action.podPopped)
 				case action.eventHappens != nil:
 					q.MoveAllToActiveOrBackoffQueue(logger, *action.eventHappens, nil, nil, nil)
 				case action.podEnqueued != nil:
@@ -679,8 +680,8 @@ func Test_InFlightPods(t *testing.T) {
 	}
 }
 
-func popPod(t *testing.T, q *PriorityQueue, pod *v1.Pod) *framework.QueuedPodInfo {
-	p, err := q.Pop()
+func popPod(t *testing.T, logger klog.Logger, q *PriorityQueue, pod *v1.Pod) *framework.QueuedPodInfo {
+	p, err := q.Pop(logger)
 	if err != nil {
 		t.Fatalf("Pop failed: %v", err)
 	}
@@ -714,7 +715,7 @@ func TestPop(t *testing.T) {
 			q.Add(logger, pod)
 
 			// Simulate failed attempt that makes the pod unschedulable.
-			poppedPod := popPod(t, q, pod)
+			poppedPod := popPod(t, logger, q, pod)
 			// We put register the plugin to PendingPlugins so that it's interpreted as queueImmediately and skip backoff.
 			poppedPod.PendingPlugins = sets.New("fooPlugin1")
 			if err := q.AddUnschedulableIfNotPresent(logger, poppedPod, q.SchedulingCycle()); err != nil {
@@ -725,7 +726,7 @@ func TestPop(t *testing.T) {
 			q.MoveAllToActiveOrBackoffQueue(logger, PvAdd, nil, nil, nil)
 
 			// Now check result of Pop.
-			poppedPod = popPod(t, q, pod)
+			poppedPod = popPod(t, logger, q, pod)
 			if len(poppedPod.PendingPlugins) > 0 {
 				t.Errorf("QueuedPodInfo from Pop should have empty PendingPlugins, got instead: %+v", poppedPod)
 			}
@@ -742,7 +743,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 	// insert unschedulablePodInfo and pop right after that
 	// because the scheduling queue records unschedulablePod as in-flight Pod.
 	q.Add(logger, unschedulablePodInfo.Pod)
-	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != unschedulablePodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
 	}
 
@@ -763,7 +764,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after adding pods (-want, +got):\n%s", diff)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != highPriNominatedPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPriNominatedPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriNominatedPodInfo.Pod.Name, p.Pod.Name)
 	}
 	if len(q.nominator.nominatedPods) != 1 {
@@ -796,7 +797,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 
 	// Pop all pods except for the first one
 	for i := totalNum - 1; i > 0; i-- {
-		p, _ := q.Pop()
+		p, _ := q.Pop(logger)
 		if diff := cmp.Diff(&expectedPods[i], p.Pod); diff != "" {
 			t.Errorf("Unexpected pod (-want, +got):\n%s", diff)
 		}
@@ -806,7 +807,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 	q.MoveAllToActiveOrBackoffQueue(logger, WildCardEvent, nil, nil, nil)
 	oldCycle := q.SchedulingCycle()
 
-	firstPod, _ := q.Pop()
+	firstPod, _ := q.Pop(logger)
 	if diff := cmp.Diff(&expectedPods[0], firstPod.Pod); diff != "" {
 		t.Errorf("Unexpected pod (-want, +got):\n%s", diff)
 	}
@@ -849,7 +850,7 @@ func TestPriorityQueue_Pop(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
+		if p, err := q.Pop(logger); err != nil || p.Pod != medPriorityPodInfo.Pod {
 			t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 		}
 		if len(q.nominator.nominatedPods["node1"]) != 1 {
@@ -897,7 +898,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(unschedulablePodInfo.Pod)); !exists {
 		t.Errorf("Expected: %v to be added to activeQ.", unschedulablePodInfo.Pod.Name)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != highPriNominatedPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPriNominatedPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 
@@ -916,7 +917,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 
 	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before testing AddUnschedulableIfNotPresent.
 	q.activeQ.Add(podInfo)
-	if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != medPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	err = q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(medPriorityPodInfo.Pod, "plugin"), q.SchedulingCycle())
@@ -940,7 +941,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error from activeQ.Add: %v", err)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != medPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	// updating a pod which is in unschedulable queue, and it is not backing off,
@@ -958,7 +959,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	// and the pods will be moved into activeQ.
 	c.Step(q.podInitialBackoffDuration)
 	q.Update(logger, medPriorityPodInfo.Pod, updatedPod)
-	if p, err := q.Pop(); err != nil || p.Pod != updatedPod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != updatedPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", updatedPod.Name, p.Pod.Name)
 	}
 }
@@ -1330,7 +1331,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m), WithClock(cl))
 			// add to unsched pod pool
 			q.activeQ.Add(q.newQueuedPodInfo(test.podInfo.Pod))
-			if p, err := q.Pop(); err != nil || p.Pod != test.podInfo.Pod {
+			if p, err := q.Pop(logger); err != nil || p.Pod != test.podInfo.Pod {
 				t.Errorf("Expected: %v after Pop, but got: %v", test.podInfo.Pod.Name, p.Pod.Name)
 			}
 			err := q.AddUnschedulableIfNotPresent(logger, test.podInfo, q.SchedulingCycle())
@@ -1371,12 +1372,12 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
 	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
 	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod))
-	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != unschedulablePodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
 	}
 	expectInFlightPods(t, q, unschedulablePodInfo.Pod.UID)
 	q.activeQ.Add(q.newQueuedPodInfo(highPriorityPodInfo.Pod))
-	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	expectInFlightPods(t, q, unschedulablePodInfo.Pod.UID, highPriorityPodInfo.Pod.UID)
@@ -1392,7 +1393,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	// Construct a Pod, but don't associate its scheduler failure to any plugin
 	hpp1 := clonePod(highPriorityPodInfo.Pod, "hpp1")
 	q.activeQ.Add(q.newQueuedPodInfo(hpp1))
-	if p, err := q.Pop(); err != nil || p.Pod != hpp1 {
+	if p, err := q.Pop(logger); err != nil || p.Pod != hpp1 {
 		t.Errorf("Expected: %v after Pop, but got: %v", hpp1, p.Pod.Name)
 	}
 	expectInFlightPods(t, q, hpp1.UID)
@@ -1405,7 +1406,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	// Construct another Pod, and associate its scheduler failure to plugin "barPlugin".
 	hpp2 := clonePod(highPriorityPodInfo.Pod, "hpp2")
 	q.activeQ.Add(q.newQueuedPodInfo(hpp2))
-	if p, err := q.Pop(); err != nil || p.Pod != hpp2 {
+	if p, err := q.Pop(logger); err != nil || p.Pod != hpp2 {
 		t.Errorf("Expected: %v after Pop, but got: %v", hpp2, p.Pod.Name)
 	}
 	expectInFlightPods(t, q, hpp2.UID)
@@ -1423,7 +1424,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 		t.Errorf("Expected 1 item to be in activeQ, but got: %v", q.activeQ.Len())
 	}
 	// Pop out the medPriorityPodInfo in activeQ.
-	if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != medPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod, p.Pod.Name)
 	}
 	expectInFlightPods(t, q, medPriorityPodInfo.Pod.UID)
@@ -1441,17 +1442,17 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 
 	q.schedulingCycle++
 	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod))
-	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != unschedulablePodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
 	}
 	expectInFlightPods(t, q, medPriorityPodInfo.Pod.UID, unschedulablePodInfo.Pod.UID)
 	q.activeQ.Add(q.newQueuedPodInfo(highPriorityPodInfo.Pod))
-	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	expectInFlightPods(t, q, medPriorityPodInfo.Pod.UID, unschedulablePodInfo.Pod.UID, highPriorityPodInfo.Pod.UID)
 	q.activeQ.Add(q.newQueuedPodInfo(hpp1))
-	if p, err := q.Pop(); err != nil || p.Pod != hpp1 {
+	if p, err := q.Pop(logger); err != nil || p.Pod != hpp1 {
 		t.Errorf("Expected: %v after Pop, but got: %v", hpp1, p.Pod.Name)
 	}
 	unschedulableQueuedPodInfo := q.newQueuedPodInfo(unschedulablePodInfo.Pod, "fooPlugin")
@@ -1553,11 +1554,11 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
 	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
 	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod))
-	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != unschedulablePodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
 	}
 	q.activeQ.Add(q.newQueuedPodInfo(affinityPod))
-	if p, err := q.Pop(); err != nil || p.Pod != affinityPod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != affinityPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", affinityPod.Name, p.Pod.Name)
 	}
 	q.Add(logger, medPriorityPodInfo.Pod)
@@ -1596,7 +1597,7 @@ func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
 	q.Add(logger, medPriorityPodInfo.Pod)
 	q.Add(logger, unschedulablePodInfo.Pod)
 	q.Add(logger, highPriorityPodInfo.Pod)
-	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	expectedList := []*framework.PodInfo{medPriorityPodInfo, unschedulablePodInfo}
@@ -1681,11 +1682,11 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 	q := NewTestQueue(ctx, newDefaultQueueSort())
 	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
 	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod))
-	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != unschedulablePodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
 	}
 	q.activeQ.Add(q.newQueuedPodInfo(highPriorityPodInfo.Pod))
-	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	q.Add(logger, medPriorityPodInfo.Pod)
@@ -1748,7 +1749,7 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after adding pods (-want, +got):\n%s", diff)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != medPriorityPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	// List of nominated pods shouldn't change after popping them from the queue.
@@ -1935,14 +1936,15 @@ func TestUnschedulablePodsMap(t *testing.T) {
 }
 
 func TestSchedulingQueue_Close(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	q := NewTestQueue(ctx, newDefaultQueueSort())
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		pod, err := q.Pop()
+		pod, err := q.Pop(logger)
 		if err != nil {
 			t.Errorf("Expected nil err from Pop() if queue is closed, but got %q", err.Error())
 		}
@@ -1972,7 +1974,7 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 	c.Step(time.Microsecond)
 	// Simulate a pod being popped by the scheduler, determined unschedulable, and
 	// then moved back to the active queue.
-	p1, err := q.Pop()
+	p1, err := q.Pop(logger)
 	if err != nil {
 		t.Errorf("Error while popping the head of the queue: %v", err)
 	}
@@ -1996,7 +1998,7 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 	// Simulation is over. Now let's pop all pods. The pod popped first should be
 	// the last one we pop here.
 	for i := 0; i < 5; i++ {
-		p, err := q.Pop()
+		p, err := q.Pop(logger)
 		if err != nil {
 			t.Errorf("Error while popping pods from the queue: %v", err)
 		}
@@ -2032,7 +2034,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 
 	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent() below.
 	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePod))
-	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != unschedulablePod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePod.Name, p.Pod.Name)
 	}
 	// Put in the unschedulable queue
@@ -2047,7 +2049,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 
 	// Simulate a pod being popped by the scheduler,
 	// At this time, unschedulable pod should be popped.
-	p1, err := q.Pop()
+	p1, err := q.Pop(logger)
 	if err != nil {
 		t.Errorf("Error while popping the head of the queue: %v", err)
 	}
@@ -2080,7 +2082,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 
 	// At this time, newerPod should be popped
 	// because it is the oldest tried pod.
-	p2, err2 := q.Pop()
+	p2, err2 := q.Pop(logger)
 	if err2 != nil {
 		t.Errorf("Error while popping the head of the queue: %v", err2)
 	}
@@ -2103,7 +2105,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 	q.Add(logger, highPod)
 	// Simulate a pod being popped by the scheduler, determined unschedulable, and
 	// then moved back to the active queue.
-	p, err := q.Pop()
+	p, err := q.Pop(logger)
 	if err != nil {
 		t.Errorf("Error while popping the head of the queue: %v", err)
 	}
@@ -2125,7 +2127,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 	// Move all unschedulable pods to the active queue.
 	q.MoveAllToActiveOrBackoffQueue(logger, TestEvent, nil, nil, nil)
 
-	p, err = q.Pop()
+	p, err = q.Pop(logger)
 	if err != nil {
 		t.Errorf("Error while popping the head of the queue: %v", err)
 	}
@@ -2170,11 +2172,11 @@ func TestHighPriorityFlushUnschedulablePodsLeftover(t *testing.T) {
 
 	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
 	q.activeQ.Add(q.newQueuedPodInfo(highPod))
-	if p, err := q.Pop(); err != nil || p.Pod != highPod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPod.Name, p.Pod.Name)
 	}
 	q.activeQ.Add(q.newQueuedPodInfo(midPod))
-	if p, err := q.Pop(); err != nil || p.Pod != midPod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != midPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", midPod.Name, p.Pod.Name)
 	}
 	err := q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(highPod, "fakePlugin"), q.SchedulingCycle())
@@ -2188,10 +2190,10 @@ func TestHighPriorityFlushUnschedulablePodsLeftover(t *testing.T) {
 	c.Step(DefaultPodMaxInUnschedulablePodsDuration + time.Second)
 	q.flushUnschedulablePodsLeftover(logger)
 
-	if p, err := q.Pop(); err != nil || p.Pod != highPod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != highPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
-	if p, err := q.Pop(); err != nil || p.Pod != midPod {
+	if p, err := q.Pop(logger); err != nil || p.Pod != midPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 }
@@ -2296,7 +2298,7 @@ var (
 		if err := queue.activeQ.Add(queue.newQueuedPodInfo(pInfo.Pod)); err != nil {
 			t.Fatalf("Unexpected error during Add: %v", err)
 		}
-		p, err := queue.Pop()
+		p, err := queue.Pop(logger)
 		if err != nil {
 			t.Fatalf("Unexpected error during Pop: %v", err)
 		}
@@ -2314,7 +2316,7 @@ var (
 		if err := queue.activeQ.Add(queue.newQueuedPodInfo(pInfo.Pod)); err != nil {
 			t.Fatalf("Unexpected error during Add: %v", err)
 		}
-		p, err := queue.Pop()
+		p, err := queue.Pop(logger)
 		if err != nil {
 			t.Fatalf("Unexpected error during Pop: %v", err)
 		}
@@ -2770,7 +2772,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 			name: "pod is created and scheduled after 2 attempts",
 			perPodSchedulingMetricsScenario: func(c *testingclock.FakeClock, queue *PriorityQueue, pod *v1.Pod) {
 				queue.Add(logger, pod)
-				pInfo, err := queue.Pop()
+				pInfo, err := queue.Pop(logger)
 				if err != nil {
 					t.Fatalf("Failed to pop a pod %v", err)
 				}
@@ -2790,7 +2792,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 			name: "pod is created and scheduled after 2 attempts but before the second pop, call update",
 			perPodSchedulingMetricsScenario: func(c *testingclock.FakeClock, queue *PriorityQueue, pod *v1.Pod) {
 				queue.Add(logger, pod)
-				pInfo, err := queue.Pop()
+				pInfo, err := queue.Pop(logger)
 				if err != nil {
 					t.Fatalf("Failed to pop a pod %v", err)
 				}
@@ -2841,7 +2843,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
 
 			test.perPodSchedulingMetricsScenario(c, queue, pod)
-			podInfo, err := queue.Pop()
+			podInfo, err := queue.Pop(logger)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2978,7 +2980,7 @@ func TestBackOffFlow(t *testing.T) {
 		t.Run(fmt.Sprintf("step %d", i), func(t *testing.T) {
 			timestamp := cl.Now()
 			// Simulate schedule attempt.
-			podInfo, err := q.Pop()
+			podInfo, err := q.Pop(logger)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3073,7 +3075,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 			for i, podInfo := range tt.podInfos {
 				// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent() below.
 				q.activeQ.Add(q.newQueuedPodInfo(podInfo.Pod))
-				if p, err := q.Pop(); err != nil || p.Pod != podInfo.Pod {
+				if p, err := q.Pop(logger); err != nil || p.Pod != podInfo.Pod {
 					t.Errorf("Expected: %v after Pop, but got: %v", podInfo.Pod.Name, p.Pod.Name)
 				}
 				podInfo.UnschedulablePlugins = sets.New("plugin")

@@ -283,7 +283,7 @@ func TestFailureHandler(t *testing.T) {
 			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
 			queue.Add(logger, testPod)
-			queue.Pop()
+			queue.Pop(logger)
 
 			if tt.podUpdatedDuringScheduling {
 				podInformer.Informer().GetStore().Update(testPodUpdated)
@@ -304,7 +304,7 @@ func TestFailureHandler(t *testing.T) {
 
 			var got *v1.Pod
 			if tt.podUpdatedDuringScheduling {
-				head, e := queue.Pop()
+				head, e := queue.Pop(logger)
 				if e != nil {
 					t.Fatalf("Cannot pop pod from the activeQ: %v", e)
 				}

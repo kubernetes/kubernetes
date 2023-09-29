@@ -466,7 +466,7 @@ func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod) error {
 	if !ok {
 		logger.Error(nil, "Node not found when trying to remove pod", "node", klog.KRef("", pod.Spec.NodeName), "podKey", key, "pod", klog.KObj(pod))
 	} else {
-		if err := n.info.RemovePod(pod); err != nil {
+		if err := n.info.RemovePod(logger, pod); err != nil {
 			return err
 		}
 		if len(n.info.Pods) == 0 && n.info.Node() == nil {
