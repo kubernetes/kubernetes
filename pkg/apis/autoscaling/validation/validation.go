@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -397,7 +396,7 @@ func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Pa
 		}
 	}
 	if src.Target.Value == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
 	}
 
 	return allErrs
