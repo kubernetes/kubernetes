@@ -105,7 +105,7 @@ var (
 				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: compbasemetrics.STABLE,
 		},
-		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
+		[]string{"verb"},
 	)
 	requestSloLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
@@ -568,7 +568,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 			audit.AddAuditAnnotation(req.Context(), removedReleaseAnnotationKey, removedRelease)
 		}
 	}
-	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb).Observe(elapsedSeconds)
 	fieldValidation := cleanFieldValidation(req.URL)
 	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation)
 
