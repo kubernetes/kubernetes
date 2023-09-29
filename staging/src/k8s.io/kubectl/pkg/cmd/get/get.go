@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
+	"k8s.io/kubectl/pkg/util/pager"
 	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	utilpointer "k8s.io/utils/pointer"
@@ -168,7 +169,12 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run(f, args))
+
+			pager := pager.GetOutputPager(o.IOStreams)
+			cmdutil.CheckErr(pager.Start(&o.IOStreams))
+			err := o.Run(f, args)
+			pager.Done()
+			cmdutil.CheckErr(err)
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
