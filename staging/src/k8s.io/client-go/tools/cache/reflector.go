@@ -237,7 +237,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
 	}
 
-	if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
+	if s := os.Getenv("KUBE_FEATURE_GATE_USE_WATCH_LIST"); s == "true" {
 		r.UseWatchList = true
 	}
 
