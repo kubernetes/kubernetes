@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -36,6 +37,31 @@ const (
 	MaxStabilizationWindowSeconds int32 = 3600
 )
 
+// HPAValidationOptions contains the different settings for HPA validation
+type HPAValidationOptions struct {
+	AllowMismatchedTargetTypeAndValue bool
+}
+
+// ValidationOptionsForHPA generates HPAValidationOptions for HorizontalPodAutoscaler
+func ValidationOptionsForHPA(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) HPAValidationOptions {
+	opts := HPAValidationOptions{
+		AllowMismatchedTargetTypeAndValue: false,
+	}
+	// Don't allow mismatched target type/value fields for new HPAs
+	if oldAutoscaler == nil {
+		return opts
+	}
+	// Check for existing bad mismatched target type/value fields for ObjectMetricSource
+	for _, ms := range oldAutoscaler.Spec.Metrics {
+		if ms.Object != nil && ((ms.Object.Target.Type == autoscaling.ValueMetricType && ms.Object.Target.Value == nil) ||
+			(ms.Object.Target.Type == autoscaling.AverageValueMetricType && ms.Object.Target.AverageValue == nil)) {
+			opts.AllowMismatchedTargetTypeAndValue = true
+			return opts
+		}
+	}
+	return opts
+}
+
 // ValidateScale validates a Scale and returns an ErrorList with any errors.
 func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -52,7 +78,7 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 // Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
 var ValidateHorizontalPodAutoscalerName = apivalidation.ValidateReplicationControllerName
 
-func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path, minReplicasLowerBound int32) field.ErrorList {
+func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path, minReplicasLowerBound int32, opts HPAValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < minReplicasLowerBound {
@@ -68,7 +94,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	if refErrs := ValidateCrossVersionObjectReference(autoscaler.ScaleTargetRef, fldPath.Child("scaleTargetRef")); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
-	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics"), autoscaler.MinReplicas); len(refErrs) > 0 {
+	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics"), autoscaler.MinReplicas, opts); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
 	if refErrs := validateBehavior(autoscaler.Behavior, fldPath.Child("behavior")); len(refErrs) > 0 {
@@ -102,7 +128,7 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 
 // ValidateHorizontalPodAutoscaler validates a HorizontalPodAutoscaler and returns an
 // ErrorList with any errors.
-func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
+func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutoscaler, opts HPAValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&autoscaler.ObjectMeta, true, ValidateHorizontalPodAutoscalerName, field.NewPath("metadata"))
 
 	// MinReplicasLowerBound represents a minimum value for minReplicas
@@ -114,13 +140,13 @@ func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutosc
 	} else {
 		minReplicasLowerBound = 1
 	}
-	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(autoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound)...)
+	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(autoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound, opts)...)
 	return allErrs
 }
 
 // ValidateHorizontalPodAutoscalerUpdate validates an update to a HorizontalPodAutoscaler and returns an
 // ErrorList with any errors.
-func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
+func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler, opts HPAValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
 
 	// minReplicasLowerBound represents a minimum value for minReplicas
@@ -133,7 +159,7 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autosca
 		minReplicasLowerBound = 1
 	}
 
-	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound)...)
+	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound, opts)...)
 	return allErrs
 }
 
@@ -147,14 +173,14 @@ func ValidateHorizontalPodAutoscalerStatusUpdate(newAutoscaler, oldAutoscaler *a
 	return allErrs
 }
 
-func validateMetrics(metrics []autoscaling.MetricSpec, fldPath *field.Path, minReplicas *int32) field.ErrorList {
+func validateMetrics(metrics []autoscaling.MetricSpec, fldPath *field.Path, minReplicas *int32, opts HPAValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	hasObjectMetrics := false
 	hasExternalMetrics := false
 
 	for i, metricSpec := range metrics {
 		idxPath := fldPath.Index(i)
-		if targetErrs := validateMetricSpec(metricSpec, idxPath); len(targetErrs) > 0 {
+		if targetErrs := validateMetricSpec(metricSpec, idxPath, opts); len(targetErrs) > 0 {
 			allErrs = append(allErrs, targetErrs...)
 		}
 		if metricSpec.Type == autoscaling.ObjectMetricSourceType {
@@ -244,7 +270,7 @@ var validMetricSourceTypes = sets.NewString(
 	string(autoscaling.ContainerResourceMetricSourceType))
 var validMetricSourceTypesList = validMetricSourceTypes.List()
 
-func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.ErrorList {
+func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path, opts HPAValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(string(spec.Type)) == 0 {
@@ -259,7 +285,7 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 	if spec.Object != nil {
 		typesPresent.Insert("object")
 		if typesPresent.Len() == 1 {
-			allErrs = append(allErrs, validateObjectSource(spec.Object, fldPath.Child("object"))...)
+			allErrs = append(allErrs, validateObjectSource(spec.Object, fldPath.Child("object"), opts)...)
 		}
 	}
 
@@ -337,15 +363,41 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 	return allErrs
 }
 
-func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Path) field.ErrorList {
+func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Path, opts HPAValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, ValidateCrossVersionObjectReference(src.DescribedObject, fldPath.Child("describedObject"))...)
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
+	if !opts.AllowMismatchedTargetTypeAndValue {
+		switch src.Target.Type {
+		case autoscaling.UtilizationMetricType:
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("target").Child("type"), src.Target.Type, "must not set Utilization type for Object source type"))
+		case autoscaling.ValueMetricType:
+			if src.Target.Value == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("value"), "must set target value for value metric type"))
+			}
+			if src.Target.AverageValue != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("target").Child("averageValue"), src.Target.AverageValue, "must not set target averageValue for value metric type"))
+			}
+			if src.Target.AverageUtilization != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("target").Child("averageUtilization"), src.Target.AverageUtilization, "must not set target averageUtilization for value metric type"))
+			}
+		case autoscaling.AverageValueMetricType:
+			if src.Target.Value != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("target").Child("value"), src.Target.Value, "must not set target value for average value metric type"))
+			}
+			if src.Target.AverageValue == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set target averageValue for average value metric type"))
+			}
+			if src.Target.AverageUtilization != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("target").Child("averageUtilization"), src.Target.AverageUtilization, "must not set target averageUtilization for average value metric type"))
+			}
+		}
+	}
 	if src.Target.Value == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
 	}
 
 	return allErrs
@@ -440,14 +492,6 @@ func validateMetricTarget(mt autoscaling.MetricTarget, fldPath *field.Path) fiel
 		mt.Type != autoscaling.ValueMetricType &&
 		mt.Type != autoscaling.AverageValueMetricType {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), mt.Type, "must be either Utilization, Value, or AverageValue"))
-	}
-
-	if mt.Type == autoscaling.ValueMetricType && mt.Value == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), mt.Value, "must be set for metric target type Value"))
-	}
-
-	if mt.Type == autoscaling.AverageValueMetricType && mt.AverageValue == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("averageValue"), mt.AverageValue, "must be set for metric target type AverageValue"))
 	}
 
 	if mt.Value != nil && mt.Value.Sign() != 1 {
