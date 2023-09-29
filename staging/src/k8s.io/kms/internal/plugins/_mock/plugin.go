@@ -25,14 +25,15 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-	"k8s.io/kms/internal"
 	"k8s.io/kms/pkg/service"
 	"k8s.io/kms/pkg/util"
+	"k8s.io/kms/plugins/mock/pkcs11"
 )
 
 var (
-	listenAddr = flag.String("listen-addr", "unix:///tmp/kms.socket", "gRPC listen address")
-	timeout    = flag.Duration("timeout", 5*time.Second, "gRPC timeout")
+	listenAddr     = flag.String("listen-addr", "unix:///tmp/kms.socket", "gRPC listen address")
+	timeout        = flag.Duration("timeout", 5*time.Second, "gRPC timeout")
+	configFilePath = flag.String("config-file-path", "/etc/softhsm-config.json", "SoftHSM config file path")
 )
 
 func main() {
@@ -44,7 +45,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	remoteKMSService, err := internal.NewMockAESService("somerandomstring", "aes-key-id")
+	remoteKMSService, err := pkcs11.NewPKCS11RemoteService(*configFilePath, "kms-test")
 	if err != nil {
 		klog.ErrorS(err, "failed to create remote service")
 		os.Exit(1)

@@ -296,10 +296,6 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
-    - repository: api
-      branch: master
-    - repository: client-go
-      branch: master
     source:
       branch: master
       dir: staging/src/k8s.io/kms
