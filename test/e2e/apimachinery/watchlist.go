@@ -37,15 +37,15 @@ import (
 
 var _ = SIGDescribe("API Streaming (aka. WatchList) [Serial] [Feature:WatchList]", func() {
 	f := framework.NewDefaultFramework("watchlist")
-	ginkgo.It("should be requested when ENABLE_CLIENT_GO_WATCH_LIST_ALPHA is set", func(ctx context.Context) {
-		prevWatchListEnvValue, wasWatchListEnvSet := os.LookupEnv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA")
-		os.Setenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA", "true")
+	ginkgo.It("should be requested when KUBE_FEATURE_GATE_USE_WATCH_LIST is set", func(ctx context.Context) {
+		prevWatchListEnvValue, wasWatchListEnvSet := os.LookupEnv("KUBE_FEATURE_GATE_USE_WATCH_LIST")
+		os.Setenv("KUBE_FEATURE_GATE_USE_WATCH_LIST", "true")
 		defer func() {
 			if !wasWatchListEnvSet {
-				os.Unsetenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA")
+				os.Unsetenv("KUBE_FEATURE_GATE_USE_WATCH_LIST")
 				return
 			}
-			os.Setenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA", prevWatchListEnvValue)
+			os.Setenv("KUBE_FEATURE_GATE_USE_WATCH_LIST", prevWatchListEnvValue)
 		}()
 		stopCh := make(chan struct{})
 		defer close(stopCh)
