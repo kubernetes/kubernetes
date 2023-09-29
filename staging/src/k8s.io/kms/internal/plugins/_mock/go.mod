@@ -4,12 +4,10 @@ go 1.19
 
 require (
 	github.com/ThalesIgnite/crypto11 v1.2.5
-	k8s.io/klog/v2 v2.100.1
 	k8s.io/kms v0.0.0-00010101000000-000000000000
 )
 
 require (
-	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/miekg/pkcs11 v1.0.3-0.20190429190417-a667d056470f // indirect
@@ -25,6 +23,5 @@ require (
 
 replace (
 	k8s.io/apimachinery => ../../../../apimachinery
-	k8s.io/client-go => ../../../../client-go
 	k8s.io/kms => ../../../../kms
 )

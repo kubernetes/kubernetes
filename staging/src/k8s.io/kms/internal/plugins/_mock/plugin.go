@@ -24,7 +24,6 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/klog/v2"
 	"k8s.io/kms/pkg/service"
 	"k8s.io/kms/pkg/util"
 	"k8s.io/kms/plugins/mock/pkcs11"
@@ -41,14 +40,12 @@ func main() {
 
 	addr, err := util.ParseEndpoint(*listenAddr)
 	if err != nil {
-		klog.ErrorS(err, "failed to parse endpoint")
-		os.Exit(1)
+		panic("failed to parse endpoint: " + err.Error())
 	}
 
 	remoteKMSService, err := pkcs11.NewPKCS11RemoteService(*configFilePath, "kms-test")
 	if err != nil {
-		klog.ErrorS(err, "failed to create remote service")
-		os.Exit(1)
+		panic("failed to create remote service: " + err.Error())
 	}
 
 	ctx := withShutdownSignal(context.Background())
@@ -58,16 +55,13 @@ func main() {
 		remoteKMSService,
 	)
 
-	klog.InfoS("starting server", "listenAddr", *listenAddr)
 	go func() {
 		if err := grpcService.ListenAndServe(); err != nil {
-			klog.ErrorS(err, "failed to serve")
-			os.Exit(1)
+			panic("failed to serve: " + err.Error())
 		}
 	}()
 
 	<-ctx.Done()
-	klog.InfoS("shutting down server")
 	grpcService.Shutdown()
 }
 
@@ -81,7 +75,6 @@ func withShutdownSignal(ctx context.Context) context.Context {
 
 	go func() {
 		<-signalChan
-		klog.InfoS("received shutdown signal")
 		cancel()
 	}()
 	return nctx
