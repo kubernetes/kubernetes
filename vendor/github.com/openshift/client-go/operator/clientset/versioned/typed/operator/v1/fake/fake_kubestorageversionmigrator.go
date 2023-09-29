@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	operatorv1 "github.com/openshift/api/operator/v1"
-	applyconfigurationsoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/operator/v1"
+	operatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeKubeStorageVersionMigrators struct {
 	Fake *FakeOperatorV1
 }
 
-var kubestorageversionmigratorsResource = schema.GroupVersionResource{Group: "operator.openshift.io", Version: "v1", Resource: "kubestorageversionmigrators"}
+var kubestorageversionmigratorsResource = v1.SchemeGroupVersion.WithResource("kubestorageversionmigrators")
 
-var kubestorageversionmigratorsKind = schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1", Kind: "KubeStorageVersionMigrator"}
+var kubestorageversionmigratorsKind = v1.SchemeGroupVersion.WithKind("KubeStorageVersionMigrator")
 
 // Get takes name of the kubeStorageVersionMigrator, and returns the corresponding kubeStorageVersionMigrator object, and an error if there is any.
-func (c *FakeKubeStorageVersionMigrators) Get(ctx context.Context, name string, options v1.GetOptions) (result *operatorv1.KubeStorageVersionMigrator, err error) {
+func (c *FakeKubeStorageVersionMigrators) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.KubeStorageVersionMigrator, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(kubestorageversionmigratorsResource, name), &operatorv1.KubeStorageVersionMigrator{})
+		Invokes(testing.NewRootGetAction(kubestorageversionmigratorsResource, name), &v1.KubeStorageVersionMigrator{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.KubeStorageVersionMigrator), err
+	return obj.(*v1.KubeStorageVersionMigrator), err
 }
 
 // List takes label and field selectors, and returns the list of KubeStorageVersionMigrators that match those selectors.
-func (c *FakeKubeStorageVersionMigrators) List(ctx context.Context, opts v1.ListOptions) (result *operatorv1.KubeStorageVersionMigratorList, err error) {
+func (c *FakeKubeStorageVersionMigrators) List(ctx context.Context, opts metav1.ListOptions) (result *v1.KubeStorageVersionMigratorList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(kubestorageversionmigratorsResource, kubestorageversionmigratorsKind, opts), &operatorv1.KubeStorageVersionMigratorList{})
+		Invokes(testing.NewRootListAction(kubestorageversionmigratorsResource, kubestorageversionmigratorsKind, opts), &v1.KubeStorageVersionMigratorList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeKubeStorageVersionMigrators) List(ctx context.Context, opts v1.List
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &operatorv1.KubeStorageVersionMigratorList{ListMeta: obj.(*operatorv1.KubeStorageVersionMigratorList).ListMeta}
-	for _, item := range obj.(*operatorv1.KubeStorageVersionMigratorList).Items {
+	list := &v1.KubeStorageVersionMigratorList{ListMeta: obj.(*v1.KubeStorageVersionMigratorList).ListMeta}
+	for _, item := range obj.(*v1.KubeStorageVersionMigratorList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +57,69 @@ func (c *FakeKubeStorageVersionMigrators) List(ctx context.Context, opts v1.List
 }
 
 // Watch returns a watch.Interface that watches the requested kubeStorageVersionMigrators.
-func (c *FakeKubeStorageVersionMigrators) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeKubeStorageVersionMigrators) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(kubestorageversionmigratorsResource, opts))
 }
 
 // Create takes the representation of a kubeStorageVersionMigrator and creates it.  Returns the server's representation of the kubeStorageVersionMigrator, and an error, if there is any.
-func (c *FakeKubeStorageVersionMigrators) Create(ctx context.Context, kubeStorageVersionMigrator *operatorv1.KubeStorageVersionMigrator, opts v1.CreateOptions) (result *operatorv1.KubeStorageVersionMigrator, err error) {
+func (c *FakeKubeStorageVersionMigrators) Create(ctx context.Context, kubeStorageVersionMigrator *v1.KubeStorageVersionMigrator, opts metav1.CreateOptions) (result *v1.KubeStorageVersionMigrator, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(kubestorageversionmigratorsResource, kubeStorageVersionMigrator), &operatorv1.KubeStorageVersionMigrator{})
+		Invokes(testing.NewRootCreateAction(kubestorageversionmigratorsResource, kubeStorageVersionMigrator), &v1.KubeStorageVersionMigrator{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.KubeStorageVersionMigrator), err
+	return obj.(*v1.KubeStorageVersionMigrator), err
 }
 
 // Update takes the representation of a kubeStorageVersionMigrator and updates it. Returns the server's representation of the kubeStorageVersionMigrator, and an error, if there is any.
-func (c *FakeKubeStorageVersionMigrators) Update(ctx context.Context, kubeStorageVersionMigrator *operatorv1.KubeStorageVersionMigrator, opts v1.UpdateOptions) (result *operatorv1.KubeStorageVersionMigrator, err error) {
+func (c *FakeKubeStorageVersionMigrators) Update(ctx context.Context, kubeStorageVersionMigrator *v1.KubeStorageVersionMigrator, opts metav1.UpdateOptions) (result *v1.KubeStorageVersionMigrator, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(kubestorageversionmigratorsResource, kubeStorageVersionMigrator), &operatorv1.KubeStorageVersionMigrator{})
+		Invokes(testing.NewRootUpdateAction(kubestorageversionmigratorsResource, kubeStorageVersionMigrator), &v1.KubeStorageVersionMigrator{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.KubeStorageVersionMigrator), err
+	return obj.(*v1.KubeStorageVersionMigrator), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeKubeStorageVersionMigrators) UpdateStatus(ctx context.Context, kubeStorageVersionMigrator *operatorv1.KubeStorageVersionMigrator, opts v1.UpdateOptions) (*operatorv1.KubeStorageVersionMigrator, error) {
+func (c *FakeKubeStorageVersionMigrators) UpdateStatus(ctx context.Context, kubeStorageVersionMigrator *v1.KubeStorageVersionMigrator, opts metav1.UpdateOptions) (*v1.KubeStorageVersionMigrator, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(kubestorageversionmigratorsResource, "status", kubeStorageVersionMigrator), &operatorv1.KubeStorageVersionMigrator{})
+		Invokes(testing.NewRootUpdateSubresourceAction(kubestorageversionmigratorsResource, "status", kubeStorageVersionMigrator), &v1.KubeStorageVersionMigrator{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.KubeStorageVersionMigrator), err
+	return obj.(*v1.KubeStorageVersionMigrator), err
 }
 
 // Delete takes name of the kubeStorageVersionMigrator and deletes it. Returns an error if one occurs.
-func (c *FakeKubeStorageVersionMigrators) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeKubeStorageVersionMigrators) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(kubestorageversionmigratorsResource, name, opts), &operatorv1.KubeStorageVersionMigrator{})
+		Invokes(testing.NewRootDeleteActionWithOptions(kubestorageversionmigratorsResource, name, opts), &v1.KubeStorageVersionMigrator{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeKubeStorageVersionMigrators) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeKubeStorageVersionMigrators) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(kubestorageversionmigratorsResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &operatorv1.KubeStorageVersionMigratorList{})
+	_, err := c.Fake.Invokes(action, &v1.KubeStorageVersionMigratorList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched kubeStorageVersionMigrator.
-func (c *FakeKubeStorageVersionMigrators) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *operatorv1.KubeStorageVersionMigrator, err error) {
+func (c *FakeKubeStorageVersionMigrators) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.KubeStorageVersionMigrator, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(kubestorageversionmigratorsResource, name, pt, data, subresources...), &operatorv1.KubeStorageVersionMigrator{})
+		Invokes(testing.NewRootPatchSubresourceAction(kubestorageversionmigratorsResource, name, pt, data, subresources...), &v1.KubeStorageVersionMigrator{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.KubeStorageVersionMigrator), err
+	return obj.(*v1.KubeStorageVersionMigrator), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied kubeStorageVersionMigrator.
-func (c *FakeKubeStorageVersionMigrators) Apply(ctx context.Context, kubeStorageVersionMigrator *applyconfigurationsoperatorv1.KubeStorageVersionMigratorApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.KubeStorageVersionMigrator, err error) {
+func (c *FakeKubeStorageVersionMigrators) Apply(ctx context.Context, kubeStorageVersionMigrator *operatorv1.KubeStorageVersionMigratorApplyConfiguration, opts metav1.ApplyOptions) (result *v1.KubeStorageVersionMigrator, err error) {
 	if kubeStorageVersionMigrator == nil {
 		return nil, fmt.Errorf("kubeStorageVersionMigrator provided to Apply must not be nil")
 	}
@@ -133,16 +132,16 @@ func (c *FakeKubeStorageVersionMigrators) Apply(ctx context.Context, kubeStorage
 		return nil, fmt.Errorf("kubeStorageVersionMigrator.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(kubestorageversionmigratorsResource, *name, types.ApplyPatchType, data), &operatorv1.KubeStorageVersionMigrator{})
+		Invokes(testing.NewRootPatchSubresourceAction(kubestorageversionmigratorsResource, *name, types.ApplyPatchType, data), &v1.KubeStorageVersionMigrator{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.KubeStorageVersionMigrator), err
+	return obj.(*v1.KubeStorageVersionMigrator), err
 }
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeKubeStorageVersionMigrators) ApplyStatus(ctx context.Context, kubeStorageVersionMigrator *applyconfigurationsoperatorv1.KubeStorageVersionMigratorApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.KubeStorageVersionMigrator, err error) {
+func (c *FakeKubeStorageVersionMigrators) ApplyStatus(ctx context.Context, kubeStorageVersionMigrator *operatorv1.KubeStorageVersionMigratorApplyConfiguration, opts metav1.ApplyOptions) (result *v1.KubeStorageVersionMigrator, err error) {
 	if kubeStorageVersionMigrator == nil {
 		return nil, fmt.Errorf("kubeStorageVersionMigrator provided to Apply must not be nil")
 	}
@@ -155,9 +154,9 @@ func (c *FakeKubeStorageVersionMigrators) ApplyStatus(ctx context.Context, kubeS
 		return nil, fmt.Errorf("kubeStorageVersionMigrator.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(kubestorageversionmigratorsResource, *name, types.ApplyPatchType, data, "status"), &operatorv1.KubeStorageVersionMigrator{})
+		Invokes(testing.NewRootPatchSubresourceAction(kubestorageversionmigratorsResource, *name, types.ApplyPatchType, data, "status"), &v1.KubeStorageVersionMigrator{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.KubeStorageVersionMigrator), err
+	return obj.(*v1.KubeStorageVersionMigrator), err
 }

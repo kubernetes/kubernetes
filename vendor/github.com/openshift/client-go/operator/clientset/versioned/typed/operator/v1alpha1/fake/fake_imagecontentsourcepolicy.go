@@ -11,7 +11,6 @@ import (
 	operatorv1alpha1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,9 +21,9 @@ type FakeImageContentSourcePolicies struct {
 	Fake *FakeOperatorV1alpha1
 }
 
-var imagecontentsourcepoliciesResource = schema.GroupVersionResource{Group: "operator.openshift.io", Version: "v1alpha1", Resource: "imagecontentsourcepolicies"}
+var imagecontentsourcepoliciesResource = v1alpha1.SchemeGroupVersion.WithResource("imagecontentsourcepolicies")
 
-var imagecontentsourcepoliciesKind = schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1alpha1", Kind: "ImageContentSourcePolicy"}
+var imagecontentsourcepoliciesKind = v1alpha1.SchemeGroupVersion.WithKind("ImageContentSourcePolicy")
 
 // Get takes name of the imageContentSourcePolicy, and returns the corresponding imageContentSourcePolicy object, and an error if there is any.
 func (c *FakeImageContentSourcePolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ImageContentSourcePolicy, err error) {

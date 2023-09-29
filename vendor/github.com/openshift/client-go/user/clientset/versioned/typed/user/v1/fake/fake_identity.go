@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	userv1 "github.com/openshift/api/user/v1"
-	applyconfigurationsuserv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/user/v1"
+	userv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeIdentities struct {
 	Fake *FakeUserV1
 }
 
-var identitiesResource = schema.GroupVersionResource{Group: "user.openshift.io", Version: "v1", Resource: "identities"}
+var identitiesResource = v1.SchemeGroupVersion.WithResource("identities")
 
-var identitiesKind = schema.GroupVersionKind{Group: "user.openshift.io", Version: "v1", Kind: "Identity"}
+var identitiesKind = v1.SchemeGroupVersion.WithKind("Identity")
 
 // Get takes name of the identity, and returns the corresponding identity object, and an error if there is any.
-func (c *FakeIdentities) Get(ctx context.Context, name string, options v1.GetOptions) (result *userv1.Identity, err error) {
+func (c *FakeIdentities) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Identity, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(identitiesResource, name), &userv1.Identity{})
+		Invokes(testing.NewRootGetAction(identitiesResource, name), &v1.Identity{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.Identity), err
+	return obj.(*v1.Identity), err
 }
 
 // List takes label and field selectors, and returns the list of Identities that match those selectors.
-func (c *FakeIdentities) List(ctx context.Context, opts v1.ListOptions) (result *userv1.IdentityList, err error) {
+func (c *FakeIdentities) List(ctx context.Context, opts metav1.ListOptions) (result *v1.IdentityList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(identitiesResource, identitiesKind, opts), &userv1.IdentityList{})
+		Invokes(testing.NewRootListAction(identitiesResource, identitiesKind, opts), &v1.IdentityList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeIdentities) List(ctx context.Context, opts v1.ListOptions) (result 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &userv1.IdentityList{ListMeta: obj.(*userv1.IdentityList).ListMeta}
-	for _, item := range obj.(*userv1.IdentityList).Items {
+	list := &v1.IdentityList{ListMeta: obj.(*v1.IdentityList).ListMeta}
+	for _, item := range obj.(*v1.IdentityList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,58 +57,58 @@ func (c *FakeIdentities) List(ctx context.Context, opts v1.ListOptions) (result 
 }
 
 // Watch returns a watch.Interface that watches the requested identities.
-func (c *FakeIdentities) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeIdentities) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(identitiesResource, opts))
 }
 
 // Create takes the representation of a identity and creates it.  Returns the server's representation of the identity, and an error, if there is any.
-func (c *FakeIdentities) Create(ctx context.Context, identity *userv1.Identity, opts v1.CreateOptions) (result *userv1.Identity, err error) {
+func (c *FakeIdentities) Create(ctx context.Context, identity *v1.Identity, opts metav1.CreateOptions) (result *v1.Identity, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(identitiesResource, identity), &userv1.Identity{})
+		Invokes(testing.NewRootCreateAction(identitiesResource, identity), &v1.Identity{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.Identity), err
+	return obj.(*v1.Identity), err
 }
 
 // Update takes the representation of a identity and updates it. Returns the server's representation of the identity, and an error, if there is any.
-func (c *FakeIdentities) Update(ctx context.Context, identity *userv1.Identity, opts v1.UpdateOptions) (result *userv1.Identity, err error) {
+func (c *FakeIdentities) Update(ctx context.Context, identity *v1.Identity, opts metav1.UpdateOptions) (result *v1.Identity, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(identitiesResource, identity), &userv1.Identity{})
+		Invokes(testing.NewRootUpdateAction(identitiesResource, identity), &v1.Identity{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.Identity), err
+	return obj.(*v1.Identity), err
 }
 
 // Delete takes name of the identity and deletes it. Returns an error if one occurs.
-func (c *FakeIdentities) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeIdentities) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(identitiesResource, name, opts), &userv1.Identity{})
+		Invokes(testing.NewRootDeleteActionWithOptions(identitiesResource, name, opts), &v1.Identity{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeIdentities) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeIdentities) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(identitiesResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &userv1.IdentityList{})
+	_, err := c.Fake.Invokes(action, &v1.IdentityList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched identity.
-func (c *FakeIdentities) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *userv1.Identity, err error) {
+func (c *FakeIdentities) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Identity, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(identitiesResource, name, pt, data, subresources...), &userv1.Identity{})
+		Invokes(testing.NewRootPatchSubresourceAction(identitiesResource, name, pt, data, subresources...), &v1.Identity{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.Identity), err
+	return obj.(*v1.Identity), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied identity.
-func (c *FakeIdentities) Apply(ctx context.Context, identity *applyconfigurationsuserv1.IdentityApplyConfiguration, opts v1.ApplyOptions) (result *userv1.Identity, err error) {
+func (c *FakeIdentities) Apply(ctx context.Context, identity *userv1.IdentityApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Identity, err error) {
 	if identity == nil {
 		return nil, fmt.Errorf("identity provided to Apply must not be nil")
 	}
@@ -122,9 +121,9 @@ func (c *FakeIdentities) Apply(ctx context.Context, identity *applyconfiguration
 		return nil, fmt.Errorf("identity.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(identitiesResource, *name, types.ApplyPatchType, data), &userv1.Identity{})
+		Invokes(testing.NewRootPatchSubresourceAction(identitiesResource, *name, types.ApplyPatchType, data), &v1.Identity{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.Identity), err
+	return obj.(*v1.Identity), err
 }

@@ -11,7 +11,6 @@ import (
 	operatorv1alpha1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,9 +21,9 @@ type FakeEtcdBackups struct {
 	Fake *FakeOperatorV1alpha1
 }
 
-var etcdbackupsResource = schema.GroupVersionResource{Group: "operator.openshift.io", Version: "v1alpha1", Resource: "etcdbackups"}
+var etcdbackupsResource = v1alpha1.SchemeGroupVersion.WithResource("etcdbackups")
 
-var etcdbackupsKind = schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1alpha1", Kind: "EtcdBackup"}
+var etcdbackupsKind = v1alpha1.SchemeGroupVersion.WithKind("EtcdBackup")
 
 // Get takes name of the etcdBackup, and returns the corresponding etcdBackup object, and an error if there is any.
 func (c *FakeEtcdBackups) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.EtcdBackup, err error) {

@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	userv1 "github.com/openshift/api/user/v1"
-	applyconfigurationsuserv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/user/v1"
+	userv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeUsers struct {
 	Fake *FakeUserV1
 }
 
-var usersResource = schema.GroupVersionResource{Group: "user.openshift.io", Version: "v1", Resource: "users"}
+var usersResource = v1.SchemeGroupVersion.WithResource("users")
 
-var usersKind = schema.GroupVersionKind{Group: "user.openshift.io", Version: "v1", Kind: "User"}
+var usersKind = v1.SchemeGroupVersion.WithKind("User")
 
 // Get takes name of the user, and returns the corresponding user object, and an error if there is any.
-func (c *FakeUsers) Get(ctx context.Context, name string, options v1.GetOptions) (result *userv1.User, err error) {
+func (c *FakeUsers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.User, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(usersResource, name), &userv1.User{})
+		Invokes(testing.NewRootGetAction(usersResource, name), &v1.User{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.User), err
+	return obj.(*v1.User), err
 }
 
 // List takes label and field selectors, and returns the list of Users that match those selectors.
-func (c *FakeUsers) List(ctx context.Context, opts v1.ListOptions) (result *userv1.UserList, err error) {
+func (c *FakeUsers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.UserList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(usersResource, usersKind, opts), &userv1.UserList{})
+		Invokes(testing.NewRootListAction(usersResource, usersKind, opts), &v1.UserList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeUsers) List(ctx context.Context, opts v1.ListOptions) (result *user
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &userv1.UserList{ListMeta: obj.(*userv1.UserList).ListMeta}
-	for _, item := range obj.(*userv1.UserList).Items {
+	list := &v1.UserList{ListMeta: obj.(*v1.UserList).ListMeta}
+	for _, item := range obj.(*v1.UserList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,58 +57,58 @@ func (c *FakeUsers) List(ctx context.Context, opts v1.ListOptions) (result *user
 }
 
 // Watch returns a watch.Interface that watches the requested users.
-func (c *FakeUsers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeUsers) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(usersResource, opts))
 }
 
 // Create takes the representation of a user and creates it.  Returns the server's representation of the user, and an error, if there is any.
-func (c *FakeUsers) Create(ctx context.Context, user *userv1.User, opts v1.CreateOptions) (result *userv1.User, err error) {
+func (c *FakeUsers) Create(ctx context.Context, user *v1.User, opts metav1.CreateOptions) (result *v1.User, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(usersResource, user), &userv1.User{})
+		Invokes(testing.NewRootCreateAction(usersResource, user), &v1.User{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.User), err
+	return obj.(*v1.User), err
 }
 
 // Update takes the representation of a user and updates it. Returns the server's representation of the user, and an error, if there is any.
-func (c *FakeUsers) Update(ctx context.Context, user *userv1.User, opts v1.UpdateOptions) (result *userv1.User, err error) {
+func (c *FakeUsers) Update(ctx context.Context, user *v1.User, opts metav1.UpdateOptions) (result *v1.User, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(usersResource, user), &userv1.User{})
+		Invokes(testing.NewRootUpdateAction(usersResource, user), &v1.User{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.User), err
+	return obj.(*v1.User), err
 }
 
 // Delete takes name of the user and deletes it. Returns an error if one occurs.
-func (c *FakeUsers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeUsers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(usersResource, name, opts), &userv1.User{})
+		Invokes(testing.NewRootDeleteActionWithOptions(usersResource, name, opts), &v1.User{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeUsers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeUsers) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(usersResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &userv1.UserList{})
+	_, err := c.Fake.Invokes(action, &v1.UserList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched user.
-func (c *FakeUsers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *userv1.User, err error) {
+func (c *FakeUsers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.User, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(usersResource, name, pt, data, subresources...), &userv1.User{})
+		Invokes(testing.NewRootPatchSubresourceAction(usersResource, name, pt, data, subresources...), &v1.User{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.User), err
+	return obj.(*v1.User), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied user.
-func (c *FakeUsers) Apply(ctx context.Context, user *applyconfigurationsuserv1.UserApplyConfiguration, opts v1.ApplyOptions) (result *userv1.User, err error) {
+func (c *FakeUsers) Apply(ctx context.Context, user *userv1.UserApplyConfiguration, opts metav1.ApplyOptions) (result *v1.User, err error) {
 	if user == nil {
 		return nil, fmt.Errorf("user provided to Apply must not be nil")
 	}
@@ -122,9 +121,9 @@ func (c *FakeUsers) Apply(ctx context.Context, user *applyconfigurationsuserv1.U
 		return nil, fmt.Errorf("user.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(usersResource, *name, types.ApplyPatchType, data), &userv1.User{})
+		Invokes(testing.NewRootPatchSubresourceAction(usersResource, *name, types.ApplyPatchType, data), &v1.User{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.User), err
+	return obj.(*v1.User), err
 }

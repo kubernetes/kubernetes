@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	operatorv1 "github.com/openshift/api/operator/v1"
-	applyconfigurationsoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/operator/v1"
+	operatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -23,25 +22,25 @@ type FakeIngressControllers struct {
 	ns   string
 }
 
-var ingresscontrollersResource = schema.GroupVersionResource{Group: "operator.openshift.io", Version: "v1", Resource: "ingresscontrollers"}
+var ingresscontrollersResource = v1.SchemeGroupVersion.WithResource("ingresscontrollers")
 
-var ingresscontrollersKind = schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1", Kind: "IngressController"}
+var ingresscontrollersKind = v1.SchemeGroupVersion.WithKind("IngressController")
 
 // Get takes name of the ingressController, and returns the corresponding ingressController object, and an error if there is any.
-func (c *FakeIngressControllers) Get(ctx context.Context, name string, options v1.GetOptions) (result *operatorv1.IngressController, err error) {
+func (c *FakeIngressControllers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.IngressController, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(ingresscontrollersResource, c.ns, name), &operatorv1.IngressController{})
+		Invokes(testing.NewGetAction(ingresscontrollersResource, c.ns, name), &v1.IngressController{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.IngressController), err
+	return obj.(*v1.IngressController), err
 }
 
 // List takes label and field selectors, and returns the list of IngressControllers that match those selectors.
-func (c *FakeIngressControllers) List(ctx context.Context, opts v1.ListOptions) (result *operatorv1.IngressControllerList, err error) {
+func (c *FakeIngressControllers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.IngressControllerList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(ingresscontrollersResource, ingresscontrollersKind, c.ns, opts), &operatorv1.IngressControllerList{})
+		Invokes(testing.NewListAction(ingresscontrollersResource, ingresscontrollersKind, c.ns, opts), &v1.IngressControllerList{})
 
 	if obj == nil {
 		return nil, err
@@ -51,8 +50,8 @@ func (c *FakeIngressControllers) List(ctx context.Context, opts v1.ListOptions) 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &operatorv1.IngressControllerList{ListMeta: obj.(*operatorv1.IngressControllerList).ListMeta}
-	for _, item := range obj.(*operatorv1.IngressControllerList).Items {
+	list := &v1.IngressControllerList{ListMeta: obj.(*v1.IngressControllerList).ListMeta}
+	for _, item := range obj.(*v1.IngressControllerList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -61,75 +60,75 @@ func (c *FakeIngressControllers) List(ctx context.Context, opts v1.ListOptions) 
 }
 
 // Watch returns a watch.Interface that watches the requested ingressControllers.
-func (c *FakeIngressControllers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeIngressControllers) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(ingresscontrollersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a ingressController and creates it.  Returns the server's representation of the ingressController, and an error, if there is any.
-func (c *FakeIngressControllers) Create(ctx context.Context, ingressController *operatorv1.IngressController, opts v1.CreateOptions) (result *operatorv1.IngressController, err error) {
+func (c *FakeIngressControllers) Create(ctx context.Context, ingressController *v1.IngressController, opts metav1.CreateOptions) (result *v1.IngressController, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(ingresscontrollersResource, c.ns, ingressController), &operatorv1.IngressController{})
+		Invokes(testing.NewCreateAction(ingresscontrollersResource, c.ns, ingressController), &v1.IngressController{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.IngressController), err
+	return obj.(*v1.IngressController), err
 }
 
 // Update takes the representation of a ingressController and updates it. Returns the server's representation of the ingressController, and an error, if there is any.
-func (c *FakeIngressControllers) Update(ctx context.Context, ingressController *operatorv1.IngressController, opts v1.UpdateOptions) (result *operatorv1.IngressController, err error) {
+func (c *FakeIngressControllers) Update(ctx context.Context, ingressController *v1.IngressController, opts metav1.UpdateOptions) (result *v1.IngressController, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(ingresscontrollersResource, c.ns, ingressController), &operatorv1.IngressController{})
+		Invokes(testing.NewUpdateAction(ingresscontrollersResource, c.ns, ingressController), &v1.IngressController{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.IngressController), err
+	return obj.(*v1.IngressController), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeIngressControllers) UpdateStatus(ctx context.Context, ingressController *operatorv1.IngressController, opts v1.UpdateOptions) (*operatorv1.IngressController, error) {
+func (c *FakeIngressControllers) UpdateStatus(ctx context.Context, ingressController *v1.IngressController, opts metav1.UpdateOptions) (*v1.IngressController, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(ingresscontrollersResource, "status", c.ns, ingressController), &operatorv1.IngressController{})
+		Invokes(testing.NewUpdateSubresourceAction(ingresscontrollersResource, "status", c.ns, ingressController), &v1.IngressController{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.IngressController), err
+	return obj.(*v1.IngressController), err
 }
 
 // Delete takes name of the ingressController and deletes it. Returns an error if one occurs.
-func (c *FakeIngressControllers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeIngressControllers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(ingresscontrollersResource, c.ns, name, opts), &operatorv1.IngressController{})
+		Invokes(testing.NewDeleteActionWithOptions(ingresscontrollersResource, c.ns, name, opts), &v1.IngressController{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeIngressControllers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeIngressControllers) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(ingresscontrollersResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &operatorv1.IngressControllerList{})
+	_, err := c.Fake.Invokes(action, &v1.IngressControllerList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched ingressController.
-func (c *FakeIngressControllers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *operatorv1.IngressController, err error) {
+func (c *FakeIngressControllers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.IngressController, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ingresscontrollersResource, c.ns, name, pt, data, subresources...), &operatorv1.IngressController{})
+		Invokes(testing.NewPatchSubresourceAction(ingresscontrollersResource, c.ns, name, pt, data, subresources...), &v1.IngressController{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.IngressController), err
+	return obj.(*v1.IngressController), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied ingressController.
-func (c *FakeIngressControllers) Apply(ctx context.Context, ingressController *applyconfigurationsoperatorv1.IngressControllerApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.IngressController, err error) {
+func (c *FakeIngressControllers) Apply(ctx context.Context, ingressController *operatorv1.IngressControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.IngressController, err error) {
 	if ingressController == nil {
 		return nil, fmt.Errorf("ingressController provided to Apply must not be nil")
 	}
@@ -142,17 +141,17 @@ func (c *FakeIngressControllers) Apply(ctx context.Context, ingressController *a
 		return nil, fmt.Errorf("ingressController.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ingresscontrollersResource, c.ns, *name, types.ApplyPatchType, data), &operatorv1.IngressController{})
+		Invokes(testing.NewPatchSubresourceAction(ingresscontrollersResource, c.ns, *name, types.ApplyPatchType, data), &v1.IngressController{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.IngressController), err
+	return obj.(*v1.IngressController), err
 }
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeIngressControllers) ApplyStatus(ctx context.Context, ingressController *applyconfigurationsoperatorv1.IngressControllerApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.IngressController, err error) {
+func (c *FakeIngressControllers) ApplyStatus(ctx context.Context, ingressController *operatorv1.IngressControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.IngressController, err error) {
 	if ingressController == nil {
 		return nil, fmt.Errorf("ingressController provided to Apply must not be nil")
 	}
@@ -165,10 +164,10 @@ func (c *FakeIngressControllers) ApplyStatus(ctx context.Context, ingressControl
 		return nil, fmt.Errorf("ingressController.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ingresscontrollersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &operatorv1.IngressController{})
+		Invokes(testing.NewPatchSubresourceAction(ingresscontrollersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.IngressController{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.IngressController), err
+	return obj.(*v1.IngressController), err
 }

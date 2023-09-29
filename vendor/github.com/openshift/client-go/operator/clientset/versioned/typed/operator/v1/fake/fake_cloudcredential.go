@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	operatorv1 "github.com/openshift/api/operator/v1"
-	applyconfigurationsoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/operator/v1"
+	operatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeCloudCredentials struct {
 	Fake *FakeOperatorV1
 }
 
-var cloudcredentialsResource = schema.GroupVersionResource{Group: "operator.openshift.io", Version: "v1", Resource: "cloudcredentials"}
+var cloudcredentialsResource = v1.SchemeGroupVersion.WithResource("cloudcredentials")
 
-var cloudcredentialsKind = schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1", Kind: "CloudCredential"}
+var cloudcredentialsKind = v1.SchemeGroupVersion.WithKind("CloudCredential")
 
 // Get takes name of the cloudCredential, and returns the corresponding cloudCredential object, and an error if there is any.
-func (c *FakeCloudCredentials) Get(ctx context.Context, name string, options v1.GetOptions) (result *operatorv1.CloudCredential, err error) {
+func (c *FakeCloudCredentials) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.CloudCredential, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(cloudcredentialsResource, name), &operatorv1.CloudCredential{})
+		Invokes(testing.NewRootGetAction(cloudcredentialsResource, name), &v1.CloudCredential{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.CloudCredential), err
+	return obj.(*v1.CloudCredential), err
 }
 
 // List takes label and field selectors, and returns the list of CloudCredentials that match those selectors.
-func (c *FakeCloudCredentials) List(ctx context.Context, opts v1.ListOptions) (result *operatorv1.CloudCredentialList, err error) {
+func (c *FakeCloudCredentials) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CloudCredentialList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(cloudcredentialsResource, cloudcredentialsKind, opts), &operatorv1.CloudCredentialList{})
+		Invokes(testing.NewRootListAction(cloudcredentialsResource, cloudcredentialsKind, opts), &v1.CloudCredentialList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeCloudCredentials) List(ctx context.Context, opts v1.ListOptions) (r
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &operatorv1.CloudCredentialList{ListMeta: obj.(*operatorv1.CloudCredentialList).ListMeta}
-	for _, item := range obj.(*operatorv1.CloudCredentialList).Items {
+	list := &v1.CloudCredentialList{ListMeta: obj.(*v1.CloudCredentialList).ListMeta}
+	for _, item := range obj.(*v1.CloudCredentialList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +57,69 @@ func (c *FakeCloudCredentials) List(ctx context.Context, opts v1.ListOptions) (r
 }
 
 // Watch returns a watch.Interface that watches the requested cloudCredentials.
-func (c *FakeCloudCredentials) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCloudCredentials) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(cloudcredentialsResource, opts))
 }
 
 // Create takes the representation of a cloudCredential and creates it.  Returns the server's representation of the cloudCredential, and an error, if there is any.
-func (c *FakeCloudCredentials) Create(ctx context.Context, cloudCredential *operatorv1.CloudCredential, opts v1.CreateOptions) (result *operatorv1.CloudCredential, err error) {
+func (c *FakeCloudCredentials) Create(ctx context.Context, cloudCredential *v1.CloudCredential, opts metav1.CreateOptions) (result *v1.CloudCredential, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(cloudcredentialsResource, cloudCredential), &operatorv1.CloudCredential{})
+		Invokes(testing.NewRootCreateAction(cloudcredentialsResource, cloudCredential), &v1.CloudCredential{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.CloudCredential), err
+	return obj.(*v1.CloudCredential), err
 }
 
 // Update takes the representation of a cloudCredential and updates it. Returns the server's representation of the cloudCredential, and an error, if there is any.
-func (c *FakeCloudCredentials) Update(ctx context.Context, cloudCredential *operatorv1.CloudCredential, opts v1.UpdateOptions) (result *operatorv1.CloudCredential, err error) {
+func (c *FakeCloudCredentials) Update(ctx context.Context, cloudCredential *v1.CloudCredential, opts metav1.UpdateOptions) (result *v1.CloudCredential, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(cloudcredentialsResource, cloudCredential), &operatorv1.CloudCredential{})
+		Invokes(testing.NewRootUpdateAction(cloudcredentialsResource, cloudCredential), &v1.CloudCredential{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.CloudCredential), err
+	return obj.(*v1.CloudCredential), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCloudCredentials) UpdateStatus(ctx context.Context, cloudCredential *operatorv1.CloudCredential, opts v1.UpdateOptions) (*operatorv1.CloudCredential, error) {
+func (c *FakeCloudCredentials) UpdateStatus(ctx context.Context, cloudCredential *v1.CloudCredential, opts metav1.UpdateOptions) (*v1.CloudCredential, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(cloudcredentialsResource, "status", cloudCredential), &operatorv1.CloudCredential{})
+		Invokes(testing.NewRootUpdateSubresourceAction(cloudcredentialsResource, "status", cloudCredential), &v1.CloudCredential{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.CloudCredential), err
+	return obj.(*v1.CloudCredential), err
 }
 
 // Delete takes name of the cloudCredential and deletes it. Returns an error if one occurs.
-func (c *FakeCloudCredentials) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeCloudCredentials) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(cloudcredentialsResource, name, opts), &operatorv1.CloudCredential{})
+		Invokes(testing.NewRootDeleteActionWithOptions(cloudcredentialsResource, name, opts), &v1.CloudCredential{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCloudCredentials) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeCloudCredentials) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(cloudcredentialsResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &operatorv1.CloudCredentialList{})
+	_, err := c.Fake.Invokes(action, &v1.CloudCredentialList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched cloudCredential.
-func (c *FakeCloudCredentials) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *operatorv1.CloudCredential, err error) {
+func (c *FakeCloudCredentials) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CloudCredential, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(cloudcredentialsResource, name, pt, data, subresources...), &operatorv1.CloudCredential{})
+		Invokes(testing.NewRootPatchSubresourceAction(cloudcredentialsResource, name, pt, data, subresources...), &v1.CloudCredential{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.CloudCredential), err
+	return obj.(*v1.CloudCredential), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied cloudCredential.
-func (c *FakeCloudCredentials) Apply(ctx context.Context, cloudCredential *applyconfigurationsoperatorv1.CloudCredentialApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.CloudCredential, err error) {
+func (c *FakeCloudCredentials) Apply(ctx context.Context, cloudCredential *operatorv1.CloudCredentialApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CloudCredential, err error) {
 	if cloudCredential == nil {
 		return nil, fmt.Errorf("cloudCredential provided to Apply must not be nil")
 	}
@@ -133,16 +132,16 @@ func (c *FakeCloudCredentials) Apply(ctx context.Context, cloudCredential *apply
 		return nil, fmt.Errorf("cloudCredential.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(cloudcredentialsResource, *name, types.ApplyPatchType, data), &operatorv1.CloudCredential{})
+		Invokes(testing.NewRootPatchSubresourceAction(cloudcredentialsResource, *name, types.ApplyPatchType, data), &v1.CloudCredential{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.CloudCredential), err
+	return obj.(*v1.CloudCredential), err
 }
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeCloudCredentials) ApplyStatus(ctx context.Context, cloudCredential *applyconfigurationsoperatorv1.CloudCredentialApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.CloudCredential, err error) {
+func (c *FakeCloudCredentials) ApplyStatus(ctx context.Context, cloudCredential *operatorv1.CloudCredentialApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CloudCredential, err error) {
 	if cloudCredential == nil {
 		return nil, fmt.Errorf("cloudCredential provided to Apply must not be nil")
 	}
@@ -155,9 +154,9 @@ func (c *FakeCloudCredentials) ApplyStatus(ctx context.Context, cloudCredential 
 		return nil, fmt.Errorf("cloudCredential.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(cloudcredentialsResource, *name, types.ApplyPatchType, data, "status"), &operatorv1.CloudCredential{})
+		Invokes(testing.NewRootPatchSubresourceAction(cloudcredentialsResource, *name, types.ApplyPatchType, data, "status"), &v1.CloudCredential{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.CloudCredential), err
+	return obj.(*v1.CloudCredential), err
 }

@@ -7,7 +7,6 @@ import (
 
 	v1 "github.com/openshift/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -17,9 +16,9 @@ type FakeSelfSubjectRulesReviews struct {
 	ns   string
 }
 
-var selfsubjectrulesreviewsResource = schema.GroupVersionResource{Group: "authorization.openshift.io", Version: "v1", Resource: "selfsubjectrulesreviews"}
+var selfsubjectrulesreviewsResource = v1.SchemeGroupVersion.WithResource("selfsubjectrulesreviews")
 
-var selfsubjectrulesreviewsKind = schema.GroupVersionKind{Group: "authorization.openshift.io", Version: "v1", Kind: "SelfSubjectRulesReview"}
+var selfsubjectrulesreviewsKind = v1.SchemeGroupVersion.WithKind("SelfSubjectRulesReview")
 
 // Create takes the representation of a selfSubjectRulesReview and creates it.  Returns the server's representation of the selfSubjectRulesReview, and an error, if there is any.
 func (c *FakeSelfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *v1.SelfSubjectRulesReview, opts metav1.CreateOptions) (result *v1.SelfSubjectRulesReview, err error) {
