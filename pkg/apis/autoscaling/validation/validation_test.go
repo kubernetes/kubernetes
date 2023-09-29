@@ -1845,7 +1845,7 @@ func prepareMismatchedTargetTypeAndValueCasesBadUpdate() []autoscaling.Horizonta
 						Name: "somemetric",
 					},
 					Target: autoscaling.MetricTarget{
-						Type:         autoscaling.ValueMetricType,
+						Type: autoscaling.ValueMetricType,
 					},
 				},
 			}},
