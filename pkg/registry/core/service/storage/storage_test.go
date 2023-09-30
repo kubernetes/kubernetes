@@ -502,6 +502,24 @@ func TestPatchAllocatedValues(t *testing.T) {
 		update: svctest.MakeService("foo",
 			svctest.SetTypeExternalName,
 			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal)),
+	}, {
+		name: "Headless_Service_patched",
+		before: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			// these are not valid, but prove the test
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
+			svctest.SetClusterIPs("None"),
+			svctest.SetUniqueNodePorts,
+			svctest.SetHealthCheckNodePort(31234)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeExternalName,
+			// these are not valid, but prove the test
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyLocal),
+			svctest.SetClusterIPs(""),
+			svctest.SetUniqueNodePorts,
+			svctest.SetHealthCheckNodePort(31234)),
+		expectSameNodePort: true,
+		expectSameHCNP:     true,
 	}}
 
 	for _, tc := range testCases {

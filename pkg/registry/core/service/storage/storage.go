@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	core "k8s.io/api/core/v1"
 	"math/rand"
 	"net"
 	"net/http"
@@ -641,7 +642,7 @@ func patchAllocatedValues(after After, before Before) {
 }
 
 func needsClusterIP(svc *api.Service) bool {
-	if svc.Spec.Type == api.ServiceTypeExternalName {
+	if svc.Spec.Type == api.ServiceTypeExternalName || svc.Spec.ClusterIP == core.ClusterIPNone {
 		return false
 	}
 	return true
