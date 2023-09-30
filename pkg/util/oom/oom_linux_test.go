@@ -22,7 +22,7 @@ package oom
 import (
 	"os"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	units "github.com/docker/go-units"
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"

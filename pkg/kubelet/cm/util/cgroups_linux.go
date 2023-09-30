@@ -19,8 +19,8 @@ package util
 import (
 	"path/filepath"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	libcontainerutils "github.com/opencontainers/runc/libcontainer/utils"
+	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
+	libcontainerutils "k8s.io/kubernetes/pkg/util/libcontainer/utils"
 )
 
 const (

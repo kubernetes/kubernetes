@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
+	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 )
 
 const (

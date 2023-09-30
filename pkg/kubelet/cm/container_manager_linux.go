@@ -29,14 +29,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
-	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 
-	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -65,6 +61,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
+	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups/manager"
+	"k8s.io/kubernetes/pkg/util/libcontainer/configs"
+	libcontaineruserns "k8s.io/kubernetes/pkg/util/libcontainer/userns"
 	"k8s.io/kubernetes/pkg/util/oom"
 )
 

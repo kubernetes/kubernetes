@@ -20,7 +20,7 @@ limitations under the License.
 package e2enode
 
 import (
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 )
 
 // IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.

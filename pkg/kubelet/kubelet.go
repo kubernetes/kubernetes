@@ -33,11 +33,11 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/go-cmp/cmp"
-	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"github.com/opencontainers/selinux/go-selinux"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/client-go/informers"
+	libcontaineruserns "k8s.io/kubernetes/pkg/util/libcontainer/userns"
 
 	"k8s.io/mount-utils"
 	"k8s.io/utils/integer"

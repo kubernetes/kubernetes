@@ -23,10 +23,10 @@ import (
 	"path/filepath"
 	"strconv"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"

@@ -29,12 +29,12 @@ import (
 	"github.com/golang/mock/gomock"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
+	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 
 	"k8s.io/mount-utils"
 )
