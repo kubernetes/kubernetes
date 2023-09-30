@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	"k8s.io/kubernetes/pkg/features"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // TestPodGcOrphanedPodsWithFinalizer tests deletion of orphaned pods
@@ -256,7 +256,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			}
 
 			// trigger termination of the pod, but with long grace period so that it is not removed immediately
-			err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: pointer.Int64(300)})
+			err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](300)})
 			if err != nil {
 				t.Fatalf("Error: '%v' while deleting pod: '%v'", err, klog.KObj(pod))
 			}
