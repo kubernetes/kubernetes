@@ -20,10 +20,10 @@ limitations under the License.
 package e2enode
 
 import (
-	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 )
 
 // IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
 func IsCgroup2UnifiedMode() bool {
-	return libcontainercgroups.IsCgroup2UnifiedMode()
+	return libcontainer.IsCgroup2UnifiedMode()
 }

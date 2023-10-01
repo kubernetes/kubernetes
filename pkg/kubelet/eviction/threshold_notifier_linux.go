@@ -18,12 +18,12 @@ package eviction
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"sync"
 	"time"
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
-	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 )
 
 const (
@@ -51,7 +51,7 @@ func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier,
 	// Instead long term, on cgroupv2 kubelet should rely on combining usage of memory.low on root pods cgroup with inotify notifications on memory.events and or PSI pressure.
 	// For now, let's return a fake "disabled" cgroup notifier on cgroupv2.
 	// https://github.com/kubernetes/kubernetes/issues/106331
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		return &disabledThresholdNotifier{}, nil
 	}
 

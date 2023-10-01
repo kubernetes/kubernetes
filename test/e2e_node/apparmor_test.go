@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"os"
 	"os/exec"
 	"regexp"
@@ -38,7 +39,6 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
-	"k8s.io/kubernetes/pkg/util/libcontainer/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -253,5 +253,5 @@ func isAppArmorEnabled() bool {
 	if strings.Contains(framework.TestContext.NodeName, "-ubuntu-") {
 		return true
 	}
-	return apparmor.IsEnabled()
+	return libcontainer.IsEnabled()
 }

@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -479,26 +479,26 @@ func getContainerNameForProcess(name, pidFile string) (string, error) {
 // It enforces a unified hierarchy for memory and cpu cgroups.
 // On systemd environments, it uses the name=systemd cgroup for the specified pid.
 func getContainer(pid int) (string, error) {
-	cgs, err := cgroups.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	cgs, err := libcontainer.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err
 	}
 
-	if cgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		unified, found := cgs[""]
 		if !found {
-			return "", cgroups.NewNotFoundError("unified")
+			return "", libcontainer.NewNotFoundError("unified")
 		}
 		return unified, nil
 	}
 
 	cpu, found := cgs["cpu"]
 	if !found {
-		return "", cgroups.NewNotFoundError("cpu")
+		return "", libcontainer.NewNotFoundError("cpu")
 	}
 	memory, found := cgs["memory"]
 	if !found {
-		return "", cgroups.NewNotFoundError("memory")
+		return "", libcontainer.NewNotFoundError("memory")
 	}
 
 	// since we use this container for accounting, we need to ensure it is a unified hierarchy.

@@ -8,18 +8,19 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
+	"github.com/opencontainers/runc/libcontainer/apparmor"
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
+	libcontainermanager "github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
-	"github.com/opencontainers/runc/libcontainer/configs"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
-
+	"github.com/opencontainers/runc/libcontainer/userns"
+	libcontainerutils "github.com/opencontainers/runc/libcontainer/utils"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 )
 
 const (
@@ -29,7 +30,7 @@ const (
 
 func CreateCgroup(cgroupConfig *CgroupConfig, useSystemd bool, subsystems *CgroupSubsystems) error {
 	libcontainerCgroupConfig := ConvertCgroupConfig(cgroupConfig, true, useSystemd, subsystems)
-	manager, err := manager.New(libcontainerCgroupConfig)
+	manager, err := libcontainermanager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return err
 	}
@@ -54,7 +55,7 @@ func CreateCgroup(cgroupConfig *CgroupConfig, useSystemd bool, subsystems *Cgrou
 
 func UpdateCGroup(cgroupConfig *CgroupConfig, useSystemd bool, subsystems *CgroupSubsystems) error {
 	libcontainerCgroupConfig := ConvertCgroupConfig(cgroupConfig, true, useSystemd, subsystems)
-	manager, err := manager.New(libcontainerCgroupConfig)
+	manager, err := libcontainermanager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup manager: %v", err)
 	}
@@ -63,7 +64,7 @@ func UpdateCGroup(cgroupConfig *CgroupConfig, useSystemd bool, subsystems *Cgrou
 
 func DestroyCGroup(cgroupConfig *CgroupConfig, useSystemd bool, subsystems *CgroupSubsystems) error {
 	libcontainerCgroupConfig := ConvertCgroupConfig(cgroupConfig, false, useSystemd, subsystems)
-	manager, err := manager.New(libcontainerCgroupConfig)
+	manager, err := libcontainermanager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,7 @@ func ConvertResources(resourceConfig *ResourceConfig, subsystems *CgroupSubsyste
 		resources.Memory = *resourceConfig.Memory
 	}
 	if resourceConfig.CPUShares != nil {
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if IsCgroup2UnifiedMode() {
 			resources.CpuWeight = getCPUWeight(resourceConfig.CPUShares)
 		} else {
 			resources.CpuShares = *resourceConfig.CPUShares
@@ -158,7 +159,7 @@ func ConvertResources(resourceConfig *ResourceConfig, subsystems *CgroupSubsyste
 	// Ideally unified is used for all the resources when running on cgroup v2.
 	// It doesn't make difference for the memory.max limit, but for e.g. the cpu controller
 	// you can specify the correct setting without relying on the conversions performed by the OCI runtime.
-	if resourceConfig.Unified != nil && libcontainercgroups.IsCgroup2UnifiedMode() {
+	if resourceConfig.Unified != nil && IsCgroup2UnifiedMode() {
 		resources.Unified = make(map[string]string)
 		for k, v := range resourceConfig.Unified {
 			resources.Unified[k] = v
@@ -200,7 +201,7 @@ func ReadUnifiedControllers(path string) (sets.String, error) {
 
 func maybeSetHugetlb(resourceConfig *ResourceConfig, resources *libcontainerconfigs.Resources, subsystems *CgroupSubsystems) {
 	// Check if hugetlb is supported.
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if IsCgroup2UnifiedMode() {
 		if !GetSupportedUnifiedControllers().Has("hugetlb") {
 			klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
 			return
@@ -237,17 +238,17 @@ func maybeSetHugetlb(resourceConfig *ResourceConfig, resources *libcontainerconf
 }
 
 // Create a cgroup container manager.
-func CreateCgroupContainerManager(containerName string) (cgroups.Manager, error) {
-	cg := &configs.Cgroup{
+func CreateCgroupContainerManager(containerName string) (libcontainercgroups.Manager, error) {
+	cg := &libcontainerconfigs.Cgroup{
 		Parent: "/",
 		Name:   containerName,
-		Resources: &configs.Resources{
+		Resources: &libcontainerconfigs.Resources{
 			SkipDevices: true,
 		},
 		Systemd: false,
 	}
 
-	return manager.New(cg)
+	return libcontainermanager.New(cg)
 }
 
 // ResourceConfig holds information about all the supported cgroup resource parameters.
@@ -272,7 +273,7 @@ type ResourceConfig struct {
 type CgroupSubsystems struct {
 	// Cgroup subsystem mounts.
 	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
-	Mounts []libcontainercgroups.Mount
+	Mounts []Mount
 
 	// Cgroup subsystem to their mount location.
 	// e.g.: "cpu" -> "/sys/fs/cgroup/cpu"
@@ -334,7 +335,7 @@ func (cgroupName CgroupName) ToSystemd() string {
 // getCgroupSubsystemsV1 returns information about the mounted cgroup v1 subsystems
 func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 	// get all cgroup mounts.
-	allCgroups, err := libcontainercgroups.GetCgroupMounts(true)
+	allCgroups, err := GetCgroupMounts(true)
 	if err != nil {
 		return &CgroupSubsystems{}, err
 	}
@@ -363,16 +364,16 @@ func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 
 // getCgroupSubsystemsV2 returns information about the enabled cgroup v2 subsystems
 func getCgroupSubsystemsV2() (*CgroupSubsystems, error) {
-	controllers, err := cgroups.GetAllSubsystems()
+	controllers, err := libcontainercgroups.GetAllSubsystems()
 	if err != nil {
 		return nil, err
 	}
 
-	mounts := []libcontainercgroups.Mount{}
+	mounts := []Mount{}
 	mountPoints := make(map[string]string, len(controllers))
 	for _, controller := range controllers {
 		mountPoints[controller] = CgroupRoot
-		m := libcontainercgroups.Mount{
+		m := Mount{
 			Mountpoint: CgroupRoot,
 			Root:       CgroupRoot,
 			Subsystems: []string{controller},
@@ -388,9 +389,52 @@ func getCgroupSubsystemsV2() (*CgroupSubsystems, error) {
 
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
 func GetCgroupSubsystems() (*CgroupSubsystems, error) {
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if IsCgroup2UnifiedMode() {
 		return getCgroupSubsystemsV2()
 	}
 
 	return getCgroupSubsystemsV1()
+}
+
+var (
+	IsEnabled                   = apparmor.IsEnabled
+	GetCgroupParamUint          = fscommon.GetCgroupParamUint
+	GetCgroupParamString        = fscommon.GetCgroupParamString
+	RunningInUserNS             = userns.RunningInUserNS
+	IsCgroup2UnifiedMode        = libcontainercgroups.IsCgroup2UnifiedMode
+	ParseCgroupFile             = libcontainercgroups.ParseCgroupFile
+	NewNotFoundError            = libcontainercgroups.NewNotFoundError
+	IsNotFound                  = libcontainercgroups.IsNotFound
+	HugePageSizes               = libcontainercgroups.HugePageSizes
+	PathExists                  = libcontainercgroups.PathExists
+	FindCgroupMountpointAndRoot = libcontainercgroups.FindCgroupMountpointAndRoot
+	GetOwnCgroup                = libcontainercgroups.GetOwnCgroup
+	GetPids                     = libcontainercgroups.GetPids
+	CleanPath                   = libcontainerutils.CleanPath
+)
+
+type (
+	Manager = libcontainercgroups.Manager
+)
+
+type Mount struct {
+	Mountpoint string
+	Root       string
+	Subsystems []string
+}
+
+func GetCgroupMounts(all bool) ([]Mount, error) {
+	if mounts, err := libcontainercgroups.GetCgroupMounts(all); err != nil {
+		return nil, err
+	} else {
+		var allMounts []Mount
+		for _, mount := range mounts {
+			allMounts = append(allMounts, Mount{
+				Mountpoint: mount.Mountpoint,
+				Root:       mount.Root,
+				Subsystems: mount.Subsystems,
+			})
+		}
+		return allMounts, nil
+	}
 }

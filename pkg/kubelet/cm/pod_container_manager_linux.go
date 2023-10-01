@@ -31,7 +31,6 @@ import (
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 )
 
 const (
@@ -76,7 +75,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	if !alreadyExists {
 		enforceMemoryQoS := false
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-			libcontainercgroups.IsCgroup2UnifiedMode() {
+			libcontainer.IsCgroup2UnifiedMode() {
 			enforceMemoryQoS = true
 		}
 		// Create the pod container

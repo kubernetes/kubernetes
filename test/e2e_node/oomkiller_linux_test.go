@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,7 +30,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 )
 
 type testCase struct {
@@ -81,7 +81,7 @@ var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 
 	// If using cgroup v2, we set memory.oom.group=1 for the container cgroup so that any process which gets OOM killed
 	// in the process, causes all processes in the container to get OOM killed
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		testCases = append(testCases, testCase{
 			name:                   "multi process container",
 			oomTargetContainerName: "oomkill-multi-target-container",

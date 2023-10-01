@@ -18,9 +18,8 @@ package app
 
 import (
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"k8s.io/utils/inotify"
-
-	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 )
 
 func watchForLockfileContention(path string, done chan struct{}) error {
@@ -48,5 +47,5 @@ func watchForLockfileContention(path string, done chan struct{}) error {
 }
 
 func isCgroup2UnifiedMode() bool {
-	return libcontainercgroups.IsCgroup2UnifiedMode()
+	return libcontainer.IsCgroup2UnifiedMode()
 }

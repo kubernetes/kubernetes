@@ -33,8 +33,6 @@ import (
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/util/libcontainer"
-	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
-	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups/fscommon"
 )
 
 const (
@@ -151,7 +149,7 @@ func (m *cgroupManagerImpl) buildCgroupUnifiedPath(name libcontainer.CgroupName)
 
 // Validate checks if all subsystem cgroups already exist
 func (m *cgroupManagerImpl) Validate(name libcontainer.CgroupName) error {
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		cgroupPath := m.buildCgroupUnifiedPath(name)
 		neededControllers := libcontainer.GetSupportedUnifiedControllers()
 		enabledControllers, err := libcontainer.ReadUnifiedControllers(cgroupPath)
@@ -186,7 +184,7 @@ func (m *cgroupManagerImpl) Validate(name libcontainer.CgroupName) error {
 		if !allowlistControllers.Has(controller) {
 			continue
 		}
-		if !libcontainercgroups.PathExists(path) {
+		if !libcontainer.PathExists(path) {
 			missingPaths = append(missingPaths, path)
 		}
 	}
@@ -322,7 +320,7 @@ func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName libcontainer.CgroupName) 
 // as read from cgroupfs.
 func (m *cgroupManagerImpl) MemoryUsage(name libcontainer.CgroupName) (int64, error) {
 	var path, file string
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		path = m.buildCgroupUnifiedPath(name)
 		file = "memory.current"
 	} else {
@@ -333,7 +331,7 @@ func (m *cgroupManagerImpl) MemoryUsage(name libcontainer.CgroupName) (int64, er
 		path = mp + "/" + m.Name(name)
 		file = "memory.usage_in_bytes"
 	}
-	val, err := fscommon.GetCgroupParamUint(path, file)
+	val, err := libcontainer.GetCgroupParamUint(path, file)
 	return int64(val), err
 }
 
@@ -350,7 +348,7 @@ func CpuWeightToCpuShares(cpuWeight uint64) uint64 {
 }
 
 func getCgroupv1CpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, error) {
-	cpuQuotaStr, errQ := fscommon.GetCgroupParamString(cgroupPath, "cpu.cfs_quota_us")
+	cpuQuotaStr, errQ := libcontainer.GetCgroupParamString(cgroupPath, "cpu.cfs_quota_us")
 	if errQ != nil {
 		return nil, fmt.Errorf("failed to read CPU quota for cgroup %v: %v", cgroupPath, errQ)
 	}
@@ -358,11 +356,11 @@ func getCgroupv1CpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, erro
 	if errInt != nil {
 		return nil, fmt.Errorf("failed to convert CPU quota as integer for cgroup %v: %v", cgroupPath, errInt)
 	}
-	cpuPeriod, errP := fscommon.GetCgroupParamUint(cgroupPath, "cpu.cfs_period_us")
+	cpuPeriod, errP := libcontainer.GetCgroupParamUint(cgroupPath, "cpu.cfs_period_us")
 	if errP != nil {
 		return nil, fmt.Errorf("failed to read CPU period for cgroup %v: %v", cgroupPath, errP)
 	}
-	cpuShares, errS := fscommon.GetCgroupParamUint(cgroupPath, "cpu.shares")
+	cpuShares, errS := libcontainer.GetCgroupParamUint(cgroupPath, "cpu.shares")
 	if errS != nil {
 		return nil, fmt.Errorf("failed to read CPU shares for cgroup %v: %v", cgroupPath, errS)
 	}
@@ -371,7 +369,7 @@ func getCgroupv1CpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, erro
 
 func getCgroupv2CpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, error) {
 	var cpuLimitStr, cpuPeriodStr string
-	cpuLimitAndPeriod, err := fscommon.GetCgroupParamString(cgroupPath, "cpu.max")
+	cpuLimitAndPeriod, err := libcontainer.GetCgroupParamString(cgroupPath, "cpu.max")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cpu.max file for cgroup %v: %v", cgroupPath, err)
 	}
@@ -391,7 +389,7 @@ func getCgroupv2CpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, erro
 	if errPeriod != nil {
 		return nil, fmt.Errorf("failed to convert CPU period as integer for cgroup %v: %v", cgroupPath, errPeriod)
 	}
-	cpuWeight, errWeight := fscommon.GetCgroupParamUint(cgroupPath, "cpu.weight")
+	cpuWeight, errWeight := libcontainer.GetCgroupParamUint(cgroupPath, "cpu.weight")
 	if errWeight != nil {
 		return nil, fmt.Errorf("failed to read CPU weight for cgroup %v: %v", cgroupPath, errWeight)
 	}
@@ -400,7 +398,7 @@ func getCgroupv2CpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, erro
 }
 
 func getCgroupCpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, error) {
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		return getCgroupv2CpuConfig(cgroupPath)
 	} else {
 		return getCgroupv1CpuConfig(cgroupPath)
@@ -409,10 +407,10 @@ func getCgroupCpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, error)
 
 func getCgroupMemoryConfig(cgroupPath string) (*libcontainer.ResourceConfig, error) {
 	memLimitFile := "memory.limit_in_bytes"
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		memLimitFile = "memory.max"
 	}
-	memLimit, err := fscommon.GetCgroupParamUint(cgroupPath, memLimitFile)
+	memLimit, err := libcontainer.GetCgroupParamUint(cgroupPath, memLimitFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", memLimitFile, cgroupPath, err)
 	}
@@ -487,7 +485,7 @@ func setCgroupv2CpuConfig(cgroupPath string, resourceConfig *libcontainer.Resour
 }
 
 func setCgroupCpuConfig(cgroupPath string, resourceConfig *libcontainer.ResourceConfig) error {
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		return setCgroupv2CpuConfig(cgroupPath, resourceConfig)
 	} else {
 		return setCgroupv1CpuConfig(cgroupPath, resourceConfig)
@@ -496,7 +494,7 @@ func setCgroupCpuConfig(cgroupPath string, resourceConfig *libcontainer.Resource
 
 func setCgroupMemoryConfig(cgroupPath string, resourceConfig *libcontainer.ResourceConfig) error {
 	memLimitFile := "memory.limit_in_bytes"
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		memLimitFile = "memory.max"
 	}
 	memLimit := strconv.FormatInt(*resourceConfig.Memory, 10)

@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"math"
 	"net"
 	"net/http"
@@ -37,8 +38,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/client-go/informers"
-	libcontaineruserns "k8s.io/kubernetes/pkg/util/libcontainer/userns"
-
 	"k8s.io/mount-utils"
 	"k8s.io/utils/integer"
 	netutils "k8s.io/utils/net"
@@ -464,7 +463,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	oomWatcher, err := oomwatcher.NewWatcher(kubeDeps.Recorder)
 	if err != nil {
-		if libcontaineruserns.RunningInUserNS() {
+		if libcontainer.RunningInUserNS() {
 			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) {
 				// oomwatcher.NewWatcher returns "open /dev/kmsg: operation not permitted" error,
 				// when running in a user namespace with sysctl value `kernel.dmesg_restrict=1`.

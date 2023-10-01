@@ -21,9 +21,9 @@ package oom
 
 import (
 	"os"
-
-	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -103,5 +103,5 @@ func TestOOMScoreAdjContainer(t *testing.T) {
 
 func TestPidListerFailure(t *testing.T) {
 	_, err := getPids("/does/not/exist")
-	assert.True(t, cgroups.IsNotFound(err) || os.IsNotExist(err), "expected getPids to return not exists error. Got %v", err)
+	assert.True(t, libcontainer.IsNotFound(err) || os.IsNotExist(err), "expected getPids to return not exists error. Got %v", err)
 }

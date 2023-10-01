@@ -19,6 +19,7 @@ package apparmor
 import (
 	"errors"
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -26,7 +27,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/libcontainer/apparmor"
 )
 
 // Whether AppArmor should be disabled by default.
@@ -101,7 +101,7 @@ func validateHost() error {
 	}
 
 	// Check kernel support.
-	if !apparmor.IsEnabled() {
+	if !libcontainer.IsEnabled() {
 		return errors.New("AppArmor is not enabled on the host")
 	}
 

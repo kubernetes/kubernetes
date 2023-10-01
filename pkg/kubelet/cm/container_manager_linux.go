@@ -63,8 +63,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/util/libcontainer"
-	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
-	libcontaineruserns "k8s.io/kubernetes/pkg/util/libcontainer/userns"
 	"k8s.io/kubernetes/pkg/util/oom"
 )
 
@@ -78,10 +76,10 @@ type systemContainer struct {
 
 	// Function that ensures the state of the container.
 	// m is the cgroup manager for the specified container.
-	ensureStateFunc func(m cgroups.Manager) error
+	ensureStateFunc func(m libcontainer.Manager) error
 
 	// Manager for the cgroups of the external container.
-	manager cgroups.Manager
+	manager libcontainer.Manager
 }
 
 func newSystemCgroups(containerName string) (*systemContainer, error) {
@@ -156,7 +154,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 		return f, fmt.Errorf("%s - %v", localErr, err)
 	}
 
-	if cgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		f.cpuHardcapping = true
 		return f, nil
 	}
@@ -417,7 +415,7 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 			klog.V(2).InfoS("Updating kernel flag", "flag", flag, "expectedValue", expectedValue, "actualValue", val)
 			err = sysctl.SetSysctl(flag, expectedValue)
 			if err != nil {
-				if libcontaineruserns.RunningInUserNS() {
+				if libcontainer.RunningInUserNS() {
 					if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletInUserNamespace) {
 						klog.V(2).InfoS("Updating kernel flag failed (running in UserNS, ignoring)", "flag", flag, "err", err)
 						continue
@@ -473,7 +471,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 		if err != nil {
 			return err
 		}
-		cont.ensureStateFunc = func(manager cgroups.Manager) error {
+		cont.ensureStateFunc = func(manager libcontainer.Manager) error {
 			return ensureSystemCgroups("/", manager)
 		}
 		systemContainers = append(systemContainers, cont)
@@ -485,7 +483,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 			return err
 		}
 
-		cont.ensureStateFunc = func(_ cgroups.Manager) error {
+		cont.ensureStateFunc = func(_ libcontainer.Manager) error {
 			return ensureProcessInContainerWithOOMScore(os.Getpid(), int(cm.KubeletOOMScoreAdj), cont.manager)
 		}
 		systemContainers = append(systemContainers, cont)
@@ -701,7 +699,7 @@ func isProcessRunningInHost(pid int) (bool, error) {
 	return initPidNs == processPidNs, nil
 }
 
-func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager cgroups.Manager) error {
+func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager libcontainer.Manager) error {
 	if runningInHost, err := isProcessRunningInHost(pid); err != nil {
 		// Err on the side of caution. Avoid moving the docker daemon unless we are able to identify its context.
 		return err
@@ -745,29 +743,29 @@ func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager cgro
 }
 
 // getContainer returns the cgroup associated with the specified pid.
-// It enforces a unified hierarchy for memory and cpu cgroups.
+// It enforces a unified hierarchy for memory and cpu libcontainer.
 // On systemd environments, it uses the name=systemd cgroup for the specified pid.
 func getContainer(pid int) (string, error) {
-	cgs, err := cgroups.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	cgs, err := libcontainer.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err
 	}
 
-	if cgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		c, found := cgs[""]
 		if !found {
-			return "", cgroups.NewNotFoundError("unified")
+			return "", libcontainer.NewNotFoundError("unified")
 		}
 		return c, nil
 	}
 
 	cpu, found := cgs["cpu"]
 	if !found {
-		return "", cgroups.NewNotFoundError("cpu")
+		return "", libcontainer.NewNotFoundError("cpu")
 	}
 	memory, found := cgs["memory"]
 	if !found {
-		return "", cgroups.NewNotFoundError("memory")
+		return "", libcontainer.NewNotFoundError("memory")
 	}
 
 	// since we use this container for accounting, we need to ensure its a unified hierarchy.
@@ -802,7 +800,7 @@ func getContainer(pid int) (string, error) {
 //
 // The reason of leaving kernel threads at root cgroup is that we don't want to tie the
 // execution of these threads with to-be defined /system quota and create priority inversions.
-func ensureSystemCgroups(rootCgroupPath string, manager cgroups.Manager) error {
+func ensureSystemCgroups(rootCgroupPath string, manager libcontainer.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	// Only keep errors on latest attempt.
 	var finalErr error

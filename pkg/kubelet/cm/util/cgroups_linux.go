@@ -19,8 +19,7 @@ package util
 import (
 	"path/filepath"
 
-	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
-	libcontainerutils "k8s.io/kubernetes/pkg/util/libcontainer/utils"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 )
 
 const (
@@ -33,7 +32,7 @@ const (
 func GetPids(cgroupPath string) ([]int, error) {
 	dir := ""
 
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		path, err := filepath.Rel("/", cgroupPath)
 		if err != nil {
 			return nil, err
@@ -46,15 +45,15 @@ func GetPids(cgroupPath string) ([]int, error) {
 			return nil, err
 		}
 	}
-	return libcontainercgroups.GetPids(dir)
+	return libcontainer.GetPids(dir)
 }
 
 // getCgroupV1Path gets the file path to the "devices" subsystem of the desired cgroup.
 // cgroupPath is the path in the cgroup hierarchy.
 func getCgroupV1Path(cgroupPath string) (string, error) {
-	cgroupPath = libcontainerutils.CleanPath(cgroupPath)
+	cgroupPath = libcontainer.CleanPath(cgroupPath)
 
-	mnt, root, err := libcontainercgroups.FindCgroupMountpointAndRoot(cgroupPath, "devices")
+	mnt, root, err := libcontainer.FindCgroupMountpointAndRoot(cgroupPath, "devices")
 	// If we didn't mount the subsystem, there is no point we make the path.
 	if err != nil {
 		return "", err
@@ -79,7 +78,7 @@ func getCgroupV1ParentPath(mountpoint, root string) (string, error) {
 	// Use GetThisCgroupDir instead of GetInitCgroupDir, because the creating
 	// process could in container and shared pid namespace with host, and
 	// /proc/1/cgroup could point to whole other world of cgroups.
-	initPath, err := libcontainercgroups.GetOwnCgroup("devices")
+	initPath, err := libcontainer.GetOwnCgroup("devices")
 	if err != nil {
 		return "", err
 	}
