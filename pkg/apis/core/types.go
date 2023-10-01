@@ -4640,7 +4640,7 @@ type NodeSystemInfo struct {
 	ContainerRuntimeVersion string
 	// Kubelet Version reported by the node.
 	KubeletVersion string
-	// KubeProxy Version reported by the node.
+	// Deprecated: KubeProxy Version reported by the node.
 	KubeProxyVersion string
 	// The Operating System reported by the node
 	OperatingSystem string
