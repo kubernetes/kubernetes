@@ -18,6 +18,7 @@ package cm
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -57,8 +58,8 @@ func (cm *containerManagerStub) GetNodeConfig() NodeConfig {
 	return NodeConfig{}
 }
 
-func (cm *containerManagerStub) GetMountedSubsystems() *CgroupSubsystems {
-	return &CgroupSubsystems{}
+func (cm *containerManagerStub) GetMountedSubsystems() *libcontainer.CgroupSubsystems {
+	return &libcontainer.CgroupSubsystems{}
 }
 
 func (cm *containerManagerStub) GetQOSContainersInfo() QOSContainersInfo {
@@ -97,11 +98,11 @@ func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceLi
 	return cm.extendedPluginResources, cm.extendedPluginResources, []string{}
 }
 
-func (m *podContainerManagerStub) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*ResourceConfig, error) {
+func (m *podContainerManagerStub) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*libcontainer.ResourceConfig, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *podContainerManagerStub) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
+func (m *podContainerManagerStub) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *libcontainer.ResourceConfig) error {
 	return fmt.Errorf("not implemented")
 }
 

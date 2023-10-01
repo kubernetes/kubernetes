@@ -21,6 +21,7 @@ package cm
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"strconv"
 	"strings"
 	"time"
@@ -49,7 +50,7 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 		nodeAllocatable = cm.getNodeAllocatableInternalAbsolute()
 	}
 
-	cgroupConfig := &CgroupConfig{
+	cgroupConfig := &libcontainer.CgroupConfig{
 		Name: cm.cgroupRoot,
 		// The default limits for cpu shares can be very low which can lead to CPU starvation for pods.
 		ResourceParameters: getCgroupConfig(nodeAllocatable),
@@ -78,7 +79,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 
 	klog.V(4).InfoS("Attempting to enforce Node Allocatable", "config", nc)
 
-	cgroupConfig := &CgroupConfig{
+	cgroupConfig := &libcontainer.CgroupConfig{
 		Name:               cm.cgroupRoot,
 		ResourceParameters: getCgroupConfig(nodeAllocatable),
 	}
@@ -134,7 +135,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 }
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
-func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.ResourceList) error {
+func enforceExistingCgroup(cgroupManager CgroupManager, cName libcontainer.CgroupName, rl v1.ResourceList) error {
 	rp := getCgroupConfig(rl)
 	if rp == nil {
 		return fmt.Errorf("%q cgroup is not configured properly", cName)
@@ -151,7 +152,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		}
 	}
 
-	cgroupConfig := &CgroupConfig{
+	cgroupConfig := &libcontainer.CgroupConfig{
 		Name:               cName,
 		ResourceParameters: rp,
 	}
@@ -166,12 +167,12 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 }
 
 // getCgroupConfig returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.
-func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
+func getCgroupConfig(rl v1.ResourceList) *libcontainer.ResourceConfig {
 	// TODO(vishh): Set CPU Quota if necessary.
 	if rl == nil {
 		return nil
 	}
-	var rc ResourceConfig
+	var rc libcontainer.ResourceConfig
 	if q, exists := rl[v1.ResourceMemory]; exists {
 		// Memory is defined in bytes.
 		val := q.Value()

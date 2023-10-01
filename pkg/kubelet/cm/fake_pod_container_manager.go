@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"reflect"
 	"sync"
 
@@ -28,14 +29,14 @@ import (
 type FakePodContainerManager struct {
 	sync.Mutex
 	CalledFunctions []string
-	Cgroups         map[types.UID]CgroupName
+	Cgroups         map[types.UID]libcontainer.CgroupName
 }
 
 var _ PodContainerManager = &FakePodContainerManager{}
 
 func NewFakePodContainerManager() *FakePodContainerManager {
 	return &FakePodContainerManager{
-		Cgroups: make(map[types.UID]CgroupName),
+		Cgroups: make(map[types.UID]libcontainer.CgroupName),
 	}
 }
 
@@ -59,14 +60,14 @@ func (m *FakePodContainerManager) EnsureExists(_ *v1.Pod) error {
 	return nil
 }
 
-func (m *FakePodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
+func (m *FakePodContainerManager) GetPodContainerName(_ *v1.Pod) (libcontainer.CgroupName, string) {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "GetPodContainerName")
 	return nil, ""
 }
 
-func (m *FakePodContainerManager) Destroy(name CgroupName) error {
+func (m *FakePodContainerManager) Destroy(name libcontainer.CgroupName) error {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "Destroy")
@@ -79,19 +80,19 @@ func (m *FakePodContainerManager) Destroy(name CgroupName) error {
 	return nil
 }
 
-func (m *FakePodContainerManager) ReduceCPULimits(_ CgroupName) error {
+func (m *FakePodContainerManager) ReduceCPULimits(_ libcontainer.CgroupName) error {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "ReduceCPULimits")
 	return nil
 }
 
-func (m *FakePodContainerManager) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *FakePodContainerManager) GetAllPodsFromCgroups() (map[types.UID]libcontainer.CgroupName, error) {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "GetAllPodsFromCgroups")
 	// return a copy for the race detector
-	grp := make(map[types.UID]CgroupName)
+	grp := make(map[types.UID]libcontainer.CgroupName)
 	for key, value := range m.Cgroups {
 		grp[key] = value
 	}
@@ -112,14 +113,14 @@ func (cm *FakePodContainerManager) GetPodCgroupMemoryUsage(_ *v1.Pod) (uint64, e
 	return 0, nil
 }
 
-func (cm *FakePodContainerManager) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*ResourceConfig, error) {
+func (cm *FakePodContainerManager) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName) (*libcontainer.ResourceConfig, error) {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodCgroupConfig")
 	return nil, nil
 }
 
-func (cm *FakePodContainerManager) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
+func (cm *FakePodContainerManager) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *libcontainer.ResourceConfig) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupConfig")

@@ -23,6 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"net"
 	"net/http"
 	"os"
@@ -500,7 +501,7 @@ func kubeletHealthCheck(url string) bool {
 	return err == nil && resp.StatusCode == http.StatusOK
 }
 
-func toCgroupFsName(cgroupName cm.CgroupName) string {
+func toCgroupFsName(cgroupName libcontainer.CgroupName) string {
 	if kubeletCfg.CgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
 	}

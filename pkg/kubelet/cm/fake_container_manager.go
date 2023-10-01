@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -72,11 +73,11 @@ func (cm *FakeContainerManager) GetNodeConfig() NodeConfig {
 	return NodeConfig{}
 }
 
-func (cm *FakeContainerManager) GetMountedSubsystems() *CgroupSubsystems {
+func (cm *FakeContainerManager) GetMountedSubsystems() *libcontainer.CgroupSubsystems {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetMountedSubsystems")
-	return &CgroupSubsystems{}
+	return &libcontainer.CgroupSubsystems{}
 }
 
 func (cm *FakeContainerManager) GetQOSContainersInfo() QOSContainersInfo {

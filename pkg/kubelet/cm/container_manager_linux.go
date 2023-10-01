@@ -45,6 +45,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -61,9 +62,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
-	"k8s.io/kubernetes/pkg/util/libcontainer/cgroups/manager"
-	"k8s.io/kubernetes/pkg/util/libcontainer/configs"
 	libcontaineruserns "k8s.io/kubernetes/pkg/util/libcontainer/userns"
 	"k8s.io/kubernetes/pkg/util/oom"
 )
@@ -85,7 +85,7 @@ type systemContainer struct {
 }
 
 func newSystemCgroups(containerName string) (*systemContainer, error) {
-	manager, err := createManager(containerName)
+	manager, err := libcontainer.CreateCgroupContainerManager(containerName)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ type containerManagerImpl struct {
 	// Tasks that are run periodically
 	periodicTasks []func()
 	// Holds all the mounted cgroup subsystems
-	subsystems *CgroupSubsystems
+	subsystems *libcontainer.CgroupSubsystems
 	nodeInfo   *v1.Node
 	// Interface for cgroup management
 	cgroupManager CgroupManager
@@ -116,7 +116,7 @@ type containerManagerImpl struct {
 	internalCapacity v1.ResourceList
 	// Absolute cgroupfs path to a cgroup that Kubelet needs to place all pods under.
 	// This path include a top level container for enforcing Node Allocatable.
-	cgroupRoot CgroupName
+	cgroupRoot libcontainer.CgroupName
 	// Event recorder interface.
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
@@ -199,7 +199,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
-	subsystems, err := GetCgroupSubsystems()
+	subsystems, err := libcontainer.GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
@@ -375,20 +375,6 @@ func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLi
 	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, cm.topologyManager}
 }
 
-// Create a cgroup container manager.
-func createManager(containerName string) (cgroups.Manager, error) {
-	cg := &configs.Cgroup{
-		Parent: "/",
-		Name:   containerName,
-		Resources: &configs.Resources{
-			SkipDevices: true,
-		},
-		Systemd: false,
-	}
-
-	return manager.New(cg)
-}
-
 type KernelTunableBehavior string
 
 const (
@@ -536,7 +522,7 @@ func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return cm.cgroupManager.Name(cm.cgroupRoot)
 }
 
-func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
+func (cm *containerManagerImpl) GetMountedSubsystems() *libcontainer.CgroupSubsystems {
 	return cm.subsystems
 }
 

@@ -20,6 +20,7 @@ limitations under the License.
 package cm
 
 import (
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"path"
 	"reflect"
 	"testing"
@@ -30,14 +31,14 @@ func TestNewCgroupName(t *testing.T) {
 	a := ParseCgroupfsToCgroupName("/a/")
 	ab := NewCgroupName(a, "b")
 
-	expectedAB := CgroupName([]string{"a", "", "b"})
+	expectedAB := libcontainer.CgroupName([]string{"a", "", "b"})
 	if !reflect.DeepEqual(ab, expectedAB) {
 		t.Errorf("Expected %d%+v; got %d%+v", len(expectedAB), expectedAB, len(ab), ab)
 	}
 
 	abc := NewCgroupName(ab, "c")
 
-	expectedABC := CgroupName([]string{"a", "", "b", "c"})
+	expectedABC := libcontainer.CgroupName([]string{"a", "", "b", "c"})
 	if !reflect.DeepEqual(abc, expectedABC) {
 		t.Errorf("Expected %d%+v; got %d%+v", len(expectedABC), expectedABC, len(abc), abc)
 	}
@@ -51,7 +52,7 @@ func TestNewCgroupName(t *testing.T) {
 
 func TestCgroupNameToSystemdBasename(t *testing.T) {
 	testCases := []struct {
-		input    CgroupName
+		input    libcontainer.CgroupName
 		expected string
 	}{
 		{
@@ -96,7 +97,7 @@ func TestCgroupNameToSystemdBasename(t *testing.T) {
 
 func TestCgroupNameToSystemd(t *testing.T) {
 	testCases := []struct {
-		input    CgroupName
+		input    libcontainer.CgroupName
 		expected string
 	}{
 		{
@@ -129,7 +130,7 @@ func TestCgroupNameToSystemd(t *testing.T) {
 
 func TestCgroupNameToCgroupfs(t *testing.T) {
 	testCases := []struct {
-		input    CgroupName
+		input    libcontainer.CgroupName
 		expected string
 	}{
 		{
@@ -151,7 +152,7 @@ func TestCgroupNameToCgroupfs(t *testing.T) {
 func TestParseSystemdToCgroupName(t *testing.T) {
 	testCases := []struct {
 		input    string
-		expected CgroupName
+		expected libcontainer.CgroupName
 	}{
 		{
 			input:    "/test",

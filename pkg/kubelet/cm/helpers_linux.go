@@ -19,6 +19,7 @@ package cm
 import (
 	"bufio"
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -26,14 +27,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	libcontainercgroups "k8s.io/kubernetes/pkg/util/libcontainer/cgroups"
-
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
 const (
@@ -118,7 +116,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *libcontainer.ResourceConfig {
 	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling)
 	// sum requests and limits.
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
@@ -168,7 +166,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	qosClass := v1qos.GetPodQOS(pod)
 
 	// build the result
-	result := &ResourceConfig{}
+	result := &libcontainer.ResourceConfig{}
 	if qosClass == v1.PodQOSGuaranteed {
 		result.CPUShares = &cpuShares
 		result.CPUQuota = &cpuQuota
@@ -202,70 +200,6 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	}
 
 	return result
-}
-
-// getCgroupSubsystemsV1 returns information about the mounted cgroup v1 subsystems
-func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
-	// get all cgroup mounts.
-	allCgroups, err := libcontainercgroups.GetCgroupMounts(true)
-	if err != nil {
-		return &CgroupSubsystems{}, err
-	}
-	if len(allCgroups) == 0 {
-		return &CgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
-	}
-	mountPoints := make(map[string]string, len(allCgroups))
-	for _, mount := range allCgroups {
-		// BEFORE kubelet used a random mount point per cgroups subsystem;
-		// NOW    more deterministic: kubelet use mount point with shortest path;
-		// FUTURE is bright with clear expectation determined in doc.
-		// ref. issue: https://github.com/kubernetes/kubernetes/issues/95488
-
-		for _, subsystem := range mount.Subsystems {
-			previous := mountPoints[subsystem]
-			if previous == "" || len(mount.Mountpoint) < len(previous) {
-				mountPoints[subsystem] = mount.Mountpoint
-			}
-		}
-	}
-	return &CgroupSubsystems{
-		Mounts:      allCgroups,
-		MountPoints: mountPoints,
-	}, nil
-}
-
-// getCgroupSubsystemsV2 returns information about the enabled cgroup v2 subsystems
-func getCgroupSubsystemsV2() (*CgroupSubsystems, error) {
-	controllers, err := libcontainercgroups.GetAllSubsystems()
-	if err != nil {
-		return nil, err
-	}
-
-	mounts := []libcontainercgroups.Mount{}
-	mountPoints := make(map[string]string, len(controllers))
-	for _, controller := range controllers {
-		mountPoints[controller] = util.CgroupRoot
-		m := libcontainercgroups.Mount{
-			Mountpoint: util.CgroupRoot,
-			Root:       util.CgroupRoot,
-			Subsystems: []string{controller},
-		}
-		mounts = append(mounts, m)
-	}
-
-	return &CgroupSubsystems{
-		Mounts:      mounts,
-		MountPoints: mountPoints,
-	}, nil
-}
-
-// GetCgroupSubsystems returns information about the mounted cgroup subsystems
-func GetCgroupSubsystems() (*CgroupSubsystems, error) {
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
-		return getCgroupSubsystemsV2()
-	}
-
-	return getCgroupSubsystemsV1()
 }
 
 // getCgroupProcs takes a cgroup directory name as an argument

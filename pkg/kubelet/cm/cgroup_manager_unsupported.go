@@ -21,6 +21,7 @@ package cm
 
 import (
 	"errors"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 
 	v1 "k8s.io/api/core/v1"
 )
@@ -41,73 +42,73 @@ func NewCgroupManager(_ interface{}) CgroupManager {
 	return &unsupportedCgroupManager{}
 }
 
-func (m *unsupportedCgroupManager) Name(_ CgroupName) string {
+func (m *unsupportedCgroupManager) Name(_ libcontainer.CgroupName) string {
 	return ""
 }
 
-func (m *unsupportedCgroupManager) Validate(_ CgroupName) error {
+func (m *unsupportedCgroupManager) Validate(_ libcontainer.CgroupName) error {
 	return errNotSupported
 }
 
-func (m *unsupportedCgroupManager) Exists(_ CgroupName) bool {
+func (m *unsupportedCgroupManager) Exists(_ libcontainer.CgroupName) bool {
 	return false
 }
 
-func (m *unsupportedCgroupManager) Destroy(_ *CgroupConfig) error {
+func (m *unsupportedCgroupManager) Destroy(_ *libcontainer.CgroupConfig) error {
 	return nil
 }
 
-func (m *unsupportedCgroupManager) Update(_ *CgroupConfig) error {
+func (m *unsupportedCgroupManager) Update(_ *libcontainer.CgroupConfig) error {
 	return nil
 }
 
-func (m *unsupportedCgroupManager) Create(_ *CgroupConfig) error {
+func (m *unsupportedCgroupManager) Create(_ *libcontainer.CgroupConfig) error {
 	return errNotSupported
 }
 
-func (m *unsupportedCgroupManager) MemoryUsage(_ CgroupName) (int64, error) {
+func (m *unsupportedCgroupManager) MemoryUsage(_ libcontainer.CgroupName) (int64, error) {
 	return -1, errNotSupported
 }
 
-func (m *unsupportedCgroupManager) Pids(_ CgroupName) []int {
+func (m *unsupportedCgroupManager) Pids(_ libcontainer.CgroupName) []int {
 	return nil
 }
 
-func (m *unsupportedCgroupManager) CgroupName(name string) CgroupName {
-	return CgroupName([]string{})
+func (m *unsupportedCgroupManager) CgroupName(name string) libcontainer.CgroupName {
+	return libcontainer.CgroupName([]string{})
 }
 
-func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName CgroupName) error {
+func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName libcontainer.CgroupName) error {
 	return nil
 }
 
-func (m *unsupportedCgroupManager) GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error) {
+func (m *unsupportedCgroupManager) GetCgroupConfig(name libcontainer.CgroupName, resource v1.ResourceName) (*libcontainer.ResourceConfig, error) {
 	return nil, errNotSupported
 }
 
-func (m *unsupportedCgroupManager) SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
+func (m *unsupportedCgroupManager) SetCgroupConfig(name libcontainer.CgroupName, resource v1.ResourceName, resourceConfig *libcontainer.ResourceConfig) error {
 	return errNotSupported
 }
 
-var RootCgroupName = CgroupName([]string{})
+var RootCgroupName = libcontainer.CgroupName([]string{})
 
-func NewCgroupName(base CgroupName, components ...string) CgroupName {
+func NewCgroupName(base libcontainer.CgroupName, components ...string) libcontainer.CgroupName {
 	return append(append([]string{}, base...), components...)
 }
 
-func (cgroupName CgroupName) ToSystemd() string {
+func (cgroupName libcontainer.CgroupName) ToSystemd() string {
 	return ""
 }
 
-func ParseSystemdToCgroupName(name string) CgroupName {
+func ParseSystemdToCgroupName(name string) libcontainer.CgroupName {
 	return nil
 }
 
-func (cgroupName CgroupName) ToCgroupfs() string {
+func (cgroupName libcontainer.CgroupName) ToCgroupfs() string {
 	return ""
 }
 
-func ParseCgroupfsToCgroupName(name string) CgroupName {
+func ParseCgroupfsToCgroupName(name string) libcontainer.CgroupName {
 	return nil
 }
 

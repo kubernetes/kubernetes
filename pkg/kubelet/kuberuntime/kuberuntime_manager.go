@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"os"
 	"path/filepath"
 	"sort"
@@ -675,7 +676,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 		var err error
 		switch rName {
 		case v1.ResourceCPU:
-			podCpuResources := &cm.ResourceConfig{CPUPeriod: podResources.CPUPeriod}
+			podCpuResources := &libcontainer.ResourceConfig{CPUPeriod: podResources.CPUPeriod}
 			if setLimitValue == true {
 				podCpuResources.CPUQuota = podResources.CPUQuota
 			} else {

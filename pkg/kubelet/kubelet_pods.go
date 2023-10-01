@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"net/http"
 	"net/url"
 	"os"
@@ -1022,7 +1023,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// this ensures our view of the cgroup tree does not mistakenly observe pods
 	// that are added after the fact...
 	var (
-		cgroupPods map[types.UID]cm.CgroupName
+		cgroupPods map[types.UID]libcontainer.CgroupName
 		err        error
 	)
 	if kl.cgroupsPerQOS {
@@ -2282,7 +2283,7 @@ func (kl *Kubelet) GetPortForward(ctx context.Context, podName, podNamespace str
 
 // cleanupOrphanedPodCgroups removes cgroups that should no longer exist.
 // it reconciles the cached state of cgroupPods with the specified list of runningPods
-func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupPods map[types.UID]cm.CgroupName, possiblyRunningPods map[types.UID]sets.Empty) {
+func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupPods map[types.UID]libcontainer.CgroupName, possiblyRunningPods map[types.UID]sets.Empty) {
 	// Iterate over all the found pods to verify if they should be running
 	for uid, val := range cgroupPods {
 		// if the pod is in the running set, its not a candidate for cleanup

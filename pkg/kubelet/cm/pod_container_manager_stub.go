@@ -19,6 +19,7 @@ package cm
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 )
 
 type podContainerManagerStub struct {
@@ -34,19 +35,19 @@ func (m *podContainerManagerStub) EnsureExists(_ *v1.Pod) error {
 	return nil
 }
 
-func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
+func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (libcontainer.CgroupName, string) {
 	return nil, ""
 }
 
-func (m *podContainerManagerStub) Destroy(_ CgroupName) error {
+func (m *podContainerManagerStub) Destroy(_ libcontainer.CgroupName) error {
 	return nil
 }
 
-func (m *podContainerManagerStub) ReduceCPULimits(_ CgroupName) error {
+func (m *podContainerManagerStub) ReduceCPULimits(_ libcontainer.CgroupName) error {
 	return nil
 }
 
-func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]libcontainer.CgroupName, error) {
 	return nil, nil
 }
 

@@ -21,6 +21,7 @@ package cm
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"strconv"
 	"testing"
 
@@ -107,7 +108,7 @@ func activeTestPods() []*v1.Pod {
 }
 
 func createTestQOSContainerManager() (*qosContainerManagerImpl, error) {
-	subsystems, err := GetCgroupSubsystems()
+	subsystems, err := libcontainer.GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
@@ -131,18 +132,18 @@ func TestQoSContainerCgroup(t *testing.T) {
 	m, err := createTestQOSContainerManager()
 	assert.Nil(t, err)
 
-	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
+	qosConfigs := map[v1.PodQOSClass]*libcontainer.CgroupConfig{
 		v1.PodQOSGuaranteed: {
 			Name:               m.qosContainersInfo.Guaranteed,
-			ResourceParameters: &ResourceConfig{},
+			ResourceParameters: &libcontainer.ResourceConfig{},
 		},
 		v1.PodQOSBurstable: {
 			Name:               m.qosContainersInfo.Burstable,
-			ResourceParameters: &ResourceConfig{},
+			ResourceParameters: &libcontainer.ResourceConfig{},
 		},
 		v1.PodQOSBestEffort: {
 			Name:               m.qosContainersInfo.BestEffort,
-			ResourceParameters: &ResourceConfig{},
+			ResourceParameters: &libcontainer.ResourceConfig{},
 		},
 	}
 

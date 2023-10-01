@@ -22,6 +22,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -119,7 +120,7 @@ const (
 	systemReservedCgroup = "system-reserved"
 )
 
-func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error {
+func createIfNotExists(cm cm.CgroupManager, cgroupConfig *libcontainer.CgroupConfig) error {
 	if !cm.Exists(cgroupConfig.Name) {
 		if err := cm.Create(cgroupConfig); err != nil {
 			return err
@@ -130,7 +131,7 @@ func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error
 
 func createTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error {
 	// Create kube reserved cgroup
-	cgroupConfig := &cm.CgroupConfig{
+	cgroupConfig := &libcontainer.CgroupConfig{
 		Name: cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup),
 	}
 	if err := createIfNotExists(cgroupManager, cgroupConfig); err != nil {
@@ -144,7 +145,7 @@ func createTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error 
 
 func destroyTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error {
 	// Create kube reserved cgroup
-	cgroupConfig := &cm.CgroupConfig{
+	cgroupConfig := &libcontainer.CgroupConfig{
 		Name: cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup),
 	}
 	if err := cgroupManager.Destroy(cgroupConfig); err != nil {
@@ -161,7 +162,7 @@ func convertSharesToWeight(shares int64) int64 {
 
 func runTest(ctx context.Context, f *framework.Framework) error {
 	var oldCfg *kubeletconfig.KubeletConfiguration
-	subsystems, err := cm.GetCgroupSubsystems()
+	subsystems, err := libcontainer.GetCgroupSubsystems()
 	if err != nil {
 		return err
 	}

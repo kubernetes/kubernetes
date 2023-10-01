@@ -10,8 +10,6 @@ var (
 	NewNotFoundError            = libcontainercgroups.NewNotFoundError
 	IsNotFound                  = libcontainercgroups.IsNotFound
 	HugePageSizes               = libcontainercgroups.HugePageSizes
-	GetCgroupMounts             = libcontainercgroups.GetCgroupMounts
-	GetAllSubsystems            = libcontainercgroups.GetAllSubsystems
 	PathExists                  = libcontainercgroups.PathExists
 	FindCgroupMountpointAndRoot = libcontainercgroups.FindCgroupMountpointAndRoot
 	GetOwnCgroup                = libcontainercgroups.GetOwnCgroup
@@ -19,6 +17,27 @@ var (
 )
 
 type (
-	Mount   = libcontainercgroups.Mount
 	Manager = libcontainercgroups.Manager
 )
+
+type Mount struct {
+	Mountpoint string
+	Root       string
+	Subsystems []string
+}
+
+func GetCgroupMounts(all bool) ([]Mount, error) {
+	if mounts, err := libcontainercgroups.GetCgroupMounts(all); err != nil {
+		return nil, err
+	} else {
+		var allMounts []Mount
+		for _, mount := range mounts {
+			allMounts = append(allMounts, Mount{
+				Mountpoint: mount.Mountpoint,
+				Root:       mount.Root,
+				Subsystems: mount.Subsystems,
+			})
+		}
+		return allMounts, nil
+	}
+}

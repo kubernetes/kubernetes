@@ -18,6 +18,7 @@ package cm
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,15 +53,15 @@ type QOSContainerManager interface {
 type qosContainerManagerImpl struct {
 	sync.Mutex
 	qosContainersInfo  QOSContainersInfo
-	subsystems         *CgroupSubsystems
+	subsystems         *libcontainer.CgroupSubsystems
 	cgroupManager      CgroupManager
 	activePods         ActivePodsFunc
 	getNodeAllocatable func() v1.ResourceList
-	cgroupRoot         CgroupName
+	cgroupRoot         libcontainer.CgroupName
 	qosReserved        map[v1.ResourceName]int64
 }
 
-func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
+func NewQOSContainerManager(subsystems *libcontainer.CgroupSubsystems, cgroupRoot libcontainer.CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
 	if !nodeConfig.CgroupsPerQOS {
 		return &qosContainerManagerNoop{
 			cgroupRoot: cgroupRoot,
@@ -88,14 +89,14 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 
 	// Top level for Qos containers are created only for Burstable
 	// and Best Effort classes
-	qosClasses := map[v1.PodQOSClass]CgroupName{
+	qosClasses := map[v1.PodQOSClass]libcontainer.CgroupName{
 		v1.PodQOSBurstable:  NewCgroupName(rootContainer, strings.ToLower(string(v1.PodQOSBurstable))),
 		v1.PodQOSBestEffort: NewCgroupName(rootContainer, strings.ToLower(string(v1.PodQOSBestEffort))),
 	}
 
 	// Create containers for both qos classes
 	for qosClass, containerName := range qosClasses {
-		resourceParameters := &ResourceConfig{}
+		resourceParameters := &libcontainer.ResourceConfig{}
 		// the BestEffort QoS class has a statically configured minShares value
 		if qosClass == v1.PodQOSBestEffort {
 			minShares := uint64(MinShares)
@@ -103,7 +104,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 		}
 
 		// containerConfig object stores the cgroup specifications
-		containerConfig := &CgroupConfig{
+		containerConfig := &libcontainer.CgroupConfig{
 			Name:               containerName,
 			ResourceParameters: resourceParameters,
 		}
@@ -145,7 +146,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 }
 
 // setHugePagesUnbounded ensures hugetlb is effectively unbounded
-func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConfig) error {
+func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *libcontainer.CgroupConfig) error {
 	hugePageLimit := map[int64]int64{}
 	for _, pageSize := range libcontainercgroups.HugePageSizes() {
 		pageSizeBytes, err := units.RAMInBytes(pageSize)
@@ -158,7 +159,7 @@ func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConf
 	return nil
 }
 
-func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
+func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]*libcontainer.CgroupConfig) error {
 	for _, v := range configs {
 		if err := m.setHugePagesUnbounded(v); err != nil {
 			return err
@@ -167,7 +168,7 @@ func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]
 	return nil
 }
 
-func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
+func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*libcontainer.CgroupConfig) error {
 	pods := m.activePods()
 	burstablePodCPURequest := int64(0)
 	reuseReqs := make(v1.ResourceList, 4)
@@ -225,7 +226,7 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 // setMemoryReserve sums the memory limits of all pods in a QOS class,
 // calculates QOS class memory limits, and set those limits in the
 // CgroupConfig for each QOS class.
-func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*CgroupConfig, percentReserve int64) {
+func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*libcontainer.CgroupConfig, percentReserve int64) {
 	qosMemoryRequests := m.getQoSMemoryRequests()
 
 	resources := m.getNodeAllocatable()
@@ -254,7 +255,7 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 // retrySetMemoryReserve checks for any QoS cgroups over the limit
 // that was attempted to be set in the first Update() and adjusts
 // their memory limit to the usage to prevent further growth.
-func (m *qosContainerManagerImpl) retrySetMemoryReserve(configs map[v1.PodQOSClass]*CgroupConfig, percentReserve int64) {
+func (m *qosContainerManagerImpl) retrySetMemoryReserve(configs map[v1.PodQOSClass]*libcontainer.CgroupConfig, percentReserve int64) {
 	// Unreclaimable memory usage may already exceeded the desired limit
 	// Attempt to set the limit near the current usage to put pressure
 	// on the cgroup and prevent further growth.
@@ -279,7 +280,7 @@ func (m *qosContainerManagerImpl) retrySetMemoryReserve(configs map[v1.PodQOSCla
 
 // setMemoryQoS sums the memory requests of all pods in the Burstable class,
 // and set the sum memory as the memory.min in the Unified field of CgroupConfig.
-func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*CgroupConfig) {
+func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*libcontainer.CgroupConfig) {
 	qosMemoryRequests := m.getQoSMemoryRequests()
 
 	// Calculate the memory.min:
@@ -309,18 +310,18 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	m.Lock()
 	defer m.Unlock()
 
-	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
+	qosConfigs := map[v1.PodQOSClass]*libcontainer.CgroupConfig{
 		v1.PodQOSGuaranteed: {
 			Name:               m.qosContainersInfo.Guaranteed,
-			ResourceParameters: &ResourceConfig{},
+			ResourceParameters: &libcontainer.ResourceConfig{},
 		},
 		v1.PodQOSBurstable: {
 			Name:               m.qosContainersInfo.Burstable,
-			ResourceParameters: &ResourceConfig{},
+			ResourceParameters: &libcontainer.ResourceConfig{},
 		},
 		v1.PodQOSBestEffort: {
 			Name:               m.qosContainersInfo.BestEffort,
-			ResourceParameters: &ResourceConfig{},
+			ResourceParameters: &libcontainer.ResourceConfig{},
 		},
 	}
 
@@ -384,7 +385,7 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 }
 
 type qosContainerManagerNoop struct {
-	cgroupRoot CgroupName
+	cgroupRoot libcontainer.CgroupName
 }
 
 var _ QOSContainerManager = &qosContainerManagerNoop{}

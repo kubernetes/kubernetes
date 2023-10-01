@@ -20,6 +20,7 @@ limitations under the License.
 package cm
 
 import (
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"strings"
 	"testing"
 
@@ -39,7 +40,7 @@ func TestIsCgroupPod(t *testing.T) {
 	}
 	podUID := types.UID("123")
 	testCases := []struct {
-		input          CgroupName
+		input          libcontainer.CgroupName
 		expectedResult bool
 		expectedUID    types.UID
 	}{
@@ -214,7 +215,7 @@ func TestGetPodContainerName(t *testing.T) {
 		name                string
 		fields              fields
 		args                args
-		wantCgroupName      CgroupName
+		wantCgroupName      libcontainer.CgroupName
 		wantLiteralCgroupfs string
 	}{
 		{

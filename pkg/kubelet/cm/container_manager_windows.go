@@ -25,6 +25,7 @@ package cm
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -135,8 +136,8 @@ func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
 	return NodeConfig{}
 }
 
-func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
-	return &CgroupSubsystems{}
+func (cm *containerManagerImpl) GetMountedSubsystems() *libcontainer.CgroupSubsystems {
+	return &libcontainer.CgroupSubsystems{}
 }
 
 func (cm *containerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {

@@ -18,13 +18,13 @@ package eviction
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"time"
 
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
@@ -49,7 +49,7 @@ var _ ThresholdNotifier = &memoryThresholdNotifier{}
 // NewMemoryThresholdNotifier creates a ThresholdNotifier which is designed to respond to the given threshold.
 // UpdateThreshold must be called once before the threshold will be active.
 func NewMemoryThresholdNotifier(threshold evictionapi.Threshold, cgroupRoot string, factory NotifierFactory, handler func(string)) (ThresholdNotifier, error) {
-	cgroups, err := cm.GetCgroupSubsystems()
+	cgroups, err := libcontainer.GetCgroupSubsystems()
 	if err != nil {
 		return nil, err
 	}

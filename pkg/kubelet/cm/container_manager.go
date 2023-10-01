@@ -18,6 +18,7 @@ package cm
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"strconv"
 	"strings"
 	"time"
@@ -66,7 +67,7 @@ type ContainerManager interface {
 	NewPodContainerManager() PodContainerManager
 
 	// GetMountedSubsystems returns the mounted cgroup subsystems on the node
-	GetMountedSubsystems() *CgroupSubsystems
+	GetMountedSubsystems() *libcontainer.CgroupSubsystems
 
 	// GetQOSContainersInfo returns the names of top level QoS containers
 	GetQOSContainersInfo() QOSContainersInfo

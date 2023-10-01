@@ -21,6 +21,7 @@ package cm
 
 import (
 	"errors"
+	"k8s.io/kubernetes/pkg/util/libcontainer"
 	"os"
 	"path"
 	"testing"
@@ -264,9 +265,9 @@ func TestGetCapacity(t *testing.T) {
 func TestNewPodContainerManager(t *testing.T) {
 
 	info := QOSContainersInfo{
-		Guaranteed: CgroupName{"guaranteed"},
-		BestEffort: CgroupName{"besteffort"},
-		Burstable:  CgroupName{"burstable"},
+		Guaranteed: libcontainer.CgroupName{"guaranteed"},
+		BestEffort: libcontainer.CgroupName{"besteffort"},
+		Burstable:  libcontainer.CgroupName{"burstable"},
 	}
 	QosEnabled := NodeConfig{
 		CgroupsPerQOS: true,
@@ -284,7 +285,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, ""),
+					cgroupManager:     NewCgroupManager(&libcontainer.CgroupSubsystems{}, ""),
 				},
 
 				NodeConfig: QosDisabled,
@@ -295,7 +296,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, ""),
+					cgroupManager:     NewCgroupManager(&libcontainer.CgroupSubsystems{}, ""),
 				},
 
 				NodeConfig: QosEnabled,
@@ -306,7 +307,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, "systemd"),
+					cgroupManager:     NewCgroupManager(&libcontainer.CgroupSubsystems{}, "systemd"),
 				},
 
 				NodeConfig: QosEnabled,
@@ -317,7 +318,7 @@ func TestNewPodContainerManager(t *testing.T) {
 			cm: &containerManagerImpl{
 				qosContainerManager: &qosContainerManagerImpl{
 					qosContainersInfo: info,
-					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, "systemd"),
+					cgroupManager:     NewCgroupManager(&libcontainer.CgroupSubsystems{}, "systemd"),
 				},
 
 				NodeConfig: QosDisabled,
