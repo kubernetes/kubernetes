@@ -208,12 +208,7 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *libcontainer.CgroupConfig) err
 		metrics.CgroupManagerDuration.WithLabelValues("destroy").Observe(metrics.SinceInSeconds(start))
 	}()
 
-	err2 := libcontainer.DestroyCGroup(cgroupConfig, m.useSystemd, m.subsystems)
-	if err2 != nil {
-		return err2
-	}
-
-	return nil
+	return libcontainer.DestroyCGroup(cgroupConfig, m.useSystemd, m.subsystems)
 }
 
 // getCPUWeight converts from the range [2, 262144] to [1, 10000]
@@ -244,12 +239,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *libcontainer.CgroupConfig) erro
 		metrics.CgroupManagerDuration.WithLabelValues("create").Observe(metrics.SinceInSeconds(start))
 	}()
 
-	err2 := libcontainer.CreateCgroup(cgroupConfig, m.useSystemd, m.subsystems)
-	if err2 != nil {
-		return err2
-	}
-
-	return nil
+	return libcontainer.CreateCgroup(cgroupConfig, m.useSystemd, m.subsystems)
 }
 
 // Scans through all subsystems to find pids associated with specified cgroup.
