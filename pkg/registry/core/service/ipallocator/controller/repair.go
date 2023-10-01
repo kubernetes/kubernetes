@@ -101,6 +101,8 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 		leaksByFamily[secondary] = make(map[string]int)
 	}
 
+	registerMetrics()
+
 	return &Repair{
 		interval:      interval,
 		serviceClient: serviceClient,
@@ -131,7 +133,13 @@ func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
 
 // runOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) runOnce() error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, c.doRunOnce)
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := c.doRunOnce()
+		if err != nil {
+			clusterIPRepairReconcileErrors.Inc()
+		}
+		return err
+	})
 }
 
 // doRunOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
@@ -222,6 +230,7 @@ func (c *Repair) doRunOnce() error {
 			ip := netutils.ParseIPSloppy(ip)
 			if ip == nil {
 				// cluster IP is corrupt
+				clusterIPRepairIPErrors.WithLabelValues("invalid").Inc()
 				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPNotValid", "ClusterIPValidation", "Cluster IP %s is not a valid IP; please recreate service", ip)
 				runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", ip, svc.Name, svc.Namespace))
 				continue
@@ -230,6 +239,7 @@ func (c *Repair) doRunOnce() error {
 			family := getFamilyByIP(ip)
 			if _, ok := rebuiltByFamily[family]; !ok {
 				// this service is using an IPFamily no longer configured on cluster
+				clusterIPRepairIPErrors.WithLabelValues("invalid").Inc()
 				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPNotValid", "ClusterIPValidation", "Cluster IP %s(%s) is of ip family that is no longer configured on cluster; please recreate service", ip, family)
 				runtime.HandleError(fmt.Errorf("the cluster IP %s(%s) for service %s/%s is of ip family that is no longer configured on cluster; please recreate", ip, family, svc.Name, svc.Namespace))
 				continue
@@ -245,24 +255,29 @@ func (c *Repair) doRunOnce() error {
 					actualStored.Release(ip)
 				} else {
 					// cluster IP doesn't seem to be allocated
+					clusterIPRepairIPErrors.WithLabelValues("repair").Inc()
 					c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPNotAllocated", "ClusterIPAllocation", "Cluster IP [%v]:%s is not allocated; repairing", family, ip)
 					runtime.HandleError(fmt.Errorf("the cluster IP [%v]:%s for service %s/%s is not allocated; repairing", family, ip, svc.Name, svc.Namespace))
 				}
 				delete(c.leaksByFamily[family], ip.String()) // it is used, so it can't be leaked
 			case ipallocator.ErrAllocated:
 				// cluster IP is duplicate
+				clusterIPRepairIPErrors.WithLabelValues("duplicate").Inc()
 				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPAlreadyAllocated", "ClusterIPAllocation", "Cluster IP [%v]:%s was assigned to multiple services; please recreate service", family, ip)
 				runtime.HandleError(fmt.Errorf("the cluster IP [%v]:%s for service %s/%s was assigned to multiple services; please recreate", family, ip, svc.Name, svc.Namespace))
 			case err.(*ipallocator.ErrNotInRange):
 				// cluster IP is out of range
+				clusterIPRepairIPErrors.WithLabelValues("outOfRange").Inc()
 				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPOutOfRange", "ClusterIPAllocation", "Cluster IP [%v]:%s is not within the service CIDR %s; please recreate service", family, ip, c.networkByFamily[family])
 				runtime.HandleError(fmt.Errorf("the cluster IP [%v]:%s for service %s/%s is not within the service CIDR %s; please recreate", family, ip, svc.Name, svc.Namespace, c.networkByFamily[family]))
 			case ipallocator.ErrFull:
 				// somehow we are out of IPs
+				clusterIPRepairIPErrors.WithLabelValues("full").Inc()
 				cidr := actualAlloc.CIDR()
 				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ServiceCIDRFull", "ClusterIPAllocation", "Service CIDR %v is full; you must widen the CIDR in order to create new services for Cluster IP [%v]:%s", cidr, family, ip)
 				return fmt.Errorf("the service CIDR %v is full; you must widen the CIDR in order to create new services for Cluster IP [%v]:%s", cidr, family, ip)
 			default:
+				clusterIPRepairIPErrors.WithLabelValues("unknown").Inc()
 				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "UnknownError", "ClusterIPAllocation", "Unable to allocate cluster IP [%v]:%s due to an unknown error", family, ip)
 				return fmt.Errorf("unable to allocate cluster IP [%v]:%s for service %s/%s due to an unknown error, exiting: %v", family, ip, svc.Name, svc.Namespace, err)
 			}
@@ -314,9 +329,11 @@ func (c *Repair) checkLeaked(leaks map[string]int, stored ipallocator.Interface,
 			// pretend it is still in use until count expires
 			leaks[ip.String()] = count - 1
 			if err := rebuilt.Allocate(ip); err != nil {
+				// do not increment the metric here, if it is a leak it will be detected once the counter gets to 0
 				runtime.HandleError(fmt.Errorf("the cluster IP %s may have leaked, but can not be allocated: %v", ip, err))
 			}
 		default:
+			clusterIPRepairIPErrors.WithLabelValues("leak").Inc()
 			// do not add it to the rebuilt set, which means it will be available for reuse
 			runtime.HandleError(fmt.Errorf("the cluster IP %s appears to have leaked: cleaning up", ip))
 		}
