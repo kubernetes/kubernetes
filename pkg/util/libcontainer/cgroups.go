@@ -397,7 +397,7 @@ func GetCgroupSubsystems() (*CgroupSubsystems, error) {
 }
 
 var (
-	IsEnabled                   = apparmor.IsEnabled
+	IsAppArmorEnabled           = apparmor.IsEnabled
 	GetCgroupParamUint          = fscommon.GetCgroupParamUint
 	GetCgroupParamString        = fscommon.GetCgroupParamString
 	RunningInUserNS             = userns.RunningInUserNS

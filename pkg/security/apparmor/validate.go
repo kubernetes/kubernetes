@@ -101,7 +101,7 @@ func validateHost() error {
 	}
 
 	// Check kernel support.
-	if !libcontainer.IsEnabled() {
+	if !libcontainer.IsAppArmorEnabled() {
 		return errors.New("AppArmor is not enabled on the host")
 	}
 

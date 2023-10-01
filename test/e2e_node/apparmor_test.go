@@ -253,5 +253,5 @@ func isAppArmorEnabled() bool {
 	if strings.Contains(framework.TestContext.NodeName, "-ubuntu-") {
 		return true
 	}
-	return libcontainer.IsEnabled()
+	return libcontainer.IsAppArmorEnabled()
 }
