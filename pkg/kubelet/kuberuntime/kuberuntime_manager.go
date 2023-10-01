@@ -676,13 +676,13 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 		var err error
 		switch rName {
 		case v1.ResourceCPU:
-			podCpuResources := &libcontainer.ResourceConfig{CPUPeriod: podResources.CPUPeriod}
+			podCPUResources := &libcontainer.ResourceConfig{CPUPeriod: podResources.CPUPeriod}
 			if setLimitValue == true {
-				podCpuResources.CPUQuota = podResources.CPUQuota
+				podCPUResources.CPUQuota = podResources.CPUQuota
 			} else {
-				podCpuResources.CPUShares = podResources.CPUShares
+				podCPUResources.CPUShares = podResources.CPUShares
 			}
-			err = pcm.SetPodCgroupConfig(pod, rName, podCpuResources)
+			err = pcm.SetPodCgroupConfig(pod, rName, podCPUResources)
 		case v1.ResourceMemory:
 			err = pcm.SetPodCgroupConfig(pod, rName, podResources)
 		}

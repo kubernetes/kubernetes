@@ -387,7 +387,7 @@ func getCgroupv2CpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, erro
 	return &libcontainer.ResourceConfig{CPUShares: &cpuShares, CPUQuota: &cpuLimit, CPUPeriod: &cpuPeriod}, nil
 }
 
-func getCgroupCpuConfig(cgroupPath string) (*libcontainer.ResourceConfig, error) {
+func getCgroupCPUConfig(cgroupPath string) (*libcontainer.ResourceConfig, error) {
 	if libcontainer.IsCgroup2UnifiedMode() {
 		return getCgroupv2CpuConfig(cgroupPath)
 	} else {
@@ -419,7 +419,7 @@ func (m *cgroupManagerImpl) GetCgroupConfig(name libcontainer.CgroupName, resour
 	}
 	switch resource {
 	case v1.ResourceCPU:
-		return getCgroupCpuConfig(cgroupResourcePath)
+		return getCgroupCPUConfig(cgroupResourcePath)
 	case v1.ResourceMemory:
 		return getCgroupMemoryConfig(cgroupResourcePath)
 	}
@@ -474,7 +474,7 @@ func setCgroupv2CpuConfig(cgroupPath string, resourceConfig *libcontainer.Resour
 	return nil
 }
 
-func setCgroupCpuConfig(cgroupPath string, resourceConfig *libcontainer.ResourceConfig) error {
+func setCgroupCPUConfig(cgroupPath string, resourceConfig *libcontainer.ResourceConfig) error {
 	if libcontainer.IsCgroup2UnifiedMode() {
 		return setCgroupv2CpuConfig(cgroupPath, resourceConfig)
 	} else {
@@ -504,7 +504,7 @@ func (m *cgroupManagerImpl) SetCgroupConfig(name libcontainer.CgroupName, resour
 	}
 	switch resource {
 	case v1.ResourceCPU:
-		return setCgroupCpuConfig(cgroupResourcePath, resourceConfig)
+		return setCgroupCPUConfig(cgroupResourcePath, resourceConfig)
 	case v1.ResourceMemory:
 		return setCgroupMemoryConfig(cgroupResourcePath, resourceConfig)
 	}
