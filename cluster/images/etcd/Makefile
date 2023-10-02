@@ -26,7 +26,7 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.7
+BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.9
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
 LATEST_ETCD_VERSION?=3.5.7
