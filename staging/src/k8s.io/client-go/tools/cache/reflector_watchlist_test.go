@@ -393,7 +393,7 @@ func TestWatchList(t *testing.T) {
 			listWatcher.customListResponse = scenario.podList
 			listWatcher.closeAfterListRequests = scenario.closeAfterListRequests
 			if scenario.disableUseWatchList {
-				reflector.UseWatchList = false
+				reflector.useWatchList = false
 			}
 
 			err := reflector.ListAndWatch(stopCh)
@@ -483,7 +483,7 @@ func testData() (*fakeListWatcher, Store, *Reflector, chan struct{}) {
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
-	r.UseWatchList = true
+	r.useWatchList = true
 
 	return lw, s, r, stopCh
 }
