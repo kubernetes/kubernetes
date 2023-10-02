@@ -2,7 +2,7 @@ apiVersion: apiserver.config.k8s.io/v1
 kind: EncryptionConfiguration
 resources:
   - resources:
-    - '*.*' #trigger the kms e2e job to get metrics
+    - 'randomwithnomatch' #
     providers:
     - kms:
         apiVersion: v2
