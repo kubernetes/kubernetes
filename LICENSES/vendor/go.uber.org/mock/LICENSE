@@ -1,4 +1,4 @@
-= vendor/github.com/golang/mock licensed under: =
+= vendor/go.uber.org/mock licensed under: =
 
 
                                  Apache License
@@ -203,4 +203,4 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-= vendor/github.com/golang/mock/LICENSE 3b83ef96387f14655fc854ddc3c6bd57
+= vendor/go.uber.org/mock/LICENSE 3b83ef96387f14655fc854ddc3c6bd57
