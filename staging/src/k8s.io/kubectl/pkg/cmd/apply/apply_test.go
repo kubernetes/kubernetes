@@ -1121,7 +1121,6 @@ func TestApplyPruneObjectsWithoutNamespace(t *testing.T) {
 	testCases := map[string]struct {
 		currentResources        []runtime.Object
 		pruneAllowlist          []string
-		namespace               string
 		expectedPrunedResources []string
 		expectedOutputs         []string
 	}{
@@ -1172,12 +1171,19 @@ func TestApplyPruneObjectsWithoutNamespace(t *testing.T) {
 
 				ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 				cmd := NewCmdApply("kubectl", tf, ioStreams)
-				cmd.Flags().Set("filename", filenameRC)
-				cmd.Flags().Set("prune", "true")
-				cmd.Flags().Set("namespace", tc.namespace)
-				cmd.Flags().Set("all", "true")
+				if err := cmd.Flags().Set("filename", filenameRC); err != nil {
+					t.Fatal(err)
+				}
+				if err = cmd.Flags().Set("prune", "true"); err != nil {
+					t.Fatal(err)
+				}
+				if err = cmd.Flags().Set("all", "true"); err != nil {
+					t.Fatal(err)
+				}
 				for _, allow := range tc.pruneAllowlist {
-					cmd.Flags().Set("prune-allowlist", allow)
+					if err = cmd.Flags().Set("prune-allowlist", allow); err != nil {
+						t.Fatal(err)
+					}
 				}
 				cmd.Run(cmd, []string{})
 
