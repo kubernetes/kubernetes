@@ -1789,7 +1789,7 @@ func prepareMismatchedTargetTypeAndValueCasesUpdate() []autoscaling.HorizontalPo
 	}}
 	return mismatchedCases
 }
-func prepareMismatchedTargetTypeAndValueCasesBadUpdate() []autoscaling.HorizontalPodAutoscaler {
+func prepareMismatchedTargetTypeAndValueCasesPassValidationPreviously() []autoscaling.HorizontalPodAutoscaler {
 	// Test case for going from mismatched to invalid
 	mismatchedBadCases := []autoscaling.HorizontalPodAutoscaler{{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1817,6 +1817,71 @@ func prepareMismatchedTargetTypeAndValueCasesBadUpdate() []autoscaling.Horizonta
 					Target: autoscaling.MetricTarget{
 						Type:         autoscaling.ValueMetricType,
 						AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type:         autoscaling.UtilizationMetricType,
+						AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}}
+	return mismatchedBadCases
+}
+
+func prepareMismatchedTargetTypeAndValueCasesPassValidationPreviouslyUpdate() []autoscaling.HorizontalPodAutoscaler {
+	// Test case for going from mismatched to invalid
+	mismatchedBadCases := []autoscaling.HorizontalPodAutoscaler{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "theversion",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{{
+				Type: autoscaling.ObjectMetricSourceType,
+				Object: &autoscaling.ObjectMetricSource{
+					DescribedObject: autoscaling.CrossVersionObjectReference{
+						Kind: "ReplicationController",
+						Name: "myrc",
+					},
+					Metric: autoscaling.MetricIdentifier{
+						Name: "somemetric",
+					},
+					Target: autoscaling.MetricTarget{
+						Type: autoscaling.ValueMetricType,
 					},
 				},
 			}},
@@ -1961,15 +2026,19 @@ func TestValidateHorizontalPodAutoscalerUpdateMismatchedTargetTypeAndValue(t *te
 		}
 	}
 	// Test for mismatched cases getting updated to fail previous validaiton
-	mismatchedBadCases := prepareMismatchedTargetTypeAndValueCasesBadUpdate()
-	newHPA, oldHPA := &mismatchedBadCases[1], &mismatchedBadCases[0]
-	opts := ValidationOptionsForHPA(newHPA, oldHPA)
-	errs := ValidateHorizontalPodAutoscalerUpdate(newHPA, oldHPA, opts)
-	errorMsg := "must set either a target value or averageValue"
-	if len(errs) == 0 {
-		t.Errorf("expected failure for %q", errorMsg)
-	} else if !strings.Contains(errs[0].Error(), errorMsg) {
-		t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
+	newHPA, oldHPA := prepareMismatchedTargetTypeAndValueCasesPassValidationPreviouslyUpdate(), prepareMismatchedTargetTypeAndValueCasesPassValidationPreviously()
+
+	for i, old := range oldHPA {
+		newHPA := newHPA[i]
+
+		opts := ValidationOptionsForHPA(&newHPA, &old)
+		errs := ValidateHorizontalPodAutoscalerUpdate(&newHPA, &old, opts)
+		errorMsg := "must set either a target value or averageValue"
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %q", errorMsg)
+		} else if !strings.Contains(errs[0].Error(), errorMsg) {
+			t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
+		}
 	}
 
 }

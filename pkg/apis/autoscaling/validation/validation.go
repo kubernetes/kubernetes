@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -51,9 +52,11 @@ func ValidationOptionsForHPA(newAutoscaler, oldAutoscaler *autoscaling.Horizonta
 		return opts
 	}
 	// Check for existing bad mismatched target type/value fields for ObjectMetricSource
+	// If UtilizationMetricType was set previously then either one of the values could have been used to pass validation before
 	for _, ms := range oldAutoscaler.Spec.Metrics {
 		if ms.Object != nil && ((ms.Object.Target.Type == autoscaling.ValueMetricType && ms.Object.Target.Value == nil) ||
-			(ms.Object.Target.Type == autoscaling.AverageValueMetricType && ms.Object.Target.AverageValue == nil)) {
+			(ms.Object.Target.Type == autoscaling.AverageValueMetricType && ms.Object.Target.AverageValue == nil) ||
+			(ms.Object.Target.Type == autoscaling.UtilizationMetricType)) {
 			opts.AllowMismatchedTargetTypeAndValue = true
 			return opts
 		}
