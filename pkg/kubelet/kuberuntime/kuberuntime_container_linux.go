@@ -22,6 +22,7 @@ package kuberuntime
 import (
 	"errors"
 	"fmt"
+	"k8s.io/kubernetes/pkg/libcontainer"
 	"math"
 	"os"
 	"path/filepath"
@@ -31,7 +32,6 @@ import (
 
 	"github.com/containerd/cgroups"
 	cadvisorv1 "github.com/google/cadvisor/info/v1"
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -250,7 +250,7 @@ func GetHugepageLimitsFromResources(resources v1.ResourceRequirements) []*runtim
 	var hugepageLimits []*runtimeapi.HugepageLimit
 
 	// For each page size, limit to 0.
-	for _, pageSize := range libcontainercgroups.HugePageSizes() {
+	for _, pageSize := range libcontainer.HugePageSizes() {
 		hugepageLimits = append(hugepageLimits, &runtimeapi.HugepageLimit{
 			PageSize: pageSize,
 			Limit:    uint64(0),
@@ -321,7 +321,7 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 // the cgroup version for unit tests by assigning a new mocked function into it. Without it,
 // the cgroup version would solely depend on the environment running the test.
 var isCgroup2UnifiedMode = func() bool {
-	return libcontainercgroups.IsCgroup2UnifiedMode()
+	return libcontainer.IsCgroup2UnifiedMode()
 }
 
 var (

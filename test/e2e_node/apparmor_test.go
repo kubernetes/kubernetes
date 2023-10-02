@@ -38,13 +38,13 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+	"k8s.io/kubernetes/pkg/libcontainer"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/opencontainers/runc/libcontainer/apparmor"
 )
 
 var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
@@ -253,5 +253,5 @@ func isAppArmorEnabled() bool {
 	if strings.Contains(framework.TestContext.NodeName, "-ubuntu-") {
 		return true
 	}
-	return apparmor.IsEnabled()
+	return libcontainer.IsAppArmorEnabled()
 }

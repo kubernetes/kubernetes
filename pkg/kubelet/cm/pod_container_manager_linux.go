@@ -23,7 +23,6 @@ import (
 	"path"
 	"strings"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/libcontainer"
 )
 
 const (
@@ -75,7 +75,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	if !alreadyExists {
 		enforceMemoryQoS := false
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-			libcontainercgroups.IsCgroup2UnifiedMode() {
+			libcontainer.IsCgroup2UnifiedMode() {
 			enforceMemoryQoS = true
 		}
 		// Create the pod container

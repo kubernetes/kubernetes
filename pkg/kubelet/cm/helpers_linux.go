@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -34,6 +33,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
+	"k8s.io/kubernetes/pkg/libcontainer"
 )
 
 const (
@@ -207,7 +207,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 // getCgroupSubsystemsV1 returns information about the mounted cgroup v1 subsystems
 func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 	// get all cgroup mounts.
-	allCgroups, err := libcontainercgroups.GetCgroupMounts(true)
+	allCgroups, err := libcontainer.GetCgroupMounts(true)
 	if err != nil {
 		return &CgroupSubsystems{}, err
 	}
@@ -236,16 +236,16 @@ func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 
 // getCgroupSubsystemsV2 returns information about the enabled cgroup v2 subsystems
 func getCgroupSubsystemsV2() (*CgroupSubsystems, error) {
-	controllers, err := libcontainercgroups.GetAllSubsystems()
+	controllers, err := libcontainer.GetAllSubsystems()
 	if err != nil {
 		return nil, err
 	}
 
-	mounts := []libcontainercgroups.Mount{}
+	mounts := []libcontainer.Mount{}
 	mountPoints := make(map[string]string, len(controllers))
 	for _, controller := range controllers {
 		mountPoints[controller] = util.CgroupRoot
-		m := libcontainercgroups.Mount{
+		m := libcontainer.Mount{
 			Mountpoint: util.CgroupRoot,
 			Root:       util.CgroupRoot,
 			Subsystems: []string{controller},
@@ -261,7 +261,7 @@ func getCgroupSubsystemsV2() (*CgroupSubsystems, error) {
 
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
 func GetCgroupSubsystems() (*CgroupSubsystems, error) {
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		return getCgroupSubsystemsV2()
 	}
 

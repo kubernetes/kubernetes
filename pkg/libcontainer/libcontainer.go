@@ -1,8 +1,5 @@
-//go:build linux
-// +build linux
-
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2enode
+package libcontainer
 
 import (
-	"k8s.io/kubernetes/pkg/libcontainer"
+	libcontainerapparmor "github.com/opencontainers/runc/libcontainer/apparmor"
+	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 )
 
-// IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
-func IsCgroup2UnifiedMode() bool {
-	return libcontainer.IsCgroup2UnifiedMode()
-}
+var (
+	RunningInUserNS   = libcontaineruserns.RunningInUserNS
+	IsAppArmorEnabled = libcontainerapparmor.IsEnabled
+)

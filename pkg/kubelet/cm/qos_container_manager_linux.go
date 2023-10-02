@@ -29,12 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	units "github.com/docker/go-units"
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/libcontainer"
 )
 
 const (
@@ -147,7 +147,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 // setHugePagesUnbounded ensures hugetlb is effectively unbounded
 func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConfig) error {
 	hugePageLimit := map[int64]int64{}
-	for _, pageSize := range libcontainercgroups.HugePageSizes() {
+	for _, pageSize := range libcontainer.HugePageSizes() {
 		pageSizeBytes, err := units.RAMInBytes(pageSize)
 		if err != nil {
 			return err
@@ -336,7 +336,7 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 
 	// update the qos level cgrougs v2 settings of memory qos if feature enabled
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-		libcontainercgroups.IsCgroup2UnifiedMode() {
+		libcontainer.IsCgroup2UnifiedMode() {
 		m.setMemoryQoS(qosConfigs)
 	}
 

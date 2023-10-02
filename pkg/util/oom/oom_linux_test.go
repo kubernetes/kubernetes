@@ -21,11 +21,11 @@ package oom
 
 import (
 	"os"
-
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kubernetes/pkg/libcontainer"
 )
 
 // Converts a sequence of PID lists into a PID lister.
@@ -103,5 +103,5 @@ func TestOOMScoreAdjContainer(t *testing.T) {
 
 func TestPidListerFailure(t *testing.T) {
 	_, err := getPids("/does/not/exist")
-	assert.True(t, cgroups.IsNotFound(err) || os.IsNotExist(err), "expected getPids to return not exists error. Got %v", err)
+	assert.True(t, libcontainer.IsNotFound(err) || os.IsNotExist(err), "expected getPids to return not exists error. Got %v", err)
 }

@@ -29,12 +29,12 @@ import (
 	"github.com/golang/mock/gomock"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
+	"k8s.io/kubernetes/pkg/libcontainer"
 
 	"k8s.io/mount-utils"
 )
@@ -68,7 +68,7 @@ func fakeContainerMgrMountInt() mount.Interface {
 func TestCgroupMountValidationSuccess(t *testing.T) {
 	f, err := validateSystemRequirements(fakeContainerMgrMountInt())
 	assert.NoError(t, err)
-	if cgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
 	} else {
 		assert.False(t, f.cpuHardcapping, "cpu hardcapping is expected to be disabled")
@@ -76,7 +76,7 @@ func TestCgroupMountValidationSuccess(t *testing.T) {
 }
 
 func TestCgroupMountValidationMemoryMissing(t *testing.T) {
-	if cgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
 	mountInt := mount.NewFakeMounter(
@@ -102,7 +102,7 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 }
 
 func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
-	if cgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
 	mountInt := mount.NewFakeMounter(
@@ -141,7 +141,7 @@ func TestGetCpuWeight(t *testing.T) {
 }
 
 func TestSoftRequirementsValidationSuccess(t *testing.T) {
-	if cgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
 	req := require.New(t)

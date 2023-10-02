@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/google/go-cmp/cmp"
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -42,6 +41,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/libcontainer"
 )
 
 func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *runtimeapi.ContainerConfig {
@@ -478,7 +478,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 	var baseHugepage []*runtimeapi.HugepageLimit
 
 	// For each page size, limit to 0.
-	for _, pageSize := range libcontainercgroups.HugePageSizes() {
+	for _, pageSize := range libcontainer.HugePageSizes() {
 		baseHugepage = append(baseHugepage, &runtimeapi.HugepageLimit{
 			PageSize: pageSize,
 			Limit:    uint64(0),
@@ -593,7 +593,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 		machineHugepageSupport := true
 		for _, hugepageLimit := range test.expected {
 			hugepageSupport := false
-			for _, pageSize := range libcontainercgroups.HugePageSizes() {
+			for _, pageSize := range libcontainer.HugePageSizes() {
 				if pageSize == hugepageLimit.PageSize {
 					hugepageSupport = true
 					break

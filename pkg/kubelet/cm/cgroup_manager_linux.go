@@ -27,11 +27,8 @@ import (
 	"sync"
 	"time"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
-	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
-	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -40,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/libcontainer"
 )
 
 const (
@@ -93,7 +91,7 @@ func (cgroupName CgroupName) ToSystemd() string {
 		newparts = append(newparts, part)
 	}
 
-	result, err := cgroupsystemd.ExpandSlice(strings.Join(newparts, "-") + systemdSuffix)
+	result, err := libcontainer.ExpandSlice(strings.Join(newparts, "-") + systemdSuffix)
 	if err != nil {
 		// Should never happen...
 		panic(fmt.Errorf("error converting cgroup name [%v] to systemd format: %v", cgroupName, err))
@@ -132,7 +130,7 @@ func IsSystemdStyleName(name string) bool {
 type CgroupSubsystems struct {
 	// Cgroup subsystem mounts.
 	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
-	Mounts []libcontainercgroups.Mount
+	Mounts []libcontainer.Mount
 
 	// Cgroup subsystem to their mount location.
 	// e.g.: "cpu" -> "/sys/fs/cgroup/cpu"
@@ -197,14 +195,14 @@ func (m *cgroupManagerImpl) buildCgroupUnifiedPath(name CgroupName) string {
 }
 
 // libctCgroupConfig converts CgroupConfig to libcontainer's Cgroup config.
-func (m *cgroupManagerImpl) libctCgroupConfig(in *CgroupConfig, needResources bool) *libcontainerconfigs.Cgroup {
-	config := &libcontainerconfigs.Cgroup{
+func (m *cgroupManagerImpl) libctCgroupConfig(in *CgroupConfig, needResources bool) *libcontainer.Cgroup {
+	config := &libcontainer.Cgroup{
 		Systemd: m.useSystemd,
 	}
 	if needResources {
-		config.Resources = m.toResources(in.ResourceParameters)
+		config.Resources = (*libcontainerconfigs.Resources)(m.toResources(in.ResourceParameters))
 	} else {
-		config.Resources = &libcontainerconfigs.Resources{}
+		config.Resources = (*libcontainerconfigs.Resources)(&libcontainer.Resources{})
 	}
 
 	if !config.Systemd {
@@ -219,7 +217,7 @@ func (m *cgroupManagerImpl) libctCgroupConfig(in *CgroupConfig, needResources bo
 	// Setting Path is optional as it can be deduced from Name and Parent.
 
 	// TODO(filbranden): This logic belongs in libcontainer/cgroup/systemd instead.
-	// It should take a libcontainerconfigs.Cgroup.Path field (rather than Name and Parent)
+	// It should take a libcontainer.Cgroup.Path field (rather than Name and Parent)
 	// and split it appropriately, using essentially the logic below.
 	// This was done for cgroupfs in opencontainers/runc#497 but a counterpart
 	// for systemd was never introduced.
@@ -237,7 +235,7 @@ func (m *cgroupManagerImpl) libctCgroupConfig(in *CgroupConfig, needResources bo
 
 // Validate checks if all subsystem cgroups already exist
 func (m *cgroupManagerImpl) Validate(name CgroupName) error {
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		cgroupPath := m.buildCgroupUnifiedPath(name)
 		neededControllers := getSupportedUnifiedControllers()
 		enabledControllers, err := readUnifiedControllers(cgroupPath)
@@ -272,7 +270,7 @@ func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 		if !allowlistControllers.Has(controller) {
 			continue
 		}
-		if !libcontainercgroups.PathExists(path) {
+		if !libcontainer.PathExists(path) {
 			missingPaths = append(missingPaths, path)
 		}
 	}
@@ -297,7 +295,7 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 	}()
 
 	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, false)
-	manager, err := manager.New(libcontainerCgroupConfig)
+	manager, err := libcontainer.New((*libcontainerconfigs.Cgroup)(libcontainerCgroupConfig))
 	if err != nil {
 		return err
 	}
@@ -352,8 +350,8 @@ func getSupportedUnifiedControllers() sets.String {
 	return supportedControllers.Intersection(availableRootControllers)
 }
 
-func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
-	resources := &libcontainerconfigs.Resources{
+func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainer.Resources {
+	resources := &libcontainer.Resources{
 		SkipDevices:     true,
 		SkipFreezeOnSet: true,
 	}
@@ -364,7 +362,7 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 		resources.Memory = *resourceConfig.Memory
 	}
 	if resourceConfig.CPUShares != nil {
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if libcontainer.IsCgroup2UnifiedMode() {
 			resources.CpuWeight = getCPUWeight(resourceConfig.CPUShares)
 		} else {
 			resources.CpuShares = *resourceConfig.CPUShares
@@ -385,7 +383,7 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	// Ideally unified is used for all the resources when running on cgroup v2.
 	// It doesn't make difference for the memory.max limit, but for e.g. the cpu controller
 	// you can specify the correct setting without relying on the conversions performed by the OCI runtime.
-	if resourceConfig.Unified != nil && libcontainercgroups.IsCgroup2UnifiedMode() {
+	if resourceConfig.Unified != nil && libcontainer.IsCgroup2UnifiedMode() {
 		resources.Unified = make(map[string]string)
 		for k, v := range resourceConfig.Unified {
 			resources.Unified[k] = v
@@ -394,9 +392,9 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	return resources
 }
 
-func (m *cgroupManagerImpl) maybeSetHugetlb(resourceConfig *ResourceConfig, resources *libcontainerconfigs.Resources) {
+func (m *cgroupManagerImpl) maybeSetHugetlb(resourceConfig *ResourceConfig, resources *libcontainer.Resources) {
 	// Check if hugetlb is supported.
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		if !getSupportedUnifiedControllers().Has("hugetlb") {
 			klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
 			return
@@ -421,7 +419,7 @@ func (m *cgroupManagerImpl) maybeSetHugetlb(resourceConfig *ResourceConfig, reso
 		pageSizes.Insert(sizeString)
 	}
 	// for each page size omitted, limit to 0
-	for _, pageSize := range libcontainercgroups.HugePageSizes() {
+	for _, pageSize := range libcontainer.HugePageSizes() {
 		if pageSizes.Has(pageSize) {
 			continue
 		}
@@ -440,7 +438,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	}()
 
 	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
-	manager, err := manager.New(libcontainerCgroupConfig)
+	manager, err := libcontainer.New((*libcontainerconfigs.Cgroup)(libcontainerCgroupConfig))
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup manager: %v", err)
 	}
@@ -455,7 +453,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	}()
 
 	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
-	manager, err := manager.New(libcontainerCgroupConfig)
+	manager, err := libcontainer.New((*libcontainerconfigs.Cgroup)(libcontainerCgroupConfig))
 	if err != nil {
 		return err
 	}
@@ -547,7 +545,7 @@ func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
 // as read from cgroupfs.
 func (m *cgroupManagerImpl) MemoryUsage(name CgroupName) (int64, error) {
 	var path, file string
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		path = m.buildCgroupUnifiedPath(name)
 		file = "memory.current"
 	} else {
@@ -558,7 +556,7 @@ func (m *cgroupManagerImpl) MemoryUsage(name CgroupName) (int64, error) {
 		path = mp + "/" + m.Name(name)
 		file = "memory.usage_in_bytes"
 	}
-	val, err := fscommon.GetCgroupParamUint(path, file)
+	val, err := libcontainer.GetCgroupParamUint(path, file)
 	return int64(val), err
 }
 
@@ -575,7 +573,7 @@ func CpuWeightToCpuShares(cpuWeight uint64) uint64 {
 }
 
 func getCgroupv1CpuConfig(cgroupPath string) (*ResourceConfig, error) {
-	cpuQuotaStr, errQ := fscommon.GetCgroupParamString(cgroupPath, "cpu.cfs_quota_us")
+	cpuQuotaStr, errQ := libcontainer.GetCgroupParamString(cgroupPath, "cpu.cfs_quota_us")
 	if errQ != nil {
 		return nil, fmt.Errorf("failed to read CPU quota for cgroup %v: %v", cgroupPath, errQ)
 	}
@@ -583,11 +581,11 @@ func getCgroupv1CpuConfig(cgroupPath string) (*ResourceConfig, error) {
 	if errInt != nil {
 		return nil, fmt.Errorf("failed to convert CPU quota as integer for cgroup %v: %v", cgroupPath, errInt)
 	}
-	cpuPeriod, errP := fscommon.GetCgroupParamUint(cgroupPath, "cpu.cfs_period_us")
+	cpuPeriod, errP := libcontainer.GetCgroupParamUint(cgroupPath, "cpu.cfs_period_us")
 	if errP != nil {
 		return nil, fmt.Errorf("failed to read CPU period for cgroup %v: %v", cgroupPath, errP)
 	}
-	cpuShares, errS := fscommon.GetCgroupParamUint(cgroupPath, "cpu.shares")
+	cpuShares, errS := libcontainer.GetCgroupParamUint(cgroupPath, "cpu.shares")
 	if errS != nil {
 		return nil, fmt.Errorf("failed to read CPU shares for cgroup %v: %v", cgroupPath, errS)
 	}
@@ -596,7 +594,7 @@ func getCgroupv1CpuConfig(cgroupPath string) (*ResourceConfig, error) {
 
 func getCgroupv2CpuConfig(cgroupPath string) (*ResourceConfig, error) {
 	var cpuLimitStr, cpuPeriodStr string
-	cpuLimitAndPeriod, err := fscommon.GetCgroupParamString(cgroupPath, "cpu.max")
+	cpuLimitAndPeriod, err := libcontainer.GetCgroupParamString(cgroupPath, "cpu.max")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cpu.max file for cgroup %v: %v", cgroupPath, err)
 	}
@@ -616,7 +614,7 @@ func getCgroupv2CpuConfig(cgroupPath string) (*ResourceConfig, error) {
 	if errPeriod != nil {
 		return nil, fmt.Errorf("failed to convert CPU period as integer for cgroup %v: %v", cgroupPath, errPeriod)
 	}
-	cpuWeight, errWeight := fscommon.GetCgroupParamUint(cgroupPath, "cpu.weight")
+	cpuWeight, errWeight := libcontainer.GetCgroupParamUint(cgroupPath, "cpu.weight")
 	if errWeight != nil {
 		return nil, fmt.Errorf("failed to read CPU weight for cgroup %v: %v", cgroupPath, errWeight)
 	}
@@ -625,7 +623,7 @@ func getCgroupv2CpuConfig(cgroupPath string) (*ResourceConfig, error) {
 }
 
 func getCgroupCpuConfig(cgroupPath string) (*ResourceConfig, error) {
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		return getCgroupv2CpuConfig(cgroupPath)
 	} else {
 		return getCgroupv1CpuConfig(cgroupPath)
@@ -634,10 +632,10 @@ func getCgroupCpuConfig(cgroupPath string) (*ResourceConfig, error) {
 
 func getCgroupMemoryConfig(cgroupPath string) (*ResourceConfig, error) {
 	memLimitFile := "memory.limit_in_bytes"
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		memLimitFile = "memory.max"
 	}
-	memLimit, err := fscommon.GetCgroupParamUint(cgroupPath, memLimitFile)
+	memLimit, err := libcontainer.GetCgroupParamUint(cgroupPath, memLimitFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", memLimitFile, cgroupPath, err)
 	}
@@ -712,7 +710,7 @@ func setCgroupv2CpuConfig(cgroupPath string, resourceConfig *ResourceConfig) err
 }
 
 func setCgroupCpuConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		return setCgroupv2CpuConfig(cgroupPath, resourceConfig)
 	} else {
 		return setCgroupv1CpuConfig(cgroupPath, resourceConfig)
@@ -721,7 +719,7 @@ func setCgroupCpuConfig(cgroupPath string, resourceConfig *ResourceConfig) error
 
 func setCgroupMemoryConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
 	memLimitFile := "memory.limit_in_bytes"
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if libcontainer.IsCgroup2UnifiedMode() {
 		memLimitFile = "memory.max"
 	}
 	memLimit := strconv.FormatInt(*resourceConfig.Memory, 10)
