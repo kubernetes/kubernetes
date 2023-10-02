@@ -335,6 +335,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			priorRevision := currentRevision
 			framework.ExpectEqual(currentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision))
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
@@ -354,20 +355,20 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			w := &cache.ListWatch{
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					ginkgo.By("MYDEBUG ListWatch inside")
 					options.LabelSelector = labelSelector
 					return c.AppsV1().StatefulSets(ns).Watch(ctx, options)
 				},
 			}
-			ginkgo.By("MYDEBUG Setting watch on STS")
+			ginkgo.By("Setting watch on the StatefulSet")
 			ssList, err := c.AppsV1().StatefulSets(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 			framework.ExpectNoError(err, "failed to list StatefulSets")
-			ginkgo.By(fmt.Sprintf("MYDEBUG STS %v, %v", len(ssList.Items), ssList.ResourceVersion))
+			wg := sync.WaitGroup{}
+			wg.Add(1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
+				defer wg.Done()
 
 				_, err = watchtools.Until(ctx, ssList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-					ginkgo.By("MYDEBUG observer event")
 					if e, ok := event.Object.(*appsv1.StatefulSet); ok {
 						found := e.ObjectMeta.Name == ss.ObjectMeta.Name &&
 							e.ObjectMeta.Namespace == ss.ObjectMeta.Namespace
@@ -375,16 +376,16 @@ var _ = SIGDescribe("StatefulSet", func() {
 							framework.Logf("Observed Statefulset %v in namespace %v with annotations: %v & Conditions: %v", ss.ObjectMeta.Name, ss.ObjectMeta.Namespace, ss.Annotations, ss.Status.Conditions)
 							return false, nil
 						}
-						ginkgo.By(fmt.Sprintf("OBSERVER STS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: %v, %v, %v, %v", e.Status.CurrentReplicas, e.Status.UpdatedReplicas, e.Status.CurrentRevision, e.Status.UpdateRevision))
+						ginkgo.By(fmt.Sprintf("StatefulSet status fields: CurrentReplicas=%v, UpdatedReplicas=%v, CurrentRevision=%v, UpdateRevision=%v", e.Status.CurrentReplicas, e.Status.UpdatedReplicas, e.Status.CurrentRevision, e.Status.UpdateRevision))
 						if e.Status.UpdatedReplicas == 2 && e.Status.Replicas == 3 {
-							ginkgo.By("MYDEBUG Marking pod0 as  Failed")
+							ginkgo.By("Marking pod0 as  Failed")
 							pod0 := pods.Items[0]
 							pod0name := pod0.Name
 							err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-								ginkgo.By("MYDEBUG Retrying to set the phase on POD")
+								ginkgo.By("Retrying to set the phase on POD")
 								pod0, err := c.CoreV1().Pods(ss.Namespace).Get(ctx, pod0name, metav1.GetOptions{})
 								if err != nil {
-									ginkgo.By(fmt.Sprintf("MYDEBUG Retrying to set the phase on POD: %v", err))
+									ginkgo.By(fmt.Sprintf("Retrying to set the phase on POD: %v", err))
 									return nil
 								}
 								pod0.Status.Phase = v1.PodFailed
@@ -393,8 +394,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 							})
 							return false, nil
 						}
-						if e.Status.UpdatedReplicas == 3 {
-							return false, nil
+						if e.Status.UpdatedReplicas == 3 && priorRevision != updateRevision {
+							ginkgo.By("Rolling Updated completed")
+							return true, nil
 						}
 					}
 					object := strings.Split(fmt.Sprintf("%v", event.Object), "{")[0]
@@ -421,7 +423,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			pods = e2estatefulset.GetPodList(ctx, c, ss)
 			e2estatefulset.SortStatefulPods(pods)
 
-			ginkgo.By("MYDEBUG WaitForPodReady")
+			ginkgo.By("WaitForPodReady")
 			err = restorePodHTTPProbe(ss, &pods.Items[1])
 			framework.ExpectNoError(err)
 			ss, _ = e2estatefulset.WaitForPodReady(ctx, c, ss, pods.Items[1].Name)
@@ -443,6 +445,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 					updateRevision))
 			}
+			wg.Wait()
 		})
 
 		ginkgo.It("should perform rolling updates of template modifications when the pod exits with Failed phase, failed container", func(ctx context.Context) {
