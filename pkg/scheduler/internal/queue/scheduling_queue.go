@@ -89,6 +89,7 @@ type PreEnqueueCheck func(pod *v1.Pod) bool
 // makes it easy to use those data structures as a SchedulingQueue.
 type SchedulingQueue interface {
 	framework.PodNominator
+	framework.BackgroundRunner
 	Add(logger klog.Logger, pod *v1.Pod) error
 	// Activate moves the given pods to activeQ iff they're in unschedulablePods or backoffQ.
 	// The passed-in pods are originally compiled from plugins that want to activate Pods,
@@ -418,6 +419,13 @@ const (
 // If all QueueingHintFns returns Skip, the scheduling queue enqueues the Pod back to unschedulable Pod pool
 // because no plugin changes the scheduling result via the event.
 func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) queueingStrategy {
+	if event == podFailed {
+		if pod, ok := oldObj.(*v1.Pod); ok && pod.UID == pInfo.Pod.UID {
+			logger.V(6).Info("Worth requeuing because operation for pod failed", "pod", klog.KObj(pInfo.Pod))
+			return queueAfterBackoff
+		}
+	}
+
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
 	if rejectorPlugins.Len() == 0 {
 		logger.V(6).Info("Worth requeuing because no failed plugins", "pod", klog.KObj(pInfo.Pod))
@@ -1084,6 +1092,47 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 		}
 	}
 	p.movePodsToActiveOrBackoffQueue(logger, unschedulablePods, event, oldObj, newObj)
+}
+
+// RunInBackground implements BackgroundRunner.
+func (p *PriorityQueue) RunInBackground(ctx context.Context, pod *v1.Pod, cb func(ctx context.Context) error) {
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "Background")
+	// TODO: can we force background activities to stop via
+	// some other context?
+	ctx = klog.NewContext(context.Background(), logger)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				p.podFailure(ctx, pod, fmt.Errorf("background operation failed with a panic: %v", r))
+			}
+		}()
+		if err := cb(ctx); err != nil {
+			p.podFailure(ctx, pod, fmt.Errorf("background operation failed: %v", err))
+		}
+	}()
+}
+
+// podFailure triggers scheduling of the pod by emitting a special event.  If
+// that happens while the pod is in flight, re-enqueuing the pod will pick the
+// backoff queue. If it happens later, the pod gets moved out of the
+// unschedulable queue into the active or backoff queue, depending on whether
+// it has failed before.
+func (p *PriorityQueue) podFailure(ctx context.Context, pod *v1.Pod, err error) {
+	logger := klog.FromContext(ctx)
+	logger.V(3).Info("Scheduling the pod will be retried", "pod", klog.KObj(pod), "err", err)
+	p.MoveAllToActiveOrBackoffQueue(logger, podFailed, pod, pod, func(unschedulablePod *v1.Pod) bool {
+		return pod.UID == unschedulablePod.UID
+	})
+}
+
+// podFailed is a special event that is used to indicate that one particular
+// pod (given as separate parameter or in clusterEvent) has failed and needs to
+// be rescheduled.
+var podFailed = framework.ClusterEvent{
+	Resource:   framework.Pod,
+	ActionType: framework.All,
+	Label:      "PodFailed",
 }
 
 // MoveAllToActiveOrBackoffQueue moves all pods from unschedulablePods to activeQ or backoffQ.

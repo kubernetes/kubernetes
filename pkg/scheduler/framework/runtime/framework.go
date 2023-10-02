@@ -77,6 +77,7 @@ type frameworkImpl struct {
 
 	extenders []framework.Extender
 	framework.PodNominator
+	framework.BackgroundRunner
 
 	parallelizer parallelize.Parallelizer
 }
@@ -392,6 +393,10 @@ func (f *frameworkImpl) setInstrumentedPlugins() {
 
 func (f *frameworkImpl) SetPodNominator(n framework.PodNominator) {
 	f.PodNominator = n
+}
+
+func (f *frameworkImpl) SetBackgroundRunner(runner framework.BackgroundRunner) {
+	f.BackgroundRunner = runner
 }
 
 // getScoreWeights makes sure that, between MultiPoint-Score plugin weights and individual Score

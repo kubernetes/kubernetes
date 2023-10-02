@@ -236,6 +236,22 @@ func (p *podSchedulingState) publish(ctx context.Context, pod *v1.Pod, clientset
 	return nil
 }
 
+// publishInBackground can be used to publish the modified PodSchedulingContext
+// in a goroutine without blocking the caller. It must be called right before
+// returning framework.Unschedulable as status.
+func (p *podSchedulingState) publishInBackground(ctx context.Context, pod *v1.Pod, clientset kubernetes.Interface, runInBackground func(context.Context, *v1.Pod, func(context.Context) error)) {
+	if !p.isDirty() {
+		return
+	}
+	runInBackground(ctx, pod, func(ctx context.Context) error {
+		err := p.publish(ctx, pod, clientset)
+		if err != nil {
+			return fmt.Errorf("publishing PodSchedulingContext failed: %v", err)
+		}
+		return nil
+	})
+}
+
 func statusForClaim(schedulingCtx *resourcev1alpha2.PodSchedulingContext, podClaimName string) *resourcev1alpha2.ResourceClaimSchedulingStatus {
 	if schedulingCtx == nil {
 		return nil
@@ -774,27 +790,31 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 		claim := state.claims[index]
 		if len(claim.Status.ReservedFor) == 0 ||
 			len(claim.Status.ReservedFor) == 1 && claim.Status.ReservedFor[0].UID == pod.UID {
-			// Before we tell a driver to deallocate a claim, we
-			// have to stop telling it to allocate. Otherwise,
-			// depending on timing, it will deallocate the claim,
-			// see a PodSchedulingContext with selected node, and
-			// allocate again for that same node.
-			if state.podSchedulingState.schedulingCtx != nil &&
-				state.podSchedulingState.schedulingCtx.Spec.SelectedNode != "" {
-				state.podSchedulingState.selectedNode = ptr.To("")
-				if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
-					return nil, statusError(logger, err)
+			pl.fh.RunInBackground(ctx, pod, func(ctx context.Context) error {
+				logger := klog.FromContext(ctx)
+				// Before we tell a driver to deallocate a claim, we
+				// have to stop telling it to allocate. Otherwise,
+				// depending on timing, it will deallocate the claim,
+				// see a PodSchedulingContext with selected node, and
+				// allocate again for that same node.
+				if state.podSchedulingState.schedulingCtx != nil &&
+					state.podSchedulingState.schedulingCtx.Spec.SelectedNode != "" {
+					state.podSchedulingState.selectedNode = ptr.To("")
+					if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
+						return err
+					}
 				}
-			}
 
-			claim := state.claims[index].DeepCopy()
-			claim.Status.DeallocationRequested = true
-			claim.Status.ReservedFor = nil
-			logger.V(5).Info("Requesting deallocation of ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
-			if _, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
-				return nil, statusError(logger, err)
-			}
-			return nil, nil
+				claim := state.claims[index].DeepCopy()
+				claim.Status.DeallocationRequested = true
+				claim.Status.ReservedFor = nil
+				logger.V(5).Info("Requesting deallocation of ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+				if _, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("update ResourceClaim status: %v", err)
+				}
+				return nil
+			})
+			return nil, framework.NewStatus(framework.Unschedulable, "waiting for deallocation of claim")
 		}
 	}
 	return nil, framework.NewStatus(framework.Unschedulable, "still not schedulable")
@@ -961,17 +981,13 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			state.podSchedulingState.schedulingCtx.Spec.SelectedNode != nodeName {
 			state.podSchedulingState.selectedNode = &nodeName
 			logger.V(5).Info("start allocation", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
-			if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
-				return statusError(logger, err)
-			}
+			state.podSchedulingState.publish(ctx, pod, pl.clientset)
 			return statusPending(logger, "waiting for resource driver to allocate resource", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 		}
 	}
 
 	// May have been modified earlier in PreScore or above.
-	if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
-		return statusError(logger, err)
-	}
+	state.podSchedulingState.publishInBackground(ctx, pod, pl.clientset, pl.fh.RunInBackground)
 
 	// More than one pending claim and not enough information about all of them.
 	//
