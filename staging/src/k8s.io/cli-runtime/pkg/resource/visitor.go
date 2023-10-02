@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -330,11 +331,40 @@ type httpget func(url string) (int, string, io.ReadCloser, error)
 
 // httpgetImpl Implements a function to retrieve a url and return the results.
 func httpgetImpl(url string) (int, string, io.ReadCloser, error) {
+	var maxSizeBytes int64
+	maxSizeBytes = 1024 * 1024
 	resp, err := http.Get(url)
 	if err != nil {
 		return 0, "", nil, err
 	}
+
+	if err := validateURLContentSize(*resp, maxSizeBytes); err != nil {
+		return 0, "", nil, err
+	}
+
 	return resp.StatusCode, resp.Status, resp.Body, nil
+}
+
+// validateURLContentSize function validates the content lenth for a given URL, if its
+// larger than the allowed maxSizeBytes a relevant error is thrown
+func validateURLContentSize(resp http.Response, maxSizeBytes int64) error {
+
+	contentLength := resp.Header.Get("Content-Length")
+	if contentLength == "" {
+		return nil
+	}
+
+	sizeBytes, err := strconv.ParseInt(contentLength, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	if sizeBytes > maxSizeBytes {
+		return fmt.Errorf("Content-Length of larger than the allowed bytes")
+	}
+
+	return nil
+
 }
 
 // DecoratedVisitor will invoke the decorators in order prior to invoking the visitor function
