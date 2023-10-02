@@ -958,16 +958,15 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			state.podSchedulingState.schedulingCtx.Spec.SelectedNode != nodeName {
 			state.podSchedulingState.selectedNode = &nodeName
 			logger.V(5).Info("start allocation", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
-			if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
-				return statusError(logger, err)
-			}
-			return statusPending(logger, "waiting for resource driver to allocate resource", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
+			// The actual publish happens in PreBind or Unreserve.
+			return nil
 		}
 	}
 
 	// May have been modified earlier in PreScore or above.
-	if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
-		return statusError(logger, err)
+	if state.podSchedulingState.isDirty() {
+		// The actual publish happens in PreBind or Unreserve.
+		return nil
 	}
 
 	// More than one pending claim and not enough information about all of them.
@@ -1004,6 +1003,18 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 	}
 
 	logger := klog.FromContext(ctx)
+
+	// Was publishing delayed? If yes, do it now.
+	//
+	// The most common scenario is that a different set of potential nodes
+	// was identified. This revised set needs to be published to enable DRA
+	// drivers to provide better guidance for future scheduling attempts.
+	if state.podSchedulingState.isDirty() {
+		if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
+			logger.Error(err, "publish PodSchedulingContext")
+		}
+	}
+
 	for _, claim := range state.claims {
 		if claim.Status.Allocation != nil &&
 			resourceclaim.IsReservedForPod(pod, claim) {
@@ -1042,6 +1053,15 @@ func (pl *dynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 	}
 
 	logger := klog.FromContext(ctx)
+
+	// Was publishing delayed? If yes, do it now and then cause binding to stop.
+	if state.podSchedulingState.isDirty() {
+		if err := state.podSchedulingState.publish(ctx, pod, pl.clientset); err != nil {
+			return statusError(logger, err)
+		}
+		return statusPending(logger, "waiting for resource driver", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
+	}
+
 	for index, claim := range state.claims {
 		if !resourceclaim.IsReservedForPod(pod, claim) {
 			// The claim might be stale, for example because the claim can get shared and some

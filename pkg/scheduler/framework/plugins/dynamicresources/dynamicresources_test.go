@@ -351,8 +351,8 @@ func TestPlugin(t *testing.T) {
 			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
 			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
-				reserve: result{
-					status: framework.NewStatus(framework.Pending, `waiting for resource driver to allocate resource`),
+				prebind: result{
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver`),
 					added:  []metav1.Object{schedulingSelectedPotential},
 				},
 			},
@@ -365,8 +365,8 @@ func TestPlugin(t *testing.T) {
 			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim, pendingDelayedClaim2},
 			classes: []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
-				reserve: result{
-					status: framework.NewStatus(framework.Pending, `waiting for resource driver to provide information`),
+				prebind: result{
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver`),
 					added:  []metav1.Object{schedulingPotential},
 				},
 			},
@@ -379,8 +379,8 @@ func TestPlugin(t *testing.T) {
 			schedulings: []*resourcev1alpha2.PodSchedulingContext{schedulingInfo},
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			want: want{
-				reserve: result{
-					status: framework.NewStatus(framework.Pending, `waiting for resource driver to allocate resource`),
+				prebind: result{
+					status: framework.NewStatus(framework.Pending, `waiting for resource driver`),
 					changes: change{
 						scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
 							return st.FromPodSchedulingContexts(in).
@@ -399,7 +399,7 @@ func TestPlugin(t *testing.T) {
 			schedulings: []*resourcev1alpha2.PodSchedulingContext{schedulingInfo},
 			classes:     []*resourcev1alpha2.ResourceClass{resourceClass},
 			prepare: prepare{
-				reserve: change{
+				prebind: change{
 					scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
 						// This does not actually conflict with setting the
 						// selected node, but because the plugin is not using
@@ -411,7 +411,7 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 			want: want{
-				reserve: result{
+				prebind: result{
 					status: framework.AsStatus(errors.New(`ResourceVersion must match the object that gets updated`)),
 				},
 			},
