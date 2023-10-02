@@ -50,6 +50,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -1312,13 +1313,15 @@ func createPods(ctx context.Context, tb testing.TB, namespace string, cpo *creat
 // namespace are scheduled. Times out after 10 minutes because even at the
 // lowest observed QPS of ~10 pods/sec, a 5000-node test should complete.
 func waitUntilPodsScheduledInNamespace(ctx context.Context, tb testing.TB, podInformer coreinformers.PodInformer, namespace string, wantCount int) error {
-	return wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+	var pendingPod *v1.Pod
+
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
 		select {
 		case <-ctx.Done():
 			return true, ctx.Err()
 		default:
 		}
-		scheduled, err := getScheduledPods(podInformer, namespace)
+		scheduled, unscheduled, err := getScheduledPods(podInformer, namespace)
 		if err != nil {
 			return false, err
 		}
@@ -1327,8 +1330,18 @@ func waitUntilPodsScheduledInNamespace(ctx context.Context, tb testing.TB, podIn
 			return true, nil
 		}
 		tb.Logf("namespace: %s, pods: want %d, got %d", namespace, wantCount, len(scheduled))
+		if len(unscheduled) > 0 {
+			pendingPod = unscheduled[0]
+		} else {
+			pendingPod = nil
+		}
 		return false, nil
 	})
+
+	if err != nil && pendingPod != nil {
+		err = fmt.Errorf("at least pod %s is not scheduled: %v", klog.KObj(pendingPod), err)
+	}
+	return err
 }
 
 // waitUntilPodsScheduled blocks until the all pods in the given namespaces are
