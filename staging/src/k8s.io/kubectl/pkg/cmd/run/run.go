@@ -515,7 +515,7 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Po
 		return err
 	}
 
-	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &corev1.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false)
+	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &corev1.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false, false)
 	if err != nil {
 		return err
 	}

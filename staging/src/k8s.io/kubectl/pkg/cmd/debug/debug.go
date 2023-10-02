@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -723,7 +724,7 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 				return false, fmt.Errorf("watch did not return a pod: %v", ev.Object)
 			}
 
-			s := getContainerStatusByName(p, containerName)
+			s := podcmd.GetContainerStatusByName(p, containerName)
 			if s == nil {
 				return false, nil
 			}
@@ -777,7 +778,7 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter gen
 		opts.AttachFunc = attach.DefaultAttachFunc
 	}
 
-	status := getContainerStatusByName(pod, containerName)
+	status := podcmd.GetContainerStatusByName(pod, containerName)
 	if status == nil {
 		// impossible path
 		return fmt.Errorf("error getting container status of container name %q: %+v", containerName, err)
@@ -794,18 +795,6 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter gen
 	return nil
 }
 
-func getContainerStatusByName(pod *corev1.Pod, containerName string) *corev1.ContainerStatus {
-	allContainerStatus := [][]corev1.ContainerStatus{pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses, pod.Status.EphemeralContainerStatuses}
-	for _, statusSlice := range allContainerStatus {
-		for i := range statusSlice {
-			if statusSlice[i].Name == containerName {
-				return &statusSlice[i]
-			}
-		}
-	}
-	return nil
-}
-
 // logOpts logs output from opts to the pods log.
 func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Pod, opts *attach.AttachOptions) error {
 	ctrName, err := opts.GetContainerName(pod)
@@ -813,7 +802,7 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Po
 		return err
 	}
 
-	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &corev1.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false)
+	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &corev1.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false, false)
 	if err != nil {
 		return err
 	}

@@ -245,7 +245,7 @@ func TestLog(t *testing.T) {
 			name: "fail if LogsForObject fails",
 			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
 				o := NewLogsOptions(streams, false)
-				o.LogsForObject = func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
+				o.LogsForObject = func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool, wait bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 					return nil, errors.New("Error from the LogsForObject")
 				}
 				return o
@@ -663,6 +663,23 @@ func TestValidateLogOptions(t *testing.T) {
 			args:     []string{"my-pod", "my-container"},
 			expected: "only one of -c or an inline",
 		},
+		{
+			name: "--wait not combined with --follow",
+			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
+				o := NewLogsOptions(streams, false)
+				o.Wait = true
+
+				var err error
+				o.Options, err = o.ToLogOptions()
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
+				return o
+			},
+			args:     []string{"my-pod", "my-container"},
+			expected: "--wait should be used only with --follow",
+		},
 	}
 	for _, test := range tests {
 		streams := genericiooptions.NewTestIOStreamsDiscard()
@@ -873,7 +890,7 @@ func (l *logTestMock) mockConsumeRequest(request restclient.ResponseWrapper, out
 	return err
 }
 
-func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
+func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool, wait bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 	switch object.(type) {
 	case *corev1.Pod:
 		_, ok := options.(*corev1.PodLogOptions)

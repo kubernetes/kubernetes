@@ -68,6 +68,9 @@ var (
 		# Begin streaming the logs of the ruby container in pod web-1
 		kubectl logs -f -c ruby web-1
 
+		# Wait for atleast one container to be ready before streaming the logs
+		kubectl logs -f web-1 -w
+
 		# Begin streaming the logs from all containers in pods defined by label app=nginx
 		kubectl logs -f -l app=nginx --all-containers=true
 
@@ -114,6 +117,7 @@ type LogsOptions struct {
 	Tail                         int64
 	Container                    string
 	InsecureSkipTLSVerifyBackend bool
+	Wait                         bool
 
 	// whether or not a container name was given via --container
 	ContainerNameSpecified bool
@@ -182,6 +186,7 @@ func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 	cmd.Flags().IntVar(&o.MaxFollowConcurrency, "max-log-requests", o.MaxFollowConcurrency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
 	cmd.Flags().BoolVar(&o.Prefix, "prefix", o.Prefix, "Prefix each log line with the log source (pod name and container name)")
+	cmd.Flags().BoolVarP(&o.Wait, "wait", "w", o.Wait, "Wait for the container to be running when the logs are streaming")
 }
 
 func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
@@ -319,12 +324,16 @@ func (o LogsOptions) Validate() error {
 		return fmt.Errorf("--tail must be greater than or equal to -1")
 	}
 
+	if o.Wait && !o.Follow {
+		return fmt.Errorf("--wait should be used only with --follow")
+	}
+
 	return nil
 }
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() error {
-	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
+	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers, o.Wait)
 	if err != nil {
 		return err
 	}
