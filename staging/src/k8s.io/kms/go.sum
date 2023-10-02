@@ -135,10 +135,10 @@ github.com/opencontainers/runc v1.1.9/go.mod h1:CbUumNnWCuTGFukNXahoo/RFBZvDAgRh
 github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/selinux v1.10.0/go.mod h1:2i0OySw99QjzBBQByd1Gr9gSjvuho1lHsJxIJ3gGbJI=
 github.com/openshift/api v0.0.0-20230915112357-693d4b64813c/go.mod h1:NFgA+laiQtptmjsp1trDnGqjV62nYzlUfQ6P5I9oqXA=
-github.com/openshift/apiserver-library-go v0.0.0-20230915134751-5c71e94d6f05/go.mod h1:x2CP20tBy7PnNCy0N6LxwnNHwsiPBlmAqG4xemgemZ8=
-github.com/openshift/client-go v0.0.0-20230915115245-53bd8980dfb7/go.mod h1:ihUJrhBcYAGYQrJu/gP2OMgfVds5f5z5kbeLNBqjHLo=
+github.com/openshift/apiserver-library-go v0.0.0-20230927115548-521857444d9a/go.mod h1:1EYKLn9Noff0qebQdZghEtZDYNySM575P5Xo8WnB+Lk=
+github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1/go.mod h1:ihUJrhBcYAGYQrJu/gP2OMgfVds5f5z5kbeLNBqjHLo=
 github.com/openshift/google-cadvisor v0.47.3-openshift-4.15-1/go.mod h1:oVv5yHVVOLU95NPFplxxFkOiQd+hCBnXW/iH3taVm58=
-github.com/openshift/library-go v0.0.0-20230915122714-b753831a0dce/go.mod h1:Y3kMcQhx+oARET073sjj5YruA6Ef4zdAbh9w/ikU7DA=
+github.com/openshift/library-go v0.0.0-20230927113136-405c34317fa4/go.mod h1:hl8bxWuFMM72N4YH7FKLGWtYhDz/A0xwvaa8Yr5fxYU=
 github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20230811135323-13a5964cc98e/go.mod h1:gCQYp2Q+kSoIj7ykSVb9nskRSsR6PUj4AiLywzIhbKM=
 github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

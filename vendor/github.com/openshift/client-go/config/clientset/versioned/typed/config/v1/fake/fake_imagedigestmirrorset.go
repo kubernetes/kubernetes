@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	configv1 "github.com/openshift/api/config/v1"
-	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeImageDigestMirrorSets struct {
 	Fake *FakeConfigV1
 }
 
-var imagedigestmirrorsetsResource = schema.GroupVersionResource{Group: "config.openshift.io", Version: "v1", Resource: "imagedigestmirrorsets"}
+var imagedigestmirrorsetsResource = v1.SchemeGroupVersion.WithResource("imagedigestmirrorsets")
 
-var imagedigestmirrorsetsKind = schema.GroupVersionKind{Group: "config.openshift.io", Version: "v1", Kind: "ImageDigestMirrorSet"}
+var imagedigestmirrorsetsKind = v1.SchemeGroupVersion.WithKind("ImageDigestMirrorSet")
 
 // Get takes name of the imageDigestMirrorSet, and returns the corresponding imageDigestMirrorSet object, and an error if there is any.
-func (c *FakeImageDigestMirrorSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *configv1.ImageDigestMirrorSet, err error) {
+func (c *FakeImageDigestMirrorSets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ImageDigestMirrorSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(imagedigestmirrorsetsResource, name), &configv1.ImageDigestMirrorSet{})
+		Invokes(testing.NewRootGetAction(imagedigestmirrorsetsResource, name), &v1.ImageDigestMirrorSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.ImageDigestMirrorSet), err
+	return obj.(*v1.ImageDigestMirrorSet), err
 }
 
 // List takes label and field selectors, and returns the list of ImageDigestMirrorSets that match those selectors.
-func (c *FakeImageDigestMirrorSets) List(ctx context.Context, opts v1.ListOptions) (result *configv1.ImageDigestMirrorSetList, err error) {
+func (c *FakeImageDigestMirrorSets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ImageDigestMirrorSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(imagedigestmirrorsetsResource, imagedigestmirrorsetsKind, opts), &configv1.ImageDigestMirrorSetList{})
+		Invokes(testing.NewRootListAction(imagedigestmirrorsetsResource, imagedigestmirrorsetsKind, opts), &v1.ImageDigestMirrorSetList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeImageDigestMirrorSets) List(ctx context.Context, opts v1.ListOption
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &configv1.ImageDigestMirrorSetList{ListMeta: obj.(*configv1.ImageDigestMirrorSetList).ListMeta}
-	for _, item := range obj.(*configv1.ImageDigestMirrorSetList).Items {
+	list := &v1.ImageDigestMirrorSetList{ListMeta: obj.(*v1.ImageDigestMirrorSetList).ListMeta}
+	for _, item := range obj.(*v1.ImageDigestMirrorSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +57,69 @@ func (c *FakeImageDigestMirrorSets) List(ctx context.Context, opts v1.ListOption
 }
 
 // Watch returns a watch.Interface that watches the requested imageDigestMirrorSets.
-func (c *FakeImageDigestMirrorSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeImageDigestMirrorSets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(imagedigestmirrorsetsResource, opts))
 }
 
 // Create takes the representation of a imageDigestMirrorSet and creates it.  Returns the server's representation of the imageDigestMirrorSet, and an error, if there is any.
-func (c *FakeImageDigestMirrorSets) Create(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSet, opts v1.CreateOptions) (result *configv1.ImageDigestMirrorSet, err error) {
+func (c *FakeImageDigestMirrorSets) Create(ctx context.Context, imageDigestMirrorSet *v1.ImageDigestMirrorSet, opts metav1.CreateOptions) (result *v1.ImageDigestMirrorSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(imagedigestmirrorsetsResource, imageDigestMirrorSet), &configv1.ImageDigestMirrorSet{})
+		Invokes(testing.NewRootCreateAction(imagedigestmirrorsetsResource, imageDigestMirrorSet), &v1.ImageDigestMirrorSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.ImageDigestMirrorSet), err
+	return obj.(*v1.ImageDigestMirrorSet), err
 }
 
 // Update takes the representation of a imageDigestMirrorSet and updates it. Returns the server's representation of the imageDigestMirrorSet, and an error, if there is any.
-func (c *FakeImageDigestMirrorSets) Update(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSet, opts v1.UpdateOptions) (result *configv1.ImageDigestMirrorSet, err error) {
+func (c *FakeImageDigestMirrorSets) Update(ctx context.Context, imageDigestMirrorSet *v1.ImageDigestMirrorSet, opts metav1.UpdateOptions) (result *v1.ImageDigestMirrorSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(imagedigestmirrorsetsResource, imageDigestMirrorSet), &configv1.ImageDigestMirrorSet{})
+		Invokes(testing.NewRootUpdateAction(imagedigestmirrorsetsResource, imageDigestMirrorSet), &v1.ImageDigestMirrorSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.ImageDigestMirrorSet), err
+	return obj.(*v1.ImageDigestMirrorSet), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeImageDigestMirrorSets) UpdateStatus(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSet, opts v1.UpdateOptions) (*configv1.ImageDigestMirrorSet, error) {
+func (c *FakeImageDigestMirrorSets) UpdateStatus(ctx context.Context, imageDigestMirrorSet *v1.ImageDigestMirrorSet, opts metav1.UpdateOptions) (*v1.ImageDigestMirrorSet, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(imagedigestmirrorsetsResource, "status", imageDigestMirrorSet), &configv1.ImageDigestMirrorSet{})
+		Invokes(testing.NewRootUpdateSubresourceAction(imagedigestmirrorsetsResource, "status", imageDigestMirrorSet), &v1.ImageDigestMirrorSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.ImageDigestMirrorSet), err
+	return obj.(*v1.ImageDigestMirrorSet), err
 }
 
 // Delete takes name of the imageDigestMirrorSet and deletes it. Returns an error if one occurs.
-func (c *FakeImageDigestMirrorSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeImageDigestMirrorSets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(imagedigestmirrorsetsResource, name, opts), &configv1.ImageDigestMirrorSet{})
+		Invokes(testing.NewRootDeleteActionWithOptions(imagedigestmirrorsetsResource, name, opts), &v1.ImageDigestMirrorSet{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeImageDigestMirrorSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeImageDigestMirrorSets) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(imagedigestmirrorsetsResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &configv1.ImageDigestMirrorSetList{})
+	_, err := c.Fake.Invokes(action, &v1.ImageDigestMirrorSetList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched imageDigestMirrorSet.
-func (c *FakeImageDigestMirrorSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *configv1.ImageDigestMirrorSet, err error) {
+func (c *FakeImageDigestMirrorSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ImageDigestMirrorSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(imagedigestmirrorsetsResource, name, pt, data, subresources...), &configv1.ImageDigestMirrorSet{})
+		Invokes(testing.NewRootPatchSubresourceAction(imagedigestmirrorsetsResource, name, pt, data, subresources...), &v1.ImageDigestMirrorSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.ImageDigestMirrorSet), err
+	return obj.(*v1.ImageDigestMirrorSet), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied imageDigestMirrorSet.
-func (c *FakeImageDigestMirrorSets) Apply(ctx context.Context, imageDigestMirrorSet *applyconfigurationsconfigv1.ImageDigestMirrorSetApplyConfiguration, opts v1.ApplyOptions) (result *configv1.ImageDigestMirrorSet, err error) {
+func (c *FakeImageDigestMirrorSets) Apply(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageDigestMirrorSet, err error) {
 	if imageDigestMirrorSet == nil {
 		return nil, fmt.Errorf("imageDigestMirrorSet provided to Apply must not be nil")
 	}
@@ -133,16 +132,16 @@ func (c *FakeImageDigestMirrorSets) Apply(ctx context.Context, imageDigestMirror
 		return nil, fmt.Errorf("imageDigestMirrorSet.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(imagedigestmirrorsetsResource, *name, types.ApplyPatchType, data), &configv1.ImageDigestMirrorSet{})
+		Invokes(testing.NewRootPatchSubresourceAction(imagedigestmirrorsetsResource, *name, types.ApplyPatchType, data), &v1.ImageDigestMirrorSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.ImageDigestMirrorSet), err
+	return obj.(*v1.ImageDigestMirrorSet), err
 }
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeImageDigestMirrorSets) ApplyStatus(ctx context.Context, imageDigestMirrorSet *applyconfigurationsconfigv1.ImageDigestMirrorSetApplyConfiguration, opts v1.ApplyOptions) (result *configv1.ImageDigestMirrorSet, err error) {
+func (c *FakeImageDigestMirrorSets) ApplyStatus(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageDigestMirrorSet, err error) {
 	if imageDigestMirrorSet == nil {
 		return nil, fmt.Errorf("imageDigestMirrorSet provided to Apply must not be nil")
 	}
@@ -155,9 +154,9 @@ func (c *FakeImageDigestMirrorSets) ApplyStatus(ctx context.Context, imageDigest
 		return nil, fmt.Errorf("imageDigestMirrorSet.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(imagedigestmirrorsetsResource, *name, types.ApplyPatchType, data, "status"), &configv1.ImageDigestMirrorSet{})
+		Invokes(testing.NewRootPatchSubresourceAction(imagedigestmirrorsetsResource, *name, types.ApplyPatchType, data, "status"), &v1.ImageDigestMirrorSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.ImageDigestMirrorSet), err
+	return obj.(*v1.ImageDigestMirrorSet), err
 }

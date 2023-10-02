@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	operatorv1 "github.com/openshift/api/operator/v1"
-	applyconfigurationsoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/operator/v1"
+	operatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeClusterCSIDrivers struct {
 	Fake *FakeOperatorV1
 }
 
-var clustercsidriversResource = schema.GroupVersionResource{Group: "operator.openshift.io", Version: "v1", Resource: "clustercsidrivers"}
+var clustercsidriversResource = v1.SchemeGroupVersion.WithResource("clustercsidrivers")
 
-var clustercsidriversKind = schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1", Kind: "ClusterCSIDriver"}
+var clustercsidriversKind = v1.SchemeGroupVersion.WithKind("ClusterCSIDriver")
 
 // Get takes name of the clusterCSIDriver, and returns the corresponding clusterCSIDriver object, and an error if there is any.
-func (c *FakeClusterCSIDrivers) Get(ctx context.Context, name string, options v1.GetOptions) (result *operatorv1.ClusterCSIDriver, err error) {
+func (c *FakeClusterCSIDrivers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterCSIDriver, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clustercsidriversResource, name), &operatorv1.ClusterCSIDriver{})
+		Invokes(testing.NewRootGetAction(clustercsidriversResource, name), &v1.ClusterCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.ClusterCSIDriver), err
+	return obj.(*v1.ClusterCSIDriver), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterCSIDrivers that match those selectors.
-func (c *FakeClusterCSIDrivers) List(ctx context.Context, opts v1.ListOptions) (result *operatorv1.ClusterCSIDriverList, err error) {
+func (c *FakeClusterCSIDrivers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterCSIDriverList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clustercsidriversResource, clustercsidriversKind, opts), &operatorv1.ClusterCSIDriverList{})
+		Invokes(testing.NewRootListAction(clustercsidriversResource, clustercsidriversKind, opts), &v1.ClusterCSIDriverList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeClusterCSIDrivers) List(ctx context.Context, opts v1.ListOptions) (
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &operatorv1.ClusterCSIDriverList{ListMeta: obj.(*operatorv1.ClusterCSIDriverList).ListMeta}
-	for _, item := range obj.(*operatorv1.ClusterCSIDriverList).Items {
+	list := &v1.ClusterCSIDriverList{ListMeta: obj.(*v1.ClusterCSIDriverList).ListMeta}
+	for _, item := range obj.(*v1.ClusterCSIDriverList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +57,69 @@ func (c *FakeClusterCSIDrivers) List(ctx context.Context, opts v1.ListOptions) (
 }
 
 // Watch returns a watch.Interface that watches the requested clusterCSIDrivers.
-func (c *FakeClusterCSIDrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterCSIDrivers) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(clustercsidriversResource, opts))
 }
 
 // Create takes the representation of a clusterCSIDriver and creates it.  Returns the server's representation of the clusterCSIDriver, and an error, if there is any.
-func (c *FakeClusterCSIDrivers) Create(ctx context.Context, clusterCSIDriver *operatorv1.ClusterCSIDriver, opts v1.CreateOptions) (result *operatorv1.ClusterCSIDriver, err error) {
+func (c *FakeClusterCSIDrivers) Create(ctx context.Context, clusterCSIDriver *v1.ClusterCSIDriver, opts metav1.CreateOptions) (result *v1.ClusterCSIDriver, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clustercsidriversResource, clusterCSIDriver), &operatorv1.ClusterCSIDriver{})
+		Invokes(testing.NewRootCreateAction(clustercsidriversResource, clusterCSIDriver), &v1.ClusterCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.ClusterCSIDriver), err
+	return obj.(*v1.ClusterCSIDriver), err
 }
 
 // Update takes the representation of a clusterCSIDriver and updates it. Returns the server's representation of the clusterCSIDriver, and an error, if there is any.
-func (c *FakeClusterCSIDrivers) Update(ctx context.Context, clusterCSIDriver *operatorv1.ClusterCSIDriver, opts v1.UpdateOptions) (result *operatorv1.ClusterCSIDriver, err error) {
+func (c *FakeClusterCSIDrivers) Update(ctx context.Context, clusterCSIDriver *v1.ClusterCSIDriver, opts metav1.UpdateOptions) (result *v1.ClusterCSIDriver, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clustercsidriversResource, clusterCSIDriver), &operatorv1.ClusterCSIDriver{})
+		Invokes(testing.NewRootUpdateAction(clustercsidriversResource, clusterCSIDriver), &v1.ClusterCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.ClusterCSIDriver), err
+	return obj.(*v1.ClusterCSIDriver), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterCSIDrivers) UpdateStatus(ctx context.Context, clusterCSIDriver *operatorv1.ClusterCSIDriver, opts v1.UpdateOptions) (*operatorv1.ClusterCSIDriver, error) {
+func (c *FakeClusterCSIDrivers) UpdateStatus(ctx context.Context, clusterCSIDriver *v1.ClusterCSIDriver, opts metav1.UpdateOptions) (*v1.ClusterCSIDriver, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clustercsidriversResource, "status", clusterCSIDriver), &operatorv1.ClusterCSIDriver{})
+		Invokes(testing.NewRootUpdateSubresourceAction(clustercsidriversResource, "status", clusterCSIDriver), &v1.ClusterCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.ClusterCSIDriver), err
+	return obj.(*v1.ClusterCSIDriver), err
 }
 
 // Delete takes name of the clusterCSIDriver and deletes it. Returns an error if one occurs.
-func (c *FakeClusterCSIDrivers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeClusterCSIDrivers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(clustercsidriversResource, name, opts), &operatorv1.ClusterCSIDriver{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clustercsidriversResource, name, opts), &v1.ClusterCSIDriver{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterCSIDrivers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeClusterCSIDrivers) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(clustercsidriversResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &operatorv1.ClusterCSIDriverList{})
+	_, err := c.Fake.Invokes(action, &v1.ClusterCSIDriverList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterCSIDriver.
-func (c *FakeClusterCSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *operatorv1.ClusterCSIDriver, err error) {
+func (c *FakeClusterCSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterCSIDriver, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustercsidriversResource, name, pt, data, subresources...), &operatorv1.ClusterCSIDriver{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustercsidriversResource, name, pt, data, subresources...), &v1.ClusterCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.ClusterCSIDriver), err
+	return obj.(*v1.ClusterCSIDriver), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied clusterCSIDriver.
-func (c *FakeClusterCSIDrivers) Apply(ctx context.Context, clusterCSIDriver *applyconfigurationsoperatorv1.ClusterCSIDriverApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.ClusterCSIDriver, err error) {
+func (c *FakeClusterCSIDrivers) Apply(ctx context.Context, clusterCSIDriver *operatorv1.ClusterCSIDriverApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterCSIDriver, err error) {
 	if clusterCSIDriver == nil {
 		return nil, fmt.Errorf("clusterCSIDriver provided to Apply must not be nil")
 	}
@@ -133,16 +132,16 @@ func (c *FakeClusterCSIDrivers) Apply(ctx context.Context, clusterCSIDriver *app
 		return nil, fmt.Errorf("clusterCSIDriver.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustercsidriversResource, *name, types.ApplyPatchType, data), &operatorv1.ClusterCSIDriver{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustercsidriversResource, *name, types.ApplyPatchType, data), &v1.ClusterCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.ClusterCSIDriver), err
+	return obj.(*v1.ClusterCSIDriver), err
 }
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeClusterCSIDrivers) ApplyStatus(ctx context.Context, clusterCSIDriver *applyconfigurationsoperatorv1.ClusterCSIDriverApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.ClusterCSIDriver, err error) {
+func (c *FakeClusterCSIDrivers) ApplyStatus(ctx context.Context, clusterCSIDriver *operatorv1.ClusterCSIDriverApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterCSIDriver, err error) {
 	if clusterCSIDriver == nil {
 		return nil, fmt.Errorf("clusterCSIDriver provided to Apply must not be nil")
 	}
@@ -155,9 +154,9 @@ func (c *FakeClusterCSIDrivers) ApplyStatus(ctx context.Context, clusterCSIDrive
 		return nil, fmt.Errorf("clusterCSIDriver.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustercsidriversResource, *name, types.ApplyPatchType, data, "status"), &operatorv1.ClusterCSIDriver{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustercsidriversResource, *name, types.ApplyPatchType, data, "status"), &v1.ClusterCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.ClusterCSIDriver), err
+	return obj.(*v1.ClusterCSIDriver), err
 }

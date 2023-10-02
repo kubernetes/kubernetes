@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	apiserverv1 "github.com/openshift/api/apiserver/v1"
-	applyconfigurationsapiserverv1 "github.com/openshift/client-go/apiserver/applyconfigurations/apiserver/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/apiserver/v1"
+	apiserverv1 "github.com/openshift/client-go/apiserver/applyconfigurations/apiserver/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeAPIRequestCounts struct {
 	Fake *FakeApiserverV1
 }
 
-var apirequestcountsResource = schema.GroupVersionResource{Group: "apiserver.openshift.io", Version: "v1", Resource: "apirequestcounts"}
+var apirequestcountsResource = v1.SchemeGroupVersion.WithResource("apirequestcounts")
 
-var apirequestcountsKind = schema.GroupVersionKind{Group: "apiserver.openshift.io", Version: "v1", Kind: "APIRequestCount"}
+var apirequestcountsKind = v1.SchemeGroupVersion.WithKind("APIRequestCount")
 
 // Get takes name of the aPIRequestCount, and returns the corresponding aPIRequestCount object, and an error if there is any.
-func (c *FakeAPIRequestCounts) Get(ctx context.Context, name string, options v1.GetOptions) (result *apiserverv1.APIRequestCount, err error) {
+func (c *FakeAPIRequestCounts) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.APIRequestCount, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(apirequestcountsResource, name), &apiserverv1.APIRequestCount{})
+		Invokes(testing.NewRootGetAction(apirequestcountsResource, name), &v1.APIRequestCount{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apiserverv1.APIRequestCount), err
+	return obj.(*v1.APIRequestCount), err
 }
 
 // List takes label and field selectors, and returns the list of APIRequestCounts that match those selectors.
-func (c *FakeAPIRequestCounts) List(ctx context.Context, opts v1.ListOptions) (result *apiserverv1.APIRequestCountList, err error) {
+func (c *FakeAPIRequestCounts) List(ctx context.Context, opts metav1.ListOptions) (result *v1.APIRequestCountList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(apirequestcountsResource, apirequestcountsKind, opts), &apiserverv1.APIRequestCountList{})
+		Invokes(testing.NewRootListAction(apirequestcountsResource, apirequestcountsKind, opts), &v1.APIRequestCountList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeAPIRequestCounts) List(ctx context.Context, opts v1.ListOptions) (r
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &apiserverv1.APIRequestCountList{ListMeta: obj.(*apiserverv1.APIRequestCountList).ListMeta}
-	for _, item := range obj.(*apiserverv1.APIRequestCountList).Items {
+	list := &v1.APIRequestCountList{ListMeta: obj.(*v1.APIRequestCountList).ListMeta}
+	for _, item := range obj.(*v1.APIRequestCountList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +57,69 @@ func (c *FakeAPIRequestCounts) List(ctx context.Context, opts v1.ListOptions) (r
 }
 
 // Watch returns a watch.Interface that watches the requested aPIRequestCounts.
-func (c *FakeAPIRequestCounts) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeAPIRequestCounts) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(apirequestcountsResource, opts))
 }
 
 // Create takes the representation of a aPIRequestCount and creates it.  Returns the server's representation of the aPIRequestCount, and an error, if there is any.
-func (c *FakeAPIRequestCounts) Create(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCount, opts v1.CreateOptions) (result *apiserverv1.APIRequestCount, err error) {
+func (c *FakeAPIRequestCounts) Create(ctx context.Context, aPIRequestCount *v1.APIRequestCount, opts metav1.CreateOptions) (result *v1.APIRequestCount, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(apirequestcountsResource, aPIRequestCount), &apiserverv1.APIRequestCount{})
+		Invokes(testing.NewRootCreateAction(apirequestcountsResource, aPIRequestCount), &v1.APIRequestCount{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apiserverv1.APIRequestCount), err
+	return obj.(*v1.APIRequestCount), err
 }
 
 // Update takes the representation of a aPIRequestCount and updates it. Returns the server's representation of the aPIRequestCount, and an error, if there is any.
-func (c *FakeAPIRequestCounts) Update(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCount, opts v1.UpdateOptions) (result *apiserverv1.APIRequestCount, err error) {
+func (c *FakeAPIRequestCounts) Update(ctx context.Context, aPIRequestCount *v1.APIRequestCount, opts metav1.UpdateOptions) (result *v1.APIRequestCount, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(apirequestcountsResource, aPIRequestCount), &apiserverv1.APIRequestCount{})
+		Invokes(testing.NewRootUpdateAction(apirequestcountsResource, aPIRequestCount), &v1.APIRequestCount{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apiserverv1.APIRequestCount), err
+	return obj.(*v1.APIRequestCount), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeAPIRequestCounts) UpdateStatus(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCount, opts v1.UpdateOptions) (*apiserverv1.APIRequestCount, error) {
+func (c *FakeAPIRequestCounts) UpdateStatus(ctx context.Context, aPIRequestCount *v1.APIRequestCount, opts metav1.UpdateOptions) (*v1.APIRequestCount, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(apirequestcountsResource, "status", aPIRequestCount), &apiserverv1.APIRequestCount{})
+		Invokes(testing.NewRootUpdateSubresourceAction(apirequestcountsResource, "status", aPIRequestCount), &v1.APIRequestCount{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apiserverv1.APIRequestCount), err
+	return obj.(*v1.APIRequestCount), err
 }
 
 // Delete takes name of the aPIRequestCount and deletes it. Returns an error if one occurs.
-func (c *FakeAPIRequestCounts) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeAPIRequestCounts) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(apirequestcountsResource, name, opts), &apiserverv1.APIRequestCount{})
+		Invokes(testing.NewRootDeleteActionWithOptions(apirequestcountsResource, name, opts), &v1.APIRequestCount{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeAPIRequestCounts) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeAPIRequestCounts) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(apirequestcountsResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &apiserverv1.APIRequestCountList{})
+	_, err := c.Fake.Invokes(action, &v1.APIRequestCountList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched aPIRequestCount.
-func (c *FakeAPIRequestCounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *apiserverv1.APIRequestCount, err error) {
+func (c *FakeAPIRequestCounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.APIRequestCount, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(apirequestcountsResource, name, pt, data, subresources...), &apiserverv1.APIRequestCount{})
+		Invokes(testing.NewRootPatchSubresourceAction(apirequestcountsResource, name, pt, data, subresources...), &v1.APIRequestCount{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apiserverv1.APIRequestCount), err
+	return obj.(*v1.APIRequestCount), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied aPIRequestCount.
-func (c *FakeAPIRequestCounts) Apply(ctx context.Context, aPIRequestCount *applyconfigurationsapiserverv1.APIRequestCountApplyConfiguration, opts v1.ApplyOptions) (result *apiserverv1.APIRequestCount, err error) {
+func (c *FakeAPIRequestCounts) Apply(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCountApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIRequestCount, err error) {
 	if aPIRequestCount == nil {
 		return nil, fmt.Errorf("aPIRequestCount provided to Apply must not be nil")
 	}
@@ -133,16 +132,16 @@ func (c *FakeAPIRequestCounts) Apply(ctx context.Context, aPIRequestCount *apply
 		return nil, fmt.Errorf("aPIRequestCount.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(apirequestcountsResource, *name, types.ApplyPatchType, data), &apiserverv1.APIRequestCount{})
+		Invokes(testing.NewRootPatchSubresourceAction(apirequestcountsResource, *name, types.ApplyPatchType, data), &v1.APIRequestCount{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apiserverv1.APIRequestCount), err
+	return obj.(*v1.APIRequestCount), err
 }
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeAPIRequestCounts) ApplyStatus(ctx context.Context, aPIRequestCount *applyconfigurationsapiserverv1.APIRequestCountApplyConfiguration, opts v1.ApplyOptions) (result *apiserverv1.APIRequestCount, err error) {
+func (c *FakeAPIRequestCounts) ApplyStatus(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCountApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIRequestCount, err error) {
 	if aPIRequestCount == nil {
 		return nil, fmt.Errorf("aPIRequestCount provided to Apply must not be nil")
 	}
@@ -155,9 +154,9 @@ func (c *FakeAPIRequestCounts) ApplyStatus(ctx context.Context, aPIRequestCount 
 		return nil, fmt.Errorf("aPIRequestCount.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(apirequestcountsResource, *name, types.ApplyPatchType, data, "status"), &apiserverv1.APIRequestCount{})
+		Invokes(testing.NewRootPatchSubresourceAction(apirequestcountsResource, *name, types.ApplyPatchType, data, "status"), &v1.APIRequestCount{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apiserverv1.APIRequestCount), err
+	return obj.(*v1.APIRequestCount), err
 }

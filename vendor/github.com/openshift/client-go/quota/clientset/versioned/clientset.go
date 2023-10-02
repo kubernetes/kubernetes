@@ -17,8 +17,7 @@ type Interface interface {
 	QuotaV1() quotav1.QuotaV1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	quotaV1 *quotav1.QuotaV1Client

@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	operatorv1 "github.com/openshift/api/operator/v1"
-	applyconfigurationsoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/operator/v1"
+	operatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeStorages struct {
 	Fake *FakeOperatorV1
 }
 
-var storagesResource = schema.GroupVersionResource{Group: "operator.openshift.io", Version: "v1", Resource: "storages"}
+var storagesResource = v1.SchemeGroupVersion.WithResource("storages")
 
-var storagesKind = schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1", Kind: "Storage"}
+var storagesKind = v1.SchemeGroupVersion.WithKind("Storage")
 
 // Get takes name of the storage, and returns the corresponding storage object, and an error if there is any.
-func (c *FakeStorages) Get(ctx context.Context, name string, options v1.GetOptions) (result *operatorv1.Storage, err error) {
+func (c *FakeStorages) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Storage, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(storagesResource, name), &operatorv1.Storage{})
+		Invokes(testing.NewRootGetAction(storagesResource, name), &v1.Storage{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.Storage), err
+	return obj.(*v1.Storage), err
 }
 
 // List takes label and field selectors, and returns the list of Storages that match those selectors.
-func (c *FakeStorages) List(ctx context.Context, opts v1.ListOptions) (result *operatorv1.StorageList, err error) {
+func (c *FakeStorages) List(ctx context.Context, opts metav1.ListOptions) (result *v1.StorageList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(storagesResource, storagesKind, opts), &operatorv1.StorageList{})
+		Invokes(testing.NewRootListAction(storagesResource, storagesKind, opts), &v1.StorageList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeStorages) List(ctx context.Context, opts v1.ListOptions) (result *o
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &operatorv1.StorageList{ListMeta: obj.(*operatorv1.StorageList).ListMeta}
-	for _, item := range obj.(*operatorv1.StorageList).Items {
+	list := &v1.StorageList{ListMeta: obj.(*v1.StorageList).ListMeta}
+	for _, item := range obj.(*v1.StorageList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +57,69 @@ func (c *FakeStorages) List(ctx context.Context, opts v1.ListOptions) (result *o
 }
 
 // Watch returns a watch.Interface that watches the requested storages.
-func (c *FakeStorages) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeStorages) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(storagesResource, opts))
 }
 
 // Create takes the representation of a storage and creates it.  Returns the server's representation of the storage, and an error, if there is any.
-func (c *FakeStorages) Create(ctx context.Context, storage *operatorv1.Storage, opts v1.CreateOptions) (result *operatorv1.Storage, err error) {
+func (c *FakeStorages) Create(ctx context.Context, storage *v1.Storage, opts metav1.CreateOptions) (result *v1.Storage, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(storagesResource, storage), &operatorv1.Storage{})
+		Invokes(testing.NewRootCreateAction(storagesResource, storage), &v1.Storage{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.Storage), err
+	return obj.(*v1.Storage), err
 }
 
 // Update takes the representation of a storage and updates it. Returns the server's representation of the storage, and an error, if there is any.
-func (c *FakeStorages) Update(ctx context.Context, storage *operatorv1.Storage, opts v1.UpdateOptions) (result *operatorv1.Storage, err error) {
+func (c *FakeStorages) Update(ctx context.Context, storage *v1.Storage, opts metav1.UpdateOptions) (result *v1.Storage, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(storagesResource, storage), &operatorv1.Storage{})
+		Invokes(testing.NewRootUpdateAction(storagesResource, storage), &v1.Storage{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.Storage), err
+	return obj.(*v1.Storage), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeStorages) UpdateStatus(ctx context.Context, storage *operatorv1.Storage, opts v1.UpdateOptions) (*operatorv1.Storage, error) {
+func (c *FakeStorages) UpdateStatus(ctx context.Context, storage *v1.Storage, opts metav1.UpdateOptions) (*v1.Storage, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(storagesResource, "status", storage), &operatorv1.Storage{})
+		Invokes(testing.NewRootUpdateSubresourceAction(storagesResource, "status", storage), &v1.Storage{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.Storage), err
+	return obj.(*v1.Storage), err
 }
 
 // Delete takes name of the storage and deletes it. Returns an error if one occurs.
-func (c *FakeStorages) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeStorages) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(storagesResource, name, opts), &operatorv1.Storage{})
+		Invokes(testing.NewRootDeleteActionWithOptions(storagesResource, name, opts), &v1.Storage{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeStorages) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeStorages) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(storagesResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &operatorv1.StorageList{})
+	_, err := c.Fake.Invokes(action, &v1.StorageList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched storage.
-func (c *FakeStorages) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *operatorv1.Storage, err error) {
+func (c *FakeStorages) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Storage, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storagesResource, name, pt, data, subresources...), &operatorv1.Storage{})
+		Invokes(testing.NewRootPatchSubresourceAction(storagesResource, name, pt, data, subresources...), &v1.Storage{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.Storage), err
+	return obj.(*v1.Storage), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied storage.
-func (c *FakeStorages) Apply(ctx context.Context, storage *applyconfigurationsoperatorv1.StorageApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.Storage, err error) {
+func (c *FakeStorages) Apply(ctx context.Context, storage *operatorv1.StorageApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Storage, err error) {
 	if storage == nil {
 		return nil, fmt.Errorf("storage provided to Apply must not be nil")
 	}
@@ -133,16 +132,16 @@ func (c *FakeStorages) Apply(ctx context.Context, storage *applyconfigurationsop
 		return nil, fmt.Errorf("storage.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storagesResource, *name, types.ApplyPatchType, data), &operatorv1.Storage{})
+		Invokes(testing.NewRootPatchSubresourceAction(storagesResource, *name, types.ApplyPatchType, data), &v1.Storage{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.Storage), err
+	return obj.(*v1.Storage), err
 }
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeStorages) ApplyStatus(ctx context.Context, storage *applyconfigurationsoperatorv1.StorageApplyConfiguration, opts v1.ApplyOptions) (result *operatorv1.Storage, err error) {
+func (c *FakeStorages) ApplyStatus(ctx context.Context, storage *operatorv1.StorageApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Storage, err error) {
 	if storage == nil {
 		return nil, fmt.Errorf("storage provided to Apply must not be nil")
 	}
@@ -155,9 +154,9 @@ func (c *FakeStorages) ApplyStatus(ctx context.Context, storage *applyconfigurat
 		return nil, fmt.Errorf("storage.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storagesResource, *name, types.ApplyPatchType, data, "status"), &operatorv1.Storage{})
+		Invokes(testing.NewRootPatchSubresourceAction(storagesResource, *name, types.ApplyPatchType, data, "status"), &v1.Storage{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*operatorv1.Storage), err
+	return obj.(*v1.Storage), err
 }

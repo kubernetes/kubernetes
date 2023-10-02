@@ -7,7 +7,6 @@ import (
 
 	v1 "github.com/openshift/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -17,9 +16,9 @@ type FakeLocalResourceAccessReviews struct {
 	ns   string
 }
 
-var localresourceaccessreviewsResource = schema.GroupVersionResource{Group: "authorization.openshift.io", Version: "v1", Resource: "localresourceaccessreviews"}
+var localresourceaccessreviewsResource = v1.SchemeGroupVersion.WithResource("localresourceaccessreviews")
 
-var localresourceaccessreviewsKind = schema.GroupVersionKind{Group: "authorization.openshift.io", Version: "v1", Kind: "LocalResourceAccessReview"}
+var localresourceaccessreviewsKind = v1.SchemeGroupVersion.WithKind("LocalResourceAccessReview")
 
 // Create takes the representation of a localResourceAccessReview and creates it.  Returns the server's representation of the resourceAccessReviewResponse, and an error, if there is any.
 func (c *FakeLocalResourceAccessReviews) Create(ctx context.Context, localResourceAccessReview *v1.LocalResourceAccessReview, opts metav1.CreateOptions) (result *v1.ResourceAccessReviewResponse, err error) {

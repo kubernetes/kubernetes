@@ -5,9 +5,8 @@ package fake
 import (
 	"context"
 
-	userv1 "github.com/openshift/api/user/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	v1 "github.com/openshift/api/user/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -16,43 +15,43 @@ type FakeUserIdentityMappings struct {
 	Fake *FakeUserV1
 }
 
-var useridentitymappingsResource = schema.GroupVersionResource{Group: "user.openshift.io", Version: "v1", Resource: "useridentitymappings"}
+var useridentitymappingsResource = v1.SchemeGroupVersion.WithResource("useridentitymappings")
 
-var useridentitymappingsKind = schema.GroupVersionKind{Group: "user.openshift.io", Version: "v1", Kind: "UserIdentityMapping"}
+var useridentitymappingsKind = v1.SchemeGroupVersion.WithKind("UserIdentityMapping")
 
 // Get takes name of the userIdentityMapping, and returns the corresponding userIdentityMapping object, and an error if there is any.
-func (c *FakeUserIdentityMappings) Get(ctx context.Context, name string, options v1.GetOptions) (result *userv1.UserIdentityMapping, err error) {
+func (c *FakeUserIdentityMappings) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.UserIdentityMapping, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(useridentitymappingsResource, name), &userv1.UserIdentityMapping{})
+		Invokes(testing.NewRootGetAction(useridentitymappingsResource, name), &v1.UserIdentityMapping{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.UserIdentityMapping), err
+	return obj.(*v1.UserIdentityMapping), err
 }
 
 // Create takes the representation of a userIdentityMapping and creates it.  Returns the server's representation of the userIdentityMapping, and an error, if there is any.
-func (c *FakeUserIdentityMappings) Create(ctx context.Context, userIdentityMapping *userv1.UserIdentityMapping, opts v1.CreateOptions) (result *userv1.UserIdentityMapping, err error) {
+func (c *FakeUserIdentityMappings) Create(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.CreateOptions) (result *v1.UserIdentityMapping, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(useridentitymappingsResource, userIdentityMapping), &userv1.UserIdentityMapping{})
+		Invokes(testing.NewRootCreateAction(useridentitymappingsResource, userIdentityMapping), &v1.UserIdentityMapping{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.UserIdentityMapping), err
+	return obj.(*v1.UserIdentityMapping), err
 }
 
 // Update takes the representation of a userIdentityMapping and updates it. Returns the server's representation of the userIdentityMapping, and an error, if there is any.
-func (c *FakeUserIdentityMappings) Update(ctx context.Context, userIdentityMapping *userv1.UserIdentityMapping, opts v1.UpdateOptions) (result *userv1.UserIdentityMapping, err error) {
+func (c *FakeUserIdentityMappings) Update(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.UpdateOptions) (result *v1.UserIdentityMapping, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(useridentitymappingsResource, userIdentityMapping), &userv1.UserIdentityMapping{})
+		Invokes(testing.NewRootUpdateAction(useridentitymappingsResource, userIdentityMapping), &v1.UserIdentityMapping{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*userv1.UserIdentityMapping), err
+	return obj.(*v1.UserIdentityMapping), err
 }
 
 // Delete takes name of the userIdentityMapping and deletes it. Returns an error if one occurs.
-func (c *FakeUserIdentityMappings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeUserIdentityMappings) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(useridentitymappingsResource, name, opts), &userv1.UserIdentityMapping{})
+		Invokes(testing.NewRootDeleteActionWithOptions(useridentitymappingsResource, name, opts), &v1.UserIdentityMapping{})
 	return err
 }

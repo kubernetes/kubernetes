@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	authorizationv1 "github.com/openshift/api/authorization/v1"
-	applyconfigurationsauthorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/authorization/v1"
+	authorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeClusterRoles struct {
 	Fake *FakeAuthorizationV1
 }
 
-var clusterrolesResource = schema.GroupVersionResource{Group: "authorization.openshift.io", Version: "v1", Resource: "clusterroles"}
+var clusterrolesResource = v1.SchemeGroupVersion.WithResource("clusterroles")
 
-var clusterrolesKind = schema.GroupVersionKind{Group: "authorization.openshift.io", Version: "v1", Kind: "ClusterRole"}
+var clusterrolesKind = v1.SchemeGroupVersion.WithKind("ClusterRole")
 
 // Get takes name of the clusterRole, and returns the corresponding clusterRole object, and an error if there is any.
-func (c *FakeClusterRoles) Get(ctx context.Context, name string, options v1.GetOptions) (result *authorizationv1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &authorizationv1.ClusterRole{})
+		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &v1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*authorizationv1.ClusterRole), err
+	return obj.(*v1.ClusterRole), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
-func (c *FakeClusterRoles) List(ctx context.Context, opts v1.ListOptions) (result *authorizationv1.ClusterRoleList, err error) {
+func (c *FakeClusterRoles) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterRoleList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), &authorizationv1.ClusterRoleList{})
+		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), &v1.ClusterRoleList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeClusterRoles) List(ctx context.Context, opts v1.ListOptions) (resul
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &authorizationv1.ClusterRoleList{ListMeta: obj.(*authorizationv1.ClusterRoleList).ListMeta}
-	for _, item := range obj.(*authorizationv1.ClusterRoleList).Items {
+	list := &v1.ClusterRoleList{ListMeta: obj.(*v1.ClusterRoleList).ListMeta}
+	for _, item := range obj.(*v1.ClusterRoleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,58 +57,58 @@ func (c *FakeClusterRoles) List(ctx context.Context, opts v1.ListOptions) (resul
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *FakeClusterRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterRoles) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(clusterrolesResource, opts))
 }
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *FakeClusterRoles) Create(ctx context.Context, clusterRole *authorizationv1.ClusterRole, opts v1.CreateOptions) (result *authorizationv1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Create(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.CreateOptions) (result *v1.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &authorizationv1.ClusterRole{})
+		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &v1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*authorizationv1.ClusterRole), err
+	return obj.(*v1.ClusterRole), err
 }
 
 // Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *FakeClusterRoles) Update(ctx context.Context, clusterRole *authorizationv1.ClusterRole, opts v1.UpdateOptions) (result *authorizationv1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Update(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.UpdateOptions) (result *v1.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &authorizationv1.ClusterRole{})
+		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &v1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*authorizationv1.ClusterRole), err
+	return obj.(*v1.ClusterRole), err
 }
 
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
-func (c *FakeClusterRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeClusterRoles) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(clusterrolesResource, name, opts), &authorizationv1.ClusterRole{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterrolesResource, name, opts), &v1.ClusterRole{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeClusterRoles) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &authorizationv1.ClusterRoleList{})
+	_, err := c.Fake.Invokes(action, &v1.ClusterRoleList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *FakeClusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *authorizationv1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, pt, data, subresources...), &authorizationv1.ClusterRole{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, pt, data, subresources...), &v1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*authorizationv1.ClusterRole), err
+	return obj.(*v1.ClusterRole), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied clusterRole.
-func (c *FakeClusterRoles) Apply(ctx context.Context, clusterRole *applyconfigurationsauthorizationv1.ClusterRoleApplyConfiguration, opts v1.ApplyOptions) (result *authorizationv1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Apply(ctx context.Context, clusterRole *authorizationv1.ClusterRoleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterRole, err error) {
 	if clusterRole == nil {
 		return nil, fmt.Errorf("clusterRole provided to Apply must not be nil")
 	}
@@ -122,9 +121,9 @@ func (c *FakeClusterRoles) Apply(ctx context.Context, clusterRole *applyconfigur
 		return nil, fmt.Errorf("clusterRole.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, *name, types.ApplyPatchType, data), &authorizationv1.ClusterRole{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, *name, types.ApplyPatchType, data), &v1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*authorizationv1.ClusterRole), err
+	return obj.(*v1.ClusterRole), err
 }

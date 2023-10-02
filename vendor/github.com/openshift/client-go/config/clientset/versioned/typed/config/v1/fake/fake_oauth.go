@@ -7,11 +7,10 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	configv1 "github.com/openshift/api/config/v1"
-	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -22,24 +21,24 @@ type FakeOAuths struct {
 	Fake *FakeConfigV1
 }
 
-var oauthsResource = schema.GroupVersionResource{Group: "config.openshift.io", Version: "v1", Resource: "oauths"}
+var oauthsResource = v1.SchemeGroupVersion.WithResource("oauths")
 
-var oauthsKind = schema.GroupVersionKind{Group: "config.openshift.io", Version: "v1", Kind: "OAuth"}
+var oauthsKind = v1.SchemeGroupVersion.WithKind("OAuth")
 
 // Get takes name of the oAuth, and returns the corresponding oAuth object, and an error if there is any.
-func (c *FakeOAuths) Get(ctx context.Context, name string, options v1.GetOptions) (result *configv1.OAuth, err error) {
+func (c *FakeOAuths) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.OAuth, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(oauthsResource, name), &configv1.OAuth{})
+		Invokes(testing.NewRootGetAction(oauthsResource, name), &v1.OAuth{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.OAuth), err
+	return obj.(*v1.OAuth), err
 }
 
 // List takes label and field selectors, and returns the list of OAuths that match those selectors.
-func (c *FakeOAuths) List(ctx context.Context, opts v1.ListOptions) (result *configv1.OAuthList, err error) {
+func (c *FakeOAuths) List(ctx context.Context, opts metav1.ListOptions) (result *v1.OAuthList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(oauthsResource, oauthsKind, opts), &configv1.OAuthList{})
+		Invokes(testing.NewRootListAction(oauthsResource, oauthsKind, opts), &v1.OAuthList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +47,8 @@ func (c *FakeOAuths) List(ctx context.Context, opts v1.ListOptions) (result *con
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &configv1.OAuthList{ListMeta: obj.(*configv1.OAuthList).ListMeta}
-	for _, item := range obj.(*configv1.OAuthList).Items {
+	list := &v1.OAuthList{ListMeta: obj.(*v1.OAuthList).ListMeta}
+	for _, item := range obj.(*v1.OAuthList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +57,69 @@ func (c *FakeOAuths) List(ctx context.Context, opts v1.ListOptions) (result *con
 }
 
 // Watch returns a watch.Interface that watches the requested oAuths.
-func (c *FakeOAuths) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeOAuths) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(oauthsResource, opts))
 }
 
 // Create takes the representation of a oAuth and creates it.  Returns the server's representation of the oAuth, and an error, if there is any.
-func (c *FakeOAuths) Create(ctx context.Context, oAuth *configv1.OAuth, opts v1.CreateOptions) (result *configv1.OAuth, err error) {
+func (c *FakeOAuths) Create(ctx context.Context, oAuth *v1.OAuth, opts metav1.CreateOptions) (result *v1.OAuth, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(oauthsResource, oAuth), &configv1.OAuth{})
+		Invokes(testing.NewRootCreateAction(oauthsResource, oAuth), &v1.OAuth{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.OAuth), err
+	return obj.(*v1.OAuth), err
 }
 
 // Update takes the representation of a oAuth and updates it. Returns the server's representation of the oAuth, and an error, if there is any.
-func (c *FakeOAuths) Update(ctx context.Context, oAuth *configv1.OAuth, opts v1.UpdateOptions) (result *configv1.OAuth, err error) {
+func (c *FakeOAuths) Update(ctx context.Context, oAuth *v1.OAuth, opts metav1.UpdateOptions) (result *v1.OAuth, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(oauthsResource, oAuth), &configv1.OAuth{})
+		Invokes(testing.NewRootUpdateAction(oauthsResource, oAuth), &v1.OAuth{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.OAuth), err
+	return obj.(*v1.OAuth), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeOAuths) UpdateStatus(ctx context.Context, oAuth *configv1.OAuth, opts v1.UpdateOptions) (*configv1.OAuth, error) {
+func (c *FakeOAuths) UpdateStatus(ctx context.Context, oAuth *v1.OAuth, opts metav1.UpdateOptions) (*v1.OAuth, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(oauthsResource, "status", oAuth), &configv1.OAuth{})
+		Invokes(testing.NewRootUpdateSubresourceAction(oauthsResource, "status", oAuth), &v1.OAuth{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.OAuth), err
+	return obj.(*v1.OAuth), err
 }
 
 // Delete takes name of the oAuth and deletes it. Returns an error if one occurs.
-func (c *FakeOAuths) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeOAuths) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(oauthsResource, name, opts), &configv1.OAuth{})
+		Invokes(testing.NewRootDeleteActionWithOptions(oauthsResource, name, opts), &v1.OAuth{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeOAuths) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeOAuths) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(oauthsResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &configv1.OAuthList{})
+	_, err := c.Fake.Invokes(action, &v1.OAuthList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched oAuth.
-func (c *FakeOAuths) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *configv1.OAuth, err error) {
+func (c *FakeOAuths) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.OAuth, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(oauthsResource, name, pt, data, subresources...), &configv1.OAuth{})
+		Invokes(testing.NewRootPatchSubresourceAction(oauthsResource, name, pt, data, subresources...), &v1.OAuth{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.OAuth), err
+	return obj.(*v1.OAuth), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied oAuth.
-func (c *FakeOAuths) Apply(ctx context.Context, oAuth *applyconfigurationsconfigv1.OAuthApplyConfiguration, opts v1.ApplyOptions) (result *configv1.OAuth, err error) {
+func (c *FakeOAuths) Apply(ctx context.Context, oAuth *configv1.OAuthApplyConfiguration, opts metav1.ApplyOptions) (result *v1.OAuth, err error) {
 	if oAuth == nil {
 		return nil, fmt.Errorf("oAuth provided to Apply must not be nil")
 	}
@@ -133,16 +132,16 @@ func (c *FakeOAuths) Apply(ctx context.Context, oAuth *applyconfigurationsconfig
 		return nil, fmt.Errorf("oAuth.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(oauthsResource, *name, types.ApplyPatchType, data), &configv1.OAuth{})
+		Invokes(testing.NewRootPatchSubresourceAction(oauthsResource, *name, types.ApplyPatchType, data), &v1.OAuth{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.OAuth), err
+	return obj.(*v1.OAuth), err
 }
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeOAuths) ApplyStatus(ctx context.Context, oAuth *applyconfigurationsconfigv1.OAuthApplyConfiguration, opts v1.ApplyOptions) (result *configv1.OAuth, err error) {
+func (c *FakeOAuths) ApplyStatus(ctx context.Context, oAuth *configv1.OAuthApplyConfiguration, opts metav1.ApplyOptions) (result *v1.OAuth, err error) {
 	if oAuth == nil {
 		return nil, fmt.Errorf("oAuth provided to Apply must not be nil")
 	}
@@ -155,9 +154,9 @@ func (c *FakeOAuths) ApplyStatus(ctx context.Context, oAuth *applyconfigurations
 		return nil, fmt.Errorf("oAuth.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(oauthsResource, *name, types.ApplyPatchType, data, "status"), &configv1.OAuth{})
+		Invokes(testing.NewRootPatchSubresourceAction(oauthsResource, *name, types.ApplyPatchType, data, "status"), &v1.OAuth{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*configv1.OAuth), err
+	return obj.(*v1.OAuth), err
 }
