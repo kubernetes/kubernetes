@@ -261,17 +261,17 @@ func TestKindForWithNewCRDs(t *testing.T) {
 
 func TestWarnAmbigious(t *testing.T) {
 	tests := []struct {
-		name        string
-		arg         string
-		expected    schema.GroupVersionResource
-		expectedLog string
-		srvRes      []*metav1.APIResourceList
+		name                string
+		arg                 string
+		expected            schema.GroupVersionResource
+		expectedWarningLogs []string
+		srvRes              []*metav1.APIResourceList
 	}{
 		{
-			name:        "warn ambiguity",
-			arg:         "hpa",
-			expected:    schema.GroupVersionResource{Resource: "superhorizontalpodautoscalers", Group: "autoscaling"},
-			expectedLog: `short name "hpa" could also match lower priority resource horizontalpodautoscalers.autoscaling`,
+			name:                "warn ambiguity",
+			arg:                 "hpa",
+			expected:            schema.GroupVersionResource{Resource: "superhorizontalpodautoscalers", Group: "autoscaling"},
+			expectedWarningLogs: []string{`short name "hpa" could also match lower priority resource horizontalpodautoscalers.autoscaling`},
 			srvRes: []*metav1.APIResourceList{
 				{
 					GroupVersion: "autoscaling/v1",
@@ -294,10 +294,10 @@ func TestWarnAmbigious(t *testing.T) {
 			},
 		},
 		{
-			name:        "warn-builtin-shortname-ambugity",
-			arg:         "po",
-			expected:    schema.GroupVersionResource{Resource: "pods", Group: ""},
-			expectedLog: `short name "po" could also match lower priority resource poddlers.acme.com`,
+			name:                "warn-builtin-shortname-ambugity",
+			arg:                 "po",
+			expected:            schema.GroupVersionResource{Resource: "pods", Group: ""},
+			expectedWarningLogs: []string{`short name "po" could also match lower priority resource poddlers.acme.com`},
 			srvRes: []*metav1.APIResourceList{
 				{
 					GroupVersion: "v1",
@@ -310,10 +310,10 @@ func TestWarnAmbigious(t *testing.T) {
 			},
 		},
 		{
-			name:        "warn-builtin-shortname-ambugity-multi-version",
-			arg:         "po",
-			expected:    schema.GroupVersionResource{Resource: "pods", Group: ""},
-			expectedLog: `short name "po" could also match lower priority resource poddlers.acme.com`,
+			name:                "warn-builtin-shortname-ambugity-multi-version",
+			arg:                 "po",
+			expected:            schema.GroupVersionResource{Resource: "pods", Group: ""},
+			expectedWarningLogs: []string{`short name "po" could also match lower priority resource poddlers.acme.com`},
 			srvRes: []*metav1.APIResourceList{
 				{
 					GroupVersion: "v1",
@@ -345,10 +345,10 @@ func TestWarnAmbigious(t *testing.T) {
 			},
 		},
 		{
-			name:        "resource-multiple-versions-shortform",
-			arg:         "hpa",
-			expected:    schema.GroupVersionResource{Resource: "horizontalpodautoscalers", Group: "autoscaling"},
-			expectedLog: "",
+			name:                "resource-multiple-versions-shortform",
+			arg:                 "hpa",
+			expected:            schema.GroupVersionResource{Resource: "horizontalpodautoscalers", Group: "autoscaling"},
+			expectedWarningLogs: []string{},
 			srvRes: []*metav1.APIResourceList{
 				{
 					GroupVersion: "autoscaling/v1alphav1",
@@ -370,6 +370,62 @@ func TestWarnAmbigious(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:     "multi-resource-multiple-versions-shortform",
+			arg:      "hpa",
+			expected: schema.GroupVersionResource{Resource: "horizontalpodautoscalers", Group: "autoscaling"},
+			expectedWarningLogs: []string{
+				`short name "hpa" could also match lower priority resource foo.foo`,
+				`short name "hpa" could also match lower priority resource bar.bar`,
+			},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "autoscaling/v1alphav1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "autoscaling/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "foo/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "foo",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "foo/v1beta1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "foo",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "bar/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "bar",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -377,26 +433,23 @@ func TestWarnAmbigious(t *testing.T) {
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.srvRes, nil
 		}
-		warnedCount := 0
+
+		var actualWarnings []string
 		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, func(a string) {
-			warnedCount += 1
-			if warnedCount > 1 {
-				t.Fatalf("warning fired more than expected")
-			}
-			if test.expectedLog == "" {
-				t.Fatalf("unexpected warning message %s", a)
-			}
-			if test.expectedLog != a {
-				t.Fatalf("unexpected warning message expected: %s actual: %s", test.expectedLog, a)
-			}
+			actualWarnings = append(actualWarnings, a)
 		}).(shortcutExpander)
 
 		actual := mapper.expandResourceShortcut(schema.GroupVersionResource{Resource: test.arg})
 		if actual != test.expected {
 			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, actual)
 		}
-		if test.expectedLog != "" && warnedCount == 0 {
-			t.Fatalf("expected warning message %s but not fired", test.expectedLog)
+
+		if len(actualWarnings) == 0 && len(test.expectedWarningLogs) == 0 {
+			continue
+		}
+
+		if !cmp.Equal(test.expectedWarningLogs, actualWarnings) {
+			t.Fatalf("expected warning message %s but got %s", test.expectedWarningLogs, actualWarnings)
 		}
 	}
 }
