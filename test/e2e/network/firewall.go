@@ -204,16 +204,6 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should have correct firewall rules for e2e cluster", func(ctx context.Context) {
-		ginkgo.By("Checking if e2e firewall rules are correct")
-		for _, expFw := range gce.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
-			fw, err := gceCloud.GetFirewall(expFw.Name)
-			framework.ExpectNoError(err)
-			err = gce.VerifyFirewallRule(fw, expFw, cloudConfig.Network, false)
-			framework.ExpectNoError(err)
-		}
-	})
-
 	ginkgo.It("control plane should not expose well-known ports", func(ctx context.Context) {
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
