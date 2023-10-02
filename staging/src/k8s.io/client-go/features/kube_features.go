@@ -17,6 +17,8 @@ limitations under the License.
 package features
 
 import (
+	"sync/atomic"
+
 	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"k8s.io/component-base/featuregate"
@@ -41,6 +43,34 @@ const (
 	WatchList featuregate.Feature = "WatchList"
 )
 
+func DefaultFeatureGates() featuregate.FeatureGate {
+	return featureGates.Load().(featuregate.FeatureGate)
+}
+
 func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	envVarGates := featuregate.NewEnvVarFeatureGate()
+	runtime.Must(envVarGates.Add(defaultKubernetesFeatureGates))
+
+	featureGates.Store(envVarGates)
+}
+
+func AddFeaturesToExistingFeatureGates(mutableFeatureGates featuregate.MutableFeatureGate) error {
+	return mutableFeatureGates.Add(defaultKubernetesFeatureGates)
+}
+
+func SetFeatureGates(newFeatureGates featuregate.FeatureGate) {
+	featureGates.Store(newFeatureGates)
+}
+
+var (
+	// DefaultFeatureGate is a shared global FeatureGate.
+	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutableFeatureGate.
+	featureGates = &atomic.Value{}
+)
+
+// defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
+// To add a new feature, define a key for it above and add it here. The features will be
+// available throughout Kubernetes binaries.
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	WatchList: {Default: false, PreRelease: featuregate.Alpha},
 }
