@@ -18,8 +18,10 @@ package remotecommand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -476,9 +478,15 @@ func (h *heartbeat) start() {
 				klog.V(8).Infof("Websocket Ping succeeeded")
 			} else {
 				klog.Errorf("Websocket Ping failed: %v", err)
-				// Continue, in case this is a transient failure.
-				// c.conn.CloseChan above will tell us when the connection is
-				// actually closed.
+				if errors.Is(err, gwebsocket.ErrCloseSent) {
+					continue
+				} else if e, ok := err.(net.Error); ok && e.Temporary() {
+					// Continue, in case this is a transient failure.
+					// c.conn.CloseChan above will tell us when the connection is
+					// actually closed.
+					continue
+				}
+				return
 			}
 		}
 	}
