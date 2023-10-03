@@ -854,10 +854,10 @@ func validateMatchResources(mc *admissionregistration.MatchResources, fldPath *f
 	}
 
 	if mc.ObjectSelector == nil {
-		allErrors = append(allErrors, field.Required(fldPath.Child("labelSelector"), ""))
+		allErrors = append(allErrors, field.Required(fldPath.Child("objectSelector"), ""))
 	} else {
 		// validate selector strictly, this type was released after issue #99139 was resolved
-		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.ObjectSelector, metav1validation.LabelSelectorValidationOptions{}, fldPath.Child("labelSelector"))...)
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.ObjectSelector, metav1validation.LabelSelectorValidationOptions{}, fldPath.Child("objectSelector"))...)
 	}
 
 	for i, namedRuleWithOperations := range mc.ResourceRules {
