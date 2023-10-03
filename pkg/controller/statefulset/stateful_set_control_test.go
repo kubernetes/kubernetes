@@ -2429,6 +2429,12 @@ func (rt *requestTracker) reset() {
 	rt.delay = 0
 }
 
+func (rt *requestTracker) getErr() error {
+	rt.Lock()
+	defer rt.Unlock()
+	return rt.err
+}
+
 func newRequestTracker(requests int, err error, after int) requestTracker {
 	return requestTracker{
 		requests: requests,
@@ -2474,7 +2480,7 @@ func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
 	defer om.createPodTracker.inc()
 	if om.createPodTracker.errorReady() {
 		defer om.createPodTracker.reset()
-		return om.createPodTracker.err
+		return om.createPodTracker.getErr()
 	}
 	pod.SetUID(types.UID(pod.Name + "-uid"))
 	return om.podsIndexer.Update(pod)
@@ -2492,7 +2498,7 @@ func (om *fakeObjectManager) DeletePod(pod *v1.Pod) error {
 	defer om.deletePodTracker.inc()
 	if om.deletePodTracker.errorReady() {
 		defer om.deletePodTracker.reset()
-		return om.deletePodTracker.err
+		return om.deletePodTracker.getErr()
 	}
 	if key, err := controller.KeyFunc(pod); err != nil {
 		return err
