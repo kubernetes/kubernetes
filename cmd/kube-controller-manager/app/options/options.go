@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net"
 
+	clientgofeaturegate "k8s.io/client-go/features"
+
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -273,7 +275,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
-	utilfeature.DefaultMutableFeatureGate.OverrideDefault(clientgofeaturegates.WatchList, true)
+	utilfeature.DefaultMutableFeatureGate.OverrideDefault(clientgofeaturegate.WatchList, true)
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
 
 	return fss
