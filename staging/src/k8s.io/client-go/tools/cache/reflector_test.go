@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -122,6 +124,26 @@ func TestReflectorResyncChan(t *testing.T) {
 	case <-b:
 		t.Errorf("resyncChan() is at least 99 milliseconds late??")
 	}
+}
+
+// TestEstablishedWatchStoppedAfterStopCh ensures that
+// an established watch will be closed right after
+// the StopCh was also closed.
+func TestEstablishedWatchStoppedAfterStopCh(t *testing.T) {
+	ctx, ctxCancel := context.WithCancel(context.TODO())
+	ctxCancel()
+	w := watch.NewFake()
+	require.False(t, w.IsStopped())
+
+	// w is stopped when the stopCh is closed
+	target := NewReflector(nil, &v1.Pod{}, nil, 0)
+	err := target.watch(w, ctx.Done(), nil)
+	require.NoError(t, err)
+	require.True(t, w.IsStopped())
+
+	// noop when the w is nil and the ctx is closed
+	err = target.watch(nil, ctx.Done(), nil)
+	require.NoError(t, err)
 }
 
 func BenchmarkReflectorResyncChanMany(b *testing.B) {

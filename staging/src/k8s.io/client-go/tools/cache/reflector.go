@@ -397,6 +397,11 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
 		select {
 		case <-stopCh:
+			// we can only end up here when the stopCh
+			// was closed after a successful watchlist or list request
+			if w != nil {
+				w.Stop()
+			}
 			return nil
 		default:
 		}
