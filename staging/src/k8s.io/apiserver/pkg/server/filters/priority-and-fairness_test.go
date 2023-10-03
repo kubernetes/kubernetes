@@ -51,6 +51,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -153,23 +154,23 @@ func newApfServerWithHooks(t *testing.T, decision mockDecision, onExecute, postE
 		WatchTracker:    utilflowcontrol.NewWatchTracker(),
 		MaxSeatsTracker: utilflowcontrol.NewMaxSeatsTracker(),
 	}
-	return newApfServerWithFilter(t, fakeFilter, onExecute, postExecute)
+	return newApfServerWithFilter(t, fakeFilter, time.Minute/4, onExecute, postExecute)
 }
 
-func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func()) *httptest.Server {
+func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, defaultWaitLimit time.Duration, onExecute, postExecute func()) *httptest.Server {
 	epmetrics.Register()
 	fcmetrics.Register()
-	apfServer := httptest.NewServer(newApfHandlerWithFilter(t, flowControlFilter, onExecute, postExecute))
+	apfServer := httptest.NewServer(newApfHandlerWithFilter(t, flowControlFilter, defaultWaitLimit, onExecute, postExecute))
 	return apfServer
 }
 
-func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func()) http.Handler {
+func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, defaultWaitLimit time.Duration, onExecute, postExecute func()) http.Handler {
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	apfHandler := WithPriorityAndFairness(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		onExecute()
-	}), longRunningRequestCheck, flowControlFilter, defaultRequestWorkEstimator)
+	}), longRunningRequestCheck, flowControlFilter, defaultRequestWorkEstimator, defaultWaitLimit)
 
 	handler := apifilters.WithRequestInfo(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
@@ -458,7 +459,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 
 	postExecuteFunc := func() {}
 
-	server := newApfServerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc)
+	server := newApfServerWithFilter(t, fakeFilter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 	defer server.Close()
 
 	var wg sync.WaitGroup
@@ -498,7 +499,7 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 	}
 	postExecuteFunc := func() {}
 
-	server := newApfServerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc)
+	server := newApfServerWithFilter(t, fakeFilter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 	defer server.Close()
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusTooManyRequests); err != nil {
@@ -517,7 +518,7 @@ func TestApfWatchPanic(t *testing.T) {
 	}
 	postExecuteFunc := func() {}
 
-	apfHandler := newApfHandlerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc)
+	apfHandler := newApfHandlerWithFilter(t, fakeFilter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err == nil {
@@ -564,7 +565,7 @@ func TestApfWatchHandlePanic(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			apfHandler := newApfHandlerWithFilter(t, test.filter, onExecuteFunc, postExecuteFunc)
+			apfHandler := newApfHandlerWithFilter(t, test.filter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 			handler := func(w http.ResponseWriter, r *http.Request) {
 				defer func() {
 					if err := recover(); err == nil {
@@ -649,6 +650,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 		longRunningFunc,
 		fakeFilter,
 		func(_ *http.Request, _, _ string) fcrequest.WorkEstimate { return workExpected },
+		time.Minute/4,
 	)
 
 	w := httptest.NewRecorder()
@@ -685,7 +687,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var executed bool
@@ -755,7 +757,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var executed bool
@@ -831,7 +833,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var innerHandlerWriteErr error
@@ -909,7 +911,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var innerHandlerWriteErr error
@@ -984,7 +986,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
 		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, requestTimeout/4, plName, plConcurrency)
+		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		var firstRequestInnerHandlerWriteErr error
@@ -1116,11 +1118,11 @@ func fmtError(err error) string {
 }
 
 func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration []runtime.Object, serverConcurrency int,
-	requestWaitLimit time.Duration, plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
+	plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta3(), serverConcurrency, requestWaitLimit)
+	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta3(), serverConcurrency)
 
 	factory.Start(stopCh)
 
@@ -1231,7 +1233,7 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator)
+	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator, time.Minute/4)
 
 	// add the handler in the chain that adds the specified user to the request context
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1406,4 +1408,108 @@ func isStreamReset(err error) bool {
 		return strings.Contains(urlErr.Err.Error(), "INTERNAL_ERROR")
 	}
 	return false
+}
+
+func TestGetRequestWaitContext(t *testing.T) {
+	tests := []struct {
+		name                    string
+		defaultRequestWaitLimit time.Duration
+		parent                  func(t time.Time) (context.Context, context.CancelFunc)
+		newReqWaitCtxExpected   bool
+		reqWaitLimitExpected    time.Duration
+	}{
+		{
+			name: "context deadline has exceeded",
+			parent: func(time.Time) (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx, cancel
+			},
+		},
+		{
+			name: "context has a deadline, 'received at' is not set, wait limit should be one fourth of the remaining deadline from now",
+			parent: func(now time.Time) (context.Context, context.CancelFunc) {
+				return context.WithDeadline(context.Background(), now.Add(60*time.Second))
+			},
+			newReqWaitCtxExpected: true,
+			reqWaitLimitExpected:  15 * time.Second,
+		},
+		{
+			name: "context has a deadline, 'received at' is set, wait limit should be one fourth of the deadline starting from the 'received at' time",
+			parent: func(now time.Time) (context.Context, context.CancelFunc) {
+				ctx := apirequest.WithReceivedTimestamp(context.Background(), now.Add(-10*time.Second))
+				return context.WithDeadline(ctx, now.Add(50*time.Second))
+			},
+			newReqWaitCtxExpected: true,
+			reqWaitLimitExpected:  5 * time.Second, // from now
+		},
+		{
+			name:                    "context does not have any deadline, 'received at' is not set, default wait limit should be in effect from now",
+			defaultRequestWaitLimit: 15 * time.Second,
+			parent: func(time.Time) (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			newReqWaitCtxExpected: true,
+			reqWaitLimitExpected:  15 * time.Second,
+		},
+		{
+			name:                    "context does not have any deadline, 'received at' is set, default wait limit should be in effect starting from the 'received at' time",
+			defaultRequestWaitLimit: 15 * time.Second,
+			parent: func(now time.Time) (context.Context, context.CancelFunc) {
+				ctx := apirequest.WithReceivedTimestamp(context.Background(), now.Add(-10*time.Second))
+				return context.WithCancel(ctx)
+			},
+			newReqWaitCtxExpected: true,
+			reqWaitLimitExpected:  5 * time.Second, // from now
+		},
+		{
+			name: "context has a deadline, wait limit should not exceed the hard limit of 1m",
+			parent: func(now time.Time) (context.Context, context.CancelFunc) {
+				// let 1/4th of the remaining deadline exceed the hard limit
+				return context.WithDeadline(context.Background(), now.Add(8*time.Minute))
+			},
+			newReqWaitCtxExpected: true,
+			reqWaitLimitExpected:  time.Minute,
+		},
+		{
+			name:                    "context has no deadline, wait limit should not exceed the hard limit of 1m",
+			defaultRequestWaitLimit: 2 * time.Minute, // it exceeds the hard limit
+			parent: func(now time.Time) (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			newReqWaitCtxExpected: true,
+			reqWaitLimitExpected:  time.Minute,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			now := time.Now()
+			parent, cancel := test.parent(now)
+			defer cancel()
+
+			clock := clocktesting.NewFakePassiveClock(now)
+			newReqWaitCtxGot, cancelGot := getRequestWaitContext(parent, test.defaultRequestWaitLimit, clock)
+			if cancelGot == nil {
+				t.Errorf("Expected a non nil context.CancelFunc")
+				return
+			}
+			defer cancelGot()
+
+			switch {
+			case test.newReqWaitCtxExpected:
+				deadlineGot, ok := newReqWaitCtxGot.Deadline()
+				if !ok {
+					t.Errorf("Expected the new wait limit context to have a deadline")
+				}
+				if waitLimitGot := deadlineGot.Sub(now); test.reqWaitLimitExpected != waitLimitGot {
+					t.Errorf("Expected request wait limit %s, but got: %s", test.reqWaitLimitExpected, waitLimitGot)
+				}
+			default:
+				if parent != newReqWaitCtxGot {
+					t.Errorf("Expected the parent context to be returned: want: %#v, got %#v", parent, newReqWaitCtxGot)
+				}
+			}
+		})
+	}
 }
