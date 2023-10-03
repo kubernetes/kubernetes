@@ -375,14 +375,20 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	replicas []*v1.Pod,
 	i int) (bool, error) {
 	logger := klog.FromContext(ctx)
+	logger.Info("MYDEBUG processReplica", "i", i)
+	defer func() {
+		logger.Info("MYDEBUG processReplica DONE", "i", i)
+	}()
 	// delete and recreate failed pods
 	if isFailed(replicas[i]) {
+		logger.Info("MYDEBUG processReplica isFailed", "i", i)
 		ssc.recorder.Eventf(set, v1.EventTypeWarning, "RecreatingFailedPod",
 			"StatefulSet %s/%s is recreating failed Pod %s",
 			set.Namespace,
 			set.Name,
 			replicas[i].Name)
 		if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
+			logger.Info("MYDEBUG processReplica DELETION FAILED", "i", i)
 			return true, err
 		}
 		replicaOrd := i + getStartOrdinal(set)
@@ -395,6 +401,7 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	}
 	// If we find a Pod that has not been created we create the Pod
 	if !isCreated(replicas[i]) {
+		logger.Info("MYDEBUG processReplica !isCreated", "i", i)
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
 			if isStale, err := ssc.podControl.PodClaimIsStale(set, replicas[i]); err != nil {
 				return true, err
@@ -404,6 +411,7 @@ func (ssc *defaultStatefulSetControl) processReplica(
 			}
 		}
 		if err := ssc.podControl.CreateStatefulPod(ctx, set, replicas[i]); err != nil {
+			logger.Info("MYDEBUG processReplica CREATION FAILED", "i", i)
 			return true, err
 		}
 		if monotonic {
