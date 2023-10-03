@@ -378,14 +378,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}
 						ginkgo.By(fmt.Sprintf("StatefulSet status fields: CurrentReplicas=%v, UpdatedReplicas=%v, CurrentRevision=%v, UpdateRevision=%v", e.Status.CurrentReplicas, e.Status.UpdatedReplicas, e.Status.CurrentRevision, e.Status.UpdateRevision))
 						if e.Status.UpdatedReplicas == 2 && e.Status.Replicas == 3 {
-							ginkgo.By("Marking pod0 as  Failed")
+							ginkgo.By("Marking pod0 as Failed")
 							pod0 := pods.Items[0]
 							pod0name := pod0.Name
 							err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-								ginkgo.By("Retrying to set the phase on POD")
 								pod0, err := c.CoreV1().Pods(ss.Namespace).Get(ctx, pod0name, metav1.GetOptions{})
 								if err != nil {
-									ginkgo.By(fmt.Sprintf("Retrying to set the phase on POD: %v", err))
+									ginkgo.By(fmt.Sprintf("Failed retrying to set the phase on pod0: %v", err))
 									return nil
 								}
 								pod0.Status.Phase = v1.PodFailed
@@ -446,6 +445,103 @@ var _ = SIGDescribe("StatefulSet", func() {
 					updateRevision))
 			}
 			wg.Wait()
+		})
+
+		ginkgo.It("xyz-finalizer", func(ctx context.Context) {
+			ginkgo.By("Creating a new StatefulSet")
+
+			ss := e2estatefulset.NewStatefulSet("ss-failing-pods", ns, headlessSvcName, 3, nil, nil, labels)
+			ss.Labels = make(map[string]string)
+			ss.Labels["e2e"] = "testing"
+
+			setHTTPProbe(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+			ss = waitForStatus(ctx, c, ss)
+			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			framework.ExpectEqual(currentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+				ss.Namespace, ss.Name, updateRevision, currentRevision))
+			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			for i := range pods.Items {
+				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision))
+			}
+			e2estatefulset.SortStatefulPods(pods)
+			err = breakPodHTTPProbe(ss, &pods.Items[1])
+			framework.ExpectNoError(err)
+			ss, _ = waitForPodNotReady(ctx, c, ss, pods.Items[1].Name)
+			newImage := NewWebserverImage
+			oldImage := ss.Spec.Template.Spec.Containers[0].Image
+
+			ginkgo.By("ADDING FINALIZER to POD0")
+			pod0 := &pods.Items[0]
+			pod0.Finalizers = []string{"example.com/myfinalizer"}
+			pod0, err = c.CoreV1().Pods(ss.Namespace).Update(ctx, pod0, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+			pods.Items[0] = *pod0
+
+			defer func() {
+				err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					ginkgo.By("REMOVING FINALIZER to POD0 - trying")
+					pod0, err := c.CoreV1().Pods(ss.Namespace).Get(ctx, pod0.Name, metav1.GetOptions{})
+					if err != nil {
+						ginkgo.By(fmt.Sprintf("Failed retrying to set the phase on pod0: %v", err))
+						return nil
+					}
+					pod0.Finalizers = []string{}
+					pod0, err = c.CoreV1().Pods(ss.Namespace).Update(ctx, pod0, metav1.UpdateOptions{})
+					if err == nil {
+						ginkgo.By("REMOVING FINALIZER to POD0 - success")
+					}
+					return err
+				})
+				framework.ExpectNoError(err)
+			}()
+
+			ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
+			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
+
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = newImage
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Creating a new revision")
+			ss = waitForStatus(ctx, c, ss)
+			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
+
+			ginkgo.By("Updating Pods in reverse ordinal order")
+			pods = e2estatefulset.GetPodList(ctx, c, ss)
+			e2estatefulset.SortStatefulPods(pods)
+
+			ginkgo.By("WaitForPodReady")
+			err = restorePodHTTPProbe(ss, &pods.Items[1])
+			framework.ExpectNoError(err)
+			ss, _ = e2estatefulset.WaitForPodReady(ctx, c, ss, pods.Items[1].Name)
+			ss, pods = waitForRollingUpdate(ctx, c, ss)
+
+			framework.ExpectEqual(ss.Status.CurrentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
+				ss.Namespace,
+				ss.Name,
+				ss.Status.CurrentRevision,
+				updateRevision))
+			for i := range pods.Items {
+				framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, newImage, fmt.Sprintf(" Pod %s/%s has image %s not have new image %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Spec.Containers[0].Image,
+					newImage))
+				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], updateRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to update revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					updateRevision))
+			}
 		})
 
 		ginkgo.It("should perform rolling updates of template modifications when the pod exits with Failed phase, failed container", func(ctx context.Context) {
