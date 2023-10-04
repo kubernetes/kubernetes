@@ -186,6 +186,7 @@ type CompilationResult struct {
 	Program            cel.Program
 	Error              *apiservercel.Error
 	ExpressionAccessor ExpressionAccessor
+	OutputType         *cel.Type
 }
 
 // CompileCELExpression returns a compiled CEL expression.
@@ -277,5 +278,6 @@ func CompileCELExpression(expressionAccessor ExpressionAccessor, optionalVars Op
 	return CompilationResult{
 		Program:            prog,
 		ExpressionAccessor: expressionAccessor,
+		OutputType:         ast.OutputType(),
 	}
 }
