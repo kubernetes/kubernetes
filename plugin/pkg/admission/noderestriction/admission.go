@@ -452,7 +452,7 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 		// Don't allow a node to register with labels outside the allowed set.
 		// This would allow a node to add or modify its labels in a way that would let it steer privileged workloads to itself.
 		modifiedLabels := getModifiedLabels(node.Labels, nil)
-		if forbiddenLabels := p.getForbiddenLabels(modifiedLabels); len(forbiddenLabels) > 0 {
+		if forbiddenLabels := p.getForbiddenLabels(modifiedLabels, a.GetOperation()); len(forbiddenLabels) > 0 {
 			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to set the following labels: %s", nodeName, strings.Join(forbiddenLabels.List(), ", ")))
 		}
 	}
@@ -483,9 +483,10 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 		// Don't allow a node to update labels outside the allowed set.
 		// This would allow a node to add or modify its labels in a way that would let it steer privileged workloads to itself.
 		modifiedLabels := getModifiedLabels(node.Labels, oldNode.Labels)
-		if forbiddenUpdateLabels := p.getForbiddenLabels(modifiedLabels); len(forbiddenUpdateLabels) > 0 {
+		if forbiddenUpdateLabels := p.getForbiddenLabels(modifiedLabels, a.GetOperation()); len(forbiddenUpdateLabels) > 0 {
 			return admission.NewForbidden(a, fmt.Errorf("is not allowed to modify labels: %s", strings.Join(forbiddenUpdateLabels.List(), ", ")))
 		}
+
 	}
 
 	return nil
@@ -526,7 +527,7 @@ func getLabelNamespace(key string) string {
 }
 
 // getForbiddenLabels returns the set of labels that may not be added, removed, or modified by the node on create or update.
-func (p *Plugin) getForbiddenLabels(modifiedLabels sets.String) sets.String {
+func (p *Plugin) getForbiddenLabels(modifiedLabels sets.String, admissionOpn admission.Operation) sets.String {
 	if len(modifiedLabels) == 0 {
 		return nil
 	}
@@ -541,6 +542,11 @@ func (p *Plugin) getForbiddenLabels(modifiedLabels sets.String) sets.String {
 		// forbid kubelets from setting unknown kubernetes.io and k8s.io labels on update
 		if isKubernetesLabel(label) && !kubeletapis.IsKubeletLabel(label) {
 			// TODO: defer to label policy once available
+			if admissionOpn == admission.Create {
+				if kubeletapis.IsForbiddenOpenshiftLabel(label) {
+					continue
+				}
+			}
 			forbiddenLabels.Insert(label)
 		}
 	}

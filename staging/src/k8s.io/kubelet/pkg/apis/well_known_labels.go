@@ -45,12 +45,6 @@ var kubeletLabels = sets.NewString(
 
 	LabelOS,
 	LabelArch,
-
-	// These are special for OpenShift:
-	"node-role.kubernetes.io/control-plane",
-	"node-role.kubernetes.io/master",
-	"node-role.kubernetes.io/worker",
-	"node-role.kubernetes.io/etcd",
 )
 
 var kubeletLabelNamespaces = sets.NewString(
