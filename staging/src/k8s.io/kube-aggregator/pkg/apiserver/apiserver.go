@@ -158,7 +158,7 @@ type APIAggregator struct {
 	openAPIConfig *openapicommon.Config
 
 	// Enable OpenAPI V3 if these configs are non-nil
-	openAPIV3Config *openapicommon.Config
+	openAPIV3Config *openapicommon.OpenAPIV3Config
 
 	// openAPIAggregationController downloads and merges OpenAPI v2 specs.
 	openAPIAggregationController *openapicontroller.AggregationController
@@ -452,7 +452,7 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 			specDownloaderV3,
 			s.GenericAPIServer.NextDelegate(),
 			s.GenericAPIServer.Handler.GoRestfulContainer,
-			s.openAPIConfig,
+			s.openAPIV3Config,
 			s.GenericAPIServer.Handler.NonGoRestfulMux)
 		if err != nil {
 			return preparedAPIAggregator{}, err

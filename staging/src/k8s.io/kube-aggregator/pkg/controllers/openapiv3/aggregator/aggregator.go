@@ -81,7 +81,7 @@ func (s *specProxier) GetAPIServiceNames() []string {
 }
 
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
-func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.DelegationTarget, aggregatorService *restful.Container, openAPIConfig *common.Config, pathHandler common.PathHandlerByGroupVersion) (SpecProxier, error) {
+func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.DelegationTarget, aggregatorService *restful.Container, openAPIConfig *common.OpenAPIV3Config, pathHandler common.PathHandlerByGroupVersion) (SpecProxier, error) {
 	s := &specProxier{
 		apiServiceInfo: map[string]*openAPIV3APIServiceInfo{},
 		downloader:     downloader,
@@ -93,7 +93,7 @@ func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.D
 		aggregatorLocalServiceName := "k8s_internal_local_kube_aggregator_types"
 		v3Mux := mux.NewPathRecorderMux(aggregatorLocalServiceName)
 		_ = routes.OpenAPI{
-			Config: openAPIConfig,
+			V3Config: openAPIConfig,
 		}.InstallV3(aggregatorService, v3Mux)
 
 		s.AddUpdateAPIService(v3Mux, &v1.APIService{
