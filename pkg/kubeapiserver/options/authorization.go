@@ -167,8 +167,8 @@ func (o *BuiltInAuthorizationOptions) buildAuthorizationConfiguration() (*authzc
 		case authzmodes.ModeWebhook:
 			authorizers = append(authorizers, authzconfig.AuthorizerConfiguration{
 				Type: authzconfig.TypeWebhook,
+				Name: defaultWebhookName,
 				Webhook: &authzconfig.WebhookConfiguration{
-					Name:            defaultWebhookName,
 					AuthorizedTTL:   metav1.Duration{Duration: o.WebhookCacheAuthorizedTTL},
 					UnauthorizedTTL: metav1.Duration{Duration: o.WebhookCacheUnauthorizedTTL},
 					// Timeout and FailurePolicy are required for the new configuration.
@@ -183,9 +183,18 @@ func (o *BuiltInAuthorizationOptions) buildAuthorizationConfiguration() (*authzc
 				},
 			})
 		default:
-			authorizers = append(authorizers, authzconfig.AuthorizerConfiguration{Type: authzconfig.AuthorizerType(mode)})
+			authorizers = append(authorizers, authzconfig.AuthorizerConfiguration{
+				Type: authzconfig.AuthorizerType(mode),
+				Name: getNameForAuthorizerMode(mode),
+			})
 		}
 	}
 
 	return &authzconfig.AuthorizationConfiguration{Authorizers: authorizers}, nil
+}
+
+// getNameForAuthorizerMode returns the name to be set for the mode in AuthorizationConfiguration
+// For now, lower cases the mode name
+func getNameForAuthorizerMode(mode string) string {
+	return strings.ToLower(mode)
 }
