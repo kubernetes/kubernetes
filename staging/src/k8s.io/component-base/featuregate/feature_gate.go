@@ -158,7 +158,7 @@ var _ pflag.Value = &featureGate{}
 
 // internalPackages are packages that ignored when creating a name for featureGates. These packages are in the common
 // call chains, so they'd be unhelpful as names.
-var internalPackages = []string{"k8s.io/component-base/featuregate/feature_gate.go"}
+var internalPackages = []string{"k8s.io/component-base/featuregate/feature_gate.go", "k8s.io/component-base/featuregate/env_var_feature_gate.go"}
 
 func NewFeatureGate() *featureGate {
 	known := map[Feature]FeatureSpec{}
