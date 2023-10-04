@@ -141,6 +141,7 @@ type CompilationResult struct {
 	Program            cel.Program
 	Error              *apiservercel.Error
 	ExpressionAccessor ExpressionAccessor
+	OutputType         *cel.Type
 }
 
 // Compiler provides a CEL expression compiler configured with the desired admission related CEL variables and
@@ -214,6 +215,7 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, op
 	return CompilationResult{
 		Program:            prog,
 		ExpressionAccessor: expressionAccessor,
+		OutputType:         ast.OutputType(),
 	}
 }
 
