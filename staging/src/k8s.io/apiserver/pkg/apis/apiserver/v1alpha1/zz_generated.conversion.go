@@ -335,6 +335,7 @@ func Convert_apiserver_AuthorizationConfiguration_To_v1alpha1_AuthorizationConfi
 
 func autoConvert_v1alpha1_AuthorizerConfiguration_To_apiserver_AuthorizerConfiguration(in *AuthorizerConfiguration, out *apiserver.AuthorizerConfiguration, s conversion.Scope) error {
 	out.Type = apiserver.AuthorizerType(in.Type)
+	out.Name = in.Name
 	out.Webhook = (*apiserver.WebhookConfiguration)(unsafe.Pointer(in.Webhook))
 	return nil
 }
@@ -346,6 +347,7 @@ func Convert_v1alpha1_AuthorizerConfiguration_To_apiserver_AuthorizerConfigurati
 
 func autoConvert_apiserver_AuthorizerConfiguration_To_v1alpha1_AuthorizerConfiguration(in *apiserver.AuthorizerConfiguration, out *AuthorizerConfiguration, s conversion.Scope) error {
 	out.Type = string(in.Type)
+	out.Name = in.Name
 	out.Webhook = (*WebhookConfiguration)(unsafe.Pointer(in.Webhook))
 	return nil
 }
@@ -677,7 +679,6 @@ func Convert_apiserver_UDSTransport_To_v1alpha1_UDSTransport(in *apiserver.UDSTr
 }
 
 func autoConvert_v1alpha1_WebhookConfiguration_To_apiserver_WebhookConfiguration(in *WebhookConfiguration, out *apiserver.WebhookConfiguration, s conversion.Scope) error {
-	out.Name = in.Name
 	out.AuthorizedTTL = in.AuthorizedTTL
 	out.UnauthorizedTTL = in.UnauthorizedTTL
 	out.Timeout = in.Timeout
@@ -697,7 +698,6 @@ func Convert_v1alpha1_WebhookConfiguration_To_apiserver_WebhookConfiguration(in 
 }
 
 func autoConvert_apiserver_WebhookConfiguration_To_v1alpha1_WebhookConfiguration(in *apiserver.WebhookConfiguration, out *WebhookConfiguration, s conversion.Scope) error {
-	out.Name = in.Name
 	out.AuthorizedTTL = in.AuthorizedTTL
 	out.UnauthorizedTTL = in.UnauthorizedTTL
 	out.Timeout = in.Timeout

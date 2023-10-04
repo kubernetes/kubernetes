@@ -448,7 +448,7 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			repeatableTypes: sets.NewString(),
 		},
 		{
-			name: "type is required if an authorizer is defined",
+			name: "type and name are required if an authorizer is defined",
 			configuration: api.AuthorizationConfiguration{
 				Authorizers: []api.AuthorizerConfiguration{
 					{},
@@ -459,13 +459,87 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			repeatableTypes: sets.NewString(string("Webhook")),
 		},
 		{
+			name: "authorizer names should be of non-zero length",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Foo",
+						Name: "",
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Required(field.NewPath("name"), "")},
+			knownTypes:      sets.NewString(string("Foo")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "authorizer names should be unique",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Foo",
+						Name: "foo",
+					},
+					{
+						Type: "Bar",
+						Name: "foo",
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Duplicate(field.NewPath("name"), "foo")},
+			knownTypes:      sets.NewString(string("Foo"), string("Bar")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "authorizer names should be DNS1123 labels",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Foo",
+						Name: "myauthorizer",
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.NewString(string("Foo")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "authorizer names should be DNS1123 subdomains",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Foo",
+						Name: "foo.example.domain",
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.NewString(string("Foo")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "authorizer names should not be invalid DNS1123 labels or subdomains",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Foo",
+						Name: "FOO.example.domain",
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("name"), "FOO.example.domain", "")},
+			knownTypes:      sets.NewString(string("Foo")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
 			name: "bare minimum configuration with Webhook",
 			configuration: api.AuthorizationConfiguration{
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -489,8 +563,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -504,8 +578,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 					},
 					{
 						Type: "Webhook",
+						Name: "second-webhook",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "second-webhook",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -542,14 +616,16 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Foo",
+						Name: "foo-1",
 					},
 					{
 						Type: "Foo",
+						Name: "foo-2",
 					},
 				},
 			},
 			expectedErrList: field.ErrorList{field.Duplicate(field.NewPath("type"), "Foo")},
-			knownTypes:      sets.NewString([]string{string("Foo"), string("Webhook")}...),
+			knownTypes:      sets.NewString(string("Foo")),
 			repeatableTypes: sets.NewString(string("Webhook")),
 		},
 		{
@@ -558,6 +634,7 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 					},
 				},
 			},
@@ -571,6 +648,7 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type:    "Foo",
+						Name:    "foo",
 						Webhook: &api.WebhookConfiguration{},
 					},
 				},
@@ -580,153 +658,13 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			repeatableTypes: sets.NewString(string("Webhook")),
 		},
 		{
-			name: "webhook name should be of non-zero length",
-			configuration: api.AuthorizationConfiguration{
-				Authorizers: []api.AuthorizerConfiguration{
-					{
-						Type: "Webhook",
-						Webhook: &api.WebhookConfiguration{
-							Name:                                     "",
-							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
-							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
-							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
-							FailurePolicy:                            "NoOpinion",
-							SubjectAccessReviewVersion:               "v1",
-							MatchConditionSubjectAccessReviewVersion: "v1",
-							ConnectionInfo: api.WebhookConnectionInfo{
-								Type: "InClusterConfig",
-							},
-						},
-					},
-				},
-			},
-			expectedErrList: field.ErrorList{field.Required(field.NewPath("name"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
-		},
-		{
-			name: "webhook names should be unique",
-			configuration: api.AuthorizationConfiguration{
-				Authorizers: []api.AuthorizerConfiguration{
-					{
-						Type: "Webhook",
-						Webhook: &api.WebhookConfiguration{
-							Name:                                     "name-1",
-							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
-							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
-							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
-							FailurePolicy:                            "NoOpinion",
-							SubjectAccessReviewVersion:               "v1",
-							MatchConditionSubjectAccessReviewVersion: "v1",
-							ConnectionInfo: api.WebhookConnectionInfo{
-								Type: "InClusterConfig",
-							},
-						},
-					},
-					{
-						Type: "Webhook",
-						Webhook: &api.WebhookConfiguration{
-							Name:                                     "name-1",
-							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
-							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
-							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
-							FailurePolicy:                            "NoOpinion",
-							SubjectAccessReviewVersion:               "v1",
-							MatchConditionSubjectAccessReviewVersion: "v1",
-							ConnectionInfo: api.WebhookConnectionInfo{
-								Type: "InClusterConfig",
-							},
-						},
-					},
-				},
-			},
-			expectedErrList: field.ErrorList{field.Duplicate(field.NewPath("name"), "name-1")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
-		},
-		{
-			name: "webhook names should be DNS1123 labels",
-			configuration: api.AuthorizationConfiguration{
-				Authorizers: []api.AuthorizerConfiguration{
-					{
-						Type: "Webhook",
-						Webhook: &api.WebhookConfiguration{
-							Name:                                     "mywebhookname",
-							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
-							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
-							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
-							FailurePolicy:                            "NoOpinion",
-							SubjectAccessReviewVersion:               "v1",
-							MatchConditionSubjectAccessReviewVersion: "v1",
-							ConnectionInfo: api.WebhookConnectionInfo{
-								Type: "InClusterConfig",
-							},
-						},
-					},
-				},
-			},
-			expectedErrList: field.ErrorList{},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
-		},
-		{
-			name: "webhook names should be DNS1123 subdomains",
-			configuration: api.AuthorizationConfiguration{
-				Authorizers: []api.AuthorizerConfiguration{
-					{
-						Type: "Webhook",
-						Webhook: &api.WebhookConfiguration{
-							Name:                                     "webhookname.example.domain",
-							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
-							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
-							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
-							FailurePolicy:                            "NoOpinion",
-							SubjectAccessReviewVersion:               "v1",
-							MatchConditionSubjectAccessReviewVersion: "v1",
-							ConnectionInfo: api.WebhookConnectionInfo{
-								Type: "InClusterConfig",
-							},
-						},
-					},
-				},
-			},
-			expectedErrList: field.ErrorList{},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
-		},
-		{
-			name: "webhook names should not be invalid DNS1123 labels or subdomains",
-			configuration: api.AuthorizationConfiguration{
-				Authorizers: []api.AuthorizerConfiguration{
-					{
-						Type: "Webhook",
-						Webhook: &api.WebhookConfiguration{
-							Name:                                     "WEBHOOKNAME.example.domain",
-							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
-							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
-							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
-							FailurePolicy:                            "NoOpinion",
-							SubjectAccessReviewVersion:               "v1",
-							MatchConditionSubjectAccessReviewVersion: "v1",
-							ConnectionInfo: api.WebhookConnectionInfo{
-								Type: "InClusterConfig",
-							},
-						},
-					},
-				},
-			},
-			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("name"), "WEBHOOKNAME.example.domain", "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
-		},
-		{
 			name: "timeout should be specified",
 			configuration: api.AuthorizationConfiguration{
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							FailurePolicy:                            "NoOpinion",
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -750,8 +688,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							FailurePolicy:                            "NoOpinion",
 							Timeout:                                  metav1.Duration{Duration: 0 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
@@ -775,8 +713,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							FailurePolicy:                            "NoOpinion",
 							Timeout:                                  metav1.Duration{Duration: -30 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
@@ -800,8 +738,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							FailurePolicy:                            "NoOpinion",
 							Timeout:                                  metav1.Duration{Duration: 60 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
@@ -825,8 +763,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							FailurePolicy:                            "NoOpinion",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -849,8 +787,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							FailurePolicy:                            "NoOpinion",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: -30 * time.Second},
@@ -874,8 +812,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							FailurePolicy:                            "NoOpinion",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
@@ -898,8 +836,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							FailurePolicy:                            "NoOpinion",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
@@ -923,8 +861,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -947,8 +885,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -972,8 +910,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                       "default",
 							Timeout:                    metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:              metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:            metav1.Duration{Duration: 30 * time.Second},
@@ -996,8 +934,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -1021,8 +959,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -1045,8 +983,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -1070,8 +1008,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -1092,8 +1030,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -1119,8 +1057,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -1147,8 +1085,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -1172,8 +1110,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
@@ -1198,8 +1136,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{
 					{
 						Type: "Webhook",
+						Name: "default",
 						Webhook: &api.WebhookConfiguration{
-							Name:                                     "default",
 							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
 							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
 							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},

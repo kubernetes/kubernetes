@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/api/authorization/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/client-go/util/cert"
@@ -220,7 +220,7 @@ func ValidateAuthorizationConfiguration(fldPath *field.Path, c *api.Authorizatio
 	}
 
 	seenAuthorizerTypes := sets.NewString()
-	seenWebhookNames := sets.NewString()
+	seenAuthorizerNames := sets.NewString()
 	for i, a := range c.Authorizers {
 		fldPath := fldPath.Child("authorizers").Index(i)
 		aType := string(a.Type)
@@ -238,13 +238,22 @@ func ValidateAuthorizationConfiguration(fldPath *field.Path, c *api.Authorizatio
 		}
 		seenAuthorizerTypes.Insert(aType)
 
+		if len(a.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		} else if seenAuthorizerNames.Has(a.Name) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), a.Name))
+		} else if errs := utilvalidation.IsDNS1123Subdomain(a.Name); len(errs) != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), a.Name, fmt.Sprintf("authorizer name is invalid: %s", strings.Join(errs, ", "))))
+		}
+		seenAuthorizerNames.Insert(a.Name)
+
 		switch a.Type {
 		case api.TypeWebhook:
 			if a.Webhook == nil {
 				allErrs = append(allErrs, field.Required(fldPath.Child("webhook"), "required when type=Webhook"))
 				continue
 			}
-			allErrs = append(allErrs, ValidateWebhookConfiguration(fldPath, a.Webhook, seenWebhookNames)...)
+			allErrs = append(allErrs, ValidateWebhookConfiguration(fldPath, a.Webhook)...)
 		default:
 			if a.Webhook != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("webhook"), "non-null", "may only be specified when type=Webhook"))
@@ -255,16 +264,8 @@ func ValidateAuthorizationConfiguration(fldPath *field.Path, c *api.Authorizatio
 	return allErrs
 }
 
-func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfiguration, seenNames sets.String) field.ErrorList {
+func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(c.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-	} else if seenNames.Has(c.Name) {
-		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), c.Name))
-	} else if errs := utilvalidation.IsDNS1123Subdomain(c.Name); len(errs) != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), c.Name, fmt.Sprintf("webhook name is invalid: %s", strings.Join(errs, ", "))))
-	}
-	seenNames.Insert(c.Name)
 
 	if c.Timeout.Duration == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("timeout"), ""))
