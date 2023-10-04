@@ -116,6 +116,10 @@ const (
 	orphanPodCleanedVolumesKey       = "orphan_pod_cleaned_volumes"
 	orphanPodCleanedVolumesErrorsKey = "orphan_pod_cleaned_volumes_errors"
 
+	// Metrics to track the Memory Manager Behavior
+	MemoryManagerPinningRequestsTotalKey = "memory_manager_pinning_requests_total"
+	MemoryManagerPinningErrorsTotalKey   = "memory_manager_pinning_errors_total"
+
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
@@ -738,6 +742,26 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           orphanPodCleanedVolumesErrorsKey,
 			Help:           "The number of orphaned Pods whose volumes failed to be cleaned in the last periodic sweep.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// MemoryManagerPinningRequestsTotal tracks the number of times the pod spec will cause the memory manager to pin memory areas.
+	MemoryManagerPinningRequestsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryManagerPinningRequestsTotalKey,
+			Help:           "The number of memory areas allocations which required pinning.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// MemoryManagerPinningErrorsTotal tracks the number of times the pod spec required the memory manager to pin memory areas, but the allocation failed
+	MemoryManagerPinningErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryManagerPinningErrorsTotalKey,
+			Help:           "The number of memory areas allocations which required pinning failed.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
