@@ -334,12 +334,9 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			return nil
 		}
 		if err != nil {
-			if !apierrors.IsInvalid(err) {
-				return err
-			}
-			klog.Warning("The watch-list feature is not supported by the server, falling back to the previous LIST/WATCH semantics")
+			klog.Warningf("The watchlist request ended with an error, falling back to the standard LIST/WATCH semantics because making progress is better than deadlocking, err = %v", err)
 			fallbackToList = true
-			// Ensure that we won't accidentally pass some garbage down the watch.
+			// ensure that we won't accidentally pass some garbage down the watch.
 			w = nil
 		}
 	}
