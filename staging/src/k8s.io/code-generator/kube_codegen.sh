@@ -50,11 +50,16 @@ function kube::codegen::internal::git_grep() {
 #   --boilerplate <string = path_to_kube_codegen_boilerplate>
 #     An optional override for the header file to insert into generated files.
 #
+#   --extra-peer-dir <string>
+#     An optional list (this flag may be specified multiple times) of "extra"
+#     directories to consider during conversion generation.
+#
 function kube::codegen::gen_helpers() {
     local in_pkg_root=""
     local out_base="" # gengo needs the output dir must be $out_base/$out_pkg_root
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
     local v="${KUBE_VERBOSE:-0}"
+    local extra_peers=()
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -68,6 +73,10 @@ function kube::codegen::gen_helpers() {
                 ;;
             "--boilerplate")
                 boilerplate="$2"
+                shift 2
+                ;;
+            "--extra-peer-dir")
+                extra_peers+=("$2")
                 shift 2
                 ;;
             *)
@@ -128,16 +137,16 @@ function kube::codegen::gen_helpers() {
             ":(glob)${root}"/'**/zz_generated.deepcopy.go' \
             | xargs -0 rm -f
 
-        local inputs=()
+        local input_args=()
         for arg in "${input_pkgs[@]}"; do
-            inputs+=("--input-dirs" "$arg")
+            input_args+=("--input-dirs" "$arg")
         done
         "${gobin}/deepcopy-gen" \
             -v "${v}" \
             -O zz_generated.deepcopy \
             --go-header-file "${boilerplate}" \
             --output-base "${out_base}" \
-            "${inputs[@]}"
+            "${input_args[@]}"
     fi
 
     # Defaults
@@ -162,16 +171,16 @@ function kube::codegen::gen_helpers() {
             ":(glob)${root}"/'**/zz_generated.defaults.go' \
             | xargs -0 rm -f
 
-        local inputs=()
+        local input_args=()
         for arg in "${input_pkgs[@]}"; do
-            inputs+=("--input-dirs" "$arg")
+            input_args+=("--input-dirs" "$arg")
         done
         "${gobin}/defaulter-gen" \
             -v "${v}" \
             -O zz_generated.defaults \
             --go-header-file "${boilerplate}" \
             --output-base "${out_base}" \
-            "${inputs[@]}"
+            "${input_args[@]}"
     fi
 
     # Conversions
@@ -196,16 +205,21 @@ function kube::codegen::gen_helpers() {
             ":(glob)${root}"/'**/zz_generated.conversion.go' \
             | xargs -0 rm -f
 
-        local inputs=()
+        local input_args=()
         for arg in "${input_pkgs[@]}"; do
-            inputs+=("--input-dirs" "$arg")
+            input_args+=("--input-dirs" "$arg")
+        done
+        local extra_peer_args=()
+        for arg in "${extra_peers[@]:+"${extra_peers[@]}"}"; do
+            extra_peer_args+=("--extra-peer-dirs" "$arg")
         done
         "${gobin}/conversion-gen" \
             -v "${v}" \
             -O zz_generated.conversion \
             --go-header-file "${boilerplate}" \
             --output-base "${out_base}" \
-            "${inputs[@]}"
+            "${extra_peer_args[@]:+"${extra_peer_args[@]}"}" \
+            "${input_args[@]}"
     fi
 }
 
