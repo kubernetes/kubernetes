@@ -399,7 +399,7 @@ func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
 	cm, found := converted.Object["metadata"]
 	om, previouslyFound := original.Object["metadata"]
 	switch {
-	case !found && !previouslyFound:
+	case !previouslyFound && !found:
 		return nil
 	case previouslyFound && !found:
 		return fmt.Errorf("missing metadata in converted object")
@@ -416,18 +416,12 @@ func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
 		return fmt.Errorf("invalid metadata of type %T in input object", om)
 	}
 
-	result := converted
-	if previouslyFound {
-		result.Object["metadata"] = originalMeta
-	} else {
-		result.Object["metadata"] = map[string]interface{}{}
-	}
-	resultMeta := result.Object["metadata"].(map[string]interface{})
+	converted.Object["metadata"] = originalMeta
 
 	for _, fld := range []string{"labels", "annotations"} {
 		obj, found := convertedMeta[fld]
 		if !found || obj == nil {
-			delete(resultMeta, fld)
+			delete(originalMeta, fld)
 			continue
 		}
 
@@ -466,7 +460,7 @@ func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
 			}
 		}
 
-		resultMeta[fld] = convertedField
+		originalMeta[fld] = convertedField
 	}
 
 	return nil
