@@ -298,6 +298,13 @@ type AuthorizerConfiguration struct {
 	// types like Node, RBAC, ABAC, etc.
 	Type string `json:"type"`
 
+	// Name used to describe the webhook
+	// This is explicitly used in monitoring machinery for metrics
+	// Note: Names must be DNS1123 labels like `myauthorizername` or
+	//		 subdomains like `myauthorizer.example.domain`
+	// Required, with no default
+	Name string `json:"name"`
+
 	// Webhook defines the configuration for a Webhook authorizer
 	// Must be defined when Type=Webhook
 	// Must not be defined when Type!=Webhook
@@ -305,12 +312,6 @@ type AuthorizerConfiguration struct {
 }
 
 type WebhookConfiguration struct {
-	// Name used to describe the webhook
-	// This is explicitly used in monitoring machinery for metrics
-	// Note: Names must be DNS1123 labels like `mywebhookname` or
-	//		 subdomains like `webhookname.example.domain`
-	// Required, with no default
-	Name string `json:"name"`
 	// The duration to cache 'authorized' responses from the webhook
 	// authorizer.
 	// Same as setting `--authorization-webhook-cache-authorized-ttl` flag
