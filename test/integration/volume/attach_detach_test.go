@@ -476,7 +476,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 }
 
 func waitForMetric(t *testing.T, m basemetric.CounterMetric, expectedCount float64, identifier string) {
-	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 60*time.Second, false, func(context.Context) (bool, error) {
 		gotCount, err := metricstestutil.GetCounterMetricValue(m)
 		if err != nil {
 			t.Fatal(err, identifier)
@@ -493,7 +493,7 @@ func waitForMetric(t *testing.T, m basemetric.CounterMetric, expectedCount float
 }
 
 func waitForNodeToBeTainted(t *testing.T, testingClient *clientset.Clientset, nodeName, taintKey string) {
-	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), 50*time.Millisecond, 60*time.Second, false, func(context.Context) (bool, error) {
 		node, err := testingClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			t.Fatal(err)
@@ -626,8 +626,7 @@ func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, sync
 		NodeInformer:              informers.Core().V1().Nodes(),
 		EnableDynamicProvisioning: false,
 	}
-	var podgcCtrl *podgc.PodGCController
-	podgcCtrl = podgc.NewPodGCInternal(ctx,
+	podgcCtrl := podgc.NewPodGCInternal(ctx,
 		testClient,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
