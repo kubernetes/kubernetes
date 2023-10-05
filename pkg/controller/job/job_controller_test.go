@@ -375,7 +375,25 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedPodPatches:      2,
 			expectedFailed:          2,
 		},
-
+		"more terminating pods than active": {
+			parallelism:  4,
+			completions:  1,
+			backoffLimit: 6,
+			initialStatus: &jobInitialStatus{
+				startTime: func() *time.Time {
+					now := time.Now()
+					return &now
+				}(),
+			},
+			activePods:              2,
+			failedPods:              0,
+			terminatingPods:         4,
+			podReplacementPolicy:    podReplacementPolicy(batch.Failed),
+			jobPodReplacementPolicy: true,
+			expectedTerminating:     ptr.To[int32](4),
+			controllerTime:          &referenceTime,
+			expectedActive:          2,
+		},
 		"too few active pods and active back-off": {
 			parallelism:  1,
 			completions:  1,

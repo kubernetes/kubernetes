@@ -1662,6 +1662,11 @@ func activePodsForRemoval(job *batch.Job, pods []*v1.Pod, rmAtLeast int) []*v1.P
 		left = pods
 	}
 
+	// There is a possible panic here
+	// In real cases, if terminating pods > active, we can hit an out of bounds error
+	if len(left) < (rmAtLeast - len(rm)) {
+		return rm
+	}
 	if len(rm) < rmAtLeast {
 		sort.Sort(controller.ActivePods(left))
 		rm = append(rm, left[:rmAtLeast-len(rm)]...)
