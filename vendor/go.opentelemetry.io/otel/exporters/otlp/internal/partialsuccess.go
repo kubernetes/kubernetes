@@ -16,19 +16,6 @@ package internal // import "go.opentelemetry.io/otel/exporters/otlp/internal"
 
 import "fmt"
 
-// PartialSuccessDropKind indicates the kind of partial success error
-// received by an OTLP exporter, which corresponds with the signal
-// being exported.
-type PartialSuccessDropKind string
-
-const (
-	// TracingPartialSuccess indicates that some spans were rejected.
-	TracingPartialSuccess PartialSuccessDropKind = "spans"
-
-	// MetricsPartialSuccess indicates that some metric data points were rejected.
-	MetricsPartialSuccess PartialSuccessDropKind = "metric data points"
-)
-
 // PartialSuccess represents the underlying error for all handling
 // OTLP partial success messages.  Use `errors.Is(err,
 // PartialSuccess{})` to test whether an error passed to the OTel
@@ -36,7 +23,7 @@ const (
 type PartialSuccess struct {
 	ErrorMessage  string
 	RejectedItems int64
-	RejectedKind  PartialSuccessDropKind
+	RejectedKind  string
 }
 
 var _ error = PartialSuccess{}
@@ -56,13 +43,22 @@ func (ps PartialSuccess) Is(err error) bool {
 	return ok
 }
 
-// PartialSuccessToError produces an error suitable for passing to
-// `otel.Handle()` out of the fields in a partial success response,
-// independent of which signal produced the outcome.
-func PartialSuccessToError(kind PartialSuccessDropKind, itemsRejected int64, errorMessage string) error {
+// TracePartialSuccessError returns an error describing a partial success
+// response for the trace signal.
+func TracePartialSuccessError(itemsRejected int64, errorMessage string) error {
 	return PartialSuccess{
 		ErrorMessage:  errorMessage,
 		RejectedItems: itemsRejected,
-		RejectedKind:  kind,
+		RejectedKind:  "spans",
+	}
+}
+
+// MetricPartialSuccessError returns an error describing a partial success
+// response for the metric signal.
+func MetricPartialSuccessError(itemsRejected int64, errorMessage string) error {
+	return PartialSuccess{
+		ErrorMessage:  errorMessage,
+		RejectedItems: itemsRejected,
+		RejectedKind:  "metric data points",
 	}
 }

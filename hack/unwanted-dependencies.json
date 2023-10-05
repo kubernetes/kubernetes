@@ -76,7 +76,6 @@
       "cloud.google.com/go": [
         "cloud.google.com/go/compute",
         "github.com/google/cadvisor",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/genproto"
       ],
       "cloud.google.com/go/bigquery": [
@@ -85,6 +84,7 @@
       ],
       "cloud.google.com/go/compute": [
         "cloud.google.com/go/compute/metadata",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/genproto",
         "google.golang.org/grpc"
       ],

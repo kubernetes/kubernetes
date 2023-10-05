@@ -6,7 +6,7 @@ go 1.20
 
 require (
 	github.com/moby/sys/mountinfo v0.6.2
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 	golang.org/x/sys v0.13.0
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b

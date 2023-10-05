@@ -79,7 +79,7 @@ var (
 	// XDSFederation indicates whether federation support is enabled, which can
 	// be enabled by setting the environment variable
 	// "GRPC_EXPERIMENTAL_XDS_FEDERATION" to "true".
-	XDSFederation = boolFromEnv("GRPC_EXPERIMENTAL_XDS_FEDERATION", false)
+	XDSFederation = boolFromEnv("GRPC_EXPERIMENTAL_XDS_FEDERATION", true)
 
 	// XDSRLS indicates whether processing of Cluster Specifier plugins and
 	// support for the RLS CLuster Specifier is enabled, which can be enabled by
