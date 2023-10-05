@@ -678,7 +678,7 @@ func checkIPConfig(s *ProxyServer, dualStackSupported bool) (error, bool) {
 		clusterCIDRs := strings.Split(s.Config.ClusterCIDR, ",")
 		if badCIDRs(clusterCIDRs, badFamily) {
 			errors = append(errors, fmt.Errorf("cluster is %s but clusterCIDRs contains only IPv%s addresses", clusterType, badFamily))
-			if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeClusterCIDR {
+			if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeClusterCIDR && !dualStackSupported {
 				// This has always been a fatal error
 				fatal = true
 			}
