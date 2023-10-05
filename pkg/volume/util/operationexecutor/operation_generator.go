@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -2112,14 +2113,26 @@ func (og *operationGenerator) checkIfSupportsNodeExpansion(volumeToMount VolumeT
 		return false, nil
 	}
 
+	// Get volume plugin to check if the corresponding CSI driver supports NodeExpand
+	volumePlugin, _ := og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
+	if volumePlugin.GetPluginName() == csi.CSIPluginName {
+		csiNodeExpandSupported, _ := csi.DoesPluginSupportNodeExpand(volumeToMount.VolumeSpec)
+		if !csiNodeExpandSupported {
+			return false, nil
+		}
+	}
+
 	// Get expander, if possible
 	expandableVolumePlugin, _ :=
 		og.volumePluginMgr.FindNodeExpandablePluginBySpec(volumeToMount.VolumeSpec)
+
+	// Check if node expansion is supported
 	if expandableVolumePlugin != nil &&
 		expandableVolumePlugin.RequiresFSResize() &&
 		volumeToMount.VolumeSpec.PersistentVolume != nil {
 		return true, expandableVolumePlugin
 	}
+
 	return false, nil
 }
 

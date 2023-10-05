@@ -138,3 +138,27 @@ func inUseError(err error) bool {
 	// More info - https://github.com/container-storage-interface/spec/blob/master/spec.md#controllerexpandvolume-errors
 	return st.Code() == codes.FailedPrecondition
 }
+
+func DoesPluginSupportNodeExpand(spec *volume.Spec) (bool, error) {
+	csiSource, err := getCSISourceFromSpec(spec)
+	if err != nil {
+		return false, errors.New(log("Expander.DoesPluginSupportNodeExpand failed to get CSI persistent source: %v", err))
+	}
+
+	csClient, err := newCsiDriverClient(csiDriverName(csiSource.Driver))
+	if err != nil {
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
+		return false, volumetypes.NewTransientOperationFailure(err.Error())
+	}
+
+	ctx, cancel := createCSIOperationContext(spec, csiTimeout)
+	defer cancel()
+
+	nodeExpandSet, err := csClient.NodeSupportsNodeExpand(ctx)
+	if err != nil {
+		return false, fmt.Errorf("Expander.DoesPluginSupportNodeExpand failed to check if node supports expansion : %v", err)
+	}
+
+	return nodeExpandSet, nil
+}
