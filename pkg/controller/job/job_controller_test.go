@@ -357,9 +357,10 @@ func TestControllerSyncJob(t *testing.T) {
 			jobPodReplacementPolicy: true,
 			terminatingPods:         1,
 			expectedTerminating:     ptr.To[int32](1),
-			expectedPodPatches:      2,
-			expectedDeletions:       1,
-			expectedFailed:          1,
+			// Removes finalizer and deletes one failed pod
+			expectedPodPatches: 1,
+			expectedFailed:     1,
+			expectedActive:     1,
 		},
 		"WQ job: recreate pods when terminating or failed": {
 			parallelism:             1,
@@ -375,7 +376,20 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedPodPatches:      2,
 			expectedFailed:          2,
 		},
-
+		"more terminating pods than parallelism": {
+			parallelism:             1,
+			completions:             1,
+			backoffLimit:            6,
+			activePods:              2,
+			failedPods:              0,
+			terminatingPods:         4,
+			podReplacementPolicy:    podReplacementPolicy(batch.Failed),
+			jobPodReplacementPolicy: true,
+			expectedTerminating:     ptr.To[int32](4),
+			expectedActive:          1,
+			expectedDeletions:       1,
+			expectedPodPatches:      1,
+		},
 		"too few active pods and active back-off": {
 			parallelism:  1,
 			completions:  1,
