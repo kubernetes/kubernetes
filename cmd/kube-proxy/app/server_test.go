@@ -763,11 +763,12 @@ func Test_detectNodeIPs(t *testing.T) {
 
 func Test_checkIPConfig(t *testing.T) {
 	cases := []struct {
-		name  string
-		proxy *ProxyServer
-		ssErr bool
-		dsErr bool
-		fatal bool
+		name    string
+		proxy   *ProxyServer
+		ssErr   bool
+		ssFatal bool
+		dsErr   bool
+		dsFatal bool
 	}{
 		{
 			name: "empty config",
@@ -820,9 +821,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   true,
+			dsFatal: false,
 		},
 		{
 			name: "wrong-family clusterCIDR when using ClusterCIDR LocalDetector",
@@ -833,9 +835,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: true,
+			ssErr:   true,
+			ssFatal: true,
+			dsErr:   true,
+			dsFatal: false,
 		},
 
 		{
@@ -879,9 +882,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   true,
+			dsFatal: false,
 		},
 
 		{
@@ -929,9 +933,10 @@ func Test_checkIPConfig(t *testing.T) {
 				PrimaryIPFamily: v1.IPv4Protocol,
 				podCIDRs:        []string{"fd01:2345::/64"},
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: true,
+			ssErr:   true,
+			ssFatal: true,
+			dsErr:   true,
+			dsFatal: true,
 		},
 
 		{
@@ -957,9 +962,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   true,
+			dsFatal: false,
 		},
 
 		{
@@ -1003,9 +1009,9 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
-			ssErr: true,
-			dsErr: false,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   false,
 		},
 
 		{
@@ -1031,9 +1037,9 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
-			ssErr: true,
-			dsErr: false,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   false,
 		},
 	}
 
@@ -1044,8 +1050,8 @@ func Test_checkIPConfig(t *testing.T) {
 				t.Errorf("unexpected error in single-stack case: %v", err)
 			} else if err == nil && c.ssErr {
 				t.Errorf("unexpected lack of error in single-stack case")
-			} else if fatal != c.fatal {
-				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			} else if fatal != c.ssFatal {
+				t.Errorf("expected fatal=%v, got %v", c.ssFatal, fatal)
 			}
 
 			err, fatal = checkIPConfig(c.proxy, true)
@@ -1053,8 +1059,8 @@ func Test_checkIPConfig(t *testing.T) {
 				t.Errorf("unexpected error in dual-stack case: %v", err)
 			} else if err == nil && c.dsErr {
 				t.Errorf("unexpected lack of error in dual-stack case")
-			} else if fatal != c.fatal {
-				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			} else if fatal != c.dsFatal {
+				t.Errorf("expected fatal=%v, got %v", c.dsFatal, fatal)
 			}
 		})
 	}
