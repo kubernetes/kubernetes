@@ -62,8 +62,6 @@ var objectOrder = map[string]int{
 // with per-service rules, we don't know what order syncProxyRules is going to output them
 // in, but the order doesn't matter anyway. So we sort the rules in those chains.
 var sortedChains = sets.New(
-	kubeServicesFilterChain,
-	kubeExternalServicesChain,
 	kubeServicesChain,
 	kubeNodePortsChain,
 )
@@ -256,6 +254,17 @@ func (tracer *nftablesTracer) matchDestAndSource(elements []*knftables.Element, 
 	return nil
 }
 
+// matchDestPort checks an "meta l4proto . th dport" against a set/map, and returns the
+// matching Element, if found.
+func (tracer *nftablesTracer) matchDestPort(elements []*knftables.Element, protocol, destPort string) *knftables.Element {
+	for _, element := range elements {
+		if element.Key[0] == protocol && element.Key[1] == destPort {
+			return element
+		}
+	}
+	return nil
+}
+
 // We intentionally don't try to parse arbitrary nftables rules, as the syntax is quite
 // complicated and context sensitive. (E.g., "ip daddr" could be the start of an address
 // comparison, or it could be the start of a set/map lookup.) Instead, we just have
@@ -273,6 +282,10 @@ var destPortRegexp = regexp.MustCompile(`^(tcp|udp|sctp) dport (\d+)`)
 var destIPOnlyLookupRegexp = regexp.MustCompile(`^ip6* daddr @(\S+)`)
 var destLookupRegexp = regexp.MustCompile(`^ip6* daddr \. meta l4proto \. th dport @(\S+)`)
 var destSourceLookupRegexp = regexp.MustCompile(`^ip6* daddr \. meta l4proto \. th dport \. ip6* saddr @(\S+)`)
+var destPortLookupRegexp = regexp.MustCompile(`^meta l4proto \. th dport @(\S+)`)
+
+var destDispatchRegexp = regexp.MustCompile(`^ip6* daddr \. meta l4proto \. th dport vmap @(\S+)$`)
+var destPortDispatchRegexp = regexp.MustCompile(`^meta l4proto \. th dport vmap @(\S+)$`)
 
 var sourceAddrRegexp = regexp.MustCompile(`^ip6* saddr (!= )?(\S+)`)
 var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
@@ -355,6 +368,46 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				if tracer.matchDest(tracer.nft.Table.Sets[set].Elements, destIP, protocol, destPort) == nil {
 					rule = ""
 					break
+				}
+
+			case destPortLookupRegexp.MatchString(rule):
+				// `^meta l4proto . th dport @(\S+)`
+				// Tests whether "protocol . destPort" is a member of the
+				// indicated set.
+				match := destPortLookupRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				set := match[1]
+				if tracer.matchDestPort(tracer.nft.Table.Sets[set].Elements, protocol, destPort) == nil {
+					rule = ""
+					break
+				}
+
+			case destDispatchRegexp.MatchString(rule):
+				// `^ip6* daddr \. meta l4proto \. th dport vmap @(\S+)$`
+				// Looks up "destIP . protocol . destPort" in the indicated
+				// verdict map, and if found, runs the assocated verdict.
+				match := destDispatchRegexp.FindStringSubmatch(rule)
+				mapName := match[1]
+				element := tracer.matchDest(tracer.nft.Table.Maps[mapName].Elements, destIP, protocol, destPort)
+				if element == nil {
+					rule = ""
+					break
+				} else {
+					rule = element.Value[0]
+				}
+
+			case destPortDispatchRegexp.MatchString(rule):
+				// `^meta l4proto \. th dport vmap @(\S+)$`
+				// Looks up "protocol . destPort" in the indicated verdict map,
+				// and if found, runs the assocated verdict.
+				match := destPortDispatchRegexp.FindStringSubmatch(rule)
+				mapName := match[1]
+				element := tracer.matchDestPort(tracer.nft.Table.Maps[mapName].Elements, protocol, destPort)
+				if element == nil {
+					rule = ""
+					break
+				} else {
+					rule = element.Value[0]
 				}
 
 			case destAddrRegexp.MatchString(rule):

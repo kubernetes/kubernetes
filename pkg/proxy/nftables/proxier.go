@@ -69,8 +69,10 @@ const (
 	kubeNodePortIPsSet = "nodeport-ips"
 
 	// handling for services with no endpoints
-	kubeServicesFilterChain   = "services-filter"
-	kubeExternalServicesChain = "external-services"
+	kubeEndpointsCheckChain    = "endpoints-check"
+	kubeNoEndpointServicesMap  = "no-endpoint-services"
+	kubeNoEndpointNodePortsMap = "no-endpoint-nodeports"
+	kubeRejectChain            = "reject-chain"
 
 	// LoadBalancerSourceRanges handling
 	kubeFirewallSet             = "firewall"
@@ -340,10 +342,10 @@ type nftablesJumpChain struct {
 }
 
 var nftablesJumpChains = []nftablesJumpChain{
-	{kubeExternalServicesChain, "filter-input", "ct state new"},
-	{kubeExternalServicesChain, "filter-forward", "ct state new"},
-	{kubeServicesFilterChain, "filter-forward", "ct state new"},
-	{kubeServicesFilterChain, "filter-output", "ct state new"},
+	{kubeEndpointsCheckChain, "filter-input", "ct state new"},
+	{kubeEndpointsCheckChain, "filter-forward", "ct state new"},
+	{kubeEndpointsCheckChain, "filter-output", "ct state new"},
+
 	{kubeForwardChain, "filter-forward", ""},
 
 	{kubeFirewallCheckChain, "filter-input", "ct state new"},
@@ -374,9 +376,11 @@ func ensureChain(chain string, tx *knftables.Transaction, createdChains sets.Set
 func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	ipX := "ip"
 	ipvX_addr := "ipv4_addr" //nolint:stylecheck // var name intentionally resembles value
+	noLocalhost := "ip daddr != 127.0.0.0/8"
 	if proxier.ipFamily == v1.IPv6Protocol {
 		ipX = "ip6"
 		ipvX_addr = "ipv6_addr"
+		noLocalhost = "ip6 daddr != ::1"
 	}
 
 	tx.Add(&knftables.Table{
@@ -409,7 +413,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	}
 
 	// Ensure all of our other "top-level" chains exist
-	for _, chain := range []string{kubeServicesFilterChain, kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain, kubeMasqueradingChain, kubeMarkMasqChain} {
+	for _, chain := range []string{kubeServicesChain, kubeForwardChain, kubeNodePortsChain, kubeMasqueradingChain, kubeMarkMasqChain} {
 		ensureChain(chain, tx, createdChains)
 	}
 
@@ -482,6 +486,59 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 				},
 			})
 		}
+	}
+
+	// Set up "no endpoints" drop/reject handling
+	tx.Add(&knftables.Map{
+		Name:    kubeNoEndpointServicesMap,
+		Type:    ipvX_addr + " . inet_proto . inet_service : verdict",
+		Comment: ptr.To("vmap to drop or reject packets to services with no endpoints"),
+	})
+	tx.Add(&knftables.Map{
+		Name:    kubeNoEndpointNodePortsMap,
+		Type:    "inet_proto . inet_service : verdict",
+		Comment: ptr.To("vmap to drop or reject packets to service nodeports with no endpoints"),
+	})
+
+	tx.Add(&knftables.Chain{
+		Name:    kubeRejectChain,
+		Comment: ptr.To("helper for @no-endpoint-services / @no-endpoint-nodeports"),
+	})
+	tx.Flush(&knftables.Chain{
+		Name: kubeRejectChain,
+	})
+	tx.Add(&knftables.Rule{
+		Chain: kubeRejectChain,
+		Rule:  "reject",
+	})
+
+	tx.Add(&knftables.Rule{
+		Chain: kubeEndpointsCheckChain,
+		Rule: knftables.Concat(
+			ipX, "daddr", ".", "meta l4proto", ".", "th dport",
+			"vmap", "@", kubeNoEndpointServicesMap,
+		),
+	})
+
+	if proxier.nodePortAddresses.MatchAll() {
+		tx.Add(&knftables.Rule{
+			Chain: kubeEndpointsCheckChain,
+			Rule: knftables.Concat(
+				"fib daddr type local",
+				noLocalhost,
+				"meta l4proto . th dport",
+				"vmap", "@", kubeNoEndpointNodePortsMap,
+			),
+		})
+	} else {
+		tx.Add(&knftables.Rule{
+			Chain: kubeEndpointsCheckChain,
+			Rule: knftables.Concat(
+				ipX, "daddr", "@", kubeNodePortIPsSet,
+				"meta l4proto . th dport",
+				"vmap", "@", kubeNoEndpointNodePortsMap,
+			),
+		})
 	}
 
 	// Set up LoadBalancerSourceRanges firewalling
@@ -907,6 +964,12 @@ func (proxier *Proxier) syncProxyRules() {
 	tx.Flush(&knftables.Set{
 		Name: kubeFirewallAllowSet,
 	})
+	tx.Flush(&knftables.Map{
+		Name: kubeNoEndpointServicesMap,
+	})
+	tx.Flush(&knftables.Map{
+		Name: kubeNoEndpointNodePortsMap,
+	})
 
 	// Accumulate service/endpoint chains and affinity sets to keep.
 	activeChains := sets.New[string]()
@@ -1004,25 +1067,21 @@ func (proxier *Proxier) syncProxyRules() {
 			ensureChain(externalTrafficChain, tx, activeChains)
 		}
 
-		var internalTrafficFilterVerdict, internalTrafficFilterComment string
-		var externalTrafficFilterVerdict, externalTrafficFilterComment string
+		var internalTrafficFilterVerdict, externalTrafficFilterVerdict string
 		if !hasEndpoints {
 			// The service has no endpoints at all; hasInternalEndpoints and
 			// hasExternalEndpoints will also be false, and we will not
 			// generate any chains in the "nat" table for the service; only
 			// rules in the "filter" table rejecting incoming packets for
 			// the service's IPs.
-			internalTrafficFilterVerdict = "reject"
-			internalTrafficFilterComment = fmt.Sprintf("%s has no endpoints", svcPortNameString)
-			externalTrafficFilterVerdict = "reject"
-			externalTrafficFilterComment = internalTrafficFilterComment
+			internalTrafficFilterVerdict = fmt.Sprintf("goto %s", kubeRejectChain)
+			externalTrafficFilterVerdict = fmt.Sprintf("goto %s", kubeRejectChain)
 		} else {
 			if !hasInternalEndpoints {
 				// The internalTrafficPolicy is "Local" but there are no local
 				// endpoints. Traffic to the clusterIP will be dropped, but
 				// external traffic may still be accepted.
 				internalTrafficFilterVerdict = "drop"
-				internalTrafficFilterComment = fmt.Sprintf("%s has no local endpoints", svcPortNameString)
 				serviceNoLocalEndpointsTotalInternal++
 			}
 			if !hasExternalEndpoints {
@@ -1031,7 +1090,6 @@ func (proxier *Proxier) syncProxyRules() {
 				// the cluster will be dropped, but traffic from inside
 				// the cluster may still be accepted.
 				externalTrafficFilterVerdict = "drop"
-				externalTrafficFilterComment = fmt.Sprintf("%s has no local endpoints", svcPortNameString)
 				serviceNoLocalEndpointsTotalExternal++
 			}
 		}
@@ -1048,14 +1106,17 @@ func (proxier *Proxier) syncProxyRules() {
 			})
 		} else {
 			// No endpoints.
-			tx.Add(&knftables.Rule{
-				Chain: kubeServicesFilterChain,
-				Rule: knftables.Concat(
-					ipX, "daddr", svcInfo.ClusterIP(),
-					protocol, "dport", svcInfo.Port(),
+			tx.Add(&knftables.Element{
+				Map: kubeNoEndpointServicesMap,
+				Key: []string{
+					svcInfo.ClusterIP().String(),
+					protocol,
+					strconv.Itoa(svcInfo.Port()),
+				},
+				Value: []string{
 					internalTrafficFilterVerdict,
-				),
-				Comment: &internalTrafficFilterComment,
+				},
+				Comment: &svcPortNameString,
 			})
 		}
 
@@ -1077,14 +1138,17 @@ func (proxier *Proxier) syncProxyRules() {
 				// Either no endpoints at all (REJECT) or no endpoints for
 				// external traffic (DROP anything that didn't get
 				// short-circuited by the EXT chain.)
-				tx.Add(&knftables.Rule{
-					Chain: kubeExternalServicesChain,
-					Rule: knftables.Concat(
-						ipX, "daddr", externalIP,
-						protocol, "dport", svcInfo.Port(),
+				tx.Add(&knftables.Element{
+					Map: kubeNoEndpointServicesMap,
+					Key: []string{
+						externalIP,
+						protocol,
+						strconv.Itoa(svcInfo.Port()),
+					},
+					Value: []string{
 						externalTrafficFilterVerdict,
-					),
-					Comment: &externalTrafficFilterComment,
+					},
+					Comment: &svcPortNameString,
 				})
 			}
 		}
@@ -1156,14 +1220,17 @@ func (proxier *Proxier) syncProxyRules() {
 			// external traffic (DROP anything that didn't get short-circuited
 			// by the EXT chain.)
 			for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
-				tx.Add(&knftables.Rule{
-					Chain: kubeExternalServicesChain,
-					Rule: knftables.Concat(
-						ipX, "daddr", lbip,
-						protocol, "dport", svcInfo.Port(),
+				tx.Add(&knftables.Element{
+					Map: kubeNoEndpointServicesMap,
+					Key: []string{
+						lbip,
+						protocol,
+						strconv.Itoa(svcInfo.Port()),
+					},
+					Value: []string{
 						externalTrafficFilterVerdict,
-					),
-					Comment: &externalTrafficFilterComment,
+					},
+					Comment: &svcPortNameString,
 				})
 			}
 		}
@@ -1186,14 +1253,16 @@ func (proxier *Proxier) syncProxyRules() {
 				// Either no endpoints at all (REJECT) or no endpoints for
 				// external traffic (DROP anything that didn't get
 				// short-circuited by the EXT chain.)
-				tx.Add(&knftables.Rule{
-					Chain: kubeExternalServicesChain,
-					Rule: knftables.Concat(
-						"fib daddr type local",
-						protocol, "dport", svcInfo.NodePort(),
+				tx.Add(&knftables.Element{
+					Map: kubeNoEndpointNodePortsMap,
+					Key: []string{
+						protocol,
+						strconv.Itoa(svcInfo.NodePort()),
+					},
+					Value: []string{
 						externalTrafficFilterVerdict,
-					),
-					Comment: &externalTrafficFilterComment,
+					},
+					Comment: &svcPortNameString,
 				})
 			}
 		}
