@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/integer"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -783,7 +783,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	}
 	var terminating *int32
 	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		terminating = pointer.Int32(controller.CountTerminatingPods(pods))
+		terminating = ptr.To(controller.CountTerminatingPods(pods))
 	}
 	jobCtx := &syncJobCtx{
 		job:                  &job,
@@ -799,7 +799,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	failed := job.Status.Failed + int32(nonIgnoredFailedPodsCount(jobCtx, newFailedPods)) + int32(len(jobCtx.uncounted.failed))
 	var ready *int32
 	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
-		ready = pointer.Int32(countReadyPods(jobCtx.activePods))
+		ready = ptr.To(countReadyPods(jobCtx.activePods))
 	}
 
 	// Job first start. Set StartTime only if the job is not in the suspended state.
@@ -918,11 +918,11 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		}
 	}
 
-	needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !pointer.Int32Equal(ready, job.Status.Ready)
+	needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !ptr.Equal(ready, job.Status.Ready)
 	job.Status.Active = active
 	job.Status.Ready = ready
 	job.Status.Terminating = jobCtx.terminating
-	needsStatusUpdate = needsStatusUpdate || !pointer.Int32Equal(job.Status.Terminating, jobCtx.terminating)
+	needsStatusUpdate = needsStatusUpdate || !ptr.Equal(job.Status.Terminating, jobCtx.terminating)
 	err = jm.trackJobStatusAndRemoveFinalizers(ctx, jobCtx, needsStatusUpdate)
 	if err != nil {
 		return fmt.Errorf("tracking status: %w", err)
@@ -1106,9 +1106,9 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		jobCtx.job.Status.CompletedIndexes = succeededIndexesStr
 		var failedIndexesStr *string
 		if jobCtx.failedIndexes != nil {
-			failedIndexesStr = pointer.String(jobCtx.failedIndexes.String())
+			failedIndexesStr = ptr.To(jobCtx.failedIndexes.String())
 		}
-		if !pointer.StringEqual(jobCtx.job.Status.FailedIndexes, failedIndexesStr) {
+		if !ptr.Equal(jobCtx.job.Status.FailedIndexes, failedIndexesStr) {
 			jobCtx.job.Status.FailedIndexes = failedIndexesStr
 			needsFlush = true
 		}
@@ -1642,7 +1642,7 @@ func (jm *Controller) getPodCreationInfoForIndependentIndexes(logger klog.Logger
 	if len(indexesToAddNow) > 0 {
 		return indexesToAddNow, 0
 	}
-	return indexesToAddNow, pointer.DurationDeref(minRemainingTimePerIndex, 0)
+	return indexesToAddNow, ptr.Deref(minRemainingTimePerIndex, 0)
 }
 
 // activePodsForRemoval returns Pods that should be removed because there

@@ -59,7 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	clocktesting "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var realClock = &clock.RealClock{}
@@ -326,7 +326,7 @@ func TestControllerSyncJob(t *testing.T) {
 			activePods:          3,
 			readyPods:           2,
 			expectedActive:      3,
-			expectedReady:       pointer.Int32(2),
+			expectedReady:       ptr.To[int32](2),
 			jobReadyPodsEnabled: true,
 		},
 		"WQ job: correct # of pods": {
@@ -356,7 +356,7 @@ func TestControllerSyncJob(t *testing.T) {
 			podReplacementPolicy:    podReplacementPolicy(batch.Failed),
 			jobPodReplacementPolicy: true,
 			terminatingPods:         1,
-			expectedTerminating:     pointer.Int32(1),
+			expectedTerminating:     ptr.To[int32](1),
 			expectedPodPatches:      2,
 			expectedDeletions:       1,
 			expectedFailed:          1,
@@ -370,7 +370,7 @@ func TestControllerSyncJob(t *testing.T) {
 			podReplacementPolicy:    podReplacementPolicy(batch.TerminatingOrFailed),
 			jobPodReplacementPolicy: true,
 			terminatingPods:         1,
-			expectedTerminating:     pointer.Int32(1),
+			expectedTerminating:     ptr.To[int32](1),
 			expectedActive:          1,
 			expectedPodPatches:      2,
 			expectedFailed:          2,
@@ -637,7 +637,7 @@ func TestControllerSyncJob(t *testing.T) {
 			podReplacementPolicy:    podReplacementPolicy(batch.Failed),
 			jobPodReplacementPolicy: true,
 			terminatingPods:         1,
-			expectedTerminating:     pointer.Int32(1),
+			expectedTerminating:     ptr.To[int32](1),
 		},
 		"indexed job with some pods deleted, podReplacementPolicy TerminatingOrFailed": {
 			parallelism:             2,
@@ -650,7 +650,7 @@ func TestControllerSyncJob(t *testing.T) {
 			podReplacementPolicy:    podReplacementPolicy(batch.TerminatingOrFailed),
 			jobPodReplacementPolicy: true,
 			terminatingPods:         1,
-			expectedTerminating:     pointer.Int32(1),
+			expectedTerminating:     ptr.To[int32](1),
 			expectedPodPatches:      1,
 		},
 		"indexed job completed": {
@@ -887,7 +887,7 @@ func TestControllerSyncJob(t *testing.T) {
 
 			// job & pods setup
 			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, tc.completionMode)
-			job.Spec.Suspend = pointer.Bool(tc.suspend)
+			job.Spec.Suspend = ptr.To(tc.suspend)
 			if tc.jobPodReplacementPolicy {
 				job.Spec.PodReplacementPolicy = tc.podReplacementPolicy
 			}
@@ -1482,7 +1482,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32(6),
+					Completions:    ptr.To[int32](6),
 				},
 				Status: batch.JobStatus{
 					Active: 1,
@@ -1510,8 +1510,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32(2),
-					Parallelism:    pointer.Int32(2),
+					Completions:    ptr.To[int32](2),
+					Parallelism:    ptr.To[int32](2),
 				},
 				Status: batch.JobStatus{
 					Active:           2,
@@ -1537,8 +1537,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32(2),
-					Parallelism:    pointer.Int32(2),
+					Completions:    ptr.To[int32](2),
+					Parallelism:    ptr.To[int32](2),
 				},
 				Status: batch.JobStatus{
 					Active:           2,
@@ -1565,7 +1565,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32(6),
+					Completions:    ptr.To[int32](6),
 				},
 				Status: batch.JobStatus{
 					Active: 1,
@@ -1598,7 +1598,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32(7),
+					Completions:    ptr.To[int32](7),
 				},
 				Status: batch.JobStatus{
 					Failed:           2,
@@ -1680,7 +1680,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32(501),
+					Completions:    ptr.To[int32](501),
 				},
 			},
 			pods: func() []*v1.Pod {
@@ -1703,8 +1703,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 		"pod flips from failed to succeeded": {
 			job: batch.Job{
 				Spec: batch.JobSpec{
-					Completions: pointer.Int32(2),
-					Parallelism: pointer.Int32(2),
+					Completions: ptr.To[int32](2),
+					Parallelism: ptr.To[int32](2),
 				},
 				Status: batch.JobStatus{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
@@ -1732,8 +1732,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode:       &indexedCompletion,
-					Completions:          pointer.Int32(6),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					Completions:          ptr.To[int32](6),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
 			pods: []*v1.Pod{
@@ -1742,7 +1742,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-					FailedIndexes:           pointer.String(""),
+					FailedIndexes:           ptr.To(""),
 				},
 			},
 		},
@@ -1751,8 +1751,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode:       &indexedCompletion,
-					Completions:          pointer.Int32(6),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					Completions:          ptr.To[int32](6),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 				Status: batch.JobStatus{
 					Active: 1,
@@ -1769,13 +1769,13 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
 						Failed: []types.UID{"a1"},
 					},
-					FailedIndexes: pointer.String(""),
+					FailedIndexes: ptr.To(""),
 				},
 				{
 					Active:                  1,
 					Failed:                  1,
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-					FailedIndexes:           pointer.String(""),
+					FailedIndexes:           ptr.To(""),
 				},
 			},
 			wantFailedPodsMetric: 1,
@@ -1785,8 +1785,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode:       &indexedCompletion,
-					Completions:          pointer.Int32(6),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					Completions:          ptr.To[int32](6),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
 			pods: []*v1.Pod{
@@ -1795,14 +1795,14 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			wantRmFinalizers: 1,
 			wantStatusUpdates: []batch.JobStatus{
 				{
-					FailedIndexes: pointer.String("1"),
+					FailedIndexes: ptr.To("1"),
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
 						Failed: []types.UID{"a"},
 					},
 				},
 				{
 					Failed:                  1,
-					FailedIndexes:           pointer.String("1"),
+					FailedIndexes:           ptr.To("1"),
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				},
 			},
@@ -1974,7 +1974,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			// job & pods setup
 			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, batch.NonIndexedCompletion)
 			job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
-			job.Spec.Suspend = pointer.Bool(tc.suspend)
+			job.Spec.Suspend = ptr.To(tc.suspend)
 			start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
 			job.Status.StartTime = &start
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
@@ -2071,7 +2071,7 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			job := newJobWithName(tc.jobName, 1, 1, 6, batch.NonIndexedCompletion)
-			job.Spec.ActiveDeadlineSeconds = pointer.Int64(1)
+			job.Spec.ActiveDeadlineSeconds = ptr.To[int64](1)
 			if tc.setStartTime {
 				start := metav1.NewTime(fakeClock.Now())
 				job.Status.StartTime = &start
@@ -2129,7 +2129,7 @@ func TestSingleJobFailedCondition(t *testing.T) {
 	}
 
 	job := newJob(1, 1, 6, batch.NonIndexedCompletion)
-	job.Spec.ActiveDeadlineSeconds = pointer.Int64(10)
+	job.Spec.ActiveDeadlineSeconds = ptr.To[int64](10)
 	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
 	job.Status.StartTime = &start
 	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobFailed, v1.ConditionFalse, "DeadlineExceeded", "Job was active longer than specified deadline", realClock.Now()))
@@ -2266,15 +2266,15 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									ContainerName: pointer.String("main-container"),
+									ContainerName: ptr.To("main-container"),
 									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
 									Values:        []int32{1, 2, 3},
 								},
@@ -2282,7 +2282,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 							{
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									ContainerName: pointer.String("main-container"),
+									ContainerName: ptr.To("main-container"),
 									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
 									Values:        []int32{5, 6, 7},
 								},
@@ -2330,9 +2330,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2368,9 +2368,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2413,9 +2413,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2468,9 +2468,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2523,9 +2523,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2562,9 +2562,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(2),
-					Completions:  pointer.Int32(2),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](2),
+					Completions:  ptr.To[int32](2),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2613,9 +2613,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					Selector:       validSelector,
 					Template:       validTemplate,
 					CompletionMode: &indexedCompletionMode,
-					Parallelism:    pointer.Int32(1),
-					Completions:    pointer.Int32(1),
-					BackoffLimit:   pointer.Int32(6),
+					Parallelism:    ptr.To[int32](1),
+					Completions:    ptr.To[int32](1),
+					BackoffLimit:   ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2658,9 +2658,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -2711,9 +2711,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -2758,9 +2758,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2813,9 +2813,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(0),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](0),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2859,9 +2859,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(0),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](0),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2896,9 +2896,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(0),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](0),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: onExitCodeRules,
 					},
@@ -2940,9 +2940,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -2993,9 +2993,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -3059,9 +3059,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(0),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](0),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -3103,9 +3103,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(0),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](0),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -3150,9 +3150,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:     validSelector,
 					Template:     validTemplate,
-					Parallelism:  pointer.Int32(1),
-					Completions:  pointer.Int32(1),
-					BackoffLimit: pointer.Int32(6),
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](6),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -3199,10 +3199,10 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Parallelism:  pointer.Int32(1),
+					Parallelism:  ptr.To[int32](1),
 					Selector:     validSelector,
 					Template:     validTemplate,
-					BackoffLimit: pointer.Int32(0),
+					BackoffLimit: ptr.To[int32](0),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -3233,10 +3233,10 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Parallelism:  pointer.Int32(1),
+					Parallelism:  ptr.To[int32](1),
 					Selector:     validSelector,
 					Template:     validTemplate,
-					BackoffLimit: pointer.Int32(0),
+					BackoffLimit: ptr.To[int32](0),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -3325,8 +3325,8 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			if actual.Status.Failed != tc.wantStatusFailed {
 				t.Errorf("unexpected number of failed pods. Expected %d, saw %d\n", tc.wantStatusFailed, actual.Status.Failed)
 			}
-			if pointer.Int32Deref(actual.Status.Terminating, 0) != pointer.Int32Deref(tc.wantStatusTerminating, 0) {
-				t.Errorf("unexpected number of terminating pods. Expected %d, saw %d\n", pointer.Int32Deref(tc.wantStatusTerminating, 0), pointer.Int32Deref(actual.Status.Terminating, 0))
+			if ptr.Deref(actual.Status.Terminating, 0) != ptr.Deref(tc.wantStatusTerminating, 0) {
+				t.Errorf("unexpected number of terminating pods. Expected %d, saw %d\n", ptr.Deref(tc.wantStatusTerminating, 0), ptr.Deref(actual.Status.Terminating, 0))
 			}
 		})
 	}
@@ -3371,11 +3371,11 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(2),
-					Completions:          pointer.Int32(2),
-					BackoffLimit:         pointer.Int32(math.MaxInt32),
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
 			pods: []v1.Pod{
@@ -3387,7 +3387,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Failed:                  1,
 				Succeeded:               2,
 				CompletedIndexes:        "0,1",
-				FailedIndexes:           pointer.String(""),
+				FailedIndexes:           ptr.To(""),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
@@ -3405,11 +3405,11 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(2),
-					Completions:          pointer.Int32(2),
-					BackoffLimit:         pointer.Int32(math.MaxInt32),
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
 			pods: []v1.Pod{
@@ -3418,7 +3418,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Active:                  2,
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-				FailedIndexes:           pointer.String(""),
+				FailedIndexes:           ptr.To(""),
 			},
 		},
 		"single failed pod replaced already": {
@@ -3429,11 +3429,11 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(2),
-					Completions:          pointer.Int32(2),
-					BackoffLimit:         pointer.Int32(math.MaxInt32),
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
 			pods: []v1.Pod{
@@ -3444,7 +3444,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Active:                  2,
 				Failed:                  1,
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-				FailedIndexes:           pointer.String(""),
+				FailedIndexes:           ptr.To(""),
 			},
 		},
 		"single failed index due to exceeding the backoff limit per index, the job continues": {
@@ -3455,11 +3455,11 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(2),
-					Completions:          pointer.Int32(2),
-					BackoffLimit:         pointer.Int32(math.MaxInt32),
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
 			pods: []v1.Pod{
@@ -3468,7 +3468,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Active:                  1,
 				Failed:                  1,
-				FailedIndexes:           pointer.String("0"),
+				FailedIndexes:           ptr.To("0"),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
@@ -3481,11 +3481,11 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(2),
-					Completions:          pointer.Int32(2),
-					BackoffLimit:         pointer.Int32(math.MaxInt32),
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -3516,7 +3516,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Active:                  1,
 				Failed:                  1,
-				FailedIndexes:           pointer.String("0"),
+				FailedIndexes:           ptr.To("0"),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
@@ -3529,11 +3529,11 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(2),
-					Completions:          pointer.Int32(2),
-					BackoffLimit:         pointer.Int32(6),
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](6),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -3565,7 +3565,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Active:                  0,
 				Failed:                  1,
-				FailedIndexes:           pointer.String(""),
+				FailedIndexes:           ptr.To(""),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
@@ -3592,11 +3592,11 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(2),
-					Completions:          pointer.Int32(2),
-					BackoffLimit:         pointer.Int32(6),
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](6),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -3628,7 +3628,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Active:                  2,
 				Failed:                  0,
-				FailedIndexes:           pointer.String(""),
+				FailedIndexes:           ptr.To(""),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
@@ -3640,11 +3640,11 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(2),
-					Completions:          pointer.Int32(2),
-					BackoffLimit:         pointer.Int32(1),
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](1),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
 			pods: []v1.Pod{
@@ -3654,7 +3654,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  2,
 				Succeeded:               0,
-				FailedIndexes:           pointer.String(""),
+				FailedIndexes:           ptr.To(""),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
@@ -3674,11 +3674,11 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(2),
-					Completions:          pointer.Int32(2),
-					BackoffLimit:         pointer.Int32(math.MaxInt32),
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
 			pods: []v1.Pod{
@@ -3688,7 +3688,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  1,
 				Succeeded:               1,
-				FailedIndexes:           pointer.String("0"),
+				FailedIndexes:           ptr.To("0"),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
@@ -3709,12 +3709,12 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(4),
-					Completions:          pointer.Int32(4),
-					BackoffLimit:         pointer.Int32(math.MaxInt32),
+					Parallelism:          ptr.To[int32](4),
+					Completions:          ptr.To[int32](4),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
-					MaxFailedIndexes:     pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+					MaxFailedIndexes:     ptr.To[int32](1),
 				},
 			},
 			pods: []v1.Pod{
@@ -3726,7 +3726,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  3,
 				Succeeded:               1,
-				FailedIndexes:           pointer.String("0,2"),
+				FailedIndexes:           ptr.To("0,2"),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
@@ -3747,14 +3747,14 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validTemplate,
-					Parallelism:          pointer.Int32(3),
-					Completions:          pointer.Int32(3),
-					BackoffLimit:         pointer.Int32(math.MaxInt32),
+					Parallelism:          ptr.To[int32](3),
+					Completions:          ptr.To[int32](3),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 				Status: batch.JobStatus{
-					FailedIndexes:    pointer.String("0"),
+					FailedIndexes:    ptr.To("0"),
 					CompletedIndexes: "1",
 				},
 			},
@@ -3871,7 +3871,7 @@ func TestUpdateJobRequeue(t *testing.T) {
 		"spec update": {
 			oldJob: newJob(1, 1, 1, batch.IndexedCompletion),
 			updateFn: func(job *batch.Job) {
-				job.Spec.Suspend = pointer.Bool(false)
+				job.Spec.Suspend = ptr.To(false)
 				job.Generation++
 			},
 			wantRequeuedImmediately: true,
@@ -4861,7 +4861,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			// job & pods setup
 			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, batch.NonIndexedCompletion)
 			job.Spec.Template.Spec.RestartPolicy = v1.RestartPolicyOnFailure
-			job.Spec.Suspend = pointer.Bool(tc.suspend)
+			job.Spec.Suspend = ptr.To(tc.suspend)
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 			for i, pod := range newPodList(len(tc.restartCounts), tc.podPhase, job) {
