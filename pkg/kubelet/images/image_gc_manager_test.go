@@ -652,6 +652,119 @@ func getImagesAndFreeSpace(ctx context.Context, t *testing.T, assert *assert.Ass
 	assert.Len(fakeRuntime.ImageList, imagesLen)
 }
 
+func TestGarbageCollectImageTooOld(t *testing.T) {
+	ctx := context.Background()
+	policy := ImageGCPolicy{
+		HighThresholdPercent: 90,
+		LowThresholdPercent:  80,
+		MinAge:               0,
+		MaxAge:               time.Minute * 1,
+	}
+	fakeRuntime := &containertest.FakeRuntime{}
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+	manager := &realImageGCManager{
+		runtime:       fakeRuntime,
+		policy:        policy,
+		imageRecords:  make(map[string]*imageRecord),
+		statsProvider: mockStatsProvider,
+		recorder:      &record.FakeRecorder{},
+	}
+
+	fakeRuntime.ImageList = []container.Image{
+		makeImage(0, 1024),
+		makeImage(1, 2048),
+	}
+	// 1 image is in use, and another one is not old enough
+	fakeRuntime.AllPodList = []*containertest.FakePod{
+		{Pod: &container.Pod{
+			Containers: []*container.Container{
+				makeContainer(1),
+			},
+		}},
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	t.Log(fakeClock.Now())
+	images, err := manager.imagesInEvictionOrder(ctx, fakeClock.Now())
+	require.NoError(t, err)
+	require.Equal(t, len(images), 1)
+	// Simulate pod having just used this image, but having been GC'd
+	images[0].lastUsed = fakeClock.Now()
+
+	// First GC round should not GC remaining image, as it was used too recently.
+	assert := assert.New(t)
+	images, err = manager.freeOldImages(ctx, images, fakeClock.Now())
+	require.NoError(t, err)
+	assert.Len(images, 1)
+	assert.Len(fakeRuntime.ImageList, 2)
+
+	// move clock by a millisecond past maxAge duration, then 1 image will be garbage collected
+	fakeClock.Step(policy.MaxAge + 1)
+	images, err = manager.freeOldImages(ctx, images, fakeClock.Now())
+	require.NoError(t, err)
+	assert.Len(images, 0)
+	assert.Len(fakeRuntime.ImageList, 1)
+}
+
+func TestGarbageCollectImageMaxAgeDisabled(t *testing.T) {
+	ctx := context.Background()
+	policy := ImageGCPolicy{
+		HighThresholdPercent: 90,
+		LowThresholdPercent:  80,
+		MinAge:               0,
+		MaxAge:               0,
+	}
+	fakeRuntime := &containertest.FakeRuntime{}
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+	manager := &realImageGCManager{
+		runtime:       fakeRuntime,
+		policy:        policy,
+		imageRecords:  make(map[string]*imageRecord),
+		statsProvider: mockStatsProvider,
+		recorder:      &record.FakeRecorder{},
+	}
+
+	assert := assert.New(t)
+	fakeRuntime.ImageList = []container.Image{
+		makeImage(0, 1024),
+		makeImage(1, 2048),
+	}
+	assert.Len(fakeRuntime.ImageList, 2)
+	// 1 image is in use, and another one is not old enough
+	fakeRuntime.AllPodList = []*containertest.FakePod{
+		{Pod: &container.Pod{
+			Containers: []*container.Container{
+				makeContainer(1),
+			},
+		}},
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	t.Log(fakeClock.Now())
+	images, err := manager.imagesInEvictionOrder(ctx, fakeClock.Now())
+	require.NoError(t, err)
+	require.Equal(t, len(images), 1)
+	assert.Len(fakeRuntime.ImageList, 2)
+
+	// First GC round should not GC remaining image, as it was used too recently.
+	images, err = manager.freeOldImages(ctx, images, fakeClock.Now())
+	require.NoError(t, err)
+	assert.Len(images, 1)
+	assert.Len(fakeRuntime.ImageList, 2)
+
+	// Move clock by a lot, and the images should continue to not be garbage colleced
+	// See https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go
+	fakeClock.SetTime(time.Unix(1<<63-62135596801, 999999999))
+	images, err = manager.freeOldImages(ctx, images, fakeClock.Now())
+	require.NoError(t, err)
+	assert.Len(images, 1)
+	assert.Len(fakeRuntime.ImageList, 2)
+}
+
 func TestValidateImageGCPolicy(t *testing.T) {
 	testCases := []struct {
 		name          string
