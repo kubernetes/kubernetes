@@ -116,6 +116,9 @@ const (
 	orphanPodCleanedVolumesKey       = "orphan_pod_cleaned_volumes"
 	orphanPodCleanedVolumesErrorsKey = "orphan_pod_cleaned_volumes_errors"
 
+	// Metric for tracking garbage collected images
+	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
+
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
@@ -783,6 +786,15 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           NodeStartupKey,
 			Help:           "Duration in seconds of node startup in total.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	ImageGarbageCollectedTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageGarbageCollectedTotalKey,
+			Help:           "Total number of images garbage collected by the kubelet, whether through disk usage or image age.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
