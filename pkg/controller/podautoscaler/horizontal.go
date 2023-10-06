@@ -474,7 +474,7 @@ func (a *HorizontalController) reconcileKey(ctx context.Context, key string) (de
 
 // computeStatusForObjectMetric computes the desired number of replicas for the specified metric of type ObjectMetricSourceType.
 func (a *HorizontalController) computeStatusForObjectMetric(specReplicas, statusReplicas int32, metricSpec autoscalingv2.MetricSpec, hpa *autoscalingv2.HorizontalPodAutoscaler, selector labels.Selector, status *autoscalingv2.MetricStatus, metricSelector labels.Selector) (replicas int32, timestamp time.Time, metricName string, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
-	if metricSpec.Object.Target.Type == autoscalingv2.ValueMetricType {
+	if metricSpec.Object.Target.Type == autoscalingv2.ValueMetricType && metricSpec.Object.Target.Value != nil {
 		replicaCountProposal, usageProposal, timestampProposal, err := a.replicaCalc.GetObjectMetricReplicas(specReplicas, metricSpec.Object.Target.Value.MilliValue(), metricSpec.Object.Metric.Name, hpa.Namespace, &metricSpec.Object.DescribedObject, selector, metricSelector)
 		if err != nil {
 			condition := a.getUnableComputeReplicaCountCondition(hpa, "FailedGetObjectMetric", err)
@@ -494,7 +494,7 @@ func (a *HorizontalController) computeStatusForObjectMetric(specReplicas, status
 			},
 		}
 		return replicaCountProposal, timestampProposal, fmt.Sprintf("%s metric %s", metricSpec.Object.DescribedObject.Kind, metricSpec.Object.Metric.Name), autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
-	} else if metricSpec.Object.Target.Type == autoscalingv2.AverageValueMetricType {
+	} else if metricSpec.Object.Target.Type == autoscalingv2.AverageValueMetricType && metricSpec.Object.Target.AverageValue != nil {
 		replicaCountProposal, usageProposal, timestampProposal, err := a.replicaCalc.GetObjectPerPodMetricReplicas(statusReplicas, metricSpec.Object.Target.AverageValue.MilliValue(), metricSpec.Object.Metric.Name, hpa.Namespace, &metricSpec.Object.DescribedObject, metricSelector)
 		if err != nil {
 			condition := a.getUnableComputeReplicaCountCondition(hpa, "FailedGetObjectMetric", err)
