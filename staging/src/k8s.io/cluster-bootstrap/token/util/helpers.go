@@ -17,9 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"bufio"
 	"crypto/rand"
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 
@@ -59,29 +59,21 @@ func GenerateBootstrapToken() (string, error) {
 // randBytes returns a random string consisting of the characters in
 // validBootstrapTokenChars, with the length customized by the parameter
 func randBytes(length int) (string, error) {
-	// len("0123456789abcdefghijklmnopqrstuvwxyz") = 36 which doesn't evenly divide
-	// the possible values of a byte: 256 mod 36 = 4. Discard any random bytes we
-	// read that are >= 252 so the bytes we evenly divide the character set.
-	const maxByteValue = 252
-
 	var (
-		b     byte
-		err   error
 		token = make([]byte, length)
+		max   = new(big.Int).SetUint64(uint64(len(validBootstrapTokenChars)))
 	)
 
-	reader := bufio.NewReaderSize(rand.Reader, length*2)
 	for i := range token {
-		for {
-			if b, err = reader.ReadByte(); err != nil {
-				return "", err
-			}
-			if b < maxByteValue {
-				break
-			}
+		val, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", fmt.Errorf("could not generate random integer: %w", err)
 		}
-
-		token[i] = validBootstrapTokenChars[int(b)%len(validBootstrapTokenChars)]
+		// Use simple operations in constant-time to obtain a byte in the a-z,0-9
+		// character range
+		x := val.Uint64()
+		res := x + 48 + (39 & ((9 - x) >> 8))
+		token[i] = byte(res)
 	}
 
 	return string(token), nil
@@ -92,10 +84,36 @@ func TokenFromIDAndSecret(id, secret string) string {
 	return fmt.Sprintf("%s.%s", id, secret)
 }
 
-// IsValidBootstrapToken returns whether the given string is valid as a Bootstrap Token and
-// in other words satisfies the BootstrapTokenRegexp
+// IsValidBootstrapToken returns whether the given string is valid as a Bootstrap Token.
+// Avoid using BootstrapTokenRegexp.MatchString(token) and instead perform constant-time
+// comparisons on the secret.
 func IsValidBootstrapToken(token string) bool {
-	return BootstrapTokenRegexp.MatchString(token)
+	// Must be exactly two strings separated by "."
+	t := strings.Split(token, ".")
+	if len(t) != 2 {
+		return false
+	}
+
+	// Validate the ID: t[0]
+	// Using a Regexp for it is safe because the ID is public already
+	if !BootstrapTokenIDRegexp.MatchString(t[0]) {
+		return false
+	}
+
+	// Validate the secret with constant-time: t[1]
+	secret := t[1]
+	if len(secret) != api.BootstrapTokenSecretBytes { // Must be an exact size
+		return false
+	}
+	for i := range secret {
+		c := int(secret[i])
+		notDigit := (c < 48 || c > 57)   // Character is not in the 0-9 range
+		notLetter := (c < 97 || c > 122) // Character is not in the a-z range
+		if notDigit && notLetter {
+			return false
+		}
+	}
+	return true
 }
 
 // IsValidBootstrapTokenID returns whether the given string is valid as a Bootstrap Token ID and
