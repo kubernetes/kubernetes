@@ -1,0 +1,83 @@
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+syntax = "proto3";
+
+package v1alpha1;
+option go_package = "k8s.io/kubelet/pkg/apis/podstatus/v1alpha1";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+
+// PodStatus is a service provided by the kubelet that serves the information about
+// the local pod's readiness.
+service PodStatus {
+    // GetPodStatus returns a PodStatus for given pod's UID
+    rpc GetPodStatus(PodStatusGetRequest) returns (PodStatusGetResponse) {}
+    // ListPodStatus returns a of List of PodStatus
+    rpc ListPodStatus(PodStatusListRequest) returns (PodStatusListResponse) {}
+}
+
+// PodStatusListRequest is the request made to the PodStatus service to list all local pod's statuses.
+message PodStatusListRequest {}
+
+// PodStatusListResponse returns a List of PodStatus containing all local pod's running on a given node.
+message PodStatusListResponse {
+    repeated PodStatusType Pods = 1;
+}
+// PodStatusWatchRequest is the request made to the PodStatus service for watch all local pod's statuses.
+message PodStatusWatchRequest {}
+
+// PodStatusGetRequest is the request made to the PodStatus service to get Pod's status.
+message PodStatusGetRequest {
+    string podUID = 1;
+}
+
+// PodStatusGetResponse returns PodStatus.
+message PodStatusGetResponse {
+    PodStatusType Status = 1;
+}
+
+// ConditionStatus aligns with v1.ConditionStatus
+enum ConditionStatus {
+    True = 0;
+    False = 1;
+    Unknown = 2;
+}
+
+// PodStatusType returns a Pod details and list of status Conditions with deletion info.
+message PodStatusType {
+    string podUID = 1;
+    string podNamespace = 2;
+    string podName = 3;
+    bool static = 4;
+    repeated PodCondition conditions = 5;
+    k8s.io.apimachinery.pkg.apis.meta.v1.Time DeletionTimestamp = 6;
+}
+
+// PodCondition aligns with v1.PodCondition.
+message PodCondition {
+    PodConditionType Type = 1;
+    ConditionStatus Status = 2;
+    k8s.io.apimachinery.pkg.apis.meta.v1.Time LastProbeTime = 3;
+    k8s.io.apimachinery.pkg.apis.meta.v1.Time LastTransitionTime = 4;
+    string Reason = 5;
+    string Message = 6;
+}
+
+// PodConditionType aligns with v1.PodConditionType
+// due to limiting messages size the type was changed to int
+enum PodConditionType {
+    ContainersReady = 0;
+    Initialized = 1;
+    Ready = 2;
+    PodScheduled = 3;
+    DisruptionTarget = 4;
+}

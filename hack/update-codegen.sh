@@ -808,6 +808,7 @@ function codegen::protobindings() {
         "staging/src/k8s.io/cri-api/pkg/apis/runtime"
 
         "staging/src/k8s.io/kubelet/pkg/apis/podresources"
+         "staging/src/k8s.io/kubelet/pkg/apis/podstatus"
 
         "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
 
