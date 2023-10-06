@@ -57,6 +57,25 @@ func NewDefinitionsSchemaResolver(scheme *runtime.Scheme, getDefinitions common.
 	}
 }
 
+func (d *DefinitionsSchemaResolver) LookupSchema(name string) *spec.Schema {
+	if res, ok := d.defs[name]; ok {
+		s, err := populateRefs(func(ref string) (*spec.Schema, bool) {
+			// find the schema by the ref string, and return a deep copy
+			def, ok := d.defs[ref]
+			if !ok {
+				return nil, false
+			}
+			s := def.Schema
+			return &s, true
+		}, &res.Schema)
+		if err != nil {
+			return nil
+		}
+		return s
+	}
+	return nil
+}
+
 func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (*spec.Schema, error) {
 	s, ok := d.gvkToSchema[gvk]
 	if !ok {

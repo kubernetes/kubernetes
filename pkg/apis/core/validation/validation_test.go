@@ -38,14 +38,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	apivalidationtesting "k8s.io/apiserver/pkg/cel/apivalidation/testing"
+	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
+	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	utilpointer "k8s.io/utils/pointer"
+
+	// Ensure everything installed in schema
+	_ "k8s.io/kubernetes/pkg/api/testing"
 )
 
 const (
@@ -104,9 +111,435 @@ func testVolume(name string, namespace string, spec core.PersistentVolumeSpec) *
 	}
 }
 
+func TestValidatePersistentVolumesWithFramework(t *testing.T) {
+	validMode := core.PersistentVolumeFilesystem
+	invalidMode := core.PersistentVolumeMode("fakeVolumeMode")
+
+	type options struct {
+		enableReadWriteOncePod bool
+	}
+	cases := []apivalidationtesting.TestCase[*core.PersistentVolume, options]{
+		{
+			Name: "good-volume",
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name: "good-volume-with-capacity-unit",
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10Gi"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name: "good-volume-without-capacity-unit",
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name: "good-volume-with-storage-class",
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				StorageClassName: "valid",
+			}),
+		},
+		{
+			Name: "good-volume-with-retain-policy",
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRetain,
+			}),
+		},
+		{
+			Name: "good-volume-with-volume-mode",
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				VolumeMode: &validMode,
+			}),
+		},
+		{
+			Name:           "invalid-accessmode",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{"fakemode"},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "invalid-reclaimpolicy",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				PersistentVolumeReclaimPolicy: "fakeReclaimPolicy",
+			}),
+		},
+		{
+			Name:           "invalid-volume-mode",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				VolumeMode: &invalidMode,
+			}),
+		},
+		{
+			Name: "with-read-write-once-pod-feature-gate-enabled",
+			Options: options{
+				enableReadWriteOncePod: true,
+			},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "with-read-write-once-pod-feature-gate-disabled",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "with-read-write-once-pod-and-others-feature-gate-enabled",
+			ExpectedErrors: []string{"hi"},
+			Options: options{
+				enableReadWriteOncePod: true,
+			},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod", "ReadWriteMany"},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "unexpected-namespace",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "unexpected-namespace", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "missing-volume-source",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			}),
+		},
+		{
+			Name:           "bad-name",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("123*Bad(Name", "unexpected-namespace", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "missing-name",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "missing-capacity",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "bad-volume-zero-capacity",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("0"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "missing-accessmodes",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("goodname", "missing-accessmodes", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+			}),
+		},
+		{
+			Name:           "too-many-sources",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("5G"),
+				},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+					GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "foo", FSType: "ext4"},
+				},
+			}),
+		},
+		{
+			Name:           "host mount of / with recycle reclaim policy",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("bad-recycle-do-not-want", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRecycle,
+			}),
+		},
+		{
+			Name:           "host mount of / with recycle reclaim policy 2",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("bad-recycle-do-not-want", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/a/..",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRecycle,
+			}),
+		},
+		{
+			Name:           "invalid-storage-class-name",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("invalid-storage-class-name", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				StorageClassName: "-invalid-",
+			}),
+		},
+		{
+			Name:           "bad-hostpath-volume-backsteps",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo/..",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				StorageClassName: "backstep-hostpath",
+			}),
+		},
+		{
+			Name:   "volume-node-affinity",
+			Object: testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		{
+			Name:           "volume-empty-node-affinity",
+			ExpectedErrors: []string{"hi"},
+			Object:         testVolumeWithNodeAffinity(&core.VolumeNodeAffinity{}),
+		},
+		{
+			Name:           "volume-bad-node-affinity",
+			ExpectedErrors: []string{"hi"},
+			Object: testVolumeWithNodeAffinity(
+				&core.VolumeNodeAffinity{
+					Required: &core.NodeSelector{
+						NodeSelectorTerms: []core.NodeSelectorTerm{{
+							MatchExpressions: []core.NodeSelectorRequirement{{
+								Operator: core.NodeSelectorOpIn,
+								Values:   []string{"test-label-value"},
+							}},
+						}},
+					},
+				}),
+		},
+	}
+
+	defs := resolver.NewDefinitionsSchemaResolver(legacyscheme.Scheme, generatedopenapi.GetOpenAPIDefinitions)
+	apivalidationtesting.TestValidate(t, legacyscheme.Scheme, defs, func(a *core.PersistentVolume, o options) field.ErrorList {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, o.enableReadWriteOncePod)()
+
+		opts := ValidationOptionsForPersistentVolume(a, nil)
+		return ValidatePersistentVolume(a, opts)
+	}, cases...)
+}
+
 func TestValidatePersistentVolumes(t *testing.T) {
 	validMode := core.PersistentVolumeFilesystem
 	invalidMode := core.PersistentVolumeMode("fakeVolumeMode")
+
 	scenarios := map[string]struct {
 		isExpectedFailure      bool
 		enableReadWriteOncePod bool
