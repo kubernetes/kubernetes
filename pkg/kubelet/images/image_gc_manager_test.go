@@ -255,11 +255,8 @@ func TestDoNotDeletePinnedImage(t *testing.T) {
 		},
 	}
 
-	spaceFreed, err := manager.freeSpace(ctx, 4096, time.Now())
 	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 1)
+	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 4096, 1024, 1, time.Now())
 }
 
 func TestDeleteUnPinnedImage(t *testing.T) {
@@ -280,11 +277,8 @@ func TestDeleteUnPinnedImage(t *testing.T) {
 		},
 	}
 
-	spaceFreed, err := manager.freeSpace(ctx, 2048, time.Now())
 	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(2048, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 0)
+	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 2048, 2048, 0, time.Now())
 }
 
 func TestAllPinnedImages(t *testing.T) {
@@ -306,11 +300,8 @@ func TestAllPinnedImages(t *testing.T) {
 		},
 	}
 
-	spaceFreed, err := manager.freeSpace(ctx, 2048, time.Now())
 	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(0, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 2)
+	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 2048, 0, 2, time.Now())
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
@@ -404,11 +395,8 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 		}},
 	}
 
-	spaceFreed, err := manager.freeSpace(ctx, 2048, time.Now())
 	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 1)
+	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 2048, 1024, 1, time.Now())
 }
 
 func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
@@ -487,11 +475,8 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 
 	// We're setting the delete time one minute in the future, so the time the image
 	// was first detected and the delete time are different.
-	spaceFreed, err := manager.freeSpace(ctx, 1024, time.Now().Add(time.Minute))
 	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 1)
+	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 1024, 1024, 1, time.Now().Add(time.Minute))
 }
 
 func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
@@ -526,11 +511,8 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, manager.imageRecordsLen(), 2)
 
-	spaceFreed, err := manager.freeSpace(ctx, 1024, time.Now())
 	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(2048, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 1)
+	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 1024, 2048, 1, time.Now())
 }
 
 func TestGarbageCollectBelowLowThreshold(t *testing.T) {
@@ -653,18 +635,21 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, manager.imageRecordsLen(), 2)
 	// no space freed since one image is in used, and another one is not old enough
-	spaceFreed, err := manager.freeSpace(ctx, 1024, fakeClock.Now())
 	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(0, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 2)
+	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 1024, 0, 2, fakeClock.Now())
 
 	// move clock by minAge duration, then 1 image will be garbage collected
 	fakeClock.Step(policy.MinAge)
-	spaceFreed, err = manager.freeSpace(ctx, 1024, fakeClock.Now())
+	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 1024, 1024, 1, fakeClock.Now())
+}
+
+func getImagesAndFreeSpace(ctx context.Context, t *testing.T, assert *assert.Assertions, im *realImageGCManager, fakeRuntime *containertest.FakeRuntime, spaceToFree, expectedSpaceFreed int64, imagesLen int, freeTime time.Time) {
+	images, err := im.imagesInEvictionOrder(ctx, freeTime)
 	require.NoError(t, err)
-	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 1)
+	spaceFreed, err := im.freeSpace(ctx, spaceToFree, freeTime, images)
+	require.NoError(t, err)
+	assert.EqualValues(expectedSpaceFreed, spaceFreed)
+	assert.Len(fakeRuntime.ImageList, imagesLen)
 }
 
 func TestValidateImageGCPolicy(t *testing.T) {
