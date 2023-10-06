@@ -25,6 +25,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgofeaturegate "k8s.io/client-go/features"
 	clientset "k8s.io/client-go/kubernetes"
 	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
@@ -273,6 +274,10 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
+	// TODO: We need a better strategy here because 'Setting' doesn't change the Default value
+	// that is shown on the command line. On the command line, it is displayed as:
+	// WatchListClient=true|false (BETA - default=false)
+	utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", clientgofeaturegate.WatchList))
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
 
 	return fss
