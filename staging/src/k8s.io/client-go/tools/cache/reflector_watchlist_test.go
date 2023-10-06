@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/pointer"
 )
@@ -491,7 +492,7 @@ func verifyStore(t *testing.T, s Store, expectedPods []v1.Pod) {
 }
 
 func makePod(name, rv string) *v1.Pod {
-	return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, ResourceVersion: rv}}
+	return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, ResourceVersion: rv, UID: types.UID(name)}}
 }
 
 func testData() (*fakeListWatcher, Store, *Reflector, chan struct{}) {
