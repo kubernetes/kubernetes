@@ -36,6 +36,7 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 )
 
@@ -429,6 +430,7 @@ func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo)
 		return err
 	}
 	delete(im.imageRecords, image.id)
+	metrics.ImageGarbageCollectedTotal.Inc()
 	return err
 }
 
