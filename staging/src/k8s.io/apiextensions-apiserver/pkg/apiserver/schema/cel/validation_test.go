@@ -17,22 +17,29 @@ limitations under the License.
 package cel
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/warning"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
@@ -3010,6 +3017,590 @@ func TestValidateFieldPath(t *testing.T) {
 			if tc.validFieldPath != nil && tc.validFieldPath.String() != path.Child(validField.String()).String() {
 				t.Errorf("expected %v, got %v", tc.validFieldPath, path.Child(validField.String()))
 			}
+		})
+	}
+}
+
+// FixTabsOrDie counts the number of tab characters preceding the first
+// line in the given yaml object. It removes that many tabs from every
+// line. It panics (it's a test funvion) if some line has fewer tabs
+// than the first line.
+//
+// The purpose of this is to make it easier to read tests.
+func FixTabsOrDie(in string) string {
+	lines := bytes.Split([]byte(in), []byte{'\n'})
+	if len(lines[0]) == 0 && len(lines) > 1 {
+		lines = lines[1:]
+	}
+	// Create prefix made of tabs that we want to remove.
+	var prefix []byte
+	for _, c := range lines[0] {
+		if c != '\t' {
+			break
+		}
+		prefix = append(prefix, byte('\t'))
+	}
+	// Remove prefix from all tabs, fail otherwise.
+	for i := range lines {
+		line := lines[i]
+		// It's OK for the last line to be blank (trailing \n)
+		if i == len(lines)-1 && len(line) <= len(prefix) && bytes.TrimSpace(line) == nil {
+			lines[i] = []byte{}
+			break
+		}
+		if !bytes.HasPrefix(line, prefix) {
+			minRange := i - 5
+			maxRange := i + 5
+			if minRange < 0 {
+				minRange = 0
+			}
+			if maxRange > len(lines) {
+				maxRange = len(lines)
+			}
+			panic(fmt.Errorf("line %d doesn't start with expected number (%d) of tabs (%v-%v):\n%v", i, len(prefix), minRange, maxRange, string(bytes.Join(lines[minRange:maxRange], []byte{'\n'}))))
+		}
+		lines[i] = line[len(prefix):]
+	}
+
+	joined := string(bytes.Join(lines, []byte{'\n'}))
+
+	// Convert rest of tabs to spaces since yaml doesnt like yabs
+	// (assuming 2 space alignment)
+	return strings.ReplaceAll(joined, "\t", "  ")
+}
+
+// Creates a *spec.Schema Schema by decoding the given YAML. Panics on error
+func mustSchema(source string) *schema.Structural {
+	source = FixTabsOrDie(source)
+	d := yaml.NewYAMLOrJSONDecoder(strings.NewReader(source), 4096)
+	props := &apiextensions.JSONSchemaProps{}
+	if err := d.Decode(props); err != nil {
+		panic(err)
+	}
+	convertedProps := &apiextensionsinternal.JSONSchemaProps{}
+	if err := apiextensions.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(props, convertedProps, nil); err != nil {
+		panic(err)
+	}
+
+	res, err := schema.NewStructural(convertedProps)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+// Creates an *unstructured by decoding the given YAML. Panics on error
+func mustUnstructured(source string) interface{} {
+	source = FixTabsOrDie(source)
+	d := yaml.NewYAMLOrJSONDecoder(strings.NewReader(source), 4096)
+	var res interface{}
+	if err := d.Decode(&res); err != nil {
+		panic(err)
+	}
+	return res
+}
+
+type warningRecorder struct {
+	mu       sync.Mutex
+	warnings []string
+}
+
+// AddWarning adds a warning to recorder.
+func (r *warningRecorder) AddWarning(agent, text string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.warnings = append(r.warnings, text)
+}
+
+func (r *warningRecorder) Warnings() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	warnings := make([]string, len(r.warnings))
+	copy(warnings, r.warnings)
+	return warnings
+}
+
+func TestRatcheting(t *testing.T) {
+	cases := []struct {
+		name   string
+		schema *schema.Structural
+		oldObj interface{}
+		newObj interface{}
+
+		// Errors that should occur when evaluating this operation with
+		// ratcheting feature enabled
+		errors []string
+
+		// Errors that should occur when evaluating this operation with
+		// ratcheting feature disabled
+		// These errors should be raised as warnings when ratcheting is enabled
+		warnings []string
+
+		runtimeCostBudget int64
+	}{
+		{
+			name: "normal CEL expression",
+			schema: mustSchema(`
+				type: object
+				properties:
+					foo:
+						type: string
+						x-kubernetes-validations:
+						- rule: self == "bar"
+						  message: "gotta be baz"
+				`),
+			oldObj: mustUnstructured(`
+				foo: baz
+			`),
+			newObj: mustUnstructured(`
+				foo: baz
+			`),
+			warnings: []string{
+				`root.foo: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "normal CEL expression thats a descendent of an atomic array whose parent is totally unchanged",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: atomic
+				items:
+					type: object
+					properties:
+						bar:
+							type: string
+							x-kubernetes-validations:
+							- rule: self == "baz"
+							  message: "gotta be baz"
+				`),
+			// CEL error comes from uncorrelatable portion of the schema,
+			// but it should be ratcheted anyway because it is the descendent
+			// of an unchanged correlatable node
+			oldObj: mustUnstructured(`
+				- bar: bar
+			`),
+			newObj: mustUnstructured(`
+				- bar: bar
+			`),
+			warnings: []string{
+				`root[0].bar: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "normal CEL expression thats a descendent of a set whose parent is totally unchanged",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: set
+				items:
+					type: number
+					x-kubernetes-validations:
+					- rule: int(self) % 2 == 1
+					  message: "gotta be odd"
+				`),
+			// CEL error comes from uncorrelatable portion of the schema,
+			// but it should be ratcheted anyway because it is the descendent
+			// of an unchanged correlatable node
+			oldObj: mustUnstructured(`
+				- 1
+				- 2
+			`),
+			newObj: mustUnstructured(`
+				- 1
+				- 2
+			`),
+			warnings: []string{
+				`root[1]: Invalid value: "number": gotta be odd`,
+			},
+		},
+		{
+			name: "normal CEL expression thats a descendent of a set and one of its siblings has changed",
+			schema: mustSchema(`
+				type: object
+				properties:
+					stringField:
+						type: string
+					setArray:
+						type: array
+						x-kubernetes-list-type: set
+						items:
+							type: number
+							x-kubernetes-validations:
+							- rule: int(self) % 2 == 1
+							  message: "gotta be odd"
+				`),
+			oldObj: mustUnstructured(`
+				stringField: foo
+				setArray:
+				- 1
+				- 3
+				- 2
+			`),
+			newObj: mustUnstructured(`
+				stringField: changed but ratcheted
+				setArray:
+				- 1
+				- 3
+				- 2
+			`),
+			warnings: []string{
+				`root.setArray[2]: Invalid value: "number": gotta be odd`,
+			},
+		},
+		{
+			name: "descendent of a map list whose parent is unchanged",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: map
+				x-kubernetes-list-map-keys: ["key"]
+				items:
+					type: object
+					properties:
+						key:
+							type: string
+						value:
+							type: string
+							x-kubernetes-validations:
+							- rule: self == "baz"
+							  message: "gotta be baz"
+			`),
+			oldObj: mustUnstructured(`
+				- key: foo
+				  value: notbaz
+				- key: bar
+				  value: notbaz
+			`),
+			newObj: mustUnstructured(`
+				- key: foo
+				  value: notbaz
+				- key: bar
+				  value: notbaz
+				- key: baz
+				  value: baz
+			`),
+			warnings: []string{
+				`root[0].value: Invalid value: "string": gotta be baz`,
+				`root[1].value: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "descendent of a map list whose siblings have changed",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: map
+				x-kubernetes-list-map-keys: ["key"]
+				items:
+					type: object
+					properties:
+						key:
+							type: string
+						value:
+							type: string
+							x-kubernetes-validations:
+							- rule: self == "baz"
+							  message: "gotta be baz"
+			`),
+			oldObj: mustUnstructured(`
+				- key: foo
+				  value: notbaz
+				- key: bar
+				  value: notbaz
+			`),
+			newObj: mustUnstructured(`
+				- key: foo
+				  value: baz
+				- key: bar
+				  value: notbaz
+			`),
+			warnings: []string{
+				`root[1].value: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "descendent of a map whose parent is totally unchanged",
+			schema: mustSchema(`
+				type: object
+				properties:
+					stringField:
+						type: string
+					mapField:
+						type: object
+						properties:
+							foo:
+								type: string
+								x-kubernetes-validations:
+								- rule: self == "baz"
+								  message: "gotta be baz"
+							mapField:
+								type: object
+								properties:
+									bar:
+										type: string
+										x-kubernetes-validations:
+										- rule: self == "baz"
+										  message: "gotta be nested baz"
+				`),
+			oldObj: mustUnstructured(`
+				stringField: foo
+				mapField:
+					foo: notbaz
+					mapField:
+						bar: notbaz
+			`),
+			newObj: mustUnstructured(`
+				stringField: foo
+				mapField:
+					foo: notbaz
+					mapField:
+						bar: notbaz
+			`),
+			warnings: []string{
+				`root.mapField.foo: Invalid value: "string": gotta be baz`,
+				`root.mapField.mapField.bar: Invalid value: "string": gotta be nested baz`,
+			},
+		},
+		{
+			name: "descendent of a map whose siblings have changed",
+			schema: mustSchema(`
+				type: object
+				properties:
+					stringField:
+						type: string
+					mapField:
+						type: object
+						properties:
+							foo:
+								type: string
+								x-kubernetes-validations:
+								- rule: self == "baz"
+								  message: "gotta be baz"
+							mapField:
+								type: object
+								properties:
+									bar:
+										type: string
+										x-kubernetes-validations:
+										- rule: self == "baz"
+										  message: "gotta be baz"
+									otherBar:
+										type: string
+										x-kubernetes-validations:
+										- rule: self == "otherBaz"
+										  message: "gotta be otherBaz"
+				`),
+			oldObj: mustUnstructured(`
+				stringField: foo
+				mapField:
+					foo: baz
+					mapField:
+						bar: notbaz
+						otherBar: nototherBaz
+			`),
+			newObj: mustUnstructured(`
+				stringField: foo
+				mapField:
+					foo: notbaz
+					mapField:
+						bar: notbaz
+						otherBar: otherBaz
+			`),
+			errors: []string{
+				// Didn't get ratcheted because we changed its value from baz to notbaz
+				`root.mapField.foo: Invalid value: "string": gotta be baz`,
+			},
+			warnings: []string{
+				// Ratcheted because its value remained the same, even though it is invalid
+				`root.mapField.mapField.bar: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "normal CEL expression thats a descendent of an atomic array whose siblings has changed",
+			schema: mustSchema(`
+				type: object
+				properties:
+					stringField:
+						type: string
+					atomicArray:
+						type: array
+						x-kubernetes-list-type: atomic
+						items:
+							type: object
+							properties:
+								bar:
+									type: string
+									x-kubernetes-validations:
+									- rule: self == "baz"
+									  message: "gotta be baz"
+				`),
+			oldObj: mustUnstructured(`
+				stringField: foo
+				atomicArray:
+				- bar: bar
+			`),
+			newObj: mustUnstructured(`
+				stringField: changed but ratcheted
+				atomicArray:
+				- bar: bar
+			`),
+			warnings: []string{
+				`root.atomicArray[0].bar: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "we can't ratchet a normal CEL expression from an uncorrelatable part of the schema whose parent nodes has changed",
+			schema: mustSchema(`
+				type: array
+				x-kubernetes-list-type: atomic
+				items:
+					type: object
+					properties:
+						bar:
+							type: string
+							x-kubernetes-validations:
+							- rule: self == "baz"
+							  message: "gotta be baz"
+			`),
+			// CEL error comes from uncorrelatable portion of the schema,
+			// but it should be ratcheted anyway because it is the descendent
+			// or an unchanged correlatable node
+			oldObj: mustUnstructured(`
+				- bar: bar
+			`),
+			newObj: mustUnstructured(`
+				- bar: bar
+				- bar: baz
+			`),
+			errors: []string{
+				`root[0].bar: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "transition rules never ratchet for correlatable schemas",
+			schema: mustSchema(`
+				type: object
+				properties:
+					foo:
+						type: string
+						x-kubernetes-validations:
+						- rule: oldSelf != "bar" && self == "baz"
+						  message: gotta be baz
+			`),
+			oldObj: mustUnstructured(`
+				foo: bar
+			`),
+			newObj: mustUnstructured(`
+				foo: bar
+			`),
+			errors: []string{
+				`root.foo: Invalid value: "string": gotta be baz`,
+			},
+		},
+		{
+			name: "changing field path does not change ratcheting logic",
+			schema: mustSchema(`
+				type: object
+				x-kubernetes-validations:
+				- rule: self.foo == "baz"
+				  message: gotta be baz
+				  fieldPath: ".foo"
+				properties:
+					bar:
+						type: string
+					foo:
+						type: string
+			`),
+			oldObj: mustUnstructured(`
+				foo: bar
+			`),
+			// Fieldpath is on unchanged field `foo`, but since rule is on the
+			// changed parent object we still get an error
+			newObj: mustUnstructured(`
+				foo: bar
+				bar: invalid
+			`),
+			errors: []string{
+				`root.foo: Invalid value: "object": gotta be baz`,
+			},
+		},
+		{
+			name: "cost budget errors are not ratcheted",
+			schema: mustSchema(`
+				type: string
+				minLength: 5
+				x-kubernetes-validations:
+				- rule: self == "baz"
+				  message: gotta be baz
+			`),
+			oldObj:            "unchanged",
+			newObj:            "unchanged",
+			runtimeCostBudget: 1,
+			errors: []string{
+				`validation failed due to running out of cost budget, no further validation rules will be run`,
+			},
+		},
+		{
+			name: "compile errors are not ratcheted",
+			schema: mustSchema(`
+				type: string
+				x-kubernetes-validations:
+				- rule: asdausidyhASDNJm
+				  message: gotta be baz
+			`),
+			oldObj: "unchanged",
+			newObj: "unchanged",
+			errors: []string{
+				`rule compile error: compilation failed: ERROR: <input>:1:1: undeclared reference to 'asdausidyhASDNJm'`,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			validator := NewValidator(c.schema, false, celconfig.PerCallLimit)
+			require.NotNil(t, validator)
+			recorder := &warningRecorder{}
+			ctx := warning.WithWarningRecorder(context.TODO(), recorder)
+			budget := c.runtimeCostBudget
+			if budget == 0 {
+				budget = celconfig.RuntimeCELCostBudget
+			}
+			errs, _ := validator.ValidateWithRatcheting(
+				ctx,
+				field.NewPath("root"),
+				c.schema,
+				c.newObj,
+				c.oldObj,
+				budget,
+			)
+
+			require.Len(t, errs, len(c.errors), "must have expected number of errors")
+			require.Len(t, recorder.Warnings(), len(c.warnings), "must have expected number of warnings")
+
+			// Check that the expected errors were raised
+			for _, expectedErr := range c.errors {
+				found := false
+				for _, err := range errs {
+					if strings.Contains(err.Error(), expectedErr) {
+						found = true
+						break
+					}
+				}
+
+				assert.True(t, found, "expected error %q not found", expectedErr)
+			}
+
+			// Check that the ratcheting disabled errors were raised as warnings
+			for _, expectedWarning := range c.warnings {
+				found := false
+				for _, warning := range recorder.Warnings() {
+					if warning == expectedWarning {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "expected warning %q not found", expectedWarning)
+			}
+
 		})
 	}
 }
