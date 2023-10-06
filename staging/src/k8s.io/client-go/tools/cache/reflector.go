@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -39,6 +38,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/features"
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -107,6 +107,7 @@ type Reflector struct {
 	// might result in an increased memory consumption of the APIServer.
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
+	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
 	UseWatchList bool
 }
 
@@ -237,9 +238,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
 	}
 
-	if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
-		r.UseWatchList = true
-	}
+	r.UseWatchList = features.DefaultFeatureGates().Enabled(features.WatchList)
 
 	return r
 }
