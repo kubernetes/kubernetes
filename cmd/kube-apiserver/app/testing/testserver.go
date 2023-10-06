@@ -174,6 +174,11 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
+	// Intercept feature gate flags to steer tests toward SetFeatureGateDuringTest.
+	featuregatefs := pflag.NewFlagSet("featuregate-trap", pflag.PanicOnError)
+	utilfeature.DefaultFeatureGate.DeepCopy().AddFlag(featuregatefs)
+	fs.AddFlagSet(featuregatefs) // first flag registered with a name wins
+
 	s := options.NewServerRunOptions()
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
@@ -317,6 +322,14 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err
 	}
+
+	featuregatefs.VisitAll(func(flag *pflag.Flag) {
+		if !flag.Changed {
+			return
+		}
+
+		t.Fatalf("Flag %q mutates global state and should not be used in integration tests. Prefer SetFeatureGateDuringTest from k8s.io/component-base/featuregate/testing.", flag.Name)
+	})
 
 	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
 	if err != nil {
