@@ -26,6 +26,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -63,7 +64,6 @@ var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [
 var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-
 	testCases := []testCase{
 		{
 			name:                   "single process container",
@@ -116,6 +116,9 @@ func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMem
 		})
 
 		ginkgo.It("The containers terminated by OOM killer should have the reason set to OOMKilled", func() {
+			// We can remove this skip once https://github.com/kubernetes/kubernetes/issues/119600 has been resolved.
+			e2eskipper.Skipf("oom issues tests are flaky")
+
 			ginkgo.By("Waiting for the pod to be failed")
 			err := e2epod.WaitForPodTerminatedInNamespace(context.TODO(), f.ClientSet, testCase.podSpec.Name, "", f.Namespace.Name)
 			framework.ExpectNoError(err, "Failed waiting for pod to terminate, %s/%s", f.Namespace.Name, testCase.podSpec.Name)
