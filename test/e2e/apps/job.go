@@ -280,31 +280,18 @@ var _ = SIGDescribe("Job", func() {
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		ginkgo.By("Ensuring pods aren't created for job")
-		err = framework.Gomega().Consistently(ctx, framework.HandleRetry(func(ctx context.Context) ([]v1.Pod, error) {
-			pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
-			if err != nil {
-				return nil, fmt.Errorf("failed to list pod for a given job %s in namespace %s: %w", job.Name, f.Namespace.Name, err)
-			}
-			return pods.Items, nil
-		})).WithPolling(framework.Poll).WithTimeout(wait.ForeverTestTimeout).Should(gomega.BeEmpty())
-		framework.ExpectNoError(err, "failed to confirm that pods aren't created for job %s in namespace %s", job.Name, f.Namespace.Name)
-
 		ginkgo.By("Checking Job status to observe Suspended state")
-		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
-		framework.ExpectNoError(err, "failed to retrieve latest job object")
-		exists := false
-		for _, c := range job.Status.Conditions {
-			if c.Type == batchv1.JobSuspended {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			framework.Failf("Job was expected to be completed or failed")
-		}
+		err = e2ejob.WaitForJobSuspend(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to observe suspend state: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods aren't created for job")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to list pod for a given job %s in namespace %s", job.Name, f.Namespace.Name)
+		gomega.Expect(pods.Items).To(gomega.BeEmpty())
 
 		ginkgo.By("Updating the job with suspend=false")
+		job, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Get(ctx, job.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get job in namespace: %s", f.Namespace.Name)
 		job.Spec.Suspend = pointer.BoolPtr(false)
 		job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
