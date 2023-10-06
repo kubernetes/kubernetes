@@ -88,6 +88,18 @@ func WaitForJobReady(ctx context.Context, c clientset.Interface, ns, jobName str
 	})
 }
 
+// WaitForJobSuspend uses c to wait for suspend condition for the Job jobName in namespace ns.
+func WaitForJobSuspend(ctx context.Context, c clientset.Interface, ns, jobName string) error {
+	return WaitForJobState(ctx, c, ns, jobName, JobTimeout, func(job *batchv1.Job) string {
+		for _, c := range job.Status.Conditions {
+			if c.Type == batchv1.JobSuspended && c.Status == v1.ConditionTrue {
+				return ""
+			}
+		}
+		return "job should be suspended"
+	})
+}
+
 // WaitForJobFailed uses c to wait for the Job jobName in namespace ns to fail
 func WaitForJobFailed(c clientset.Interface, ns, jobName string) error {
 	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
