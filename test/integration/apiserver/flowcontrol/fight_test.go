@@ -27,7 +27,6 @@ import (
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfc "k8s.io/apiserver/pkg/util/flowcontrol"
 	fqtesting "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
@@ -35,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	utilfeature "k8s.io/component-base/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 	testclocks "k8s.io/utils/clock/testing"

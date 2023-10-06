@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/features"

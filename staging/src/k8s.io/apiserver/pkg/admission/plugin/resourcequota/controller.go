@@ -38,8 +38,8 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/feature"
 )
 
 // Evaluator is used to see if quota constraints are satisfied.

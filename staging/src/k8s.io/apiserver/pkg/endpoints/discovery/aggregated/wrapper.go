@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 )
 
 type WrappedHandler struct {

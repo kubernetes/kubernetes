@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 

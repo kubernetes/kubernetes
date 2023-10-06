@@ -22,7 +22,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	netutils "k8s.io/utils/net"
 

@@ -26,7 +26,7 @@ import (
 	"runtime"
 	"strings"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"

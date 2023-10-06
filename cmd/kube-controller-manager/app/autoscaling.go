@@ -22,9 +22,9 @@ package app
 import (
 	"context"
 
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
+	"k8s.io/component-base/feature"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"

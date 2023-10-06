@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	utilfeature "k8s.io/component-base/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"

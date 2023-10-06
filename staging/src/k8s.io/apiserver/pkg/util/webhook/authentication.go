@@ -31,10 +31,10 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/features"
 	egressselector "k8s.io/apiserver/pkg/server/egressselector"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/component-base/feature"
 	tracing "k8s.io/component-base/tracing"
 )
 

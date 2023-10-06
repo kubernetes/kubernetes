@@ -44,7 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storageversion"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	versioninfo "k8s.io/component-base/version"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )

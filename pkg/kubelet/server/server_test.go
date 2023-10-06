@@ -53,7 +53,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubelet/pkg/cri/streaming"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"

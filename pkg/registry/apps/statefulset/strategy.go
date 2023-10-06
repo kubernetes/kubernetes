@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	"k8s.io/kubernetes/pkg/api/pod"

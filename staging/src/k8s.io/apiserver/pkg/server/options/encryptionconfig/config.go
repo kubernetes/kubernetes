@@ -52,7 +52,7 @@ import (
 	envelopemetrics "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	"k8s.io/klog/v2"
 	kmsservice "k8s.io/kms/pkg/service"
 )

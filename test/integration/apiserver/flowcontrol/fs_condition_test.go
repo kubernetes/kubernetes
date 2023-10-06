@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolapply "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
 	clientset "k8s.io/client-go/kubernetes"
+	utilfeature "k8s.io/component-base/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 )

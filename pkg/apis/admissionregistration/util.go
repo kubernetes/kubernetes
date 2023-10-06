@@ -18,7 +18,7 @@ package admissionregistration
 
 import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 )
 
 // DropDisabledMutatingWebhookConfigurationFields removes disabled fields from the mutatingWebhookConfiguration metadata and spec.

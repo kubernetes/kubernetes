@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	netutils "k8s.io/utils/net"
 
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"

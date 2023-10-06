@@ -22,7 +22,7 @@ import (
 
 	kubeapiserveradmission "k8s.io/apiserver/pkg/admission"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	"k8s.io/component-base/featuregate"
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/features"

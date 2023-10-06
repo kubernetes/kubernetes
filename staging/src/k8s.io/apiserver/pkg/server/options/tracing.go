@@ -35,7 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/feature"
 	tracing "k8s.io/component-base/tracing"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"k8s.io/utils/path"

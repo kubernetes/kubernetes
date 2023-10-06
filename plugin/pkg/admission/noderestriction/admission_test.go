@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 

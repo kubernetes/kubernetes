@@ -24,11 +24,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	fakecloud "k8s.io/cloud-provider/fake"
+	utilfeature "k8s.io/component-base/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"

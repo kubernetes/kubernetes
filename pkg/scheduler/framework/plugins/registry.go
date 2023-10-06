@@ -17,7 +17,7 @@ limitations under the License.
 package plugins
 
 import (
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"

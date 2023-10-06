@@ -30,7 +30,7 @@ import (
 	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
