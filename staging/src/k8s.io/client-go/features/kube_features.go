@@ -19,6 +19,26 @@ import (
 	"k8s.io/component-base/featuregate"
 )
 
+const (
+	// Every feature gate should add method here following this template:
+	//
+	// // owner: @username
+	// // alpha: v1.4
+	// MyFeature featuregate.Feature = "MyFeature"
+	//
+	// Feature gates should be listed in alphabetical, case-sensitive
+	// (upper before any lower case character) order. This reduces the risk
+	// of code conflicts because changes are more likely to be scattered
+	// across the file.
+
+	// owner: @p0lyn0mial
+	// alpha: v1.27
+	// beta: v1.29
+	//
+	// Allow the API server to stream individual items instead of chunking
+	WatchList featuregate.Feature = "WatchListClient"
+)
+
 // DefaultFeatureGates returns the feature gates exposed by this library.
 //
 // By default, only the default features gate will be returned.
@@ -76,4 +96,6 @@ var (
 //
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	WatchList: {Default: false, PreRelease: featuregate.Beta},
+}
