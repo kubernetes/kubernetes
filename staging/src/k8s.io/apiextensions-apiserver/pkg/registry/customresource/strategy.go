@@ -26,6 +26,7 @@ import (
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -257,6 +258,9 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	if celValidator := a.celValidator; celValidator != nil {
 		if has, err := hasBlockingErr(errs); has {
 			errs = append(errs, err)
+		} else if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+			err, _ := celValidator.ValidateWithRatcheting(ctx, nil, a.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
+			errs = append(errs, err...)
 		} else {
 			err, _ := celValidator.Validate(ctx, nil, a.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
 			errs = append(errs, err...)
