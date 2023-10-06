@@ -306,12 +306,18 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 		return err
 	}
 
+	freeTime := time.Now()
+	images, err := im.imagesInEvictionOrder(ctx, freeTime)
+	if err != nil {
+		return err
+	}
+
 	// If over the max threshold, free enough to place us at the lower threshold.
 	usagePercent := 100 - int(available*100/capacity)
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
 		klog.InfoS("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
-		freed, err := im.freeSpace(ctx, amountToFree, time.Now())
+		freed, err := im.freeSpace(ctx, amountToFree, freeTime, images)
 		if err != nil {
 			return err
 		}
@@ -328,7 +334,12 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 
 func (im *realImageGCManager) DeleteUnusedImages(ctx context.Context) error {
 	klog.InfoS("Attempting to delete unused images")
-	_, err := im.freeSpace(ctx, math.MaxInt64, time.Now())
+	freeTime := time.Now()
+	images, err := im.imagesInEvictionOrder(ctx, freeTime)
+	if err != nil {
+		return err
+	}
+	_, err = im.freeSpace(ctx, math.MaxInt64, freeTime, images)
 	return err
 }
 
@@ -338,10 +349,58 @@ func (im *realImageGCManager) DeleteUnusedImages(ctx context.Context) error {
 // bytes freed is always returned.
 // Note that error may be nil and the number of bytes free may be less
 // than bytesToFree.
-func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, freeTime time.Time) (int64, error) {
+func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, freeTime time.Time, images []evictionInfo) (int64, error) {
+	// Delete unused images until we've freed up enough space.
+	var deletionErrors []error
+	spaceFreed := int64(0)
+	for _, image := range images {
+		klog.V(5).InfoS("Evaluating image ID for possible garbage collection", "imageID", image.id)
+		// Images that are currently in used were given a newer lastUsed.
+		if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) {
+			klog.V(5).InfoS("Image ID was used too recently, not eligible for garbage collection", "imageID", image.id, "lastUsed", image.lastUsed, "freeTime", freeTime)
+			continue
+		}
+
+		// Avoid garbage collect the image if the image is not old enough.
+		// In such a case, the image may have just been pulled down, and will be used by a container right away.
+		if freeTime.Sub(image.firstDetected) < im.policy.MinAge {
+			klog.V(5).InfoS("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image.id, "age", freeTime.Sub(image.firstDetected), "minAge", im.policy.MinAge)
+			continue
+		}
+
+		if err := im.freeImage(ctx, image); err != nil {
+			deletionErrors = append(deletionErrors, err)
+			continue
+		}
+		spaceFreed += image.size
+
+		if spaceFreed >= bytesToFree {
+			break
+		}
+	}
+
+	if len(deletionErrors) > 0 {
+		return spaceFreed, fmt.Errorf("wanted to free %d bytes, but freed %d bytes space with errors in image deletion: %v", bytesToFree, spaceFreed, errors.NewAggregate(deletionErrors))
+	}
+	return spaceFreed, nil
+}
+
+func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo) error {
+	// Remove image. Continue despite errors.
+	klog.InfoS("Removing image to free bytes", "imageID", image.id, "size", image.size)
+	err := im.runtime.RemoveImage(ctx, container.ImageSpec{Image: image.id})
+	if err != nil {
+		return err
+	}
+	delete(im.imageRecords, image.id)
+	return err
+}
+
+// Queries all of the image records and arranges them in a slice of evictionInfo, sorted based on last time used, ignoring images pinned by the runtime.
+func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTime time.Time) ([]evictionInfo, error) {
 	imagesInUse, err := im.detectImages(ctx, freeTime)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	im.imageRecordsLock.Lock()
@@ -366,45 +425,7 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 		})
 	}
 	sort.Sort(byLastUsedAndDetected(images))
-
-	// Delete unused images until we've freed up enough space.
-	var deletionErrors []error
-	spaceFreed := int64(0)
-	for _, image := range images {
-		klog.V(5).InfoS("Evaluating image ID for possible garbage collection", "imageID", image.id)
-		// Images that are currently in used were given a newer lastUsed.
-		if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) {
-			klog.V(5).InfoS("Image ID was used too recently, not eligible for garbage collection", "imageID", image.id, "lastUsed", image.lastUsed, "freeTime", freeTime)
-			continue
-		}
-
-		// Avoid garbage collect the image if the image is not old enough.
-		// In such a case, the image may have just been pulled down, and will be used by a container right away.
-
-		if freeTime.Sub(image.firstDetected) < im.policy.MinAge {
-			klog.V(5).InfoS("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image.id, "age", freeTime.Sub(image.firstDetected), "minAge", im.policy.MinAge)
-			continue
-		}
-
-		// Remove image. Continue despite errors.
-		klog.InfoS("Removing image to free bytes", "imageID", image.id, "size", image.size)
-		err := im.runtime.RemoveImage(ctx, container.ImageSpec{Image: image.id})
-		if err != nil {
-			deletionErrors = append(deletionErrors, err)
-			continue
-		}
-		delete(im.imageRecords, image.id)
-		spaceFreed += image.size
-
-		if spaceFreed >= bytesToFree {
-			break
-		}
-	}
-
-	if len(deletionErrors) > 0 {
-		return spaceFreed, fmt.Errorf("wanted to free %d bytes, but freed %d bytes space with errors in image deletion: %v", bytesToFree, spaceFreed, errors.NewAggregate(deletionErrors))
-	}
-	return spaceFreed, nil
+	return images, nil
 }
 
 type evictionInfo struct {
