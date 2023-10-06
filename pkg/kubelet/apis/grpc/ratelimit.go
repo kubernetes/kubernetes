@@ -27,17 +27,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	// DefaultQPS is determined by empirically reviewing known consumers of the API.
-	// It's at least unlikely that there is a legitimate need to query podresources
-	// more than 100 times per second, the other subsystems are not guaranteed to react
-	// so fast in the first place.
-	DefaultQPS = 100
-	// DefaultBurstTokens is determined by empirically reviewing known consumers of the API.
-	// See the documentation of DefaultQPS, same caveats apply.
-	DefaultBurstTokens = 10
-)
-
 var (
 	ErrorLimitExceeded = status.Error(codes.ResourceExhausted, "rejected by rate limit")
 )
@@ -59,9 +48,10 @@ func LimiterUnaryServerInterceptor(limiter Limiter) grpc.UnaryServerInterceptor 
 	}
 }
 
-func WithRateLimiter(qps, burstTokens int32) grpc.ServerOption {
+// WithRateLimiter creates new rate limiter with unary interceptor.
+func WithRateLimiter(serviceName string, qps, burstTokens int32) grpc.ServerOption {
 	qpsVal := gotimerate.Limit(qps)
 	burstVal := int(burstTokens)
-	klog.InfoS("Setting rate limiting for podresources endpoint", "qps", qpsVal, "burstTokens", burstVal)
+	klog.InfoS("Setting rate limiting for endpoint", "service", serviceName, "qps", qpsVal, "burstTokens", burstVal)
 	return grpc.UnaryInterceptor(LimiterUnaryServerInterceptor(gotimerate.NewLimiter(qpsVal, burstVal)))
 }
