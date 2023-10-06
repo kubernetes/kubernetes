@@ -78,6 +78,11 @@ type ImageGCPolicy struct {
 
 	// Minimum age at which an image can be garbage collected.
 	MinAge time.Duration
+
+	// Maximum age after which an image can be garbage collected, regardless of disk usage.
+	// Currently gated by MaximumImageGCAge feature gate and Kubelet configuration.
+	// If 0, the feature is disabled.
+	MaxAge time.Duration
 }
 
 type realImageGCManager struct {

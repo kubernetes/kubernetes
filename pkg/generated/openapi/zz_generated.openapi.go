@@ -55465,6 +55465,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
+					"imageMaximumGCAge": {
+						SchemaProps: spec.SchemaProps{
+							Description: "imageMaximumGCAge is the maximum age an image can be unused before it is garbage collected. The default of this field is \"0s\", which disables this field--meaning images won't be garbage collected based on being unused for too long. Default: \"0s\" (disabled)",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 					"imageGCHighThresholdPercent": {
 						SchemaProps: spec.SchemaProps{
 							Description: "imageGCHighThresholdPercent is the percent of disk usage after which image garbage collection is always run. The percent is calculated by dividing this field value by 100, so this field must be between 0 and 100, inclusive. When specified, the value must be greater than imageGCLowThresholdPercent. Default: 85",

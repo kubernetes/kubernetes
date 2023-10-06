@@ -882,6 +882,13 @@ const (
 	// alpha: v1.29
 	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
 	LoadBalancerIPMode featuregate.Feature = "LoadBalancerIPMode"
+
+	// owner: @haircommander
+	// kep: http://kep.k8s.io/4210
+	// alpha: v1.29
+	// ImageMaximumGCAge enables the Kubelet configuration field of the same name, allowing an admin
+	// to specify the age after which an image will be garbage collected.
+	ImageMaximumGCAge featuregate.Feature = "ImageMaximumGCAge"
 )
 
 func init() {
@@ -1120,6 +1127,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodIndexLabel: {Default: true, PreRelease: featuregate.Beta},
 
 	LoadBalancerIPMode: {Default: false, PreRelease: featuregate.Alpha},
+
+	ImageMaximumGCAge: {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
