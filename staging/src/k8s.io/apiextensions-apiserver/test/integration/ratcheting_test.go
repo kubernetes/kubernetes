@@ -17,6 +17,7 @@ limitations under the License.
 package integration_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -95,11 +97,50 @@ var fakeRESTMapper map[schema.GroupVersionResource]string = map[schema.GroupVers
 	myCRDV1Beta1: "MyCoolCRD",
 }
 
+// FixTabsOrDie counts the number of tab characters preceding the first
+// line in the given yaml object. It removes that many tabs from every
+// line. It panics (it's a test function) if some line has fewer tabs
+// than the first line.
+//
+// The purpose of this is to make it easier to read tests.
+func FixTabsOrDie(in string) string {
+	lines := bytes.Split([]byte(in), []byte{'\n'})
+	if len(lines[0]) == 0 && len(lines) > 1 {
+		lines = lines[1:]
+	}
+	// Create prefix made of tabs that we want to remove.
+	var prefix []byte
+	for _, c := range lines[0] {
+		if c != '\t' {
+			break
+		}
+		prefix = append(prefix, byte('\t'))
+	}
+	// Remove prefix from all tabs, fail otherwise.
+	for i := range lines {
+		line := lines[i]
+		// It's OK for the last line to be blank (trailing \n)
+		if i == len(lines)-1 && len(line) <= len(prefix) && bytes.TrimSpace(line) == nil {
+			lines[i] = []byte{}
+			break
+		}
+		if !bytes.HasPrefix(line, prefix) {
+			panic(fmt.Errorf("line %d doesn't start with expected number (%d) of tabs: %v", i, len(prefix), string(line)))
+		}
+		lines[i] = line[len(prefix):]
+	}
+	joined := string(bytes.Join(lines, []byte{'\n'}))
+
+	// Convert rest of tabs to spaces since yaml doesnt like yabs
+	// (assuming 2 space alignment)
+	return strings.ReplaceAll(joined, "\t", "  ")
+}
+
 type applyPatchOperation struct {
 	description string
 	gvr         schema.GroupVersionResource
 	name        string
-	patch       map[string]interface{}
+	patch       interface{}
 }
 
 func (a applyPatchOperation) Do(ctx *ratchetingTestContext) error {
@@ -109,25 +150,33 @@ func (a applyPatchOperation) Do(ctx *ratchetingTestContext) error {
 		return fmt.Errorf("no mapping found for Gvr %v, add entry to fakeRESTMapper", a.gvr)
 	}
 
-	a.patch["kind"] = kind
-	a.patch["apiVersion"] = a.gvr.GroupVersion().String()
-
-	if meta, ok := a.patch["metadata"]; ok {
-		mObj := meta.(map[string]interface{})
-		mObj["name"] = a.name
-		mObj["namespace"] = "default"
-	} else {
-		a.patch["metadata"] = map[string]interface{}{
-			"name":      a.name,
-			"namespace": "default",
+	patch := &unstructured.Unstructured{}
+	if obj, ok := a.patch.(map[string]interface{}); ok {
+		patch.Object = obj
+	} else if str, ok := a.patch.(string); ok {
+		str = FixTabsOrDie(str)
+		if err := utilyaml.NewYAMLOrJSONDecoder(strings.NewReader(str), len(str)).Decode(&patch.Object); err != nil {
+			return err
 		}
+	} else {
+		return fmt.Errorf("invalid patch type: %T", a.patch)
 	}
 
-	_, err := ctx.DynamicClient.Resource(a.gvr).Namespace("default").Apply(context.TODO(), a.name, &unstructured.Unstructured{
-		Object: a.patch,
-	}, metav1.ApplyOptions{
-		FieldManager: "manager",
-	})
+	patch.SetKind(kind)
+	patch.SetAPIVersion(a.gvr.GroupVersion().String())
+	patch.SetName(a.name)
+	patch.SetNamespace("default")
+
+	_, err := ctx.DynamicClient.
+		Resource(a.gvr).
+		Namespace(patch.GetNamespace()).
+		Apply(
+			context.TODO(),
+			patch.GetName(),
+			patch,
+			metav1.ApplyOptions{
+				FieldManager: "manager",
+			})
 
 	return err
 
@@ -1295,13 +1344,54 @@ func TestRatchetingFunctionality(t *testing.T) {
 		},
 		{
 			Name: "CEL_transition_rules_should_not_ratchet",
+			Operations: []ratchetingTestOperation{
+				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
+					Type:                   "object",
+					XPreserveUnknownFields: ptr(true),
+				}},
+				applyPatchOperation{
+					"create instance with strings that do not start with k8s",
+					myCRDV1Beta1, myCRDInstanceName,
+					`
+						myStringField: myStringValue
+						myOtherField: myOtherField
+					`,
+				},
+				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
+					Type:                   "object",
+					XPreserveUnknownFields: ptr(true),
+					Properties: map[string]apiextensionsv1.JSONSchemaProps{
+						"myStringField": {
+							Type: "string",
+							XValidations: apiextensionsv1.ValidationRules{
+								{
+									Rule: "oldSelf != 'myStringValue' || self == 'validstring'",
+								},
+							},
+						},
+					},
+				}},
+				expectError{applyPatchOperation{
+					"try to change one field to valid value, but unchanged field fails to be ratcheted by transition rule",
+					myCRDV1Beta1, myCRDInstanceName,
+					`
+						myOtherField: myNewOtherField
+						myStringField: myStringValue
+					`,
+				}},
+				applyPatchOperation{
+					"change both fields to valid values",
+					myCRDV1Beta1, myCRDInstanceName,
+					`
+						myStringField: validstring
+						myOtherField: myNewOtherField
+					`,
+				},
+			},
 		},
 		// Future Functionality, disabled tests
 		{
 			Name: "CEL Add Change Rule",
-			// Planned future test. CEL Rules are not yet ratcheted in alpha
-			// implementation of CRD Validation Ratcheting
-			Disabled: true,
 			Operations: []ratchetingTestOperation{
 				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
 					Type: "object",

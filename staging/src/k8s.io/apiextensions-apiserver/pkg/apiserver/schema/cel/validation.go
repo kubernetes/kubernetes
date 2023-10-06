@@ -38,8 +38,10 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/metrics"
+	"k8s.io/apiserver/pkg/warning"
 
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
@@ -147,6 +149,71 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType
 // Most callers can ignore the returned remainingBudget value unless another validate call is going to be made
 // context is passed for supporting context cancellation during cel validation
 func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+	return s.validate(ctx, fldPath, sts, obj, oldObj, ratchetingOptions{}, costBudget)
+}
+
+func (s *Validator) ValidateWithRatcheting(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+	// May be a worthwhile optimization to share the correlated object instance
+	// with the OpenAPI schema validator to avoid doing DeepEqual twice
+	return s.validate(ctx, fldPath, sts, obj, oldObj, ratchetingOptions{
+		currentCorrelation: common.NewCorrelatedObject(obj, oldObj, &model.Structural{Structural: sts}),
+	}, costBudget)
+}
+
+// ratchetingOptions stores the current correlation object and the nearest
+// parent which was correlatable. The parent is stored so that we can check at
+// the point an error is thrown whether it should be ratcheted using simple
+// logic
+// Key and Index should be used as normally to traverse to the next node.
+type ratchetingOptions struct {
+	// Current correlation object. If nil, then this node is from an uncorrelatable
+	// part of the schema
+	currentCorrelation *common.CorrelatedObject
+
+	// If currentCorrelation is nil, this is the nearest parent to this node
+	// which was correlatable. If the parent is deepequal to its old value,
+	// then errors thrown by this node are ratcheted
+	nearestParentCorrelation *common.CorrelatedObject
+}
+
+// shouldRatchetError returns true if the errors raised by the current node
+// should be ratcheted.
+//
+// Errors for the current node should be ratcheted if one of the following is true:
+//  1. The current node is correlatable, and it is equal to its old value
+//  2. The current node has a correlatable ancestor, and the ancestor is equal
+//     to its old value.
+func (r ratchetingOptions) shouldRatchetError() bool {
+	if r.currentCorrelation != nil {
+		return r.currentCorrelation.CachedDeepEqual()
+	}
+
+	return r.nearestParentCorrelation.CachedDeepEqual()
+}
+
+// Finds the next node following the field in the tree and returns options using
+// that node. If none could be found, then retains a reference to the last
+// correlatable ancestor for ratcheting purposes
+func (r ratchetingOptions) key(field string) ratchetingOptions {
+	if r.currentCorrelation == nil {
+		return r
+	}
+
+	return ratchetingOptions{currentCorrelation: r.currentCorrelation.Key(field), nearestParentCorrelation: r.currentCorrelation}
+}
+
+// Finds the next node following the index in the tree and returns options using
+// that node. If none could be found, then retains a reference to the last
+// correlatable ancestor for ratcheting purposes
+func (r ratchetingOptions) index(idx int) ratchetingOptions {
+	if r.currentCorrelation == nil {
+		return r
+	}
+
+	return ratchetingOptions{currentCorrelation: r.currentCorrelation.Index(idx), nearestParentCorrelation: r.currentCorrelation}
+}
+
+func (s *Validator) validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, correlation ratchetingOptions, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	t := time.Now()
 	defer func() {
 		metrics.Metrics.ObserveEvaluation(time.Since(t))
@@ -156,28 +223,31 @@ func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *sche
 		return nil, remainingBudget
 	}
 
-	errs, remainingBudget = s.validateExpressions(ctx, fldPath, sts, obj, oldObj, remainingBudget)
+	errs, remainingBudget = s.validateExpressions(ctx, fldPath, sts, obj, oldObj, correlation, remainingBudget)
+
 	if remainingBudget < 0 {
 		return errs, remainingBudget
 	}
+
 	switch obj := obj.(type) {
 	case []interface{}:
 		oldArray, _ := oldObj.([]interface{})
 		var arrayErrs field.ErrorList
-		arrayErrs, remainingBudget = s.validateArray(ctx, fldPath, sts, obj, oldArray, remainingBudget)
+		arrayErrs, remainingBudget = s.validateArray(ctx, fldPath, sts, obj, oldArray, correlation, remainingBudget)
 		errs = append(errs, arrayErrs...)
 		return errs, remainingBudget
 	case map[string]interface{}:
 		oldMap, _ := oldObj.(map[string]interface{})
 		var mapErrs field.ErrorList
-		mapErrs, remainingBudget = s.validateMap(ctx, fldPath, sts, obj, oldMap, remainingBudget)
+		mapErrs, remainingBudget = s.validateMap(ctx, fldPath, sts, obj, oldMap, correlation, remainingBudget)
 		errs = append(errs, mapErrs...)
 		return errs, remainingBudget
 	}
+
 	return errs, remainingBudget
 }
 
-func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, correlation ratchetingOptions, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	// guard against oldObj being a non-nil interface with a nil value
 	if oldObj != nil {
 		v := reflect.ValueOf(oldObj)
@@ -263,26 +333,35 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			if len(compiled.NormalizedRuleFieldPath) > 0 {
 				fldPath = fldPath.Child(compiled.NormalizedRuleFieldPath)
 			}
+
+			addErr := func(e *field.Error) {
+				if !compiled.TransitionRule && correlation.shouldRatchetError() {
+					warning.AddWarning(ctx, "", e.Error())
+				} else {
+					errs = append(errs, e)
+				}
+			}
+
 			if compiled.MessageExpression != nil {
 				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
 				if msgErr != nil {
 					if msgErr.Type == cel.ErrorTypeInternal {
-						errs = append(errs, field.InternalError(fldPath, msgErr))
+						addErr(field.InternalError(fldPath, msgErr))
 						return errs, -1
 					} else if msgErr.Type == cel.ErrorTypeInvalid {
-						errs = append(errs, field.Invalid(fldPath, sts.Type, msgErr.Error()))
+						addErr(field.Invalid(fldPath, sts.Type, msgErr.Error()))
 						return errs, -1
 					} else {
 						klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
-						errs = append(errs, fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
+						addErr(fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 						remainingBudget = newRemainingBudget
 					}
 				} else {
-					errs = append(errs, fieldErrorForReason(fldPath, sts.Type, messageExpression, rule.Reason))
+					addErr(fieldErrorForReason(fldPath, sts.Type, messageExpression, rule.Reason))
 					remainingBudget = newRemainingBudget
 				}
 			} else {
-				errs = append(errs, fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
+				addErr(fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 			}
 		}
 	}
@@ -566,7 +645,7 @@ func (a *validationActivation) Parent() interpreter.Activation {
 	return nil
 }
 
-func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj map[string]interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj map[string]interface{}, correlation ratchetingOptions, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if remainingBudget < 0 {
 		return errs, remainingBudget
@@ -585,7 +664,7 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *s
 			}
 
 			var err field.ErrorList
-			err, remainingBudget = s.AdditionalProperties.Validate(ctx, fldPath.Key(k), sts.AdditionalProperties.Structural, v, oldV, remainingBudget)
+			err, remainingBudget = s.AdditionalProperties.validate(ctx, fldPath.Key(k), sts.AdditionalProperties.Structural, v, oldV, correlation.key(k), remainingBudget)
 			errs = append(errs, err...)
 			if remainingBudget < 0 {
 				return errs, remainingBudget
@@ -603,7 +682,7 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *s
 				}
 
 				var err field.ErrorList
-				err, remainingBudget = sub.Validate(ctx, fldPath.Child(k), &stsProp, v, oldV, remainingBudget)
+				err, remainingBudget = sub.validate(ctx, fldPath.Child(k), &stsProp, v, oldV, correlation.key(k), remainingBudget)
 				errs = append(errs, err...)
 				if remainingBudget < 0 {
 					return errs, remainingBudget
@@ -615,7 +694,7 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *s
 	return errs, remainingBudget
 }
 
-func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj []interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj []interface{}, correlation ratchetingOptions, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if remainingBudget < 0 {
 		return errs, remainingBudget
@@ -627,7 +706,7 @@ func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts 
 		correlatableOldItems := makeMapList(sts, oldObj)
 		for i := range obj {
 			var err field.ErrorList
-			err, remainingBudget = s.Items.Validate(ctx, fldPath.Index(i), sts.Items, obj[i], correlatableOldItems.Get(obj[i]), remainingBudget)
+			err, remainingBudget = s.Items.validate(ctx, fldPath.Index(i), sts.Items, obj[i], correlatableOldItems.Get(obj[i]), correlation.index(i), remainingBudget)
 			errs = append(errs, err...)
 			if remainingBudget < 0 {
 				return errs, remainingBudget
