@@ -1,0 +1,19 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - thockin
+  - lavalamp
+  - smarterclayton
+  - wojtek-t
+  - deads2k
+  - yujuhong
+  - derekwaynecarr
+  - caesarxuchao
+  - mikedanese
+  - liggitt
+  - saad-ali
+  - janetkuo
+  - pwittrock
+  - ncdc
+  - dims
+  - enj

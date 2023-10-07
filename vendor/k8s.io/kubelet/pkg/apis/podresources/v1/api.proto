@@ -1,0 +1,114 @@
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+syntax = "proto3";
+
+package v1;
+option go_package = "k8s.io/kubelet/pkg/apis/podresources/v1";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+
+// PodResourcesLister is a service provided by the kubelet that provides information about the
+// node resources consumed by pods and containers on the node
+service PodResourcesLister {
+    rpc List(ListPodResourcesRequest) returns (ListPodResourcesResponse) {}
+    rpc GetAllocatableResources(AllocatableResourcesRequest) returns (AllocatableResourcesResponse) {}
+    rpc Get(GetPodResourcesRequest) returns (GetPodResourcesResponse) {}
+}
+
+message AllocatableResourcesRequest {}
+
+// AllocatableResourcesResponses contains informations about all the devices known by the kubelet
+message AllocatableResourcesResponse {
+    repeated ContainerDevices devices = 1;
+    repeated int64 cpu_ids = 2;
+    repeated ContainerMemory memory = 3;
+}
+
+// ListPodResourcesRequest is the request made to the PodResourcesLister service
+message ListPodResourcesRequest {}
+
+// ListPodResourcesResponse is the response returned by List function
+message ListPodResourcesResponse {
+    repeated PodResources pod_resources = 1;
+}
+
+// PodResources contains information about the node resources assigned to a pod
+message PodResources {
+    string name = 1;
+    string namespace = 2;
+    repeated ContainerResources containers = 3;
+}
+
+// ContainerResources contains information about the resources assigned to a container
+message ContainerResources {
+    string name = 1;
+    repeated ContainerDevices devices = 2;
+    repeated int64 cpu_ids = 3;
+    repeated ContainerMemory memory = 4;
+    repeated DynamicResource dynamic_resources = 5;
+}
+
+// ContainerMemory contains information about memory and hugepages assigned to a container
+message ContainerMemory {
+    string memory_type = 1;
+    uint64 size = 2;
+    TopologyInfo topology = 3;
+}
+
+// ContainerDevices contains information about the devices assigned to a container
+message ContainerDevices {
+    string resource_name = 1;
+    repeated string device_ids = 2;
+    TopologyInfo topology = 3;
+}
+
+// Topology describes hardware topology of the resource
+message TopologyInfo {
+    repeated NUMANode nodes = 1;
+}
+
+// NUMA representation of NUMA node
+message NUMANode {
+    int64 ID = 1;
+}
+
+// DynamicResource contains information about the devices assigned to a container by DRA
+message DynamicResource {
+    string class_name = 1;
+    string claim_name = 2;
+    string claim_namespace = 3;
+    repeated ClaimResource claim_resources = 4;
+}
+
+// ClaimResource contains per plugin resource information
+message ClaimResource {
+    repeated CDIDevice cdi_devices = 1 [(gogoproto.customname) = "CDIDevices"];
+}
+
+// CDIDevice specifies a CDI device information
+message CDIDevice {
+    // Fully qualified CDI device name
+    // for example: vendor.com/gpu=gpudevice1
+    // see more details in the CDI specification:
+    // https://github.com/container-orchestrated-devices/container-device-interface/blob/main/SPEC.md
+    string name = 1;
+}
+
+// GetPodResourcesRequest contains information about the pod
+message GetPodResourcesRequest {
+    string pod_name = 1;
+    string pod_namespace = 2;
+}
+
+// GetPodResourcesResponse contains information about the pod the devices
+message GetPodResourcesResponse {
+    PodResources pod_resources = 1;
+}
