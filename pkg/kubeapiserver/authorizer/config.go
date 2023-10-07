@@ -19,6 +19,7 @@ package authorizer
 import (
 	"errors"
 	"fmt"
+
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
@@ -122,6 +123,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 				configuredAuthorizer.Webhook.AuthorizedTTL.Duration,
 				configuredAuthorizer.Webhook.UnauthorizedTTL.Duration,
 				*config.WebhookRetryBackoff,
+				configuredAuthorizer.Webhook.MatchConditions,
 			)
 			if err != nil {
 				return nil, nil, err

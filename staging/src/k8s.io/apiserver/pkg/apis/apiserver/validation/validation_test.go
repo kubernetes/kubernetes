@@ -32,7 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certutil "k8s.io/client-go/util/cert"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 )
 
@@ -428,6 +431,8 @@ type (
 )
 
 func TestValidateAuthorizationConfiguration(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)()
+
 	badKubeConfigFile := "../some/relative/path/kubeconfig"
 
 	tempKubeConfigFile, err := os.CreateTemp("/tmp", "kubeconfig")
@@ -548,6 +553,39 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 							MatchConditionSubjectAccessReviewVersion: "v1",
 							ConnectionInfo: api.WebhookConnectionInfo{
 								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.NewString(string("Webhook")),
+			repeatableTypes: sets.NewString(string("Webhook")),
+		},
+		{
+			name: "bare minimum configuration with Webhook and MatchConditions",
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+							MatchConditions: []api.WebhookMatchCondition{
+								{
+									Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kube-system'",
+								},
+								{
+									Expression: "request.user == 'admin'",
+								},
 							},
 						},
 					},
@@ -1156,8 +1194,6 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			knownTypes:      sets.NewString(string("Webhook")),
 			repeatableTypes: sets.NewString(string("Webhook")),
 		},
-
-		// TODO: When the CEL expression validator is implemented, add a few test cases to typecheck the expression
 	}
 
 	for _, test := range tests {
@@ -1166,20 +1202,120 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			if len(errList) != len(test.expectedErrList) {
 				t.Errorf("expected %d errs, got %d, errors %v", len(test.expectedErrList), len(errList), errList)
 			}
-
-			for i, expected := range test.expectedErrList {
-				if expected.Type.String() != errList[i].Type.String() {
-					t.Errorf("expected err type %s, got %s",
-						expected.Type.String(),
-						errList[i].Type.String())
-				}
-				if expected.BadValue != errList[i].BadValue {
-					t.Errorf("expected bad value '%s', got '%s'",
-						expected.BadValue,
-						errList[i].BadValue)
+			if len(errList) == len(test.expectedErrList) {
+				for i, expected := range test.expectedErrList {
+					if expected.Type.String() != errList[i].Type.String() {
+						t.Errorf("expected err type %s, got %s",
+							expected.Type.String(),
+							errList[i].Type.String())
+					}
+					if expected.BadValue != errList[i].BadValue {
+						t.Errorf("expected bad value '%s', got '%s'",
+							expected.BadValue,
+							errList[i].BadValue)
+					}
 				}
 			}
 		})
 
+	}
+}
+
+func TestValidateAndCompileMatchConditions(t *testing.T) {
+	testCases := []struct {
+		name            string
+		matchConditions []api.WebhookMatchCondition
+		featureEnabled  bool
+		expectedErr     string
+	}{
+		{
+			name: "match conditions are used With feature enabled",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kube-system'",
+				},
+				{
+					Expression: "request.user == 'admin'",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    "",
+		},
+		{
+			name: "should fail when match conditions are used without feature enabled",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kube-system'",
+				},
+				{
+					Expression: "request.user == 'admin'",
+				},
+			},
+			featureEnabled: false,
+			expectedErr:    `matchConditions: Invalid value: "": matchConditions are not supported when StructuredAuthorizationConfiguration feature gate is disabled`,
+		},
+		{
+			name:            "no matchConditions should not require feature enablement",
+			matchConditions: []api.WebhookMatchCondition{},
+			featureEnabled:  false,
+			expectedErr:     "",
+		},
+		{
+			name: "match conditions with invalid expressions",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "  ",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    "matchConditions[0].expression: Required value",
+		},
+		{
+			name: "match conditions with duplicate expressions",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "request.user == 'admin'",
+				},
+				{
+					Expression: "request.user == 'admin'",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    `matchConditions[1].expression: Duplicate value: "request.user == 'admin'"`,
+		},
+		{
+			name: "match conditions with undeclared reference",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "test",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    "matchConditions[0].expression: Invalid value: \"test\": compilation failed: ERROR: <input>:1:1: undeclared reference to 'test' (in container '')\n | test\n | ^",
+		},
+		{
+			name: "match conditions with bad return type",
+			matchConditions: []api.WebhookMatchCondition{
+				{
+					Expression: "request.user = 'test'",
+				},
+			},
+			featureEnabled: true,
+			expectedErr:    "matchConditions[0].expression: Invalid value: \"request.user = 'test'\": compilation failed: ERROR: <input>:1:14: Syntax error: token recognition error at: '= '\n | request.user = 'test'\n | .............^\nERROR: <input>:1:16: Syntax error: extraneous input ''test'' expecting <EOF>\n | request.user = 'test'\n | ...............^",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, tt.featureEnabled)()
+			celMatcher, errList := ValidateAndCompileMatchConditions(tt.matchConditions)
+			if len(tt.expectedErr) == 0 && len(tt.matchConditions) > 0 && len(errList) == 0 && celMatcher == nil {
+				t.Errorf("celMatcher should not be nil when there are matchCondition and no error returned")
+			}
+			got := errList.ToAggregate()
+			if d := cmp.Diff(tt.expectedErr, errString(got)); d != "" {
+				t.Fatalf("ValidateAndCompileMatchConditions validation mismatch (-want +got):\n%s", d)
+			}
+		})
 	}
 }
