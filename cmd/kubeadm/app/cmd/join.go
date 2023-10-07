@@ -135,6 +135,7 @@ type joinOptions struct {
 	externalcfg           *kubeadmapiv1.JoinConfiguration
 	patchesDir            string
 	dryRun                bool
+	skipCRIDetect         bool
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -221,9 +222,9 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	// both when running the entire workflow or single phases
 	joinRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
 		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
-			// avoid CRI detection
+			// skip CRI detection
 			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
-			joinOptions.externalcfg.NodeRegistration.CRISocket = kubeadmconstants.UnknownCRISocket
+			joinOptions.skipCRIDetect = true
 		}
 		data, err := newJoinData(cmd, args, joinOptions, out, kubeadmconstants.GetAdminKubeConfigPath())
 		if err != nil {
@@ -426,7 +427,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		opt.externalcfg.Discovery.BootstrapToken = nil //NB. this could be removed when we get better control on args (e.g. phases without discovery should have NoArgs )
 	}
 
-	cfg, err := configutil.LoadOrDefaultJoinConfiguration(opt.cfgPath, opt.externalcfg)
+	cfg, err := configutil.LoadOrDefaultJoinConfiguration(opt.cfgPath, opt.externalcfg, opt.skipCRIDetect)
 	if err != nil {
 		return nil, err
 	}

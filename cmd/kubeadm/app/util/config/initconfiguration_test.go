@@ -90,7 +90,7 @@ kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), certDir, const
 				return
 			}
 
-			obj, err := LoadInitConfigurationFromFile(cfgPath)
+			obj, err := LoadInitConfigurationFromFile(cfgPath, true)
 			if rt.expectErr {
 				if err == nil {
 					t.Error("Unexpected success")
@@ -185,7 +185,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 				t.Fatalf("unexpected error while marshalling to YAML: %v", err)
 			}
 
-			cfg, err := BytesToInitConfiguration(b)
+			cfg, err := BytesToInitConfiguration(b, true)
 			if err != nil {
 				t.Fatalf("unexpected error of BytesToInitConfiguration: %v\nconfig: %s", err, string(b))
 			}

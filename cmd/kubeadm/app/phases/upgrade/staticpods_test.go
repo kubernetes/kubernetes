@@ -600,7 +600,7 @@ func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.InitConfigura
 	configBytes := []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version))
 
 	// Unmarshal the config
-	return configutil.BytesToInitConfiguration(configBytes)
+	return configutil.BytesToInitConfiguration(configBytes, false)
 }
 
 func getTempDir(t *testing.T, name string) (string, func()) {

@@ -59,7 +59,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	}
 
 	// Apply dynamic defaults
-	if err := SetInitDynamicDefaults(cfg); err != nil {
+	if err := SetInitDynamicDefaults(cfg, false); err != nil {
 		return nil, err
 	}
 

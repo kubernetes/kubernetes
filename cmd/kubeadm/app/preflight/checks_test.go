@@ -1082,7 +1082,7 @@ func TestJoinIPCheck(t *testing.T) {
 				UnsafeSkipCAVerification: true,
 			},
 		},
-	})
+	}, true)
 	if err != nil {
 		t.Fatalf("unexpected failure when defaulting JoinConfiguration: %v", err)
 	}
