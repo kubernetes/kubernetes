@@ -113,7 +113,7 @@ func mergePluginSet(logger klog.Logger, defaultPluginSet, customPluginSet v1.Plu
 	disabledPlugins := sets.New[string]()
 	enabledCustomPlugins := make(map[string]pluginIndex)
 	// replacedPluginIndex is a set of index of plugins, which have replaced the default plugins.
-	replacedPluginIndex := sets.NewInt()
+	replacedPluginIndex := sets.New[int]()
 	var disabled []v1.Plugin
 	for _, disabledPlugin := range customPluginSet.Disabled {
 		// if the user is manually disabling any (or all, with "*") default plugins for an extension point,
