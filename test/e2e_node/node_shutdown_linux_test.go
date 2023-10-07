@@ -199,6 +199,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			initialConfig.FeatureGates = map[string]bool{
 				string(features.GracefulNodeShutdown):                   true,
 				string(features.GracefulNodeShutdownBasedOnPodPriority): false,
+				string(features.PodReadyToStartContainersCondition):     true,
 			}
 			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
 			initialConfig.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: nodeShutdownGracePeriodCriticalPods}
@@ -327,6 +328,27 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				podStatusUpdateTimeout+(nodeShutdownGracePeriod-nodeShutdownGracePeriodCriticalPods),
 				pollInterval).Should(gomega.Succeed())
 
+			ginkgo.By("Verify that all pod ready to start condition are set to false after terminating")
+			// All pod ready to start condition should set to false
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				list, err = e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
+					FieldSelector: nodeSelector,
+				})
+				if err != nil {
+					return err
+				}
+				gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)))
+				for _, pod := range list.Items {
+					if !isPodReadyToStartConditionSetToFalse(&pod) {
+						framework.Logf("Expecting pod (%v/%v) 's ready to start condition set to false, "+
+							"but it's not currently: Pod Condition %+v", pod.Namespace, pod.Name, pod.Status.Conditions)
+						return fmt.Errorf("pod (%v/%v) 's ready to start condition should be false, condition: %s, phase: %s",
+							pod.Namespace, pod.Name, pod.Status.Conditions, pod.Status.Phase)
+					}
+				}
+				return nil
+			},
+			).Should(gomega.Succeed())
 		})
 
 		ginkgo.It("should be able to handle a cancelled shutdown", func(ctx context.Context) {
@@ -722,4 +744,18 @@ func isPodShutdown(pod *v1.Pod) bool {
 // Pods should never report failed phase and have ready condition = true (https://github.com/kubernetes/kubernetes/issues/108594)
 func isPodStatusAffectedByIssue108594(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed && podutils.IsPodReady(pod)
+}
+
+func isPodReadyToStartConditionSetToFalse(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	readyToStartConditionSetToFalse := false
+	for _, cond := range pod.Status.Conditions {
+		if cond.Status == v1.ConditionFalse {
+			readyToStartConditionSetToFalse = true
+		}
+	}
+
+	return readyToStartConditionSetToFalse
 }
