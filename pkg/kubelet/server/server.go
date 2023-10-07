@@ -377,9 +377,8 @@ func (s *Server) InstallDefaultHandlers() {
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.ComponentSLIs) {
-		slis.SLIMetricsWithReset{}.Install(s.restfulCont)
-	}
+	slis.SLIMetricsWithReset{}.Install(s.restfulCont)
+
 	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
 	ws.

@@ -134,7 +134,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		ginkgo.By("Checking that the PVC status is Terminating")
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "While checking PVC status")
-		framework.ExpectNotEqual(pvc.ObjectMeta.DeletionTimestamp, nil)
+		gomega.Expect(pvc.ObjectMeta.DeletionTimestamp).ToNot(gomega.BeNil())
 
 		ginkgo.By("Deleting the pod that uses the PVC")
 		err = e2epod.DeletePodWithWait(ctx, client, pod)
@@ -153,7 +153,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		ginkgo.By("Checking that the PVC status is Terminating")
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "While checking PVC status")
-		framework.ExpectNotEqual(pvc.ObjectMeta.DeletionTimestamp, nil)
+		gomega.Expect(pvc.ObjectMeta.DeletionTimestamp).ToNot(gomega.BeNil())
 
 		ginkgo.By("Creating second Pod whose scheduling fails because it uses a PVC that is being deleted")
 		secondPod, err2 := e2epod.CreateUnschedulablePod(ctx, client, nameSpace, nil, []*v1.PersistentVolumeClaim{pvc}, f.NamespacePodSecurityLevel, "")
@@ -166,7 +166,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		ginkgo.By("Checking again that the PVC status is Terminating")
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "While checking PVC status")
-		framework.ExpectNotEqual(pvc.ObjectMeta.DeletionTimestamp, nil)
+		gomega.Expect(pvc.ObjectMeta.DeletionTimestamp).ToNot(gomega.BeNil())
 
 		ginkgo.By("Deleting the first pod that uses the PVC")
 		err = e2epod.DeletePodWithWait(ctx, client, pod)

@@ -66,7 +66,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -141,7 +141,7 @@ func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
 type falseMapPlugin struct{}
 
 func newFalseMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &falseMapPlugin{}, nil
 	}
 }
@@ -161,7 +161,7 @@ func (pl *falseMapPlugin) ScoreExtensions() framework.ScoreExtensions {
 type numericMapPlugin struct{}
 
 func newNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &numericMapPlugin{}, nil
 	}
 }
@@ -183,7 +183,7 @@ func (pl *numericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewNoPodsFilterPlugin initializes a noPodsFilterPlugin and returns it.
-func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewNoPodsFilterPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &noPodsFilterPlugin{}, nil
 }
 
@@ -223,7 +223,7 @@ func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ *framewor
 }
 
 func newReverseNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &reverseNumericMapPlugin{}, nil
 	}
 }
@@ -252,7 +252,7 @@ func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ *framework.CycleSta
 }
 
 func newTrueMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &trueMapPlugin{}, nil
 	}
 }
@@ -291,7 +291,7 @@ func (s *fakeNodeSelector) Filter(_ context.Context, _ *framework.CycleState, _ 
 	return nil
 }
 
-func newFakeNodeSelector(args runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newFakeNodeSelector(_ context.Context, args runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	pl := &fakeNodeSelector{}
 	if err := frameworkruntime.DecodeInto(args, &pl.fakeNodeSelectorArgs); err != nil {
 		return nil, err
@@ -333,7 +333,7 @@ func (f *fakeNodeSelectorDependOnPodAnnotation) Filter(_ context.Context, _ *fra
 	return nil
 }
 
-func newFakeNodeSelectorDependOnPodAnnotation(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newFakeNodeSelectorDependOnPodAnnotation(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &fakeNodeSelectorDependOnPodAnnotation{}, nil
 }
 
@@ -598,7 +598,7 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 	go wait.Until(createPodsOneRound, 9*time.Millisecond, ctx.Done())
 
 	// Capture the events to wait all pods to be scheduled at least once.
-	allWaitSchedulingPods := sets.NewString()
+	allWaitSchedulingPods := sets.New[string]()
 	for i := 0; i < waitSchedulingPodNumber; i++ {
 		allWaitSchedulingPods.Insert(fmt.Sprintf("pod%d", i))
 	}
@@ -2179,7 +2179,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.New("node2"),
-			wantEvaluatedNodes: pointer.Int32(1),
+			wantEvaluatedNodes: ptr.To[int32](1),
 		},
 		{
 			name: "test prefilter plugin returning non-intersecting nodes",
@@ -2257,7 +2257,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"node1": framework.Unschedulable,
 					}),
 				),
-				tf.RegisterPluginAsExtensions("FakeFilter2", func(configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
+				tf.RegisterPluginAsExtensions("FakeFilter2", func(_ context.Context, configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
 					return tf.FakePreFilterAndFilterPlugin{
 						FakePreFilterPlugin: &tf.FakePreFilterPlugin{
 							Result: nil,
@@ -2277,7 +2277,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.New("node2", "node3"),
-			wantEvaluatedNodes: pointer.Int32(3),
+			wantEvaluatedNodes: ptr.To[int32](3),
 		},
 		{
 			name: "test all prescore plugins return skip",
@@ -2488,7 +2488,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			plugin := tf.FakeFilterPlugin{}
 			registerFakeFilterFunc := tf.RegisterFilterPlugin(
 				"FakeFilter",
-				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return &plugin, nil
 				},
 			)
@@ -2923,7 +2923,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 		},
 		{
 			name:              "set profile percentageOfNodesToScore and nodes number not more than 50",
-			profilePercentage: pointer.Int32(40),
+			profilePercentage: ptr.To[int32](40),
 			numAllNodes:       10,
 			wantNumNodes:      10,
 		},
@@ -2934,14 +2934,14 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 		},
 		{
 			name:              "set profile percentageOfNodesToScore and nodes number more than 50",
-			profilePercentage: pointer.Int32(40),
+			profilePercentage: ptr.To[int32](40),
 			numAllNodes:       1000,
 			wantNumNodes:      400,
 		},
 		{
 			name:              "set global and profile percentageOfNodesToScore and nodes number more than 50",
 			globalPercentage:  100,
-			profilePercentage: pointer.Int32(40),
+			profilePercentage: ptr.To[int32](40),
 			numAllNodes:       1000,
 			wantNumNodes:      400,
 		},
@@ -2958,7 +2958,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 		},
 		{
 			name:              "set profile percentageOfNodesToScore and nodes number more than 50*125",
-			profilePercentage: pointer.Int32(40),
+			profilePercentage: ptr.To[int32](40),
 			numAllNodes:       6000,
 			wantNumNodes:      2400,
 		},
@@ -3063,7 +3063,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			plugin := tf.FakeFilterPlugin{FailedNodeReturnCodeMap: test.nodeReturnCodeMap}
 			registerFakeFilterFunc := tf.RegisterFilterPlugin(
 				"FakeFilter",
-				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return &plugin, nil
 				},
 			)
@@ -3279,7 +3279,7 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, volu
 	fns := []tf.RegisterPluginFunc{
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPluginAsExtensions(volumebinding.Name, func(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+		tf.RegisterPluginAsExtensions(volumebinding.Name, func(ctx context.Context, plArgs runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 			return &volumebinding.VolumeBinding{Binder: volumeBinder, PVCLister: pvcInformer.Lister()}, nil
 		}, "PreFilter", "Filter", "Reserve", "PreBind"),
 	}

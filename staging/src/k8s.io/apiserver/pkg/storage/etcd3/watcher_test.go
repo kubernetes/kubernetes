@@ -24,14 +24,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	clientv3 "go.etcd.io/etcd/client/v3"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestWatch(t *testing.T) {
@@ -120,6 +128,16 @@ func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
 	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
 }
 
+func TestEtcdWatchSemantics(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchSemantics(ctx, t, store)
+}
+
+func TestEtcdWatchSemanticInitialEventsExtended(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchSemanticInitialEventsExtended(ctx, t, store)
+}
+
 // =======================================================================
 // Implementation-specific tests are following.
 // The following tests are exercising the details of the implementation
@@ -142,7 +160,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		w.run()
+		w.run(false, true)
 		wg.Done()
 	}()
 	w.errChan <- fmt.Errorf("some error")
@@ -150,25 +168,89 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	wg.Wait()
 }
 
-// TestWatchErrorWhenNoNewFunc checks if an error
-// will be returned when establishing a watch
-// with progressNotify options set
-// when newFunc wasn't provided
-func TestWatchErrorWhenNoNewFunc(t *testing.T) {
-	origCtx, store, _ := testSetup(t, func(opts *setupOptions) { opts.newFunc = nil })
+// TestWatchErrorIncorrectConfiguration checks if an error
+// will be returned when the storage hasn't been properly
+// initialised for watch requests
+func TestWatchErrorIncorrectConfiguration(t *testing.T) {
+	scenarios := []struct {
+		name            string
+		setupFn         func(opts *setupOptions)
+		requestOpts     storage.ListOptions
+		enableWatchList bool
+		expectedErr     error
+	}{
+		{
+			name:        "no newFunc provided",
+			setupFn:     func(opts *setupOptions) { opts.newFunc = nil },
+			requestOpts: storage.ListOptions{ProgressNotify: true},
+			expectedErr: apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided")),
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			if scenario.enableWatchList {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+			}
+			origCtx, store, _ := testSetup(t, scenario.setupFn)
+			ctx, cancel := context.WithCancel(origCtx)
+			defer cancel()
+
+			w, err := store.watcher.Watch(ctx, "/abc", 0, scenario.requestOpts)
+			if err == nil {
+				t.Fatalf("expected an error but got none")
+			}
+			if w != nil {
+				t.Fatalf("didn't expect a watcher because the test assumes incorrect store initialisation")
+			}
+			if err.Error() != scenario.expectedErr.Error() {
+				t.Fatalf("unexpected err = %v, expected = %v", err, scenario.expectedErr)
+			}
+		})
+	}
+}
+
+func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
 	defer cancel()
+	requestOpts := storage.ListOptions{
+		SendInitialEvents: ptr.To(true),
+		Recursive:         true,
+		Predicate: storage.SelectionPredicate{
+			Field:               fields.Everything(),
+			Label:               labels.Everything(),
+			AllowWatchBookmarks: true,
+		},
+	}
+	var expectedErr *apierrors.StatusError
+	if !errors.As(storage.NewTooLargeResourceVersionError(uint64(102), 1, 0), &expectedErr) {
+		t.Fatalf("Unable to convert NewTooLargeResourceVersionError to apierrors.StatusError")
+	}
 
-	w, err := store.watcher.Watch(ctx, "/abc", 0, storage.ListOptions{ProgressNotify: true})
-	if err == nil {
-		t.Fatalf("expected an error but got none")
+	w, err := store.watcher.Watch(ctx, "/abc", int64(102), requestOpts)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if w != nil {
-		t.Fatalf("didn't expect a watcher because progress notifications cannot be delivered for a watcher without newFunc")
+	defer w.Stop()
+
+	actualEvent := <-w.ResultChan()
+	if actualEvent.Type != watch.Error {
+		t.Fatalf("Unexpected type of the event: %v, expected: %v", actualEvent.Type, watch.Error)
 	}
-	expectedError := apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
-	if err.Error() != expectedError.Error() {
-		t.Fatalf("unexpected err = %v, expected = %v", err, expectedError)
+	actualErr, ok := actualEvent.Object.(*metav1.Status)
+	if !ok {
+		t.Fatalf("Expected *apierrors.StatusError, got: %#v", actualEvent.Object)
+	}
+
+	if actualErr.Details.RetryAfterSeconds <= 0 {
+		t.Fatalf("RetryAfterSeconds must be > 0, actual value: %v", actualErr.Details.RetryAfterSeconds)
+	}
+	// rewrite the Details as it contains retry seconds
+	// and validate the whole struct
+	expectedErr.ErrStatus.Details = actualErr.Details
+	if diff := cmp.Diff(*actualErr, expectedErr.ErrStatus); diff != "" {
+		t.Fatalf("Unexpected error returned, diff: %v", diff)
 	}
 }
 

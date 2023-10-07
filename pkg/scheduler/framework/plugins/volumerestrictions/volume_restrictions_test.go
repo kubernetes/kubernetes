@@ -505,8 +505,8 @@ func newPlugin(ctx context.Context, t *testing.T) framework.Plugin {
 }
 
 func newPluginWithListers(ctx context.Context, t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim, enableReadWriteOncePod bool) framework.Plugin {
-	pluginFactory := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-		return New(plArgs, fh, feature.Features{
+	pluginFactory := func(ctx context.Context, plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+		return New(ctx, plArgs, fh, feature.Features{
 			EnableReadWriteOncePod: enableReadWriteOncePod,
 		})
 	}

@@ -26,6 +26,7 @@ import (
 
 func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	checkError := func(v string) {
+		t.Helper()
 		annotations := make(map[string]string)
 		annotations[v1.AnnotationLoadBalancerSourceRangesKey] = v
 		svc := v1.Service{}
@@ -49,6 +50,7 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	checkError("10.0.0.1")
 
 	checkOK := func(v string) utilnet.IPNetSet {
+		t.Helper()
 		annotations := make(map[string]string)
 		annotations[v1.AnnotationLoadBalancerSourceRangesKey] = v
 		svc := v1.Service{}
@@ -112,6 +114,7 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 
 func TestAllowAll(t *testing.T) {
 	checkAllowAll := func(allowAll bool, cidrs ...string) {
+		t.Helper()
 		ipnets, err := utilnet.ParseIPNets(cidrs...)
 		if err != nil {
 			t.Errorf("Unexpected error parsing cidrs: %v", cidrs)
@@ -131,6 +134,7 @@ func TestAllowAll(t *testing.T) {
 
 func TestExternallyAccessible(t *testing.T) {
 	checkExternallyAccessible := func(expect bool, service *v1.Service) {
+		t.Helper()
 		res := ExternallyAccessible(service)
 		if res != expect {
 			t.Errorf("Expected ExternallyAccessible = %v, got %v", expect, res)
@@ -174,6 +178,7 @@ func TestExternallyAccessible(t *testing.T) {
 
 func TestExternalPolicyLocal(t *testing.T) {
 	checkExternalPolicyLocal := func(requestsOnlyLocalTraffic bool, service *v1.Service) {
+		t.Helper()
 		res := ExternalPolicyLocal(service)
 		if res != requestsOnlyLocalTraffic {
 			t.Errorf("Expected requests OnlyLocal traffic = %v, got %v",
@@ -240,6 +245,7 @@ func TestExternalPolicyLocal(t *testing.T) {
 
 func TestNeedsHealthCheck(t *testing.T) {
 	checkNeedsHealthCheck := func(needsHealthCheck bool, service *v1.Service) {
+		t.Helper()
 		res := NeedsHealthCheck(service)
 		if res != needsHealthCheck {
 			t.Errorf("Expected needs health check = %v, got %v",
@@ -280,6 +286,7 @@ func TestNeedsHealthCheck(t *testing.T) {
 
 func TestInternalPolicyLocal(t *testing.T) {
 	checkInternalPolicyLocal := func(expected bool, service *v1.Service) {
+		t.Helper()
 		res := InternalPolicyLocal(service)
 		if res != expected {
 			t.Errorf("Expected internal local traffic = %v, got %v",

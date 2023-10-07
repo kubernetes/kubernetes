@@ -60,16 +60,16 @@ const (
 	rsaKeySize             = 2048
 )
 
-// CertConfig is a wrapper around certutil.Config extending it with PublicKeyAlgorithm.
+// CertConfig is a wrapper around certutil.Config extending it with EncryptionAlgorithm.
 type CertConfig struct {
 	certutil.Config
-	NotAfter           *time.Time
-	PublicKeyAlgorithm x509.PublicKeyAlgorithm
+	NotAfter            *time.Time
+	EncryptionAlgorithm kubeadmapi.EncryptionAlgorithmType
 }
 
 // NewCertificateAuthority creates new certificate and private key for the certificate authority
 func NewCertificateAuthority(config *CertConfig) (*x509.Certificate, crypto.Signer, error) {
-	key, err := NewPrivateKey(config.PublicKeyAlgorithm)
+	key, err := NewPrivateKey(config.EncryptionAlgorithm)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key while generating CA certificate")
 	}
@@ -86,7 +86,7 @@ func NewCertificateAuthority(config *CertConfig) (*x509.Certificate, crypto.Sign
 
 // NewIntermediateCertificateAuthority creates new certificate and private key for an intermediate certificate authority
 func NewIntermediateCertificateAuthority(parentCert *x509.Certificate, parentKey crypto.Signer, config *CertConfig) (*x509.Certificate, crypto.Signer, error) {
-	key, err := NewPrivateKey(config.PublicKeyAlgorithm)
+	key, err := NewPrivateKey(config.EncryptionAlgorithm)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key while generating intermediate CA certificate")
 	}
@@ -105,7 +105,7 @@ func NewCertAndKey(caCert *x509.Certificate, caKey crypto.Signer, config *CertCo
 		return nil, nil, errors.New("must specify at least one ExtKeyUsage")
 	}
 
-	key, err := NewPrivateKey(config.PublicKeyAlgorithm)
+	key, err := NewPrivateKey(config.EncryptionAlgorithm)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
@@ -120,7 +120,7 @@ func NewCertAndKey(caCert *x509.Certificate, caKey crypto.Signer, config *CertCo
 
 // NewCSRAndKey generates a new key and CSR and that could be signed to create the given certificate
 func NewCSRAndKey(config *CertConfig) (*x509.CertificateRequest, crypto.Signer, error) {
-	key, err := NewPrivateKey(config.PublicKeyAlgorithm)
+	key, err := NewPrivateKey(config.EncryptionAlgorithm)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
@@ -623,8 +623,8 @@ func EncodePublicKeyPEM(key crypto.PublicKey) ([]byte, error) {
 // NewPrivateKey returns a new private key.
 var NewPrivateKey = GeneratePrivateKey
 
-func GeneratePrivateKey(keyType x509.PublicKeyAlgorithm) (crypto.Signer, error) {
-	if keyType == x509.ECDSA {
+func GeneratePrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Signer, error) {
+	if keyType == kubeadmapi.EncryptionAlgorithmECDSA {
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	}
 

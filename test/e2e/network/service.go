@@ -772,7 +772,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Kubernetes Service
 		Description: By default when a kubernetes cluster is running there MUST be a 'kubernetes' service running in the cluster.
 	*/
-	framework.ConformanceIt("should provide secure master service ", func(ctx context.Context) {
+	framework.ConformanceIt("should provide secure master service", func(ctx context.Context) {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch the service object for the service named kubernetes")
 	})
@@ -782,7 +782,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Service, endpoints
 		Description: Create a service with a endpoint without any Pods, the service MUST run and show empty endpoints. Add a pod to the service and the service MUST validate to show all the endpoints for the ports exposed by the Pod. Add another Pod then the list of all Ports exposed by both the Pods MUST be valid and have corresponding service endpoint. Once the second Pod is deleted then set of endpoint MUST be validated to show only ports from the first container that are exposed. Once both pods are deleted the endpoints from the service MUST be empty.
 	*/
-	framework.ConformanceIt("should serve a basic endpoint from pods ", func(ctx context.Context) {
+	framework.ConformanceIt("should serve a basic endpoint from pods", func(ctx context.Context) {
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -843,7 +843,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Service, endpoints with multiple ports
 		Description: Create a service with two ports but no Pods are added to the service yet.  The service MUST run and show empty set of endpoints. Add a Pod to the first port, service MUST list one endpoint for the Pod on that port. Add another Pod to the second port, service MUST list both the endpoints. Delete the first Pod and the service MUST list only the endpoint to the second Pod. Delete the second Pod and the service must now have empty set of endpoints.
 	*/
-	framework.ConformanceIt("should serve multiport endpoints from pods ", func(ctx context.Context) {
+	framework.ConformanceIt("should serve multiport endpoints from pods", func(ctx context.Context) {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
 		ns := f.Namespace.Name
@@ -1401,7 +1401,7 @@ var _ = common.SIGDescribe("Services", func() {
 		gomega.Expect(nodePortCounts).To(gomega.Equal(2), "updated service should have two Ports but found %d Ports", nodePortCounts)
 
 		for _, port := range nodePortService.Spec.Ports {
-			framework.ExpectNotEqual(port.NodePort, 0, "NodePort service failed to allocate NodePort for Port %s", port.Name)
+			gomega.Expect(port.NodePort).ToNot(gomega.BeZero(), "NodePort service failed to allocate NodePort for Port %s", port.Name)
 			framework.Logf("NodePort service allocates NodePort: %d for Port: %s over Protocol: %s", port.NodePort, port.Name, port.Protocol)
 		}
 	})
@@ -2139,15 +2139,15 @@ var _ = common.SIGDescribe("Services", func() {
 		for i := 0; i < 5; i++ {
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress0)
 			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to NodePort address")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to NodePort address")
 
 			time.Sleep(5 * time.Second)
 		}
@@ -2529,7 +2529,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 	})
 
@@ -2599,7 +2599,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 	})
 
@@ -2672,7 +2672,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 
 		ginkgo.By("Creating 2 pause hostNetwork pods that will try to connect to the webserver")
@@ -2701,7 +2701,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod3.Namespace, pausePod3.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 		}
 	})
 
@@ -2943,7 +2943,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
 
 			time.Sleep(5 * time.Second)
 		}
@@ -3099,7 +3099,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// connections are neither internal nor external and always get Cluster traffic policy.
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
-			framework.ExpectError(err, "expected error when trying to connect to node port for pausePod0")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to node port for pausePod0")
 
 			execHostnameTest(*pausePod0, nodePortAddress0, webserverPod0.Name)
 			execHostnameTest(*pausePod1, nodePortAddress0, webserverPod0.Name)
@@ -3311,7 +3311,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("fetching the Endpoint")
 		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
-		framework.ExpectError(err, "should not be able to fetch Endpoint")
+		gomega.Expect(err).To(gomega.HaveOccurred(), "should not be able to fetch Endpoint")
 	})
 
 	/*

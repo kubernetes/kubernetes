@@ -77,6 +77,96 @@ func (lazy *lazyAccept) String() string {
 	return "unknown"
 }
 
+// lazyAPIGroup implements String() string and it will
+// lazily get Group from request info.
+type lazyAPIGroup struct {
+	req *http.Request
+}
+
+func (lazy *lazyAPIGroup) String() string {
+	if lazy.req != nil {
+		ctx := lazy.req.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if ok {
+			return requestInfo.APIGroup
+		}
+	}
+
+	return "unknown"
+}
+
+// lazyAPIVersion implements String() string and it will
+// lazily get Group from request info.
+type lazyAPIVersion struct {
+	req *http.Request
+}
+
+func (lazy *lazyAPIVersion) String() string {
+	if lazy.req != nil {
+		ctx := lazy.req.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if ok {
+			return requestInfo.APIVersion
+		}
+	}
+
+	return "unknown"
+}
+
+// lazyName implements String() string and it will
+// lazily get Group from request info.
+type lazyName struct {
+	req *http.Request
+}
+
+func (lazy *lazyName) String() string {
+	if lazy.req != nil {
+		ctx := lazy.req.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if ok {
+			return requestInfo.Name
+		}
+	}
+
+	return "unknown"
+}
+
+// lazySubresource implements String() string and it will
+// lazily get Group from request info.
+type lazySubresource struct {
+	req *http.Request
+}
+
+func (lazy *lazySubresource) String() string {
+	if lazy.req != nil {
+		ctx := lazy.req.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if ok {
+			return requestInfo.Subresource
+		}
+	}
+
+	return "unknown"
+}
+
+// lazyNamespace implements String() string and it will
+// lazily get Group from request info.
+type lazyNamespace struct {
+	req *http.Request
+}
+
+func (lazy *lazyNamespace) String() string {
+	if lazy.req != nil {
+		ctx := lazy.req.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if ok {
+			return requestInfo.Namespace
+		}
+	}
+
+	return "unknown"
+}
+
 // lazyAuditID implements Stringer interface to lazily retrieve
 // the audit ID associated with the request.
 type lazyAuditID struct {

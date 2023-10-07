@@ -104,7 +104,7 @@ type TestPlugin struct {
 	name string
 }
 
-func newTestPlugin(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+func newTestPlugin(_ context.Context, injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
 	return &TestPlugin{name: "test-plugin"}, nil
 }
 
@@ -1066,7 +1066,7 @@ func TestDryRunPreemption(t *testing.T) {
 			registeredPlugins := append([]tf.RegisterPluginFunc{
 				tf.RegisterFilterPlugin(
 					"FakeFilter",
-					func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 						return &fakePlugin, nil
 					},
 				)},

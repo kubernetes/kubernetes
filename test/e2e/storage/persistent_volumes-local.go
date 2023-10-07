@@ -150,7 +150,7 @@ var (
 		Level: "s0:c0,c1"}
 )
 
-var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
+var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

@@ -452,8 +452,7 @@ func (*foo) Name() string {
 	return "Foo"
 }
 
-// newFoo creates a new instance of the foo plugin.
-func newFoo(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newFoo(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &foo{}, nil
 }
 

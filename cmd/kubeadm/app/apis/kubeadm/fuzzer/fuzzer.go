@@ -91,6 +91,7 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.Scheduler.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.Etcd.Local.ExtraEnvs = []kubeadm.EnvVar{}
+	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {

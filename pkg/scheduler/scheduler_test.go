@@ -54,7 +54,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSchedulerCreation(t *testing.T) {
@@ -438,7 +438,7 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 		},
 		{
 			name:                           "percentageOfNodesScore is not nil",
-			percentageOfNodesToScoreConfig: pointer.Int32(10),
+			percentageOfNodesToScoreConfig: ptr.To[int32](10),
 			wantedPercentageOfNodesToScore: 10,
 		},
 	}
@@ -538,7 +538,7 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 		{
 			name: "register indexer, no conflicts",
 			entrypoints: map[string]frameworkruntime.PluginFactory{
-				"AddIndexer": func(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 						"nodeName": indexByPodSpecNodeName,
@@ -551,14 +551,14 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 			name: "register the same indexer name multiple times, conflict",
 			// order of registration doesn't matter
 			entrypoints: map[string]frameworkruntime.PluginFactory{
-				"AddIndexer1": func(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer1": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 						"nodeName": indexByPodSpecNodeName,
 					})
 					return &TestPlugin{name: "AddIndexer1"}, err
 				},
-				"AddIndexer2": func(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer2": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 						"nodeName": indexByPodAnnotationNodeName,
@@ -572,14 +572,14 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 			name: "register the same indexer body with different names, no conflicts",
 			// order of registration doesn't matter
 			entrypoints: map[string]frameworkruntime.PluginFactory{
-				"AddIndexer1": func(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer1": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 						"nodeName1": indexByPodSpecNodeName,
 					})
 					return &TestPlugin{name: "AddIndexer1"}, err
 				},
-				"AddIndexer2": func(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer2": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
 						"nodeName2": indexByPodAnnotationNodeName,
@@ -819,13 +819,15 @@ func Test_buildQueueingHintMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, !tt.featuregateDisabled)()
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			registry := frameworkruntime.Registry{}
 			cfgPls := &schedulerapi.Plugins{}
 			plugins := append(tt.plugins, &fakebindPlugin{}, &fakeQueueSortPlugin{})
 			for _, pl := range plugins {
 				tmpPl := pl
-				if err := registry.Register(pl.Name(), func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 					return tmpPl, nil
 				}); err != nil {
 					t.Fatalf("fail to register filter plugin (%s)", pl.Name())
@@ -834,9 +836,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			}
 
 			profile := schedulerapi.KubeSchedulerProfile{Plugins: cfgPls}
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			fwk, err := newFramework(registry, profile, stopCh)
+			fwk, err := newFramework(ctx, registry, profile)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -864,8 +864,10 @@ func Test_buildQueueingHintMap(t *testing.T) {
 						t.Errorf("got plugin name %v, want %v", fn.PluginName, wantfns[i].PluginName)
 						continue
 					}
-					if fn.QueueingHintFn(logger, nil, nil, nil) != wantfns[i].QueueingHintFn(logger, nil, nil, nil) {
-						t.Errorf("got queueing hint function (%v) returning %v, expect it to return %v", fn.PluginName, fn.QueueingHintFn(logger, nil, nil, nil), wantfns[i].QueueingHintFn(logger, nil, nil, nil))
+					got, gotErr := fn.QueueingHintFn(logger, nil, nil, nil)
+					want, wantErr := wantfns[i].QueueingHintFn(logger, nil, nil, nil)
+					if got != want || gotErr != wantErr {
+						t.Errorf("got queueing hint function (%v) returning (%v, %v), expect it to return (%v, %v)", fn.PluginName, got, gotErr, want, wantErr)
 						continue
 					}
 				}
@@ -1010,13 +1012,16 @@ func Test_UnionedGVKs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			registry := plugins.NewInTreeRegistry()
 
 			cfgPls := &schedulerapi.Plugins{MultiPoint: tt.plugins}
 			plugins := []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}, &fakeNoopPlugin{}, &fakeNoopRuntimePlugin{}, &fakeQueueSortPlugin{}, &fakebindPlugin{}}
 			for _, pl := range plugins {
 				tmpPl := pl
-				if err := registry.Register(pl.Name(), func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 					return tmpPl, nil
 				}); err != nil {
 					t.Fatalf("fail to register filter plugin (%s)", pl.Name())
@@ -1024,9 +1029,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			}
 
 			profile := schedulerapi.KubeSchedulerProfile{Plugins: cfgPls, PluginConfig: defaults.PluginConfigsV1}
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			fwk, err := newFramework(registry, profile, stopCh)
+			fwk, err := newFramework(ctx, registry, profile)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1043,8 +1046,8 @@ func Test_UnionedGVKs(t *testing.T) {
 	}
 }
 
-func newFramework(r frameworkruntime.Registry, profile schedulerapi.KubeSchedulerProfile, stopCh <-chan struct{}) (framework.Framework, error) {
-	return frameworkruntime.NewFramework(context.Background(), r, &profile,
+func newFramework(ctx context.Context, r frameworkruntime.Registry, profile schedulerapi.KubeSchedulerProfile) (framework.Framework, error) {
+	return frameworkruntime.NewFramework(ctx, r, &profile,
 		frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(nil, nil)),
 		frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)),
 	)
@@ -1089,8 +1092,8 @@ var hintFromFakeNode = framework.QueueingHint(100)
 
 type fakeNodePlugin struct{}
 
-var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) framework.QueueingHint {
-	return hintFromFakeNode
+var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
+	return hintFromFakeNode, nil
 }
 
 func (*fakeNodePlugin) Name() string { return fakeNode }
@@ -1099,7 +1102,7 @@ func (*fakeNodePlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.
 	return nil
 }
 
-func (*fakeNodePlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *fakeNodePlugin) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}, QueueingHintFn: fakeNodePluginQueueingFn},
 	}
@@ -1109,8 +1112,8 @@ var hintFromFakePod = framework.QueueingHint(101)
 
 type fakePodPlugin struct{}
 
-var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) framework.QueueingHint {
-	return hintFromFakePod
+var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
+	return hintFromFakePod, nil
 }
 
 func (*fakePodPlugin) Name() string { return fakePod }
@@ -1119,7 +1122,7 @@ func (*fakePodPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.P
 	return nil
 }
 
-func (*fakePodPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *fakePodPlugin) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add}, QueueingHintFn: fakePodPluginQueueingFn},
 	}

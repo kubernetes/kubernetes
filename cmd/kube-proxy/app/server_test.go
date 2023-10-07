@@ -36,7 +36,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // TestLoadConfig tests proper operation of loadConfig()
@@ -195,8 +195,8 @@ nodePortAddresses:
 			ClusterCIDR:      tc.clusterCIDR,
 			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            pointer.Int32(2),
-				Min:                   pointer.Int32(1),
+				MaxPerCore:            ptr.To[int32](2),
+				Min:                   ptr.To[int32](1),
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
 			},
@@ -205,8 +205,8 @@ nodePortAddresses:
 			HostnameOverride:   "foo",
 			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeAll:      true,
-				MasqueradeBit:      pointer.Int32(17),
-				LocalhostNodePorts: pointer.Bool(true),
+				MasqueradeBit:      ptr.To[int32](17),
+				LocalhostNodePorts: ptr.To(true),
 				MinSyncPeriod:      metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:         metav1.Duration{Duration: 60 * time.Second},
 			},
@@ -217,7 +217,7 @@ nodePortAddresses:
 			},
 			MetricsBindAddress: tc.metricsBindAddress,
 			Mode:               kubeproxyconfig.ProxyMode(tc.mode),
-			OOMScoreAdj:        pointer.Int32(17),
+			OOMScoreAdj:        ptr.To[int32](17),
 			PortRange:          "2-7",
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 			DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
@@ -821,11 +821,12 @@ func Test_detectNodeIPs(t *testing.T) {
 // Tests IP configuration validation in various proxy setups.
 func Test_checkIPConfig(t *testing.T) {
 	cases := []struct {
-		name  string
-		proxy *ProxyServer
-		ssErr bool
-		dsErr bool
-		fatal bool
+		name    string
+		proxy   *ProxyServer
+		ssErr   bool
+		ssFatal bool
+		dsErr   bool
+		dsFatal bool
 	}{
 		{
 			name: "empty config",
@@ -878,9 +879,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   true,
+			dsFatal: false,
 		},
 		{
 			name: "wrong-family clusterCIDR when using ClusterCIDR LocalDetector",
@@ -891,9 +893,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: true,
+			ssErr:   true,
+			ssFatal: true,
+			dsErr:   true,
+			dsFatal: false,
 		},
 
 		{
@@ -937,9 +940,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   true,
+			dsFatal: false,
 		},
 
 		{
@@ -987,9 +991,10 @@ func Test_checkIPConfig(t *testing.T) {
 				PrimaryIPFamily: v1.IPv4Protocol,
 				podCIDRs:        []string{"fd01:2345::/64"},
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: true,
+			ssErr:   true,
+			ssFatal: true,
+			dsErr:   true,
+			dsFatal: true,
 		},
 
 		{
@@ -1015,9 +1020,10 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
-			ssErr: true,
-			dsErr: true,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   true,
+			dsFatal: false,
 		},
 
 		{
@@ -1061,9 +1067,9 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
-			ssErr: true,
-			dsErr: false,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   false,
 		},
 
 		{
@@ -1089,9 +1095,9 @@ func Test_checkIPConfig(t *testing.T) {
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
 			},
-			ssErr: true,
-			dsErr: false,
-			fatal: false,
+			ssErr:   true,
+			ssFatal: false,
+			dsErr:   false,
 		},
 	}
 
@@ -1102,8 +1108,8 @@ func Test_checkIPConfig(t *testing.T) {
 				t.Errorf("unexpected error in single-stack case: %v", err)
 			} else if err == nil && c.ssErr {
 				t.Errorf("unexpected lack of error in single-stack case")
-			} else if fatal != c.fatal {
-				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			} else if fatal != c.ssFatal {
+				t.Errorf("expected fatal=%v, got %v", c.ssFatal, fatal)
 			}
 
 			err, fatal = checkIPConfig(c.proxy, true)
@@ -1111,8 +1117,8 @@ func Test_checkIPConfig(t *testing.T) {
 				t.Errorf("unexpected error in dual-stack case: %v", err)
 			} else if err == nil && c.dsErr {
 				t.Errorf("unexpected lack of error in dual-stack case")
-			} else if fatal != c.fatal {
-				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			} else if fatal != c.dsFatal {
+				t.Errorf("expected fatal=%v, got %v", c.dsFatal, fatal)
 			}
 		})
 	}

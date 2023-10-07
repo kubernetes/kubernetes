@@ -152,7 +152,7 @@ func BuildGenericConfig(
 		lastErr = fmt.Errorf("invalid authorization config: %v", err)
 		return
 	}
-	if !sets.NewString(s.Authorization.Modes...).Has(modes.ModeRBAC) {
+	if s.Authorization != nil && !sets.NewString(s.Authorization.Modes...).Has(modes.ModeRBAC) {
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
@@ -172,9 +172,15 @@ func BuildGenericConfig(
 	return
 }
 
-// BuildAuthorizer constructs the authorizer
+// BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, nil
 func BuildAuthorizer(s controlplaneapiserver.CompletedOptions, EgressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
-	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
+	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
+	if err != nil {
+		return nil, nil, err
+	}
+	if authorizationConfig == nil {
+		return nil, nil, nil
+	}
 
 	if EgressSelector != nil {
 		egressDialer, err := EgressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
@@ -196,7 +202,6 @@ func BuildPriorityAndFairness(s controlplaneapiserver.CompletedOptions, extclien
 		versionedInformer,
 		extclient.FlowcontrolV1beta3(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
-		s.GenericServerRunOptions.RequestTimeout/4,
 	), nil
 }
 

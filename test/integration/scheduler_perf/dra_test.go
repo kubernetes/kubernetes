@@ -216,7 +216,7 @@ func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ctx := klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA test driver"))
+		ctx := klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), op.DriverName))
 		controller.Run(ctx, 5 /* workers */)
 	}()
 	tb.Cleanup(func() {

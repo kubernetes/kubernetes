@@ -7,7 +7,7 @@ go 1.20
 require (
 	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/emicklei/go-restful/v3 v3.9.0
+	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gogo/protobuf v1.3.2
@@ -47,9 +47,9 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kms v0.0.0
-	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9
+	k8s.io/kube-openapi v0.0.0-20230905202853-d090da108d2f
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.28.0
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd
 	sigs.k8s.io/structured-merge-diff/v4 v4.3.0
 	sigs.k8s.io/yaml v1.3.0

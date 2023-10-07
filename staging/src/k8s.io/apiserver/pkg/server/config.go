@@ -915,7 +915,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(
 			c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount, workEstimatorCfg, c.FlowControl.GetMaxSeats)
 		handler = filterlatency.TrackCompleted(handler)
-		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, requestWorkEstimator)
+		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, requestWorkEstimator, c.RequestTimeout/4)
 		handler = filterlatency.TrackStarted(handler, c.TracerProvider, "priorityandfairness")
 	} else {
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
@@ -994,14 +994,10 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableMetrics {
 		if c.EnableProfiling {
 			routes.MetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
-			if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
-				slis.SLIMetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
-			}
+			slis.SLIMetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
 		} else {
 			routes.DefaultMetrics{}.Install(s.Handler.NonGoRestfulMux)
-			if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
-				slis.SLIMetrics{}.Install(s.Handler.NonGoRestfulMux)
-			}
+			slis.SLIMetrics{}.Install(s.Handler.NonGoRestfulMux)
 		}
 	}
 

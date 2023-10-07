@@ -94,18 +94,39 @@ func TestWatchList(t *testing.T) {
 			expectedStoreContent: []v1.Pod{*makePod("p1", "1")},
 		},
 		{
-			name: "returning any other error than apierrors.NewInvalid stops the reflector and reports the error",
+			name: "returning any other error than apierrors.NewInvalid forces fallback",
 			watchOptionsPredicate: func(options metav1.ListOptions) error {
-				return fmt.Errorf("dummy error")
+				if options.SendInitialEvents != nil && *options.SendInitialEvents {
+					return fmt.Errorf("dummy error")
+				}
+				return nil
 			},
-			expectedError:         fmt.Errorf("dummy error"),
-			expectedWatchRequests: 1,
-			expectedRequestOptions: []metav1.ListOptions{{
-				SendInitialEvents:    pointer.Bool(true),
-				AllowWatchBookmarks:  true,
-				ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
-				TimeoutSeconds:       pointer.Int64(1),
-			}},
+			podList: &v1.PodList{
+				ListMeta: metav1.ListMeta{ResourceVersion: "1"},
+				Items:    []v1.Pod{*makePod("p1", "1")},
+			},
+			closeAfterWatchEvents: 1,
+			watchEvents:           []watch.Event{{Type: watch.Added, Object: makePod("p2", "2")}},
+			expectedWatchRequests: 2,
+			expectedListRequests:  1,
+			expectedStoreContent:  []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
+			expectedRequestOptions: []metav1.ListOptions{
+				{
+					SendInitialEvents:    pointer.Bool(true),
+					AllowWatchBookmarks:  true,
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					TimeoutSeconds:       pointer.Int64(1),
+				},
+				{
+					ResourceVersion: "0",
+					Limit:           500,
+				},
+				{
+					AllowWatchBookmarks: true,
+					ResourceVersion:     "1",
+					TimeoutSeconds:      pointer.Int64(1),
+				},
+			},
 		},
 		{
 			name: "the reflector can fall back to old LIST/WATCH semantics when a server doesn't support streaming",
@@ -349,6 +370,27 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedStoreContent: []v1.Pod{*makePod("p1", "1"), *makePod("p3", "3")},
 			expectedError:        apierrors.NewResourceExpired("rv already expired"),
+		},
+		{
+			name:                  "prove that the reflector is checking the value of the initialEventsEnd annotation",
+			closeAfterWatchEvents: 3,
+			watchEvents: []watch.Event{
+				{Type: watch.Added, Object: makePod("p1", "1")},
+				{Type: watch.Added, Object: makePod("p2", "2")},
+				{Type: watch.Bookmark, Object: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						ResourceVersion: "2",
+						Annotations:     map[string]string{"k8s.io/initial-events-end": "false"},
+					},
+				}},
+			},
+			expectedWatchRequests: 1,
+			expectedRequestOptions: []metav1.ListOptions{{
+				SendInitialEvents:    pointer.Bool(true),
+				AllowWatchBookmarks:  true,
+				ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+				TimeoutSeconds:       pointer.Int64(1),
+			}},
 		},
 	}
 	for _, s := range scenarios {

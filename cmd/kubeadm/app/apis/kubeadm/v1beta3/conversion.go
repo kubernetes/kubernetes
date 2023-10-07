@@ -38,7 +38,24 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 		return err
 	}
 	err = Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(&ClusterConfiguration{}, &out.ClusterConfiguration, s)
+	// Required to pass fuzzer tests. This ClusterConfiguration is empty and is never defaulted.
+	// If we call Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration() it will receive
+	// a default value, thus here we need to reset it back to "".
+	out.EncryptionAlgorithm = ""
 	return err
+}
+
+// Convert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration is required due to missing EncryptionAlgorithm in v1beta3.
+func Convert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in *kubeadm.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+	return autoConvert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in, out, s)
+}
+
+// Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration is required due to missing EncryptionAlgorithm in v1beta3.
+func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	// Required to pass validation and fuzzer tests. The field is missing in v1beta3, thus we have to
+	// default it to a sane (default) value in the internal type.
+	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA
+	return autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
 
 // Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent is required due to the missing ControlPlaneComponent.ExtraEnvs in v1beta3.

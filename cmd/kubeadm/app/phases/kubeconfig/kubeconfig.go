@@ -482,7 +482,7 @@ func createKubeConfigAndCSR(kubeConfigDir string, kubeadmConfig *kubeadmapi.Init
 
 	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec, nil)
 
-	clientKey, err := pkiutil.NewPrivateKey(clientCertConfig.PublicKeyAlgorithm)
+	clientKey, err := pkiutil.NewPrivateKey(clientCertConfig.EncryptionAlgorithm)
 	if err != nil {
 		return err
 	}

@@ -56,7 +56,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			Create the custom resource definition and then delete it. The creation and deletion MUST
 			be successful.
 		*/
-		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func(ctx context.Context) {
+		framework.ConformanceIt("creating/deleting custom resource definition objects works", func(ctx context.Context) {
 
 			config, err := framework.LoadConfig()
 			framework.ExpectNoError(err, "loading config")
@@ -83,7 +83,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			custom resource definitions via delete collection; the delete MUST be successful and MUST delete only the
 			labeled custom resource definitions.
 		*/
-		framework.ConformanceIt("listing custom resource definition objects works ", func(ctx context.Context) {
+		framework.ConformanceIt("listing custom resource definition objects works", func(ctx context.Context) {
 			testListSize := 10
 			config, err := framework.LoadConfig()
 			framework.ExpectNoError(err, "loading config")
@@ -143,7 +143,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			Description: Create a custom resource definition. Attempt to read, update and patch its status sub-resource;
 			all mutating sub-resource operations MUST be visible to subsequent reads.
 		*/
-		framework.ConformanceIt("getting/updating/patching custom resource definition status sub-resource works ", func(ctx context.Context) {
+		framework.ConformanceIt("getting/updating/patching custom resource definition status sub-resource works", func(ctx context.Context) {
 			config, err := framework.LoadConfig()
 			framework.ExpectNoError(err, "loading config")
 			apiExtensionClient, err := clientset.NewForConfig(config)
@@ -267,7 +267,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		the default is applied. Create another CR. Remove default, add default for another field and read CR until
 		new field is defaulted, but old default stays.
 	*/
-	framework.ConformanceIt("custom resource defaulting for requests and from storage works ", func(ctx context.Context) {
+	framework.ConformanceIt("custom resource defaulting for requests and from storage works", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "loading config")
 		apiExtensionClient, err := clientset.NewForConfig(config)

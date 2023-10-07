@@ -92,9 +92,9 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 		})
 
 		ginkgo.It("should report admission failures when the topology manager alignment is known to fail", func(ctx context.Context) {
@@ -118,9 +118,9 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 		})
 
 		ginkgo.It("should not report any admission failures when the topology manager alignment is expected to succeed", func(ctx context.Context) {
@@ -144,9 +144,9 @@ var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
-			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Eventually(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
-			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			gomega.Consistently(ctx, getKubeletMetrics, 2*time.Minute, 10*time.Second).Should(matchResourceMetrics)
 		})
 	})
 })
