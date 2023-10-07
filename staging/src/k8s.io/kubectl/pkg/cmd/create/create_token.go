@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +46,9 @@ type TokenOptions struct {
 	// PrintFlags holds options necessary for obtaining a printer
 	PrintFlags *genericclioptions.PrintFlags
 	PrintObj   func(obj runtime.Object) error
+
+	// Flags hold the parsed CLI flags.
+	Flags *pflag.FlagSet
 
 	// Name and namespace of service account to create a token for
 	Name      string
@@ -137,7 +141,7 @@ func NewCmdCreateToken(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) 
 
 	cmd.Flags().StringArrayVar(&o.Audiences, "audience", o.Audiences, "Audience of the requested token. If unset, defaults to requesting a token for use with the Kubernetes API server. May be repeated to request a token valid for multiple audiences.")
 
-	cmd.Flags().DurationVar(&o.Duration, "duration", o.Duration, "Requested lifetime of the issued token. The server may return a token with a longer or shorter lifetime.")
+	cmd.Flags().DurationVar(&o.Duration, "duration", o.Duration, "Requested lifetime of the issued token. If not set, the lifetime will be determined by the server automatically. The server may return a token with a longer or shorter lifetime.")
 
 	cmd.Flags().StringVar(&o.BoundObjectKind, "bound-object-kind", o.BoundObjectKind, "Kind of an object to bind the token to. "+
 		"Supported kinds are "+strings.Join(sets.StringKeySet(boundObjectKindToAPIVersion).List(), ", ")+". "+
@@ -148,6 +152,8 @@ func NewCmdCreateToken(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) 
 	cmd.Flags().StringVar(&o.BoundObjectUID, "bound-object-uid", o.BoundObjectUID, "UID of an object to bind the token to. "+
 		"Requires --bound-object-kind and --bound-object-name. "+
 		"If unset, the UID of the existing object is used.")
+
+	o.Flags = cmd.Flags()
 
 	return cmd
 }
@@ -195,7 +201,7 @@ func (o *TokenOptions) Validate() error {
 	if len(o.Namespace) == 0 {
 		return fmt.Errorf("--namespace is required")
 	}
-	if o.Duration < 0 {
+	if o.Duration < 0 || (o.Duration == 0 && o.Flags.Changed("duration")) {
 		return fmt.Errorf("--duration must be positive")
 	}
 	if o.Duration%time.Second != 0 {
