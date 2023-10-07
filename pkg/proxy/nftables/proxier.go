@@ -65,6 +65,9 @@ const (
 	kubeServicesChain  = "services"
 	kubeNodePortsChain = "nodeports"
 
+	// set of IPs that accept NodePort traffic
+	kubeNodePortIPsSet = "nodeport-ips"
+
 	// handling for services with no endpoints
 	kubeServicesFilterChain   = "services-filter"
 	kubeExternalServicesChain = "external-services"
@@ -365,6 +368,11 @@ func ensureChain(chain string, tx *knftables.Transaction, createdChains sets.Set
 }
 
 func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
+	ipvX_addr := "ipv4_addr" //nolint:stylecheck // var name intentionally resembles value
+	if proxier.ipFamily == v1.IPv6Protocol {
+		ipvX_addr = "ipv6_addr"
+	}
+
 	tx.Add(&knftables.Table{
 		Comment: ptr.To("rules for kube-proxy"),
 	})
@@ -434,6 +442,40 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 			Chain: kubeForwardChain,
 			Rule:  "ct state invalid drop",
 		})
+	}
+
+	// Fill in nodeport-ips set if needed (or delete it if not). (We do "add+delete"
+	// rather than just "delete" when we want to ensure the set doesn't exist, because
+	// doing just "delete" would return an error if the set didn't exist.)
+	tx.Add(&knftables.Set{
+		Name:    kubeNodePortIPsSet,
+		Type:    ipvX_addr,
+		Comment: ptr.To("IPs that accept NodePort traffic"),
+	})
+	if proxier.nodePortAddresses.MatchAll() {
+		tx.Delete(&knftables.Set{
+			Name: kubeNodePortIPsSet,
+		})
+	} else {
+		tx.Flush(&knftables.Set{
+			Name: kubeNodePortIPsSet,
+		})
+		nodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
+		if err != nil {
+			klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
+		}
+		for _, ip := range nodeIPs {
+			if ip.IsLoopback() {
+				klog.ErrorS(nil, "--nodeport-addresses includes localhost but localhost NodePorts are not supported", "address", ip.String())
+				continue
+			}
+			tx.Add(&knftables.Element{
+				Set: kubeNodePortIPsSet,
+				Key: []string{
+					ip.String(),
+				},
+			})
+		}
 	}
 }
 
@@ -1343,26 +1385,14 @@ func (proxier *Proxier) syncProxyRules() {
 			Comment: ptr.To("kubernetes service nodeports; NOTE: this must be the last rule in this chain"),
 		})
 	} else {
-		nodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
-		if err != nil {
-			klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
-		}
-		for _, ip := range nodeIPs {
-			if ip.IsLoopback() {
-				klog.ErrorS(nil, "--nodeport-addresses includes localhost but localhost NodePorts are not supported", "address", ip.String())
-				continue
-			}
-
-			// create nodeport rules for each IP one by one
-			tx.Add(&knftables.Rule{
-				Chain: kubeServicesChain,
-				Rule: knftables.Concat(
-					ipX, "daddr", ip,
-					"jump", kubeNodePortsChain,
-				),
-				Comment: ptr.To("kubernetes service nodeports; NOTE: this must be the last rule in this chain"),
-			})
-		}
+		tx.Add(&knftables.Rule{
+			Chain: kubeServicesChain,
+			Rule: knftables.Concat(
+				ipX, "daddr", "@", kubeNodePortIPsSet,
+				"jump", kubeNodePortsChain,
+			),
+			Comment: ptr.To("kubernetes service nodeports; NOTE: this must be the last rule in this chain"),
+		})
 	}
 
 	// Figure out which chains are now stale. Unfortunately, we can't delete them

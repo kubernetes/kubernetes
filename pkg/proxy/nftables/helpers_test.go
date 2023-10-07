@@ -221,6 +221,17 @@ func (tracer *nftablesTracer) addressMatches(ipStr, not, ruleAddress string) boo
 	}
 }
 
+// matchDestIPOnly checks an "ip daddr" against a set/map, and returns the matching
+// Element, if found.
+func (tracer *nftablesTracer) matchDestIPOnly(elements []*knftables.Element, destIP string) *knftables.Element {
+	for _, element := range elements {
+		if element.Key[0] == destIP {
+			return element
+		}
+	}
+	return nil
+}
+
 // We intentionally don't try to parse arbitrary nftables rules, as the syntax is quite
 // complicated and context sensitive. (E.g., "ip daddr" could be the start of an address
 // comparison, or it could be the start of a set/map lookup.) Instead, we just have
@@ -235,6 +246,7 @@ func (tracer *nftablesTracer) addressMatches(ipStr, not, ruleAddress string) boo
 var destAddrRegexp = regexp.MustCompile(`^ip6* daddr (!= )?(\S+)`)
 var destAddrLocalRegexp = regexp.MustCompile(`^fib daddr type local`)
 var destPortRegexp = regexp.MustCompile(`^(tcp|udp|sctp) dport (\d+)`)
+var destIPOnlyLookupRegexp = regexp.MustCompile(`^ip6* daddr @(\S+)`)
 
 var sourceAddrRegexp = regexp.MustCompile(`^ip6* saddr (!= )?(\S+)`)
 var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
@@ -287,6 +299,17 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 			// thing with it.
 
 			switch {
+			case destIPOnlyLookupRegexp.MatchString(rule):
+				// `^ip6* daddr @(\S+)`
+				// Tests whether destIP is a member of the indicated set.
+				match := destIPOnlyLookupRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				set := match[1]
+				if tracer.matchDestIPOnly(tracer.nft.Table.Sets[set].Elements, destIP) == nil {
+					rule = ""
+					break
+				}
+
 			case destAddrRegexp.MatchString(rule):
 				// `^ip6* daddr (!= )?(\S+)`
 				// Tests whether destIP does/doesn't match a literal.
