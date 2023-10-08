@@ -353,21 +353,6 @@ func unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete []*discovery
 	return unchangedSlices
 }
 
-// hintsEnabled returns true if the provided annotations include either
-// v1.AnnotationTopologyMode or v1.DeprecatedAnnotationTopologyAwareHints key
-// with a value set to "Auto" or "auto". When both are set,
-// v1.DeprecatedAnnotationTopologyAwareHints has precedence.
-func hintsEnabled(annotations map[string]string) bool {
-	val, ok := annotations[v1.DeprecatedAnnotationTopologyAwareHints]
-	if !ok {
-		val, ok = annotations[v1.AnnotationTopologyMode]
-		if !ok {
-			return false
-		}
-	}
-	return val == "Auto" || val == "auto"
-}
-
 // isServiceIPSet aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 // copied from k8s.io/kubernetes/pkg/apis/core/v1/helper

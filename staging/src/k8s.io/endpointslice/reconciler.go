@@ -34,7 +34,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/endpointslice/metrics"
-	"k8s.io/endpointslice/topologycache"
+	"k8s.io/endpointslice/topologyheuristics"
 	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2"
 )
@@ -47,9 +47,9 @@ type Reconciler struct {
 	maxEndpointsPerSlice int32
 	endpointSliceTracker *endpointsliceutil.EndpointSliceTracker
 	metricsCache         *metrics.Cache
-	// topologyCache tracks the distribution of Nodes and endpoints across zones
-	// to enable TopologyAwareHints.
-	topologyCache *topologycache.TopologyCache
+	// topologyHeuristicsManager manages multiple heuristics that provide topology
+	// hints for EndpointSlices.
+	topologyHeuristicsManager *topologyheuristics.Manager
 	// eventRecorder allows Reconciler to record and publish events.
 	eventRecorder  record.EventRecorder
 	controllerName string
@@ -81,12 +81,12 @@ func (r *Reconciler) Reconcile(logger klog.Logger, service *corev1.Service, pods
 	for _, existingSlice := range existingSlices {
 		// service no longer supports that address type, add it to deleted slices
 		if !serviceSupportedAddressesTypes.Has(existingSlice.AddressType) {
-			if r.topologyCache != nil {
+			if r.topologyHeuristicsManager != nil {
 				svcKey, err := ServiceControllerKey(existingSlice)
 				if err != nil {
 					logger.Info("Couldn't get key to remove EndpointSlice from topology cache", "existingSlice", existingSlice, "err", err)
 				} else {
-					r.topologyCache.RemoveHints(svcKey, existingSlice.AddressType)
+					r.topologyHeuristicsManager.ClearCachedHints(logger, svcKey, existingSlice.AddressType)
 				}
 			}
 
@@ -136,7 +136,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 	slicesToCreate := []*discovery.EndpointSlice{}
 	slicesToUpdate := []*discovery.EndpointSlice{}
 	slicesToDelete := []*discovery.EndpointSlice{}
-	events := []*topologycache.EventBuilder{}
+	events := []*topologyheuristics.EventBuilder{}
 
 	// Build data structures for existing state.
 	existingSlicesByPortMap := map[endpointsliceutil.PortMapKey][]*discovery.EndpointSlice{}
@@ -253,7 +253,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 	// Topology hints are assigned per address type. This means it is
 	// theoretically possible for endpoints of one address type to be assigned
 	// hints while another endpoints of another address type are not.
-	si := &topologycache.SliceInfo{
+	si := &topologyheuristics.SliceInfo{
 		ServiceKey:  fmt.Sprintf("%s/%s", service.Namespace, service.Name),
 		AddressType: addressType,
 		ToCreate:    slicesToCreate,
@@ -261,21 +261,14 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 		Unchanged:   unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete),
 	}
 
-	if r.topologyCache != nil && hintsEnabled(service.Annotations) {
-		slicesToCreate, slicesToUpdate, events = r.topologyCache.AddHints(logger, si)
+	_, hintsEnabled := topologyheuristics.HeuristicNameFromAnnotations(service.Annotations)
+	if r.topologyHeuristicsManager != nil && hintsEnabled {
+		slicesToCreate, slicesToUpdate, events = r.topologyHeuristicsManager.PopulateHints(logger, service, si)
 	} else {
-		if r.topologyCache != nil {
-			if r.topologyCache.HasPopulatedHints(si.ServiceKey) {
-				logger.Info("TopologyAwareHints annotation has changed, removing hints", "serviceKey", si.ServiceKey, "addressType", si.AddressType)
-				events = append(events, &topologycache.EventBuilder{
-					EventType: corev1.EventTypeWarning,
-					Reason:    "TopologyAwareHintsDisabled",
-					Message:   topologycache.FormatWithAddressType(topologycache.TopologyAwareHintsDisabled, si.AddressType),
-				})
-			}
-			r.topologyCache.RemoveHints(si.ServiceKey, addressType)
+		if r.topologyHeuristicsManager != nil {
+			events = r.topologyHeuristicsManager.ClearCachedHints(logger, si.ServiceKey, addressType)
 		}
-		slicesToCreate, slicesToUpdate = topologycache.RemoveHintsFromSlices(si)
+		slicesToCreate, slicesToUpdate = topologyheuristics.RemoveHintsFromSlices(si)
 	}
 	err := r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)
 	if err != nil {
@@ -288,16 +281,16 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 
 }
 
-func NewReconciler(client clientset.Interface, nodeLister corelisters.NodeLister, maxEndpointsPerSlice int32, endpointSliceTracker *endpointsliceutil.EndpointSliceTracker, topologyCache *topologycache.TopologyCache, eventRecorder record.EventRecorder, controllerName string) *Reconciler {
+func NewReconciler(client clientset.Interface, nodeLister corelisters.NodeLister, maxEndpointsPerSlice int32, endpointSliceTracker *endpointsliceutil.EndpointSliceTracker, topologyHeuristicsManager *topologyheuristics.Manager, eventRecorder record.EventRecorder, controllerName string) *Reconciler {
 	return &Reconciler{
-		client:               client,
-		nodeLister:           nodeLister,
-		maxEndpointsPerSlice: maxEndpointsPerSlice,
-		endpointSliceTracker: endpointSliceTracker,
-		metricsCache:         metrics.NewCache(maxEndpointsPerSlice),
-		topologyCache:        topologyCache,
-		eventRecorder:        eventRecorder,
-		controllerName:       controllerName,
+		client:                    client,
+		nodeLister:                nodeLister,
+		maxEndpointsPerSlice:      maxEndpointsPerSlice,
+		endpointSliceTracker:      endpointSliceTracker,
+		metricsCache:              metrics.NewCache(maxEndpointsPerSlice),
+		topologyHeuristicsManager: topologyHeuristicsManager,
+		eventRecorder:             eventRecorder,
+		controllerName:            controllerName,
 	}
 }
 
@@ -398,8 +391,9 @@ func (r *Reconciler) finalize(
 	}
 
 	topologyLabel := "Disabled"
-	if r.topologyCache != nil && hintsEnabled(service.Annotations) {
-		topologyLabel = "Auto"
+	topologyName, _ := topologyheuristics.HeuristicNameFromAnnotations(service.Annotations)
+	if r.topologyHeuristicsManager != nil && r.topologyHeuristicsManager.RecognizableHeuristic(topologyName) {
+		topologyLabel = topologyName
 	}
 
 	numSlicesChanged := len(slicesToCreate) + len(slicesToUpdate) + len(slicesToDelete)

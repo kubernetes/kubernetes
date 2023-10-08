@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/endpointslice/metrics"
-	"k8s.io/endpointslice/topologycache"
+	"k8s.io/endpointslice/topologyheuristics"
 	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/pointer"
@@ -714,7 +714,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 	endpointSlices := fetchEndpointSlices(t, client, namespace)
 	for _, endpointSlice := range endpointSlices {
 		for i, endpoint := range endpointSlice.Endpoints {
-			if !topologycache.EndpointReady(endpoint) {
+			if !topologyheuristics.EndpointReady(endpoint) {
 				t.Errorf("Expected endpoints[%d] to be ready", i)
 			}
 		}
@@ -1703,7 +1703,7 @@ func TestReconcilerPodMissingNode(t *testing.T) {
 	}
 }
 
-func TestReconcileTopology(t *testing.T) {
+func TestReconcileTopologyHints(t *testing.T) {
 	ns := "testing"
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", ns)
 
@@ -1771,42 +1771,43 @@ func TestReconcileTopology(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                   string
-		topologyCacheEnabled   bool
-		hintsAnnotation        string
-		existingSlices         []*discovery.EndpointSlice
-		pods                   []*corev1.Pod
-		nodes                  []*corev1.Node
-		expectedHints          map[string]int
-		expectedCrossZoneHints int
-		expectedMetrics        expectedMetrics
+		name                             string
+		topologyHeuristicsManagerEnabled bool
+		hintsAnnotation                  string
+		existingSlices                   []*discovery.EndpointSlice
+		pods                             []*corev1.Pod
+		nodes                            []*corev1.Node
+		expectedHints                    map[string]int
+		expectedCrossZoneHints           int
+		expectedMetrics                  expectedMetrics
 	}{{
-		name:                   "no change, topologyCache disabled, annotation == auto",
-		topologyCacheEnabled:   false,
-		hintsAnnotation:        "auto",
-		existingSlices:         []*discovery.EndpointSlice{slicesByName["zone-c"]},
-		pods:                   slicePods["zone-c"],
-		nodes:                  nodes,
-		expectedHints:          nil,
-		expectedCrossZoneHints: 0,
+		name:                             "no change, topologyHeuristicsManager disabled, annotation == auto",
+		topologyHeuristicsManagerEnabled: false,
+		hintsAnnotation:                  "auto",
+		existingSlices:                   []*discovery.EndpointSlice{slicesByName["zone-c"]},
+		pods:                             slicePods["zone-c"],
+		nodes:                            nodes,
+		expectedHints:                    nil,
+		expectedCrossZoneHints:           0,
 		expectedMetrics: expectedMetrics{
-			desiredSlices:        1,
-			actualSlices:         1,
-			desiredEndpoints:     3,
-			addedPerSync:         0,
-			removedPerSync:       0,
-			numCreated:           0,
-			numUpdated:           0,
-			numDeleted:           0,
-			slicesChangedPerSync: 0,
+			desiredSlices:                    1,
+			actualSlices:                     1,
+			desiredEndpoints:                 3,
+			addedPerSync:                     0,
+			removedPerSync:                   0,
+			numCreated:                       0,
+			numUpdated:                       0,
+			numDeleted:                       0,
+			slicesChangedPerSync:             0,
+			slicesChangedPerSyncTopologyName: "disabled",
 		},
 	}, {
-		name:                 "enabling topologyCache, hintsAnnotation == auto",
-		topologyCacheEnabled: true,
-		hintsAnnotation:      "auto",
-		existingSlices:       []*discovery.EndpointSlice{slicesByName["zone-c"]},
-		pods:                 slicePods["zone-c"],
-		nodes:                nodes,
+		name:                             "enabling topologyHeuristicsManager, hintsAnnotation == auto",
+		topologyHeuristicsManagerEnabled: true,
+		hintsAnnotation:                  "auto",
+		existingSlices:                   []*discovery.EndpointSlice{slicesByName["zone-c"]},
+		pods:                             slicePods["zone-c"],
+		nodes:                            nodes,
 		expectedHints: map[string]int{
 			"zone-a": 1,
 			"zone-b": 1,
@@ -1814,43 +1815,45 @@ func TestReconcileTopology(t *testing.T) {
 		},
 		expectedCrossZoneHints: 2,
 		expectedMetrics: expectedMetrics{
-			desiredSlices:                1,
-			actualSlices:                 1,
-			desiredEndpoints:             3,
-			addedPerSync:                 0,
-			removedPerSync:               0,
-			numCreated:                   0,
-			numUpdated:                   1,
-			numDeleted:                   0,
-			slicesChangedPerSyncTopology: 1,
+			desiredSlices:                    1,
+			actualSlices:                     1,
+			desiredEndpoints:                 3,
+			addedPerSync:                     0,
+			removedPerSync:                   0,
+			numCreated:                       0,
+			numUpdated:                       1,
+			numDeleted:                       0,
+			slicesChangedPerSync:             1,
+			slicesChangedPerSyncTopologyName: "auto",
 		},
 	}, {
-		name:                   "topology enabled,  hintsAnnotation==auto, ratio beyond threshold",
-		topologyCacheEnabled:   true,
-		hintsAnnotation:        "auto",
-		existingSlices:         []*discovery.EndpointSlice{slicesByName["zone-a-c"]},
-		pods:                   slicePods["zone-a-c"],
-		nodes:                  nodes,
-		expectedHints:          nil,
-		expectedCrossZoneHints: 0,
+		name:                             "topology enabled,  hintsAnnotation==auto, ratio beyond threshold",
+		topologyHeuristicsManagerEnabled: true,
+		hintsAnnotation:                  "auto",
+		existingSlices:                   []*discovery.EndpointSlice{slicesByName["zone-a-c"]},
+		pods:                             slicePods["zone-a-c"],
+		nodes:                            nodes,
+		expectedHints:                    nil,
+		expectedCrossZoneHints:           0,
 		expectedMetrics: expectedMetrics{
-			desiredSlices:                1,
-			actualSlices:                 1,
-			desiredEndpoints:             4,
-			addedPerSync:                 0,
-			removedPerSync:               0,
-			numCreated:                   0,
-			numUpdated:                   0,
-			numDeleted:                   0,
-			slicesChangedPerSyncTopology: 0,
+			desiredSlices:                    1,
+			actualSlices:                     1,
+			desiredEndpoints:                 4,
+			addedPerSync:                     0,
+			removedPerSync:                   0,
+			numCreated:                       0,
+			numUpdated:                       0,
+			numDeleted:                       0,
+			slicesChangedPerSync:             0,
+			slicesChangedPerSyncTopologyName: "auto",
 		},
 	}, {
-		name:                 "topology enabled, hintsAnnotation==Auto, more slices and endpoints",
-		topologyCacheEnabled: true,
-		hintsAnnotation:      "Auto",
-		existingSlices:       []*discovery.EndpointSlice{slicesByName["zone-a-c"], slicesByName["zone-a-b"]},
-		pods:                 append(slicePods["zone-a-c"], slicePods["zone-a-b"]...),
-		nodes:                nodes,
+		name:                             "topology enabled, hintsAnnotation==Auto, more slices and endpoints",
+		topologyHeuristicsManagerEnabled: true,
+		hintsAnnotation:                  "Auto",
+		existingSlices:                   []*discovery.EndpointSlice{slicesByName["zone-a-c"], slicesByName["zone-a-b"]},
+		pods:                             append(slicePods["zone-a-c"], slicePods["zone-a-b"]...),
+		nodes:                            nodes,
 		expectedHints: map[string]int{
 			"zone-a": 3,
 			"zone-b": 3,
@@ -1867,29 +1870,31 @@ func TestReconcileTopology(t *testing.T) {
 			// TODO(robscott): Since we're potentially changing more slices when
 			// adding topology hints we could use it as a free repacking
 			// opportunity. That would make this value 1.
-			numUpdated:                   2,
-			numDeleted:                   0,
-			slicesChangedPerSyncTopology: 2,
+			numUpdated:                       2,
+			numDeleted:                       0,
+			slicesChangedPerSync:             2,
+			slicesChangedPerSyncTopologyName: "Auto",
 		},
 	}, {
-		name:                   "topology enabled, hintsAnnotation==disabled, more slices and endpoints",
-		topologyCacheEnabled:   true,
-		hintsAnnotation:        "disabled",
-		existingSlices:         []*discovery.EndpointSlice{slicesByName["zone-a-c"], slicesByName["zone-a-b"]},
-		pods:                   append(slicePods["zone-a-c"], slicePods["zone-a-b"]...),
-		nodes:                  nodes,
-		expectedHints:          nil,
-		expectedCrossZoneHints: 0,
+		name:                             "topology enabled, hintsAnnotation==disabled, more slices and endpoints",
+		topologyHeuristicsManagerEnabled: true,
+		hintsAnnotation:                  "disabled",
+		existingSlices:                   []*discovery.EndpointSlice{slicesByName["zone-a-c"], slicesByName["zone-a-b"]},
+		pods:                             append(slicePods["zone-a-c"], slicePods["zone-a-b"]...),
+		nodes:                            nodes,
+		expectedHints:                    nil,
+		expectedCrossZoneHints:           0,
 		expectedMetrics: expectedMetrics{
-			desiredSlices:        1,
-			actualSlices:         2,
-			desiredEndpoints:     9,
-			addedPerSync:         0,
-			removedPerSync:       0,
-			numCreated:           0,
-			numUpdated:           0,
-			numDeleted:           0,
-			slicesChangedPerSync: 0,
+			desiredSlices:                    1,
+			actualSlices:                     2,
+			desiredEndpoints:                 9,
+			addedPerSync:                     0,
+			removedPerSync:                   0,
+			numCreated:                       0,
+			numUpdated:                       0,
+			numDeleted:                       0,
+			slicesChangedPerSync:             0,
+			slicesChangedPerSyncTopologyName: "disabled",
 		},
 	}}
 
@@ -1902,9 +1907,10 @@ func TestReconcileTopology(t *testing.T) {
 
 			setupMetrics()
 			r := newReconciler(client, tc.nodes, defaultMaxEndpointsPerSlice)
-			if tc.topologyCacheEnabled {
-				r.topologyCache = topologycache.NewTopologyCache()
-				r.topologyCache.SetNodes(logger, tc.nodes)
+			if tc.topologyHeuristicsManagerEnabled {
+				heuristic := topologyheuristics.NewProportionalZoneCPUHeuristic()
+				r.topologyHeuristicsManager, _ = topologyheuristics.NewManager(logger, []topologyheuristics.Heuristic{heuristic}, heuristic.Name(), []string{})
+				heuristic.SetNodes(logger, tc.nodes)
 			}
 
 			service := svc.DeepCopy()
@@ -2112,18 +2118,23 @@ func reconcileHelper(t *testing.T, r *Reconciler, service *corev1.Service, pods 
 // Metrics helpers
 
 type expectedMetrics struct {
-	desiredSlices                int
-	actualSlices                 int
-	desiredEndpoints             int
-	addedPerSync                 int
-	removedPerSync               int
-	numCreated                   int
-	numUpdated                   int
-	numDeleted                   int
-	slicesChangedPerSync         int
-	slicesChangedPerSyncTopology int
-	syncSuccesses                int
-	syncErrors                   int
+	desiredSlices    int
+	actualSlices     int
+	desiredEndpoints int
+	addedPerSync     int
+	removedPerSync   int
+	numCreated       int
+	numUpdated       int
+	numDeleted       int
+
+	// slicesChangedPerSync metric is associated with a topology. Hence,
+	// slicesChangedPerSyncTopologyName value contains the topology label used for
+	// the metric.
+	slicesChangedPerSync             int
+	slicesChangedPerSyncTopologyName string
+
+	syncSuccesses int
+	syncErrors    int
 }
 
 func expectMetrics(t *testing.T, em expectedMetrics) {
@@ -2177,16 +2188,16 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 		t.Errorf("Expected endpointSliceChangesDeleted to be %d, got %v", em.numDeleted, actualDeleted)
 	}
 
-	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled"))
+	topologyName := em.slicesChangedPerSyncTopologyName
+	// If no topologyName is specified, it means that topology hints are disabled.
+	// In such a case, the "disabled" metric label is used.
+	if topologyName == "" {
+		topologyName = "Disabled"
+	}
+	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues(topologyName))
 	handleErr(t, err, "slicesChangedPerSync")
 	if actualSlicesChangedPerSync != float64(em.slicesChangedPerSync) {
 		t.Errorf("Expected slicesChangedPerSync to be %d, got %v", em.slicesChangedPerSync, actualSlicesChangedPerSync)
-	}
-
-	actualSlicesChangedPerSyncTopology, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Auto"))
-	handleErr(t, err, "slicesChangedPerSyncTopology")
-	if actualSlicesChangedPerSyncTopology != float64(em.slicesChangedPerSyncTopology) {
-		t.Errorf("Expected slicesChangedPerSyncTopology to be %d, got %v", em.slicesChangedPerSyncTopology, actualSlicesChangedPerSyncTopology)
 	}
 
 	actualSyncSuccesses, err := testutil.GetCounterMetricValue(metrics.EndpointSliceSyncs.WithLabelValues("success"))
@@ -2210,16 +2221,12 @@ func handleErr(t *testing.T, err error, metricName string) {
 
 func setupMetrics() {
 	metrics.RegisterMetrics()
-	metrics.NumEndpointSlices.Delete(map[string]string{})
-	metrics.DesiredEndpointSlices.Delete(map[string]string{})
-	metrics.EndpointsDesired.Delete(map[string]string{})
-	metrics.EndpointsAddedPerSync.Delete(map[string]string{})
-	metrics.EndpointsRemovedPerSync.Delete(map[string]string{})
-	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "create"})
-	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "update"})
-	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "delete"})
-	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "Disabled"})
-	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "Auto"})
-	metrics.EndpointSliceSyncs.Delete(map[string]string{"result": "success"})
-	metrics.EndpointSliceSyncs.Delete(map[string]string{"result": "error"})
+	metrics.NumEndpointSlices.Reset()
+	metrics.DesiredEndpointSlices.Reset()
+	metrics.EndpointsDesired.Reset()
+	metrics.EndpointsAddedPerSync.Reset()
+	metrics.EndpointsRemovedPerSync.Reset()
+	metrics.EndpointSliceChanges.Reset()
+	metrics.EndpointSlicesChangedPerSync.Reset()
+	metrics.EndpointSliceSyncs.Reset()
 }
