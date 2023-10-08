@@ -68,34 +68,3 @@ func (si *SliceInfo) getEndpointsWithMissingZone() int {
 	}
 	return result
 }
-
-// getAllocatedHintsByZone sums up the allocated hints we currently have in
-// unchanged slices and marks slices for update as necessary. A slice needs to
-// be updated if any of the following are true:
-//   - It has an endpoint without zone hints
-//   - It has an endpoint hint for a zone that no longer needs any
-//   - It has endpoint hints that would make the minimum allocations necessary
-//     impossible with changes to slices that are already being updated or
-//     created.
-func (si *SliceInfo) getAllocatedHintsByZone(allocations map[string]allocation) EndpointZoneInfo {
-	allocatedHintsByZone := EndpointZoneInfo{}
-
-	// Using filtering in place to remove any endpoints that are no longer
-	// unchanged (https://github.com/golang/go/wiki/SliceTricks#filter-in-place)
-	j := 0
-	for _, slice := range si.Unchanged {
-		hintsByZone := getHintsByZone(slice, allocatedHintsByZone, allocations)
-		if hintsByZone == nil {
-			si.ToUpdate = append(si.ToUpdate, slice.DeepCopy())
-		} else {
-			si.Unchanged[j] = slice
-			j++
-			for zone, numHints := range hintsByZone {
-				allocatedHintsByZone[zone] += numHints
-			}
-		}
-	}
-
-	si.Unchanged = si.Unchanged[:j]
-	return allocatedHintsByZone
-}
