@@ -502,7 +502,7 @@ func (gc *GarbageCollector) isDangling(ctx context.Context, reference metav1.Own
 // solid: the owner exists, and is not "waitingForDependentsDeletion"
 // dangling: the owner does not exist
 // waitingForDependentsDeletion: the owner exists, its deletionTimestamp is non-nil, and it has
-// FinalizerDeletingDependents
+// FinalizerDeletingDependents and the reference has the BlockOwnerDeletion set to true
 // This function communicates with the server.
 func (gc *GarbageCollector) classifyReferences(ctx context.Context, item *node, latestReferences []metav1.OwnerReference) (
 	solid, dangling, waitingForDependentsDeletion []metav1.OwnerReference, err error) {
@@ -520,7 +520,7 @@ func (gc *GarbageCollector) classifyReferences(ctx context.Context, item *node, 
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		if ownerAccessor.GetDeletionTimestamp() != nil && hasDeleteDependentsFinalizer(ownerAccessor) {
+		if ownerAccessor.GetDeletionTimestamp() != nil && hasDeleteDependentsFinalizer(ownerAccessor) && reference.BlockOwnerDeletion != nil && *reference.BlockOwnerDeletion {
 			waitingForDependentsDeletion = append(waitingForDependentsDeletion, reference)
 		} else {
 			solid = append(solid, reference)

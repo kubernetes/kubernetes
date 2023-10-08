@@ -601,7 +601,7 @@ func (gb *GraphBuilder) processTransitions(logger klog.Logger, oldObj interface{
 		logger.V(2).Info("add item to attemptToDelete, because it's waiting for its dependents to be deleted", "item", n.identity)
 		// if the n is added as a "virtual" node, its deletingDependents field is not properly set, so always set it here.
 		n.markDeletingDependents()
-		for dep := range n.dependents {
+		for dep := range n.blockingDependents() {
 			gb.attemptToDelete.Add(dep)
 		}
 		gb.attemptToDelete.Add(n)
