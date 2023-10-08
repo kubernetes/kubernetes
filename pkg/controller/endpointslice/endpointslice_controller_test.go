@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/endpointslice/topologycache"
+	"k8s.io/endpointslice/topologyheuristics"
 	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
@@ -1798,13 +1798,13 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 		name                 string
 		nodes                []nodeInfo
 		topologyCacheEnabled bool
-		endpointZoneInfo     map[string]topologycache.EndpointZoneInfo
+		endpointZoneInfo     map[string]topologyheuristics.EndpointZoneInfo
 		expectedQueueLen     int
 	}{{
 		name:                 "empty",
 		nodes:                []nodeInfo{},
 		topologyCacheEnabled: false,
-		endpointZoneInfo:     map[string]topologycache.EndpointZoneInfo{},
+		endpointZoneInfo:     map[string]topologyheuristics.EndpointZoneInfo{},
 		expectedQueueLen:     0,
 	}, {
 		name: "lopsided, queue required",
@@ -1814,7 +1814,7 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
 		},
 		topologyCacheEnabled: true,
-		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+		endpointZoneInfo: map[string]topologyheuristics.EndpointZoneInfo{
 			"ns/svc1": {zoneA: 1, zoneB: 2, zoneC: 3},
 		},
 		expectedQueueLen: 1,
@@ -1826,7 +1826,7 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
 		},
 		topologyCacheEnabled: true,
-		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+		endpointZoneInfo: map[string]topologyheuristics.EndpointZoneInfo{
 			"ns/svc1": {zoneA: 1, zoneB: 2, zoneC: 3},
 		},
 		expectedQueueLen: 1,
@@ -1839,7 +1839,7 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
 		},
 		topologyCacheEnabled: true,
-		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+		endpointZoneInfo: map[string]topologyheuristics.EndpointZoneInfo{
 			"ns/svc1": {zoneB: 5, zoneC: 4},
 		},
 		expectedQueueLen: 0,
@@ -1852,7 +1852,7 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
 		},
 		topologyCacheEnabled: true,
-		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+		endpointZoneInfo: map[string]topologyheuristics.EndpointZoneInfo{
 			"ns/svc1": {zoneB: 5, zoneC: 4},
 		},
 		expectedQueueLen: 1,
@@ -1865,7 +1865,7 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
 		},
 		topologyCacheEnabled: true,
-		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+		endpointZoneInfo: map[string]topologyheuristics.EndpointZoneInfo{
 			"ns/svc1": {zoneB: 5, zoneC: 4},
 		},
 		expectedQueueLen: 1,
@@ -1878,7 +1878,7 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
 		},
 		topologyCacheEnabled: true,
-		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+		endpointZoneInfo: map[string]topologyheuristics.EndpointZoneInfo{
 			"ns/svc1": {zoneB: 6, zoneC: 4},
 		},
 		expectedQueueLen: 1,
@@ -1890,7 +1890,7 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu100},
 		},
 		topologyCacheEnabled: true,
-		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+		endpointZoneInfo: map[string]topologyheuristics.EndpointZoneInfo{
 			"ns/svc1": {zoneA: 20, zoneB: 10, zoneC: 1},
 		},
 		expectedQueueLen: 0,
@@ -1902,7 +1902,7 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu100},
 		},
 		topologyCacheEnabled: true,
-		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+		endpointZoneInfo: map[string]topologyheuristics.EndpointZoneInfo{
 			"ns/svc1": {zoneA: 20, zoneB: 10, zoneC: 0},
 		},
 		expectedQueueLen: 1,
@@ -1937,9 +1937,9 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 				}
 				esController.nodeStore.Add(node)
 				if tc.topologyCacheEnabled {
-					esController.topologyCache = topologycache.NewTopologyCache()
+					esController.proportionalZoneCPUHeuristic = topologyheuristics.NewProportionalZoneCPUHeuristic()
 					for serviceKey, endpointZoneInfo := range tc.endpointZoneInfo {
-						esController.topologyCache.SetHints(serviceKey, discovery.AddressTypeIPv4, endpointZoneInfo)
+						esController.proportionalZoneCPUHeuristic.SetHints(serviceKey, discovery.AddressTypeIPv4, endpointZoneInfo)
 					}
 				}
 			}
@@ -1967,7 +1967,7 @@ func TestUpdateNode(t *testing.T) {
 		},
 	}
 	_, esController := newController(t, nil, time.Duration(0))
-	sliceInfo := &topologycache.SliceInfo{
+	sliceInfo := &topologyheuristics.SliceInfo{
 		ServiceKey:  "ns/svc",
 		AddressType: discovery.AddressTypeIPv4,
 		ToCreate: []*discovery.EndpointSlice{
@@ -2009,24 +2009,24 @@ func TestUpdateNode(t *testing.T) {
 	esController.nodeStore.Add(node2)
 	esController.addNode(logger, node1)
 	esController.addNode(logger, node2)
-	// The Nodes don't have the zone label, AddHints should fail.
-	_, _, eventsBuilders := esController.topologyCache.AddHints(logger, sliceInfo)
+	// The Nodes don't have the zone label, PopulateHints should fail.
+	_, _, eventsBuilders := esController.proportionalZoneCPUHeuristic.PopulateHints(logger, sliceInfo)
 	require.Len(t, eventsBuilders, 1)
-	assert.Contains(t, eventsBuilders[0].Message, topologycache.InsufficientNodeInfo)
+	assert.Contains(t, eventsBuilders[0].Message, topologyheuristics.InsufficientNodeInfo)
 
 	updateNode1 := node1.DeepCopy()
 	updateNode1.Labels = map[string]string{v1.LabelTopologyZone: "zone-a"}
 	updateNode2 := node2.DeepCopy()
 	updateNode2.Labels = map[string]string{v1.LabelTopologyZone: "zone-b"}
 
-	// After adding the zone label to the Nodes and calling the event handler updateNode, AddHints should succeed.
+	// After adding the zone label to the Nodes and calling the event handler updateNode, PopulateHints should succeed.
 	esController.nodeStore.Update(updateNode1)
 	esController.nodeStore.Update(updateNode2)
 	esController.updateNode(logger, node1, updateNode1)
 	esController.updateNode(logger, node2, updateNode2)
-	_, _, eventsBuilders = esController.topologyCache.AddHints(logger, sliceInfo)
+	_, _, eventsBuilders = esController.proportionalZoneCPUHeuristic.PopulateHints(logger, sliceInfo)
 	require.Len(t, eventsBuilders, 1)
-	assert.Contains(t, eventsBuilders[0].Message, topologycache.TopologyAwareHintsEnabled)
+	assert.Contains(t, eventsBuilders[0].Message, topologyheuristics.TopologyAwareHintsEnabled)
 }
 
 // Test helpers

@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	endpointslicerec "k8s.io/endpointslice"
 	endpointslicemetrics "k8s.io/endpointslice/metrics"
-	"k8s.io/endpointslice/topologycache"
+	"k8s.io/endpointslice/topologyheuristics"
 	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
@@ -151,6 +151,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
+	var topologyHeuristicsManager *topologyheuristics.Manager
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
@@ -164,7 +165,15 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 			},
 		})
 
-		c.topologyCache = topologycache.NewTopologyCache()
+		c.proportionalZoneCPUHeuristic = topologyheuristics.NewProportionalZoneCPUHeuristic()
+		// Initialize all default available topology heuristics in the
+		// topologyHeuristicsManager.
+		topologyHeuristicsManager = topologyheuristics.NewManager(
+			logger,
+			[]topologyheuristics.Heuristic{c.proportionalZoneCPUHeuristic},
+			c.proportionalZoneCPUHeuristic.Name(), /* default heuristic */
+			[]string{},
+		)
 	}
 
 	c.reconciler = endpointslicerec.NewReconciler(
@@ -172,7 +181,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.nodeLister,
 		c.maxEndpointsPerSlice,
 		c.endpointSliceTracker,
-		c.topologyCache,
+		topologyHeuristicsManager,
 		c.eventRecorder,
 		controllerName,
 	)
@@ -244,9 +253,11 @@ type Controller struct {
 	// This can be used to reduce overall number of all endpoint slice updates.
 	endpointUpdatesBatchPeriod time.Duration
 
-	// topologyCache tracks the distribution of Nodes and endpoints across zones
-	// to enable TopologyAwareHints.
-	topologyCache *topologycache.TopologyCache
+	// proportionalZoneCPUHeuristic provides EndpointSlice topology hints using
+	// the [Proportional CPU Heuristic]
+	//
+	// [Proportional CPU Heuristic]: https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/2433-topology-aware-hints#proportional-cpu-heuristic
+	proportionalZoneCPUHeuristic *topologyheuristics.ProportionalZoneCPUHeuristic
 }
 
 // Run will not return until stopCh is closed.
@@ -545,10 +556,11 @@ func (c *Controller) deleteNode(logger klog.Logger, obj interface{}) {
 	c.checkNodeTopologyDistribution(logger)
 }
 
-// checkNodeTopologyDistribution updates Nodes in the topology cache and then
-// queues any Services that are past the threshold.
+// checkNodeTopologyDistribution updates Nodes in the
+// proportionalZoneCPUHeuristic cache and then queues any Services that are past
+// the threshold.
 func (c *Controller) checkNodeTopologyDistribution(logger klog.Logger) {
-	if c.topologyCache == nil {
+	if c.proportionalZoneCPUHeuristic == nil {
 		return
 	}
 	nodes, err := c.nodeLister.List(labels.Everything())
@@ -556,8 +568,8 @@ func (c *Controller) checkNodeTopologyDistribution(logger klog.Logger) {
 		logger.Error(err, "Error listing Nodes")
 		return
 	}
-	c.topologyCache.SetNodes(logger, nodes)
-	serviceKeys := c.topologyCache.GetOverloadedServices()
+	c.proportionalZoneCPUHeuristic.SetNodes(logger, nodes)
+	serviceKeys := c.proportionalZoneCPUHeuristic.GetOverloadedServices()
 	for _, serviceKey := range serviceKeys {
 		logger.V(2).Info("Queuing Service after Node change due to overloading", "key", serviceKey)
 		c.queue.Add(serviceKey)
