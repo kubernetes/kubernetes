@@ -35,7 +35,6 @@ const (
 	MaximumAllowedMinorVersionDowngradeSkew = 1
 
 	// MaximumAllowedMinorVersionKubeletSkew describes how many minor versions the control plane version and the kubelet can skew in a kubeadm cluster
-	// Refer to https://kubernetes.io/releases/version-skew-policy/#kubelet-1
 	MaximumAllowedMinorVersionKubeletSkew = 3
 )
 
