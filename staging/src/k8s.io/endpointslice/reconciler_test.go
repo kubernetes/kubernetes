@@ -1896,6 +1896,31 @@ func TestReconcileTopologyHints(t *testing.T) {
 			slicesChangedPerSync:             0,
 			slicesChangedPerSyncTopologyName: "disabled",
 		},
+	}, {
+		name:                             "topology enabled, hintsAnnotation==PreferZone",
+		topologyHeuristicsManagerEnabled: true,
+		hintsAnnotation:                  "PreferZone",
+		existingSlices:                   []*discovery.EndpointSlice{slicesByName["zone-a-b"], slicesByName["zone-a-c"]},
+		pods:                             append(slicePods["zone-a-b"], slicePods["zone-a-c"]...),
+		nodes:                            nodes,
+		expectedHints: map[string]int{
+			"zone-a": 4,
+			"zone-b": 3,
+			"zone-c": 2,
+		},
+		expectedCrossZoneHints: 0, // PreferZone topology should never have cross-zone hints.
+		expectedMetrics: expectedMetrics{
+			desiredSlices:                    1,
+			actualSlices:                     2,
+			desiredEndpoints:                 9,
+			addedPerSync:                     0,
+			removedPerSync:                   0,
+			numCreated:                       0,
+			numUpdated:                       2,
+			numDeleted:                       0,
+			slicesChangedPerSync:             2,
+			slicesChangedPerSyncTopologyName: "PreferZone",
+		},
 	}}
 
 	for _, tc := range testCases {
@@ -1908,14 +1933,18 @@ func TestReconcileTopologyHints(t *testing.T) {
 			setupMetrics()
 			r := newReconciler(client, tc.nodes, defaultMaxEndpointsPerSlice)
 			if tc.topologyHeuristicsManagerEnabled {
-				heuristic := topologyheuristics.NewProportionalZoneCPUHeuristic()
-				r.topologyHeuristicsManager, _ = topologyheuristics.NewManager(logger, []topologyheuristics.Heuristic{heuristic}, heuristic.Name(), []string{})
-				heuristic.SetNodes(logger, tc.nodes)
+				proportionalCPUTopology := topologyheuristics.NewProportionalZoneCPUHeuristic()
+				proportionalCPUTopology.SetNodes(logger, tc.nodes)
+
+				preferZoneHeuristic := topologyheuristics.NewPreferZoneHeuristic()
+				allHeuristics := []topologyheuristics.Heuristic{proportionalCPUTopology, preferZoneHeuristic}
+
+				r.topologyHeuristicsManager, _ = topologyheuristics.NewManager(logger, allHeuristics, proportionalCPUTopology.Name(), []string{})
 			}
 
 			service := svc.DeepCopy()
 			service.Annotations = map[string]string{
-				corev1.DeprecatedAnnotationTopologyAwareHints: tc.hintsAnnotation,
+				corev1.AnnotationTopologyMode: tc.hintsAnnotation,
 			}
 			r.Reconcile(logger, service, tc.pods, tc.existingSlices, time.Now())
 

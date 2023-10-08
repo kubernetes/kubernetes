@@ -27,7 +27,10 @@ type SliceInfo struct {
 	AddressType discovery.AddressType
 	ToCreate    []*discovery.EndpointSlice
 	ToUpdate    []*discovery.EndpointSlice
-	Unchanged   []*discovery.EndpointSlice
+	// Unchanged slices are direct copies from informer cache. We need to deep
+	// copy an unchanged slice before making any modifications to it so that we do
+	// not modify the slice within the informer cache.
+	Unchanged []*discovery.EndpointSlice
 }
 
 func (si *SliceInfo) getTotalReadyEndpoints() int {
@@ -42,6 +45,28 @@ func (si *SliceInfo) getTotalReadyEndpoints() int {
 		totalEndpoints += numReadyEndpoints(slice.Endpoints)
 	}
 	return totalEndpoints
+}
+
+// getEndpointsWithMissingZone returns the number of ready endpoints that do not
+// have a zone assigned.
+func (si *SliceInfo) getEndpointsWithMissingZone() int {
+	var slices []*discovery.EndpointSlice
+	slices = append(slices, si.ToCreate...)
+	slices = append(slices, si.ToUpdate...)
+	slices = append(slices, si.Unchanged...)
+
+	var result int
+	for _, slice := range slices {
+		for _, endpoint := range slice.Endpoints {
+			if !EndpointReady(endpoint) {
+				continue
+			}
+			if endpoint.Zone == nil || *endpoint.Zone == "" {
+				result++
+			}
+		}
+	}
+	return result
 }
 
 // getAllocatedHintsByZone sums up the allocated hints we currently have in
