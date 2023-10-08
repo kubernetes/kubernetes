@@ -67,9 +67,10 @@ func RemoveHintsFromSlices(si *SliceInfo) ([]*discovery.EndpointSlice, []*discov
 	return si.ToCreate, si.ToUpdate
 }
 
-// FormatWithAddressType foramts a given string by adding an addressType to the end of it.
-func FormatWithAddressType(s string, addressType discovery.AddressType) string {
-	return fmt.Sprintf("%s, addressType: %s", s, addressType)
+// FormatWithAddressTypeAndHeuristicName formats a given string by adding an
+// addressType and heuristicName to the end of it.
+func FormatWithAddressTypeAndHeuristicName(s string, addressType discovery.AddressType, heuristicName string) string {
+	return fmt.Sprintf("%s, addressType: %s, heuristic: %v", s, addressType, heuristicName)
 }
 
 // redistributeHints redistributes hints based in the provided EndpointSlices.
