@@ -82,13 +82,8 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
 apiVersion: %s
-kind: InitConfiguration
-nodeRegistration:
-  criSocket: %s
----
-apiVersion: %[1]s
 kind: ClusterConfiguration
-kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket, constants.CurrentKubernetesVersion))),
+kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.CurrentKubernetesVersion))),
 		},
 		{
 			name:               "use coredns",
@@ -98,13 +93,8 @@ kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.U
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
 apiVersion: %s
-kind: InitConfiguration
-nodeRegistration:
-  criSocket: %s
----
-apiVersion: %[1]s
 kind: ClusterConfiguration
-kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket, constants.MinimumControlPlaneVersion))),
+kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.MinimumControlPlaneVersion))),
 		},
 	}
 

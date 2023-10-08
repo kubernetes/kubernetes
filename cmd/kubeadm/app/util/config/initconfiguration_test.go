@@ -126,9 +126,6 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
-				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-					CRISocket: constants.UnknownCRISocket,
-				},
 			},
 			expectedTaintCnt: 1,
 		},
@@ -138,9 +135,6 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
-				},
-				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-					CRISocket: constants.UnknownCRISocket,
 				},
 			},
 			expectedTaintCnt: 1,
@@ -153,8 +147,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 					Kind:       constants.InitConfigurationKind,
 				},
 				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-					Taints:    []v1.Taint{},
-					CRISocket: constants.UnknownCRISocket,
+					Taints: []v1.Taint{},
 				},
 			},
 			expectedTaintCnt: 0,
@@ -171,7 +164,6 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 						{Key: "taint1"},
 						{Key: "taint2"},
 					},
-					CRISocket: constants.UnknownCRISocket,
 				},
 			},
 			expectedTaintCnt: 2,

@@ -442,7 +442,7 @@ func newCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
 func NewImagesList(cfgPath string, cfg *kubeadmapiv1old.ClusterConfiguration) (*ImagesList, error) {
-	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cmdutil.DefaultInitConfiguration(), cfg, true /* skipCRIDetect */)
+	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, &kubeadmapiv1old.InitConfiguration{}, cfg, true /* skipCRIDetect */)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
 	}
