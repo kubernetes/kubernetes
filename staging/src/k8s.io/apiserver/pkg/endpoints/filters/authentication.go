@@ -29,8 +29,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -101,6 +104,18 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 			)
 		}
 
+		// http2 is an expensive protocol that is prone to abuse,
+		// see CVE-2023-44487 and CVE-2023-39325 for an example.
+		// Do not allow unauthenticated clients to keep these
+		// connections open (i.e. basically degrade them to the
+		// performance of http1 with keep-alive disabled).
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnauthenticatedHTTP2DOSMitigation) && req.ProtoMajor == 2 && isAnonymousUser(resp.User) {
+			// limit this connection to just this request,
+			// and then send a GOAWAY and tear down the TCP connection
+			// https://github.com/golang/net/commit/97aa3a539ec716117a9d15a4659a911f50d13c3c
+			w.Header().Set("Connection", "close")
+		}
+
 		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))
 		handler.ServeHTTP(w, req)
 	})
@@ -108,6 +123,17 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 
 func Unauthorized(s runtime.NegotiatedSerializer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// http2 is an expensive protocol that is prone to abuse,
+		// see CVE-2023-44487 and CVE-2023-39325 for an example.
+		// Do not allow unauthenticated clients to keep these
+		// connections open (i.e. basically degrade them to the
+		// performance of http1 with keep-alive disabled).
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnauthenticatedHTTP2DOSMitigation) && req.ProtoMajor == 2 {
+			// limit this connection to just this request,
+			// and then send a GOAWAY and tear down the TCP connection
+			// https://github.com/golang/net/commit/97aa3a539ec716117a9d15a4659a911f50d13c3c
+			w.Header().Set("Connection", "close")
+		}
 		ctx := req.Context()
 		requestInfo, found := genericapirequest.RequestInfoFrom(ctx)
 		if !found {
@@ -126,4 +152,16 @@ func audiencesAreAcceptable(apiAuds, responseAudiences authenticator.Audiences) 
 	}
 
 	return len(apiAuds.Intersect(responseAudiences)) > 0
+}
+
+func isAnonymousUser(u user.Info) bool {
+	if u.GetName() == user.Anonymous {
+		return true
+	}
+	for _, group := range u.GetGroups() {
+		if group == user.AllUnauthenticated {
+			return true
+		}
+	}
+	return false
 }
