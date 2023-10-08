@@ -34,8 +34,11 @@ const (
 	overloadThreshold float64 = 0.2
 )
 
-// TopologyCache tracks the distribution of Nodes and endpoints across zones.
-type TopologyCache struct {
+// ProportionalZoneCPUHeuristic is a heuristic that provides EndpointSlice
+// topology hints using the [Proportional CPU Heuristic].
+//
+// [Proportional CPU Heuristic]: https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/2433-topology-aware-hints#proportional-cpu-heuristic
+type ProportionalZoneCPUHeuristic struct {
 	lock                    sync.Mutex
 	sufficientNodeInfo      bool
 	cpuByZone               map[string]*resource.Quantity
@@ -56,9 +59,12 @@ type allocation struct {
 	desired float64
 }
 
-// NewTopologyCache initializes a new TopologyCache.
-func NewTopologyCache() *TopologyCache {
-	return &TopologyCache{
+// ProportionalZoneCPUHeuristic implements the Heuristic interface.
+var _ Heuristic = &ProportionalZoneCPUHeuristic{}
+
+// NewProportionalZoneCPUHeuristic initializes a new ProportionalZoneCPUHeuristic.
+func NewProportionalZoneCPUHeuristic() *ProportionalZoneCPUHeuristic {
+	return &ProportionalZoneCPUHeuristic{
 		cpuByZone:               map[string]*resource.Quantity{},
 		cpuRatiosByZone:         map[string]float64{},
 		endpointsByService:      map[string]map[discovery.AddressType]EndpointZoneInfo{},
@@ -66,9 +72,13 @@ func NewTopologyCache() *TopologyCache {
 	}
 }
 
+func (t *ProportionalZoneCPUHeuristic) Name() string {
+	return "ProportionalZoneCPU"
+}
+
 // GetOverloadedServices returns a list of Service keys that refer to Services
 // that have crossed the overload threshold for any zone.
-func (t *TopologyCache) GetOverloadedServices() []string {
+func (t *ProportionalZoneCPUHeuristic) GetOverloadedServices() []string {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -85,17 +95,17 @@ func (t *TopologyCache) GetOverloadedServices() []string {
 	return svcKeys
 }
 
-// AddHints adds or updates topology hints on EndpointSlices and returns updated
-// lists of EndpointSlices to create and update.
-func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*EventBuilder) {
+// PopulateHints adds or updates topology hints on EndpointSlices and returns
+// updated lists of EndpointSlices to create and update.
+func (t *ProportionalZoneCPUHeuristic) PopulateHints(logger klog.Logger, si *SliceInfo) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*EventBuilder) {
 	totalEndpoints := si.getTotalReadyEndpoints()
 	allocations, allocationsEvent := t.getAllocations(totalEndpoints)
 	events := []*EventBuilder{}
 	if allocationsEvent != nil {
 		logger.Info(allocationsEvent.Message+", removing hints", "key", si.ServiceKey, "addressType", si.AddressType)
-		allocationsEvent.Message = FormatWithAddressType(allocationsEvent.Message, si.AddressType)
+		allocationsEvent.Message = FormatWithAddressTypeAndHeuristicName(allocationsEvent.Message, si.AddressType, t.Name())
 		events = append(events, allocationsEvent)
-		t.RemoveHints(si.ServiceKey, si.AddressType)
+		t.ClearCachedHints(logger, si.ServiceKey, si.AddressType)
 		slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
 		return slicesToCreate, slicesToUpdate, events
 	}
@@ -119,9 +129,9 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 				events = append(events, &EventBuilder{
 					EventType: v1.EventTypeWarning,
 					Reason:    "TopologyAwareHintsDisabled",
-					Message:   FormatWithAddressType(NoZoneSpecified, si.AddressType),
+					Message:   FormatWithAddressTypeAndHeuristicName(NoZoneSpecified, si.AddressType, t.Name()),
 				})
-				t.RemoveHints(si.ServiceKey, si.AddressType)
+				t.ClearCachedHints(logger, si.ServiceKey, si.AddressType)
 				slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
 				return slicesToCreate, slicesToUpdate, events
 			}
@@ -146,9 +156,9 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 		events = append(events, &EventBuilder{
 			EventType: v1.EventTypeWarning,
 			Reason:    "TopologyAwareHintsDisabled",
-			Message:   FormatWithAddressType(NoAllocatedHintsForZones, si.AddressType),
+			Message:   FormatWithAddressTypeAndHeuristicName(NoAllocatedHintsForZones, si.AddressType, t.Name()),
 		})
-		t.RemoveHints(si.ServiceKey, si.AddressType)
+		t.ClearCachedHints(logger, si.ServiceKey, si.AddressType)
 		slicesToCreate, slicesToUpdate := RemoveHintsFromSlices(si)
 		return slicesToCreate, slicesToUpdate, events
 	}
@@ -164,7 +174,7 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 		events = append(events, &EventBuilder{
 			EventType: v1.EventTypeNormal,
 			Reason:    "TopologyAwareHintsEnabled",
-			Message:   FormatWithAddressType(TopologyAwareHintsEnabled, si.AddressType),
+			Message:   FormatWithAddressTypeAndHeuristicName(TopologyAwareHintsEnabled, si.AddressType, t.Name()),
 		})
 	}
 	return si.ToCreate, si.ToUpdate, events
@@ -172,14 +182,14 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 
 // SetHints sets topology hints for the provided serviceKey and addrType in this
 // cache.
-func (t *TopologyCache) SetHints(serviceKey string, addrType discovery.AddressType, allocatedHintsByZone EndpointZoneInfo) {
+func (t *ProportionalZoneCPUHeuristic) SetHints(serviceKey string, addrType discovery.AddressType, allocatedHintsByZone EndpointZoneInfo) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	t.setHintsLocked(serviceKey, addrType, allocatedHintsByZone)
 }
 
-func (t *TopologyCache) setHintsLocked(serviceKey string, addrType discovery.AddressType, allocatedHintsByZone EndpointZoneInfo) {
+func (t *ProportionalZoneCPUHeuristic) setHintsLocked(serviceKey string, addrType discovery.AddressType, allocatedHintsByZone EndpointZoneInfo) {
 	_, ok := t.endpointsByService[serviceKey]
 	if !ok {
 		t.endpointsByService[serviceKey] = map[discovery.AddressType]EndpointZoneInfo{}
@@ -191,7 +201,7 @@ func (t *TopologyCache) setHintsLocked(serviceKey string, addrType discovery.Add
 
 // RemoveHints removes topology hints for the provided serviceKey and addrType
 // from this cache.
-func (t *TopologyCache) RemoveHints(serviceKey string, addrType discovery.AddressType) {
+func (t *ProportionalZoneCPUHeuristic) ClearCachedHints(logger klog.Logger, serviceKey string, addrType discovery.AddressType) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -205,8 +215,8 @@ func (t *TopologyCache) RemoveHints(serviceKey string, addrType discovery.Addres
 	t.hintsPopulatedByService.Delete(serviceKey)
 }
 
-// SetNodes updates the Node distribution for the TopologyCache.
-func (t *TopologyCache) SetNodes(logger klog.Logger, nodes []*v1.Node) {
+// SetNodes updates the Node distribution for the ProportionalZoneCPUHeuristic.
+func (t *ProportionalZoneCPUHeuristic) SetNodes(logger klog.Logger, nodes []*v1.Node) {
 	cpuByZone := map[string]*resource.Quantity{}
 	sufficientNodeInfo := true
 
@@ -267,21 +277,21 @@ func (t *TopologyCache) SetNodes(logger klog.Logger, nodes []*v1.Node) {
 }
 
 // HasPopulatedHints checks whether there are populated hints for a given service in the cache.
-func (t *TopologyCache) HasPopulatedHints(serviceKey string) bool {
+func (t *ProportionalZoneCPUHeuristic) HasPopulatedHints(serviceKey string) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	return t.hasPopulatedHintsLocked(serviceKey)
 }
 
-func (t *TopologyCache) hasPopulatedHintsLocked(serviceKey string) bool {
+func (t *ProportionalZoneCPUHeuristic) hasPopulatedHintsLocked(serviceKey string) bool {
 	return t.hintsPopulatedByService.Has(serviceKey)
 }
 
 // getAllocations returns a set of minimum and maximum allocations per zone. If
 // it is not possible to provide allocations that are below the overload
 // threshold, a nil value will be returned.
-func (t *TopologyCache) getAllocations(numEndpoints int) (map[string]allocation, *EventBuilder) {
+func (t *ProportionalZoneCPUHeuristic) getAllocations(numEndpoints int) (map[string]allocation, *EventBuilder) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 

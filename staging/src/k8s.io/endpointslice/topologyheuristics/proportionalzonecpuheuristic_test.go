@@ -31,7 +31,7 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-func TestAddHints(t *testing.T) {
+func PopulateHints(t *testing.T) {
 	testCases := []struct {
 		name                        string
 		cpuRatiosByZone             map[string]float64
@@ -380,17 +380,17 @@ func TestAddHints(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cache := NewTopologyCache()
-			cache.cpuRatiosByZone = tc.cpuRatiosByZone
+			heuristic := NewProportionalZoneCPUHeuristic()
+			heuristic.cpuRatiosByZone = tc.cpuRatiosByZone
 
 			logger, _ := ktesting.NewTestContext(t)
-			slicesToCreate, slicesToUpdate, events := cache.AddHints(logger, tc.sliceInfo)
+			slicesToCreate, slicesToUpdate, events := heuristic.PopulateHints(logger, tc.sliceInfo)
 
 			expectEquivalentSlices(t, slicesToCreate, tc.expectedSlicesToCreate)
 			expectEquivalentSlices(t, slicesToUpdate, tc.expectedSlicesToUpdate)
 			compareExpectedEvents(t, tc.expectedEvents, events)
 
-			endpointsByAddrType, ok := cache.endpointsByService[tc.sliceInfo.ServiceKey]
+			endpointsByAddrType, ok := heuristic.endpointsByService[tc.sliceInfo.ServiceKey]
 			if tc.expectedEndpointsByAddrType == nil {
 				if ok {
 					t.Errorf("Expected no endpoints for Service %s, got %+v", tc.sliceInfo.ServiceKey, endpointsByAddrType)
@@ -554,7 +554,7 @@ func TestSetNodes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cache := NewTopologyCache()
+			heuristic := NewProportionalZoneCPUHeuristic()
 			nodes := make([]*v1.Node, 0, len(tc.nodes))
 			for _, node := range tc.nodes {
 				labels := node.labels
@@ -583,22 +583,22 @@ func TestSetNodes(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			cache.SetNodes(logger, nodes)
+			heuristic.SetNodes(logger, nodes)
 
-			if cache.sufficientNodeInfo != tc.expectSufficientNodeInfo {
-				t.Errorf("Expected sufficientNodeInfo to be %t, got %t", tc.expectSufficientNodeInfo, cache.sufficientNodeInfo)
+			if heuristic.sufficientNodeInfo != tc.expectSufficientNodeInfo {
+				t.Errorf("Expected sufficientNodeInfo to be %t, got %t", tc.expectSufficientNodeInfo, heuristic.sufficientNodeInfo)
 			}
 
-			if cache.cpuRatiosByZone == nil || tc.expectedRatios == nil {
-				if (cache.cpuRatiosByZone == nil) != (tc.expectedRatios == nil) {
-					t.Errorf("Expected %+v, got %+v", tc.expectedRatios, cache.cpuRatiosByZone)
+			if heuristic.cpuRatiosByZone == nil || tc.expectedRatios == nil {
+				if (heuristic.cpuRatiosByZone == nil) != (tc.expectedRatios == nil) {
+					t.Errorf("Expected %+v, got %+v", tc.expectedRatios, heuristic.cpuRatiosByZone)
 				}
 			} else {
-				if len(cache.cpuRatiosByZone) != len(tc.expectedRatios) {
-					t.Errorf("Expected ratios with %d zones, got %d", len(tc.expectedRatios), len(cache.cpuRatiosByZone))
+				if len(heuristic.cpuRatiosByZone) != len(tc.expectedRatios) {
+					t.Errorf("Expected ratios with %d zones, got %d", len(tc.expectedRatios), len(heuristic.cpuRatiosByZone))
 				}
 				for zone, expectedRatio := range tc.expectedRatios {
-					actualRatio, ok := cache.cpuRatiosByZone[zone]
+					actualRatio, ok := heuristic.cpuRatiosByZone[zone]
 					if !ok {
 						t.Errorf("Expected ratio for %s zone, got none", zone)
 					} else if actualRatio != expectedRatio {
@@ -607,16 +607,16 @@ func TestSetNodes(t *testing.T) {
 				}
 			}
 
-			if cache.cpuByZone == nil || tc.expectedCPUByZone == nil {
-				if (cache.cpuByZone == nil) != (tc.expectedCPUByZone == nil) {
-					t.Errorf("Expected %+v, got %+v", tc.expectedCPUByZone, cache.cpuByZone)
+			if heuristic.cpuByZone == nil || tc.expectedCPUByZone == nil {
+				if (heuristic.cpuByZone == nil) != (tc.expectedCPUByZone == nil) {
+					t.Errorf("Expected %+v, got %+v", tc.expectedCPUByZone, heuristic.cpuByZone)
 				}
 			} else {
-				if len(cache.cpuByZone) != len(tc.expectedCPUByZone) {
-					t.Errorf("Expected CPU with %d zones, got %d", len(tc.expectedCPUByZone), len(cache.cpuByZone))
+				if len(heuristic.cpuByZone) != len(tc.expectedCPUByZone) {
+					t.Errorf("Expected CPU with %d zones, got %d", len(tc.expectedCPUByZone), len(heuristic.cpuByZone))
 				}
 				for zone, expectedCPU := range tc.expectedCPUByZone {
-					actualCPU, ok := cache.cpuByZone[zone]
+					actualCPU, ok := heuristic.cpuByZone[zone]
 					if !ok {
 						t.Errorf("Expected CPU for %s zone, got none", zone)
 					} else if !actualCPU.Equal(*expectedCPU) {
@@ -628,7 +628,7 @@ func TestSetNodes(t *testing.T) {
 	}
 }
 
-func TestTopologyCacheRace(t *testing.T) {
+func TestProportionalZoneCPUHeuristicRace(t *testing.T) {
 	sliceInfo := &SliceInfo{
 		ServiceKey:  "ns/svc",
 		AddressType: discovery.AddressTypeIPv4,
@@ -658,7 +658,7 @@ func TestTopologyCacheRace(t *testing.T) {
 		{zone: "zone-c", cpu: resource.MustParse("500m"), ready: v1.ConditionTrue},
 	}
 
-	cache := NewTopologyCache()
+	heuristic := NewProportionalZoneCPUHeuristic()
 	nodes := []*v1.Node{}
 	for _, node := range nodeInfos {
 		labels := map[string]string{}
@@ -685,13 +685,13 @@ func TestTopologyCacheRace(t *testing.T) {
 
 	logger, _ := ktesting.NewTestContext(t)
 	go func() {
-		cache.SetNodes(logger, nodes)
+		heuristic.SetNodes(logger, nodes)
 	}()
 	go func() {
-		cache.AddHints(logger, sliceInfo)
+		heuristic.PopulateHints(logger, sliceInfo)
 	}()
 	go func() {
-		cache.HasPopulatedHints(sliceInfo.ServiceKey)
+		heuristic.HasPopulatedHints(sliceInfo.ServiceKey)
 	}()
 }
 
