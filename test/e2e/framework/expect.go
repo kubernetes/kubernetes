@@ -212,8 +212,9 @@ func newAsyncAssertion(ctx context.Context, args []interface{}, consistently boo
 		args: args,
 		// PodStart is used as default because waiting for a pod is the
 		// most common operation.
-		timeout:  TestContext.timeouts.PodStart,
-		interval: TestContext.timeouts.Poll,
+		timeout:      TestContext.timeouts.PodStart,
+		interval:     TestContext.timeouts.Poll,
+		consistently: consistently,
 	}
 }
 
