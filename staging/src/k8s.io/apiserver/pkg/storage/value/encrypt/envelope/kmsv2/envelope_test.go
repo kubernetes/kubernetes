@@ -33,6 +33,8 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -1259,6 +1261,165 @@ func TestGenerateTransformer(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEnvelopeTracing_TransformToStorage(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		expected []string
+	}{
+		{
+			desc: "encrypt",
+			expected: []string{
+				"About to encrypt data using DEK",
+				"Data encryption succeeded",
+				"About to encode encrypted object",
+				"Encoded encrypted object",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			fakeRecorder := tracetest.NewSpanRecorder()
+			otelTracer := trace.NewTracerProvider(trace.WithSpanProcessor(fakeRecorder)).Tracer("test")
+
+			ctx := testContext(t)
+			ctx, span := otelTracer.Start(ctx, "parent")
+			defer span.End()
+
+			envelopeService := newTestEnvelopeService()
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			state, err := testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool())()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
+				func() (State, error) { return state, nil }, testAPIServerID, 1*time.Second, fakeClock)
+
+			dataCtx := value.DefaultContext([]byte(testContextText))
+			originalText := []byte(testText)
+
+			if _, err := transformer.TransformToStorage(ctx, originalText, dataCtx); err != nil {
+				t.Fatalf("envelopeTransformer: error while transforming data to storage: %v", err)
+			}
+
+			output := fakeRecorder.Ended()
+			if len(output) != 1 {
+				t.Fatalf("expected 1 span, got %d", len(output))
+			}
+			out := output[0]
+			validateTraceSpan(t, out, "TransformToStorage with envelopeTransformer", testProviderName, testAPIServerID, tc.expected)
+		})
+	}
+}
+
+func TestEnvelopeTracing_TransformFromStorage(t *testing.T) {
+	testCases := []struct {
+		desc                     string
+		cacheTTL                 time.Duration
+		simulateKMSPluginFailure bool
+		expected                 []string
+	}{
+		{
+			desc:     "decrypt",
+			cacheTTL: 5 * time.Second,
+			expected: []string{
+				"About to decode encrypted object",
+				"Decoded encrypted object",
+				"About to decrypt data using DEK",
+				"Data decryption succeeded",
+			},
+		},
+		{
+			desc:     "decrypt with cache miss",
+			cacheTTL: 1 * time.Second,
+			expected: []string{
+				"About to decode encrypted object",
+				"Decoded encrypted object",
+				"About to decrypt DEK using remote service",
+				"DEK decryption succeeded",
+				"About to decrypt data using DEK",
+				"Data decryption succeeded",
+			},
+		},
+		{
+			desc:                     "decrypt with cache miss, simulate KMS plugin failure",
+			cacheTTL:                 1 * time.Second,
+			simulateKMSPluginFailure: true,
+			expected: []string{
+				"About to decode encrypted object",
+				"Decoded encrypted object",
+				"About to decrypt DEK using remote service",
+				"DEK decryption failed",
+				"exception",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			fakeRecorder := tracetest.NewSpanRecorder()
+			otelTracer := trace.NewTracerProvider(trace.WithSpanProcessor(fakeRecorder)).Tracer("test")
+
+			ctx := testContext(t)
+
+			envelopeService := newTestEnvelopeService()
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			state, err := testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool())()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
+				func() (State, error) { return state, nil }, testAPIServerID, tc.cacheTTL, fakeClock)
+
+			dataCtx := value.DefaultContext([]byte(testContextText))
+			originalText := []byte(testText)
+
+			transformedData, _ := transformer.TransformToStorage(ctx, originalText, dataCtx)
+
+			// advance the clock to allow cache entries to expire depending on TTL
+			fakeClock.Step(2 * time.Second)
+			// force GC to run by performing a write
+			transformer.(*envelopeTransformer).cache.set([]byte("some-other-unrelated-key"), &envelopeTransformer{})
+
+			envelopeService.SetDisabledStatus(tc.simulateKMSPluginFailure)
+
+			// start recording only for the decrypt call
+			ctx, span := otelTracer.Start(ctx, "parent")
+			defer span.End()
+
+			_, _, _ = transformer.TransformFromStorage(ctx, transformedData, dataCtx)
+
+			output := fakeRecorder.Ended()
+			validateTraceSpan(t, output[0], "TransformFromStorage with envelopeTransformer", testProviderName, testAPIServerID, tc.expected)
+		})
+	}
+}
+
+func validateTraceSpan(t *testing.T, span trace.ReadOnlySpan, spanName, providerName, apiserverID string, expected []string) {
+	t.Helper()
+
+	if span.Name() != spanName {
+		t.Fatalf("expected span name %q, got %q", spanName, span.Name())
+	}
+	attrs := span.Attributes()
+	if len(attrs) != 1 {
+		t.Fatalf("expected 1 attributes, got %d", len(attrs))
+	}
+	if attrs[0].Key != "transformer.provider.name" && attrs[0].Value.AsString() != providerName {
+		t.Errorf("expected providerName %q, got %q", providerName, attrs[0].Value.AsString())
+	}
+	if len(span.Events()) != len(expected) {
+		t.Fatalf("expected %d events, got %d", len(expected), len(span.Events()))
+	}
+	for i, event := range span.Events() {
+		if event.Name != expected[i] {
+			t.Errorf("expected event %q, got %q", expected[i], event.Name)
+		}
 	}
 }
 
