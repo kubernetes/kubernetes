@@ -122,15 +122,15 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 }
 
 // internal struct for endpoints information
-type endpointsInfo struct {
+type endpointInfo struct {
 	*proxy.BaseEndpointInfo
 
 	ChainName utiliptables.Chain
 }
 
-// returns a new proxy.Endpoint which abstracts a endpointsInfo
+// returns a new proxy.Endpoint which abstracts a endpointInfo
 func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
-	return &endpointsInfo{
+	return &endpointInfo{
 		BaseEndpointInfo: baseInfo,
 		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.Endpoint),
 	}
@@ -143,7 +143,7 @@ type Proxier struct {
 	// services that happened since iptables was synced. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
 	// current is state after applying all of those.
-	endpointsChanges *proxy.EndpointChangeTracker
+	endpointsChanges *proxy.EndpointsChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
 	mu           sync.Mutex // protects the following fields
@@ -265,7 +265,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		svcPortMap:               make(proxy.ServicePortMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
+		endpointsChanges:         proxy.NewEndpointsChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
 		needFullSync:             true,
 		syncPeriod:               syncPeriod,
 		iptables:                 ipt,
@@ -952,7 +952,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Note the endpoint chains that will be used
 		for _, ep := range allLocallyReachableEndpoints {
-			if epInfo, ok := ep.(*endpointsInfo); ok {
+			if epInfo, ok := ep.(*endpointInfo); ok {
 				activeNATChains[epInfo.ChainName] = true
 			}
 		}
@@ -1345,9 +1345,9 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Generate the per-endpoint chains.
 		for _, ep := range allLocallyReachableEndpoints {
-			epInfo, ok := ep.(*endpointsInfo)
+			epInfo, ok := ep.(*endpointInfo)
 			if !ok {
-				klog.ErrorS(nil, "Failed to cast endpointsInfo", "endpointsInfo", ep)
+				klog.ErrorS(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
 				continue
 			}
 
@@ -1556,7 +1556,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffe
 	// First write session affinity rules, if applicable.
 	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 		for _, ep := range endpoints {
-			epInfo, ok := ep.(*endpointsInfo)
+			epInfo, ok := ep.(*endpointInfo)
 			if !ok {
 				continue
 			}
@@ -1578,7 +1578,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffe
 	// Now write loadbalancing rules.
 	numEndpoints := len(endpoints)
 	for i, ep := range endpoints {
-		epInfo, ok := ep.(*endpointsInfo)
+		epInfo, ok := ep.(*endpointInfo)
 		if !ok {
 			continue
 		}
