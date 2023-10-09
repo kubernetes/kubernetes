@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -46,11 +47,15 @@ const (
 
 type fakeDRADriverGRPCServer struct {
 	drapbv1.UnimplementedNodeServer
-	driverName string
-	timeout    *time.Duration
+	driverName             string
+	timeout                *time.Duration
+	prepareResourceCalls   atomic.Uint32
+	unprepareResourceCalls atomic.Uint32
 }
 
 func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
+	s.prepareResourceCalls.Add(1)
+
 	if s.timeout != nil {
 		time.Sleep(*s.timeout)
 	}
@@ -60,6 +65,8 @@ func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req 
 }
 
 func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, req *drapbv1.NodeUnprepareResourcesRequest) (*drapbv1.NodeUnprepareResourcesResponse, error) {
+	s.unprepareResourceCalls.Add(1)
+
 	if s.timeout != nil {
 		time.Sleep(*s.timeout)
 	}
@@ -68,10 +75,23 @@ func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, re
 
 type tearDown func()
 
-func setupFakeDRADriverGRPCServer(shouldTimeout bool) (string, tearDown, error) {
+type fakeDRAServerInfo struct {
+	// fake DRA server
+	server *fakeDRADriverGRPCServer
+	// fake DRA plugin socket name
+	socketName string
+	// teardownFn stops fake gRPC server
+	teardownFn tearDown
+}
+
+func setupFakeDRADriverGRPCServer(shouldTimeout bool) (fakeDRAServerInfo, error) {
 	socketDir, err := os.MkdirTemp("", "dra")
 	if err != nil {
-		return "", nil, err
+		return fakeDRAServerInfo{
+			server:     nil,
+			socketName: "",
+			teardownFn: nil,
+		}, err
 	}
 
 	socketName := filepath.Join(socketDir, "server.sock")
@@ -85,7 +105,11 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool) (string, tearDown, error) 
 	l, err := net.Listen("unix", socketName)
 	if err != nil {
 		teardown()
-		return "", nil, err
+		return fakeDRAServerInfo{
+			server:     nil,
+			socketName: "",
+			teardownFn: nil,
+		}, err
 	}
 
 	s := grpc.NewServer()
@@ -105,7 +129,11 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool) (string, tearDown, error) 
 		s.GracefulStop()
 	}()
 
-	return socketName, teardown, nil
+	return fakeDRAServerInfo{
+		server:     fakeDRADriverGRPCServer,
+		socketName: socketName,
+		teardownFn: teardown,
+	}, nil
 }
 
 func TestNewManagerImpl(t *testing.T) {
@@ -177,10 +205,12 @@ func TestGetResources(t *testing.T) {
 				},
 			},
 			claimInfo: &ClaimInfo{
-				annotations: []kubecontainer.Annotation{
-					{
-						Name:  "test-annotation",
-						Value: "123",
+				annotations: map[string][]kubecontainer.Annotation{
+					"test-plugin": {
+						{
+							Name:  "test-annotation",
+							Value: "123",
+						},
 					},
 				},
 				ClaimInfoState: state.ClaimInfoState{
@@ -280,14 +310,15 @@ func TestPrepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 
 	for _, test := range []struct {
-		description         string
-		driverName          string
-		pod                 *v1.Pod
-		claimInfo           *ClaimInfo
-		resourceClaim       *resourcev1alpha2.ResourceClaim
-		wantErr             bool
-		wantTimeout         bool
-		wantResourceSkipped bool
+		description          string
+		driverName           string
+		pod                  *v1.Pod
+		claimInfo            *ClaimInfo
+		resourceClaim        *resourcev1alpha2.ResourceClaim
+		wantErr              bool
+		wantTimeout          bool
+		wantResourceSkipped  bool
+		ExpectedPrepareCalls uint32
 	}{
 		{
 			description: "failed to fetch ResourceClaim",
@@ -497,6 +528,7 @@ func TestPrepareResources(t *testing.T) {
 					Namespace:  "test-namespace",
 					PodUIDs:    sets.Set[string]{"test-another-pod-reserved": sets.Empty{}},
 				},
+				prepared: true,
 			},
 			resourceClaim: &resourcev1alpha2.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -574,11 +606,12 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			wantErr:     true,
-			wantTimeout: true,
+			wantErr:              true,
+			wantTimeout:          true,
+			ExpectedPrepareCalls: 1,
 		},
 		{
-			description: "should prepare resource",
+			description: "should prepare resource, claim not in cache",
 			driverName:  driverName,
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -630,6 +663,78 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
+			ExpectedPrepareCalls: 1,
+		},
+		{
+			description: "should prepare resource. claim in cache, manager did not prepare resource",
+			driverName:  driverName,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+					UID:       "test-reserved",
+				},
+				Spec: v1.PodSpec{
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name: "test-pod-claim",
+							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+								s := "test-pod-claim"
+								return &s
+							}()},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Claims: []v1.ResourceClaim{
+									{
+										Name: "test-pod-claim",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			claimInfo: &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					DriverName: driverName,
+					ClassName:  "test-class",
+					ClaimName:  "test-pod-claim",
+					ClaimUID:   "test-reserved",
+					Namespace:  "test-namespace",
+					PodUIDs:    sets.Set[string]{"test-reserved": sets.Empty{}},
+					CDIDevices: map[string][]string{
+						driverName: {fmt.Sprintf("%s/%s=some-device", driverName, driverClassName)},
+					},
+					ResourceHandles: []resourcev1alpha2.ResourceHandle{{Data: "test-data"}},
+				},
+				annotations: make(map[string][]kubecontainer.Annotation),
+				prepared:    false,
+			},
+			resourceClaim: &resourcev1alpha2.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod-claim",
+					Namespace: "test-namespace",
+					UID:       "test-reserved",
+				},
+				Spec: resourcev1alpha2.ResourceClaimSpec{
+					ResourceClassName: "test-class",
+				},
+				Status: resourcev1alpha2.ResourceClaimStatus{
+					DriverName: driverName,
+					Allocation: &resourcev1alpha2.AllocationResult{
+						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+							{Data: "test-data"},
+						},
+					},
+					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+						{UID: "test-reserved"},
+					},
+				},
+			},
+			ExpectedPrepareCalls: 1,
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
@@ -649,14 +754,14 @@ func TestPrepareResources(t *testing.T) {
 				}
 			}
 
-			socketName, teardown, err := setupFakeDRADriverGRPCServer(test.wantTimeout)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer teardown()
+			defer draServerInfo.teardownFn()
 
 			plg := plugin.NewRegistrationHandler()
-			if err := plg.RegisterPlugin(test.driverName, socketName, []string{"1.27"}); err != nil {
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
@@ -666,6 +771,9 @@ func TestPrepareResources(t *testing.T) {
 			}
 
 			err = manager.PrepareResources(test.pod)
+
+			assert.Equal(t, test.ExpectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
+
 			if test.wantErr {
 				assert.Error(t, err)
 				return // PrepareResources returned an error so stopping the subtest here
@@ -705,13 +813,14 @@ func TestUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 
 	for _, test := range []struct {
-		description         string
-		driverName          string
-		pod                 *v1.Pod
-		claimInfo           *ClaimInfo
-		wantErr             bool
-		wantTimeout         bool
-		wantResourceSkipped bool
+		description            string
+		driverName             string
+		pod                    *v1.Pod
+		claimInfo              *ClaimInfo
+		wantErr                bool
+		wantTimeout            bool
+		wantResourceSkipped    bool
+		expectedUnprepareCalls uint32
 	}{
 		{
 			description: "plugin does not exist",
@@ -838,11 +947,12 @@ func TestUnprepareResources(t *testing.T) {
 					},
 				},
 			},
-			wantErr:     true,
-			wantTimeout: true,
+			wantErr:                true,
+			wantTimeout:            true,
+			expectedUnprepareCalls: 1,
 		},
 		{
-			description: "should unprepare resource",
+			description: "should unprepare resource, claim previously prepared by currently running manager",
 			driverName:  driverName,
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -885,7 +995,57 @@ func TestUnprepareResources(t *testing.T) {
 						},
 					},
 				},
+				prepared: true,
 			},
+			expectedUnprepareCalls: 1,
+		},
+		{
+			description: "should unprepare resource, claim previously was not prepared by currently running manager",
+			driverName:  driverName,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+					UID:       "test-reserved",
+				},
+				Spec: v1.PodSpec{
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name: "test-pod-claim",
+							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+								s := "test-pod-claim"
+								return &s
+							}()},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Claims: []v1.ResourceClaim{
+									{
+										Name: "test-pod-claim",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			claimInfo: &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					DriverName: driverName,
+					ClaimName:  "test-pod-claim",
+					Namespace:  "test-namespace",
+					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+						{
+							DriverName: driverName,
+							Data:       "test data",
+						},
+					},
+				},
+				prepared: false,
+			},
+			expectedUnprepareCalls: 1,
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
@@ -894,14 +1054,14 @@ func TestUnprepareResources(t *testing.T) {
 				t.Fatalf("failed to create a new instance of the claimInfoCache, err: %v", err)
 			}
 
-			socketName, teardown, err := setupFakeDRADriverGRPCServer(test.wantTimeout)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer teardown()
+			defer draServerInfo.teardownFn()
 
 			plg := plugin.NewRegistrationHandler()
-			if err := plg.RegisterPlugin(test.driverName, socketName, []string{"1.27"}); err != nil {
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
@@ -916,6 +1076,9 @@ func TestUnprepareResources(t *testing.T) {
 			}
 
 			err = manager.UnprepareResources(test.pod)
+
+			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
+
 			if test.wantErr {
 				assert.Error(t, err)
 				return // UnprepareResources returned an error so stopping the subtest here
