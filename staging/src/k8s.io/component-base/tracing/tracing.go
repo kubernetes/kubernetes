@@ -68,6 +68,12 @@ func (s *Span) End(logThreshold time.Duration) {
 	}
 }
 
+// RecordError will record err as an exception span event for this span.
+// If this span is not being recorded or err is nil then this method does nothing.
+func (s *Span) RecordError(err error, attributes ...attribute.KeyValue) {
+	s.otelSpan.RecordError(err, trace.WithAttributes(attributes...))
+}
+
 func attributesToFields(attributes []attribute.KeyValue) []utiltrace.Field {
 	fields := make([]utiltrace.Field, len(attributes))
 	for i := range attributes {
