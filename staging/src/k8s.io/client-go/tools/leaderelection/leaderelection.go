@@ -29,7 +29,7 @@ limitations under the License.
 //
 // In a scenario where the clock skew within candidates is bounded by a given threshold
 // `ClockSkewToleration`, it is possible to set `UseRenewTime` to decide if the
-// candidate should try to acquire the object.
+// candidate should try to acquire the object based on the timestamp of the leader token.
 //
 // However the level of tolerance to skew rate can be configured by setting
 // RenewDeadline and LeaseDuration appropriately. The tolerance expressed as a
