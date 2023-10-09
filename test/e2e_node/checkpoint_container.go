@@ -103,11 +103,9 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(
-			isReady,
-			true,
-			"pod should be ready",
-		)
+		if !isReady {
+			framework.Failf("pod %q should be ready", p.Name)
+		}
 
 		framework.Logf(
 			"About to checkpoint container %q on %q",
@@ -199,7 +197,9 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 				}
 			}
 			for fileName := range checkForFiles {
-				framework.ExpectEqual(checkForFiles[fileName], true)
+				if !checkForFiles[fileName] {
+					framework.Failf("File %q not found in checkpoint archive %q", fileName, item)
+				}
 			}
 			// cleanup checkpoint archive
 			os.RemoveAll(item)

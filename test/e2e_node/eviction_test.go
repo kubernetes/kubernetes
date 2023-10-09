@@ -368,7 +368,9 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive]
 		})
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
-			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				framework.ExpectNoError(err, "failed to create priority class")
+			}
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
@@ -426,7 +428,9 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disru
 		})
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
-			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				framework.ExpectNoError(err, "failed to create priority class")
+			}
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
@@ -480,7 +484,9 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 		})
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
-			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				framework.ExpectNoError(err, "failed to create priority class")
+			}
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
@@ -731,7 +737,7 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 		}
 
 		if priorityPod.Status.Phase == v1.PodFailed {
-			framework.ExpectEqual(priorityPod.Status.Reason, eviction.Reason, "pod %s failed; expected Status.Reason to be %s, but got %s",
+			gomega.Expect(priorityPod.Status.Reason).To(gomega.Equal(eviction.Reason), "pod %s failed; expected Status.Reason to be %s, but got %s",
 				priorityPod.Name, eviction.Reason, priorityPod.Status.Reason)
 		}
 
@@ -779,41 +785,47 @@ func verifyEvictionEvents(ctx context.Context, f *framework.Framework, testSpecs
 			}.AsSelector().String()
 			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{FieldSelector: selector})
 			framework.ExpectNoError(err, "getting events")
-			framework.ExpectEqual(len(podEvictEvents.Items), 1, "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
+			gomega.Expect(podEvictEvents.Items).To(gomega.HaveLen(1), "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
 			event := podEvictEvents.Items[0]
 
 			if expectedStarvedResource != noStarvedResource {
 				// Check the eviction.StarvedResourceKey
 				starved, found := event.Annotations[eviction.StarvedResourceKey]
-				framework.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the starved resource %s, but it was not found",
-					pod.Name, expectedStarvedResource)
+				if !found {
+					framework.Failf("Expected to find an annotation on the eviction event for pod %s containing the starved resource %s, but it was not found",
+						pod.Name, expectedStarvedResource)
+				}
 				starvedResource := v1.ResourceName(starved)
-				framework.ExpectEqual(starvedResource, expectedStarvedResource, "Expected to the starved_resource annotation on pod %s to contain %s, but got %s instead",
+				gomega.Expect(starvedResource).To(gomega.Equal(expectedStarvedResource), "Expected to the starved_resource annotation on pod %s to contain %s, but got %s instead",
 					pod.Name, expectedStarvedResource, starvedResource)
 
 				// We only check these keys for memory, because ephemeral storage evictions may be due to volume usage, in which case these values are not present
 				if expectedStarvedResource == v1.ResourceMemory {
 					// Check the eviction.OffendingContainersKey
 					offendersString, found := event.Annotations[eviction.OffendingContainersKey]
-					framework.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the offending containers, but it was not found",
-						pod.Name)
+					if !found {
+						framework.Failf("Expected to find an annotation on the eviction event for pod %s containing the offending containers, but it was not found",
+							pod.Name)
+					}
 					offendingContainers := strings.Split(offendersString, ",")
-					framework.ExpectEqual(len(offendingContainers), 1, "Expected to find the offending container's usage in the %s annotation, but no container was found",
+					gomega.Expect(offendingContainers).To(gomega.HaveLen(1), "Expected to find the offending container's usage in the %s annotation, but no container was found",
 						eviction.OffendingContainersKey)
-					framework.ExpectEqual(offendingContainers[0], pod.Spec.Containers[0].Name, "Expected to find the offending container: %s's usage in the %s annotation, but found %s instead",
+					gomega.Expect(offendingContainers[0]).To(gomega.Equal(pod.Spec.Containers[0].Name), "Expected to find the offending container: %s's usage in the %s annotation, but found %s instead",
 						pod.Spec.Containers[0].Name, eviction.OffendingContainersKey, offendingContainers[0])
 
 					// Check the eviction.OffendingContainersUsageKey
 					offendingUsageString, found := event.Annotations[eviction.OffendingContainersUsageKey]
-					framework.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the offending containers' usage, but it was not found",
-						pod.Name)
+					if !found {
+						framework.Failf("Expected to find an annotation on the eviction event for pod %s containing the offending containers' usage, but it was not found",
+							pod.Name)
+					}
 					offendingContainersUsage := strings.Split(offendingUsageString, ",")
-					framework.ExpectEqual(len(offendingContainersUsage), 1, "Expected to find the offending container's usage in the %s annotation, but found %+v",
+					gomega.Expect(offendingContainersUsage).To(gomega.HaveLen(1), "Expected to find the offending container's usage in the %s annotation, but found %+v",
 						eviction.OffendingContainersUsageKey, offendingContainersUsage)
 					usageQuantity, err := resource.ParseQuantity(offendingContainersUsage[0])
 					framework.ExpectNoError(err, "parsing pod %s's %s annotation as a quantity", pod.Name, eviction.OffendingContainersUsageKey)
 					request := pod.Spec.Containers[0].Resources.Requests[starvedResource]
-					framework.ExpectEqual(usageQuantity.Cmp(request), 1, "Expected usage of offending container: %s in pod %s to exceed its request %s",
+					gomega.Expect(usageQuantity.Cmp(request)).To(gomega.Equal(1), "Expected usage of offending container: %s in pod %s to exceed its request %s",
 						usageQuantity.String(), pod.Name, request.String())
 				}
 			}

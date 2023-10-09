@@ -80,7 +80,7 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 		ginkgo.It("should be rotated and limited to a fixed amount of files", func(ctx context.Context) {
 
 			ginkgo.By("get container log path")
-			framework.ExpectEqual(len(logRotationPod.Status.ContainerStatuses), 1, "log rotation pod should have one container")
+			gomega.Expect(logRotationPod.Status.ContainerStatuses).To(gomega.HaveLen(1), "log rotation pod should have one container")
 			id := kubecontainer.ParseContainerID(logRotationPod.Status.ContainerStatuses[0].ContainerID).ID
 			r, _, err := getCRIClient()
 			framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")

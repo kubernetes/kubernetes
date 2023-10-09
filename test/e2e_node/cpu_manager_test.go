@@ -241,7 +241,7 @@ func runGuPodTest(ctx context.Context, f *framework.Framework, cpuCount int) {
 		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
 		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
 
-		framework.ExpectEqual(cpus.Size(), cpuCount, "expected cpu set size == %d, got %q", cpuCount, cpus.String())
+		gomega.Expect(cpus.Size()).To(gomega.Equal(cpuCount), "expected cpu set size == %d, got %q", cpuCount, cpus.String())
 	}
 
 	ginkgo.By("by deleting the pods and waiting for container removal")

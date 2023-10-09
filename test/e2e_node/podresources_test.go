@@ -566,7 +566,7 @@ func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpo
 	ginkgo.By(fmt.Sprintf("expecting some %q devices reported", sd.resourceName))
 	gomega.ExpectWithOffset(1, devs).ToNot(gomega.BeEmpty())
 	for _, dev := range devs {
-		framework.ExpectEqual(dev.ResourceName, sd.resourceName)
+		gomega.Expect(dev.ResourceName).To(gomega.Equal(sd.resourceName))
 		gomega.ExpectWithOffset(1, dev.DeviceIds).ToNot(gomega.BeEmpty())
 	}
 }
@@ -859,8 +859,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 						if dev.ResourceName != defaultTopologyUnawareResourceName {
 							continue
 						}
-
-						framework.ExpectEqual(dev.Topology == nil, true, "Topology is expected to be empty for topology unaware resources")
+						gomega.Expect(dev.Topology).To(gomega.BeNil(), "Topology is expected to be empty for topology unaware resources")
 					}
 
 					desc := podDesc{
