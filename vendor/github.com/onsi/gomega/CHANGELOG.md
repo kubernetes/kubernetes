@@ -1,3 +1,61 @@
+## 1.28.0
+
+### Features
+- Add VerifyHost handler to ghttp (#698) [0b03b36]
+
+### Fixes
+- Read Body for Newer Responses in HaveHTTPBodyMatcher (#686) [18d6673]
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.11.0 to 2.12.0 (#693) [55a33f3]
+- Typo in matchers.go (#691) [de68e8f]
+- Bump commonmarker from 0.23.9 to 0.23.10 in /docs (#690) [ab17f5e]
+- chore: update test matrix for Go 1.21 (#689) [5069017]
+- Bump golang.org/x/net from 0.12.0 to 0.14.0 (#688) [babe25f]
+
+## 1.27.10
+
+### Fixes
+- fix: go 1.21 adding goroutine ID to creator+location (#685) [bdc7803]
+
+## 1.27.9
+
+### Fixes
+- Prevent nil-dereference in format.Object for boxed nil error (#681) [3b31fc3]
+
+### Maintenance
+- Bump golang.org/x/net from 0.11.0 to 0.12.0 (#679) [360849b]
+- chore: use String() instead of fmt.Sprintf (#678) [86f3659]
+- Bump golang.org/x/net from 0.10.0 to 0.11.0 (#674) [642ead0]
+- chore: unnecessary use of fmt.Sprintf (#677) [ceb9ca6]
+- Bump github.com/onsi/ginkgo/v2 from 2.10.0 to 2.11.0 (#675) [a2087d8]
+- docs: fix ContainSubstring references (#673) [fc9a89f]
+- Bump github.com/onsi/ginkgo/v2 from 2.9.7 to 2.10.0 (#671) [9076019]
+
+## 1.27.8
+
+### Fixes
+- HaveExactElement should not call FailureMessage if a submatcher returned an error [096f392]
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.9.5 to 2.9.7 (#669) [8884bee]
+
+## 1.27.7
+
+### Fixes
+- fix: gcustom.MakeMatcher accepts nil as actual value (#666) [57054d5]
+
+### Maintenance
+- update gitignore [05c1bc6]
+- Bump github.com/onsi/ginkgo/v2 from 2.9.4 to 2.9.5 (#663) [7cadcf6]
+- Bump golang.org/x/net from 0.9.0 to 0.10.0 (#662) [b524839]
+- Bump github.com/onsi/ginkgo/v2 from 2.9.2 to 2.9.4 (#661) [5f44694]
+- Bump commonmarker from 0.23.8 to 0.23.9 in /docs (#657) [05dc99a]
+- Bump nokogiri from 1.14.1 to 1.14.3 in /docs (#658) [3a033d1]
+- Replace deprecated NewGomegaWithT with NewWithT (#659) [a19238f]
+- Bump golang.org/x/net from 0.8.0 to 0.9.0 (#656) [29ed041]
+- Bump actions/setup-go from 3 to 4 (#651) [11b2080]
+
 ## 1.27.6
 
 ### Fixes
