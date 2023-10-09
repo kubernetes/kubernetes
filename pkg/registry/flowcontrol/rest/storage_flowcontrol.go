@@ -36,6 +36,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
 	flowcontrolapisv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
@@ -74,6 +75,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1beta3.SchemeGroupVersion.Version] = storageMap
+	}
+
+	if storageMap, err := p.storage(apiResourceConfigSource, restOptionsGetter, flowcontrolapisv1.SchemeGroupVersion); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1.SchemeGroupVersion.Version] = storageMap
 	}
 
 	return apiGroupInfo, nil

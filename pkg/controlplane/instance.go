@@ -75,6 +75,7 @@ import (
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	flowcontrolv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
 	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
@@ -735,6 +736,7 @@ var (
 		rbacv1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
+		flowcontrolv1.SchemeGroupVersion,
 	}
 
 	// legacyBetaEnabledByDefaultResources is the list of beta resources we enable.  You may only add to this list

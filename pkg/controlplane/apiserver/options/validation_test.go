@@ -44,7 +44,7 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 		},
 		{
 			runtimeConfig:    "api/beta=false",
-			errShouldContain: conflict,
+			errShouldContain: "",
 		},
 		{
 			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta1=false",
@@ -56,11 +56,19 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 		},
 		{
 			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta3=false",
-			errShouldContain: conflict,
+			errShouldContain: "",
 		},
 		{
 			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta3=true",
 			errShouldContain: "",
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1=true",
+			errShouldContain: "",
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1=false",
+			errShouldContain: conflict,
 		},
 	}
 
