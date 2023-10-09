@@ -453,8 +453,8 @@ func (g ginkgoErrors) InvalidEntryDescription(cl CodeLocation) error {
 
 func (g ginkgoErrors) MissingParametersForTableFunction(cl CodeLocation) error {
 	return GinkgoError{
-		Heading:      fmt.Sprintf("No parameters have been passed to the Table Function"),
-		Message:      fmt.Sprintf("The Table Function expected at least 1 parameter"),
+		Heading:      "No parameters have been passed to the Table Function",
+		Message:      "The Table Function expected at least 1 parameter",
 		CodeLocation: cl,
 		DocLink:      "table-specs",
 	}
