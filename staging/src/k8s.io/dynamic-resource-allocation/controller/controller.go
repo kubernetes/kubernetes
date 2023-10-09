@@ -348,7 +348,6 @@ func (ctrl *controller) Run(workers int) {
 var errRequeue = errors.New("requeue")
 
 // errPeriodic is a special error instance that functions can return
-// to request silent instance that functions can return
 // to request silent retrying at a fixed rate.
 var errPeriodic = errors.New("periodic")
 
@@ -527,8 +526,9 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *resourcev1alpha2.R
 		return errRequeue
 	}
 
-	// Check parameters.
-	claimParameters, classParameters, err := ctrl.getParameters(ctx, claim, class)
+	// Check parameters. Do not record event to Claim if its parameters are invalid,
+	// syncKey will record the error.
+	claimParameters, classParameters, err := ctrl.getParameters(ctx, claim, class, false)
 	if err != nil {
 		return err
 	}
@@ -549,14 +549,18 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *resourcev1alpha2.R
 	return nil
 }
 
-func (ctrl *controller) getParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass) (claimParameters, classParameters interface{}, err error) {
+func (ctrl *controller) getParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, notifyClaim bool) (claimParameters, classParameters interface{}, err error) {
 	classParameters, err = ctrl.driver.GetClassParameters(ctx, class)
 	if err != nil {
+		ctrl.eventRecorder.Event(class, v1.EventTypeWarning, "Failed", err.Error())
 		err = fmt.Errorf("class parameters %s: %v", class.ParametersRef, err)
 		return
 	}
 	claimParameters, err = ctrl.driver.GetClaimParameters(ctx, claim, class, classParameters)
 	if err != nil {
+		if notifyClaim {
+			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "Failed", err.Error())
+		}
 		err = fmt.Errorf("claim parameters %s: %v", claim.Spec.ParametersRef, err)
 		return
 	}
@@ -674,9 +678,10 @@ func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim
 	if class.DriverName != ctrl.name {
 		return nil, nil
 	}
-	// Check parameters.
-	claimParameters, classParameters, err := ctrl.getParameters(ctx, claim, class)
+	// Check parameters. Record event to claim and pod if parameters are invalid.
+	claimParameters, classParameters, err := ctrl.getParameters(ctx, claim, class, true)
 	if err != nil {
+		ctrl.eventRecorder.Event(pod, v1.EventTypeWarning, "Failed", fmt.Sprintf("claim %v: %v", claim.Name, err.Error()))
 		return nil, err
 	}
 	return &ClaimAllocation{
