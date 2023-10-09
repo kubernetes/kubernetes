@@ -79,7 +79,7 @@ var _ = SIGDescribe("Pod SIGKILL [LinuxOnly] [NodeConformance]", func() {
 			gomega.Expect(containerStatus.State.Terminated.ExitCode).Should(gomega.Equal(int32(137)))
 
 			ginkgo.By(fmt.Sprintf("Verify exit reason of the pod (%v/%v) container", f.Namespace.Name, podSpec.Name))
-			framework.ExpectEqual(containerStatus.State.Terminated.Reason, "Error", fmt.Sprintf("Container terminated by sigkill expect Error but got %v", containerStatus.State.Terminated.Reason))
+			gomega.Expect(containerStatus.State.Terminated.Reason).Should(gomega.Equal("Error"), "Container terminated by sigkill expect Error but got %v", containerStatus.State.Terminated.Reason)
 		})
 
 		ginkgo.AfterEach(func() {

@@ -279,7 +279,7 @@ func logNodeEvents(ctx context.Context, f *framework.Framework) {
 func getLocalNode(ctx context.Context, f *framework.Framework) *v1.Node {
 	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(len(nodeList.Items), 1, "Unexpected number of node objects for node e2e. Expects only one node.")
+	gomega.Expect(nodeList.Items).Should(gomega.HaveLen(1), "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
 }
 
@@ -375,7 +375,7 @@ func findContainerRuntimeServiceName() (string, error) {
 
 	runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
 	framework.ExpectNoError(err, "failed to get list of container runtime pids")
-	framework.ExpectEqual(len(runtimePids), 1, "Unexpected number of container runtime pids. Expected 1 but got %v", len(runtimePids))
+	gomega.Expect(runtimePids).To(gomega.HaveLen(1), "Unexpected number of container runtime pids. Expected 1 but got %v", len(runtimePids))
 
 	containerRuntimePid := runtimePids[0]
 
@@ -418,7 +418,7 @@ func performContainerRuntimeUnitOp(op containerRuntimeUnitOp) error {
 	framework.ExpectNoError(err, "dbus connection error")
 
 	job := <-reschan
-	framework.ExpectEqual(job, "done", "Expected job to complete with done")
+	gomega.Expect(job).To(gomega.Equal("done"), "Expected job to complete with done")
 
 	return nil
 }
