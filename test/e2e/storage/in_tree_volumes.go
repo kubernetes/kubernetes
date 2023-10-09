@@ -53,8 +53,6 @@ var testDrivers = []func() storageframework.TestDriver{
 
 // This executes testSuites for in-tree volumes.
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
-	framework.Logf("Enabling in-tree volume drivers")
-
 	gceEnabled := false
 	for _, driver := range framework.TestContext.EnabledVolumeDrivers {
 		switch driver {
