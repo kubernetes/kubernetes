@@ -131,6 +131,9 @@ type featureGate struct {
 	enabled *atomic.Value
 	// closed is set to true when AddFlag is called, and prevents subsequent calls to Add
 	closed bool
+
+	initialize     func(MutableFeatureGate) error
+	initializeOnce sync.Once
 }
 
 func setUnsetAlphaGates(known map[Feature]FeatureSpec, enabled map[Feature]bool, val bool) {
@@ -161,6 +164,10 @@ var _ pflag.Value = &featureGate{}
 var internalPackages = []string{"k8s.io/component-base/featuregate/feature_gate.go"}
 
 func NewFeatureGate() *featureGate {
+	return NewFeatureGateWithInitializer(func(MutableFeatureGate) error { return nil })
+}
+
+func NewFeatureGateWithInitializer(initializer func(MutableFeatureGate) error) *featureGate {
 	known := map[Feature]FeatureSpec{}
 	for k, v := range defaultFeatures {
 		known[k] = v
@@ -178,6 +185,7 @@ func NewFeatureGate() *featureGate {
 		known:           knownValue,
 		special:         specialFeatures,
 		enabled:         enabledValue,
+		initialize:      initializer,
 	}
 	return f
 }
@@ -207,6 +215,10 @@ func (f *featureGate) Set(value string) error {
 
 // SetFromMap stores flag gates for known features from a map[string]bool or returns an error
 func (f *featureGate) SetFromMap(m map[string]bool) error {
+	f.initializeOnce.Do(func() {
+		// consume the sync.Once to cancel initialization before first read
+	})
+
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -307,6 +319,15 @@ func (f *featureGate) GetAll() map[Feature]FeatureSpec {
 
 // Enabled returns true if the key is enabled.  If the key is not known, this call will panic.
 func (f *featureGate) Enabled(key Feature) bool {
+	f.initializeOnce.Do(func() {
+		// not previously initialized
+		if initialize := f.initialize; initialize != nil {
+			if err := initialize(f); err != nil {
+				panic(err)
+			}
+		}
+	})
+
 	if v, ok := f.enabled.Load().(map[Feature]bool)[key]; ok {
 		return v
 	}
