@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta3
+package v1
 
 import (
-	"k8s.io/api/flowcontrol/v1beta3"
+	v1 "k8s.io/api/flowcontrol/v1"
 )
 
 // Default settings for flow-schema
@@ -34,13 +34,13 @@ const (
 )
 
 // SetDefaults_FlowSchema sets default values for flow schema
-func SetDefaults_FlowSchemaSpec(spec *v1beta3.FlowSchemaSpec) {
+func SetDefaults_FlowSchemaSpec(spec *v1.FlowSchemaSpec) {
 	if spec.MatchingPrecedence == 0 {
 		spec.MatchingPrecedence = FlowSchemaDefaultMatchingPrecedence
 	}
 }
 
-func SetDefaults_ExemptPriorityLevelConfiguration(eplc *v1beta3.ExemptPriorityLevelConfiguration) {
+func SetDefaults_ExemptPriorityLevelConfiguration(eplc *v1.ExemptPriorityLevelConfiguration) {
 	if eplc.NominalConcurrencyShares == nil {
 		eplc.NominalConcurrencyShares = new(int32)
 		*eplc.NominalConcurrencyShares = 0
@@ -51,7 +51,7 @@ func SetDefaults_ExemptPriorityLevelConfiguration(eplc *v1beta3.ExemptPriorityLe
 	}
 }
 
-func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1beta3.LimitedPriorityLevelConfiguration) {
+func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1.LimitedPriorityLevelConfiguration) {
 	if lplc.NominalConcurrencyShares == 0 {
 		lplc.NominalConcurrencyShares = PriorityLevelConfigurationDefaultNominalConcurrencyShares
 	}
@@ -62,7 +62,7 @@ func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1beta3.LimitedPriority
 }
 
 // SetDefaults_FlowSchema sets default values for flow schema
-func SetDefaults_QueuingConfiguration(cfg *v1beta3.QueuingConfiguration) {
+func SetDefaults_QueuingConfiguration(cfg *v1.QueuingConfiguration) {
 	if cfg.HandSize == 0 {
 		cfg.HandSize = PriorityLevelConfigurationDefaultHandSize
 	}

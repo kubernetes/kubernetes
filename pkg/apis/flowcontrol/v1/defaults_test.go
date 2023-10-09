@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta3
+package v1
 
 import (
 	"reflect"
@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
 )
@@ -35,16 +35,16 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 	}{
 		{
 			name: "Defaulting for Exempt",
-			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
-				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-					Type:   flowcontrolv1beta3.PriorityLevelEnablementExempt,
-					Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{},
+			original: &flowcontrolv1.PriorityLevelConfiguration{
+				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+					Type:   flowcontrolv1.PriorityLevelEnablementExempt,
+					Exempt: &flowcontrolv1.ExemptPriorityLevelConfiguration{},
 				},
 			},
-			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
-				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-					Type: flowcontrolv1beta3.PriorityLevelEnablementExempt,
-					Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{
+			expected: &flowcontrolv1.PriorityLevelConfiguration{
+				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1.PriorityLevelEnablementExempt,
+					Exempt: &flowcontrolv1.ExemptPriorityLevelConfiguration{
 						NominalConcurrencyShares: pointer.Int32(0),
 						LendablePercent:          pointer.Int32(0),
 					},
@@ -53,25 +53,25 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 		},
 		{
 			name: "LendablePercent is not specified in Limited, should default to zero",
-			original: &flowcontrolv1beta3.PriorityLevelConfiguration{
-				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
-					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+			original: &flowcontrolv1.PriorityLevelConfiguration{
+				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 5,
-						LimitResponse: flowcontrolv1beta3.LimitResponse{
-							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						LimitResponse: flowcontrolv1.LimitResponse{
+							Type: flowcontrolv1.LimitResponseTypeReject,
 						},
 					},
 				},
 			},
-			expected: &flowcontrolv1beta3.PriorityLevelConfiguration{
-				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
-					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+			expected: &flowcontrolv1.PriorityLevelConfiguration{
+				Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 5,
 						LendablePercent:          pointer.Int32(0),
-						LimitResponse: flowcontrolv1beta3.LimitResponse{
-							Type: flowcontrolv1beta3.LimitResponseTypeReject,
+						LimitResponse: flowcontrolv1.LimitResponse{
+							Type: flowcontrolv1.LimitResponseTypeReject,
 						},
 					},
 				},
