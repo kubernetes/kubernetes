@@ -118,9 +118,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 
 		// get all schedulable nodes to determine the number of replicas for pods
 		// this is to ensure connectivity from all nodes on cluster
-		// FIXME: tests may be run in large clusters. This test is O(n^2) in the
-		// number of nodes used. It should use GetBoundedReadySchedulableNodes().
-		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, cs)
+		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 3)
 		framework.ExpectNoError(err)
 
 		replicas := int32(len(nodeList.Items))
