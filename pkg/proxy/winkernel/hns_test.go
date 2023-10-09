@@ -203,7 +203,7 @@ func TestCreateEndpointLocal(t *testing.T) {
 	hns := hns{hcn: newHcnImpl()}
 	Network := mustTestNetwork(t)
 
-	endpoint := &endpointsInfo{
+	endpoint := &endpointInfo{
 		ip:         epIpAddress,
 		macAddress: epMacAddress,
 		isLocal:    true,
@@ -242,7 +242,7 @@ func TestCreateEndpointRemote(t *testing.T) {
 	Network := mustTestNetwork(t)
 	providerAddress := epPaAddress
 
-	endpoint := &endpointsInfo{
+	endpoint := &endpointInfo{
 		ip:              epIpAddressRemote,
 		macAddress:      epMacAddress,
 		isLocal:         false,
@@ -350,11 +350,11 @@ func TestGetLoadBalancerExisting(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	endpoint := &endpointsInfo{
+	endpoint := &endpointInfo{
 		ip:    Endpoint.IpConfigurations[0].IpAddress,
 		hnsID: Endpoint.Id,
 	}
-	endpoints := []endpointsInfo{*endpoint}
+	endpoints := []endpointInfo{*endpoint}
 	hash, err := hashEndpoints(endpoints)
 	if err != nil {
 		t.Error(err)
@@ -409,11 +409,11 @@ func TestGetLoadBalancerNew(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	endpoint := &endpointsInfo{
+	endpoint := &endpointInfo{
 		ip:    Endpoint.IpConfigurations[0].IpAddress,
 		hnsID: Endpoint.Id,
 	}
-	endpoints := []endpointsInfo{*endpoint}
+	endpoints := []endpointInfo{*endpoint}
 	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 	if err != nil {
 		t.Error(err)
@@ -523,7 +523,7 @@ func TestHashEndpoints(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	endpointInfoA := &endpointsInfo{
+	endpointInfoA := &endpointInfo{
 		ip:    endpointA.IpConfigurations[0].IpAddress,
 		hnsID: endpointA.Id,
 	}
@@ -543,12 +543,12 @@ func TestHashEndpoints(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	endpointInfoB := &endpointsInfo{
+	endpointInfoB := &endpointInfo{
 		ip:    endpointB.IpConfigurations[0].IpAddress,
 		hnsID: endpointB.Id,
 	}
-	endpoints := []endpointsInfo{*endpointInfoA, *endpointInfoB}
-	endpointsReverse := []endpointsInfo{*endpointInfoB, *endpointInfoA}
+	endpoints := []endpointInfo{*endpointInfoA, *endpointInfoB}
+	endpointsReverse := []endpointInfo{*endpointInfoB, *endpointInfoA}
 	h1, err := hashEndpoints(endpoints)
 	if err != nil {
 		t.Error(err)
