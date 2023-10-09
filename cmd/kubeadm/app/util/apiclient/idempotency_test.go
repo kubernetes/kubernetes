@@ -18,6 +18,7 @@ package apiclient
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -32,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientgotesting "k8s.io/client-go/testing"
 
@@ -56,49 +58,49 @@ func TestMain(m *testing.M) {
 	os.Exit(exitVal)
 }
 
-func TestCreateOrUpdateConfigMap(t *testing.T) {
+func testCreateOrUpdate[T kubernetesObject](t *testing.T, resource, resources string, empty T, clientBuilder func(kubernetes.Interface, T) kubernetesInterface[T]) {
 	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
+		nameFormat    string
+		setupClient   func(*clientsetfake.Clientset, string)
 		expectedError bool
 	}{
 		{
-			name: "create configmap success",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+			nameFormat: "create %s success",
+			setupClient: func(client *clientsetfake.Clientset, resources string) {
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
 					return true, nil, nil
 				})
 			},
 			expectedError: false,
 		},
 		{
-			name: "create configmap returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+			nameFormat: "create %s returns error",
+			setupClient: func(client *clientsetfake.Clientset, resources string) {
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
 					return true, nil, errors.New("unknown error")
 				})
 			},
 			expectedError: true,
 		},
 		{
-			name: "configmap exists, update it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+			nameFormat: "%s exists, update it",
+			setupClient: func(client *clientsetfake.Clientset, resources string) {
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
 					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
 				})
-				client.PrependReactor("update", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("update", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
 					return true, nil, nil
 				})
 			},
 			expectedError: false,
 		},
 		{
-			name: "configmap exists, update error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+			nameFormat: "%s exists, update error",
+			setupClient: func(client *clientsetfake.Clientset, resources string) {
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
 					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
 				})
-				client.PrependReactor("update", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("update", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
 					return true, nil, errors.New("")
 				})
 			},
@@ -107,10 +109,103 @@ func TestCreateOrUpdateConfigMap(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(fmt.Sprintf(tc.nameFormat, resource), func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			tc.setupClient(client, resources)
+			err := CreateOrUpdate(context.Background(), clientBuilder(client, empty), empty)
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestCreateOrUpdateConfigMap(t *testing.T) {
+	testCreateOrUpdate(t, "configmap", "configmaps", &v1.ConfigMap{},
+		func(client kubernetes.Interface, obj *v1.ConfigMap) kubernetesInterface[*v1.ConfigMap] {
+			return client.CoreV1().ConfigMaps(obj.ObjectMeta.Namespace)
+		})
+}
+
+func testCreateOrMutate[T kubernetesObject](t *testing.T, resource, resources string, empty T, clientBuilder func(kubernetes.Interface, T) kubernetesInterface[T]) {
+	tests := []struct {
+		nameFormat    string
+		setupClient   func(*clientsetfake.Clientset)
+		mutator       objectMutator[T]
+		expectedError bool
+	}{
+		{
+			nameFormat: "create %s",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+				client.PrependReactor("get", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+				client.PrependReactor("update", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			nameFormat: "create %s error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			nameFormat: "%s exists, mutate returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("get", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, empty, nil
+				})
+			},
+			mutator:       func(T) error { return errors.New("") },
+			expectedError: true,
+		},
+		{
+			nameFormat: "%s exists, get returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("get", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			expectedError: true,
+		},
+		{
+			nameFormat: "%s exists, mutate returns error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("get", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, empty, nil
+				})
+				client.PrependReactor("update", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
+				})
+			},
+			mutator:       func(T) error { return nil },
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf(tc.nameFormat, resource), func(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			tc.setupClient(client)
-			err := CreateOrUpdateConfigMap(client, &v1.ConfigMap{})
+			err := CreateOrMutate[T](context.Background(), clientBuilder(client, empty), empty, tc.mutator)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
 			}
@@ -119,84 +214,67 @@ func TestCreateOrUpdateConfigMap(t *testing.T) {
 }
 
 func TestCreateOrMutateConfigMap(t *testing.T) {
+	testCreateOrMutate(t, "configmap", "configmaps", &v1.ConfigMap{},
+		func(client kubernetes.Interface, obj *v1.ConfigMap) kubernetesInterface[*v1.ConfigMap] {
+			return client.CoreV1().ConfigMaps(obj.ObjectMeta.Namespace)
+		})
+}
+
+func testCreateOrRetain[T kubernetesObject](t *testing.T, resource, resources string, empty T, clientBuilder func(kubernetes.Interface, T) kubernetesInterface[T]) {
 	tests := []struct {
-		name          string
+		nameFormat    string
 		setupClient   func(*clientsetfake.Clientset)
-		mutator       func(*v1.ConfigMap) error
 		expectedError bool
 	}{
 		{
-			name: "create configmap",
+			nameFormat: "%s exists",
 			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
+				client.PrependReactor("get", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, empty, nil
 				})
-				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
+			},
+			expectedError: false,
+		},
+		{
+			nameFormat: "%s get returns an error",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("")
 				})
-				client.PrependReactor("update", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+			},
+			expectedError: true,
+		},
+		{
+			nameFormat: "%s is not found, create it",
+			setupClient: func(client *clientsetfake.Clientset) {
+				client.PrependReactor("get", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
 					return true, nil, nil
 				})
 			},
 			expectedError: false,
 		},
 		{
-			name: "create configmap error",
+			nameFormat: "%s is not found, create returns an error",
 			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
+				client.PrependReactor("get", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
+				})
+				client.PrependReactor("create", resources, func(clientgotesting.Action) (bool, runtime.Object, error) {
 					return true, nil, errors.New("")
 				})
 			},
-			expectedError: true,
-		},
-		{
-			name: "configmap exists, mutate returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, &v1.ConfigMap{}, nil
-				})
-			},
-			mutator:       func(*v1.ConfigMap) error { return errors.New("") },
-			expectedError: true,
-		},
-		{
-			name: "configmap exists, get returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "configmap exists, mutate returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, &v1.ConfigMap{}, nil
-				})
-				client.PrependReactor("update", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			mutator:       func(*v1.ConfigMap) error { return nil },
 			expectedError: true,
 		},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(fmt.Sprintf(tc.nameFormat, resource), func(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			tc.setupClient(client)
-			err := CreateOrMutateConfigMap(client, &v1.ConfigMap{}, tc.mutator)
+			err := CreateOrRetain[T](context.Background(), clientBuilder(client, empty), empty)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
 			}
@@ -205,623 +283,73 @@ func TestCreateOrMutateConfigMap(t *testing.T) {
 }
 
 func TestCreateOrRetainConfigMap(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "configmap exists",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, &v1.ConfigMap{}, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "configmap get returns an error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "configmap is not found, create it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "configmap is not found, create returns an error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("get", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("create", "configmaps", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrRetainConfigMap(client, &v1.ConfigMap{}, "some-cm")
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrRetain(t, "configmap", "configmaps", &v1.ConfigMap{},
+		func(client kubernetes.Interface, obj *v1.ConfigMap) kubernetesInterface[*v1.ConfigMap] {
+			return client.CoreV1().ConfigMaps(obj.ObjectMeta.Namespace)
 		})
-	}
 }
 
 func TestCreateOrUpdateSecret(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "create secret success",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "create secret returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("unknown error")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "secret exists, update it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "secret exists, update error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "secrets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrUpdateSecret(client, &v1.Secret{})
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrUpdate(t, "secret", "secrets", &v1.Secret{},
+		func(client kubernetes.Interface, obj *v1.Secret) kubernetesInterface[*v1.Secret] {
+			return client.CoreV1().Secrets(obj.ObjectMeta.Namespace)
 		})
-	}
 }
 
 func TestCreateOrUpdateServiceAccount(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "create serviceaccount success",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "create serviceaccount returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("unknown error")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "serviceaccount exists, update it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "serviceaccount exists, update error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "serviceaccounts", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrUpdateServiceAccount(client, &v1.ServiceAccount{})
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrUpdate(t, "serviceaccount", "serviceaccounts", &v1.ServiceAccount{},
+		func(client kubernetes.Interface, obj *v1.ServiceAccount) kubernetesInterface[*v1.ServiceAccount] {
+			return client.CoreV1().ServiceAccounts(obj.ObjectMeta.Namespace)
 		})
-	}
 }
 
 func TestCreateOrUpdateDeployment(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "create deployment success",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "create deployment returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("unknown error")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "deployment exists, update it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "deployment exists, update error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrUpdateDeployment(client, &apps.Deployment{})
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrUpdate(t, "deployment", "deployments", &apps.Deployment{},
+		func(client kubernetes.Interface, obj *apps.Deployment) kubernetesInterface[*apps.Deployment] {
+			return client.AppsV1().Deployments(obj.ObjectMeta.Namespace)
 		})
-	}
 }
 
 func TestCreateOrRetainDeployment(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "deployment exists",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("get", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, &apps.Deployment{}, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "deployment get returns an error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("get", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "deployment is not found, create it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("get", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "deployment is not found, create returns an error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("get", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewNotFound(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("create", "deployments", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrRetainDeployment(client, &apps.Deployment{}, "some-deployment")
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrRetain(t, "deployment", "deployments", &apps.Deployment{},
+		func(client kubernetes.Interface, obj *apps.Deployment) kubernetesInterface[*apps.Deployment] {
+			return client.AppsV1().Deployments(obj.ObjectMeta.Namespace)
 		})
-	}
 }
 
 func TestCreateOrUpdateDaemonSet(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "create daemonset success",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "create daemonset returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("unknown error")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "daemonset exists, update it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "daemonset exists, update error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "daemonsets", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrUpdateDaemonSet(client, &apps.DaemonSet{})
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrUpdate(t, "daemonset", "daemonsets", &apps.DaemonSet{},
+		func(client kubernetes.Interface, obj *apps.DaemonSet) kubernetesInterface[*apps.DaemonSet] {
+			return client.AppsV1().DaemonSets(obj.ObjectMeta.Namespace)
 		})
-	}
 }
 
 func TestCreateOrUpdateRole(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "create role success",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "create role returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("unknown error")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "role exists, update it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "role exists, update error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "roles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrUpdateRole(client, &rbac.Role{})
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrUpdate(t, "role", "roles", &rbac.Role{},
+		func(client kubernetes.Interface, obj *rbac.Role) kubernetesInterface[*rbac.Role] {
+			return client.RbacV1().Roles(obj.ObjectMeta.Namespace)
 		})
-	}
 }
 
 func TestCreateOrUpdateRoleBindings(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "create rolebinding success",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "create rolebinding returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("unknown error")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "rolebinding exists, update it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "rolebinding exists, update error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "rolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{})
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrUpdate(t, "rolebinding", "rolebindings", &rbac.RoleBinding{},
+		func(client kubernetes.Interface, obj *rbac.RoleBinding) kubernetesInterface[*rbac.RoleBinding] {
+			return client.RbacV1().RoleBindings(obj.ObjectMeta.Namespace)
 		})
-	}
 }
 
 func TestCreateOrUpdateClusterRole(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "create clusterrole success",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "create clusterrole returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("unknown error")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "clusterrole exists, update it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "clusterrole exists, update error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "clusterroles", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrUpdateClusterRole(client, &rbac.ClusterRole{})
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrUpdate(t, "clusterrole", "clusterroles", &rbac.ClusterRole{},
+		func(client kubernetes.Interface, obj *rbac.ClusterRole) kubernetesInterface[*rbac.ClusterRole] {
+			return client.RbacV1().ClusterRoles()
 		})
-	}
 }
 
 func TestCreateOrUpdateClusterRoleBindings(t *testing.T) {
-	tests := []struct {
-		name          string
-		setupClient   func(*clientsetfake.Clientset)
-		expectedError bool
-	}{
-		{
-			name: "create clusterrolebinding success",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "create clusterrolebinding returns error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("unknown error")
-				})
-			},
-			expectedError: true,
-		},
-		{
-			name: "clusterrolebinding exists, update it",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, nil
-				})
-			},
-			expectedError: false,
-		},
-		{
-			name: "clusterrolebinding exists, update error",
-			setupClient: func(client *clientsetfake.Clientset) {
-				client.PrependReactor("create", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{}, "name")
-				})
-				client.PrependReactor("update", "clusterrolebindings", func(clientgotesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("")
-				})
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			tc.setupClient(client)
-			err := CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{})
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
-			}
+	testCreateOrUpdate(t, "clusterrolebinding", "clusterrolebindings", &rbac.ClusterRoleBinding{},
+		func(client kubernetes.Interface, obj *rbac.ClusterRoleBinding) kubernetesInterface[*rbac.ClusterRoleBinding] {
+			return client.RbacV1().ClusterRoleBindings()
 		})
-	}
 }
 
 func TestPatchNodeOnce(t *testing.T) {
