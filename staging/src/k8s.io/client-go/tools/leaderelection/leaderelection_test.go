@@ -91,6 +91,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 		expectSuccess    bool
 		transitionLeader bool
 		outHolder        string
+		useRenewTime     bool
 	}{
 		{
 			name: "acquire from no object",
@@ -180,12 +181,12 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			outHolder:        "baz",
 		},
 		{
-			name: "acquire from led, unacked, expired object",
+			name: "acquire from led, unacked object",
 			reactors: []Reactor{
 				{
 					verb: "get",
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past.Add(time.Second))}), nil
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
 					},
 				},
 				{
@@ -195,7 +196,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing"},
 			observedTime:   past,
 
 			expectSuccess:    true,
@@ -203,12 +204,12 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			outHolder:        "baz",
 		},
 		{
-			name: "acquire from empty led, acked, non expired object",
+			name: "acquire from empty led, acked object",
 			reactors: []Reactor{
 				{
 					verb: "get",
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(future)}), nil
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: ""}), nil
 					},
 				},
 				{
@@ -218,38 +219,14 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(future)},
-			observedTime:   future,
+			observedTime: future,
 
 			expectSuccess:    true,
 			transitionLeader: true,
 			outHolder:        "baz",
 		},
 		{
-			name: "acquire from empty led, acked, expired object",
-			reactors: []Reactor{
-				{
-					verb: "get",
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)}), nil
-					},
-				},
-				{
-					verb: "update",
-					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(fakeclient.CreateAction).GetObject(), nil
-					},
-				},
-			},
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)},
-			observedTime:   future,
-
-			expectSuccess:    true,
-			transitionLeader: true,
-			outHolder:        "baz",
-		},
-		{
-			name: "don't acquire from led, acked, non expired object",
+			name: "don't acquire from led, acked object",
 			reactors: []Reactor{
 				{
 					verb: "get",
@@ -258,8 +235,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(future)},
-			observedTime:   future,
+			observedTime: future,
 
 			expectSuccess: false,
 			outHolder:     "bing",
@@ -270,7 +246,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				{
 					verb: "get",
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)}), nil
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
 					},
 				},
 				{
@@ -281,10 +257,33 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				},
 			},
 			observedTime:   future,
-			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz", AcquireTime: metav1.NewTime(past), RenewTime: metav1.NewTime(past)},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz"},
 
 			expectSuccess: true,
 			outHolder:     "baz",
+		},
+		{
+			name: "acquire from led, acked, expired object",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", RenewTime: metav1.NewTime(past), LeaseDurationSeconds: 3}), nil
+					},
+				},
+				{
+					verb: "update",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			observedTime: future,
+
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
+			useRenewTime:     true,
 		},
 	}
 
@@ -332,6 +331,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 						reportedLeader = l
 					},
 				},
+				UseRenewTime: test.useRenewTime,
 			}
 			observedRawRecord := GetRawRecordOrDie(t, objectType, test.observedRecord)
 			le := &LeaderElector{

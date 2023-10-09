@@ -159,6 +159,13 @@ type LeaderElectionConfig struct {
 
 	// Name is the name of the resource lock for debugging
 	Name string
+
+	// UseRenewTime should be set to true if the LeaderElection should consider
+	// timestamps in the leader election record. It should be set to `true` only
+	// if the clock skew of the different candidates is negligible. It
+	// can be used to speed up the first leader election, thus reduce initialization
+	// time of services using leader election.
+	UseRenewTime bool
 }
 
 // LeaderCallbacks are callbacks that are triggered during certain
@@ -263,6 +270,15 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	return succeeded
 }
 
+// getConsideredTime returns the RenewTime of the last observed record if `UseRenewTime` is enabled.
+// otherwise it returns the time at which the last observed record was observed locally.
+func (le *LeaderElector) getConsideredTime() time.Time {
+	if le.config.UseRenewTime {
+		return le.observedRecord.RenewTime.Time
+	}
+	return le.observedTime
+}
+
 // renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails or ctx signals done.
 func (le *LeaderElector) renew(ctx context.Context) {
 	defer le.config.Lock.RecordEvent("stopped leading")
@@ -349,7 +365,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 		le.observedRawRecord = oldLeaderElectionRawRecord
 	}
 	if len(oldLeaderElectionRecord.HolderIdentity) > 0 &&
-		oldLeaderElectionRecord.RenewTime.Add(time.Second*time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).After(now.Time) &&
+		le.getConsideredTime().Add(time.Second*time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).After(now.Time) &&
 		!le.IsLeader() {
 		klog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
 		return false
