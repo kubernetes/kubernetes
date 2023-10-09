@@ -289,6 +289,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	return proxier, nil
 }
 
+// Configures conntrack settings based on ProxyServer's configuration.
 func (s *ProxyServer) setupConntrack() error {
 	ct := &realConntracker{}
 
@@ -332,6 +333,7 @@ func (s *ProxyServer) setupConntrack() error {
 	return nil
 }
 
+// Calculates max conntrack entries based on proxy config and CPU count.
 func getConntrackMax(config proxyconfigapi.KubeProxyConntrackConfiguration) (int, error) {
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 		floor := 0
@@ -349,6 +351,7 @@ func getConntrackMax(config proxyconfigapi.KubeProxyConntrackConfiguration) (int
 	return 0, nil
 }
 
+// Waits for a node to be assigned a PodCIDR before proceeding.
 func waitForPodCIDR(client clientset.Interface, nodeName string) (*v1.Node, error) {
 	// since allocators can assign the podCIDR after the node registers, we do a watch here to wait
 	// for podCIDR to be assigned, instead of assuming that the Get() on startup will have it.
@@ -393,6 +396,7 @@ func waitForPodCIDR(client clientset.Interface, nodeName string) (*v1.Node, erro
 	return nil, fmt.Errorf("event object not of type node")
 }
 
+// Retrieves the number of CPUs, prioritizing /sys data due to a known issue.
 func detectNumCPU() int {
 	// try get numCPU from /sys firstly due to a known issue (https://github.com/kubernetes/kubernetes/issues/99225)
 	_, numCPU, err := machine.GetTopology(sysfs.NewRealSysFs())
@@ -402,6 +406,7 @@ func detectNumCPU() int {
 	return numCPU
 }
 
+// Returns a local traffic detector based on the provided mode and configuration.
 func getLocalDetector(ipFamily v1.IPFamily, mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, nodePodCIDRs []string) (proxyutiliptables.LocalTrafficDetector, error) {
 	switch mode {
 	case proxyconfigapi.LocalModeClusterCIDR:
@@ -439,6 +444,7 @@ func getLocalDetector(ipFamily v1.IPFamily, mode proxyconfigapi.LocalMode, confi
 	return proxyutiliptables.NewNoOpLocalDetector(), nil
 }
 
+// Returns dual-stack local traffic detectors based on the mode and configuration.
 func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, nodePodCIDRs []string) ([2]proxyutiliptables.LocalTrafficDetector, error) {
 	var localDetectors [2]proxyutiliptables.LocalTrafficDetector
 	var err error

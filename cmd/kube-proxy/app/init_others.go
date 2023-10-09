@@ -23,9 +23,11 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// initForOS performs OS-specific initialization; currently a stub.
 func initForOS(service bool) error {
 	return nil
 }
 
+// addOSFlags adds OS-specific flags to the provided flag set; currently a no-op.
 func (o *Options) addOSFlags(fs *pflag.FlagSet) {
 }

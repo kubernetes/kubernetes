@@ -43,6 +43,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// Test_platformApplyDefaults verifies default settings for proxy and local detection modes.
 func Test_platformApplyDefaults(t *testing.T) {
 	testCases := []struct {
 		name                string
@@ -106,6 +107,7 @@ func Test_platformApplyDefaults(t *testing.T) {
 	}
 }
 
+// Test_getLocalDetector checks local traffic detector based on proxy config and IP family.
 func Test_getLocalDetector(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -292,6 +294,7 @@ func Test_getLocalDetector(t *testing.T) {
 	}
 }
 
+// Tests dual-stack local traffic detection for various proxy configurations.
 func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -439,6 +442,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 	}
 }
 
+// Creates a Node object with the given Pod CIDRs.
 func makeNodeWithPodCIDRs(cidrs ...string) *v1.Node {
 	if len(cidrs) == 0 {
 		return &v1.Node{}
@@ -451,6 +455,7 @@ func makeNodeWithPodCIDRs(cidrs ...string) *v1.Node {
 	}
 }
 
+// Returns a function that resolves a LocalTrafficDetector, failing the test on error.
 func resolveLocalDetector(t *testing.T) func(proxyutiliptables.LocalTrafficDetector, error) proxyutiliptables.LocalTrafficDetector {
 	return func(localDetector proxyutiliptables.LocalTrafficDetector, err error) proxyutiliptables.LocalTrafficDetector {
 		t.Helper()
@@ -461,6 +466,7 @@ func resolveLocalDetector(t *testing.T) func(proxyutiliptables.LocalTrafficDetec
 	}
 }
 
+// Returns a function to resolve dual-stack LocalTrafficDetectors, erroring on failure.
 func resolveDualStackLocalDetectors(t *testing.T) func(localDetector proxyutiliptables.LocalTrafficDetector, err1 error) func(proxyutiliptables.LocalTrafficDetector, error) [2]proxyutiliptables.LocalTrafficDetector {
 	return func(localDetector proxyutiliptables.LocalTrafficDetector, err error) func(proxyutiliptables.LocalTrafficDetector, error) [2]proxyutiliptables.LocalTrafficDetector {
 		t.Helper()
@@ -477,6 +483,7 @@ func resolveDualStackLocalDetectors(t *testing.T) func(localDetector proxyutilip
 	}
 }
 
+// TestConfigChange checks proxy response to config file updates.
 func TestConfigChange(t *testing.T) {
 	setUp := func() (*os.File, string, error) {
 		tempDir, err := os.MkdirTemp("", "kubeproxy-config-change")
@@ -593,6 +600,7 @@ detectLocalMode: "BridgeInterface"`)
 	}
 }
 
+// Test_waitForPodCIDR verifies the correct PodCIDRs are returned after a node update.
 func Test_waitForPodCIDR(t *testing.T) {
 	expected := []string{"192.168.0.0/24", "fd00:1:2::/64"}
 	nodeName := "test-node"
@@ -642,6 +650,7 @@ func Test_waitForPodCIDR(t *testing.T) {
 	}
 }
 
+// Tests computation of conntrack max based on core count and configuration.
 func TestGetConntrackMax(t *testing.T) {
 	ncores := goruntime.NumCPU()
 	testCases := []struct {
@@ -688,6 +697,7 @@ func TestGetConntrackMax(t *testing.T) {
 	}
 }
 
+// Tests platformSetup's handling of DetectLocalModes and PodCIDRs.
 func TestProxyServer_platformSetup(t *testing.T) {
 	tests := []struct {
 		name         string

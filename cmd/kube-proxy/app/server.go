@@ -90,6 +90,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// Initializes feature gates for metrics and logging APIs.
 func init() {
 	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
@@ -320,6 +321,7 @@ func (o *Options) initWatcher() error {
 	return nil
 }
 
+// Handles file system events for the proxy server's configuration file.
 func (o *Options) eventHandler(ent fsnotify.Event) {
 	if ent.Has(fsnotify.Write) || ent.Has(fsnotify.Rename) {
 		// error out when ConfigFile is updated
@@ -329,6 +331,7 @@ func (o *Options) eventHandler(ent fsnotify.Event) {
 	o.errCh <- nil
 }
 
+// Handles and forwards errors to the proxy server's error channel.
 func (o *Options) errorHandler(err error) {
 	o.errCh <- err
 }
@@ -397,6 +400,7 @@ func (o *Options) runLoop() error {
 	}
 }
 
+// Writes the proxy server's configuration to a specified file in YAML format.
 func (o *Options) writeConfigFile() (err error) {
 	const mediaType = runtime.ContentTypeYAML
 	info, ok := runtime.SerializerInfoForMediaType(proxyconfigscheme.Codecs.SupportedMediaTypes(), mediaType)
@@ -777,6 +781,7 @@ func createClient(config componentbaseconfig.ClientConnectionConfiguration, mast
 	return client, nil
 }
 
+// Starts the health check server for the proxy and reports any errors encountered.
 func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 	if hz == nil {
 		return
@@ -799,6 +804,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
 }
 
+// Starts the proxy's metrics server with optional profiling and handles errors.
 func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
 	if len(bindAddress) == 0 {
 		return
@@ -940,6 +946,7 @@ func (s *ProxyServer) Run() error {
 	return <-errCh
 }
 
+// Logs an event indicating the start of the proxy server.
 func (s *ProxyServer) birthCry() {
 	s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeNormal, "Starting", "StartKubeProxy", "")
 }

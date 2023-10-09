@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 )
 
+// Initializes and runs the scheduler command, then exits with the returned status code.
 func main() {
 	command := app.NewSchedulerCommand()
 	code := cli.Run(command)

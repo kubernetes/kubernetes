@@ -29,6 +29,7 @@ const (
 	serviceName = "kube-proxy"
 )
 
+// initForOS initializes the service for Windows if windowsService is true.
 func initForOS(windowsService bool) error {
 	if windowsService {
 		return service.InitService(serviceName)
@@ -36,6 +37,7 @@ func initForOS(windowsService bool) error {
 	return nil
 }
 
+// addOSFlags adds Windows-specific flags to the provided flag set for kube-proxy configuration.
 func (o *Options) addOSFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.WindowsService, "windows-service", o.WindowsService, "Enable Windows Service Control Manager API integration")
 	fs.StringVar(&o.config.Winkernel.SourceVip, "source-vip", o.config.Winkernel.SourceVip, "The IP address of the source VIP for non-DSR.")

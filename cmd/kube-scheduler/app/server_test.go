@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
+// TestSetup tests the scheduler configuration setup using various test cases.
 func TestSetup(t *testing.T) {
 	// temp dir
 	tmpDir, err := os.MkdirTemp("", "scheduler-options")
@@ -446,6 +447,7 @@ type foo struct{}
 var _ framework.PreFilterPlugin = &foo{}
 var _ framework.FilterPlugin = &foo{}
 
+// Name returns the name of the foo plugin.
 func (*foo) Name() string {
 	return "Foo"
 }
@@ -454,14 +456,17 @@ func newFoo(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.
 	return &foo{}, nil
 }
 
+// PreFilter performs initial filtering checks and returns the result.
 func (*foo) PreFilter(_ context.Context, _ *framework.CycleState, _ *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	return nil, nil
 }
 
+// PreFilterExtensions returns any extended information for pre-filtering.
 func (*foo) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
+// Filter evaluates if a pod can be scheduled on a given node.
 func (*foo) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	return nil
 }

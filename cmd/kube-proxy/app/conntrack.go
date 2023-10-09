@@ -45,6 +45,7 @@ type realConntracker struct{}
 
 var errReadOnlySysFS = errors.New("readOnlySysFS")
 
+// SetMax adjusts the nf_conntrack_max value and handles related sysfs constraints.
 func (rct realConntracker) SetMax(max int) error {
 	if err := rct.setIntSysCtl("nf_conntrack_max", max); err != nil {
 		return err
@@ -84,14 +85,17 @@ func (rct realConntracker) SetMax(max int) error {
 	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }
 
+// SetTCPEstablishedTimeout sets the nf_conntrack timeout for established TCP connections.
 func (rct realConntracker) SetTCPEstablishedTimeout(seconds int) error {
 	return rct.setIntSysCtl("nf_conntrack_tcp_timeout_established", seconds)
 }
 
+// SetTCPCloseWaitTimeout sets the nf_conntrack timeout for TCP connections in CLOSE_WAIT state.
 func (rct realConntracker) SetTCPCloseWaitTimeout(seconds int) error {
 	return rct.setIntSysCtl("nf_conntrack_tcp_timeout_close_wait", seconds)
 }
 
+// setIntSysCtl updates the given sysctl entry with the specified value if they differ.
 func (realConntracker) setIntSysCtl(name string, value int) error {
 	entry := "net/netfilter/" + name
 
@@ -131,6 +135,7 @@ func isSysFSWritable() (bool, error) {
 	return false, errors.New("no sysfs mounted")
 }
 
+// readIntStringFile reads the contents of a file and converts it to an integer.
 func readIntStringFile(filename string) (int, error) {
 	b, err := os.ReadFile(filename)
 	if err != nil {
@@ -139,6 +144,7 @@ func readIntStringFile(filename string) (int, error) {
 	return strconv.Atoi(strings.TrimSpace(string(b)))
 }
 
+// writeIntStringFile writes an integer value to the specified file.
 func writeIntStringFile(filename string, value int) error {
 	return os.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
 }
